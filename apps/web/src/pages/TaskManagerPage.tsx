@@ -37,6 +37,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
 import { colorOf } from "@/components/Sky";
+import { ComputerLinePanel, computerLine } from "@/components/tasks/ComputerLine";
 import {
   heatOf,
   ProgramStack,
@@ -87,19 +88,32 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
   const [confirm, setConfirm] = useState<string | null>(null);
   // The task whose steps are open in the panel ("Ver passos"); it stays open after the task ends.
   const [panel, setPanel] = useState<string | null>(null);
+  // The computer whose line is open in the panel ("Ver fila", ADR 0127); one panel at a time.
+  const [lineOf, setLineOf] = useState<{ id: string; name: string } | null>(null);
+  const openTask = (runId: string) => {
+    setLineOf(null);
+    setPanel(runId);
+  };
+  const openLine = (machine: { id: string; name: string }) => {
+    setPanel(null);
+    setLineOf(machine);
+  };
   // Esc closes the panel, like a thread's; an Escape a dialog over it took is the dialog's alone.
   useEffect(() => {
-    if (!panel) return;
+    if (!panel && !lineOf) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
       setPanel(null);
+      setLineOf(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panel]);
+  }, [panel, lineOf]);
 
   const all = view.data?.tasks ?? [];
   const activity = view.data?.activity;
+  // The computers with turns running or waiting for room (ADR 0127).
+  const computers = view.data?.computers ?? [];
   const nameOf = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
   const query = q.trim().toLocaleLowerCase();
   const matches = (task: ManagedTask) => {
@@ -158,7 +172,8 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
       selected={selected === task.runId}
       stopping={stopping.has(task.runId)}
       onSelect={() => pick(task.runId)}
-      onSteps={() => setPanel(task.runId)}
+      onSteps={() => openTask(task.runId)}
+      onLine={openLine}
       onStop={() => stopOne(task)}
     />
   );
@@ -275,6 +290,38 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
         </Carousel>
       )}
 
+      {computers.length > 0 && (
+        <section className="tm-computers" aria-label={t("taskManager.queue.computers")}>
+          <div className="list-group-head">
+            <h2>{t("taskManager.queue.computers")}</h2>
+            <span className="list-group-head__count">{computers.length}</span>
+          </div>
+          <ul className="tm-computers__list ac-card">
+            {computers.map((c) => (
+              <li key={c.id} className="tm-computer">
+                <span className="tm-computer__icon" aria-hidden="true">
+                  <Icon name="computer" size={18} />
+                </span>
+                <span className="tm-computer__text">
+                  <b>{c.name}</b>
+                  <small>{computerLine(t, c)}</small>
+                </span>
+                {(c.inLine > 0 || c.working > 0) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`${t("taskManager.queue.see")}: ${c.name}`}
+                    onClick={() => openLine({ id: c.id, name: c.name })}
+                  >
+                    {t("taskManager.queue.see")}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {view.data && all.length === 0 && (
         <EmptyState sky icon="chart" title={t("taskManager.empty.title")}>
           {t("taskManager.empty.body")}
@@ -290,7 +337,7 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
               variant="ghost"
               icon="list"
               disabled={!selTask}
-              onClick={() => selTask && setPanel(selTask.runId)}
+              onClick={() => selTask && openTask(selTask.runId)}
             >
               {t("taskManager.actions.steps")}
             </Button>
@@ -398,6 +445,17 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
           />,
           document.querySelector(".shell") ?? document.body,
         )}
+      {lineOf &&
+        createPortal(
+          <ComputerLinePanel
+            key={lineOf.id}
+            machineId={lineOf.id}
+            name={lineOf.name}
+            onClose={() => setLineOf(null)}
+            onOpenTask={openTask}
+          />,
+          document.querySelector(".shell") ?? document.body,
+        )}
     </div>
   );
 }
@@ -448,6 +506,7 @@ function TaskRow({
   stopping,
   onSelect,
   onSteps,
+  onLine,
   onStop,
 }: {
   task: ManagedTask;
@@ -460,6 +519,8 @@ function TaskRow({
   onSelect: () => void;
   /** "Ver passos": its panel. */
   onSteps: () => void;
+  /** Its computer's line ("Onde roda", ADR 0127). */
+  onLine: (machine: { id: string; name: string }) => void;
   onStop: () => void;
 }) {
   const { t } = useTranslation();
@@ -475,6 +536,7 @@ function TaskRow({
       ? `${agentName} · ${where}`
       : taskSub(t, task, [where, task.background ? null : asked].filter(Boolean).join(" · "));
   const age = taskAge(task, now);
+  const machine = task.machine;
   // A routine's run shows its agent's face (its section has no agent rows); a person's task, its state's mark.
   const face = <AgentAvatar agentId={task.agentId} name={agentName} size="xs" />;
   return (
@@ -498,7 +560,21 @@ function TaskRow({
         {taskClock(age)}
       </span>
       <span className="tm-cell tm-cell--where">
-        <span className="tm-ellipsis">{task.machine?.name ?? t("taskManager.servers")}</span>
+        {machine ? (
+          // On a computer: it opens that computer's line.
+          <button
+            type="button"
+            className="tm-where"
+            aria-label={`${t("taskManager.queue.see")}: ${machine.name}`}
+            title={t("taskManager.queue.see")}
+            onClick={() => onLine(machine)}
+          >
+            <Icon name="computer" size={14} />
+            <span className="tm-ellipsis">{machine.name}</span>
+          </button>
+        ) : (
+          <span className="tm-ellipsis">{t("taskManager.servers")}</span>
+        )}
       </span>
       <span className="tm-cell tm-cell--act">
         <Button

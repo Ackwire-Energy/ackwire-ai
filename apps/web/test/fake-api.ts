@@ -24,6 +24,7 @@ import type {
   ChannelCategory,
   ChannelMember,
   ComposioUsage,
+  ComputerQueue,
   Connection,
   ConnectorCatalog,
   ConnectorDef,
@@ -365,6 +366,8 @@ export interface FakeState {
   taskManager?: TaskManagerView;
   /** A task's steps by run (`working.taskSteps`, the task manager's panel); a run not here has none yet. */
   taskSteps?: Record<string, TaskSteps>;
+  /** Each computer's line by its id (`working.computerQueue`, ADR 0127); one not here has nothing on it. */
+  computerQueues?: Record<string, ComputerQueue>;
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -3255,6 +3258,13 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
               state.calls.push({ method: "working.taskSteps", args: [orgId, runId] });
               const createdAt = state.taskManager?.tasks.find((x) => x.runId === runId)?.createdAt ?? NOW.toISOString();
               return structuredClone(state.taskSteps?.[runId] ?? { run: { createdAt, finishedAt: null }, steps: [] });
+            },
+            computerQueue: async (orgId: string, machineId: string) => {
+              state.calls.push({ method: "working.computerQueue", args: [orgId, machineId] });
+              const name = state.taskManager?.computers?.find((c) => c.id === machineId)?.name ?? machineId;
+              return structuredClone(
+                state.computerQueues?.[machineId] ?? { computer: { id: machineId, name }, working: [], line: [] },
+              );
             },
           },
         }

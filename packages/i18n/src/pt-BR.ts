@@ -12093,6 +12093,7 @@ export const ptBR = {
       working: "Trabalhando agora",
       line: "Na fila",
       first: "Você vai primeiro",
+      place: "{{position}}º",
       waiting: "esperando há {{time}}",
       running: "há {{time}}",
       person: "Pedido de {{name}}",

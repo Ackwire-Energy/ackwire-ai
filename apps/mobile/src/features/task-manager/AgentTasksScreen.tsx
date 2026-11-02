@@ -1,5 +1,5 @@
 import type { ManagedTask } from "@agenteschat/client";
-import { taskSince, taskTitle, taskWhere } from "@agenteschat/client/lib/task-manager";
+import { linePlace, taskSince, taskTitle, taskWhere } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -10,7 +10,7 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { useAgentTasks, useStopper } from "./hooks";
-import { type Place, rowState, stateText } from "./logic";
+import { computerQueueHref, type Place, rowState, taskStateText } from "./logic";
 import { StopButton, StopConfirm, TaskMark, useAgentColor, UsingLine } from "./parts";
 
 /**
@@ -33,7 +33,7 @@ export function AgentTasksScreen({ agentId, from }: { agentId: string; from: Pla
   const waiting = view?.waiting ?? 0;
   const stoppable = view?.stoppable ?? [];
   const waitingText = waiting > 0 ? t("taskManager.waiting", { count: waiting }) : null;
-  const sub = [t("mobile.taskManager.nowCount", { count }), waitingText].filter(Boolean).join(" · ");
+  const sub = [t("taskManager.agentPanel.now", { count }), waitingText].filter(Boolean).join(" · ");
   return (
     <PushedLargeTitle
       title={t("taskManager.agentTasks", { name })}
@@ -59,9 +59,9 @@ export function AgentTasksScreen({ agentId, from }: { agentId: string; from: Pla
             </Text>
           </View>
           <View style={styles.wells}>
-            <Well label={t("taskManager.now")} value={count} />
-            <Well label={t("mobile.taskManager.wells.waiting")} value={waiting} />
-            <Well label={t("mobile.taskManager.wells.doneToday")} value={doneToday} />
+            <Well label={t("taskManager.agentPanel.wells.now")} value={count} />
+            <Well label={t("taskManager.agentPanel.wells.waiting")} value={waiting} />
+            <Well label={t("taskManager.agentPanel.wells.done")} value={doneToday} />
           </View>
           {view ? (
             view.rows.map(({ task, here }, i) => (
@@ -77,7 +77,7 @@ export function AgentTasksScreen({ agentId, from }: { agentId: string; from: Pla
             ))
           ) : (
             <Text variant="footnote" tone="faint" style={styles.free}>
-              {t("mobile.taskManager.agentFree", { name })}
+              {t("taskManager.agentPanel.none", { name })}
             </Text>
           )}
           {asking && stoppable.length > 1 ? (
@@ -137,7 +137,8 @@ function Well({ label, value }: { label: string; value: number }) {
 
 /**
  * One of the agent's tasks: its mark, title ("aqui" for one asked in that conversation), a small line (what it waits
- * for, in amber, or where and for how long), what it uses now, and "Parar". It opens the task's screen.
+ * for, in amber, or where and for how long; its place when it waits for room on its computer, with "Ver fila"), what
+ * it uses now, and "Parar". It opens the task's screen.
  */
 function TaskRow({
   task,
@@ -165,9 +166,11 @@ function TaskRow({
   const sub =
     state === "working"
       ? [place, formatDuration(t, now - taskSince(task))]
-      : [stateText(t, state), state === "stopping" ? null : place];
+      : [taskStateText(t, task, state), state === "stopping" ? null : place];
   const line = sub.filter(Boolean).join(" · ");
   const label = [title, here ? t("taskManager.strip.here") : null, line].filter(Boolean).join(", ");
+  // Waiting for room on its computer: its place is in the line above, and "Ver fila" opens the line.
+  const inLine = state === "stopping" ? null : linePlace(task);
   return (
     <Pressable
       onPress={() => router.push(`/task-manager/${task.runId}`)}
@@ -194,6 +197,19 @@ function TaskRow({
           {line}
         </Text>
         {state === "stopping" ? null : <UsingLine task={task} />}
+        {inLine ? (
+          <Pressable
+            onPress={() => router.push(computerQueueHref(inLine.machineId))}
+            accessibilityRole="button"
+            hitSlop={6}
+            style={({ pressed }) => [styles.see, pressed && styles.pressed]}
+          >
+            <Text variant="footnote" tone="muted" style={styles.semibold}>
+              {t("taskManager.queue.see")}
+            </Text>
+            <Icon name="right" size={13} color={c.muted} />
+          </Pressable>
+        ) : null}
       </View>
       {task.canStop ? (
         <StopButton label={t("taskManager.actions.stop")} stopping={state === "stopping"} onPress={onStop} />
@@ -241,4 +257,5 @@ const styles = StyleSheet.create({
   },
   manager: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 8, paddingHorizontal: 4 },
   pressed: { opacity: 0.6 },
+  see: { flexDirection: "row", alignItems: "center", gap: 2, alignSelf: "flex-start", paddingVertical: 2 },
 });

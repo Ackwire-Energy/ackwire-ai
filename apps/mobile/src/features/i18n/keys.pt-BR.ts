@@ -1186,14 +1186,7 @@ export const featureKeysPtBR = {
   // The task manager (ADR 0127; the rest of its words are shared, `taskManager.*`).
   taskManager: {
     loadFailed: "Não deu para carregar as tarefas.",
-    steps: "Passos",
-    noSteps: "Nada feito ainda.",
     gone: "Essa tarefa não está mais aqui.",
-    // An agent's tasks, from its DM's header.
-    nowCount_one: "{{count}} agora",
-    nowCount_other: "{{count}} agora",
-    wells: { waiting: "Esperam você", doneToday: "Feitas hoje" },
-    agentFree: "{{name}} está livre agora.",
   },
   // intentional: chats/activity/ui
   homeNow: {

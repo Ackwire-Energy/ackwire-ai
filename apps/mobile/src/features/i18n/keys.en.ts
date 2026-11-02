@@ -1181,14 +1181,7 @@ export const featureKeysEn = {
   // The task manager (ADR 0127; the rest of its words are shared, `taskManager.*`).
   taskManager: {
     loadFailed: "Couldn't load the tasks.",
-    steps: "Steps",
-    noSteps: "Nothing done yet.",
     gone: "This task is no longer here.",
-    // An agent's tasks, from its DM's header.
-    nowCount_one: "{{count}} now",
-    nowCount_other: "{{count}} now",
-    wells: { waiting: "Waiting for you", doneToday: "Done today" },
-    agentFree: "{{name}} is free now.",
   },
   // intentional: chats/activity/ui
   homeNow: {

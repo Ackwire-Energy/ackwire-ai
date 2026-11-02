@@ -828,7 +828,7 @@ export function RunSteps({
   if (blockItems.length === 0)
     return (
       <Text variant="footnote" tone="faint">
-        {t("mobile.taskManager.noSteps")}
+        {t("taskManager.panel.noSteps")}
       </Text>
     );
   return (

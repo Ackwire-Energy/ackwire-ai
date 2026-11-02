@@ -1,5 +1,12 @@
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
-import { endedState, taskClock, taskSince, taskState, taskTitle } from "@agenteschat/client/lib/task-manager";
+import {
+  endedState,
+  linePlace,
+  taskClock,
+  taskSince,
+  taskState,
+  taskTitle,
+} from "@agenteschat/client/lib/task-manager";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,13 +20,14 @@ import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { useStopper, useTasksToday } from "./hooks";
-import { endedText, rowState, taskSubline } from "./logic";
+import { computerQueueHref, endedText, rowState, taskSubline } from "./logic";
 import { StateLine, UsingLine } from "./parts";
 
 /**
  * A task's screen (ADR 0127), pushed from the task manager or an agent's tasks: whose it is, where and who asked, how
- * it stands, for how long, what it uses now and where it runs, its steps so far, "Abrir na conversa" and "Parar
- * tarefa". Once it ends, how it ended (the list it came from keeps what ended today).
+ * it stands (its place when it waits for room on its computer, with "Ver fila"), for how long, what it uses now and
+ * where it runs, its steps so far, "Abrir na conversa" and "Parar tarefa". Once it ends, how it ended (the list it
+ * came from keeps what ended today).
  */
 export function TaskScreen({ runId }: { runId: string }) {
   const { t } = useTranslation();
@@ -51,6 +59,7 @@ function Live({ task }: { task: ManagedTask }) {
   const { stopping, stop } = useStopper();
   const state = rowState(task, stopping);
   const title = taskTitle(t, task);
+  const inLine = state === "stopping" ? null : linePlace(task);
   return (
     <Page
       task={task}
@@ -75,6 +84,7 @@ function Live({ task }: { task: ManagedTask }) {
         },
       ]}
       steps={{ calls: task.steps, live: taskState(task) === "working" }}
+      line={inLine?.machineId ?? null}
       stop={
         task.canStop ? (
           <Button
@@ -145,6 +155,7 @@ function Page({
   sub,
   rows,
   steps,
+  line = null,
   stop,
 }: {
   task: Pick<ManagedTask, "runId" | "agentId" | "channelId" | "threadId" | "background">;
@@ -152,6 +163,8 @@ function Page({
   sub: string;
   rows: { key: string; label: string; value: ReactNode }[];
   steps: { calls: number; live: boolean };
+  /** It waits for room on this computer: "Ver fila" opens its line. */
+  line?: string | null;
   stop: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -196,6 +209,15 @@ function Page({
           ))}
         </Card>
         <View style={styles.actions}>
+          {line ? (
+            <Button
+              variant="secondary"
+              wide
+              icon="laptop"
+              label={t("taskManager.queue.see")}
+              onPress={() => router.push(computerQueueHref(line))}
+            />
+          ) : null}
           {task.background ? null : (
             <Button
               variant="secondary"
@@ -207,7 +229,7 @@ function Page({
           )}
           {stop}
         </View>
-        <Section title={t("mobile.taskManager.steps")}>
+        <Section title={t("taskManager.panel.steps")}>
           <RunSteps runId={task.runId} color={agentLook(agent).color} calls={steps.calls} live={steps.live} />
         </Section>
       </ScrollView>

@@ -420,3 +420,91 @@ html:not([data-pointer]) .tm-more:focus-visible {
     background: none;
   }
 }
+
+/* "Computadores" (ADR 0127): the computers with work, whether each has room, and "Ver fila". No memory figure. */
+.tm-computers {
+  display: flex;
+  flex-direction: column;
+}
+.tm-computers__list.ac-card {
+  --card-pad: 0;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+.tm-computer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px 8px 14px;
+}
+.tm-computer + .tm-computer {
+  border-top: 1px solid var(--line);
+}
+.tm-computer__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  color: var(--muted);
+}
+.tm-computer__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+.tm-computer__text b,
+.tm-computer__text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-computer__text b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tm-computer__text small {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+/* "Onde roda" on a computer: a quiet button over the row's own target, opening that computer's line. */
+.tm-where {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 28px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--control-r-sm);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.tm-where:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.tm-where > .ac-icon {
+  flex: none;
+  color: var(--faint);
+}
+html:not([data-pointer]) .tm-where:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

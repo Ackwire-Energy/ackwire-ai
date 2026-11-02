@@ -1,4 +1,4 @@
-import type { EndedTask, ManagedTask } from "@agenteschat/client";
+import type { ComputerSummary, EndedTask, ManagedTask } from "@agenteschat/client";
 import {
   agentSummary,
   type AgentTasks,
@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import { ComputerIcon, useComputerKind } from "@/computer/ComputerPortrait";
 import {
   Button,
   Chip,
@@ -29,11 +30,22 @@ import {
   weights,
 } from "@/ui";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNow, usePullRefresh, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { Tile } from "../shared/parts";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { useStopper, useTasksToday } from "./hooks";
-import { endedLatestFirst, endedText, groupLine, type RowState, rowState, stateText, taskSubline } from "./logic";
+import {
+  computerLine,
+  computerQueueHref,
+  endedLatestFirst,
+  endedText,
+  groupLine,
+  type RowState,
+  rowState,
+  taskStateText,
+  taskSubline,
+} from "./logic";
 import { StateLine, StopButton, StopConfirm, TaskMark, UsingLine } from "./parts";
 
 /** Rows whose agent moves (a long list stays light). */
@@ -45,7 +57,8 @@ const taskHref = (runId: string) => `/task-manager/${runId}` as const;
 /**
  * The task manager (ADR 0127), pushed from Agentes: what the agents are doing now. The tasks people asked for, by
  * agent (its row folds, says how its tasks stand and stops them all, asking first), each with its state, what it uses
- * now and "Parar"; then the routines' work in the background and what ended today. A task opens its own screen.
+ * now and "Parar"; then the routines' work in the background and what ended today. A task opens its own screen. Above
+ * them, the computers with work, each opening its line.
  */
 export function TaskManagerScreen() {
   const { t } = useTranslation();
@@ -73,6 +86,7 @@ export function TaskManagerScreen() {
       return next;
     });
   const askedCount = groups.reduce((n, g) => n + g.tasks.length, 0);
+  const computers = view?.computers ?? [];
   return (
     <PushedLargeTitle
       title={t("taskManager.title")}
@@ -114,6 +128,12 @@ export function TaskManagerScreen() {
               subtitle={t("taskManager.empty.body")}
             />
           )}
+          {computers.length > 0 ? (
+            <>
+              <SectionHeader title={t("taskManager.queue.computers")} count={computers.length} />
+              {computers.map((m, i) => <ComputerRow key={m.id} computer={m} divider={i > 0} />)}
+            </>
+          ) : null}
           {groups.length > 0 ? (
             <>
               <SectionHeader title={t("taskManager.sections.asked")} count={askedCount} />
@@ -324,7 +344,7 @@ function TaskRow({
     <Pressable
       onPress={() => router.push(taskHref(task.runId))}
       accessibilityRole="button"
-      accessibilityLabel={[title, line, stateText(t, state)].filter(Boolean).join(", ")}
+      accessibilityLabel={[title, line, taskStateText(t, task, state)].filter(Boolean).join(", ")}
       style={({ pressed }) => [
         styles.task,
         flat ? styles.flat : styles.indented,
@@ -352,6 +372,39 @@ function TaskRow({
       {task.canStop ? (
         <StopButton label={t("taskManager.actions.stop")} stopping={state === "stopping"} onPress={onStop} />
       ) : null}
+    </Pressable>
+  );
+}
+
+/**
+ * A computer with work (ADR 0127): its name, whether it has room or how many wait for it, how many run there now. It
+ * opens its line.
+ */
+function ComputerRow({ computer, divider }: { computer: ComputerSummary; divider: boolean }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const kind = useComputerKind(useOrgId(), computer.id);
+  const line = computerLine(t, computer);
+  return (
+    <Pressable
+      onPress={() => router.push(computerQueueHref(computer.id))}
+      accessibilityRole="button"
+      accessibilityLabel={`${computer.name}, ${line}`}
+      style={({ pressed }) => [styles.computer, pressed && { backgroundColor: c.sunken }]}
+    >
+      {divider ? <View style={[styles.divider, styles.computerDivider, { backgroundColor: c.line2 }]} /> : null}
+      <Tile size={30}>
+        <ComputerIcon kind={kind} size={16} color={c.muted} />
+      </Tile>
+      <View style={styles.taskText}>
+        <Text variant="subhead" numberOfLines={1} style={styles.medium}>
+          {computer.name}
+        </Text>
+        <Text variant="footnote" tone="muted" numberOfLines={1}>
+          {line}
+        </Text>
+      </View>
+      <Icon name="right" size={15} color={c.faint} />
     </Pressable>
   );
 }
@@ -443,4 +496,6 @@ const styles = StyleSheet.create({
   },
   none: { paddingHorizontal: 20, paddingBottom: 12 },
   end: { alignItems: "flex-end", gap: 2, maxWidth: 130 },
+  computer: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 16 },
+  computerDivider: { left: FLAT_INSET },
 });

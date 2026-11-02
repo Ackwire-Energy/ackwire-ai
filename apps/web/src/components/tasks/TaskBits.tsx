@@ -5,6 +5,7 @@ import { capitalize, joinNames } from "@agenteschat/client/lib/format";
 import { brainName } from "@agenteschat/client/lib/outages";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import {
+  linePlace,
   programKey,
   type TaskProgram,
   taskProgram,
@@ -14,7 +15,7 @@ import {
   waitsFor,
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
-import { callLogo } from "@agenteschat/client/lib/work";
+import { callLogo, formatDuration } from "@agenteschat/client/lib/work";
 import { Button, Chip, cx, Icon, Input, PixelStop, Popover, ProviderLogo, Spinner } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -25,6 +26,7 @@ import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
 import { useCallLogo } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useNow } from "@/hooks/useNow";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
 import "./tasks.css";
@@ -132,6 +134,17 @@ export function SayWhy({
   );
 }
 
+/**
+ * What a task waits for, in words: "Espera seu ok", "Na fila · 2º" with its place in its computer's line (ADR 0127),
+ * "Computador cheio" when the line isn't known, "Esperando o plano"…; null when it waits for nothing.
+ */
+export function waitWords(t: TFunction, task: Pick<ManagedTask, "status" | "held" | "line">): string | null {
+  const place = linePlace(task);
+  if (place) return t("taskManager.state.inLine", { position: place.position });
+  const wait = waitsFor(task);
+  return wait ? t(waitKey(wait)) : null;
+}
+
 /** "Trabalhando" (the orbit in the agent's color), "Espera seu ok" / "Espera resposta", "Na fila", "Parando…". */
 export function TaskStateChip({ task, stopping = false }: { task: ManagedTask; stopping?: boolean }) {
   const { t } = useTranslation();
@@ -140,14 +153,14 @@ export function TaskStateChip({ task, stopping = false }: { task: ManagedTask; s
   if (state === "working")
     return <Chip lead={<AgentSpinner agentId={task.agentId} size={14} />}>{t("taskManager.state.working")}</Chip>;
   if (state === "waiting") {
-    const wait = waitsFor(task) ?? "answer";
-    // A wait on a computer, a plan or a budget isn't "espera você": grey, with the clock.
+    const words = waitWords(t, task) ?? t(waitKey("answer"));
+    // A wait on a computer (its place in its line), a plan or a budget isn't "espera você": grey, with the clock.
     return waitsOnPerson(task) ? (
       <Chip tone="waiting" lead={<WaitMark />}>
-        {t(waitKey(wait))}
+        {words}
       </Chip>
     ) : (
-      <Chip icon="clock">{t(waitKey(wait))}</Chip>
+      <Chip icon="clock">{words}</Chip>
     );
   }
   return <Chip icon="clock">{t("taskManager.state.queued")}</Chip>;
@@ -229,9 +242,19 @@ export function ProgramLogo({ program }: { program: TaskProgram }) {
   return <span className="tm-logo">{logo(program.activity)}</span>;
 }
 
-/** "Usando agora": the logo, the program and what it does in it; a dash in the queue. */
+/** "Usando agora": the logo, the program and what it does in it; a dash in the queue, its wait in a computer's line. */
 export function UsingNow({ task }: { task: ManagedTask }) {
+  const { t } = useTranslation();
   const text = useProgramText()(task);
+  const place = linePlace(task);
+  const now = useNow(place?.since ? 30_000 : false);
+  if (place) {
+    // In its computer's line it uses nothing yet: how long it has waited for its turn.
+    const waited = place.since ? formatDuration(t, Math.max(0, now - Date.parse(place.since))) : null;
+    return (
+      <span className="tm-use tm-use--none">{waited ? t("taskManager.queue.waiting", { time: waited }) : "—"}</span>
+    );
+  }
   if (!text) return <span className="tm-use tm-use--none">—</span>;
   return (
     <span className="tm-use">

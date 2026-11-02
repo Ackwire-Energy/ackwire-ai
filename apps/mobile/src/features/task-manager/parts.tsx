@@ -10,7 +10,7 @@ import { useCallLogo } from "../chat/ToolCalls";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { isHeld, type RowState, stateText, usingNow } from "./logic";
+import { isHeld, type RowState, taskStateText, usingNow } from "./logic";
 
 /**
  * The pieces the task manager's list, a task's screen and an agent's tasks share (ADR 0127): a task's mark and state,
@@ -43,7 +43,7 @@ export function useAgentColor(agentId: string): AgentColorName {
   return agentLook(useDirectory().anyAgent(agentId)).color;
 }
 
-/** "Trabalhando · 6:12", "Espera seu ok · 18:03" (amber: it waits on a person), "Parando…". */
+/** "Trabalhando · 6:12", "Espera seu ok · 18:03" (amber: it waits on a person), "Na fila · 2º", "Parando…". */
 export function StateLine({ task, state, now }: { task: ManagedTask; state: RowState; now: number }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -57,7 +57,7 @@ export function StateLine({ task, state, now }: { task: ManagedTask; state: RowS
         numberOfLines={1}
         style={[styles.semibold, styles.shrink, { color: waits ? c.amber : c.ink2 }]}
       >
-        {stateText(t, state)}
+        {taskStateText(t, task, state)}
       </Text>
       {state === "stopping" ? null : (
         <Text variant="caption" tone="faint" style={styles.num}>

@@ -11736,6 +11736,7 @@ export const en = {
       working: "Working now",
       line: "In line",
       first: "You go first",
+      place: "#{{position}}",
       waiting: "waiting {{time}}",
       running: "for {{time}}",
       person: "Asked by {{name}}",
