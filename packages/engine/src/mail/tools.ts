@@ -102,9 +102,15 @@ const utcDayStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.g
 
 /**
  * Who decides an action in a person's own mailbox: that person (ADR 0038). Asked by them, admins may decide it too;
- * asked by anyone else (or nobody), only they do: an email in their name is theirs to approve.
+ * asked by anyone else (or nobody), only they do: an email in their name is theirs to approve. Once they left the
+ * workspace nobody could, so the usual rule (the agent's owner, admins) applies.
  */
-async function mailboxApprovers(db: Database, ownerId: string, requestedBy: string | null) {
+async function mailboxApprovers(db: Database, orgId: string, ownerId: string, requestedBy: string | null) {
+  const [member] = await db
+    .select({ id: schema.organizationMembers.userId })
+    .from(schema.organizationMembers)
+    .where(and(eq(schema.organizationMembers.orgId, orgId), eq(schema.organizationMembers.userId, ownerId)));
+  if (!member) return { ok: true as const, approvers: null };
   const own = requestedBy === ownerId;
   return {
     ok: true as const,
@@ -336,7 +342,9 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         sensitive:
           effect === "delete" || (effect === "send" && askToSend) || account.askActions.includes(actionOf(verb)),
         ...(effect === "read" ? { readsOutside: true as const } : {}),
-        ...(owner ? { approvers: (_input, ctx, requestedBy) => mailboxApprovers(ctx.db, owner, requestedBy) } : {}),
+        ...(owner
+          ? { approvers: (_input, ctx, requestedBy) => mailboxApprovers(ctx.db, ctx.orgId, owner, requestedBy) }
+          : {}),
         ...extra,
       };
     };

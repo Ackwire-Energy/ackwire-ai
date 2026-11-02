@@ -1144,6 +1144,8 @@ export async function removeMember(
     handed.map((a) => a.id),
   );
   if (handed.length) caches.agents.delete(`${orgId}:team`);
+  const { releaseRequiredApprovals } = await import("./approvals");
+  await releaseRequiredApprovals({ db, pubsub: options.pubsub }, orgId, targetUserId);
   if (heir && handed.length) {
     const { handOver } = await import("./agents");
     for (const agent of handed) {

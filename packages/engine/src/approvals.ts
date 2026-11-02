@@ -563,6 +563,26 @@ export async function repointApprovals(
   }
 }
 
+/**
+ * `userId` left the workspace: the waiting approvals only they could decide (their own mailbox, `required`) go back
+ * to the usual rule (`mailboxApprovers`), and whoever decides now gets the inbox item.
+ */
+export async function releaseRequiredApprovals(deps: { db: Database; pubsub?: PubSub }, orgId: string, userId: string) {
+  const rows = await deps.db
+    .update(approvals)
+    .set({ approvers: null })
+    .where(
+      and(
+        eq(approvals.orgId, orgId),
+        eq(approvals.status, "pending"),
+        sql`coalesce((${approvals.approvers} ->> 'required')::boolean, false)`,
+        sql`${approvals.approvers} -> 'userIds' @> to_jsonb(${userId}::text)`,
+      ),
+    )
+    .returning();
+  for (const row of rows) await notifyApproval(deps, row, await approverIds(deps.db, row)).catch(() => {});
+}
+
 /** Tells the channel and every approver about an approval (card in the chat, badge on the Approvals screen). */
 export async function publishApproval(
   deps: { db: Database; pubsub: PubSub },

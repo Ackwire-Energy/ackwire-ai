@@ -8,8 +8,10 @@ import {
   ingestMail,
   insertMessage,
   listApprovals,
+  listNotifications,
   notifyApproval,
   type RoutineBrief,
+  removeMember,
   setAgentAudience,
   setAgentBrain,
   setMemberRoles,
@@ -299,4 +301,37 @@ test("a new owner takes over a card-less mailbox approval without taking it from
       and(eq(schema.notifications.userId, bia.id), eq(schema.notifications.groupKey, `approval:${r.approval.id}`)),
     );
   expect(items.map((n) => n.doneAt)).toEqual([null]);
+});
+
+test("a mailbox whose owner left the workspace: the agent's owner decides its emails again, waiting ones included", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read_write");
+  await f.db.update(schema.mailAccounts).set({ createdByUserId: bia.id }).where(eq(schema.mailAccounts.id, account.id));
+  const send = async (n: number) => {
+    const r = await m.tools.invoke(await runFor(caio.id), {
+      toolUseId: `tu_${n}`,
+      name: "mail_support_send",
+      input: { to: ["client@acme.com"], subject: `Proposta ${n}`, body: "Segue a proposta.", why: WHY },
+    });
+    if (r.type !== "approval") throw new Error("expected an approval");
+    return r.approval;
+  };
+  const waiting = await send(1);
+  expect(waiting.approvers?.required).toBe(true);
+
+  await removeMember(f.db, f.owner.id, f.org.id, bia.id, { pubsub: f.pubsub });
+  const inbox = await listNotifications({ db: f.db }, f.owner.id, f.org.id);
+  expect(inbox.items.map((n) => n.kind)).toContain("approval");
+  const later = await send(2);
+  expect(later.approvers).toBeNull();
+  for (const a of [waiting, later]) {
+    const decided = await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, a.id, {
+      decision: "approve",
+    });
+    expect(decided.status).toBe("approved");
+  }
 });
