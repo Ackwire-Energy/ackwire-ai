@@ -7,14 +7,17 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageBody } from "@/chat/MessageBody";
 import { AgentAvatar, withAgentFace } from "@/components/AgentAvatar";
+import { useOpenConsultation } from "@/components/ConsultGroup";
+import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
  * What another agent told this one before it answered (`meta.consulted`), or did with work it handed it:
- * a neutral one-line card
- * on top of the reply, "Infra respondeu" with a faded preview, that opens to
- * the question (or the work) and the full answer. Expired or failed: the same card, calm,
+ * a neutral one-line card on top of the reply, "Infra respondeu" with a faded preview. In a channel or a DM it
+ * opens the two agents' conversation in the panel beside the chat, as the reply's block lines do: a long question
+ * or answer reads there, never stretching the conversation. In a thread view (no panel) and inside that panel it
+ * opens in place, to the question (or the work) and the full answer. Expired or failed: the same card, calm,
  * with an icon instead of the agent.
  */
 export function ConsultationCard({
@@ -28,6 +31,8 @@ export function ConsultationCard({
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
+  const openConsultation = useChannelActions()?.openConsultation;
+  const openId = useOpenConsultation();
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const to = agentGrammar(dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
@@ -41,14 +46,20 @@ export function ConsultationCard({
     : c.status === "expired"
       ? t("chat.consultation.waited", { minutes })
       : t("chat.consultation.wentOn");
+  const inPlace = !openConsultation;
+  const shown = inPlace && open;
   return (
-    <div className={cx("ac-consult", open && "ac-consult--open")}>
+    <div className={cx("ac-consult", shown && "ac-consult--open")}>
       <button
         type="button"
         className="ac-consult__head"
-        aria-expanded={open}
-        aria-controls={open ? bodyId : undefined}
-        onClick={() => setOpen((o) => !o)}
+        {...(openConsultation
+          ? { "aria-pressed": openId === c.consultationId, onClick: () => openConsultation(c.consultationId) }
+          : {
+              "aria-expanded": open,
+              "aria-controls": open ? bodyId : undefined,
+              onClick: () => setOpen((o) => !o),
+            })}
       >
         {ok ? (
           <AgentAvatar agentId={c.agentId} size="xs" name={to.name} state="idle" />
@@ -60,10 +71,10 @@ export function ConsultationCard({
         <b>{title}</b>
         <span className="ac-consult__pv">{preview}</span>
         <span className="ac-consult__chev" aria-hidden="true">
-          <Icon name="chevronDown" size={16} />
+          <Icon name={inPlace ? "chevronDown" : "chevronRight"} size={16} />
         </span>
       </button>
-      {open && (
+      {shown && (
         <div className="ac-consult__body" id={bodyId}>
           <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
           <div className="ac-consult__text ac-consult__text--q">

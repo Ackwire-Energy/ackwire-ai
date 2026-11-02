@@ -1976,6 +1976,9 @@
     "rolesNone": "Der Workspace hat noch keine Rollen.",
     "rolesNeeded": "Wähle mindestens eine Rolle.",
     "rolesLeave": "Wer die Rolle verliert, verlässt den Kanal.",
+    "rolesChoose": "Rollen wählen",
+    "rolesChange": "Rollen ändern",
+    "rolesDone": "Fertig",
     "publicTitle": "#{{channel}} öffentlich machen?",
     "publicBody": "Alle im Workspace können beitreten und alle Nachrichten lesen, auch die älteren.",
     "publicConfirm": "Öffentlich machen",
@@ -10797,6 +10800,11 @@
       "answeredFar": "{{to}} hat die Frage von {{from}} beantwortet",
       "answeredRequestFar": "{{to}} hat die Anfrage von {{from}} beantwortet",
       "see": "Ansehen"
+    },
+    "talk": {
+      "readAll": "Alles lesen",
+      "more_one": "{{count}} weitere Zeile",
+      "more_other": "{{count}} weitere Zeilen"
     },
     "consultPanel": {
       "label": "Unterhaltung zwischen {{from}} und {{to}}",

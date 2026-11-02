@@ -79,6 +79,7 @@ import {
   waitsForWords,
 } from "@agenteschat/client/lib/activity";
 import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
+import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib/agent-talk";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
@@ -3223,7 +3224,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   );
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
-  const threadLine = useChannelThreadsView()?.lines.get(m.id);
+  const threadsView = useChannelThreadsView();
+  const threadLine = threadsView?.lines.get(m.id);
   const [active, setActive] = useState(false);
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
@@ -3277,6 +3279,17 @@ export const TimelineMessage = memo(function TimelineMessage({
   const choiceReply = Boolean(m.meta?.choiceReply);
   // My own message with a code block or a table: the bubble takes the row's whole width.
   const wide = useMemo(() => own && hasWideBlock(body), [own, body]);
+  // A long message from one agent to another (ADR 0034): its first paragraph here and "Ler tudo", which opens it
+  // whole in its thread, beside the chat. In a thread view (no panel), where it is already read, it stays whole.
+  const openThread = !live && !m.local && !readOnly ? actions?.openThread : undefined;
+  const talk = useMemo(
+    () =>
+      openThread && talksToAgent(m, (handle) => dir.agentByHandle.get(handle)?.id)
+        ? foldTalk(body, TALK_LINE_CHARS.web)
+        : null,
+    [openThread, m, body, dir.agentByHandle],
+  );
+  const talkThread = m.threadId ?? m.id;
   // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
   const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
   const atLimit = ended ? (ended.stuck === true ? "stuck" : "steps") : undefined;
@@ -3668,13 +3681,25 @@ export const TimelineMessage = memo(function TimelineMessage({
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
               <MessageText style={workOver ? { opacity: 0.6 } : undefined}>
                 <MessageBody
-                  body={body}
+                  body={talk ? talk.lead : body}
                   resolveMention={dir.mentionName}
                   renderMention={renderMention}
                   wikiLink={wikiLink}
                   channelRefs={channelRefsOf(m.meta)}
                   accent={colorOf(agent)}
                 />
+                {talk && openThread && (
+                  <button
+                    type="button"
+                    className="msg-talk__more"
+                    aria-pressed={threadsView?.open === talkThread}
+                    onClick={() => openThread(talkThread)}
+                  >
+                    {t("chat.talk.readAll")}
+                    <span className="msg-talk__count">{t("chat.talk.more", { count: talk.more })}</span>
+                    <Icon name="chevronRight" size={14} />
+                  </button>
+                )}
               </MessageText>
             )}
           {choiceReply && (

@@ -2099,6 +2099,9 @@
     "rolesNone": "В workspace пока нет ролей.",
     "rolesNeeded": "Выберите хотя бы одну роль.",
     "rolesLeave": "Кто теряет роль, выходит из канала.",
+    "rolesChoose": "Выбрать роли",
+    "rolesChange": "Изменить роли",
+    "rolesDone": "Готово",
     "publicTitle": "Сделать #{{channel}} открытым?",
     "publicBody": "Все в рабочем пространстве смогут присоединиться и читать все сообщения, включая старые.",
     "publicConfirm": "Сделать открытым",
@@ -11493,6 +11496,13 @@
       "answeredFar": "{{to}} ответил на вопрос {{from}}",
       "answeredRequestFar": "{{to}} ответил на запрос {{from}}",
       "see": "Показать"
+    },
+    "talk": {
+      "readAll": "Читать полностью",
+      "more_one": "ещё {{count}} строка",
+      "more_few": "ещё {{count}} строки",
+      "more_many": "ещё {{count}} строк",
+      "more_other": "ещё {{count}} строки"
     },
     "consultPanel": {
       "label": "Разговор между {{from}} и {{to}}",

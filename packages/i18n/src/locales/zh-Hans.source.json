@@ -4778,6 +4778,15 @@
   "newChannel.rolesLeave": {
     "value": "Whoever loses the role leaves the channel."
   },
+  "newChannel.rolesChoose": {
+    "value": "Choose roles"
+  },
+  "newChannel.rolesChange": {
+    "value": "Change roles"
+  },
+  "newChannel.rolesDone": {
+    "value": "Done"
+  },
   "newChannel.publicTitle": {
     "value": "Make #{{channel}} public?"
   },
@@ -26208,6 +26217,15 @@
   },
   "chat.consultGroup.see": {
     "value": "See"
+  },
+  "chat.talk.readAll": {
+    "value": "Read all"
+  },
+  "chat.talk.more": {
+    "value": {
+      "one": "{{count}} more line",
+      "other": "{{count}} more lines"
+    }
   },
   "chat.consultPanel.label": {
     "value": "Conversation between {{from}} and {{to}}"
