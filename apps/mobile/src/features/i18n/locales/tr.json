@@ -43,6 +43,16 @@
     "pollAnswered_other": "{{count}} / {{total}} yanıtladı",
     "voteFailed": "Oyunuz kaydedilemedi."
   },
+  "choices": {
+    "step": "{{step}} / {{total}}",
+    "back": "Geri",
+    "next": "İleri",
+    "close": "Kapat",
+    "closed": "{{title}} · kapandı",
+    "reopen": "Yeniden göster",
+    "answeredBy": "{{name}} seçti",
+    "failed": "Seçiminiz gönderilemedi. Tekrar deneyin."
+  },
   "chart": {
     "pending": "Grafik hazırlanıyor…",
     "table": "Tablo",
@@ -504,7 +514,10 @@
     "full": "Bu sohbette zaten 100 sabitlenmiş mesaj var. Önce birinin sabitlemesini kaldırın.",
     "mark": "Sabitlendi",
     "none": "Henüz sabitlenen bir şey yok",
-    "empty": "Burada henüz sabitlenen bir şey yok. Bir mesajı basılı tutup Sabitle'ye dokunun."
+    "empty": "Burada henüz sabitlenen bir şey yok. Bir mesajı basılı tutup Sabitle'ye dokunun.",
+    "bar_one": "Sabitlenen mesajlar ({{count}})",
+    "bar_other": "Sabitlenen mesajlar ({{count}})",
+    "unpinOf": "{{name}} mesajının sabitlemesini kaldır"
   },
   "thread": {
     "threadIn": "#{{channel}} kanalında ileti dizisi",
@@ -732,7 +745,8 @@
     "title": "Etkinlik",
     "filter": {
       "all": "Tümü",
-      "waiting": "Sizi bekleyenler"
+      "waiting": "Sizi bekleyenler",
+      "done": "Tamamlananlar"
     },
     "day": {
       "today": "Bugün",
@@ -812,6 +826,8 @@
     "markUnread": "Okunmadı olarak işaretle",
     "unread": "Okunmadı",
     "done": "Tamam",
+    "restore": "Geri taşı",
+    "noneDone": "Son 30 günde tamamlandı olarak işaretlenen bir şey yok.",
     "more": "Daha fazlasını gör",
     "empty": "Sizi bekleyen bir şey yok. Derin bir nefes alın."
   },

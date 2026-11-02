@@ -45,6 +45,16 @@
     "pollAnswered_other": "{{count}} sur {{total}} ont répondu",
     "voteFailed": "Votre vote n'a pas été pris en compte."
   },
+  "choices": {
+    "step": "{{step}} sur {{total}}",
+    "back": "Retour",
+    "next": "Suivant",
+    "close": "Fermer",
+    "closed": "{{title}} · fermé",
+    "reopen": "Afficher à nouveau",
+    "answeredBy": "{{name}} a choisi",
+    "failed": "Votre choix n'a pas été envoyé. Réessayez."
+  },
   "chart": {
     "pending": "Création du graphique…",
     "table": "Tableau",
@@ -519,7 +529,11 @@
     "full": "Cette discussion a déjà 100 messages épinglés. Désépinglez-en un d'abord.",
     "mark": "Épinglé",
     "none": "Rien d'épinglé pour l'instant",
-    "empty": "Rien d'épinglé ici pour l'instant. Maintenez un message et touchez Épingler."
+    "empty": "Rien d'épinglé ici pour l'instant. Maintenez un message et touchez Épingler.",
+    "bar_one": "Messages épinglés ({{count}})",
+    "bar_many": "Messages épinglés ({{count}})",
+    "bar_other": "Messages épinglés ({{count}})",
+    "unpinOf": "Désépingler le message de {{name}}"
   },
   "thread": {
     "threadIn": "Fil dans #{{channel}}",
@@ -755,7 +769,8 @@
     "title": "Activité",
     "filter": {
       "all": "Tout",
-      "waiting": "Vous attend"
+      "waiting": "Vous attend",
+      "done": "Terminées"
     },
     "day": {
       "today": "Aujourd'hui",
@@ -868,6 +883,8 @@
     "markUnread": "Marquer comme non lu",
     "unread": "Non lu",
     "done": "Fait",
+    "restore": "Restaurer",
+    "noneDone": "Rien marqué comme terminé ces 30 derniers jours.",
     "more": "Voir plus",
     "empty": "Rien ne vous attend. Respirez."
   },

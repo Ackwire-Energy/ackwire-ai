@@ -33,7 +33,11 @@ export function Menu({
           side={side}
           sideOffset={4}
           aria-label={label}
-          onCloseAutoFocus={onClosed}
+          onCloseAutoFocus={(e) => {
+            onClosed?.();
+            // An item that opened something which took focus (the emoji picker) keeps it there.
+            if (document.activeElement && document.activeElement !== document.body) e.preventDefault();
+          }}
         >
           {children}
         </DropdownMenu.Content>

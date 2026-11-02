@@ -13,13 +13,14 @@ export function ErrorBoundary(props: ErrorBoundaryProps) {
 
 /**
  * A conversation (deep link `agenteschat://chat/<channelId>?thread=<rootId>`). `handoff=<id>`: an agent's
- * request for help in its browser, whose card opens in place, in control.
+ * request for help in its browser, whose card opens in place, in control. `m=<id>`: open at that message.
  */
 export default function ChatRoute() {
-  const { channelId, thread, handoff } = useLocalSearchParams<{
+  const { channelId, thread, handoff, m } = useLocalSearchParams<{
     channelId: string;
     thread?: string;
     handoff?: string;
+    m?: string;
   }>();
   const threadId = isSafeId(thread) ? thread : null;
   // Where "Onde você parou" opens the next time the app starts (ADR 0108).
@@ -31,6 +32,7 @@ export default function ChatRoute() {
         channelId={channelId}
         threadId={threadId}
         handoffId={isSafeId(handoff) ? handoff : null}
+        focusId={isSafeId(m) ? m : null}
       />
     </FocusLive>
   );

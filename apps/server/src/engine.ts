@@ -17,6 +17,7 @@ import {
   CursorBrain,
   composioConnectorsOf,
   connectOverHttp,
+  createApprovalRequestToolSource,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -359,6 +360,9 @@ export function buildEngine(o: EngineOptions) {
       // People's Postgres databases (ADR 0039): read-only queries, when the server has a driver.
       createDatabaseToolSource({ keyWrappers, databases: adapters.databases, resolveHost: o.resolveHost }),
       createMissionToolSource(missionDeps),
+      // Approval from the people who decide (ADR 0126): after the missions source, whose own request_approval wins
+      // in a mission's thread.
+      createApprovalRequestToolSource(),
       // Computer-brain runs only (calls through the runner bridge): before the sandbox tools, so these
       // win a name clash (`start_task`) there.
       createMissionRunToolSource(missionDeps),

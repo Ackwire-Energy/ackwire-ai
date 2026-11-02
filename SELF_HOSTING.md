@@ -1114,6 +1114,7 @@ starts).
 `agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what is free
 for new work and which agents use the most; agents are told to run it before something heavy, to tell
 the person when another agent's work leaves no room, and to stop what a finished build left running.
+Gradle's and Kotlin's daemons exit after 5 idle minutes anyway (`GRADLE_OPTS` in each agent's environment).
 Expo's default Android debug build fits an 8 GB computer this way, using nearly all the agents' memory.
 
 **The shared folder.** Every computer has one folder all of its agents read and write, so what one of

@@ -169,6 +169,7 @@ export const artifactKindEnum = pgEnum("artifact_kind", [
   "file",
   "block",
   "poll",
+  "choices",
 ]);
 
 /**
@@ -322,4 +323,26 @@ export const pollVotes = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("poll_votes_choice").on(t.artifactId, t.userId, t.option), index().on(t.orgId)],
+);
+
+/**
+ * A choice card's answer (ADR 0124); its questions and options are the artifact's content. One answer per card, the
+ * first one in: `picks` holds the option chosen for each question, in order. The person's reply message carries it
+ * to the agent.
+ */
+export const choiceAnswers = pgTable(
+  "choice_answers",
+  {
+    artifactId: uuid()
+      .primaryKey()
+      .references(() => artifacts.id, { onDelete: "cascade" }),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text().notNull(),
+    picks: integer().array().notNull(),
+    messageId: uuid(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId)],
 );

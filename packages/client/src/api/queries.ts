@@ -64,6 +64,7 @@ import type {
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
+  ChannelInput,
   ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
@@ -112,6 +113,7 @@ import type {
   RoutinePatch,
   S3Input,
   SandboxSettingsInput,
+  SearchFilterInput,
   SearchKind,
   SeriesScope,
   SidebarItem,
@@ -2142,7 +2144,7 @@ export function useUpdateChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name?: string; topic?: string }) => api.chat.update(orgId, channelId, input),
+    mutationFn: (input: ChannelInput & { name?: string }) => api.chat.update(orgId, channelId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
   });
 }
@@ -2188,13 +2190,15 @@ export function cacheDmRead(
 
 // ── Knowledge (phase 5) ─────────────────────────────────────────────────────
 
-export const useSearch = (orgId: string, q: string, kinds: SearchKind[]) => {
+/** A search; with `filters` (ADR 0123) it runs with no words too, as long as one filter is set. */
+export const useSearch = (orgId: string, q: string, kinds: SearchKind[], filters?: SearchFilterInput) => {
   const api = useApi();
   const text = q.trim();
+  const filtered = Object.keys(filters ?? {}).some((k) => k !== "sort");
   return useQuery({
-    queryKey: keys.search(orgId, text, kinds.join(",")),
-    queryFn: () => api.search.query(orgId, { q: text, kinds, limit: 50 }),
-    enabled: text.length > 0,
+    queryKey: [...keys.search(orgId, text, kinds.join(",")), filters ?? null],
+    queryFn: () => api.search.query(orgId, { q: text, kinds, limit: filters ? 100 : 50, filters }),
+    enabled: text.length > 0 || filtered,
     placeholderData: (previous) => previous,
   });
 };
@@ -2401,6 +2405,20 @@ export function useAcceptToolChange(orgId: string) {
   return useMutation({
     mutationFn: (c: { connectionId: string; toolName: string }) =>
       api.customConnectors.acceptToolChange(orgId, c.connectionId, c.toolName),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+      ]),
+  });
+}
+
+/** "Aceitar todas" on one connection's changed tools (ADR 0117). */
+export function useAcceptConnectionToolChanges(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) => api.customConnectors.acceptConnectionToolChanges(orgId, connectionId),
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
@@ -2685,6 +2703,27 @@ export const useVote = (orgId: string, id: string) => {
   return useMutation({
     mutationFn: (options: number[]) => api.artifacts.vote(orgId, id, options),
     onSuccess: (poll) => qc.setQueryData(keys.poll(orgId, id), poll),
+  });
+};
+
+/** A choice card's answer (ADR 0124): it comes in over the socket too (`choices.updated`). */
+export const useChoices = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.choices(orgId, id ?? ""),
+    queryFn: () => api.artifacts.choices(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export const useAnswerChoices = (orgId: string, id: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (picks: number[]) => api.artifacts.answerChoices(orgId, id, picks, newClientId()),
+    onSuccess: (out) => qc.setQueryData(keys.choices(orgId, id), out.choices),
+    // The card says it itself, and says nothing when someone answered first.
+    meta: { silent: true },
   });
 };
 
@@ -3995,10 +4034,15 @@ export function cacheNotification(qc: QC, orgId: string, item: AppNotification) 
 }
 
 /** Resolved on its own (question answered, approval decided, turn passed): out of every list. */
-export function dropNotification(qc: QC, orgId: string, id: string) {
+/**
+ * Takes a notification out of every list. `keepDone`: the `notification.removed` event says only that it left the
+ * inbox, so "Concluídas" keeps it; a drop the page asks for (answered, passed) takes it from there too.
+ */
+export function dropNotification(qc: QC, orgId: string, id: string, keepDone = false) {
   const before = knownNotification(qc, orgId, id);
   for (const [key, data] of listCaches(qc, orgId)) {
-    if (data) qc.setQueryData<NotificationPages>(key, removeFromPages(data, id, before));
+    if (data && !(keepDone && key[4] === "done"))
+      qc.setQueryData<NotificationPages>(key, removeFromPages(data, id, before));
   }
   moveCount(qc, orgId, before, undefined);
 }
@@ -4008,8 +4052,11 @@ export function applyNotificationEvent(qc: QC, orgId: string, event: Notificatio
   if (event.type === "notification.upserted" && event.notification.kind === "join_request")
     void qc.invalidateQueries({ queryKey: keys.joinRequests(orgId) });
   if (event.type === "notification.upserted") cacheNotification(qc, orgId, event.notification);
-  else if (event.type === "notification.removed") dropNotification(qc, orgId, event.id);
-  else {
+  else if (event.type === "notification.removed") {
+    dropNotification(qc, orgId, event.id, true);
+    // Marked done on another device: "Concluídas" gains it (one auto-resolved changes nothing there).
+    void qc.invalidateQueries({ queryKey: keys.notificationList(orgId, "done") });
+  } else {
     const count = { unread: event.unread, waiting: event.waiting };
     qc.setQueryData<NotificationCount>(keys.notificationCount(orgId), count);
     for (const [key, data] of listCaches(qc, orgId))

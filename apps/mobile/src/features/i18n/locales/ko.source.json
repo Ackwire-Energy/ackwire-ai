@@ -113,6 +113,30 @@
   "blocks.voteFailed": {
     "value": "Your vote didn't go through."
   },
+  "choices.step": {
+    "value": "{{step}} of {{total}}"
+  },
+  "choices.back": {
+    "value": "Back"
+  },
+  "choices.next": {
+    "value": "Next"
+  },
+  "choices.close": {
+    "value": "Close"
+  },
+  "choices.closed": {
+    "value": "{{title}} · closed"
+  },
+  "choices.reopen": {
+    "value": "Show again"
+  },
+  "choices.answeredBy": {
+    "value": "{{name}} picked"
+  },
+  "choices.failed": {
+    "value": "Your pick didn't go through. Try again."
+  },
   "chart.pending": {
     "value": "Building the chart…"
   },
@@ -1184,6 +1208,15 @@
   "pins.empty": {
     "value": "Nothing pinned here yet. Hold a message and tap Pin."
   },
+  "pins.bar": {
+    "value": {
+      "one": "Pinned messages ({{count}})",
+      "other": "Pinned messages ({{count}})"
+    }
+  },
+  "pins.unpinOf": {
+    "value": "Unpin the message from {{name}}"
+  },
   "thread.threadIn": {
     "value": "Thread in #{{channel}}"
   },
@@ -1751,6 +1784,9 @@
   "activity.filter.waiting": {
     "value": "Waiting for you"
   },
+  "activity.filter.done": {
+    "value": "Done"
+  },
   "activity.day.today": {
     "value": "Today"
   },
@@ -1972,6 +2008,12 @@
   },
   "activity.done": {
     "value": "Done"
+  },
+  "activity.restore": {
+    "value": "Move back"
+  },
+  "activity.noneDone": {
+    "value": "Nothing marked done in the last 30 days."
   },
   "activity.more": {
     "value": "See more"

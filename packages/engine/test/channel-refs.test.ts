@@ -86,6 +86,7 @@ test("a channel's card: counts and membership; archived shows; a private one not
     name: "diretoria",
     topic: "",
     visibility: "private",
+    audienceRoleIds: [],
     isMember: true,
     archived: false,
     people: 1,

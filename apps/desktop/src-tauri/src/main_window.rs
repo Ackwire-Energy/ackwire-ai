@@ -277,6 +277,9 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
             },
             DownloadEvent::Finished { path, success, .. } => {
                 if success {
+                    if let Some(p) = path.as_ref() {
+                        quarantine(p);
+                    }
                     if let Some(name) = path.as_ref().and_then(|p| p.file_name()) {
                         crate::menus::downloaded(&on_download, &name.to_string_lossy());
                     }
@@ -303,6 +306,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         let _ = built.set_zoom(crate::menus::restore_zoom(app, step));
     }
     crate::cover::attach(app, &window).map_err(|e| e.to_string())?;
+    crate::cover::opening(app);
     #[cfg(target_os = "macos")]
     follow_lights(app);
     fit_page(app);
@@ -652,6 +656,24 @@ fn downloads_path(app: &AppHandle, suggested: &Path) -> Option<PathBuf> {
         .unwrap_or_default();
     (1..1000).map(|n| dir.join(format!("{stem} ({n}){ext}"))).find(|p| !p.exists())
 }
+
+/// A file downloaded from the site gets the quarantine mark, as from a browser, so the Mac checks it before
+/// it opens. Only here: the app-wide switch (LSFileQuarantineEnabled) also marked what the agents' commands
+/// make, and Gatekeeper then stopped every binary they built (Info.plist).
+#[cfg(target_os = "macos")]
+fn quarantine(path: &Path) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let _ = std::process::Command::new("/usr/bin/xattr")
+        .args(["-w", "com.apple.quarantine", &format!("0081;{now:x};agentes.chat;")])
+        .arg(path)
+        .status();
+}
+
+#[cfg(not(target_os = "macos"))]
+fn quarantine(_path: &Path) {}
 
 fn front(app: &AppHandle) -> Result<(), String> {
     let window = app.get_window(LABEL).ok_or("window not found")?;

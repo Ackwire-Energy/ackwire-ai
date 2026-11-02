@@ -48,6 +48,12 @@ export function audienceWith(agent: Agent, userId: string): AgentAudience | null
 export const canTalk = (agent: Pick<Agent, "canTalk"> | undefined) => agent?.canTalk !== false;
 
 /**
+ * Whether I see how it works (instructions, tools and access, memory, files, usage, activity, settings): the
+ * server's `seesDetails`, the same rule its routes enforce. Without it, only its public card.
+ */
+export const seesDetails = (agent: { seesDetails?: boolean } | undefined) => agent?.seesDetails !== false;
+
+/**
  * Whether my lists and pickers show the agent: every agent for who manages agents, who arrange the team (the lock
  * says who it answers), only the ones that answer me for everyone else. From the server's `canTalk` (the agent's
  * audience and `talk_to_agents`), so a later limit per person reaches every list unchanged.

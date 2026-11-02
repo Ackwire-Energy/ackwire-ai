@@ -260,6 +260,8 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     AGENTES_SHARED_BIN: "/home/ag-a1b2c3d4/shared/bin",
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: "31627",
+    // A finished build's Gradle and Kotlin daemons give the memory back after 5 idle minutes, not 3 hours.
+    GRADLE_OPTS: "-Dorg.gradle.daemon.idletimeout=300000",
   };
   const launcher = systemLauncher(user, true, false);
   const p = launcher.prefix;

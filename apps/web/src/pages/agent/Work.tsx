@@ -59,8 +59,8 @@ import {
   advancedParts,
   advancedSummary,
   isAdvancedDefault,
-  isClaudeAlias,
 } from "@agenteschat/client/lib/brain-advanced";
+import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { firstName } from "@agenteschat/client/lib/format";
@@ -1229,12 +1229,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ) : null;
   // Cursor (ADR 0114): the models its plan includes, and where the CLI said so, the rest at API prices.
   const cursorPlanSays = kind === "cursor" && modelOptions.some((m) => m.inPlan);
-  const modelLine = (m: BrainModelChoice) =>
-    !plan && kind === "claude_code" && isClaudeAlias(m.value)
-      ? t(`agentPage.work.brain.modelLine.${m.value}`)
-      : cursorPlanSays
-        ? t(m.inPlan ? "brain.cursorModel.inPlan" : "brain.cursorModel.apiPrice")
-        : m.tag && t(`brain.modelTag.${m.tag}`);
+  const modelLine = (m: BrainModelChoice) => brainModelLine(t, kind, plan, m, cursorPlanSays);
   const planModelOptionsShown: SelectOption[] = [
     { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
     ...modelOptions.map((m) => {

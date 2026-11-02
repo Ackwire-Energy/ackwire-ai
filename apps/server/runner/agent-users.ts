@@ -103,6 +103,15 @@ const PRIVATE_TMP = [
  */
 export const adbServerPort = (uid: number) => 30_000 + (uid % 2768);
 
+/**
+ * Gradle's daemon exits after 5 idle minutes instead of 3 hours, and the Kotlin daemon with it: the agents share the
+ * computer's memory (`agentLimits`), and a finished Android build's daemons hold gigabytes of it, which leaves the
+ * other agents no room for their turns. Five minutes keep them warm between an agent's edits and builds. Gradle reads
+ * its client's system properties after every gradle.properties (`LayoutToPropertiesConverter`), so this holds for
+ * `gradlew` too, and an agent's own `-D` or `GRADLE_OPTS` still wins.
+ */
+const GRADLE_OPTS = "-Dorg.gradle.daemon.idletimeout=300000";
+
 const USER_NAME = /^ag-[a-z0-9]{8}$/;
 const AGENT_SHELL = "/bin/bash";
 const AGENT_PATH = "/usr/local/bin:/usr/bin:/bin";
@@ -313,6 +322,7 @@ export function systemLauncher(
     [SHARED_BIN_ENV]: `${home}/${SHARED_LINK}/bin`,
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: String(adbServerPort(u.uid)),
+    GRADLE_OPTS,
   };
   if (!systemd) return { prefix: command, env, home };
   return {

@@ -1,5 +1,5 @@
 {
-  "id": "a837d160-2a4a-43fd-9105-e62f30c01eb0",
+  "id": "319da399-2914-4371-bd29-fa20a8ab772e",
   "prevId": "c4d4d73f-9e17-4440-96a3-728ea47e63cf",
   "version": "7",
   "dialect": "postgresql",
@@ -8742,18 +8742,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "egress": {
-          "name": "egress",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "network_transition": {
-          "name": "network_transition",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "resume_tasks": {
           "name": "resume_tasks",
           "type": "boolean",
@@ -11253,6 +11241,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "done_by_user": {
+          "name": "done_by_user",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "snoozed_until": {
           "name": "snoozed_until",
           "type": "timestamp with time zone",
@@ -11299,6 +11294,34 @@
           ],
           "isUnique": false,
           "where": "\"notifications\".\"done_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notifications_done": {
+          "name": "notifications_done",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "done_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"notifications\".\"done_by_user\" and \"notifications\".\"done_at\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

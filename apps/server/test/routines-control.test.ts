@@ -132,7 +132,14 @@ test("continue: a routine paused near its plan's limit goes on for its owner; a 
   const list = (await (await api("/routines")).json()) as { routines: { state: string; usagePause: unknown }[] };
   const [paused] = list.routines;
   expect(paused?.state).toBe("usage_paused");
-  expect(paused?.usagePause).toEqual({ source: "plan", resetsAt, extraOff: false, extraUsedUp: false });
+  expect(paused?.usagePause).toEqual({
+    source: "plan",
+    resetsAt,
+    limit: false,
+    plan: null,
+    extraOff: false,
+    extraUsedUp: false,
+  });
 
   const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
   const refused = await ana(`/api/app/organizations/${orgId}/routines/${routine.id}/continue`, { json: {} });

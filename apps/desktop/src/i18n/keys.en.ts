@@ -548,6 +548,8 @@ export const desktopEn = {
     retry: "Try again",
     openTailscale: "Open Tailscale",
     otherServer: "Use another server",
+    stuck: "agentes.chat didn't open. Try again, or see the page as it is.",
+    showAnyway: "Show it anyway",
   },
   menu: {
     about: "About agentes.chat",

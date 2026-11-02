@@ -121,7 +121,8 @@ export function SettingsPage({
   const { org } = useOrg();
   const server = useAuthConfig().data;
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org, server));
-  const current = visible.some((s) => s.id === section) ? section : "general";
+  // A section this person can't open (a member's link to Geral): their first one, their account.
+  const current = visible.some((s) => s.id === section) ? section : (visible[0]?.id ?? "account");
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
   const strip = useRef<HTMLDivElement>(null);

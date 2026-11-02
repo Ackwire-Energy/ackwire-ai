@@ -35,6 +35,7 @@ export interface ThemeColors {
   warnSoft: string;
   onWarn: string;
   danger: string;
+  info: string;
   plate: string;
   plateSoft: string;
   scrim: string;
@@ -79,6 +80,7 @@ export const light: ThemeColors = {
   warnSoft: "#fbeed5",
   onWarn: "#ffffff",
   danger: "#b42a20",
+  info: "#0a6f9e",
   plate: "rgba(127, 127, 127, 0.1)",
   plateSoft: "rgba(127, 127, 127, 0.06)",
   scrim: "rgba(10, 10, 10, 0.32)",
@@ -122,6 +124,7 @@ export const dark: ThemeColors = {
   warnSoft: "#33260e",
   onWarn: "#2a1c00",
   danger: "#f08a80",
+  info: "#5cc4ea",
   plate: "rgba(127, 127, 127, 0.14)",
   plateSoft: "rgba(127, 127, 127, 0.08)",
   scrim: "rgba(0, 0, 0, 0.5)",
