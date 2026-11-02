@@ -160,6 +160,7 @@ import type {
   SandboxSettings,
   ScheduleParse,
   ScopeGrant,
+  SearchFilterInput,
   SearchHit,
   SecretRequest,
   ServerTelemetry,
@@ -193,6 +194,14 @@ import type {
   WorkingRun,
   WorkspaceLimits,
 } from "./types";
+
+/** Search filters as query parameters (lists comma-separated). */
+const filterQuery = (f: SearchFilterInput | undefined) =>
+  f
+    ? Object.fromEntries(
+        Object.entries(f).map(([k, v]) => [k, Array.isArray(v) ? v.join(",") || undefined : v === true ? "true" : v]),
+      )
+    : {};
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
 /** The most agents one `POST …/agent-setup` takes (the server's `SETUP_AGENTS_MAX`). */
@@ -815,7 +824,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       query: async (orgId, input) =>
         (
           await request<{ hits: SearchHit[] }>(`${org(orgId)}/search`, {
-            query: { q: input.q, kinds: input.kinds?.join(","), limit: input.limit },
+            query: { q: input.q, kinds: input.kinds?.join(","), limit: input.limit, ...filterQuery(input.filters) },
           })
         ).hits,
     },

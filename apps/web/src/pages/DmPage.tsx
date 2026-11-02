@@ -16,6 +16,7 @@ import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
@@ -92,6 +93,7 @@ export function DmPage({ target }: { target: DmTarget }) {
         )}
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
+      <SearchHereButton channelId={dm.data.channelId} />
       {agent && <ComputerButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
     </header>

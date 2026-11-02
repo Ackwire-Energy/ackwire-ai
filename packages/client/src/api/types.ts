@@ -2038,6 +2038,30 @@ export interface SearchHit {
   createdAt: string;
   /** Message hits: who wrote it; action hits: the agent that did it. */
   author?: { type: AuthorType; id: string; name: string } | null;
+  /** Message hits: the message (open it there) and its thread (null = the main timeline). */
+  messageId?: string | null;
+  threadId?: string | null;
+}
+
+/** What a message has (ADR 0123): a link, a file, an image (an image file, a GIF, a sticker), a card. */
+export type SearchHas = "link" | "file" | "image" | "card";
+/** `relevance`: the best matches; `newest` / `oldest`: by date. */
+export type SearchSort = "relevance" | "newest" | "oldest";
+
+/** Search filters as the API takes them (ADR 0123; `lib/search-filters.ts` builds them from chips). */
+export interface SearchFilterInput {
+  in?: string[];
+  fromUsers?: string[];
+  fromAgents?: string[];
+  mentionsUsers?: string[];
+  mentionsAgents?: string[];
+  has?: SearchHas[];
+  author?: "person" | "agent";
+  pinned?: boolean;
+  /** ISO times: at or after, before. */
+  after?: string;
+  before?: string;
+  sort?: SearchSort;
 }
 
 /**

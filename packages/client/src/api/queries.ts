@@ -112,6 +112,7 @@ import type {
   RoutinePatch,
   S3Input,
   SandboxSettingsInput,
+  SearchFilterInput,
   SearchKind,
   SeriesScope,
   SidebarItem,
@@ -2188,13 +2189,15 @@ export function cacheDmRead(
 
 // ── Knowledge (phase 5) ─────────────────────────────────────────────────────
 
-export const useSearch = (orgId: string, q: string, kinds: SearchKind[]) => {
+/** A search; with `filters` (ADR 0123) it runs with no words too, as long as one filter is set. */
+export const useSearch = (orgId: string, q: string, kinds: SearchKind[], filters?: SearchFilterInput) => {
   const api = useApi();
   const text = q.trim();
+  const filtered = Object.keys(filters ?? {}).some((k) => k !== "sort");
   return useQuery({
-    queryKey: keys.search(orgId, text, kinds.join(",")),
-    queryFn: () => api.search.query(orgId, { q: text, kinds, limit: 50 }),
-    enabled: text.length > 0,
+    queryKey: [...keys.search(orgId, text, kinds.join(",")), filters ?? null],
+    queryFn: () => api.search.query(orgId, { q: text, kinds, limit: filters ? 100 : 50, filters }),
+    enabled: text.length > 0 || filtered,
     placeholderData: (previous) => previous,
   });
 };

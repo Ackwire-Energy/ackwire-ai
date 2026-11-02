@@ -1,4 +1,11 @@
-import type { SearchDocument, SearchHit, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
+import type {
+  MessageFilter,
+  SearchDocument,
+  SearchHit,
+  SearchIndexResolver,
+  SearchKind,
+  SearchQuery,
+} from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
 import { caches } from "./cache";
 import { cutText } from "./format";
@@ -218,11 +225,13 @@ export async function searchVisible(
     kinds?: SearchKind[];
     limit?: number;
     match?: "all" | "any";
-  },
+  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort">,
 ): Promise<SearchHit[]> {
-  const embedded = input.text.trim()
-    ? await deps.gateway.embed({ orgId: input.orgId, texts: [input.text], inputType: "query" })
-    : null;
+  // A list by date ranks by no vector: no embedding to pay for.
+  const embedded =
+    input.text.trim() && (input.sort ?? "relevance") === "relevance"
+      ? await deps.gateway.embed({ orgId: input.orgId, texts: [input.text], inputType: "query" })
+      : null;
   const index = await deps.search.forOrg(input.orgId);
   return index.query({
     text: input.text,
@@ -231,7 +240,18 @@ export async function searchVisible(
     kinds: input.kinds,
     limit: input.limit,
     match: input.match,
+    after: input.after,
+    before: input.before,
+    messages: input.messages,
+    sort: input.sort,
   });
+}
+
+/** A person's search filters (ADR 0123): what `searchForUser` takes besides the words. */
+export interface UserSearchFilters extends Pick<SearchQuery, "after" | "before" | "sort"> {
+  /** Only these channels and DMs (`in:`); the ones the person can't read are dropped, never searched. */
+  channelIds?: string[];
+  messages?: MessageFilter;
 }
 
 /** A person's search across what they can read. */
@@ -239,14 +259,20 @@ export async function searchForUser(
   deps: SearchDeps,
   userId: string,
   orgId: string,
-  input: { text: string; kinds?: SearchKind[]; limit?: number },
+  input: { text: string; kinds?: SearchKind[]; limit?: number } & UserSearchFilters,
 ) {
   await requirePermission(deps.db, userId, orgId, "read");
-  const hits = await searchVisible(deps, {
-    orgId,
-    ...input,
-    visibleChannelIds: await userVisibleChannels(deps.db, orgId, userId),
-  });
+  const { channelIds, ...rest } = input;
+  let visible = await userVisibleChannels(deps.db, orgId, userId);
+  if (channelIds) {
+    const wanted = new Set(channelIds);
+    visible = visible.filter((id) => wanted.has(id));
+    if (visible.length === 0) return [];
+  }
+  // A channel scope or a message filter searches messages alone (a workspace-wide wiki page is in no channel).
+  const kinds = channelIds || input.messages ? (["message"] satisfies SearchKind[]) : input.kinds;
+  const messages = input.messages ?? (channelIds ? {} : undefined);
+  const hits = await searchVisible(deps, { orgId, ...rest, kinds, messages, visibleChannelIds: visible });
   // Wiki pages are indexed for the whole workspace; a restricted one only reaches its audience.
   const pages = hits.filter((h) => h.kind === "wiki").map((h) => h.sourceId);
   if (pages.length === 0) return hits;

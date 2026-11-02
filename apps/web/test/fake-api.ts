@@ -2629,8 +2629,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       query: async (orgId, input) => {
         log("search.query", orgId, input);
         const q = input.q.toLowerCase();
+        const f = input.filters;
+        // The filters the fake reads (ADR 0123): `in:` and `from:`.
+        const from = [...(f?.fromUsers ?? []), ...(f?.fromAgents ?? [])];
         const messages = state.messages
           .filter((m) => m.body.toLowerCase().includes(q))
+          .filter((m) => !f?.in?.length || f.in.includes(m.channelId))
+          .filter((m) => !from.length || from.includes(m.author.id ?? ""))
           .map((m) => ({
             kind: "message" as const,
             sourceId: m.id,
@@ -2642,6 +2647,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             snippet: m.body,
             score: 1,
             createdAt: m.createdAt,
+            messageId: m.id,
+            threadId: m.threadId,
+            author: m.author.id ? { type: m.author.type, id: m.author.id, name: "" } : null,
           }));
         const items = state.memories
           .filter((m) => m.text.toLowerCase().includes(q))
@@ -2655,7 +2663,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             createdAt: m.updatedAt,
           }));
         const actions = (state.teamActions ?? []).filter((h) => h.snippet.toLowerCase().includes(q));
-        return [...actions, ...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
+        const all = f && Object.keys(f).some((k) => k !== "sort") ? messages : [...actions, ...messages, ...items];
+        return all.filter((h) => !input.kinds || input.kinds.includes(h.kind));
       },
     },
     memory: {
