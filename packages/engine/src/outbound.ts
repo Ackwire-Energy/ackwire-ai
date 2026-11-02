@@ -1,5 +1,5 @@
-import { foldText, type OutboundCode, outboundUrlProblem, urlsIn } from "@agenteschat/adapters";
-import { and, desc, eq, gt, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { foldText, type OutboundCode, outboundUrlProblem, urlCopiesPrivateText, urlsIn } from "@agenteschat/adapters";
+import { and, desc, eq, gt, inArray, isNull, not, or, schema, sql } from "@agenteschat/db";
 import type { ToolContext, ToolOutput } from "./tools/types";
 import { WEB_FETCH_TOOL, WEB_SEARCH_TOOL } from "./web-tools";
 
@@ -24,7 +24,7 @@ const cache = new Map<string, RunReads>();
  * run except the public web's. Null: the agent may open it.
  */
 export async function checkOutboundUrl(
-  ctx: Pick<ToolContext, "db" | "orgId" | "runId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  ctx: Pick<ToolContext, "db" | "orgId" | "agentId" | "runId" | "channelId" | "threadRootId" | "triggerMessageId">,
   url: string,
 ): Promise<{ code: OutboundCode; message: string } | null> {
   const reads = await runReads(ctx);
@@ -44,15 +44,43 @@ export async function outboundRefusal(
   return problem ? { content: problem.message, isError: true, data: { code: problem.code, url } } : null;
 }
 
+const emptyReads = (): RunReads => ({ seq: -1, seen: new Set(), privateText: [], names: new Map() });
+
+function cachedReads(runId: string): RunReads {
+  let reads = cache.get(runId);
+  if (!reads) {
+    reads = emptyReads();
+    if (cache.size >= CACHED_RUNS) cache.delete(cache.keys().next().value as string);
+    cache.set(runId, reads);
+  }
+  return reads;
+}
+
+/**
+ * One tool result into what the run read. A private result's address that copies text the run read before is no
+ * seen address: the agent made it (printed by run_code, echoed by any tool), so it gets the full check.
+ */
+function addResult(reads: RunReads, tool: string, content: string) {
+  const web = tool === WEB_SEARCH_TOOL || tool === WEB_FETCH_TOOL;
+  for (const u of urlsIn(content)) {
+    if (web || reads.seen.has(u) || !urlCopiesPrivateText(u, reads.privateText)) reads.seen.add(u);
+  }
+  // The public web's results are no private text.
+  if (!web) reads.privateText.push(foldText(content));
+}
+
+/**
+ * A tool's whole output, as the model got it: run steps keep only its first 4000 characters, and the check must
+ * see all of it. Called by the gateway for each result of a stored run.
+ */
+export function recordRead(runId: string, tool: string, content: string) {
+  if (UUID.test(runId)) addResult(cachedReads(runId), tool, content);
+}
+
 async function runReads(ctx: Pick<ToolContext, "db" | "orgId" | "runId">): Promise<RunReads> {
   // A call outside a stored run (a test's bare context) has no reads.
-  if (!UUID.test(ctx.runId)) return { seq: -1, seen: new Set(), privateText: [], names: new Map() };
-  let reads = cache.get(ctx.runId);
-  if (!reads) {
-    reads = { seq: -1, seen: new Set(), privateText: [], names: new Map() };
-    if (cache.size >= CACHED_RUNS) cache.delete(cache.keys().next().value as string);
-    cache.set(ctx.runId, reads);
-  }
+  if (!UUID.test(ctx.runId)) return emptyReads();
+  const reads = cachedReads(ctx.runId);
   const steps = await ctx.db
     .select({ seq: schema.agentRunSteps.seq, kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
     .from(schema.agentRunSteps)
@@ -73,23 +101,25 @@ async function runReads(ctx: Pick<ToolContext, "db" | "orgId" | "runId">): Promi
       if (id) reads.names.set(id, name);
       continue;
     }
-    const content = String(data.content ?? "");
-    for (const u of urlsIn(content)) reads.seen.add(u);
-    // The public web's results are no private text.
-    const tool = reads.names.get(id) ?? name;
-    if (tool !== WEB_SEARCH_TOOL && tool !== WEB_FETCH_TOOL) reads.privateText.push(foldText(content));
+    addResult(reads, reads.names.get(id) ?? name, String(data.content ?? ""));
   }
   return reads;
 }
 
-/** Addresses people and agents wrote where this run answers: its thread, and the channel's latest messages. */
+/**
+ * Addresses people and agents wrote where this run answers: its thread, and the channel's latest messages. What
+ * this agent posted since the run started is left out: an address it posted itself is no seen address.
+ */
 async function conversationUrls(
-  ctx: Pick<ToolContext, "db" | "orgId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  ctx: Pick<ToolContext, "db" | "orgId" | "agentId" | "runId" | "channelId" | "threadRootId" | "triggerMessageId">,
 ): Promise<string[]> {
   const m = schema.messages;
   const ids = [ctx.threadRootId, ctx.triggerMessageId].filter((id) => UUID.test(id));
   if (!UUID.test(ctx.channelId)) return [];
-  const scope = and(eq(m.orgId, ctx.orgId), eq(m.channelId, ctx.channelId), isNull(m.deletedAt));
+  const own = UUID.test(ctx.runId)
+    ? sql`(${m.authorAgentId} is not distinct from ${ctx.agentId} and ${m.createdAt} >= (select ${schema.agentRuns.createdAt} from ${schema.agentRuns} where ${schema.agentRuns.id} = ${ctx.runId}))`
+    : sql`false`;
+  const scope = and(eq(m.orgId, ctx.orgId), eq(m.channelId, ctx.channelId), isNull(m.deletedAt), not(own));
   const [thread, recent] = await Promise.all([
     ctx.db
       .select({ body: m.body })

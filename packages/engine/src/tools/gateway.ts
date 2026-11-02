@@ -10,6 +10,7 @@ import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
+import { recordRead } from "../outbound";
 import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
 import { describeWhen } from "../schedule";
@@ -620,6 +621,7 @@ export function createToolGateway(deps: {
       .update(approvals)
       .set({ result: { content: shown(output.content), isError: output.isError === true } })
       .where(sql`${approvals.id} = ${approval.id}`);
+    recordRead(ctx.runId, approval.tool, output.content);
     await addRunStep(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, "tool_result", {
       toolUseId,
       name: approval.tool,
@@ -747,6 +749,7 @@ export function createToolGateway(deps: {
       };
       /** `outcome`: what the audit says; none for a call that never really was one (a malformed input). */
       const finish = async (output: ToolOutput, outcome?: AuditOutcome) => {
+        recordRead(ctx.runId, call.name, output.content);
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,

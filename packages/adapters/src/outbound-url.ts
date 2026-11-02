@@ -77,9 +77,7 @@ export function outboundUrlProblem(
   const normalized = normalizeUrl(url);
   if (normalized && opts.seen?.(normalized)) return null;
   const problem = (code: OutboundCode) => ({ code, message: OUTBOUND_MESSAGES[code] });
-  const values = [...u.searchParams.values()];
-  const fragment = decode(u.hash.slice(1));
-  const decoded = [...values, fragment].filter(Boolean).join(" ");
+  const decoded = carried(u);
   const whole = `${decode(u.href)} ${decoded}`;
   if (new RegExp(KEY_SHAPES.source).test(whole) || PRIVATE_KEY.test(whole)) return problem("outbound.credential");
   if (opts.privateText && new RegExp(SIGNED_SHAPES.source).test(whole)) return problem("outbound.credential");
@@ -90,6 +88,20 @@ export function outboundUrlProblem(
     return problem("outbound.private_text");
   }
   return null;
+}
+
+/** The text an address carries for its server: its query values and fragment, decoded. */
+function carried(u: URL) {
+  return [...u.searchParams.values(), decode(u.hash.slice(1))].filter(Boolean).join(" ");
+}
+
+/** Whether an address's query or fragment copies a private text (`outboundUrlProblem`'s private-text rule alone). */
+export function urlCopiesPrivateText(url: string, privateText: string[]): boolean {
+  try {
+    return copiesPrivateText(foldText(carried(new URL(url))), privateText);
+  } catch {
+    return false;
+  }
 }
 
 /** Whether some `WINDOW`-long run of `query` appears in a private text (both folded). */
