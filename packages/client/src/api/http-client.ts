@@ -32,9 +32,11 @@ import type {
   AgentUsage,
   AiAccounts,
   AiStatus,
+  AppConsent,
   AppNotification,
   Approval,
   ApprovalRule,
+  AppsList,
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
@@ -59,6 +61,7 @@ import type {
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
+  CreatedPersonalToken,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -875,6 +878,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       removeAccount: (orgId, machineId, accountId) =>
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, { method: "DELETE" }),
+    },
+    apps: {
+      consent: (requestId) => request<AppConsent>(`/api/app/authorize/${enc(requestId)}`),
+      decide: (requestId, input) =>
+        request<{ redirectTo: string }>(`/api/app/authorize/${enc(requestId)}`, { json: input }),
+      list: (orgId, all = false) => request<AppsList>(`${org(orgId)}/apps`, { query: all ? { all: "1" } : {} }),
+      disconnect: (orgId, grantId) => request<void>(`${org(orgId)}/apps/${enc(grantId)}`, { method: "DELETE" }),
+      createToken: (orgId, input) => request<CreatedPersonalToken>(`${org(orgId)}/tokens`, { json: input }),
+      revokeToken: (orgId, grantId) => request<void>(`${org(orgId)}/tokens/${enc(grantId)}`, { method: "DELETE" }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

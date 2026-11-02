@@ -50,6 +50,7 @@ import type {
   AgentSetup,
   AiStatus,
   ApiRule,
+  AppConsentDecision,
   AppNotification,
   Approval,
   ArtifactContent,
@@ -98,6 +99,7 @@ import type {
   NotificationFilter,
   OrgRoles,
   Person,
+  PersonalTokenInput,
   Proposal,
   ReactionCount,
   ReminderInput,
@@ -4183,4 +4185,59 @@ export function useSetAgentDatabase(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
     },
   });
+}
+
+/** `/autorizar?req=`: the app asking and the workspaces it could get (ADR 0113). Asked once: it answers once. */
+export const useAppConsent = (requestId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.appConsent(requestId),
+    queryFn: () => api.apps.consent(requestId),
+    enabled: requestId.length > 0,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    meta: { quiet: true },
+  });
+};
+
+/** Permitir or Cancelar on the consent page; the page goes to `redirectTo` once. */
+export function useDecideAppConsent(requestId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AppConsentDecision) => api.apps.decide(requestId, input),
+    meta: { silent: true },
+    onSuccess: (_r, input) => {
+      if (input.orgId) void qc.invalidateQueries({ queryKey: ["org", input.orgId, "apps"] });
+    },
+  });
+}
+
+/** Settings → AI apps. `pollMs`: also refetch this often (while waiting for an app to connect). */
+export const useApps = (orgId: string, all = false, pollMs: number | false = false) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.apps(orgId, all),
+    queryFn: () => api.apps.list(orgId, all),
+    refetchInterval: pollMs,
+  });
+};
+
+/** Desconectar an app, Revogar a token, Criar token: both lists refresh. */
+export function useAppActions(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const done = () => void qc.invalidateQueries({ queryKey: ["org", orgId, "apps"] });
+  return {
+    disconnect: useMutation({ mutationFn: (grantId: string) => api.apps.disconnect(orgId, grantId), onSuccess: done }),
+    revokeToken: useMutation({
+      mutationFn: (grantId: string) => api.apps.revokeToken(orgId, grantId),
+      onSuccess: done,
+    }),
+    createToken: useMutation({
+      mutationFn: (input: PersonalTokenInput) => api.apps.createToken(orgId, input),
+      meta: { silent: true },
+      onSuccess: done,
+    }),
+  };
 }

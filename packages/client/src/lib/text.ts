@@ -185,3 +185,26 @@ export const matchesName = (typed: string, name: string) => typedForm(typed) ===
 
 /** Text made safe inside HTML, as text or as an attribute value (quoted either way). */
 export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** Controls, zero-width, bidi and tag characters: they change how text looks without being seen. */
+const INVISIBLE: readonly [from: number, to: number][] = [
+  [0x0, 0x1f],
+  [0x7f, 0x9f],
+  [0xad, 0xad],
+  [0x61c, 0x61c],
+  [0x180e, 0x180e],
+  [0x200b, 0x200f],
+  [0x202a, 0x202e],
+  [0x2060, 0x206f],
+  [0xfeff, 0xfeff],
+  [0xe0000, 0xe007f],
+];
+
+/** Text with every invisible character written out as `\u{…}`, so an address can't pass for another. */
+export const visibleText = (text: string) =>
+  [...text]
+    .map((c) => {
+      const code = c.codePointAt(0) ?? 0;
+      return INVISIBLE.some(([from, to]) => code >= from && code <= to) ? `\\u{${code.toString(16)}}` : c;
+    })
+    .join("");

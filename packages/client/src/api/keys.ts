@@ -122,6 +122,10 @@ export const keys = {
   computerSetup: (orgId: string) => ["org", orgId, "computer-setup"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
   machineDevice: (userCode: string) => ["machine-device", userCode] as const,
+  /** Settings → AI apps: mine, or the whole workspace's (`all`), both under `apps`. */
+  apps: (orgId: string, all = false) => ["org", orgId, "apps", all ? "all" : "mine"] as const,
+  /** An app's consent (`/autorizar?req=`): not under an organization, it is picked on that page. */
+  appConsent: (requestId: string) => ["app-consent", requestId] as const,
   desktopLatest: (target: string, arch: string) => ["desktop-latest", target, arch] as const,
   artifactBlob: (orgId: string, id: string, version: number) =>
     ["org", orgId, "artifacts", "blob", id, version] as const,

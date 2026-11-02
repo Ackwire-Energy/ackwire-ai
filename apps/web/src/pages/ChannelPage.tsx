@@ -117,6 +117,7 @@ import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { appVia } from "@agenteschat/client/lib/via";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,
@@ -206,7 +207,7 @@ import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
-import { NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
+import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -3164,6 +3165,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
   const reminder = isReminderMessage(m.meta);
+  const via = m.author.type === "person" ? appVia(m.meta) : null;
   const renderMention = (handle: string, key: string) => {
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
@@ -3369,6 +3371,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 onToggle={() => setReportOpen((o) => !o)}
               />
             )}
+            {via && <AppViaTag via={via} person={name} />}
             {talker && (
               <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
                 {t("chat.notice.talker")}

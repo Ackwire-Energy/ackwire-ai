@@ -82,11 +82,12 @@ export const signInPath = (redirect: string, email?: string) =>
  */
 export function signInFor(
   redirect: string | undefined,
-): { invite: string } | { connect: "ai" } | { create: "agent" } | null {
+): { invite: string } | { connect: "ai" } | { create: "agent" } | { authorize: "app" } | null {
   if (!redirect) return null;
   const url = new URL(redirect, "http://localhost");
   const invite = /^\/invite\/([^/]+)$/.exec(url.pathname)?.[1];
   if (invite) return { invite };
+  if (url.pathname === "/autorizar") return { authorize: "app" };
   if (/^\/org\/[^/]+\/agents\/new$/.test(url.pathname)) return { create: "agent" };
   return url.searchParams.get("connect") === "ai" ? { connect: "ai" } : null;
 }

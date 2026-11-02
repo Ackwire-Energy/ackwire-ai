@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AutorizarRouteImport } from './routes/autorizar'
 import { Route as ConectarRouteImport } from './routes/conectar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -61,6 +62,11 @@ import { Route as OrgOrgIdSettingsComputersMachineIdRouteImport } from './routes
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AutorizarRoute = AutorizarRouteImport.update({
+  id: '/autorizar',
+  path: '/autorizar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConectarRoute = ConectarRouteImport.update({
@@ -304,6 +310,7 @@ const OrgOrgIdSettingsComputersMachineIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/autorizar': typeof AutorizarRoute
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -354,6 +361,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/autorizar': typeof AutorizarRoute
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -404,6 +412,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/autorizar': typeof AutorizarRoute
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -456,6 +465,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/autorizar'
     | '/conectar'
     | '/login'
     | '/onboarding'
@@ -506,6 +516,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/autorizar'
     | '/conectar'
     | '/login'
     | '/onboarding'
@@ -555,6 +566,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/autorizar'
     | '/conectar'
     | '/login'
     | '/onboarding'
@@ -606,6 +618,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AutorizarRoute: typeof AutorizarRoute
   ConectarRoute: typeof ConectarRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -633,6 +646,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/autorizar': {
+      id: '/autorizar'
+      path: '/autorizar'
+      fullPath: '/autorizar'
+      preLoaderRoute: typeof AutorizarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/conectar': {
@@ -1038,6 +1058,7 @@ const OrgOrgIdRouteWithChildren = OrgOrgIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AutorizarRoute: AutorizarRoute,
   ConectarRoute: ConectarRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
