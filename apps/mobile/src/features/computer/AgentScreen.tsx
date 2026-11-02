@@ -182,7 +182,7 @@ export function AgentScreen({
   canTakeOver: boolean;
   /** The agent held or its computer paused. */
   banner: ReactNode;
-  top: (sub: string, action: ReactNode) => ReactNode;
+  top: (sub: string, action: ReactNode, info?: ReactNode) => ReactNode;
 }) {
   const { t } = useTranslation();
   const c = useColors();
