@@ -104,8 +104,10 @@ const EVENTS: Record<ConnectorEventId, EventDef> = {
     passes(payload, filter) {
       const o = record(payload);
       if (o?.type !== "inbox.email.received") return false;
-      const data = record(o.data) ?? {};
-      return emailPasses(data, filter);
+      // The email sits under `data.email` (MillionSend's webhook payload); the thread carries the subject too.
+      const data = record(o.data);
+      const email = record(data?.email) ?? {};
+      return emailPasses({ ...email, subject: email.subject ?? record(data?.thread)?.subject }, filter);
     },
   },
 };
@@ -189,6 +191,27 @@ export async function checkConnectorTrigger(
     );
   }
   return connection;
+}
+
+/**
+ * Whether a routine may still take its connector event when a call arrives: the owner can revoke the connection or
+ * the agent's read access after the routine was saved, and the provider keeps posting either way.
+ */
+export async function connectorTriggerAllowed(
+  db: Database,
+  orgId: string,
+  routineId: string,
+  source: ConnectorTriggerSource,
+) {
+  const [routine] = await db
+    .select({ agentId: schema.routines.agentId })
+    .from(schema.routines)
+    .where(and(eq(schema.routines.id, routineId), eq(schema.routines.orgId, orgId)));
+  if (!routine?.agentId) return false;
+  return checkConnectorTrigger(db, orgId, routine.agentId, source).then(
+    () => true,
+    () => false,
+  );
 }
 
 export type ConnectorTriggerDeps = ConnectorDeps & { connect?: McpConnect };

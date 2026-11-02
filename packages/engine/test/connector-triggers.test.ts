@@ -9,6 +9,8 @@ import {
   emailPasses,
   getRoutineView,
   type McpSession,
+  newRoutineHookAddress,
+  newRoutineHookSecret,
   type RoutineHookDeps,
   receiveRoutineHook,
   setRoutineActive,
@@ -90,7 +92,14 @@ const post = (token: string, body: unknown, id: string) =>
 
 const received = (from: string, subject: string, to = "vendas@loja.example") => ({
   type: "inbox.email.received",
-  data: { inbox_id: INBOX, from, to: [to], subject },
+  data: {
+    source: "system",
+    inbox_id: INBOX,
+    thread_id: "0193eeee-0000-4000-8000-0000000000a1",
+    email_id: "0193eeee-0000-4000-8000-0000000000b1",
+    thread: { object: "inbox_thread", id: "0193eeee-0000-4000-8000-0000000000a1", subject, folder: "inbox" },
+    email: { id: "0193eeee-0000-4000-8000-0000000000b1", direction: "inbound", from, to: [to], cc: [], subject },
+  },
 });
 
 const runsOf = (routineId: string) =>
@@ -181,6 +190,40 @@ test("only an agent the connection's owner let read it may wait on its events", 
   }).catch((e: unknown) => e);
   expect((made as { code?: string }).code).toBe("routine.connector_agent_cannot_read");
   expect(calls).toEqual([]);
+});
+
+test("an email that arrives after the owner took the agent's access, or the connection, runs nothing", async () => {
+  f = await setup();
+  const { connection, calls, deps } = await millionSend();
+  const routine = await createRoutine(deps, f.owner.id, f.org.id, {
+    name: "E-mail",
+    agentId: f.agent.id,
+    prompt: "Leia.",
+    target: { type: "channel", channelId: f.general.id },
+    trigger: { type: "connector", connectionId: connection.id, event: "millionsend.email.received" },
+  });
+  const endpoint = String(calls.find((c) => c.name === "create_webhook")?.args.endpoint);
+  const token = endpoint.split("/api/hooks/")[1] ?? "";
+  // Its address and signing are MillionSend's webhook: neither changes by hand.
+  const ref = { id: routine.id, orgId: f.org.id, name: routine.name };
+  for (const change of [newRoutineHookAddress, newRoutineHookSecret]) {
+    const refused = await change(hookDeps(), f.owner.id, ref).catch((e: unknown) => e);
+    expect((refused as { code?: string }).code).toBe("routine.connector_hook");
+  }
+  await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.connectionId, connection.id));
+  expect(await post(token, received("ana@cliente.example", "Oi"), "msg_a")).toMatchObject({ runId: null });
+  await f.db.insert(schema.agentScopes).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    connectionId: connection.id,
+    scope: `custom:${connection.id}:read`,
+  });
+  await f.db
+    .update(schema.connectorConnections)
+    .set({ revokedAt: new Date() })
+    .where(eq(schema.connectorConnections.id, connection.id));
+  expect(await post(token, received("ana@cliente.example", "Oi"), "msg_b")).toMatchObject({ runId: null });
+  expect(await runsOf(routine.id)).toEqual([]);
 });
 
 test("the filter reads addresses as payloads write them; a created id from JSON or text", () => {

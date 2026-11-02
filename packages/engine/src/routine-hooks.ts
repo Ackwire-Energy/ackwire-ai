@@ -15,7 +15,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
-import { connectorCallPasses, sourceOf } from "./connector-triggers";
+import { connectorCallPasses, connectorTriggerAllowed, sourceOf } from "./connector-triggers";
 import { openSecret, randomToken, routineHookToken, sealSecret, sha256 } from "./crypto";
 import { ConflictError, TooManyError } from "./errors";
 import { cutText } from "./format";
@@ -209,9 +209,18 @@ const auditChange = (db: Database, actorId: string, routine: RoutineRef, change:
     details: { name: routine.name, change },
   });
 
+/** A connector routine's address and signing are the provider's webhook (ADR 0130): only a save changes them. */
+async function ownHookRow(deps: Pick<RoutineHookDeps, "db" | "hooks">, routine: RoutineRef) {
+  const row = await hookRow(deps, routine);
+  if (sourceOf(row.source)) {
+    throw new ConflictError("The connected service keeps this routine's address", "routine.connector_hook");
+  }
+  return row;
+}
+
 /** A new address: the old one stops at once, since its token no longer matches any hash. */
 export async function newRoutineHookAddress(deps: RoutineHookDeps, actorId: string, routine: RoutineRef) {
-  await hookRow(deps, routine);
+  await ownHookRow(deps, routine);
   await deps.db
     .update(routineHooks)
     .set({ ...newKey(deps.hooks), updatedAt: new Date() })
@@ -224,7 +233,7 @@ const secretAad = (routine: { orgId: string; id: string }) => `routine-hook|${ro
 
 /** A new signing secret, replacing any: shown this once, kept sealed to check signatures. */
 export async function newRoutineHookSecret(deps: RoutineHookDeps, actorId: string, routine: RoutineRef) {
-  await hookRow(deps, routine);
+  await ownHookRow(deps, routine);
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
   const secret = randomToken(32);
@@ -304,7 +313,13 @@ export async function receiveRoutineHook(
   }
   // A connector's event (ADR 0130): what isn't that event, or that its filter leaves out, runs nothing.
   const source = sourceOf(hook.source);
-  if (source && !connectorCallPasses(source, body)) return { status: 202, runId: null, duplicate: false };
+  if (
+    source &&
+    (!connectorCallPasses(source, body) ||
+      !(await connectorTriggerAllowed(deps.db, hook.orgId, hook.routineId, source)))
+  ) {
+    return { status: 202, runId: null, duplicate: false };
+  }
   return accept(deps, hook, { headers: input.headers, body, test: false, token: input.token });
 }
 
