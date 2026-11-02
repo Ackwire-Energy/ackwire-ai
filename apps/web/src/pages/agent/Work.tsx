@@ -896,7 +896,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       return;
     }
     if (moves) await setTarget.mutateAsync({ agentId: agent.id, machineId: moves.machineId });
-    await api.agents.setBrain(org.id, agent.id, {
+    return api.agents.setBrain(org.id, agent.id, {
       brain: kind,
       model: planModel === option?.defaultModel ? null : planModel,
       fallback,
@@ -909,7 +909,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const use = async () => {
     setBusy(true);
     try {
-      await saveThis();
+      const result = await saveThis();
       refresh();
       const same =
         !effortChanged &&
@@ -929,15 +929,23 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           : null;
       if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
-        toast.show(t("aiAccounts.share.backOnApi", g), "info", {
-          label: agent.audience?.userIds?.length
-            ? t("aiAccounts.share.letPeople", g)
-            : t("aiAccounts.share.letEveryone", g),
-          run: () =>
-            void api.agents
-              .setBrain(org.id, agent.id, { onlyOwner: false })
-              .then(refresh, () => toast.show(t("agentPage.work.failed"), "error")),
-        });
+        // "Só algumas pessoas" with nobody picked has no one to let back in: no action.
+        const people = agent.audience?.userIds?.length ?? 0;
+        toast.show(
+          t("aiAccounts.share.backOnApi", g),
+          "info",
+          agent.audience?.mode === "people" && people === 0
+            ? undefined
+            : {
+                label: people ? t("aiAccounts.share.letPeople", g) : t("aiAccounts.share.letEveryone", g),
+                run: () =>
+                  void api.agents
+                    .setBrain(org.id, agent.id, { onlyOwner: false })
+                    .then(refresh, () => toast.show(t("agentPage.work.failed"), "error")),
+              },
+        );
+      } else if (onlyShare && !onlyOwner && result?.onlyOwner) {
+        toast.show(t("aiAccounts.share.pickPeople", g), "info");
       } else
         toast.show(
           onlyShare

@@ -209,6 +209,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
     quietMs: router.quietMs,
+    pubsub: deps.pubsub,
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
     ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
   };

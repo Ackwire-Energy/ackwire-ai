@@ -216,6 +216,20 @@ describe("where a browser request opens", () => {
     expect(notificationHref(n)).toBe("/chat/c1?handoff=h1");
   });
 
+  test("one sent to someone who can't open its conversation opens the agent's computer", () => {
+    const n = notification({
+      id: "n1",
+      kind: "browser_handoff",
+      waiting: true,
+      source: { handoffId: "h1", agentId: "a1" },
+    });
+    expect(notificationHref(n)).toBe("/computer/a1");
+    // In my DM with the agent: that DM, the card in control.
+    expect(notificationHref({ ...n, source: { dmId: "d1", handoffId: "h1", agentId: "a1" } })).toBe(
+      "/chat/d1?handoff=h1",
+    );
+  });
+
   test("it is a waiting card that opens, and it comes first", () => {
     const n = notification({
       id: "n1",

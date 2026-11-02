@@ -213,6 +213,7 @@ export async function addAgentReaction(
   db: Database,
   input: { orgId: string; agentId: string; messageId: string; reaction: string },
   pubsub?: PubSub,
+  options: { notify?: boolean } = {},
 ) {
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
@@ -230,7 +231,7 @@ export async function addAgentReaction(
     reactions,
   });
   // A person's message: its author hears the agent reacted.
-  if (inserted.length > 0 && message.authorType === "person") {
+  if (inserted.length > 0 && message.authorType === "person" && options.notify !== false) {
     await notifyReaction(
       { db, pubsub },
       { orgId: input.orgId, messageId: input.messageId, agentId: input.agentId },

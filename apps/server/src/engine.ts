@@ -110,7 +110,10 @@ export interface EngineOptions {
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
   /** Tests: fake TypeSafe transport. */
   jevFetch?: typeof fetch;
-  /** Tests: how long a person's message waits for their next one before the router decides (`ROUTER_QUIET_MS`). */
+  /**
+   * Tests: how long a person's message waits for their next one before the router decides, or before the run it
+   * started makes its first model call (`ROUTER_QUIET_MS`).
+   */
   routerQuietMs?: number;
   /** Tests: a fake judge (no model calls for "is this a stop?" and the like). */
   judge?: Judge;
@@ -477,6 +480,8 @@ export function buildEngine(o: EngineOptions) {
     gifs: adapters.gifs ?? null,
     log: o.log,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
+    // A run started on a person's message reads what they add in the next seconds with it (ADR 0112).
+    quietMs: o.routerQuietMs ?? ROUTER_QUIET_MS,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
     warmBrowser,

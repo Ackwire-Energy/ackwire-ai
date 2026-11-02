@@ -275,7 +275,8 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
 /**
  * An agent that needs a person in its browser (ADR 0040) goes to its request card in the
  * conversation, like any message: the browser opens in that card (the page asks for it with
- * the notification's `handoffId`).
+ * the notification's `handoffId`). One sent to someone who can't open that conversation names
+ * none (`opensOnComputer`).
  */
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
@@ -307,8 +308,8 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // What a routine found opens the agent's message in its conversation (below); without one, the routine.
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return s.routineId ? { to: "/org/$orgId/routines", search: { open: s.routineId } } : { to: "/org/$orgId/routines" };
-  // An agent's answer in its DM opens that DM, like a message there.
-  if (n.kind === "agent_reply" && s.dmId && n.actors[0]?.type === "agent")
+  // An agent's answer or request in my DM with it opens that DM (a DM has no channel page of its own).
+  if (s.dmId && n.actors[0]?.type === "agent" && (n.kind === "agent_reply" || !s.threadId))
     return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: n.actors[0].id } };
   if (n.kind === "dm") {
     const who = n.actors[0];
@@ -326,6 +327,12 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (s.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };
   return null;
 }
+
+/** A help request whose card is in a conversation I can't open: it opens on the agent's computer, in a dialog. */
+export const opensOnComputer = (n: Pick<AppNotification, "kind" | "source" | "actors">): string | null =>
+  n.kind === "browser_handoff" && !n.source.channelId && !n.source.dmId && !n.source.threadId
+    ? (n.source.agentId ?? (n.actors[0]?.type === "agent" ? n.actors[0].id : null))
+    : null;
 
 /**
  * The workspace's computer is ready and its agents have no AI yet: opening it opens "Conectar uma IA" (the one

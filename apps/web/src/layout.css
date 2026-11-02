@@ -911,6 +911,20 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__messages > .ac-msg--grouped {
   margin-top: -4px;
 }
+/* My own rows (`.ac-msg--own`): files and the thread line hang under the bubble on its right edge. */
+.ac-msg--own .artifact-cards {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+/* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
+.ac-msg--own .ac-msg__text .md__table {
+  background: var(--bg);
+}
+.ac-msg--own .thread-line {
+  align-self: flex-end;
+  margin: 4px -6px 0 0;
+  border-radius: 10px 10px 3px 10px;
+}
 .channel__composer {
   position: relative;
   padding: 8px 24px 20px;
@@ -1766,8 +1780,12 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   padding: 0 20px;
 }
 /* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
-   down. */
+   down. The kit's plate for a bare `pre` (its own background, margins and corners) stays off: the card is the plate. */
 .ac-msg__text .code-card__code {
+  margin: 0;
+  padding: 0 16px 14px;
+  background: none;
+  border-radius: 0;
   overflow-y: auto;
 }
 .md .code-card code,
@@ -5053,19 +5071,20 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 .sidebar__item[data-status="active"] > .sidebar__item-meta {
   color: var(--ink2);
 }
-/* The open channel, tool, person or agent: on the plate, a soft glow from the right edge inward, faded out well before
-   the label; the accent's, or an agent's own color (`--sel-glow-color`). */
+/* The open channel, tool, person or agent: on the plate, a glow from the right edge inward that reads at a glance
+   (like a chosen row's raised fill) and fades out over the row's last 45%, light enough under a long name to keep its
+   contrast; the accent's, or an agent's own color (`--sel-glow-color`). */
 .sidebar__item[data-status="active"]::before {
   background:
     linear-gradient(
       to left,
-      color-mix(in srgb, var(--sel-glow-color, var(--agent)) var(--sel-glow, 11%), transparent),
-      transparent var(--sel-glow-reach, 44px)
+      color-mix(in srgb, var(--sel-glow-color, var(--agent)) var(--sel-glow, 24%), transparent),
+      transparent var(--sel-glow-reach, 45%)
     ),
     var(--side-active);
 }
 [data-theme="dark"] .sidebar__item[data-status="active"] {
-  --sel-glow: 16%;
+  --sel-glow: 30%;
 }
 
 /* The icon rail is too narrow for a frame. */
@@ -10560,15 +10579,32 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section--category[data-open="false"] .sidebar__section-body > [data-unread="true"] {
   display: flex;
 }
-/* Dragging a channel or a category: a 2px line where it lands, or the header that takes it. */
-.sidebar [data-drop="before"] {
-  box-shadow: inset 0 2px 0 var(--ink);
+/* Every drag in the sidebar (a section, a channel, a category, an agent) marks where it lands the same way: one 2px
+   line of the accent at reduced strength with round ends, in the gap before or after the row, from the names' column
+   to the row's end. A line, not an opened gap: the rows stay under the pointer while it moves. A category that takes
+   a channel (`into`), or the group of agents it would land in, takes a faint tint of the accent. */
+.sidebar :is([data-drop="before"], [data-drop="after"]) {
+  position: relative;
 }
-.sidebar [data-drop="after"] {
-  box-shadow: inset 0 -2px 0 var(--ink);
+.sidebar :is([data-drop="before"], [data-drop="after"])::after,
+.sidebar__drop-line {
+  content: "";
+  position: absolute;
+  left: var(--drop-inset, 36px);
+  right: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--agent) 60%, transparent);
+  pointer-events: none;
 }
-.sidebar [data-drop="into"] {
-  background: var(--plate);
+.sidebar [data-drop="before"]::after {
+  top: -2px;
+}
+.sidebar [data-drop="after"]::after {
+  bottom: -2px;
+}
+.sidebar :is([data-drop="into"], .sidebar__section[data-drop="true"]) {
+  background: color-mix(in srgb, var(--agent) 9%, transparent);
 }
 .channel-category__channel {
   display: inline-flex;
@@ -10613,9 +10649,12 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   display: flex;
   opacity: 0;
   transition: opacity 0.15s;
+  /* Hidden, they don't catch the pointer: a drag over another row's end lands before/after it, not in its part. */
+  pointer-events: none;
 }
 .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__row-acts {
   opacity: 1;
+  pointer-events: auto;
 }
 .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
   > .sidebar__item
@@ -10642,17 +10681,17 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
     display: none;
   }
 }
-/* Dragging an agent: the category it would land in, and inside a group the line where it would go. */
+/* Dragging an agent: the group it would land in, and inside it the line where it would go, an element in the list
+   with no height of its own (its margins take back its 2px and the gap it adds). */
 .sidebar__section[data-drop="true"] {
   border-radius: var(--control-r-sm);
-  background: var(--plate-soft);
 }
 .sidebar__drop-line {
-  height: 3px;
-  margin: -2px 8px;
-  border-radius: 2px;
-  background: var(--ink);
-  opacity: 0.55;
+  position: relative;
+  left: auto;
+  right: auto;
+  flex: none;
+  margin: -2px 8px -2px var(--drop-inset, 36px);
 }
 /* An empty group, for whoever organizes: where its agents go, in the column of the agents' names. */
 .sidebar__drop-hint {
@@ -10758,21 +10797,15 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* A section's line sits in the middle of the 10px between the parts, from the headers' titles. */
 .sidebar__block[data-drop]::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--agent);
-  pointer-events: none;
+  left: 9px;
 }
 .sidebar__block[data-drop="before"]::after {
-  top: -8px;
+  top: -6px;
 }
 .sidebar__block[data-drop="after"]::after {
-  bottom: -8px;
+  bottom: -6px;
 }
 @media (pointer: coarse) {
   .sidebar__grip {

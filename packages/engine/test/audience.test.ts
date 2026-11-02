@@ -85,6 +85,14 @@ describe("who can talk to the agent", () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  test("removing the last person keeps it restricted: only its owner, never everyone", async () => {
+    const { bia } = await world();
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
+    const emptied = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [] });
+    expect(emptied).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    expect([canTalkTo(emptied, f.owner.id), canTalkTo(emptied, bia.id)]).toEqual([true, false]);
+  });
+
   test("a mention from someone not allowed starts nothing and only they get the notice", async () => {
     const { bia } = await world();
     await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });

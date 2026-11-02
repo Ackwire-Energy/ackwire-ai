@@ -21,6 +21,8 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { isChannelMember } from "../channels";
+import { openPersonAgentDm } from "../dms";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
@@ -53,7 +55,7 @@ import {
   DESKTOP_TOOL_INFO,
 } from "./types";
 
-const { browserHandoffs, agentRuns, agents, machines, messages, users } = schema;
+const { browserHandoffs, agentRuns, agents, channelMembers, channels, machines, messages, users } = schema;
 
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
@@ -596,13 +598,20 @@ export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise
     ? await db.select({ name: users.name }).from(users).where(eq(users.id, row.controllerUserId))
     : [];
   const where = await handoffPlace(db, row);
+  // A DM has no channel page of its own (`/c/<id>` says it doesn't exist): the web opens it by the agent.
+  const [conversation] =
+    where && !where.threadId
+      ? await db.select({ kind: channels.kind }).from(channels).where(eq(channels.id, where.channelId))
+      : [];
   // The conversation holding its card (an ask's message, a take over's run), else the agent's page with its browser open.
   const link = where
     ? where.threadId
       ? `/org/${row.orgId}/threads/${where.threadId}`
-      : row.kind === "ask"
-        ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
-        : `/org/${row.orgId}/c/${where.channelId}`
+      : conversation?.kind === "dm"
+        ? `/org/${row.orgId}/dm/agent/${row.agentId}`
+        : row.kind === "ask"
+          ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
+          : `/org/${row.orgId}/c/${where.channelId}`
     : agentBrowserLink(row.orgId, row.agentId);
   return {
     status: row.status === "active" && row.controllerUserId ? "active" : "pending",
@@ -730,7 +739,6 @@ export function createBrowserHandoffToolSource(
         isError: true,
       };
     }
-    const where = runWhere(run);
     // A desktop goes only to who may drive its computer (ADR 0058 §4); a browser to who asked for the work.
     const drivers = screen === "desktop" ? await computerDrivers(ctx.db, ctx.orgId, ctx.agentId) : null;
     if (drivers?.length === 0) {
@@ -744,6 +752,33 @@ export function createBrowserHandoffToolSource(
         ? (drivers[0] ?? null)
         : null
       : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+    // The card goes where the person asked can act on it: the run's conversation when they're in it, else their DM
+    // with the agent (a run in a room between agents, or one they aren't in, would leave the request unreachable).
+    // Several drivers: one in the conversation keeps it there, else whoever asked for the work's DM; else it stays
+    // in the conversation and every driver gets it on the computer (a DM with an arbitrary one would be a stranger's).
+    const runAt = runWhere(run);
+    let asked = recipient;
+    if (!asked && drivers) {
+      const [member] = await ctx.db
+        .select({ userId: channelMembers.userId })
+        .from(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.orgId, run.orgId),
+            eq(channelMembers.channelId, runAt.channelId),
+            inArray(channelMembers.userId, drivers),
+          ),
+        )
+        .limit(1);
+      const requester = member?.userId
+        ? null
+        : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      asked = member?.userId ?? (requester && drivers.includes(requester) ? requester : null);
+    }
+    const where =
+      asked && !(await isChannelMember(ctx.db, run.orgId, runAt.channelId, asked))
+        ? { channelId: (await openPersonAgentDm(ctx.db, run.orgId, asked, run.agentId)).id, threadId: null }
+        : runAt;
     const busy = {
       content: `A person is using your ${s.what}, or was just asked to; wait for that before asking.`,
       isError: true,

@@ -25,7 +25,7 @@ export interface SearchSelectProps<V extends string = string, O extends SelectOp
   groupLabel?: (group: string) => string;
   /** Whether an option is among what was typed; default: every word in its label, value or group. */
   matches?: (option: O, query: string) => boolean;
-  /** A row after its check; default: its leading mark, label and description, as `Select` draws them. */
+  /** A row before its check; default: its leading mark, label and description, as `Select` draws them. */
   renderOption?: (option: O) => ReactNode;
   /** What the trigger shows; default: the chosen option's label, else `placeholder`. */
   renderValue?: (option: O | undefined) => ReactNode;
@@ -202,6 +202,7 @@ export function SearchSelect<V extends string = string, O extends SelectOption<V
                       onPointerMove={() => setActive(i)}
                       onClick={() => pick(o)}
                     >
+                      {renderOption ? renderOption(o) : defaultRow(o)}
                       <span className="ac-tz__check" aria-hidden="true">
                         {o.value === value && (
                           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
@@ -209,7 +210,6 @@ export function SearchSelect<V extends string = string, O extends SelectOption<V
                           </svg>
                         )}
                       </span>
-                      {renderOption ? renderOption(o) : defaultRow(o)}
                     </div>
                   );
                 });
