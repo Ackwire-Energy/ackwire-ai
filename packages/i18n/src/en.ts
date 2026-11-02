@@ -9832,6 +9832,10 @@ export const en: Translations = {
       label: "Remember",
       description: "Saves a note when someone asks.",
     },
+    save_how_to: {
+      label: "Save how-to",
+      description: "Saves how it did something that took figuring out, to reuse next time.",
+    },
     update_memory: {
       label: "Update memory",
       description: "Corrects a saved note.",

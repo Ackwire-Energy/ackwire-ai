@@ -1,4 +1,17 @@
-import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, type SQL, schema } from "@agenteschat/db";
+import {
+  and,
+  arrayContained,
+  type Database,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  rowsOf,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
@@ -46,7 +59,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "search_context",
       description:
-        "Search this organization's messages, summaries, decisions, facts and lessons that you can see, and what the team did outside (emails sent, pull requests opened, posts: kind `action`). Use it before answering questions about past work.",
+        "Search this organization's messages, summaries, decisions, facts and lessons that you can see, what the team did outside (emails sent, pull requests opened, posts: kind `action`) and, without `kinds`, your own earlier tool calls (commands, requests, scripts). Use it before answering questions about past work and before a task you or a teammate may have done before.",
       scope: "context:read",
       inputSchema: {
         type: "object",
@@ -65,14 +78,19 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const hits = await searchVisible(deps, {
-          orgId: ctx.orgId,
-          text: str(input.query),
-          visibleChannelIds: await visible(ctx),
-          kinds: Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined,
-          limit: typeof input.limit === "number" ? input.limit : 8,
-        });
-        if (hits.length === 0) return { content: "No results." };
+        const channels = await visible(ctx);
+        const kinds = Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined;
+        const [hits, steps] = await Promise.all([
+          searchVisible(deps, {
+            orgId: ctx.orgId,
+            text: str(input.query),
+            visibleChannelIds: channels,
+            kinds,
+            limit: typeof input.limit === "number" ? input.limit : 8,
+          }),
+          kinds ? [] : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, channels, str(input.query)),
+        ]);
+        if (hits.length === 0 && steps.length === 0) return { content: "No results." };
         const items = new Map(
           (
             await getContextItems(
@@ -87,7 +105,60 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           const label = item ? itemLabel(item) : `[${h.kind}]`;
           return `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)}) ${h.snippet.replace(/\s+/g, " ")}`;
         });
-        return { content: lines.join("\n"), data: { hits: hits.length } };
+        return { content: [...lines, ...steps].join("\n"), data: { hits: hits.length + steps.length } };
+      },
+    },
+    {
+      name: "save_how_to",
+      description:
+        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, the names of the secrets it uses, never their values) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same title replaces the old version. You read these in your memory in every conversation.",
+      scope: "memory:write",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            minLength: 3,
+            maxLength: 120,
+            description: "What it does, e.g. 'List the models of the Acme API'",
+          },
+          how: { type: "string", minLength: 10, maxLength: 1500 },
+        },
+        required: ["title", "how"],
+        additionalProperties: false,
+      },
+      describe: (input) => ({ title: `Save how to: ${str(input.title)}` }),
+      async execute(input, ctx) {
+        try {
+          const title = str(input.title).trim();
+          const res = await consolidateItem(
+            ctx.db,
+            {
+              orgId: ctx.orgId,
+              kind: "note",
+              scopeType: "agent",
+              scopeId: ctx.agentId,
+              agentId: ctx.agentId,
+              title,
+              subject: `how to ${title}`,
+              content: str(input.how).trim(),
+              sourceIds: [ctx.triggerMessageId],
+              // The method holds in every conversation, like a rule saved with `everywhere`.
+              channelIds: [],
+              evidence: [
+                { type: "self", ref: ctx.triggerMessageId, agentId: ctx.agentId, at: new Date().toISOString() },
+              ],
+              confidence: 0.8,
+              createdByKind: "agent",
+              createdById: ctx.agentId,
+            },
+            memoryJudging(deps),
+          );
+          await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
+          return { content: `Saved (${res.action}) as ${res.item.id}.` };
+        } catch (error) {
+          return { content: error instanceof Error ? error.message : "Could not save", isError: true };
+        }
       },
     },
     {
@@ -746,4 +817,60 @@ export function pickDistinct(candidates: ContextItem[], known: string): ContextI
     else if (newer(item, out[twin] as ContextItem)) out[twin] = item;
   }
   return out;
+}
+
+/** Tools whose calls say nothing about how a task was done. */
+const STEP_NOISE = ["search_context", "get_summary", "expand", "react", "ask_user", "save_how_to"];
+const STEP_DAYS = 90;
+const STEPS_SHOWN = 5;
+
+/**
+ * The agent's own earlier tool calls that match the query's words, in the channels it may search: how it did a
+ * task before (the command, the address, the script), with whether the call worked. Words, not meaning: a call's
+ * input is code and addresses, which full text and embeddings miss.
+ * ponytail: ILIKE over the agent's last 90 days of steps (bounded by its runs); index the steps if it gets slow.
+ */
+async function ownPastSteps(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  runId: string,
+  channelIds: string[],
+  query: string,
+): Promise<string[]> {
+  const words = [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u))].filter((w) => w.length >= 3).slice(0, 8);
+  if (words.length === 0 || channelIds.length === 0) return [];
+  const patterns = words.map((w) => sql`${`%${w.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}`);
+  const input = sql`(s.data->'input')::text`;
+  const rows = rowsOf<{ data: { name?: string; input?: unknown }; created_at: string | Date; failed: boolean | null }>(
+    await db.execute(sql`select s.data, s.created_at, (select (x.data->>'isError')::boolean from agent_run_steps x
+          where x.run_id = s.run_id and x.kind = 'tool_result' and x.data->>'toolUseId' = s.data->>'toolUseId'
+          limit 1) as failed
+      from agent_run_steps s
+      join agent_runs r on r.id = s.run_id
+      where r.org_id = ${orgId}::uuid and r.agent_id = ${agentId}::uuid and r.id is distinct from ${runId || null}::uuid
+        and r.channel_id in (${sql.join(
+          channelIds.map((c) => sql`${c}::uuid`),
+          sql`, `,
+        )})
+        and r.created_at > now() - make_interval(days => ${STEP_DAYS})
+        and s.kind = 'tool_call'
+        and coalesce(s.data->>'name', '') not in (${sql.join(
+          STEP_NOISE.map((n) => sql`${n}`),
+          sql`, `,
+        )})
+        and ${input} ilike any (array[${sql.join(patterns, sql`, `)}])
+      -- More of the query's words first, then the newest.
+      order by (${sql.join(
+        patterns.map((p) => sql`(${input} ilike ${p})::int`),
+        sql` + `,
+      )}) desc, s.created_at desc
+      limit ${STEPS_SHOWN}`),
+  );
+  return rows
+    .slice(0, STEPS_SHOWN)
+    .map(
+      (r) =>
+        `[your earlier step] (${new Date(r.created_at).toISOString().slice(0, 10)}) ${r.data.name ?? "?"} ${cutText(JSON.stringify(r.data.input ?? {}), 300)} (${r.failed ? "error" : "ok"})`,
+    );
 }

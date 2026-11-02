@@ -127,6 +127,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   remember: "updatingMemory",
   forget: "updatingMemory",
   update_memory: "updatingMemory",
+  save_how_to: "updatingMemory",
   propose_instruction_change: "updatingMemory",
   list_events: "checkingCalendar",
   find_free_time: "checkingCalendar",

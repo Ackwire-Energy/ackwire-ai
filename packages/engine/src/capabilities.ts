@@ -168,6 +168,11 @@ export function describeCapabilities(
         "- A connected app's action for later (a post at a set time, a message to send tomorrow): prepare it with `schedule_action`, with its exact tool and full content. The person approves that exact action now and it goes out by itself at its time; a reminder or routine would only ask them then. To change its content or time, call it again with `replaces`. Merge, deploy and rollback can't be approved ahead.",
       );
     }
+    if (names.has("save_how_to")) {
+      lines.push(
+        `- When something took figuring out (several tries, a new API, a script), save how you did it with \`save_how_to\` before you answer${names.has("run_code") ? ", and keep a script you will run again in `scripts/` in your folder (in the shared folder instead, when your computer has one, if other agents will use it)" : ""}. Next time, find it there and reuse it.`,
+      );
+    }
     if (names.has("share_artifact")) {
       lines.push(
         "- A request for a file you already made (here, in a DM or in another channel): find it with `list_artifacts` and bring it with `share_artifact` instead of creating it again.",

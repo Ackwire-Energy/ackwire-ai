@@ -9912,6 +9912,10 @@ export const ptBR = {
       label: "Lembrar",
       description: "Guarda uma nota quando alguém pede.",
     },
+    save_how_to: {
+      label: "Guardar como fazer",
+      description: "Guarda como fez algo que deu trabalho descobrir, para reaproveitar depois.",
+    },
     update_memory: {
       label: "Atualizar memória",
       description: "Corrige uma nota guardada.",
