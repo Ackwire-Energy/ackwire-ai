@@ -66,7 +66,7 @@ export function createToastStore() {
     for (const l of listeners) l();
   };
   return {
-    show(words: ToastText, tone: Toast["tone"] = "info", action?: ToastAction | ToastAction[], detail?: string) {
+    show(words: ToastText, tone: Toast["tone"] = "success", action?: ToastAction | ToastAction[], detail?: string) {
       const actions = action ? (Array.isArray(action) ? action : [action]) : [];
       const text = typeof words === "string" ? words : words.text;
       const toast = {

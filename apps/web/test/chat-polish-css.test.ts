@@ -56,3 +56,11 @@ test("the floating date sits at the list's top centre, fades out unless shown, a
   expect(last(top, ".channel__date-pill", "white-space")).toBe("nowrap");
   expect(last(atRule(layout, "@media (prefers-reduced-motion: reduce)"), ".channel__date", "transition")).toBe("none");
 });
+
+test("a toast given no tone is a done confirmation, green like the phone's, never the informational blue", async () => {
+  const { createToastStore } = await import("@/lib/toast");
+  const store = createToastStore();
+  store.show("Link copiado");
+  store.show("Pedido enviado", "info");
+  expect(store.get().map((x) => x.tone)).toEqual(["success", "info"]);
+});
