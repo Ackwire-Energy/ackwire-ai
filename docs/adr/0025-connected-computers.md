@@ -78,6 +78,7 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
     | 32 GB | about 48 | about 21 |
 
   - No protocol change: the Claude Code brain of older servers already read `no_slot` on a turn as `busy`, and newer servers read an older runner's `busy` the same way.
+  - The runner keeps no order and doesn't know who started a turn: the engine keeps the line (people first, agents' turns spaced, only the head asks again; ADR 0032, "Calm waits", 2026-11-02). No protocol change.
 
 **Across replicas.** The replica holding the socket executes requests. Another replica writes the request to `machine_rpc` and signals the holder through pub/sub; the reply comes back the same way (Postgres `NOTIFY` payloads are too small for file bodies). Live output streaming works only on the replica holding the socket; elsewhere the command reports its output at the end.
 

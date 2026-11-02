@@ -107,6 +107,7 @@ import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@ag
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
+import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
@@ -911,9 +912,20 @@ function ChannelView({
       const list = mergeTimeline(threadMessages.data ?? [], [mine]).filter(
         (m) => !thread.context || m.local || (m.id !== thread.id && m.createdAt > thread.createdAt),
       );
-      return buildTimeline(list, [], []);
+      const passed = supersededBrainNotices(list);
+      return buildTimeline(
+        list.filter((m) => !passed.has(m.id)),
+        [],
+        [],
+      );
     }
-    const items = buildTimeline(channelList?.visible ?? [], [], []);
+    const visible = channelList?.visible ?? [];
+    const passed = supersededBrainNotices(visible);
+    const items = buildTimeline(
+      visible.filter((m) => !passed.has(m.id)),
+      [],
+      [],
+    );
     // A marker, a closed line or a thread's line is not a message: nothing groups under it.
     const special = (m: MessageType) =>
       Boolean(threadStartOf(m.meta)) ||
