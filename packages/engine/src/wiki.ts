@@ -84,8 +84,14 @@ export interface WikiAudience {
   userIds: string[];
 }
 
+/** Who edits, among those who see: `editors` null = all of them, `agentEditorIds` null = every agent that reads. */
+export interface WikiEditors {
+  editors: WikiAudience | null;
+  agentEditorIds: string[] | null;
+}
+
 /** A folder's audience: `audience` null = every member, `agentIds` null = every agent. */
-export interface WikiFolderAudience {
+export interface WikiFolderAudience extends WikiEditors {
   folder: string;
   audience: WikiAudience | null;
   agentIds: string[] | null;
@@ -105,6 +111,10 @@ export interface WikiPageSummary {
   audience: WikiAudience | null;
   /** The agents that read it; null = every agent. */
   agentIds: string[] | null;
+  /** The people who edit it, among those who see it and hold `edit_wiki`; null = all of them. */
+  editors: WikiAudience | null;
+  /** The agents that edit it, among those that read it; null = all of them. */
+  agentEditorIds: string[] | null;
   /** The folder whose audience it follows; null = its own, or open. */
   audienceFolder: string | null;
   /** The start of the text, plain (no markdown), for cards. */
@@ -135,6 +145,8 @@ export interface WikiPageView extends WikiPageSummary {
   reads: WikiPageReads;
   /** The audience of the closest limited folder: this page can only be narrower. */
   folderAudience: WikiFolderAudience | null;
+  /** Whether the editors' list lets this reader edit it (a locked page or a missing `edit_wiki` still stops them). */
+  canEdit: boolean;
   deletedAt: string | null;
 }
 
@@ -231,7 +243,16 @@ async function requireWriter(db: Database, actor: WikiActor, orgId: string, page
   }
   const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
   if (page && who && !(await sees(db, who, page))) throw noAccess();
+  if (page) await requireEditor(db, actor, page);
   return membership;
+}
+
+/** An agent edits only on its own list and for a person on theirs, so nobody edits through an agent what they can't. */
+async function requireEditor(db: Executor, actor: WikiActor, page: PageRow) {
+  const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
+  if ((who && !(await edits(db, who, page))) || (actor.type === "agent" && !agentEdits(actor.agentId, page))) {
+    throw new ForbiddenError("Only the people chosen edit this page", "wiki.edit_limited");
+  }
 }
 
 const noAccess = () => new ForbiddenError("You don't have access to this page", "wiki.no_access");
@@ -244,6 +265,25 @@ async function sees(db: Executor, userId: string, page: Pick<PageRow, "id" | "re
 /** Whether the agent reads `page`. */
 const agentSees = (agentId: string, page: Pick<PageRow, "agentsLimited" | "audienceAgentIds">) =>
   !page.agentsLimited || page.audienceAgentIds.includes(agentId);
+
+/** Whether the person `userId` is on the page's editors, if it has a list. Owners always are. */
+async function edits(
+  db: Executor,
+  userId: string,
+  page: Pick<PageRow, "orgId" | "editorsLimited" | "editorRoleIds" | "editorUserIds">,
+) {
+  if (!page.editorsLimited || page.editorUserIds.includes(userId)) return true;
+  if ((await roleHolders(db, page.orgId, page.editorRoleIds)).has(userId)) return true;
+  const [member] = await db
+    .select({ role: organizationMembers.role })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, page.orgId), eq(organizationMembers.userId, userId)));
+  return member?.role === "owner";
+}
+
+/** Whether the agent is on the page's editors, if it has a list. */
+const agentEdits = (agentId: string, page: Pick<PageRow, "agentEditorsLimited" | "agentEditorIds">) =>
+  !page.agentEditorsLimited || page.agentEditorIds.includes(agentId);
 
 /** The condition that keeps a person or an agent to the pages they see. */
 const visibleTo = (actor: WikiActor) =>
@@ -284,7 +324,16 @@ async function findPage(
 
 type AudienceCols = Pick<
   PageRow,
-  "restricted" | "audienceRoleIds" | "audienceUserIds" | "agentsLimited" | "audienceAgentIds"
+  | "restricted"
+  | "audienceRoleIds"
+  | "audienceUserIds"
+  | "agentsLimited"
+  | "audienceAgentIds"
+  | "editorsLimited"
+  | "editorRoleIds"
+  | "editorUserIds"
+  | "agentEditorsLimited"
+  | "agentEditorIds"
 >;
 type FolderRule = typeof wikiFolderAudiences.$inferSelect;
 
@@ -294,6 +343,11 @@ const OPEN: AudienceCols = {
   audienceUserIds: [],
   agentsLimited: false,
   audienceAgentIds: [],
+  editorsLimited: false,
+  editorRoleIds: [],
+  editorUserIds: [],
+  agentEditorsLimited: false,
+  agentEditorIds: [],
 };
 
 const colsOf = (a: AudienceCols): AudienceCols => ({
@@ -302,6 +356,11 @@ const colsOf = (a: AudienceCols): AudienceCols => ({
   audienceUserIds: a.audienceUserIds,
   agentsLimited: a.agentsLimited,
   audienceAgentIds: a.audienceAgentIds,
+  editorsLimited: a.editorsLimited,
+  editorRoleIds: a.editorRoleIds,
+  editorUserIds: a.editorUserIds,
+  agentEditorsLimited: a.agentEditorsLimited,
+  agentEditorIds: a.agentEditorIds,
 });
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
@@ -309,9 +368,14 @@ const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((
 const sameAudience = (a: AudienceCols, b: AudienceCols) =>
   a.restricted === b.restricted &&
   a.agentsLimited === b.agentsLimited &&
+  a.editorsLimited === b.editorsLimited &&
+  a.agentEditorsLimited === b.agentEditorsLimited &&
   sameSet(a.audienceRoleIds, b.audienceRoleIds) &&
   sameSet(a.audienceUserIds, b.audienceUserIds) &&
-  sameSet(a.audienceAgentIds, b.audienceAgentIds);
+  sameSet(a.audienceAgentIds, b.audienceAgentIds) &&
+  sameSet(a.editorRoleIds, b.editorRoleIds) &&
+  sameSet(a.editorUserIds, b.editorUserIds) &&
+  sameSet(a.agentEditorIds, b.agentEditorIds);
 
 /** "A/B/C" → A/B/C, A/B, A: the folder and the ones above it, closest first. */
 function folderChain(folder: string) {
@@ -347,47 +411,85 @@ async function roleHolders(db: Executor, orgId: string, roleIds: string[]) {
   return new Set(rows.map((r) => r.userId));
 }
 
-/**
- * `a` kept inside `rule`, so a page or a subfolder is never wider than its folder: what `rule` leaves open stays as it
- * was, what `a` leaves open takes the rule's list, and two lists keep what they share. `held` = the rule's role holders.
- */
-function clampTo(a: AudienceCols, rule: AudienceCols, held: Set<string>): AudienceCols {
-  const people = !rule.restricted
-    ? { restricted: a.restricted, audienceRoleIds: a.audienceRoleIds, audienceUserIds: a.audienceUserIds }
-    : !a.restricted
-      ? { restricted: true, audienceRoleIds: rule.audienceRoleIds, audienceUserIds: rule.audienceUserIds }
-      : {
-          restricted: true,
-          audienceRoleIds: a.audienceRoleIds.filter((id) => rule.audienceRoleIds.includes(id)),
-          audienceUserIds: a.audienceUserIds.filter((id) => rule.audienceUserIds.includes(id) || held.has(id)),
-        };
-  const list = !rule.agentsLimited
-    ? { agentsLimited: a.agentsLimited, audienceAgentIds: a.audienceAgentIds }
-    : !a.agentsLimited
-      ? { agentsLimited: true, audienceAgentIds: rule.audienceAgentIds }
-      : {
-          agentsLimited: true,
-          audienceAgentIds: a.audienceAgentIds.filter((id) => rule.audienceAgentIds.includes(id)),
-        };
-  return { ...people, ...list };
+/** Holders of a rule's roles: for its audience, and for its editors. */
+async function heldOf(db: Executor, orgId: string, rule: AudienceCols) {
+  const [audience, editors] = await Promise.all([
+    roleHolders(db, orgId, rule.audienceRoleIds),
+    roleHolders(db, orgId, rule.editorRoleIds),
+  ]);
+  return { audience, editors };
+}
+
+type People = { limited: boolean; roleIds: string[]; userIds: string[] };
+
+/** What `rule` leaves open stays as it was, what `a` leaves open takes the rule's list, two lists keep what they share. */
+function clampPeople(a: People, rule: People, held: Set<string>): People {
+  if (!rule.limited) return a;
+  if (!a.limited) return rule;
+  return {
+    limited: true,
+    roleIds: a.roleIds.filter((id) => rule.roleIds.includes(id)),
+    userIds: a.userIds.filter((id) => rule.userIds.includes(id) || held.has(id)),
+  };
+}
+
+function clampAgents(a: { limited: boolean; ids: string[] }, rule: { limited: boolean; ids: string[] }) {
+  if (!rule.limited) return a;
+  if (!a.limited) return rule;
+  return { limited: true, ids: a.ids.filter((id) => rule.ids.includes(id)) };
+}
+
+/** `a` kept inside `rule`, seeing and editing alike, so a page or a subfolder is never wider than its folder. */
+function clampTo(a: AudienceCols, rule: AudienceCols, held: { audience: Set<string>; editors: Set<string> }) {
+  const sees = clampPeople(
+    { limited: a.restricted, roleIds: a.audienceRoleIds, userIds: a.audienceUserIds },
+    { limited: rule.restricted, roleIds: rule.audienceRoleIds, userIds: rule.audienceUserIds },
+    held.audience,
+  );
+  const reads = clampAgents(
+    { limited: a.agentsLimited, ids: a.audienceAgentIds },
+    { limited: rule.agentsLimited, ids: rule.audienceAgentIds },
+  );
+  const writes = clampPeople(
+    { limited: a.editorsLimited, roleIds: a.editorRoleIds, userIds: a.editorUserIds },
+    { limited: rule.editorsLimited, roleIds: rule.editorRoleIds, userIds: rule.editorUserIds },
+    held.editors,
+  );
+  const agentWrites = clampAgents(
+    { limited: a.agentEditorsLimited, ids: a.agentEditorIds },
+    { limited: rule.agentEditorsLimited, ids: rule.agentEditorIds },
+  );
+  return {
+    restricted: sees.limited,
+    audienceRoleIds: sees.roleIds,
+    audienceUserIds: sees.userIds,
+    agentsLimited: reads.limited,
+    audienceAgentIds: reads.ids,
+    editorsLimited: writes.limited,
+    editorRoleIds: writes.roleIds,
+    editorUserIds: writes.userIds,
+    agentEditorsLimited: agentWrites.limited,
+    agentEditorIds: agentWrites.ids,
+  } satisfies AudienceCols;
 }
 
 /** The audience of a page landing in `folder`: what it had, kept inside the closest limited folder. */
 async function placement(tx: Executor, orgId: string, folder: string, current: AudienceCols = OPEN) {
   const rule = await ruleFor(tx, orgId, folder);
   if (!rule) return { ...colsOf(current), audienceFolder: null };
-  const kept = clampTo(current, rule, await roleHolders(tx, orgId, rule.audienceRoleIds));
+  const kept = clampTo(current, rule, await heldOf(tx, orgId, rule));
   return { ...kept, audienceFolder: sameAudience(kept, rule) ? rule.folder : null };
 }
 
 /** What a new page in a limited folder takes. */
 const inherited = (rule: FolderRule | null) => (rule ? { ...colsOf(rule), audienceFolder: rule.folder } : {});
 
-/** After a create or a move: the writer and the person asking keep seeing the page, so nobody writes what they lose. */
+/** After a create or a move: the writer and the person asking keep the page, so nobody writes what they lose. */
 async function requireStaysVisible(tx: Executor, actor: WikiActor, page: PageRow) {
   const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
   if (who && !(await sees(tx, who, page))) throw noAccess();
   if (actor.type === "agent" && !agentSees(actor.agentId, page)) throw noAccess();
+  await requireEditor(tx, actor, page);
 }
 
 const folderAudienceOf = (rule: FolderRule | null): WikiFolderAudience | null =>
@@ -395,6 +497,8 @@ const folderAudienceOf = (rule: FolderRule | null): WikiFolderAudience | null =>
     folder: rule.folder,
     audience: rule.restricted ? { roleIds: rule.audienceRoleIds, userIds: rule.audienceUserIds } : null,
     agentIds: rule.agentsLimited ? rule.audienceAgentIds : null,
+    editors: rule.editorsLimited ? { roleIds: rule.editorRoleIds, userIds: rule.editorUserIds } : null,
+    agentEditorIds: rule.agentEditorsLimited ? rule.agentEditorIds : null,
   };
 
 async function findAnyPage(db: Executor, orgId: string, ref: string, options: { deleted?: boolean } = {}) {
@@ -453,6 +557,8 @@ async function summaries(db: Executor, rows: PageRow[]): Promise<WikiPageSummary
     pinned: r.pinned,
     audience: r.restricted ? { roleIds: r.audienceRoleIds, userIds: r.audienceUserIds } : null,
     agentIds: r.agentsLimited ? r.audienceAgentIds : null,
+    editors: r.editorsLimited ? { roleIds: r.editorRoleIds, userIds: r.editorUserIds } : null,
+    agentEditorIds: r.agentEditorsLimited ? r.agentEditorIds : null,
     audienceFolder: r.audienceFolder,
     excerpt: plainExcerpt(r.body, r.title),
     sourceType: r.source?.type ?? null,
@@ -589,7 +695,7 @@ function excerpt(body: string, page: Pick<PageRow, "slug" | "aliases">) {
 }
 
 async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<WikiPageView> {
-  const [summary, versions, backlinks, links, reads, rule] = await Promise.all([
+  const [summary, versions, backlinks, links, reads, rule, canEdit] = await Promise.all([
     summaryOf(db, row),
     db
       .select({
@@ -606,6 +712,7 @@ async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<Wik
     resolveOwnLinks(db, actor, row),
     pageReads(db, row),
     ruleFor(db, row.orgId, row.folder),
+    actor.type === "agent" ? agentEdits(actor.agentId, row) : edits(db, actor.userId, row),
   ]);
   const authors: WikiAuthor[] = [];
   const seen = new Set<string>();
@@ -632,6 +739,7 @@ async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<Wik
     authors,
     backlinks,
     folderAudience: folderAudienceOf(rule),
+    canEdit,
     links,
     source: row.source ?? null,
     reads,
@@ -1058,6 +1166,7 @@ export async function importWikiPages(
         })
         .returning();
       if (!page) throw new Error("wiki insert returned nothing");
+      if (page.restricted || page.editorsLimited) await requireStaysVisible(tx, actor, page);
       await addVersion(tx, page, actor, note);
       await syncWikiLinks(tx, orgId, { type: "page", id: page.id }, page.body);
       await claimLinks(tx, page);
@@ -1519,9 +1628,49 @@ async function requireAudienceChooser(db: Database, userId: string, orgId: strin
   return membership;
 }
 
+/** Only the roles and people of this workspace. */
+async function cleanPeople(db: Executor, orgId: string, list: WikiAudience) {
+  const wantedRoles = [...new Set(list.roleIds)].filter((id) => UUID.test(id));
+  const wantedUsers = [...new Set(list.userIds)];
+  const roleIds = wantedRoles.length
+    ? (
+        await db
+          .select({ id: orgRoles.id })
+          .from(orgRoles)
+          .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, wantedRoles)))
+      ).map((r) => r.id)
+    : [];
+  const userIds = wantedUsers.length
+    ? (
+        await db
+          .select({ id: organizationMembers.userId })
+          .from(organizationMembers)
+          .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, wantedUsers)))
+      ).map((r) => r.id)
+    : [];
+  return { roleIds, userIds };
+}
+
+/** Only this workspace's active agents. */
+async function cleanAgents(db: Executor, orgId: string, ids: string[]) {
+  const wanted = [...new Set(ids)].filter((id) => UUID.test(id));
+  if (wanted.length === 0) return [];
+  const rows = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), inArray(agents.id, wanted)));
+  return rows.map((r) => r.id);
+}
+
+/** Whether the chooser is in this list, as a person or through a role. */
+async function includes(db: Executor, orgId: string, userId: string, list: { roleIds: string[]; userIds: string[] }) {
+  return list.userIds.includes(userId) || (await roleHolders(db, orgId, list.roleIds)).has(userId);
+}
+
 /**
- * The columns for an audience, keeping only roles, people and agents of this workspace. Whoever sets it stays in it,
- * so nobody hides a page from themselves. `agents` undefined keeps `keep`'s list (an older app doesn't send one).
+ * The columns for an audience, keeping only roles, people and agents of this workspace. Whoever sets it stays able to
+ * see and edit, so nobody takes a page from themselves. `agents` or `edit` undefined keeps `keep`'s (an older app
+ * doesn't send them).
  */
 async function audienceCols(
   db: Executor,
@@ -1529,62 +1678,55 @@ async function audienceCols(
   chooser: { userId: string; owner: boolean },
   audience: WikiAudience | null,
   chosen: string[] | null | undefined,
+  edit: WikiEditors | undefined,
   keep: AudienceCols,
 ): Promise<AudienceCols> {
-  let roleIds: string[] = [];
-  let userIds: string[] = [];
-  if (audience) {
-    const wantedRoles = [...new Set(audience.roleIds)].filter((id) => UUID.test(id));
-    const wantedUsers = [...new Set(audience.userIds)];
-    roleIds = wantedRoles.length
-      ? (
-          await db
-            .select({ id: orgRoles.id })
-            .from(orgRoles)
-            .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, wantedRoles)))
-        ).map((r) => r.id)
-      : [];
-    userIds = wantedUsers.length
-      ? (
-          await db
-            .select({ id: organizationMembers.userId })
-            .from(organizationMembers)
-            .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, wantedUsers)))
-        ).map((r) => r.id)
-      : [];
-    const holds = (await roleHolders(db, orgId, roleIds)).has(chooser.userId);
-    if (!chooser.owner && !userIds.includes(chooser.userId) && !holds) {
-      throw new ValidationError(
-        "Keep yourself in the audience (one of your roles, or you)",
-        "wiki.audience_excludes_you",
-      );
-    }
+  const people = audience ? await cleanPeople(db, orgId, audience) : { roleIds: [], userIds: [] };
+  if (audience && !chooser.owner && !(await includes(db, orgId, chooser.userId, people))) {
+    throw new ValidationError(
+      "Keep yourself in the audience (one of your roles, or you)",
+      "wiki.audience_excludes_you",
+    );
   }
   const limited = chosen === undefined ? keep.agentsLimited : chosen !== null;
-  const wantedAgents =
-    chosen === undefined ? keep.audienceAgentIds : [...new Set(chosen ?? [])].filter((id) => UUID.test(id));
-  const agentIds =
-    limited && wantedAgents.length
-      ? (
-          await db
-            .select({ id: agents.id })
-            .from(agents)
-            .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), inArray(agents.id, wantedAgents)))
-        ).map((r) => r.id)
-      : [];
+  const agentIds = limited
+    ? await cleanAgents(db, orgId, chosen === undefined ? keep.audienceAgentIds : (chosen ?? []))
+    : [];
+  const editorsChosen = edit === undefined ? keep.editorsLimited : edit.editors !== null;
+  const editors = !editorsChosen
+    ? { roleIds: [], userIds: [] }
+    : await cleanPeople(
+        db,
+        orgId,
+        edit === undefined
+          ? { roleIds: keep.editorRoleIds, userIds: keep.editorUserIds }
+          : (edit.editors ?? { roleIds: [], userIds: [] }),
+      );
+  if (editorsChosen && !chooser.owner && !(await includes(db, orgId, chooser.userId, editors))) {
+    throw new ValidationError("Keep yourself among the people who edit", "wiki.editors_exclude_you");
+  }
+  const agentEditorsChosen = edit === undefined ? keep.agentEditorsLimited : edit.agentEditorIds !== null;
+  const agentEditorIds = agentEditorsChosen
+    ? await cleanAgents(db, orgId, edit === undefined ? keep.agentEditorIds : (edit.agentEditorIds ?? []))
+    : [];
   return {
     restricted: Boolean(audience),
-    audienceRoleIds: roleIds,
-    audienceUserIds: userIds,
+    audienceRoleIds: people.roleIds,
+    audienceUserIds: people.userIds,
     agentsLimited: limited,
     audienceAgentIds: agentIds,
+    editorsLimited: editorsChosen,
+    editorRoleIds: editors.roleIds,
+    editorUserIds: editors.userIds,
+    agentEditorsLimited: agentEditorsChosen,
+    agentEditorIds,
   };
 }
 
 /** `a` may only be narrower than the folder above it. */
 async function requireInsideFolder(db: Executor, orgId: string, a: AudienceCols, rule: FolderRule | null) {
   if (!rule) return;
-  if (!sameAudience(clampTo(a, rule, await roleHolders(db, orgId, rule.audienceRoleIds)), a)) {
+  if (!sameAudience(clampTo(a, rule, await heldOf(db, orgId, rule)), a)) {
     throw new ValidationError(
       "A page or subfolder can only be narrower than its folder: change the folder instead",
       "wiki.audience_wider_than_folder",
@@ -1595,8 +1737,8 @@ async function requireInsideFolder(db: Executor, orgId: string, a: AudienceCols,
 
 /**
  * Limits a page to an audience (or opens it again with `null`): besides owners, only the people holding one of
- * `roleIds` and the people in `userIds` see it, and with `agents` only those agents read it (`null` = every agent).
- * Who may: people who edit the wiki and manage roles, and only an audience they stay in, so nobody hides a page from
+ * `roleIds` and the people in `userIds` see it, with `agents` only those agents read it (`null` = every agent), and
+ * `edit` says who edits among them. Who may: people who edit the wiki and manage roles, and only an audience they stay in, so nobody hides a page from
  * themselves. Inside a limited folder it can only be narrower.
  */
 export async function setWikiPageAudience(
@@ -1606,13 +1748,22 @@ export async function setWikiPageAudience(
   ref: string,
   audience: WikiAudience | null,
   agents?: string[] | null,
+  edit?: WikiEditors,
 ) {
   const { db } = deps;
   const actor: WikiActor = { type: "person", userId };
   const membership = await requireAudienceChooser(db, userId, orgId);
   const page = await findPage(db, actor, orgId, ref);
   await requireWriter(db, actor, orgId, page);
-  const cols = await audienceCols(db, orgId, { userId, owner: membership.role === "owner" }, audience, agents, page);
+  const cols = await audienceCols(
+    db,
+    orgId,
+    { userId, owner: membership.role === "owner" },
+    audience,
+    agents,
+    edit,
+    page,
+  );
   const rule = await ruleFor(db, orgId, page.folder);
   await requireInsideFolder(db, orgId, cols, rule);
   const [row] = await db
@@ -1624,13 +1775,15 @@ export async function setWikiPageAudience(
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: userId },
-    action: cols.restricted || cols.agentsLimited ? "wiki.page_restricted" : "wiki.page_opened",
+    action: isLimited(cols) ? "wiki.page_restricted" : "wiki.page_opened",
     target: { type: "wiki_page", id: page.id },
     details: {
       slug: page.slug,
       roleIds: cols.audienceRoleIds,
       userIds: cols.audienceUserIds,
       agentIds: cols.agentsLimited ? cols.audienceAgentIds : null,
+      editors: cols.editorsLimited ? { roleIds: cols.editorRoleIds, userIds: cols.editorUserIds } : null,
+      agentEditorIds: cols.agentEditorsLimited ? cols.agentEditorIds : null,
     },
   });
   const view = await detail(db, actor, row);
@@ -1656,15 +1809,22 @@ export async function getWikiFolderAudience(db: Database, userId: string, orgId:
 
 const parentFolder = (folder: string) => folder.split("/").slice(0, -1).join("/");
 
-/** A limited folder is only for people in it (and owners). */
+const isLimited = (a: AudienceCols) => a.restricted || a.agentsLimited || a.editorsLimited || a.agentEditorsLimited;
+
+/** A limited folder is only for people who see it, and changing it for those who edit it (and owners). */
 async function requireInsideRule(
   db: Executor,
   who: { userId: string; owner: boolean },
   orgId: string,
   rule: FolderRule | null,
 ) {
-  if (who.owner || !rule?.restricted || rule.audienceUserIds.includes(who.userId)) return;
-  if (!(await roleHolders(db, orgId, rule.audienceRoleIds)).has(who.userId)) throw noAccess();
+  if (who.owner || !rule) return;
+  const list = { roleIds: rule.audienceRoleIds, userIds: rule.audienceUserIds };
+  if (rule.restricted && !(await includes(db, orgId, who.userId, list))) throw noAccess();
+  const editors = { roleIds: rule.editorRoleIds, userIds: rule.editorUserIds };
+  if (rule.editorsLimited && !(await includes(db, orgId, who.userId, editors))) {
+    throw new ForbiddenError("Only the people chosen edit this folder", "wiki.edit_limited");
+  }
 }
 
 /**
@@ -1679,14 +1839,15 @@ export async function setWikiFolderAudience(
   folder: string,
   audience: WikiAudience | null,
   agents: string[] | null,
+  edit: WikiEditors = { editors: null, agentEditorIds: null },
 ) {
   const { db } = deps;
   const membership = await requireAudienceChooser(db, userId, orgId);
   const path = cleanFolder(folder);
   if (!path) throw new ValidationError("Choose a folder", "wiki.folder_required");
   const chooser = { userId, owner: membership.role === "owner" };
-  const cols = await audienceCols(db, orgId, chooser, audience, agents, OPEN);
-  const limited = cols.restricted || cols.agentsLimited;
+  const cols = await audienceCols(db, orgId, chooser, audience, agents, edit, OPEN);
+  const limited = isLimited(cols);
   const changed = await db.transaction(async (tx) => {
     // One change at a time per workspace: two saves can't leave a page on a rule that was replaced.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`wiki-folders:${orgId}`}))`);
@@ -1715,6 +1876,8 @@ export async function setWikiFolderAudience(
         roleIds: cols.audienceRoleIds,
         userIds: cols.audienceUserIds,
         agentIds: cols.agentsLimited ? cols.audienceAgentIds : null,
+        editors: cols.editorsLimited ? { roleIds: cols.editorRoleIds, userIds: cols.editorUserIds } : null,
+        agentEditorIds: cols.agentEditorsLimited ? cols.agentEditorIds : null,
         pages: count,
       },
     });
@@ -1734,11 +1897,11 @@ export async function setWikiFolderAudience(
 async function reapplyFolder(tx: Executor, orgId: string, path: string) {
   const under = sql`(${wikiPages.folder} = ${path} or starts_with(${wikiPages.folder}, ${`${path}/`}))`;
   const rules = await tx.select().from(wikiFolderAudiences).where(eq(wikiFolderAudiences.orgId, orgId));
-  const holders = new Map<string, Set<string>>();
+  const holders = new Map<string, { audience: Set<string>; editors: Set<string> }>();
   const heldBy = async (rule: FolderRule) => {
     const known = holders.get(rule.id);
     if (known) return known;
-    const held = await roleHolders(tx, orgId, rule.audienceRoleIds);
+    const held = await heldOf(tx, orgId, rule);
     holders.set(rule.id, held);
     return held;
   };
@@ -1764,6 +1927,11 @@ async function reapplyFolder(tx: Executor, orgId: string, path: string) {
       audienceUserIds: wikiPages.audienceUserIds,
       agentsLimited: wikiPages.agentsLimited,
       audienceAgentIds: wikiPages.audienceAgentIds,
+      editorsLimited: wikiPages.editorsLimited,
+      editorRoleIds: wikiPages.editorRoleIds,
+      editorUserIds: wikiPages.editorUserIds,
+      agentEditorsLimited: wikiPages.agentEditorsLimited,
+      agentEditorIds: wikiPages.agentEditorIds,
     })
     .from(wikiPages)
     .where(and(eq(wikiPages.orgId, orgId), under));

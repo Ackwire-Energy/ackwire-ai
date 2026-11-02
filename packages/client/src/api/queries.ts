@@ -31,6 +31,7 @@ import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
+import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
@@ -126,7 +127,6 @@ import type {
   ThreadInfo,
   ThreadPatch,
   ToolDecision,
-  WikiAudience,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -3477,7 +3477,7 @@ export function useWikiAction(orgId: string) {
         | { type: "move"; slug: string; folder: string }
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
-        | { type: "audience"; slug: string; audience: WikiAudience | null; agentIds?: string[] | null }
+        | { type: "audience"; slug: string; access: WikiAccess }
         | {
             type: "append";
             slug: string;
@@ -3499,7 +3499,7 @@ export function useWikiAction(orgId: string) {
         case "pin":
           return api.wiki.pin(orgId, action.slug, action.pinned);
         case "audience":
-          return api.wiki.audience(orgId, action.slug, action.audience, action.agentIds);
+          return api.wiki.audience(orgId, action.slug, action.access);
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }
@@ -3526,8 +3526,8 @@ export function useSetWikiFolderAudience(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { folder: string; audience: WikiAudience | null; agentIds: string[] | null }) =>
-      api.wiki.setFolderAudience(orgId, input.folder, input.audience, input.agentIds),
+    mutationFn: (input: { folder: string; access: WikiAccess }) =>
+      api.wiki.setFolderAudience(orgId, input.folder, input.access),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
     },

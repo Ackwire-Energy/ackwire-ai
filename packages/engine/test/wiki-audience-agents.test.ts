@@ -3,6 +3,7 @@ import { schema } from "@agenteschat/db";
 import {
   createAgent,
   createWikiPage,
+  deleteWikiPage,
   getWikiFolderAudience,
   getWikiPage,
   importWikiPages,
@@ -14,6 +15,7 @@ import {
   searchWiki,
   setWikiFolderAudience,
   setWikiPageAudience,
+  updateWikiPage,
   ValidationError,
   type WikiActor,
   wikiHitsForAgent,
@@ -253,5 +255,112 @@ describe("wiki folders with an audience", () => {
     await removeMember(f.db, f.owner.id, f.org.id, bia.id);
     const info = await getWikiFolderAudience(f.db, f.owner.id, f.org.id, "Financeiro");
     expect(info.own?.audience?.userIds).toEqual([]);
+  });
+});
+
+describe("who edits a wiki page", () => {
+  const nobody = { roleIds: [], userIds: [] };
+  const write = (actor: WikiActor, ref: string, baseVersion: number) =>
+    updateWikiPage(wikiDeps(), actor, f.org.id, ref, { baseVersion, body: "mudou" });
+
+  test("everyone sees it, only the editors change it, and owners always do", async () => {
+    const { deps, admin, ana, bia, page } = await workspace();
+    const view = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null, {
+      editors: { roleIds: [admin], userIds: [] },
+      agentEditorIds: null,
+    });
+    expect(view.audience).toBeNull();
+    expect(view.editors?.roleIds).toEqual([admin]);
+    const asBia = await getWikiPage(f.db, person(bia.id), f.org.id, page.id);
+    expect(asBia.canEdit).toBe(false);
+    expect((await getWikiPage(f.db, person(ana.id), f.org.id, page.id)).canEdit).toBe(true);
+    expect(code(await write(person(bia.id), page.id, view.version).catch((e) => e))).toBe("wiki.edit_limited");
+    expect(code(await deleteWikiPage(deps, person(bia.id), f.org.id, page.id).catch((e) => e))).toBe(
+      "wiki.edit_limited",
+    );
+    const saved = await write(person(ana.id), page.id, view.version);
+    expect((await write(person(f.owner.id), page.id, saved.version)).body).toBe("mudou");
+  });
+
+  test("an agent edits only on its list and for a person on theirs", async () => {
+    const { deps, other, ana, bia, page } = await workspace();
+    const view = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null, {
+      editors: { roleIds: [], userIds: [ana.id] },
+      agentEditorIds: [f.agent.id],
+    });
+    const forAna = (agentId: string): WikiActor => ({ type: "agent", agentId, requestedByUserId: ana.id });
+    const forBia: WikiActor = { type: "agent", agentId: f.agent.id, requestedByUserId: bia.id };
+    expect(code(await write(forAna(other.id), page.id, view.version).catch((e) => e))).toBe("wiki.edit_limited");
+    expect(code(await write(forBia, page.id, view.version).catch((e) => e))).toBe("wiki.edit_limited");
+    expect((await write(forAna(f.agent.id), page.id, view.version)).version).toBe(view.version + 1);
+    expect((await getWikiPage(f.db, agent(other.id), f.org.id, page.id)).canEdit).toBe(false);
+    expect((await getWikiPage(f.db, agent(f.agent.id), f.org.id, page.id)).canEdit).toBe(true);
+  });
+
+  test("seeing still comes first: an editor outside the audience gets no access", async () => {
+    const { deps, admin, bia, page } = await workspace();
+    const view = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, { roleIds: [admin], userIds: [] }, null, {
+      editors: { roleIds: [], userIds: [bia.id] },
+      agentEditorIds: null,
+    });
+    expect(code(await write(person(bia.id), page.id, view.version).catch((e) => e))).toBe("wiki.no_access");
+  });
+
+  test("whoever sets the editors stays among them", async () => {
+    const { deps, ana, page } = await workspace();
+    const out = await setWikiPageAudience(deps, ana.id, f.org.id, page.id, null, null, {
+      editors: nobody,
+      agentEditorIds: null,
+    }).catch((e) => e);
+    expect(code(out)).toBe("wiki.editors_exclude_you");
+  });
+
+  test("an older app that sends no editors keeps the page's", async () => {
+    const { deps, ana, page } = await workspace();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null, {
+      editors: { roleIds: [], userIds: [ana.id] },
+      agentEditorIds: [f.agent.id],
+    });
+    const view = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null);
+    expect(view.editors?.userIds).toEqual([ana.id]);
+    expect(view.agentEditorIds).toEqual([f.agent.id]);
+  });
+
+  test("a folder's editors reach its pages; a page can only narrow them, and new pages follow", async () => {
+    const { deps, admin, ana, bia, other, page } = await workspace();
+    const edit = { editors: { roleIds: [admin], userIds: [] }, agentEditorIds: [f.agent.id] };
+    await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro", null, null, edit);
+    const followed = await getWikiPage(f.db, person(f.owner.id), f.org.id, page.id);
+    expect(followed.audienceFolder).toBe("Financeiro");
+    expect(followed.editors?.roleIds).toEqual([admin]);
+    expect(followed.agentEditorIds).toEqual([f.agent.id]);
+    expect(followed.folderAudience?.editors?.roleIds).toEqual([admin]);
+    const wider = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null, {
+      editors: { roleIds: [admin], userIds: [] },
+      agentEditorIds: [f.agent.id, other.id],
+    }).catch((e) => e);
+    expect(code(wider)).toBe("wiki.audience_wider_than_folder");
+    const narrow = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null, {
+      editors: { roleIds: [], userIds: [ana.id] },
+      agentEditorIds: [],
+    });
+    expect(narrow.audienceFolder).toBeNull();
+    const created = await createWikiPage(deps, person(ana.id), f.org.id, { title: "Nova", folder: "Financeiro" });
+    expect(created.editors?.roleIds).toEqual([admin]);
+    const refused = await createWikiPage(deps, person(bia.id), f.org.id, {
+      title: "Dela",
+      folder: "Financeiro",
+    }).catch((e) => e);
+    expect(code(refused)).toBe("wiki.edit_limited");
+  });
+
+  test("someone leaving is taken off the editors too", async () => {
+    const { deps, bia, page } = await workspace();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null, {
+      editors: { roleIds: [], userIds: [bia.id] },
+      agentEditorIds: null,
+    });
+    await removeMember(f.db, f.owner.id, f.org.id, bia.id);
+    expect((await getWikiPage(f.db, person(f.owner.id), f.org.id, page.id)).editors?.userIds).toEqual([]);
   });
 });

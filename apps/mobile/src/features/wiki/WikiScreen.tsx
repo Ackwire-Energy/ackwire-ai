@@ -354,11 +354,11 @@ function WikiPage({ slug }: { slug: string }) {
   const qc = useQueryClient();
   const { orgId, org } = useOrg();
   // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
-  const writes = can(org, "edit_wiki");
+  const page = useWikiPage(orgId, slug);
+  const writes = can(org, "edit_wiki") && page.data?.canEdit !== false;
   const admin = can(org, "configure");
   // Who sees a page: people who write the wiki and manage roles (the server checks the same).
   const choosesAudience = writes && can(org, "manage_roles");
-  const page = useWikiPage(orgId, slug);
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
   const graph = useWikiGraph(orgId, true);
@@ -556,6 +556,11 @@ function WikiPage({ slug }: { slug: string }) {
               {p.audience || p.agentIds ? (
                 <View style={styles.note}>
                   <Note icon="eye">{p.audience ? t("wiki.restrictedHint") : t("wiki.audienceAgentsOnlyHint")}</Note>
+                </View>
+              ) : null}
+              {p.canEdit === false ? (
+                <View style={styles.note}>
+                  <Note icon="eye">{t("wiki.readOnlyHint")}</Note>
                 </View>
               ) : null}
               {p.locked ? (

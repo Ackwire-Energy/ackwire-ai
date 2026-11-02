@@ -234,8 +234,34 @@ describe("the wiki", () => {
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(6);
     const call = state.calls.find((c) => c.method === "wiki.audience");
-    expect(call?.args.slice(1)).toEqual(["deploy", { roleIds: [ADMIN_ROLE_ID], userIds: [] }, null]);
+    expect(call?.args.slice(1)).toEqual([
+      "deploy",
+      { audience: { roleIds: [ADMIN_ROLE_ID], userIds: [] }, agentIds: null, editors: null, agentEditorIds: null },
+    ]);
     expect(screen().getByText("Restrita")).toBeTruthy();
+  });
+
+  test("Quem vê: everyone views and one role edits; agents get their own list", async () => {
+    const { state } = await go("wiki/deploy");
+    const more = screen().getByRole("button", { name: "Mais ações" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Quem vê" }));
+    const dialog = screen().getByRole("dialog", { name: "Quem vê Deploy" });
+    await click(within(dialog).getByRole("radio", { name: /^Todos podem ver/ }));
+    await click(within(dialog).getByRole("checkbox", { name: "Admin" }));
+    await click(within(dialog).getByRole("radio", { name: /^Só estes agentes/ }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    const call = state.calls.find((c) => c.method === "wiki.audience");
+    expect(call?.args.slice(1)).toEqual([
+      "deploy",
+      { audience: null, agentIds: [], editors: { roleIds: [ADMIN_ROLE_ID], userIds: [] }, agentEditorIds: null },
+    ]);
   });
 
   test("a page outside your audience: a plain no access", async () => {

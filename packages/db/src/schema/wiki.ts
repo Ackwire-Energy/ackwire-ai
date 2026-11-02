@@ -44,6 +44,13 @@ export const wikiPages = pgTable(
     /** Limited to some agents: only `audienceAgentIds` read it. Independent of `restricted`. */
     agentsLimited: boolean().notNull().default(false),
     audienceAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Only these people edit it, among those who see it and hold `edit_wiki`. Owners always do. */
+    editorsLimited: boolean().notNull().default(false),
+    editorRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    editorUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    /** Only these agents edit it, among those who read it and hold `wiki:write`. */
+    agentEditorsLimited: boolean().notNull().default(false),
+    agentEditorIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** The folder whose audience this page follows; null = its own audience, or open. */
     audienceFolder: text(),
     /** Where it came from: "Salvar na wiki" (`message`, `forum_topic`) or an import (`obsidian`, id = the vault's name). */
@@ -83,6 +90,11 @@ export const wikiFolderAudiences = pgTable(
     audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     agentsLimited: boolean().notNull().default(false),
     audienceAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    editorsLimited: boolean().notNull().default(false),
+    editorRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    editorUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    agentEditorsLimited: boolean().notNull().default(false),
+    agentEditorIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     updatedById: text().notNull(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

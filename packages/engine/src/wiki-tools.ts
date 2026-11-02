@@ -138,7 +138,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
           const hidden = p.audience || p.agentIds ? (await unseen(ctx, [p.id])).has(p.id) : false;
           return {
             content: [
-              `# ${p.title} (slug ${p.slug}, version ${p.version}${p.folder ? `, folder ${p.folder}` : ""}${p.locked ? ", locked" : ""})`,
+              `# ${p.title} (slug ${p.slug}, version ${p.version}${p.folder ? `, folder ${p.folder}` : ""}${p.locked ? ", locked" : ""}${p.canEdit ? "" : ", read-only for you"})`,
               hidden ? RESTRICTED_WIKI_RULE : "",
               p.tags.length ? `Tags: ${p.tags.join(", ")}` : "",
               cutText(p.body, 40_000),

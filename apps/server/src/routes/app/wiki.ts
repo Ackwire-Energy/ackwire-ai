@@ -63,6 +63,8 @@ const FolderAudience = z
     folder: z.string(),
     audience: Audience.nullable().openapi({ description: "null = every member." }),
     agentIds: AgentIds.nullable().openapi({ description: "null = every agent." }),
+    editors: Audience.nullable().openapi({ description: "Who edits among those who see it; null = all of them." }),
+    agentEditorIds: AgentIds.nullable().openapi({ description: "null = every agent that reads it." }),
   })
   .openapi("WikiFolderAudience");
 const Summary = z
@@ -79,6 +81,10 @@ const Summary = z
       description: "Limited to these roles and people (plus owners); null = every member.",
     }),
     agentIds: AgentIds.nullable().openapi({ description: "Limited to these agents; null = every agent." }),
+    editors: Audience.nullable().openapi({
+      description: "The people who edit it, among those who see it and hold `edit_wiki`; null = all of them.",
+    }),
+    agentEditorIds: AgentIds.nullable().openapi({ description: "Limited to these agents; null = every agent." }),
     audienceFolder: z.string().nullable().openapi({ description: "The folder whose audience it follows." }),
     excerpt: z.string().openapi({ description: "The start of the text, plain." }),
     sourceType: z.string().nullable().openapi({ description: '"obsidian" for an imported page.' }),
@@ -113,6 +119,9 @@ const Page = Summary.extend({
   backlinks: z.array(Backlink),
   folderAudience: FolderAudience.nullable().openapi({
     description: "The closest limited folder: this page can only be narrower.",
+  }),
+  canEdit: z.boolean().openapi({
+    description: "The editors' list lets this reader edit it; a locked page or a missing `edit_wiki` still stop them.",
   }),
   links: z.array(z.object({ target: z.string(), slug: z.string(), title: z.string().nullable(), exists: z.boolean() })),
   source: z
@@ -577,26 +586,28 @@ export function wikiRoutes(deps: AppDeps) {
       summary:
         "Limit a page to roles and people (owners always read it) and to some agents, or open it with `null`; for people who edit the wiki and manage roles",
       description:
-        "`wiki.audience_forbidden`: missing `edit_wiki` or `manage_roles`; `wiki.audience_excludes_you`: the audience must include you; `wiki.audience_wider_than_folder`: inside a limited folder a page can only be narrower. People outside it get `wiki.no_access` on the page. Leaving out `agentIds` keeps the page's list.",
+        "`wiki.audience_forbidden`: missing `edit_wiki` or `manage_roles`; `wiki.audience_excludes_you`: the audience must include you; `wiki.audience_wider_than_folder`: inside a limited folder a page can only be narrower; `wiki.editors_exclude_you`: the editors must include you. People outside it get `wiki.no_access` on the page, and those off its editors `wiki.edit_limited` on a write. Leaving out `agentIds`, or `editors` with `agentEditorIds`, keeps the page's own.",
       request: {
         params: PageParams,
-        body: body(z.object({ audience: Audience.nullable(), agentIds: AgentIds.nullable().optional() })),
+        body: body(
+          z.object({
+            audience: Audience.nullable(),
+            agentIds: AgentIds.nullable().optional(),
+            editors: Audience.nullable().optional(),
+            agentEditorIds: AgentIds.nullable().optional(),
+          }),
+        ),
       },
       responses: { 200: json(Page), ...errors },
     }),
     async (c) => {
       const { orgId, slug } = c.req.valid("param");
-      return c.json(
-        await setWikiPageAudience(
-          wiki(),
-          c.get("user").id,
-          orgId,
-          slug,
-          c.req.valid("json").audience,
-          c.req.valid("json").agentIds,
-        ),
-        200,
-      );
+      const { audience, agentIds, editors, agentEditorIds } = c.req.valid("json");
+      const edit =
+        editors === undefined && agentEditorIds === undefined
+          ? undefined
+          : { editors: editors ?? null, agentEditorIds: agentEditorIds ?? null };
+      return c.json(await setWikiPageAudience(wiki(), c.get("user").id, orgId, slug, audience, agentIds, edit), 200);
     },
   );
 
@@ -637,17 +648,18 @@ export function wikiRoutes(deps: AppDeps) {
             folder: z.string().min(1).max(200),
             audience: Audience.nullable(),
             agentIds: AgentIds.nullable(),
+            editors: Audience.nullable().optional(),
+            agentEditorIds: AgentIds.nullable().optional(),
           }),
         ),
       },
       responses: { 200: json(z.object({ folder: z.string(), pages: z.number() })), ...errors },
     }),
     async (c) => {
-      const { folder, audience, agentIds } = c.req.valid("json");
-      return c.json(
-        await setWikiFolderAudience(wiki(), c.get("user").id, c.req.valid("param").orgId, folder, audience, agentIds),
-        200,
-      );
+      const { folder, audience, agentIds, editors, agentEditorIds } = c.req.valid("json");
+      const edit = { editors: editors ?? null, agentEditorIds: agentEditorIds ?? null };
+      const { orgId } = c.req.valid("param");
+      return c.json(await setWikiFolderAudience(wiki(), c.get("user").id, orgId, folder, audience, agentIds, edit), 200);
     },
   );
 

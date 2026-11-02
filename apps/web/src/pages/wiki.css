@@ -133,6 +133,16 @@ html:not([data-pointer]) .wiki-row:focus-visible {
 .wiki-row__car {
   transition: transform 0.2s var(--out);
 }
+/* A row of "Quem vê": who, and what they may do. */
+.wiki-access-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wiki-access-row .scope-row {
+  flex: 1;
+  min-width: 0;
+}
 /* A folder's "Quem vê": on hover, and always once the folder is limited. */
 .wiki-folder-row {
   position: relative;

@@ -4,109 +4,169 @@ import {
   useWikiAction,
   useWikiFolderAudience,
   useWikiPage,
-  type WikiAudience,
   type WikiFolderAudience,
 } from "@agenteschat/client";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import {
+  OPEN_WIKI_ACCESS,
+  type WikiAccess,
+  type WikiAccessDraft,
+  type WikiLevel,
+  wikiAccessDraft,
+  wikiAccessLimited,
+  wikiAccessOf,
+  wikiBaseLevels,
+  wikiRowCap,
+} from "@agenteschat/client/lib/wiki";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Icon, Row, SectionHeader, Text, useToast } from "@/ui";
+import { Row, SectionHeader, Segmented, Text, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { ActionList, PushedHeader, successHaptic, Tile } from "../shared/parts";
 
 /**
- * "Quem vê" a wiki page or folder (ADR 0023 addendum), the web's dialog as a screen: people and agents are chosen
- * apart. Owners always read it. Inside a limited folder it can only be narrower.
+ * "Quem vê" a wiki page or folder (ADR 0023 addenda), the web's dialog as a screen: a level for everyone and one per
+ * role, person and agent, people and agents apart. A tap walks a row through its levels. Owners always read and edit.
+ * Inside a limited folder it can only be narrower.
  */
 export function WikiAudienceScreen({ slug, folder }: { slug?: string; folder?: string }) {
+  const orgId = useOrgId();
+  const page = useWikiPage(orgId, slug ?? null);
+  const info = useWikiFolderAudience(orgId, folder ?? "", Boolean(folder));
+  const p = slug ? page.data : undefined;
+  if (folder) {
+    if (!info.data) return null;
+    const { own, above } = info.data;
+    return <Form key={folder} folder={folder} initial={own ?? above ?? OPEN_WIKI_ACCESS} above={above} />;
+  }
+  if (!p) return null;
+  return (
+    <Form
+      key={p.id}
+      slug={p.slug}
+      inFolder={p.folder}
+      initial={{
+        audience: p.audience ?? null,
+        agentIds: p.agentIds ?? null,
+        editors: p.editors ?? null,
+        agentEditorIds: p.agentEditorIds ?? null,
+      }}
+      above={p.folderAudience ?? null}
+    />
+  );
+}
+
+/** The levels a row walks through: on or off beside "everyone can view", or each one it may reach. */
+const rowLevels = (base: WikiLevel, cap: WikiLevel): WikiLevel[] =>
+  base === "view" ? ["none", "edit"] : cap === "edit" ? ["none", "view", "edit"] : ["none", "view"];
+
+function Form({
+  slug,
+  folder,
+  inFolder,
+  initial,
+  above,
+}: {
+  slug?: string;
+  folder?: string;
+  inFolder?: string;
+  initial: WikiAccess;
+  above: WikiFolderAudience | null;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
   const toast = useToast();
   const failed = useFailed();
   const dir = useDirectory();
-  const page = useWikiPage(orgId, slug ?? null);
   const roles = useRoles(orgId);
   const action = useWikiAction(orgId);
   const saveFolder = useSetWikiFolderAudience(orgId);
-  const info = useWikiFolderAudience(orgId, folder ?? "", Boolean(folder));
-  const p = slug ? page.data : undefined;
-  const above: WikiFolderAudience | null = (folder ? info.data?.above : p?.folderAudience) ?? null;
-  const base = folder ? (info.data?.own ?? above) : p;
-  const ready = Boolean(folder ? info.data : p);
-  const [limited, setLimited] = useState<boolean | null>(null);
-  const [value, setValue] = useState<WikiAudience | null>(null);
-  const [agentsOnly, setAgentsOnly] = useState<boolean | null>(null);
-  const [picked, setPicked] = useState<string[] | null>(null);
-  const isLimited = limited ?? Boolean(base?.audience ?? above?.audience);
-  const audience = value ?? base?.audience ?? above?.audience ?? { roleIds: [], userIds: [] };
-  const isAgentsOnly = agentsOnly ?? Boolean(base?.agentIds ?? above?.agentIds);
-  const agentIds = picked ?? base?.agentIds ?? above?.agentIds ?? [];
-  const flip = (key: keyof WikiAudience, id: string) =>
-    setValue({
-      ...audience,
-      [key]: audience[key].includes(id) ? audience[key].filter((x) => x !== id) : [...audience[key], id],
-    });
+  const [draft, setDraft] = useState<WikiAccessDraft>(() => wikiAccessDraft(initial));
+  const cap = useMemo(() => wikiAccessDraft(above ?? OPEN_WIKI_ACCESS), [above]);
   const done = (title: string) => {
     successHaptic();
     toast({ title });
     router.back();
   };
   const save = () => {
-    const choice = { audience: isLimited ? audience : null, agentIds: isAgentsOnly ? agentIds : null };
+    const access = wikiAccessOf(draft);
     if (folder) {
       saveFolder.mutate(
-        { folder, ...choice },
+        { folder, access },
         {
           onSuccess: () =>
-            done(choice.audience || choice.agentIds ? t("wiki.audienceFolderSaved") : t("wiki.audienceFolderOpened")),
+            done(wikiAccessLimited(access) ? t("wiki.audienceFolderSaved") : t("wiki.audienceFolderOpened")),
           onError: failed,
         },
       );
-    } else if (p) {
+    } else if (slug) {
       action.mutate(
-        { type: "audience", slug: p.slug, ...choice },
+        { type: "audience", slug, access },
         {
-          onSuccess: (x) => done(x.audience || x.agentIds ? t("wiki.audienceSaved") : t("wiki.audienceOpened")),
+          onSuccess: () => done(wikiAccessLimited(access) ? t("wiki.audienceSaved") : t("wiki.audienceOpened")),
           onError: failed,
         },
       );
     }
   };
-  const option = (
-    on: boolean,
-    title: string,
-    subtitle: string,
-    icon: "globe" | "shield",
-    locked: boolean,
-    pick: () => void,
-  ) => (
-    <Row
-      leading={<Tile icon={icon} />}
-      title={title}
-      subtitle={subtitle}
-      subtitleLines={2}
-      meta={on ? <Icon name="check" size={20} color={c.ink} /> : undefined}
-      {...(locked ? {} : { onPress: pick })}
-    />
-  );
+  const levelName = (level: WikiLevel, base: WikiLevel) =>
+    level === "edit"
+      ? t("wiki.audienceLevelEdit")
+      : level === "view" || base === "view"
+        ? t("wiki.audienceLevelView")
+        : t("wiki.audienceLevelNone");
+  const row = (
+    group: "roles" | "users" | "agentRows",
+    base: WikiLevel,
+    rowCap: WikiLevel,
+    key: string,
+    icon: "shield" | "person",
+    label: string,
+    hint?: string,
+  ) => {
+    const level = draft[group][key] ?? "none";
+    const levels = rowLevels(base, rowCap);
+    return {
+      key,
+      icon,
+      label,
+      ...(hint ? { hint } : {}),
+      trailing: (
+        <Text variant="subhead" tone="faint">
+          {levelName(level, base)}
+        </Text>
+      ),
+      onPress: () =>
+        setDraft((d) => ({
+          ...d,
+          [group]: { ...d[group], [key]: levels[(levels.indexOf(level) + 1) % levels.length] ?? "none" },
+        })),
+    };
+  };
+  const baseItems = (allowed: WikiLevel[]) =>
+    allowed.map((level) => ({
+      key: level,
+      label:
+        level === "edit"
+          ? t("wiki.audienceBaseEdit")
+          : level === "view"
+            ? t("wiki.audienceBaseView")
+            : t("wiki.audienceBaseChosen"),
+    }));
   const roleList = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r))).filter(
-    (r) => !above?.audience || above.audience.roleIds.includes(r.id),
+    (r) => wikiRowCap(cap.people, cap.roles[r.id]) !== "none",
   );
-  const agents = dir.agents.filter((a) => !a.archivedAt && (!above?.agentIds || above.agentIds.includes(a.id)));
+  const agents = dir.agents.filter((a) => wikiRowCap(cap.agents, cap.agentRows[a.id]) !== "none");
   return (
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
       <PushedHeader
         title={t("wiki.audience")}
         solid={false}
-        action={{
-          label: t("common.save"),
-          onPress: save,
-          disabled: action.isPending || saveFolder.isPending || !ready,
-        }}
+        action={{ label: t("common.save"), onPress: save, disabled: action.isPending || saveFolder.isPending }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <Text variant="footnote" tone="faint" style={styles.lead}>
@@ -118,78 +178,59 @@ export function WikiAudienceScreen({ slug, folder }: { slug?: string; folder?: s
           </Text>
         ) : null}
         <SectionHeader title={t("wiki.audiencePeople")} />
-        {option(
-          !isLimited,
-          t("wiki.audienceEveryone"),
-          t("wiki.audienceEveryoneText"),
-          "globe",
-          Boolean(above?.audience),
-          () => setLimited(false),
-        )}
-        {option(isLimited, t("wiki.audienceLimited"), t("wiki.audienceLimitedText"), "shield", false, () =>
-          setLimited(true),
-        )}
-        {isLimited ? (
+        <View style={styles.list}>
+          <Segmented
+            items={baseItems(wikiBaseLevels(cap.people))}
+            value={draft.people}
+            onChange={(key) => setDraft((d) => ({ ...d, people: key as WikiLevel }))}
+          />
+        </View>
+        {draft.people !== "edit" ? (
           <>
             <SectionHeader title={t("wiki.audienceRoles")} />
             <View style={styles.list}>
               <ActionList
-                items={roleList.map((r) => ({
-                  key: r.id,
-                  icon: "shield",
-                  label: r.name,
-                  checked: audience.roleIds.includes(r.id),
-                  onPress: () => flip("roleIds", r.id),
-                }))}
+                items={roleList.map((r) =>
+                  row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
+                )}
               />
             </View>
             <SectionHeader title={t("wiki.audiencePeople")} />
             <View style={styles.list}>
               <ActionList
-                items={[...dir.memberById.values()].map((m) => ({
-                  key: m.userId,
-                  icon: "person",
-                  label: m.name,
-                  hint: m.email,
-                  checked: audience.userIds.includes(m.userId),
-                  onPress: () => flip("userIds", m.userId),
-                }))}
+                items={[...dir.memberById.values()].map((m) =>
+                  row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
+                )}
               />
             </View>
           </>
         ) : null}
         <SectionHeader title={t("wiki.audienceAgents")} />
-        {option(
-          !isAgentsOnly,
-          t("wiki.audienceAgentsAll"),
-          t("wiki.audienceAgentsAllText"),
-          "globe",
-          Boolean(above?.agentIds),
-          () => setAgentsOnly(false),
-        )}
-        {option(isAgentsOnly, t("wiki.audienceAgentsOnly"), t("wiki.audienceAgentsOnlyText"), "shield", false, () =>
-          setAgentsOnly(true),
-        )}
-        {isAgentsOnly ? (
-          <View style={styles.list}>
+        <View style={styles.list}>
+          <Segmented
+            items={baseItems(wikiBaseLevels(cap.agents))}
+            value={draft.agents}
+            onChange={(key) => setDraft((d) => ({ ...d, agents: key as WikiLevel }))}
+          />
+        </View>
+        {draft.agents !== "edit" ? (
+          <View style={[styles.list, styles.rows]}>
             <ActionList
-              items={agents.map((a) => ({
-                key: a.id,
-                icon: "person",
-                label: a.name,
-                checked: agentIds.includes(a.id),
-                onPress: () =>
-                  setPicked(agentIds.includes(a.id) ? agentIds.filter((x) => x !== a.id) : [...agentIds, a.id]),
-              }))}
+              items={agents.map((a) =>
+                row("agentRows", draft.agents, wikiRowCap(cap.agents, cap.agentRows[a.id]), a.id, "person", a.name),
+              )}
             />
           </View>
         ) : null}
-        {p?.folder ? (
+        <Text variant="footnote" tone="faint" style={styles.lead}>
+          {t("wiki.audienceEditNote")}
+        </Text>
+        {inFolder ? (
           <Row
             leading={<Tile icon="archive" />}
-            title={t("wiki.audienceUseFolder", { folder: p.folder })}
+            title={t("wiki.audienceUseFolder", { folder: inFolder })}
             chevron
-            onPress={() => router.push({ pathname: "/wiki-audience", params: { folder: p.folder } })}
+            onPress={() => router.push({ pathname: "/wiki-audience", params: { folder: inFolder } })}
           />
         ) : null}
       </ScrollView>
@@ -202,4 +243,5 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 40 },
   lead: { paddingHorizontal: 20, paddingVertical: 12 },
   list: { paddingHorizontal: 16 },
+  rows: { paddingTop: 12 },
 });

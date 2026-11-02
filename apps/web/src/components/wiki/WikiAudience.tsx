@@ -1,7 +1,18 @@
-import type { WikiAudience, WikiFolderAudience, WikiPage } from "@agenteschat/client";
+import type { WikiFolderAudience, WikiPage } from "@agenteschat/client";
 import { useRoles, useSetWikiFolderAudience, useWikiAction, useWikiFolderAudience } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import {
+  OPEN_WIKI_ACCESS,
+  type WikiAccess,
+  type WikiAccessDraft,
+  type WikiLevel,
+  wikiAccessDraft,
+  wikiAccessLimited,
+  wikiAccessOf,
+  wikiBaseLevels,
+  wikiRowCap,
+} from "@agenteschat/client/lib/wiki";
 import {
   Avatar,
   Button,
@@ -13,6 +24,7 @@ import {
   RadioGroup,
   RoleMark,
   SearchField,
+  Select,
 } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,11 +33,10 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
-type Choice = { audience: WikiAudience | null; agentIds: string[] | null };
-
 /**
- * "Quem vê" a wiki page or folder (ADR 0023 addendum): people and agents are chosen apart. Owners always read it; the
- * server refuses an audience that leaves out whoever sets it. A page's dialog can also set the page's folder.
+ * "Quem vê" a wiki page or folder (ADR 0023 addenda): a level for everyone and one per role, person and agent, people
+ * and agents apart. Owners always read and edit; the server refuses a choice that leaves out whoever makes it. A page's
+ * dialog can also set the page's folder.
  */
 export function WikiAudienceDialog({
   page,
@@ -66,7 +77,12 @@ function PageForm({
     <AudienceForm
       title={t("wiki.audienceTitle", { title: page.title })}
       description={t("wiki.audienceText")}
-      initial={{ audience: page.audience ?? null, agentIds: page.agentIds ?? null }}
+      initial={{
+        audience: page.audience ?? null,
+        agentIds: page.agentIds ?? null,
+        editors: page.editors ?? null,
+        agentEditorIds: page.agentEditorIds ?? null,
+      }}
       above={page.folderAudience ?? null}
       saving={action.isPending}
       extra={
@@ -75,12 +91,12 @@ function PageForm({
         ) : null
       }
       onClose={onClose}
-      onSave={(choice) =>
+      onSave={(access) =>
         action.mutate(
-          { type: "audience", slug: page.slug, ...choice },
+          { type: "audience", slug: page.slug, access },
           {
-            onSuccess: (x) => {
-              toast.show(x.audience || x.agentIds ? t("wiki.audienceSaved") : t("wiki.audienceOpened"));
+            onSuccess: () => {
+              toast.show(wikiAccessLimited(access) ? t("wiki.audienceSaved") : t("wiki.audienceOpened"));
               onClose();
             },
             onError: (e) => toast.show(errorText(t, e), "error"),
@@ -110,18 +126,16 @@ function FolderForm({
     <AudienceForm
       title={t("wiki.audienceFolderTitle", { folder })}
       description={t("wiki.audienceFolderText")}
-      initial={own ?? above ?? { audience: null, agentIds: null }}
+      initial={own ?? above ?? OPEN_WIKI_ACCESS}
       above={above}
       saving={save.isPending}
       onClose={onClose}
-      onSave={(choice) =>
+      onSave={(access) =>
         save.mutate(
-          { folder, ...choice },
+          { folder, access },
           {
             onSuccess: () => {
-              toast.show(
-                choice.audience || choice.agentIds ? t("wiki.audienceFolderSaved") : t("wiki.audienceFolderOpened"),
-              );
+              toast.show(wikiAccessLimited(access) ? t("wiki.audienceFolderSaved") : t("wiki.audienceFolderOpened"));
               onClose();
             },
             onError: (e) => toast.show(errorText(t, e), "error"),
@@ -129,6 +143,49 @@ function FolderForm({
         )
       }
     />
+  );
+}
+
+/** One role, person or agent: on or off, with its level when "everyone" gives none. */
+function AccessRow({
+  id,
+  name,
+  base,
+  level,
+  cap,
+  onChange,
+  children,
+}: {
+  id: string;
+  name: string;
+  base: WikiLevel;
+  level: WikiLevel;
+  cap: WikiLevel;
+  onChange: (level: WikiLevel) => void;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const on = base === "view" ? level === "edit" : level !== "none";
+  const most = cap === "edit" ? "edit" : "view";
+  return (
+    <div className="wiki-access-row">
+      <label htmlFor={id} className="scope-row">
+        <Checkbox id={id} checked={on} onCheckedChange={(next) => onChange(next ? most : "none")} />
+        {children}
+      </label>
+      {base === "none" && on && (
+        <Select
+          size="sm"
+          aria-label={t("wiki.audienceLevel", { name })}
+          value={level === "edit" ? "edit" : "view"}
+          onValueChange={onChange}
+          options={[
+            { value: "view" as const, label: t("wiki.audienceLevelView") },
+            ...(cap === "edit" ? [{ value: "edit" as const, label: t("wiki.audienceLevelEdit") }] : []),
+          ]}
+        />
+      )}
+    </div>
   );
 }
 
@@ -144,33 +201,31 @@ function AudienceForm({
 }: {
   title: string;
   description: string;
-  initial: Choice;
+  initial: WikiAccess;
   /** The limited folder this sits in: here it can only be narrower. */
   above: WikiFolderAudience | null;
   saving: boolean;
   extra?: ReactNode;
-  onSave: (choice: Choice) => void;
+  onSave: (access: WikiAccess) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const roles = useRoles(org.id);
   const dir = useDirectory(org.id);
-  const [limited, setLimited] = useState(Boolean(initial.audience ?? above?.audience));
-  const [value, setValue] = useState<WikiAudience>(
-    initial.audience ?? above?.audience ?? { roleIds: [], userIds: [] },
-  );
-  const [agentsLimited, setAgentsLimited] = useState(Boolean(initial.agentIds ?? above?.agentIds));
-  const [agentIds, setAgentIds] = useState<string[]>(initial.agentIds ?? above?.agentIds ?? []);
+  const [draft, setDraft] = useState<WikiAccessDraft>(() => wikiAccessDraft(initial));
   const [query, setQuery] = useState("");
+  const cap = wikiAccessDraft(above ?? OPEN_WIKI_ACCESS);
+  const peopleBases = wikiBaseLevels(cap.people);
+  const agentBases = wikiBaseLevels(cap.agents);
   const custom = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r))).filter(
-    (r) => !above?.audience || above.audience.roleIds.includes(r.id),
+    (r) => wikiRowCap(cap.people, cap.roles[r.id]) !== "none",
   );
   const q = fold(query.trim());
   const people = dir.members.filter((m) => !q || fold(`${m.name} ${m.email}`).includes(q));
-  const agents = dir.agents.filter((a) => !a.archivedAt && (!above?.agentIds || above.agentIds.includes(a.id)));
-  const toggle = (key: keyof WikiAudience, id: string, on: boolean) =>
-    setValue((v) => ({ ...v, [key]: on ? [...new Set([...v[key], id])] : v[key].filter((x) => x !== id) }));
+  const agents = dir.agents.filter((a) => wikiRowCap(cap.agents, cap.agentRows[a.id]) !== "none");
+  const setRow = (group: "roles" | "users" | "agentRows", id: string, level: WikiLevel) =>
+    setDraft((d) => ({ ...d, [group]: { ...d[group], [id]: level } }));
   return (
     <Dialog
       open
@@ -184,41 +239,53 @@ function AudienceForm({
         {above && <p className="small muted">{t("wiki.audienceInFolder", { folder: above.folder })}</p>}
         <span className="ac-field__label">{t("wiki.audiencePeople")}</span>
         <RadioGroup
-          value={limited ? "limited" : "everyone"}
-          onValueChange={(v) => setLimited(v === "limited")}
-          aria-label={t("wiki.audience")}
+          value={draft.people}
+          onValueChange={(v) => setDraft((d) => ({ ...d, people: v as WikiLevel }))}
+          aria-label={t("wiki.audiencePeople")}
           className="stack-4"
           style={{ gap: 8 }}
         >
           <RadioCard
-            value="everyone"
+            value="edit"
             id="wiki-audience-everyone"
-            checked={!limited}
-            disabled={Boolean(above?.audience)}
+            checked={draft.people === "edit"}
+            disabled={!peopleBases.includes("edit")}
             title={t("wiki.audienceEveryone")}
             description={t("wiki.audienceEveryoneText")}
           />
           <RadioCard
-            value="limited"
+            value="view"
+            id="wiki-audience-everyone-view"
+            checked={draft.people === "view"}
+            disabled={!peopleBases.includes("view")}
+            title={t("wiki.audienceEveryoneView")}
+            description={t("wiki.audienceEveryoneViewText")}
+          />
+          <RadioCard
+            value="none"
             id="wiki-audience-limited"
-            checked={limited}
+            checked={draft.people === "none"}
             title={t("wiki.audienceLimited")}
             description={t("wiki.audienceLimitedText")}
           />
         </RadioGroup>
-        {limited && (
+        {draft.people !== "edit" && (
           <div className="people-picker">
+            {draft.people === "view" && <span className="ac-field__label">{t("wiki.audienceEditors")}</span>}
             <span className="ac-field__label">{t("wiki.audienceRoles")}</span>
             {custom.map((r) => (
-              <label key={r.id} htmlFor={`wiki-audience-r-${r.id}`} className="scope-row">
-                <Checkbox
-                  id={`wiki-audience-r-${r.id}`}
-                  checked={value.roleIds.includes(r.id)}
-                  onCheckedChange={(on) => toggle("roleIds", r.id, on)}
-                />
+              <AccessRow
+                key={r.id}
+                id={`wiki-audience-r-${r.id}`}
+                name={r.name}
+                base={draft.people}
+                level={draft.roles[r.id] ?? "none"}
+                cap={wikiRowCap(cap.people, cap.roles[r.id])}
+                onChange={(level) => setRow("roles", r.id, level)}
+              >
                 <RoleMark color={r.color} icon={r.icon} size={18} />
                 <span className="scope-row__text">{r.name}</span>
-              </label>
+              </AccessRow>
             ))}
             <span className="ac-field__label">{t("wiki.audiencePeople")}</span>
             <SearchField
@@ -235,81 +302,87 @@ function AudienceForm({
               {people.length === 0 ? (
                 <p className="small muted">{t("wiki.audienceNoMatch")}</p>
               ) : (
-                people.map((m) => {
-                  const id = `wiki-audience-p-${m.userId.replace(/[^a-zA-Z0-9]/g, "-")}`;
-                  return (
-                    <label key={m.userId} htmlFor={id} className="scope-row">
-                      <Checkbox
-                        id={id}
-                        checked={value.userIds.includes(m.userId)}
-                        onCheckedChange={(on) => toggle("userIds", m.userId, on)}
-                      />
-                      <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />
-                      <span className="scope-row__text">
-                        <span>{m.name}</span>
-                        <span className="small muted">{m.email}</span>
-                      </span>
-                    </label>
-                  );
-                })
+                people.map((m) => (
+                  <AccessRow
+                    key={m.userId}
+                    id={`wiki-audience-p-${m.userId.replace(/[^a-zA-Z0-9]/g, "-")}`}
+                    name={m.name}
+                    base={draft.people}
+                    level={draft.users[m.userId] ?? "none"}
+                    cap="edit"
+                    onChange={(level) => setRow("users", m.userId, level)}
+                  >
+                    <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />
+                    <span className="scope-row__text">
+                      <span>{m.name}</span>
+                      <span className="small muted">{m.email}</span>
+                    </span>
+                  </AccessRow>
+                ))
               )}
             </div>
           </div>
         )}
         <span className="ac-field__label">{t("wiki.audienceAgents")}</span>
         <RadioGroup
-          value={agentsLimited ? "only" : "all"}
-          onValueChange={(v) => setAgentsLimited(v === "only")}
+          value={draft.agents}
+          onValueChange={(v) => setDraft((d) => ({ ...d, agents: v as WikiLevel }))}
           aria-label={t("wiki.audienceAgents")}
           className="stack-4"
           style={{ gap: 8 }}
         >
           <RadioCard
-            value="all"
+            value="edit"
             id="wiki-audience-agents-all"
-            checked={!agentsLimited}
-            disabled={Boolean(above?.agentIds)}
+            checked={draft.agents === "edit"}
+            disabled={!agentBases.includes("edit")}
             title={t("wiki.audienceAgentsAll")}
             description={t("wiki.audienceAgentsAllText")}
           />
           <RadioCard
-            value="only"
+            value="view"
+            id="wiki-audience-agents-view"
+            checked={draft.agents === "view"}
+            disabled={!agentBases.includes("view")}
+            title={t("wiki.audienceAgentsView")}
+            description={t("wiki.audienceAgentsViewText")}
+          />
+          <RadioCard
+            value="none"
             id="wiki-audience-agents-only"
-            checked={agentsLimited}
+            checked={draft.agents === "none"}
             title={t("wiki.audienceAgentsOnly")}
             description={t("wiki.audienceAgentsOnlyText")}
           />
         </RadioGroup>
-        {agentsLimited && (
+        {draft.agents !== "edit" && (
           <div className="people-picker">
+            {draft.agents === "view" && <span className="ac-field__label">{t("wiki.audienceEditors")}</span>}
             {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
             <div className="people-picker__results" role="region" aria-label={t("wiki.audienceAgents")}>
               {agents.map((a) => (
-                <label key={a.id} htmlFor={`wiki-audience-a-${a.id}`} className="scope-row">
-                  <Checkbox
-                    id={`wiki-audience-a-${a.id}`}
-                    checked={agentIds.includes(a.id)}
-                    onCheckedChange={(on) =>
-                      setAgentIds((ids) => (on ? [...new Set([...ids, a.id])] : ids.filter((x) => x !== a.id)))
-                    }
-                  />
+                <AccessRow
+                  key={a.id}
+                  id={`wiki-audience-a-${a.id}`}
+                  name={a.name}
+                  base={draft.agents}
+                  level={draft.agentRows[a.id] ?? "none"}
+                  cap={wikiRowCap(cap.agents, cap.agentRows[a.id])}
+                  onChange={(level) => setRow("agentRows", a.id, level)}
+                >
                   <AgentAvatar agent={a} size="sm" name={a.name} />
                   <span className="scope-row__text">{a.name}</span>
-                </label>
+                </AccessRow>
               ))}
             </div>
           </div>
         )}
+        <p className="small muted">{t("wiki.audienceEditNote")}</p>
       </div>
       <DialogFooter>
         {extra}
         <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button
-          variant="primary"
-          loading={saving}
-          disabled={saving}
-          onClick={() => onSave({ audience: limited ? value : null, agentIds: agentsLimited ? agentIds : null })}
-        >
+        <Button variant="primary" loading={saving} disabled={saving} onClick={() => onSave(wikiAccessOf(draft))}>
           {t("common.save")}
         </Button>
       </DialogFooter>

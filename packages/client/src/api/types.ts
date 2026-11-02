@@ -3693,6 +3693,8 @@ export interface WikiFolderAudience {
   folder: string;
   audience: WikiAudience | null;
   agentIds: string[] | null;
+  editors: WikiAudience | null;
+  agentEditorIds: string[] | null;
 }
 
 export interface WikiPageSummary {
@@ -3713,6 +3715,10 @@ export interface WikiPageSummary {
   audience?: WikiAudience | null;
   /** Limited to these agents; null or missing = every agent. */
   agentIds?: string[] | null;
+  /** Who edits among those who see it and hold `edit_wiki`; null or missing = all of them. */
+  editors?: WikiAudience | null;
+  /** The agents that edit it, among those that read it; null or missing = all of them. */
+  agentEditorIds?: string[] | null;
   /** The folder whose audience it follows. */
   audienceFolder?: string | null;
   /** The start of the text, plain, for cards. */
@@ -3941,6 +3947,8 @@ export interface WikiPage extends WikiPageSummary {
   backlinks: WikiBacklink[];
   /** The closest limited folder: this page can only be narrower. */
   folderAudience?: WikiFolderAudience | null;
+  /** False when its editors' list leaves this reader out (a locked page or a missing `edit_wiki` still stop them). */
+  canEdit?: boolean;
   /** Where it came from; an import keeps its attachments (name → Drive artifact id). */
   source?: { type: string; id: string; channelId?: string; attachments?: Record<string, string> } | null;
   /** Agents that used it in the last 7 days; the channel only when public. */
