@@ -133,9 +133,9 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
 });
 
 /**
- * A person's message's receipt beside its text, in room its row already has, never a line of its own (`markOf`):
- * by my bubble's last line (my rows keep their left side free) or at the end of a turn's name line. Faces and our
- * small marks; the words are its label, and a tap says them: the agents' sheet, or a note from the top.
+ * A person's message's receipt in a line its row already has, never one of its own (`markOf`): after the time under
+ * my turn, or at the end of a turn's name line. Faces and our small marks; the words are its label, and a tap says
+ * them: the agents' sheet, or a note from the top.
  */
 export const ReceiptMark = memo(function ReceiptMark({
   message: m,
@@ -184,11 +184,11 @@ export const ReceiptMark = memo(function ReceiptMark({
           view.state === "read" || view.state === "resolved" ? (
             <AgentFace agentId={view.agentId} size={16} live={false} framed={false} />
           ) : view.state === "now" ? (
-            <Icon name="bolt" size={12} color={c.muted} />
+            <Icon name="bolt" size={14} color={c.muted} />
           ) : view.state === "delivered" ? (
-            <Icon name="check" size={12} color={c.muted} />
+            <Icon name="check" size={14} color={c.muted} />
           ) : view.state === "held" ? (
-            <Icon name="pause" size={12} color={c.muted} />
+            <Icon name="pause" size={14} color={c.muted} />
           ) : (
             <InkOrbit size={10} color={c.muted} />
           )
@@ -206,16 +206,17 @@ export const ReceiptMark = memo(function ReceiptMark({
 function Mark({ mark, color }: { mark: ReceiptLine["mark"]; color: string }) {
   switch (mark) {
     case "seen":
+      return <Icon name="check" size={14} color={color} />;
     case "done":
-      return <Icon name="check" size={12} color={color} />;
+      return <Icon name="checks" size={14} color={color} />;
     case "working":
       return <InkOrbit size={10} color={color} />;
     case "waiting":
-      return <Icon name="pause" size={12} color={color} />;
+      return <Icon name="pause" size={14} color={color} />;
     case "asking":
-      return <Icon name="help" size={12} color={color} />;
+      return <Icon name="help" size={14} color={color} />;
     case "picking":
-      return <Icon name="clock" size={12} color={color} />;
+      return <Icon name="clock" size={14} color={color} />;
     default:
       return null;
   }
@@ -302,6 +303,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 1 },
   faces: { flexDirection: "row", alignItems: "center", gap: 2 },
   words: { flexShrink: 1 },
-  // A face (16) and a mark (12) at most: the room beside my bubble and at the end of a name line holds it.
+  // A face (16) and a mark (14) at most: the time's line under my turn and a name line's end hold it.
   mark: { flexDirection: "row", alignItems: "center", gap: 4, height: 16 },
 });

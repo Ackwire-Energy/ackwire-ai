@@ -36,30 +36,41 @@ export const BLOCK_REPLY_CHARS = 2000;
 /** The manual an agent writes blocks from: every part of the kit (`packages/client/src/lib/block-kit.ts`). */
 export const BLOCK_MANUAL = `A live block is a small interactive thing inside your reply: something the person uses now (a simulator, a filterable view, options to see side by side, a short form). Reports and documents are files, not blocks; a question with plain choices is ask_user.
 
-Write short HTML, with no <html>, <head> or <body>. Write CSS only for what the parts below don't do. There is no network: no fetch, no CDN, no outside images. Put the data in the block. Everything follows the app's theme. For passwords and keys use request_secret, never a block.
+Write short HTML, with no <html>, <head> or <body>. There is no network: no fetch, no CDN, no outside images. Put the data in the block. For passwords and keys use request_secret, never a block.
+
+It must look like part of the app, in both light and dark:
+- Build from the parts below. Plain HTML (headings, text, lists, links, inputs, selects, checkboxes, tables, progress) is already styled: leave it.
+- Write CSS only for layout and for drawings the parts can't do. Never set a font, a shadow or a border radius.
+- Never write a color. Use the variables below; a color written by hand breaks in the other theme.
+- No tinted boxes, colored badges or status dots: a caveat is <ac-note>, and the option you recommend is <ac-card selected>.
+- In a drawing, text stays upright at rest and sits inside its shape.
+- Every word on it is in the person's language.
 
 Parts (every input has a name; its value is in the state under that name):
-- <ac-slider name label min max step value unit format>; format: brl (R$ 1.200), mil (R$ 12 mil), pct, int
-- <ac-choice name label options="A|B|C" value> buttons, one choice
+- <ac-slider name label min max step value unit format>; format: brl (1200 is R$ 1.200), mil (12 is R$ 12 mil, so the value is in thousands), pct, int
+- <ac-choice name label options="A|B|C" value> buttons, one choice; the first is chosen unless value="", which leaves none, as a quiz needs
 - <ac-field name label type="text|number|date|textarea" placeholder>
 - <ac-check name label checked> a switch
 - <ac-stat label bind format unit sub sub-bind tone-bind> a big number; value for a fixed one; tone-bind reads "up" or "down"
 - <ac-chart type="bar|line" bind label format unit select all> bind is an array of {label, value}; on bars, select="name" makes a click set that input (all is the value that clears it)
 - <ac-table bind columns="Title:key:format|Title:key"> bind is an array of objects
-- <ac-text bind format> a value inside text
-- <ac-note> small text; <ac-more label="How I calculated"> text that opens
-- <ac-row> side by side; <ac-stats> a row of stats; a plain <button> already looks right
+- <ac-text bind format> a value inside text; {name} works only in <ac-send>
+- <ac-note> small text; <ac-more label> text that opens
+- <ac-card label sub selected> a card around anything; with name and value it becomes a choice: a click sets name to value and marks it
+- <ac-result label bind format unit> the answer the block gives, large and centered; value for a fixed one
+- <ac-actions align="center|start"> a row of buttons, with the right space around it; every button goes in one, and the only button showing is drawn as the main action
+- <ac-row> side by side, also for cards; <ac-stats> a row of stats
 - Any element: when="name=value" or when="name!=value" shows it only then
 
 Script:
 - agentes.compute(s => ({ ... })) derives values from the state s; they can be bound like inputs. It runs on every change.
 - agentes.on(s => { ... }) runs on every change, for your own drawing.
 - agentes.set(name, value) changes the state.
-- CSS variables: --ink, --muted, --faint, --line, --line2, --raised, --well, --c (your color).
+- CSS variables: --ink, --muted, --faint for text; --raised, --well, --sunken for surfaces; --line, --line2 for lines; --s1 to --s6 for categories, your own tones in order, with --on-s for text on them.
 
 To get an answer, add <ac-send label="Use this" text="Text with {name} or {name:format}" needs="a,b" hint="Why it's disabled">. The app shows the text and the button outside the block and the person decides; it reaches you as their message. needs lists values that must be filled or true. Add it only when your next step depends on the answer.
 
-When a number comes from your own formula, show it with <ac-more> and call it an estimate.
+When a number comes from your own formula, show how in <ac-more> and call it an estimate.
 
 Example:
 <ac-slider name="preco" label="Preço" min="50" max="200" step="10" value="100" format="brl"></ac-slider>

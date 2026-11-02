@@ -36,10 +36,10 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   agent?: boolean;
   /**
    * The viewer's own row: on the right in a bubble (`MessageText`), no face or name on screen (both stay for screen
-   * readers); the time and the receipt end the bubble's last line ("8:39 PM ✓✓"), a sending state goes under it.
+   * readers); the time goes under the bubble, a sending state in its place.
    */
   own?: boolean;
-  /** An own row's place in a run of the viewer's rows: the corners it shares square off, the time shows on "end". */
+  /** An own row's place in a run of the viewer's rows: the corners it shares square off, the time shows under "end". */
   run?: "solo" | "start" | "mid" | "end";
   /** The message text (use `MessageText`), plus attachments or cards. */
   children: ReactNode;
@@ -116,7 +116,6 @@ export function Message({
   const tap = useRef({ x: 0, y: 0 });
   const [menuAt, setMenuAt] = useState<ReturnType<typeof menuPlace>>(null);
   const menuOpen = Boolean(menu) && menuAt !== null;
-  const ownTime = own && !status && (run === "solo" || run === "end");
   useEffect(() => {
     if (!menuOpen) return;
     // The menu follows its row and closes when the row leaves the screen: a phone's keyboard going down resizes the
@@ -208,26 +207,24 @@ export function Message({
           {aside && !grouped && !own && <span className="ac-msg__aside">{aside}</span>}
         </div>
         {aside && grouped && !own && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
-        {own && (
-          // The end of the bubble's last line, WhatsApp's way: the time (one per run, on its last row: its rows are
-          // minutes apart at most) and then the receipt. The head (hidden) reads the time; the receipt is a button.
-          <span className="ac-msg__own-meta" data-time={ownTime || undefined}>
-            {ownTime && (
-              <span className="ac-msg__own-clock" aria-hidden="true">
+        {children}
+        {own &&
+          (status ? (
+            <span className="ac-msg__own-time ac-msg__status">
+              {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
+              {status.label}
+            </span>
+          ) : run === "end" || run === "solo" ? (
+            // The head (hidden) reads the time; here it is for the eye, its details on hover. One per run: its rows
+            // are minutes apart at most (they group). The receipt's mark ends this line, so it never adds one.
+            <div className="ac-msg__own-foot">
+              <span className="ac-msg__own-time" aria-hidden="true">
                 {time}
                 {meta && <span className="ac-msg__tip">{meta}</span>}
               </span>
-            )}
-            {aside && <span className="ac-msg__aside">{aside}</span>}
-          </span>
-        )}
-        {children}
-        {own && status && (
-          <span className="ac-msg__own-time ac-msg__status">
-            {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
-            {status.label}
-          </span>
-        )}
+              {aside && <span className="ac-msg__aside">{aside}</span>}
+            </div>
+          ) : null)}
         {foot && <div className="ac-msg__foot">{foot}</div>}
       </div>
       {menu &&

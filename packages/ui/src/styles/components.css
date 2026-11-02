@@ -915,8 +915,7 @@ textarea.ac-input {
 .ac-msg .ac-reacts,
 .ac-msg .ac-receipt,
 .ac-msg .thread-line,
-.ac-msg__own-time,
-.ac-msg__own-meta {
+.ac-msg__own-time {
   -webkit-user-select: none;
   user-select: none;
 }
@@ -1036,7 +1035,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 .ac-msg__time--details:hover .ac-msg__tip,
 .ac-msg__time--details:focus-visible .ac-msg__tip,
 .ac-msg__gutter-time:hover .ac-msg__tip,
-.ac-msg__own-clock:hover .ac-msg__tip {
+.ac-msg__own-time:hover .ac-msg__tip {
   visibility: visible;
   opacity: 1;
 }
@@ -1051,7 +1050,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   .ac-msg__time--details:hover .ac-msg__tip,
   .ac-msg__time--details:focus-visible .ac-msg__tip,
   .ac-msg__gutter-time:hover .ac-msg__tip,
-  .ac-msg__own-clock:hover .ac-msg__tip {
+  .ac-msg__own-time:hover .ac-msg__tip {
     transform: none;
     transition-delay: 250ms, 250ms, 0s;
   }
@@ -4985,11 +4984,12 @@ html:not([data-pointer]) .ac-hint:focus-visible {
  * The viewer's own messages: on the right in a neutral bubble a step off the page, no face or name (the hidden head
  * still reads them). What hangs under the bubble (a file, reactions, the thread line, an error, the time) shares its
  * right edge. A run of rows grouped under the first reads as one turn: the corners they share square off, and the
- * time ends the last one's bubble.
+ * time goes under the last. The turn's last corner is cut, as a card's is, on the side the bubble stands.
  */
 :root,
 [data-theme="light"] {
   --own-bubble: color-mix(in srgb, var(--ink) 6%, var(--bg));
+  --own-cut: 5px;
 }
 [data-theme="dark"] {
   --own-bubble: color-mix(in srgb, var(--ink) 11%, var(--bg));
@@ -5066,6 +5066,9 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own[data-run="end"] .ac-msg__text {
   border-top-right-radius: 6px;
 }
+.ac-msg--own:is([data-run="solo"], [data-run="end"]) .ac-msg__text {
+  border-bottom-right-radius: var(--own-cut);
+}
 /* Hovered, or its menu open: the bubble itself lights a step, in place of the row's plate. */
 .ac-msg--own:is(:hover, [data-menu-open="true"]) .ac-msg__text {
   filter: brightness(0.97);
@@ -5105,7 +5108,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   justify-content: flex-end;
   text-align: right;
 }
-/* Under the bubble while it sends ("enviando…"), or after a send that failed. */
+/* Under the run's last bubble: its time (its details on hover), or "enviando…" in its place on the same line. */
 .ac-msg__own-time {
   position: relative;
   min-height: 16px;
@@ -5116,78 +5119,36 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-/*
- * The end of the bubble's last line, as WhatsApp has it: the time (on a run's last row) and the receipt, "8:39 PM ✓✓"
- * (a DM's "Vista por" face). A zero-height item right after the bubble (`order`), its contents hanging up into the
- * bubble's bottom-right corner. The last paragraph keeps that much room at its end (`::after`), so the words wrap
- * before it; a bubble that ends in a code block, a table or a heading gives it a line of its own. The room is the
- * same with or without a receipt, sending or sent, so a receipt never changes a message's height.
- */
-.ac-msg--own {
-  --own-meta-w: 26px;
-}
-.ac-msg--own:is([data-run="solo"], [data-run="end"]) {
-  --own-meta-w: 76px;
-}
-/* A DM's own row can show the agents' check and the "Vista por" face together (20px + 6px + 20px): its room is for
-   both from the start, so the face showing up never rewraps the bubble. */
-.ac-msg--own:has(.ac-msg__own-meta .ac-receipt__seen) {
-  --own-meta-w: 52px;
-}
-.ac-msg--own:is([data-run="solo"], [data-run="end"]):has(.ac-msg__own-meta .ac-receipt__seen) {
-  --own-meta-w: 102px;
-}
-.ac-msg--own > .ac-msg__body > .ac-msg__own-meta {
-  order: 1;
-  align-self: stretch;
-  position: relative;
-  height: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 2px;
-  padding-right: 10px;
-  translate: 0 -5px;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-/* The check's 16px icon sits on the time's small type, not under it. */
-.ac-msg__own-meta > .ac-msg__aside {
-  margin-left: 0;
-  translate: 0 -1px;
-}
-.ac-msg__own-clock {
-  position: relative;
-}
-.ac-msg__own-clock > .ac-msg__tip {
+.ac-msg__own-time > .ac-msg__tip {
   left: auto;
   right: 0;
 }
-.ac-msg--own .ac-msg__text > .md > p:last-child::after,
-.ac-msg--own .ac-msg__text > .md > :is(ul, ol):last-child > li:last-child::after {
-  content: "";
-  display: inline-block;
-  width: var(--own-meta-w);
-  /* An empty, zero-height box wrapped alone to a new line makes a zero-height line: the meta would sit on the words. */
+/*
+ * The receipt's mark (agents saw it, answered it; a DM's "Vista por" face) ends the time's line, its right on the
+ * bubble's edge, so a turn says when and how it went in one place and a mark that comes never adds a line. An empty
+ * mark takes no room, so the time keeps that edge. A taller face hangs over the line's 16px.
+ */
+.ac-msg__own-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+.ac-msg__own-foot > .ac-msg__aside {
+  gap: 0;
   height: 16px;
+  margin-left: 0;
 }
-.ac-msg--own .ac-msg__text:not(:has(> .md > :is(p, ul, ol):last-child)) {
-  padding-bottom: 23px;
+.ac-msg__own-foot .ac-receipt__check,
+.ac-msg__own-foot .ac-receipt__check:has(> .ac-avatar) {
+  position: relative;
+  margin-left: 4px;
+  padding: 0;
 }
-/* No bubble (a sticker, files only): the time and the receipt are a line under what it sent. */
-.ac-msg--own:not(:has(> .ac-msg__body > .ac-msg__text)) > .ac-msg__body > .ac-msg__own-meta {
-  order: 3;
-  height: auto;
-  margin-top: 4px;
-  padding-right: 0;
-  translate: none;
+.ac-msg__own-foot .ac-receipt__check .ac-icon {
+  width: 14px;
+  height: 14px;
 }
-.ac-msg--own > .ac-msg__body > .ac-msg__text ~ * {
-  order: 2;
-}
+/* Left of the bubble, on hover: the action bar, its middle on the bubble's top edge, as on everyone's rows. */
 .ac-msg--own > .ac-msg__body > .ac-msg__actions,
 .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   top: 0;
@@ -5204,9 +5165,15 @@ html:not([data-pointer]) .ac-hint:focus-visible {
     top: -4px;
     right: 8px;
   }
+  /* A small mark, a finger: the button reaches past it, over nothing else it could press. */
+  .ac-msg__own-foot .ac-receipt__check::after {
+    content: "";
+    position: absolute;
+    inset: -14px -10px;
+  }
 }
 /* Keyboard focus in my row opens its time's details: its head is hidden, so nothing else would. */
-.ac-msg--own:has(:focus-visible) .ac-msg__own-clock > .ac-msg__tip {
+.ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
   visibility: visible;
   opacity: 1;
 }
@@ -5214,16 +5181,18 @@ html:not([data-pointer]) .ac-hint:focus-visible {
  * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
  * the usual gap under it, its corner round, and the next bubble's top corner round too.
  */
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, :empty)) {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) {
   padding-bottom: 6px;
 }
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, :empty)) .ac-msg__text {
-  border-bottom-right-radius: 18px;
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) .ac-msg__text {
+  border-bottom-right-radius: var(--own-cut);
 }
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, :empty)) + .ac-msg--own {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) + .ac-msg--own {
   padding-top: 6px;
 }
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, :empty)) + .ac-msg--own .ac-msg__text {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))
+  + .ac-msg--own
+  .ac-msg__text {
   border-top-right-radius: 18px;
 }
 

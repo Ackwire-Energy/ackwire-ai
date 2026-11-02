@@ -447,29 +447,17 @@ describe("a receipt never adds a line to its row", () => {
   const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
   const num = (text: string, pattern: RegExp) => Number(pattern.exec(text)?.[1]);
 
-  test("the mark stands in room the row already keeps: after the time at my bubble's end, at the end of a name line", () => {
+  test("the mark stands in a line the row already keeps: after the time under my turn, at the end of a name line", () => {
     const row = src("features/chat/MessageRow.tsx");
     const marks = src("features/chat/AgentReceipts.tsx");
-    // The bubble's last line keeps room at its end, with or without a mark: for the time and the mark on a run's
-    // last row (a face, its mark and the 4px between: 32px, past "12:59 PM"), the mark alone on the rows before it.
-    expect(row).toContain(
-      "tail={<View style={{ width: runEnd ? META_ROOM.withTime : META_ROOM.markOnly, height: 1 }} />}",
-    );
-    const withTime = num(row, /withTime: (\d+)/);
-    const markOnly = num(row, /markOnly: (\d+)/);
-    expect(markOnly).toBeGreaterThanOrEqual(16 + 4 + 12 + 3);
-    expect(withTime - markOnly).toBeGreaterThanOrEqual(48);
-    // Placed in the bubble's bottom-right corner, on its last line (24px lines, 10px under them), never under it.
-    expect(row).toMatch(/meMeta: \{ position: "absolute", right: \d+, bottom: \d+/);
-    const bottom = num(row, /meMeta: \{[^}]*bottom: (\d+)/);
-    const mark = num(marks, /mark: \{[^}]*height: (\d+)/);
-    const pad = num(row, /bubble: \{[^}]*paddingVertical: (\d+)/);
-    expect(bottom).toBeGreaterThanOrEqual(pad);
-    expect(bottom + mark).toBeLessThanOrEqual(pad + 24);
-    // The time first, then the mark; nothing beside the bubble any more.
-    const meta = row.slice(row.indexOf("const meta = ("), row.indexOf("const lead = body"));
-    expect(meta.indexOf("when.time(m.createdAt)")).toBeLessThan(meta.indexOf("<ReceiptMark message={m} mine"));
-    expect(row).not.toMatch(/MARK_ROOM|meMark|meLine/);
+    // The time's line holds the tallest mark, and the mark sits in it, after the time.
+    expect(num(marks, /mark: \{[^}]*height: (\d+)/)).toBe(num(row, /meTime: \{[^}]*height: (\d+)/));
+    const line = row.slice(row.indexOf("<View style={styles.meTime}>"));
+    expect(line.indexOf("when.time(m.createdAt)")).toBeLessThan(line.indexOf("<ReceiptMark message={m} mine"));
+    expect(line).toContain("<ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />");
+    // The turn's last bubble ends on the cut corner, on the side it stands.
+    expect(row).toContain("solo: { borderBottomRightRadius: BUBBLE_CUT }");
+    expect(row).toContain("end: { borderTopRightRadius: 6, borderBottomRightRadius: BUBBLE_CUT }");
     // Someone else's: absolutely placed in room their name line always keeps, so a mark that comes wraps nothing.
     expect(row).toContain('<View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>');
     expect(row).toMatch(/whoMark: \{ position: "absolute"/);

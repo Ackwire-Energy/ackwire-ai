@@ -774,7 +774,7 @@ describe("Message aside and foot", () => {
     }
   });
 
-  test("my own row: the time and then the receipt end the bubble's line, no time in the far-left column", () => {
+  test("my own row: the time and then the receipt under the turn's last bubble, no time in the far-left column", () => {
     const { container } = render(
       <>
         <Message author="Eu" time="8:39 PM" own run="start" aside={<span>✓</span>}>
@@ -786,17 +786,14 @@ describe("Message aside and foot", () => {
       </>,
     );
     const [start, end] = Array.from(container.querySelectorAll("article"));
-    // Right before the bubble in the DOM, put after it by `order`; time first, then the receipt (a button stays one).
-    expect(end?.querySelector(".ac-msg__own-meta + .ac-msg__text")?.textContent).toBe("segunda");
-    expect(end?.querySelector(".ac-msg__own-meta")?.textContent).toBe("8:40 PM✓✓");
-    expect(end?.querySelector(".ac-msg__own-clock")?.getAttribute("aria-hidden")).toBe("true");
-    expect(end?.querySelector(".ac-msg__own-meta > .ac-msg__aside")?.getAttribute("aria-hidden")).toBeNull();
-    // A run's earlier row: its receipt alone there; no time beside it, in the left column or under it.
-    expect(start?.querySelector(".ac-msg__own-meta")?.textContent).toBe("✓");
-    for (const row of [start, end]) {
+    // A line under the bubble: time first, then the receipt (a button stays one).
+    expect(end?.querySelector(".ac-msg__text + .ac-msg__own-foot")?.textContent).toBe("8:40 PM✓✓");
+    expect(end?.querySelector(".ac-msg__own-time")?.getAttribute("aria-hidden")).toBe("true");
+    expect(end?.querySelector(".ac-msg__own-foot > .ac-msg__aside")?.getAttribute("aria-hidden")).toBeNull();
+    // A run's earlier row: no time, in the left column or under it.
+    expect(start?.querySelector(".ac-msg__own-foot, .ac-msg__own-time")).toBeNull();
+    for (const row of [start, end])
       expect(row?.querySelector(".ac-msg__gutter, .ac-msg__avatar, .ac-msg__aside--floating")).toBeNull();
-      expect(row?.querySelector(".ac-msg__own-time")).toBeNull();
-    }
   });
 
   test("every menu's rows share one dense height and side padding, as dense as the message's bar", async () => {

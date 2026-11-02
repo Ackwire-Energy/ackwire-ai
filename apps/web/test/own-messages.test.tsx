@@ -65,17 +65,17 @@ describe("my own messages sit on the right", () => {
     expect(head?.className).toBe("ac-visually-hidden");
     expect(head?.textContent).toContain("Walter");
     expect(within(row("w1")).getByRole("toolbar", { name: "Ações da mensagem de Walter" })).toBeTruthy();
-    // The time once per run, ending its last bubble's line (never read twice).
-    expect(["w1", "w2", "w3", "w4"].map((id) => Boolean(row(id).querySelector(".ac-msg__own-clock")))).toEqual([
+    // The time once per run, under its last row (never read twice).
+    expect(["w1", "w2", "w3", "w4"].map((id) => Boolean(row(id).querySelector(".ac-msg__own-time")))).toEqual([
       false,
       false,
       true,
       true,
     ]);
-    expect(row("w3").querySelector(".ac-msg__own-clock")?.getAttribute("aria-hidden")).toBe("true");
+    expect(row("w3").querySelector(".ac-msg__own-time")?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  test("the receipt follows the time on the bubble's last line, and no time hangs in the far-left column", async () => {
+  test("the receipt follows the time under the turn's last bubble, and no time hangs in the far-left column", async () => {
     await open([
       said("w1", "u-walter", "Vi o alerta também", 9),
       said("w2", "u-walter", "Estou no celular", 9),
@@ -84,17 +84,14 @@ describe("my own messages sit on the right", () => {
         receipts: { seenBy: [ADA_ID], pickedBy: [], handled: [] },
       }),
     ]);
-    // Time, then the check, in one piece right after the bubble ("8:39 PM ✓"); nothing left of the bubble.
-    const meta = row("w3").querySelector(".ac-msg__own-meta") as HTMLElement;
-    expect([...meta.children].map((part) => part.className)).toEqual(["ac-msg__own-clock", "ac-msg__aside"]);
-    expect(meta.querySelector(".ac-msg__aside .ac-receipt__check")?.tagName).toBe("BUTTON");
-    expect(meta.nextElementSibling?.classList.contains("ac-msg__text")).toBe(true);
+    // Time, then the check, one line under the turn's last bubble ("8:39 PM ✓"); nothing left of the bubble.
+    const foot = row("w3").querySelector(".ac-msg__own-foot") as HTMLElement;
+    expect([...foot.children].map((part) => part.className)).toEqual(["ac-msg__own-time", "ac-msg__aside"]);
+    expect(foot.querySelector(".ac-msg__aside .ac-receipt__check")?.tagName).toBe("BUTTON");
     expect(row("w3").querySelector(".ac-msg__aside--floating")).toBeNull();
     // The rows before a run's last: no hover time in the far-left column, where everyone else's grouped rows have it.
-    for (const id of ["w1", "w2", "w3"]) {
-      expect(row(id).querySelector(".ac-msg__gutter, .ac-msg__gutter-time")).toBeNull();
-      expect(row(id).querySelector(".ac-msg__own-meta")).not.toBeNull();
-    }
+    for (const id of ["w1", "w2", "w3"]) expect(row(id).querySelector(".ac-msg__gutter, .ac-msg__gutter-time")).toBeNull();
+    for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__own-foot")).toBeNull();
   });
 
   test("something under a bubble ends the run's look: the next bubble doesn't square off against it", async () => {
@@ -118,9 +115,10 @@ describe("my own messages sit on the right", () => {
       .replace(/\s+/g, " ")
       .replace(/\( /g, "(")
       .replace(/ \)/g, ")");
-    const hanging = ".ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, :empty))";
+    const hanging =
+      ".ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))";
     expect(css).toContain(`${hanging} { padding-bottom: 6px; }`);
-    expect(css).toContain(`${hanging} .ac-msg__text { border-bottom-right-radius: 18px; }`);
+    expect(css).toContain(`${hanging} .ac-msg__text { border-bottom-right-radius: var(--own-cut); }`);
     expect(css).toContain(`${hanging} + .ac-msg--own { padding-top: 6px; }`);
     expect(css).toContain(`${hanging} + .ac-msg--own .ac-msg__text { border-top-right-radius: 18px; }`);
   });
@@ -168,7 +166,7 @@ describe("own message styles", () => {
     return out;
   };
 
-  test("the bar stands left of the bubble; the time and the check end its last line, never over my words", async () => {
+  test("the bar stands left of the bubble, never over my words; the check ends the time's line, always on screen", async () => {
     const r = await rules();
     const bar = r.get(
       ".ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions",
@@ -177,35 +175,29 @@ describe("own message styles", () => {
     expect(bar).toContain("right: calc(100% + 8px)");
     expect(bar).toContain("top: 0");
     expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__actions")).toContain("top: 0");
-    // Time and check at the bubble's bottom right: a zero-height item right after the bubble, hanging up into it.
-    const meta = r.get(".ac-msg--own > .ac-msg__body > .ac-msg__own-meta") ?? "";
-    for (const decl of ["height: 0", "align-items: flex-end", "justify-content: flex-end", "order: 1"])
-      expect(meta).toContain(decl);
-    expect(meta).not.toContain("right: calc(100% + 8px)");
-    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__text ~ *")).toContain("order: 2");
-    // The last paragraph keeps its room, wider on a run's last row (time and check) than on the others (the check);
-    // a bubble ending in something else gives it a line of its own; with no bubble it is a line under.
-    const kit = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
-    expect(r.get(".ac-msg--own")).toContain("--own-meta-w: 26px");
-    expect(kit).toContain('.ac-msg--own:is([data-run="solo"], [data-run="end"]) {\n  --own-meta-w: 76px;');
-    // A DM's row has room for the check and the "Vista por" face side by side (20px + 6px gap + 20px).
-    expect(kit).toContain(".ac-msg--own:has(.ac-msg__own-meta .ac-receipt__seen) {\n  --own-meta-w: 52px;");
-    expect(kit).toContain(
-      '.ac-msg--own:is([data-run="solo"], [data-run="end"]):has(.ac-msg__own-meta .ac-receipt__seen) {\n  --own-meta-w: 102px;',
+    // The check in the time's line, on the bubble's right edge: no line of its own, and no room while it's empty.
+    expect(r.get(".ac-msg__own-foot")).toContain("justify-content: flex-end");
+    expect(r.get(".ac-msg__own-foot > .ac-msg__aside")).toContain("height: 16px");
+    expect(r.get(".ac-msg__own-foot .ac-receipt__check")).toContain("padding: 0");
+    // No hover, focus or open menu hides it.
+    const kit = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
     );
-    expect(r.get(".ac-msg--own .ac-msg__text > .md > p:last-child::after")).toContain("width: var(--own-meta-w)");
-    // When the room wraps to a line of its own, that line has the meta's height, not none.
-    expect(r.get(".ac-msg--own .ac-msg__text > .md > p:last-child::after")).toContain("height: 16px");
-    expect(kit).toContain(
-      ".ac-msg--own .ac-msg__text:not(:has(> .md > :is(p, ul, ol):last-child)) {\n  padding-bottom: 23px;",
+    const own = [...kit.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, list = ""]) =>
+      list.includes(".ac-msg__own-foot"),
     );
-    expect(
-      r.get(".ac-msg--own:not(:has(> .ac-msg__body > .ac-msg__text)) > .ac-msg__body > .ac-msg__own-meta"),
-    ).toContain("height: auto");
-    // No hover, focus or open menu hides it: a mouse can open a DM's "Vista por" face.
-    const own = [...r.entries()].filter(([selector]) => /\.ac-msg__own-meta$/.test(selector));
     expect(own.length).toBeGreaterThan(0);
-    for (const [, body] of own) expect(body).not.toMatch(/opacity|visibility|display:\s*none/);
+    for (const [, , body = ""] of own) expect(body).not.toMatch(/opacity|visibility|display:\s*none/);
+  });
+
+  test("a turn's bubble ends on the cut corner, on the side it stands", async () => {
+    const r = await rules();
+    const css = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(/\s+/g, " ");
+    expect(css).toContain(
+      '.ac-msg--own:is([data-run="solo"], [data-run="end"]) .ac-msg__text { border-bottom-right-radius: var(--own-cut); }',
+    );
+    expect(r.get('.ac-msg--own[data-run="start"] .ac-msg__text')).toContain("border-bottom-right-radius: 6px");
   });
 
   test("a narrow window keeps room for the bar left of the bubble; a touch screen's bar sits over its top edge", async () => {
@@ -223,7 +215,7 @@ describe("own message styles", () => {
     expect(narrow).toContain("top: -4px;\n    right: 8px;");
     // Keyboard focus in my row opens its time's details (the head that has them is hidden).
     expect(css).toMatch(
-      /\.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-clock > \.ac-msg__tip \{\s*visibility: visible;/,
+      /\.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
     );
   });
 
