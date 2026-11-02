@@ -1,16 +1,19 @@
 import {
   type InvitationWithStatus,
+  type Person,
   useAllInvitations,
   useCancelSuggestion,
   useJoinRequests,
   useMe,
   useMySuggestions,
   usePeople,
+  useRemoveMember,
   useRoles,
 } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { namesText } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { removesMember } from "@agenteschat/client/lib/roles";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -56,6 +59,25 @@ function Members() {
   const roles = useRoles(orgId).data?.roles ?? [];
   const invites = can(org, "invite_people");
   const list = people.data;
+  const toast = useToast();
+  const remove = useRemoveMember(orgId);
+  const viewer = { role: org?.role ?? "member", rank: org?.rank, userId: meId ?? "", permissions: org?.permissions };
+  const orgName = org?.name ?? "";
+
+  // "Remover do workspace": confirmed first; the server checks again and its refusal is said in our words.
+  const confirmRemove = (m: Person) =>
+    Alert.alert(t("members.remove.title", { name: m.name, org: orgName }), t("members.remove.body", { org: orgName }), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("members.remove.confirm"),
+        style: "destructive",
+        onPress: () =>
+          remove.mutate(m.userId, {
+            onSuccess: () => toast({ title: t("members.remove.done", { name: m.name, org: orgName }) }),
+            onError: (e) => toast({ title: knownErrorText(t, e, i18n.language) ?? t("mobile.app.failed"), icon: "x" }),
+          }),
+      },
+    ]);
 
   return (
     <Page title={invites ? t("settings.section.members") : t("members.title")}>
@@ -81,6 +103,9 @@ function Members() {
               leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} presence ring={c.raised} />}
               label={m.userId === meId ? `${m.name}${t("common.youSuffix")}` : m.name}
               sub={memberLine(t, i18n.language, m, roles)}
+              {...(meId && removesMember(viewer, m, roles)
+                ? { more: true, disabled: remove.isPending, onPress: () => confirmRemove(m) }
+                : {})}
             />
           ))}
         </GroupedList>

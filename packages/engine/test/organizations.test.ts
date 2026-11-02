@@ -107,7 +107,9 @@ describe("ownership", () => {
     await expect(changeMemberRole(f.db, f.owner.id, f.org.id, f.owner.id, "member")).rejects.toBeInstanceOf(
       ConflictError,
     );
-    await expect(removeMember(f.db, f.owner.id, f.org.id, f.owner.id)).rejects.toBeInstanceOf(ConflictError);
+    await expect(removeMember(f.db, f.owner.id, f.org.id, f.owner.id)).rejects.toMatchObject({
+      code: "org.last_owner",
+    });
   });
 
   test("admins can't grant ownership or remove owners; they give roles below their own", async () => {

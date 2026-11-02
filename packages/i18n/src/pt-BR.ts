@@ -3629,6 +3629,14 @@ export const ptBR = {
     agentsOnlyYouHint: "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     filters: "Filtrar pessoas",
     rolesOf: "Papéis de {{name}}",
+    actionsOf: "Opções de {{name}}",
+    remove: {
+      action: "Remover do workspace",
+      title: "Remover {{name}} da {{org}}?",
+      body: "A pessoa perde o acesso à {{org}} na hora e sai dos canais. Os computadores e os logins de IA que ela conectou aqui saem junto, e as rotinas dela pausam. As mensagens e os arquivos dela ficam.",
+      confirm: "Remover",
+      done: "{{name}} saiu da {{org}}.",
+    },
     everyoneNote: "Todos vale para toda pessoa do workspace.",
     noRolesToGive: "Nenhum papel abaixo do seu para dar.",
     roleFilter: "Papel",
@@ -8588,6 +8596,7 @@ export const ptBR = {
     org: {
       createInviteOnly: "Novos workspaces precisam de convite por enquanto.",
       membersFull: "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
+      lastOwner: "Um workspace precisa de pelo menos um dono. Torne outra pessoa dona antes.",
       deleting: "Este workspace está sendo apagado.",
       notRestorable: "Este workspace não pode mais ser restaurado.",
     },

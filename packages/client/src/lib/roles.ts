@@ -147,6 +147,19 @@ export const isBelow = (
   (person.role !== "owner" &&
     (person.userId === viewer.userId || rankOf(person, roles) > (viewer.rank ?? Number.POSITIVE_INFINITY)));
 
+/**
+ * Whether the viewer may take this person out of the workspace (the server checks it again): someone else, below
+ * them, while they manage members. Leaving is not removing.
+ */
+export const removesMember = (
+  viewer: { role: string; rank?: number | null; userId: string; permissions?: readonly string[] },
+  person: Pick<Person, "userId" | "role" | "roleIds">,
+  roles: readonly OrgRole[],
+) =>
+  person.userId !== viewer.userId &&
+  (viewer.permissions ?? []).includes("manage_members") &&
+  isBelow(viewer, person, roles);
+
 /** Whether the viewer holds every key of a role (an owner all): only then may they copy it or give it. */
 export function holdsAll(viewer: { role: string; permissions?: readonly string[] }, keys: readonly string[]) {
   if (viewer.role === "owner") return true;
