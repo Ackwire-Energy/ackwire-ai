@@ -8,6 +8,7 @@ import {
   declineSecret,
   ForbiddenError,
   getSecretRequest,
+  joinOrganization,
   openDm,
   openPersonAgentDm,
   postPersonMessage,
@@ -199,6 +200,29 @@ test("someone removed and invited back is back in their DMs once one is opened a
   expect((await requireChannelAccess(f.db, caio.id, f.org.id, withAgent.id)).channel.id).toBe(withAgent.id);
   expect((await openDm(f.db, ana.id, f.org.id, { userId: caio.id })).id).toBe(withAna.id);
   expect((await requireChannelAccess(f.db, caio.id, f.org.id, withAna.id)).channel.id).toBe(withAna.id);
+});
+
+test("someone invited back is back in the DMs whose other people are still here, before anyone opens them", async () => {
+  const ana = await addMember(f.db, f.org.id, "member", "ana");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const dora = await addMember(f.db, f.org.id, "member", "dora");
+  const withAna = await openDm(f.db, ana.id, f.org.id, { userId: caio.id });
+  const withDora = await openDm(f.db, dora.id, f.org.id, { userId: caio.id });
+  const withAgent = await openPersonAgentDm(f.db, f.org.id, caio.id, f.agent.id);
+  await removeMember(f.db, f.owner.id, f.org.id, caio.id);
+  await removeMember(f.db, f.owner.id, f.org.id, dora.id);
+  await f.db.transaction((tx) => joinOrganization(tx, f.org.id, caio.id, "member"));
+
+  const has = async (channelId: string) =>
+    (
+      await f.db
+        .select()
+        .from(schema.channelMembers)
+        .where(and(eq(schema.channelMembers.channelId, channelId), eq(schema.channelMembers.userId, caio.id)))
+    ).length;
+  expect(await has(withAna.id)).toBe(1);
+  expect(await has(withAgent.id)).toBe(1);
+  expect(await has(withDora.id)).toBe(0);
 });
 
 test("an agent's DM with someone removed and back takes them in again; not while they're out", async () => {

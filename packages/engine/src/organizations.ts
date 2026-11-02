@@ -25,6 +25,7 @@ import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, saf
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { restoreDms } from "./dms";
 import { deleteGifKey } from "./gif-key";
 import { deleteJevKey } from "./jev-key";
 import { assertMemberRoom } from "./limits";
@@ -2034,6 +2035,7 @@ export async function joinOrganization(
   if (general) {
     await tx.insert(channelMembers).values({ orgId, channelId: general.id, userId }).onConflictDoNothing();
   }
+  await restoreDms(tx, orgId, userId);
 }
 
 /** Marks a person as seen now in an organization (WebSocket connect/disconnect). */
