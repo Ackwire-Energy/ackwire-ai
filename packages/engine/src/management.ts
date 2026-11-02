@@ -546,6 +546,8 @@ export interface RunSummary {
    * duration, status) show. Owners, usage viewers and admins included.
    */
   private: boolean;
+  /** Started by one of the agent's routines (its trigger carries `meta.routine`), shown even when `private`. */
+  routine: boolean;
   turns: number;
   /** Every input token, cache included. */
   inputTokens: number;
@@ -600,7 +602,7 @@ export async function listRuns(
     .groupBy(usageRecords.runId);
   const byRun = new Map(usage.map((u) => [u.runId, u]));
   const triggers = await db
-    .select({ id: messages.id, body: messages.body })
+    .select({ id: messages.id, body: messages.body, meta: messages.meta })
     .from(messages)
     .where(
       and(
@@ -612,6 +614,7 @@ export async function listRuns(
       ),
     );
   const bodies = new Map(triggers.map((t) => [t.id, t.body]));
+  const routineTriggers = new Set(triggers.filter((t) => t.meta?.routine != null).map((t) => t.id));
   const readable = await readableChannelIds(
     db,
     orgId,
@@ -631,6 +634,7 @@ export async function listRuns(
       error: r.error,
       what: hidden ? "" : (bodies.get(r.triggerMessageId) ?? "").slice(0, 200),
       private: hidden,
+      routine: routineTriggers.has(r.triggerMessageId),
       turns: r.turns,
       inputTokens: Number(u?.input ?? 0),
       cachedTokens: Number(u?.cached ?? 0),

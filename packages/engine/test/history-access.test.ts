@@ -5,6 +5,7 @@ import {
   drainOutbox,
   ForbiddenError,
   getRun,
+  insertMessage,
   listAgentMemoryRows,
   listNotifications,
   listOrgMemoryRows,
@@ -57,6 +58,22 @@ describe("run history quotes a conversation only to who reads it", () => {
     expect(inGeneral?.what).toBe("@dev check the deploy");
     expect((await getRun(f.db, f.owner.id, f.org.id, inGeneral?.id ?? "")).steps.length).toBeGreaterThan(0);
   });
+
+  test("a routine's run in a room the viewer isn't in stays marked as the routine's", async () => {
+    f = await setup();
+    const colleague = await addMember(f.db, f.org.id, "member", "colleague");
+    const [room] = await f.db
+      .insert(schema.channels)
+      .values({ orgId: f.org.id, name: "routine-room", visibility: "private", createdByUserId: colleague.id })
+      .returning();
+    const channelId = room?.id ?? "";
+    const msg = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId,
+      author: { type: "person", userId: colleague.id },
+      body: "summarize the private pipeline",
+      meta: { routine: { id: crypto.randomUUID(), name: "Weekly", runId: crypto.randomUUID() } },
+    });
     await f.db.insert(schema.agentRuns).values({
       orgId: f.org.id,
       agentId: f.agent.id,

@@ -1865,6 +1865,8 @@ export interface Run {
   what: string;
   /** The viewer isn't in the run's conversation: no `what` and no steps, only its numbers (older servers: absent). */
   private?: boolean;
+  /** Started by one of the agent's routines, also when `private` (older servers: absent). */
+  routine?: boolean;
   turns: number;
   /** Every input token, cache included. */
   inputTokens: number;

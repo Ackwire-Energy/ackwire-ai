@@ -266,6 +266,7 @@ const Run = z
       description:
         "The viewer doesn't read the run's conversation (not in its channel or DM): no `what` and no steps, only its numbers.",
     }),
+    routine: z.boolean().openapi({ description: "Started by one of the agent's routines (also when `private`)." }),
     turns: z.number(),
     inputTokens: z.number().openapi({ description: "Every input token, cache included." }),
     cachedTokens: z.number().openapi({ description: "How much of `inputTokens` was read from the prompt cache." }),

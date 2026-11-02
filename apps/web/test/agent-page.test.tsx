@@ -822,6 +822,8 @@ describe("agent page rules", () => {
     const r = { what: "@ada Resuma a semana do #eng" };
     expect(isRoutineRun(r, ["Resuma a semana do #eng"], "ada")).toBe(true);
     expect(isRoutineRun(r, [""], "ada")).toBe(false);
+    // A run in a conversation the viewer isn't in has no text; the server's flag still marks it.
+    expect(isRoutineRun({ what: "", routine: true }, [], "ada")).toBe(true);
     const run = { status: "failed", what: "x" } as Run;
     expect(runMatches(run, "failed", "", { where: "#eng", routine: false })).toBe(true);
     expect(runMatches(run, "routines", "", { where: "#eng", routine: false })).toBe(false);
