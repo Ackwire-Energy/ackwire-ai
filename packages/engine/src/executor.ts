@@ -25,7 +25,7 @@ import {
   type SystemBlock,
   textOf,
 } from "@agenteschat/providers";
-import { extraUsageOn, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
+import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { withTimeout } from "./agent-media";
@@ -2479,7 +2479,7 @@ async function executeRunInner(
       used: top.used,
       window: top.kind,
       ...(top.resetsAt ? { resetsAt: top.resetsAt } : {}),
-      extra: agent.brainExtraUsage && extraUsageOn(usage),
+      extra: agent.brainExtraUsage && extraUsageLeft(usage),
     };
   };
   /** A routine's run started by Rodar agora isn't long by kind (a person just asked for it): read once. */

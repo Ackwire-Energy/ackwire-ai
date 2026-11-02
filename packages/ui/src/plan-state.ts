@@ -186,6 +186,11 @@ const WINDOW_MS: Partial<Record<string, number>> = {
 export const extraUsageOn = (usage: { windows: readonly PlanMeterWindow[] } | null | undefined) =>
   usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL) ?? false;
 
+/** Extra usage that is on and still has room under its own cap: what long work may go on into. */
+export const extraUsageLeft = (usage: { windows: readonly PlanMeterWindow[] } | null | undefined) =>
+  usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL && w.usedPercent < PLAN_PAUSE) ??
+  false;
+
 /**
  * The window that binds long work on a run with `model`: the most used of the windows that apply to it and still
  * count now. A model's own week counts only for that model; `other` windows (extra usage, OAuth apps) never count.

@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import { extraUsageOn, planBinding } from "@agenteschat/ui/plan-state";
+import { extraUsageLeft, extraUsageOn, planBinding } from "@agenteschat/ui/plan-state";
 import {
   addChannelMember,
   answerNow,
@@ -69,6 +69,10 @@ test("the window that binds long work: live, of this model, never extra usage", 
   expect(planBinding(null)).toBeNull();
   expect(extraUsageOn(u)).toBe(true);
   expect(extraUsageOn(reading([{ kind: "five_hour", usedPercent: 1 }]))).toBe(false);
+  // Extra usage whose own cap is spent leaves long work nothing to go on into; the switch still shows.
+  expect(extraUsageLeft(u)).toBe(false);
+  expect(extraUsageLeft(reading([{ kind: "other", label: "Extra usage", usedPercent: 140 }]))).toBe(false);
+  expect(extraUsageLeft(reading([{ kind: "other", label: "Extra usage", usedPercent: 10 }]))).toBe(true);
 });
 
 test("long work: a routine or a mission by kind, else by size in this claim", () => {
@@ -428,7 +432,9 @@ test("over the budget's line only by other calls' reservations: it looks again s
   await drainOutbox(f.db, f.handlers);
   const [run] = await runs(f);
   expect(run?.status).toBe("waiting_input");
-  const until = Date.parse((run?.transcript as { waitingForBrain?: { until?: string } }).waitingForBrain?.until ?? "");
+  const until = Date.parse(
+    (run?.transcript as { waitingForBrain?: { until?: string } } | undefined)?.waitingForBrain?.until ?? "",
+  );
   expect(until).toBeLessThan(Date.now() + 3600_000);
   expect(await cards(f)).toHaveLength(0);
 
