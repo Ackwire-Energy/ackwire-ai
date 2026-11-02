@@ -368,10 +368,12 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
 
   test("the language switch changes this page only", async () => {
     await open((apps) => apps.addConsent(REQ));
+    // The app's own language on this browser (matched with the server's at sign-in) stays as it was.
+    const kept = localStorage.getItem("agentes.locale");
     await pick(within(page()).getByRole("combobox", { name: "Idioma" }), "English");
     await settle(6);
     expect(title().textContent).toBe("Claude wants to access your account");
     expect(within(page()).getByRole("button", { name: "Allow" })).toBeTruthy();
-    expect(localStorage.getItem("agentes.locale")).toBeNull();
+    expect(localStorage.getItem("agentes.locale")).toBe(kept);
   });
 });
