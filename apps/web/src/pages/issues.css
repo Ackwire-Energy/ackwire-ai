@@ -415,6 +415,10 @@ html:not([data-pointer]) .issue-card:focus-visible {
   background: var(--ok);
   box-shadow: none;
 }
+.issue-card__step[data-state="blocked"] .issue-card__step-mark {
+  background: var(--warn);
+  box-shadow: none;
+}
 .issue-card__update {
   color: var(--muted);
   overflow-wrap: anywhere;

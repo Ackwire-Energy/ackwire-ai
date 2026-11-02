@@ -97,7 +97,7 @@ export const HOW_YOU_WORK = [
  * answer never goes there.
  */
 export const WORK_IN_BACKGROUND_LINE =
-  '- If a request will take more than ~2 minutes or several rounds of tools (builds, migrations, investigations, multi-file changes, reports), call work_in_background first. In `say`, tell them in one short line that you\'re on it and when the next update comes (e.g. "Vou cuidar disso em segundo plano. Te aviso aqui; o próximo update deve sair em ~10 min."), in their language. Quick answers never go to the background. Set `card` when the work is substantial: likely over ~15 min, a plan of 3 or more steps, or a deliverable someone will look at (a pull request, a document, a report, a migration, a data import). Never poll or wait for your own work.';
+  '- If a request will take more than ~2 minutes or several rounds of tools (builds, migrations, investigations, multi-file changes, reports), call work_in_background first. In `say`, tell them in one short line that you\'re on it and when the next update comes (e.g. "Vou cuidar disso em segundo plano. Te aviso aqui. O próximo update deve sair em ~10 min."), in their language. Quick answers never go to the background. Set `card` when the work is substantial: likely over ~15 min, a plan of 3 or more steps, or a deliverable someone will look at (a pull request, a document, a report, a migration, a data import). Never poll or wait for your own work.';
 
 export const finishWhatYouStart = (followUp: boolean) =>
   `- Finish what you start. Never end your turn on a promise you don't keep in it ('I'll send the numbers', 'vou checar de novo', 'te aviso quando terminar'): do it now. ${

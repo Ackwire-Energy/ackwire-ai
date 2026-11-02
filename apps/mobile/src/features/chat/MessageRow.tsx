@@ -514,7 +514,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <ReachLines message={m} /> : null}
-        {isAgent && m.longWork ? <MessageWorkLine message={m} /> : null}
+        {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {trails && m.author.id && trails.browser.length > 0 ? (
           <TrailCard

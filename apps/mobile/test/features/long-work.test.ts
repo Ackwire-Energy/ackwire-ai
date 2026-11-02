@@ -35,7 +35,7 @@ const work = (over: Partial<WorkView> = {}): WorkView => ({
   ...over,
 });
 
-const ctx = { locale: "pt-BR", now: NOW, meId: "me", agentName: "Ada", canStop: true, nameOf: () => "Heitor" };
+const ctx = { locale: "pt-BR", now: NOW, meId: "me", agentName: "Ada", canStop: true, nameOf: () => "Bia" };
 
 describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
   test("every state, in pt-BR", async () => {
@@ -64,7 +64,7 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
     expect(
       workLine(t, work({ status: "canceled", state: null, finishedAt: NOW.toISOString(), canceledByUserId: "u" }), ctx)
         .text,
-    ).toBe("Parado por Heitor aos 12 min");
+    ).toBe("Parado por Bia aos 12 min");
   });
 
   test("in English, and a long work's hours", async () => {
@@ -97,7 +97,7 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
     expect(blockedText(t, { reason: "waiting_approval" })).toBe("Bloqueado · aguardando aprovação");
     expect(blockedText(t, { reason: "paused" })).toBe("Pausado · limite do plano");
     expect(blockedText(t, { reason: "failed", text: "run.budget_exceeded" })).toBe(
-      "Bloqueado · não terminou: O orçamento do mês acabou",
+      "Bloqueado · não terminou: o orçamento do mês acabou",
     );
   });
 
@@ -107,12 +107,64 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
       "Ainda trabalhando nisso (22 min). Agora: programando.",
     );
     expect(serverBody(t, "fallback", { bodyCode: "work_auto_moved", bodyParams: { minutes: "10" } })).toBe(
-      "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui; o próximo update deve sair em ~10 min.",
+      "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui. O próximo update deve sair em ~10 min.",
     );
     const en = await translator("en");
     expect(serverBody(en, "x", { bodyCode: "work_auto_update", bodyParams: { minutes: "22" } })).toBe(
       "Still on it (22 min).",
     );
+  });
+
+  test("a work that didn't finish or was stopped says why or by whom, and its last update", async () => {
+    const t = await translator("pt-BR");
+    const failed = {
+      bodyCode: "work_end_failed",
+      bodyParams: { minutes: "12", title: "Migrar a cobrança" },
+      workEnd: {
+        id: "w1",
+        status: "failed",
+        errorCode: "run.provider_unavailable",
+        errorParams: { detail: "timeout" },
+        lastUpdate: "Tabelas migradas.",
+      },
+    };
+    expect(serverBody(t, "fallback", failed)).toBe(
+      "Esse trabalho em segundo plano não terminou (12 min): o provedor do modelo não respondeu: timeout.\n\nÚltimo update: Tabelas migradas.",
+    );
+    const stuck = { ...failed, workEnd: { id: "w1", status: "failed", errorCode: "run.stuck" } };
+    expect(serverBody(t, "fallback", stuck)).toBe(
+      "Esse trabalho em segundo plano não terminou (12 min): parou porque travou.",
+    );
+    const stopped = {
+      bodyCode: "work_end_canceled",
+      bodyParams: { minutes: "12", title: "Migrar a cobrança", byName: "Bia" },
+      workEnd: { id: "w1", status: "canceled", byUserId: "u" },
+    };
+    expect(serverBody(t, "fallback", stopped)).toBe("Parado por Bia aos 12 min.");
+    const en = await translator("en");
+    expect(serverBody(en, "fallback", stopped)).toBe("Stopped by Bia after 12 min.");
+    expect(serverBody(en, "fallback", stuck)).toBe(
+      "This background work didn't finish (12 min): stopped because it got stuck.",
+    );
+  });
+
+  test("English names several at once as jobs", async () => {
+    const t = await translator("en");
+    const line: AgentStatusLine = {
+      by: "auto",
+      text: null,
+      kind: "work",
+      subject: "Migrate billing",
+      emoji: null,
+      until: null,
+      since: ago(20),
+      count: 2,
+      second: "Churn report",
+    };
+    expect(workStatusText(t, line, NOW)).toBe("On 2 jobs: Migrate billing and Churn report");
+    expect(
+      workLine(t, work({ state: "queued", status: "queued", queuePosition: 1 }), { ...ctx, locale: "en" }).text,
+    ).toBe("In line · starts when one of Ada's other jobs ends (#1 in line)");
   });
 
   test("Conversas and Agentes list a work by its title and plan", () => {

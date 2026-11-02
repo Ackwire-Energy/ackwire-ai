@@ -165,10 +165,52 @@ export function blockedText(
   const say = loose(t);
   if (!blocked) return null;
   if (blocked.reason === "failed") {
-    const code = blocked.text?.replace(/^run\./, "");
-    const why: string = code ? say(`agentPage.activity.errors.${code}`, { defaultValue: "" }) : "";
-    return why ? say("work.blocked.failedWhy", { why: why.replace(/\.$/, "") }) : say("work.blocked.failed");
+    const why = errorWords(t, blocked.text);
+    return why ? say("work.blocked.failedWhy", { why }) : say("work.blocked.failed");
   }
   const known = ["waiting_approval", "waiting_input", "waiting_computer", "paused"];
   return say(`work.blocked.${known.includes(blocked.reason) ? blocked.reason : "waiting_approval"}`);
+}
+
+/** A run error's code ("run.stuck") in the reader's words, mid-sentence: no capital, no final period; empty if unknown. */
+function errorWords(t: TFunction, code: unknown, params?: unknown) {
+  if (typeof code !== "string" || !code) return "";
+  const values = params && typeof params === "object" ? (params as Record<string, unknown>) : {};
+  const why = loose(t)(`agentPage.activity.errors.${code.replace(/^run\./, "")}`, {
+    ...values,
+    defaultValue: "",
+  }).replace(/\.$/, "");
+  return why.charAt(0).toLocaleLowerCase() + why.slice(1);
+}
+
+/**
+ * The end the server posts home for a work that didn't finish or was stopped (`work_end_failed`, `work_end_canceled`):
+ * why (`meta.workEnd.errorCode`) or by whom (`bodyParams.byName`), and the last update it posted.
+ */
+export function workEndBody(
+  t: TFunction,
+  code: "work_end_failed" | "work_end_canceled",
+  params: Record<string, unknown>,
+  end: unknown,
+  fallback: string,
+): string {
+  const say = loose(t);
+  const e = (end && typeof end === "object" ? end : {}) as {
+    errorCode?: unknown;
+    errorParams?: unknown;
+    lastUpdate?: unknown;
+  };
+  const why = errorWords(t, e.errorCode, e.errorParams);
+  const name = typeof params.byName === "string" ? params.byName : "";
+  const key =
+    code === "work_end_failed"
+      ? why
+        ? "chat.body.work_end_failedWhy"
+        : "chat.body.work_end_failed"
+      : name
+        ? "chat.body.work_end_canceledBy"
+        : "chat.body.work_end_canceled";
+  const head = say(key, { ...params, why, name, defaultValue: fallback });
+  const last = typeof e.lastUpdate === "string" && e.lastUpdate ? `${say("work.lastUpdate")}: ${e.lastUpdate}` : "";
+  return [head, last].filter(Boolean).join("\n\n");
 }

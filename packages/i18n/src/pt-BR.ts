@@ -9879,12 +9879,15 @@ export const ptBR = {
     stop: "Parar",
     result: "Ver resultado",
     whatHappened: "Ver o que aconteceu",
-    openThread: "Abrir conversa",
+    openThread: "Abrir thread",
     plan: "Plano do agente",
     planProgress: "{{done}} de {{total}}",
     lastUpdate: "Último update",
     shareEveryone: "Mostrar para todos",
     shared: "Todo mundo no workspace vê este cartão agora",
+    shareFailed:
+      "Não deu para mostrar este cartão para todos. Só quem pediu o trabalho, quem criou o cartão ou um admin pode.",
+    stopFailed: "Não deu para parar. Só quem pediu, o dono do agente ou um admin pode.",
     autoUpdate: "Ainda trabalhando nisso ({{duration}}).",
     autoUpdateNow: "Agora: {{now}}.",
     status: {
@@ -10307,10 +10310,12 @@ export const ptBR = {
       usage_paused: "{{agent}} pausou este trabalho · plano do {{plan}} em {{percent}}% {{window}}",
       usage_paused_budget: "{{agent}} pausou este trabalho · orçamento do mês em {{percent}}%",
       work_auto_moved:
-        "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui; o próximo update deve sair em ~{{minutes}} min.",
+        "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui. O próximo update deve sair em ~{{minutes}} min.",
       work_end_done: "Concluído ({{minutes}} min).",
       work_end_failed: "Esse trabalho em segundo plano não terminou ({{minutes}} min).",
+      work_end_failedWhy: "Esse trabalho em segundo plano não terminou ({{minutes}} min): {{why}}.",
       work_end_canceled: "Parado aos {{minutes}} min.",
+      work_end_canceledBy: "Parado por {{name}} aos {{minutes}} min.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */

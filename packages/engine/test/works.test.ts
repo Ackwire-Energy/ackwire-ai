@@ -87,7 +87,7 @@ test("work_in_background: the anchor in the timeline, updates in its thread, the
                 name: WORK_IN_BACKGROUND_TOOL,
                 input: {
                   title: "Migrar a cobrança",
-                  say: "Vou cuidar disso em segundo plano. Te aviso aqui; o próximo update deve sair em ~10 min.",
+                  say: "Vou cuidar disso em segundo plano. Te aviso aqui. O próximo update deve sair em ~10 min.",
                   next_update_minutes: 10,
                   card: true,
                   plan: [{ text: "Ler o esquema" }, { text: "Migrar" }, { text: "Conferir" }],
@@ -482,6 +482,8 @@ test("cards: none for a quick run nor a short auto work; card: true makes one; a
   expect(stopped?.status).toBe("todo");
   const end = (await messages()).find((m) => (m.meta.workEnd as { id?: string } | undefined)?.id === named.work.id);
   expect(end?.meta.workEnd).toMatchObject({ status: "canceled", byUserId: f.owner.id });
+  // Stopped: by whom, in the person's words.
+  expect(end?.meta.bodyParams).toMatchObject({ byName: f.owner.name });
 });
 
 test("a work 15 minutes old gets its card at its check-in", async () => {

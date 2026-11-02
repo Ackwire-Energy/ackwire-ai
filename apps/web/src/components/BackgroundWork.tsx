@@ -1,26 +1,16 @@
-import type { Issue, Message, WorkView } from "@agenteschat/client";
+import { type Issue, type Message, useChannels, type WorkView } from "@agenteschat/client";
 import { blockedText, workLine, workPlanProgress } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useChannelActions } from "@/components/channel-actions";
+import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-
-/** Redraws a live work's minutes every half minute. */
-function useNow(live: boolean) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (!live) return;
-    const id = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(id);
-  }, [live]);
-  return now;
-}
+import { useToast } from "@/lib/toast";
 
 /** The line of a long work (ADR 0121) and its actions, the same under the anchor and on the card. */
 function useWorkLine(work: WorkView) {
@@ -29,13 +19,17 @@ function useWorkLine(work: WorkView) {
   const dir = useDirectory(org.id);
   const api = useApi();
   const qc = useQueryClient();
+  const toast = useToast();
   const live = work.status === "live" || work.status === "queued";
-  const now = useNow(live);
+  // A live work's minutes move every half minute.
+  const now = new Date(useNow(live, 30_000));
   const agent = dir.agentById.get(work.agentId);
+  // As `mayStopRun` decides (who asked, the agent's owner, an admin); the server has the last word, said in a toast.
   const canStop =
     can(org, "manage_agents") || agent?.ownerUserId === me.user.id || work.requestedByUserId === me.user.id;
   const stop = useMutation({
     mutationFn: (runId: string) => api.agents.cancelRun(org.id, runId),
+    onError: () => toast.show(t("work.stopFailed"), "error"),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["org", org.id, "channel", work.channelId] }),
   });
   const view = workLine(t, work, {
@@ -49,14 +43,17 @@ function useWorkLine(work: WorkView) {
   return { view, stop, t };
 }
 
-/** Under the agent's "Vou cuidar disso": how the work stands, its last update, Tarefa #, Parar, Ver resultado. */
-export function MessageWorkLine({ message }: { message: Message }) {
+/**
+ * Under the agent's "Vou cuidar disso": how the work stands, its last update, Tarefa #, Parar, Ver resultado. Once its
+ * thread has replies, the thread's own line under it opens the thread (`threaded`): no second way in.
+ */
+export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
   const work = message.longWork;
   if (!work) return null;
-  return <AnchorLine work={work} />;
+  return <AnchorLine work={work} threaded={Boolean(threaded)} />;
 }
 
-function AnchorLine({ work }: { work: WorkView }) {
+function AnchorLine({ work, threaded }: { work: WorkView; threaded: boolean }) {
   const { org } = useOrg();
   const navigate = useNavigate();
   const actions = useChannelActions();
@@ -68,7 +65,7 @@ function AnchorLine({ work }: { work: WorkView }) {
       update={view.update}
       actions={
         <>
-          {view.threadId && actions?.openThread && (
+          {view.threadId && !threaded && actions?.openThread && (
             <WorkLineAction onClick={() => actions.openThread?.(view.threadId as string)}>
               {t("work.openThread")}
             </WorkLineAction>
@@ -109,16 +106,29 @@ export function IssueWorkBlock({ issue }: { issue: Issue }) {
 }
 
 function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
+  const toast = useToast();
   const navigate = useNavigate();
+  const channels = useChannels(org.id);
   const { view, stop, t } = useWorkLine(work);
   const progress = workPlanProgress(work);
   const share = useMutation({
     mutationFn: () => api.issues.share(org.id, issue.id),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["org", org.id, "issues"] }),
+    onSuccess: () => {
+      toast.show(t("work.shared"));
+      void qc.invalidateQueries({ queryKey: ["org", org.id, "issues"] });
+    },
+    onError: () => toast.show(t("work.shareFailed"), "error"),
   });
+  // Only a card a DM or a private channel holds back, for who may show it (who asked, its creator, an admin).
+  const channel = issue.channelId ? channels.data?.find((c) => c.id === issue.channelId) : undefined;
+  const heldBack = Boolean(issue.channelId && channels.data && (!channel || channel.visibility === "private"));
+  const mayShare =
+    work.requestedByUserId === me.user.id ||
+    (issue.createdBy.type === "person" && issue.createdBy.id === me.user.id) ||
+    can(org, "manage_agents");
   const openConversation = () =>
     view.threadId
       ? void navigate({ to: "/org/$orgId/threads/$threadId", params: { orgId: org.id, threadId: view.threadId } })
@@ -141,7 +151,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
                 {t("work.stop")}
               </WorkLineAction>
             )}
-            {issue.channelId && (
+            {heldBack && mayShare && (
               <WorkLineAction disabled={share.isPending} onClick={() => share.mutate()}>
                 {t("work.shareEveryone")}
               </WorkLineAction>
@@ -160,7 +170,10 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
   );
 }
 
-/** On a board card: the blocked badge, the agent's plan (its steps, the one it is on) and its last update. */
+/**
+ * On a board card: the blocked badge, how far its plan is with the step it is on (the full plan is on the task's
+ * page) and its last update. While blocked, that step waits too.
+ */
 export function IssueCardWork({ issue }: { issue: Issue }) {
   const { t } = useTranslation();
   const work = issue.backgroundWork;
@@ -168,6 +181,7 @@ export function IssueCardWork({ issue }: { issue: Issue }) {
   if (!work && !blocked) return null;
   const progress = work ? workPlanProgress(work) : null;
   const live = work && (work.status === "live" || work.status === "queued");
+  const step = live ? (work.plan.find((p) => p.state === "doing") ?? work.plan.find((p) => p.state === "todo")) : null;
   return (
     <span className="issue-card__work">
       {blocked && <span className="issue-card__blocked">{blocked}</span>}
@@ -176,12 +190,12 @@ export function IssueCardWork({ issue }: { issue: Issue }) {
           <span className="issue-card__plan-head">
             {t("work.plan")} · {t("work.planProgress", progress)}
           </span>
-          {work.plan.map((p) => (
-            <span key={p.id} className="issue-card__step" data-state={p.state}>
+          {step && (
+            <span className="issue-card__step" data-state={issue.blocked ? "blocked" : step.state}>
               <span className="issue-card__step-mark" aria-hidden="true" />
-              {p.text}
+              {step.text}
             </span>
-          ))}
+          )}
         </span>
       )}
       {live && work.lastUpdate && (

@@ -479,7 +479,7 @@ async function localeOf(db: Executor, userId: string | null) {
 export const autoMovedText = (locale: string, minutes: number) =>
   locale === "en"
     ? `This will take a while, so I'll keep going in the background. I'll post updates here, the next one in about ${minutes} min.`
-    : `Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui; o próximo update deve sair em ~${minutes} min.`;
+    : `Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui. O próximo update deve sair em ~${minutes} min.`;
 
 /** The update the server posts for a silent work (stored as the fallback; the apps word `work_auto_update`). */
 export const autoUpdateText = (locale: string, minutes: number) =>
@@ -765,13 +765,14 @@ export async function endWork(
       const byUserId = run.error?.startsWith("canceled_by:") ? run.error.slice(12) : null;
       const locale = await localeOf(tx, work.requestedByUserId);
       const last = status !== "done" && work.updateSeq > 0 ? work.lastUpdateText : null;
+      const [by] = byUserId ? await tx.select({ name: users.name }).from(users).where(eq(users.id, byUserId)) : [];
       end = await insertMessage(tx, {
         orgId: work.orgId,
         channelId: work.channelId,
         threadId: work.homeThreadId,
         author: { type: "agent", agentId: work.agentId, runId: run.id, hop: run.hop },
         body: [
-          endText(locale, status, minutes),
+          endText(locale, status, minutes, by?.name),
           last ? `${locale === "en" ? "Last update" : "Último update"}: ${last}` : "",
         ]
           .filter(Boolean)
@@ -782,11 +783,12 @@ export async function endWork(
             status,
             minutes,
             ...(detail ? { errorCode: detail.errorCode } : {}),
+            ...(detail?.errorParams ? { errorParams: detail.errorParams } : {}),
             ...(byUserId ? { byUserId } : {}),
             ...(last ? { lastUpdate: last } : {}),
           },
           bodyCode: `work_end_${status}`,
-          bodyParams: { minutes: String(minutes), title: work.title },
+          bodyParams: { minutes: String(minutes), title: work.title, ...(by?.name ? { byName: by.name } : {}) },
         },
       });
       resultId = end.id;
@@ -807,18 +809,22 @@ export async function endWork(
   return ended.work;
 }
 
-const endText = (locale: string, status: "done" | "failed" | "canceled", minutes: number) =>
+const endText = (locale: string, status: "done" | "failed" | "canceled", minutes: number, by?: string) =>
   locale === "en"
     ? status === "done"
       ? `Done (${minutes} min).`
       : status === "failed"
         ? `This background work didn't finish (${minutes} min).`
-        : `Stopped after ${minutes} min.`
+        : by
+          ? `Stopped by ${by} after ${minutes} min.`
+          : `Stopped after ${minutes} min.`
     : status === "done"
       ? `Concluído (${minutes} min).`
       : status === "failed"
         ? `Esse trabalho em segundo plano não terminou (${minutes} min).`
-        : `Parado aos ${minutes} min.`;
+        : by
+          ? `Parado por ${by} aos ${minutes} min.`
+          : `Parado aos ${minutes} min.`;
 
 /**
  * Releases queued works that now fit (oldest first) in the caller's transaction: each goes live with a fresh promise,

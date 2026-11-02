@@ -116,6 +116,7 @@ import { DeleteAccountDialog } from "./DeleteAccount";
 import { MenuEntries } from "./DesktopMenus";
 import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
+import { useNow } from "./missions/MissionBits";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
@@ -1321,6 +1322,8 @@ function AgentRow({
   // Its presence from its work and its line (ADR 0084): the badge on its face, both in the row's title (no emoji in
   // the list: the line shows where the agent is opened).
   const shown = useAgentPresence(a.id);
+  // Background work's minutes move with the anchor's line, every half minute.
+  useNow(shown?.line?.kind === "work", 30_000);
   const word = shown ? t(`presence.${shown.presence}`) : null;
   const line = agentLine(t, shown?.line ?? null);
   const dir = useDirectory(org.id);
