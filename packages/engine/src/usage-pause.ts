@@ -255,6 +255,60 @@ async function setUsageCardState(
 }
 
 /**
+ * Continuar agora's step on a paused run (the card's and Rotinas'): once per wait (a compare-and-set on its wait id
+ * with no override yet), it goes on past the pause line until `until` (the window's reset; null: until it ends) and
+ * is queued now. Audited as `usage.continued`. False: the run already moved on (a second press, the timed job).
+ */
+export async function overrideUsagePause(
+  tx: Executor,
+  p: {
+    orgId: string;
+    runId: string;
+    waitId: string;
+    until: string | null;
+    userId: string;
+    details: Record<string, unknown>;
+    channelId?: string | null;
+  },
+): Promise<boolean> {
+  const { agentRuns } = schema;
+  const override = { until: p.until, by: p.userId };
+  const [moved] = await tx
+    .update(agentRuns)
+    .set({
+      transcript: sql`${agentRuns.transcript} || jsonb_build_object('usagePause',
+        coalesce(${agentRuns.transcript}->'usagePause', '{}'::jsonb) || jsonb_build_object('override', ${JSON.stringify(override)}::jsonb))`,
+    })
+    .where(
+      and(
+        eq(agentRuns.orgId, p.orgId),
+        eq(agentRuns.id, p.runId),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'waitId' = ${p.waitId}`,
+        sql`${agentRuns.transcript}->'usagePause'->'override' is null`,
+      ),
+    )
+    .returning({ id: agentRuns.id });
+  if (!moved) return false;
+  await enqueue(tx, {
+    orgId: p.orgId,
+    kind: "agent_run.execute",
+    payload: { runId: p.runId, wait: p.waitId },
+    dedupeKey: `agent_run.execute:${p.runId}:continue:${p.waitId}`,
+    maxAttempts: 4,
+  });
+  await recordAudit(tx, {
+    orgId: p.orgId,
+    actor: { type: "person", id: p.userId },
+    action: "usage.continued",
+    target: { type: "agent_run", id: p.runId },
+    details: { ...p.details, until: p.until },
+    ...(p.channelId ? { channelId: p.channelId } : {}),
+  });
+  return true;
+}
+
+/**
  * Continuar agora on a long-work pause's card (`POST …/messages/{id}/answer-now`, ADR 0118): the run goes on now,
  * past the pause line until that window resets (the plan's own limit still stops it). Who asked, the person behind
  * the work, the agent's owner or an admin (`mayStopRun`); everyone else sees it greyed. Once: a second press, or
@@ -278,23 +332,17 @@ export async function continueUsagePause(
   if (!row) return { runs: [] };
   if (!(await mayStopRun(db, userId, membership, row)))
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can do this", "run.answer_forbidden");
-  const override = { until: card.resetsAt ?? null, by: userId };
+  const until = card.resetsAt ?? null;
   const done = await db.transaction(async (tx) => {
-    const [moved] = await tx
-      .update(agentRuns)
-      .set({
-        transcript: sql`${agentRuns.transcript} || jsonb_build_object('usagePause',
-          coalesce(${agentRuns.transcript}->'usagePause', '{}'::jsonb) || jsonb_build_object('override', ${JSON.stringify(override)}::jsonb))`,
-      })
-      .where(
-        and(
-          eq(agentRuns.id, card.runId),
-          eq(agentRuns.status, "waiting_input"),
-          sql`${agentRuns.transcript}->'waitingForBrain'->>'waitId' = ${card.waitId}`,
-          sql`${agentRuns.transcript}->'usagePause'->'override' is null`,
-        ),
-      )
-      .returning({ id: agentRuns.id });
+    const moved = await overrideUsagePause(tx, {
+      orgId: message.orgId,
+      runId: card.runId,
+      waitId: card.waitId,
+      until,
+      userId,
+      details: { messageId: message.id, source: card.source, percent: card.percent },
+      channelId: message.channelId,
+    });
     if (!moved) return null;
     const next: UsagePauseCard = {
       ...card,
@@ -307,21 +355,6 @@ export async function continueUsagePause(
       .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard}', ${JSON.stringify(next)}::jsonb)` })
       .where(and(eq(messages.orgId, message.orgId), eq(messages.id, message.id)))
       .returning();
-    await enqueue(tx, {
-      orgId: message.orgId,
-      kind: "agent_run.execute",
-      payload: { runId: card.runId, wait: card.waitId },
-      dedupeKey: `agent_run.execute:${card.runId}:continue:${card.waitId}`,
-      maxAttempts: 4,
-    });
-    await recordAudit(tx, {
-      orgId: message.orgId,
-      actor: { type: "person", id: userId },
-      action: "usage.continued",
-      target: { type: "agent_run", id: card.runId },
-      details: { messageId: message.id, source: card.source, percent: card.percent, until: override.until },
-      channelId: message.channelId,
-    });
     return updated ?? null;
   });
   if (!done) {

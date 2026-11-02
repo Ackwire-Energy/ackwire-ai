@@ -2817,6 +2817,8 @@ export function useRoutineAction(orgId: string) {
         | { type: "active"; id: string; active: boolean }
         | { type: "run"; id: string }
         | { type: "stop"; id: string }
+        /** Continuar agora on a run paused near its plan's or budget's limit. */
+        | { type: "continueUsage"; id: string }
         | { type: "update"; id: string; patch: RoutinePatch }
         | { type: "delete"; id: string }
         | { type: "duplicate"; id: string; name?: string }
@@ -2831,6 +2833,7 @@ export function useRoutineAction(orgId: string) {
       if (action.type === "duplicate") return api.routines.duplicate(orgId, action.id, action.name);
       if (action.type === "active") return api.routines.setActive(orgId, action.id, action.active);
       if (action.type === "stop") return api.routines.stop(orgId, action.id);
+      if (action.type === "continueUsage") return api.routines.continueUsage(orgId, action.id);
       if (action.type === "takeOver") {
         await api.routines.takeOver(orgId, action.id);
         return api.routines.setActive(orgId, action.id, true);

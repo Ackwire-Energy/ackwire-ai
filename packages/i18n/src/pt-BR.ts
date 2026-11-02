@@ -4435,6 +4435,10 @@ export const ptBR = {
       failing_one: "Falhando ({{count}} seguida)",
       failing_other: "Falhando ({{count}} seguidas)",
       needsWebhook: "Ainda não roda: falta o webhook do {{provider}}",
+      usagePaused: "Pausada até {{until}} (limite do plano)",
+      usagePausedUnknown: "Pausada até o plano renovar (limite do plano)",
+      usagePausedBudget: "Pausada até {{until}} (limite do orçamento)",
+      usagePausedBudgetUnknown: "Pausada até o orçamento renovar (limite do orçamento)",
     },
     pausedReason: {
       creator_left: "Pausada: quem criou saiu do workspace",
@@ -4539,6 +4543,14 @@ export const ptBR = {
     stop: "Parar",
     stopName: "Parar {{name}}",
     stoppedToast: "Execução parada.",
+    /** A run paused near its plan's or budget's limit (state `usage_paused`). */
+    usagePause: {
+      line: "Retoma sozinha quando o limite renovar. Nada é postado na conversa.",
+      continuedToast: "Execução continuando.",
+      forbidden: "Só quem criou a rotina, o dono do agente ou um admin pode continuar agora",
+      extra_off:
+        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora",
+    },
     pausedRunningToast: "Rotina pausada. A execução em andamento também parou.",
     deleteBodyRunning:
       "Ela para de rodar e sai da lista, e a execução em andamento também para. As execuções passadas continuam no histórico.",
@@ -8678,6 +8690,8 @@ export const ptBR = {
       takeOverNoAccess: "Entre na conversa da rotina antes de assumi-la.",
       agentNotInChannel: "Adicione o agente à conversa antes.",
       webhookPaused: "Ligue a rotina para testar.",
+      continueExtraOff:
+        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora.",
     },
     run: {
       notContinuable: "Esta resposta não pode mais ser continuada.",

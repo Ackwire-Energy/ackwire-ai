@@ -10,12 +10,14 @@ import {
   pausedFix,
   routineChannelOf,
   routineNotificationWords,
+  routineStateTime,
   routineStateWords,
   runMessageLink,
   runOutcome,
   runPixelStatus,
   runPixels,
   runsPerDay,
+  usageContinueBlock,
   usageParts,
   whereItRuns,
 } from "../src/lib/routine-view";
@@ -110,6 +112,31 @@ describe("a routine's runs", () => {
 });
 
 describe("a routine's state and its one-tap fix", () => {
+  test("paused near its plan's limit: until its reset, quietly; who may continue it now", () => {
+    const now = new Date(2026, 10, 1, 11, 0);
+    const resetsAt = new Date(2026, 10, 1, 14, 0).toISOString();
+    const t = ((key: string) => key) as unknown as TFunction;
+    const plan = state({ state: "usage_paused", usagePause: { source: "plan", resetsAt, extraOff: false } });
+    const until = routineStateTime(t, "pt-BR", plan, now);
+    expect(until).toBe("14:00");
+    expect(routineStateWords(plan, until)).toEqual({
+      key: "routines.state.usagePaused",
+      values: { until: "14:00" },
+      icon: "pause",
+      tone: "neutral",
+    });
+    const budget = state({ state: "usage_paused", usagePause: { source: "budget", resetsAt, extraOff: false } });
+    expect(routineStateWords(budget, until).key).toBe("routines.state.usagePausedBudget");
+    const unknown = state({ state: "usage_paused", usagePause: { source: "plan", resetsAt: null, extraOff: false } });
+    expect(routineStateTime(t, "pt-BR", unknown, now)).toBe("");
+    expect(routineStateWords(unknown, "").key).toBe("routines.state.usagePausedUnknown");
+    expect(usageContinueBlock({ canManage: true, usagePause: plan.usagePause })).toBeNull();
+    expect(usageContinueBlock({ canManage: false, usagePause: plan.usagePause })).toBe("forbidden");
+    expect(usageContinueBlock({ canManage: true, usagePause: { source: "plan", resetsAt, extraOff: true } })).toBe(
+      "extra_off",
+    );
+  });
+
   test("the chip for each state", () => {
     expect(routineStateWords(state({}))).toMatchObject({ key: "routines.state.active", tone: "neutral" });
     expect(routineStateWords(state({ state: "running" }))).toMatchObject({ key: "routines.state.running" });

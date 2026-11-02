@@ -4393,6 +4393,10 @@ export const en: Translations = {
       failing_one: "Failing ({{count}} in a row)",
       failing_other: "Failing ({{count}} in a row)",
       needsWebhook: "Can't run yet: no {{provider}} webhook",
+      usagePaused: "Paused until {{until}} (plan limit)",
+      usagePausedUnknown: "Paused until the plan resets (plan limit)",
+      usagePausedBudget: "Paused until {{until}} (budget limit)",
+      usagePausedBudgetUnknown: "Paused until the budget renews (budget limit)",
     },
     pausedReason: {
       creator_left: "Paused: whoever created it left the workspace",
@@ -4497,6 +4501,13 @@ export const en: Translations = {
     stop: "Stop",
     stopName: "Stop {{name}}",
     stoppedToast: "Run stopped.",
+    /** A run paused near its plan's or budget's limit (state `usage_paused`). */
+    usagePause: {
+      line: "It picks up by itself when the limit resets. Nothing is posted in the conversation.",
+      continuedToast: "Run continuing.",
+      forbidden: "Only who created the routine, the agent's owner or an admin can continue it now",
+      extra_off: "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now",
+    },
     pausedRunningToast: "Routine paused. The run in progress stopped too.",
     deleteBodyRunning:
       "It stops running and leaves the list, and the run in progress stops too. Past runs stay in the history.",
@@ -8619,6 +8630,8 @@ export const en: Translations = {
       takeOverNoAccess: "Join the routine's conversation before taking it over.",
       agentNotInChannel: "Add the agent to the conversation first.",
       webhookPaused: "Turn the routine on to test it.",
+      continueExtraOff:
+        "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now.",
     },
     run: {
       notContinuable: "This answer can't be continued anymore.",

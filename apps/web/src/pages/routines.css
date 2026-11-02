@@ -393,6 +393,20 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-details__actions > .ac-btn {
   flex: 1 1 auto;
 }
+.routine-details__usage-pause {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.routine-details__usage-pause p {
+  margin: 0;
+}
+.routine-details__usage-pause-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
 .routine-details .ac-details__section p {
   margin: 0;
 }

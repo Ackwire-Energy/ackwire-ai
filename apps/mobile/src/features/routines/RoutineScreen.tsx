@@ -70,7 +70,7 @@ import {
   useWhenText,
 } from "./hooks";
 import { hasFired, isDoneOnce, isPaused, isReminder, isRunning, mailTrouble, routineTitle, targetIcon } from "./logic";
-import { FixButton, StateChip } from "./parts";
+import { FixButton, StateChip, UsagePausedNote } from "./parts";
 import { RunStrip } from "./RunPixels";
 import { nextLabel } from "./rule";
 import { WebhookCard } from "./WebhookCard";
@@ -288,6 +288,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
             </View>
           ) : null}
 
+          {r.state === "usage_paused" ? <UsagePausedNote routine={r} controls={controls} /> : null}
           <Section title={t("routines.panel.week")}>
             <Block>
               <Text variant="body">{health ? health.map(say).join(" · ") : t("routines.health.none")}</Text>

@@ -418,6 +418,8 @@ export interface Transcript {
     until?: string;
     /** A long-work pause (`usage_pause`): on the plan's window or the agent's budget. */
     source?: "plan" | "budget";
+    /** When the limit resets, when known (Rotinas says "Pausada até…"; `until` is later by the stagger). */
+    resetsAt?: string;
   };
   /**
    * Long work paused near a limit (ADR 0118): `paused` once it was (it stays long work), `cardId` its card,
@@ -2391,7 +2393,7 @@ async function executeRunInner(
       waitId,
       waitKey: key,
       until: runAt.toISOString(),
-      ...(u.pause ? { source: u.pause.source } : {}),
+      ...(u.pause ? { source: u.pause.source, ...(resetsAt ? { resetsAt } : {}) } : {}),
     };
     await addRunStep(db, run, "error", {
       reason: "usage_wait",

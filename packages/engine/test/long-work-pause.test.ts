@@ -10,10 +10,12 @@ import {
   type BrainTurn,
   cancelRun,
   clearPlanLimits,
+  continueRoutineUsagePause,
   createJobHandlers,
   createRoutine,
   drainOutbox,
   enqueueRunJob,
+  getRoutineView,
   holdsMessages,
   insertMessage,
   isLongWork,
@@ -492,4 +494,74 @@ test("Continuar agora on the card of a run canceled while paused: the card says 
   expect(await answerNow(deps, f.owner.id, f.org.id, card.id)).toEqual({ runs: [] });
   const [after] = await cards(f);
   expect((after?.meta.actionCard as { state?: string } | undefined)?.state).toBe("ended");
+});
+
+// ── Rotinas: a routine's paused slot ─────────────────────────────────────────
+
+test("Rotinas shows a routine's paused slot until its reset; Continuar agora for its people goes on, posting nothing", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  const resetsAt = new Date(Date.now() + 3600_000).toISOString();
+  await storeOwnUsage(f, machineId, reading([{ kind: "five_hour", usedPercent: 96, resetsAt }]));
+  const { brain, seen } = scripted(() => [{ type: "done", text: "Deploys ok." }]);
+  const handlers = handlersWith(f, brain);
+  await scheduledSlot(f);
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(0);
+  const [routine] = await f.db.select().from(schema.routines);
+  const id = routine?.id ?? "";
+  const view = await getRoutineView(f.db, f.owner.id, f.org.id, id);
+  expect(view.state).toBe("usage_paused");
+  expect(view.usagePause).toEqual({ source: "plan", resetsAt, extraOff: false });
+
+  // Someone who isn't its creator, the agent's owner or an admin sees it, and can't continue it.
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const theirs = await getRoutineView(f.db, bia.id, f.org.id, id);
+  expect(theirs.state).toBe("usage_paused");
+  expect(theirs.canManage).toBe(false);
+  const refused = await continueRoutineUsagePause({ db: f.db }, bia.id, f.org.id, id).catch((e) => e);
+  expect((refused as { code?: string }).code).toBe("routine.editor_only");
+
+  const before = (await f.db.select().from(schema.messages).where(eq(schema.messages.orgId, f.org.id))).length;
+  expect(await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id)).toEqual({ continued: true });
+  expect(await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id)).toEqual({ continued: false });
+  // Nothing is posted where it reports for the pause or the press.
+  expect((await f.db.select().from(schema.messages).where(eq(schema.messages.orgId, f.org.id))).length).toBe(before);
+  expect(await allCards(f)).toHaveLength(0);
+  expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).state).not.toBe("usage_paused");
+
+  // It goes on now, still at 96%: past the pause line until that window resets.
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(1);
+  const audit = await f.db
+    .select()
+    .from(schema.auditLog)
+    .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "usage.continued")));
+  expect(audit).toHaveLength(1);
+});
+
+test("Continuar agora on a routine whose agent keeps long work off paid extra usage is refused with the reason", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f, { brainExtraUsage: false });
+  await storeOwnUsage(
+    f,
+    machineId,
+    reading([
+      { kind: "five_hour", usedPercent: 97, resetsAt: iso(3600_000) },
+      { kind: "other", label: "Extra usage", usedPercent: 10 },
+    ]),
+  );
+  const { brain, seen } = scripted(() => [{ type: "done", text: "ok" }]);
+  const handlers = handlersWith(f, brain);
+  await scheduledSlot(f);
+  await drainOutbox(f.db, handlers);
+  const [routine] = await f.db.select().from(schema.routines);
+  const id = routine?.id ?? "";
+  expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).usagePause?.extraOff).toBe(true);
+  const refused = await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id).catch((e) => e);
+  expect((refused as { code?: string }).code).toBe("routine.continue_extra_off");
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(0);
+  expect((await runs(f)).at(-1)?.status).toBe("waiting_input");
 });

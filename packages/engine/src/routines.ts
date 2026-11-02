@@ -77,7 +77,7 @@ import {
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { standingRefusal } from "./standing";
-import { USAGE_WAIT_CODES } from "./usage-pause";
+import { overrideUsagePause, USAGE_WAIT_CODES } from "./usage-pause";
 
 export { startRoutineRun } from "./routine-room";
 
@@ -239,6 +239,7 @@ export type RoutineState =
   | "running"
   | "waiting_computer"
   | "waiting_person"
+  | "usage_paused"
   | "failing"
   | "needs_webhook";
 
@@ -261,6 +262,12 @@ export interface RoutineView {
   state: RoutineState;
   /** Its run waits for the agent's computer since then. */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
+  /**
+   * Its run paused near its plan's or budget's limit (ADR 0118, `usage_paused`): it picks up at `resetsAt` (null:
+   * not known yet). `extraOff`: a plan pause on an agent whose switch keeps long work off paid extra usage, so
+   * Continuar agora is refused. Who may press it: `canManage`.
+   */
+  usagePause: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean } | null;
   /** Where it thinks: the agent's brain and, for a computer brain, the computer's name. */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -395,6 +402,11 @@ type AgentRunInfo = {
   waitingMachineId: string | null;
   /** What it waits on when that's its plan's limit or its budget (`USAGE_WAIT_CODES`). */
   waitingCode: string | null;
+  /** A long-work pause's (`usage_pause`): on what and when the limit resets. */
+  waitSource: string | null;
+  resetsAt: string | null;
+  /** Continuar agora was pressed on it: back at work as soon as its job runs. */
+  continued: boolean;
   updatedAt: Date;
 };
 
@@ -409,6 +421,15 @@ const agentWaiting = (a: AgentRunInfo | undefined) =>
   a?.status === "waiting_approval" || (a?.status === "waiting_input" && !USAGE_WAIT_CODES.has(a.waitingCode ?? ""));
 /** Waiting for its computer (ADR 0032 §5), not for a person. */
 const agentAway = (a: AgentRunInfo | undefined) => a?.status === "waiting_input" && Boolean(a.waitingMachineId);
+/**
+ * Long work paused near a limit (ADR 0118), not continued, whose reset hasn't passed: continued or past its reset,
+ * its job picks it up any moment.
+ */
+const usagePausedAt = (a: AgentRunInfo, now: Date) =>
+  a.status === "waiting_input" &&
+  a.waitingCode === "usage_pause" &&
+  !a.continued &&
+  !(a.resetsAt && Date.parse(a.resetsAt) <= now.getTime());
 /**
  * Not an email run held for the next email (§6.8): that row stays queued with no job on purpose and is no
  * run yet, so no view shows it and it never makes a routine look busy.
@@ -463,6 +484,9 @@ async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<
           error: agentRuns.error,
           waitingMachineId: agentRuns.waitingMachineId,
           waitingCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+          waitSource: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
+          resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+          continued: sql<boolean>`(${agentRuns.transcript}->'usagePause'->'override') is not null`,
           updatedAt: agentRuns.updatedAt,
         })
         .from(agentRuns)
@@ -722,7 +746,12 @@ async function views(
       .where(inWeek)
       .groupBy(routineRuns.routineId),
     db
-      .select({ id: agents.id, brain: agents.brain, machineId: agents.machineId })
+      .select({
+        id: agents.id,
+        brain: agents.brain,
+        machineId: agents.machineId,
+        extraUsage: agents.brainExtraUsage,
+      })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), inArray(agents.id, [...new Set(rows.map((r) => r.agentId))]))),
     lookup(wantedHooks, () =>
@@ -790,6 +819,15 @@ async function views(
           since: away.updatedAt.toISOString(),
         }
       : null;
+    const agent = agentById.get(r.agentId);
+    const paused = openAgents.find((a) => usagePausedAt(a, now));
+    const usagePause = paused
+      ? {
+          source: paused.waitSource === "budget" ? ("budget" as const) : ("plan" as const),
+          resetsAt: paused.resetsAt,
+          extraOff: paused.waitSource !== "budget" && agent?.extraUsage === false,
+        }
+      : null;
     const hook = webhookOf(r);
     // A run at work says what it does first (a manual run of a paused routine, a one-off's run after it
     // fired: both inactive, both stoppable); paused, unable to run, failing or active only when nothing is at work.
@@ -797,15 +835,17 @@ async function views(
       ? "waiting_computer"
       : openAgents.some(agentWaiting)
         ? "waiting_person"
-        : open.length > 0
-          ? "running"
-          : !r.active
-            ? "paused"
-            : hook && !hooked.has(hook)
-              ? "needs_webhook"
-              : r.failuresInRow > 0
-                ? "failing"
-                : "active";
+        : usagePause
+          ? "usage_paused"
+          : open.length > 0
+            ? "running"
+            : !r.active
+              ? "paused"
+              : hook && !hooked.has(hook)
+                ? "needs_webhook"
+                : r.failuresInRow > 0
+                  ? "failing"
+                  : "active";
     const outcomes = new Map<string, number>();
     let started = 0;
     for (const w of week.get(r.id) ?? []) {
@@ -823,7 +863,6 @@ async function views(
       skipped: count("skipped") + count("superseded"),
       missed: count("missed"),
     };
-    const agent = agentById.get(r.agentId);
     const kind = brainKindOf(agent?.brain);
     const used = usageOf.get(r.id);
     const hookKey = hookKeys.get(r.id);
@@ -843,6 +882,7 @@ async function views(
       failuresInRow: r.failuresInRow,
       state,
       waitingFor,
+      usagePause,
       brain: {
         kind,
         machineName: kind !== "model" && agent?.machineId ? (machineName.get(agent.machineId) ?? null) : null,
@@ -1878,6 +1918,62 @@ export async function stopRoutineRun(
     });
   }
   return { stopped };
+}
+
+/**
+ * Continuar agora on a routine paused near its plan's or budget's limit (ADR 0118): its creator, admins or the
+ * agent's owner (as for stopping it). The run goes on now past the pause line until that window resets; a plan
+ * pause on an agent whose switch keeps long work off paid extra usage is refused with that reason. Nothing is
+ * posted where it reports. Once: a second press, or the run already picked up, does nothing.
+ */
+export async function continueRoutineUsagePause(
+  deps: { db: Database },
+  actorId: string,
+  orgId: string,
+  routineId: string,
+): Promise<{ continued: boolean }> {
+  const { db } = deps;
+  const routine = await loadRoutine(db, orgId, routineId);
+  await requireRoutineEditor(db, actorId, orgId, routine);
+  const [paused] = await db
+    .select({
+      runId: agentRuns.id,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      source: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
+      resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+      extraUsage: agents.brainExtraUsage,
+    })
+    .from(routineRuns)
+    .innerJoin(agentRuns, eq(agentRuns.id, routineRuns.agentRunId))
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    .where(
+      and(
+        eq(routineRuns.orgId, orgId),
+        eq(routineRuns.routineId, routine.id),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'usage_pause'`,
+      ),
+    )
+    .orderBy(desc(routineRuns.createdAt))
+    .limit(1);
+  if (!paused?.waitId) return { continued: false };
+  if (paused.source !== "budget" && !paused.extraUsage) {
+    throw new ConflictError(
+      "This agent's long work doesn't use paid extra usage: turn it on in its AI settings to continue now",
+      "routine.continue_extra_off",
+    );
+  }
+  const continued = await db.transaction((tx) =>
+    overrideUsagePause(tx, {
+      orgId,
+      runId: paused.runId,
+      waitId: paused.waitId as string,
+      until: paused.resetsAt,
+      userId: actorId,
+      details: { routineId: routine.id, source: paused.source ?? "plan" },
+    }),
+  );
+  return { continued };
 }
 
 /**

@@ -36,9 +36,9 @@ export const mailTrouble = (r: Pick<Routine, "trigger">) =>
   r.trigger.type === "email" && r.trigger.status && r.trigger.status !== "active" ? r.trigger.status : null;
 /** A run of it is working now (Parar stops it). */
 export const isRunning = (r: Pick<Routine, "state">) => r.state === "running";
-/** A run of it is at work: working, or waiting for a person or its computer. */
+/** A run of it is at work: working, waiting for a person or its computer, or paused near its plan's limit. */
 export const isAtWork = (r: Pick<Routine, "state">) =>
-  isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer";
+  isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer" || r.state === "usage_paused";
 /** A one-off that already fired (or was cancelled): no switch, no "Rodar agora", nothing left to run. */
 export const hasFired = (r: Pick<Routine, "trigger" | "active">) => r.trigger.type === "once" && !r.active;
 /** A one-off that fired and whose run ended: shown muted, under "Concluídos" (while its run works, it is live). */
