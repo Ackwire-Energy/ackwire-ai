@@ -904,8 +904,11 @@ With a GitHub App set up (`GITHUB_APP_*`) and installed for a repository, agents
 that repository straight from github.com (a one-hour, read-only token for that repository alone)
 and still push through your server, so the computer must reach github.com too; without the App,
 clones go through your server. A computer runs at most two clones at once, and a clone goes on when
-your server restarts. On a single-user computer, clones share a cache in `~/.agentes-runner/git-cache`
-that is never pruned (checkouts borrow its objects); remove a repository's folder there only once no
+your server restarts. Clones fetched from github.com share a cache that is never pruned (checkouts
+borrow its objects): `~/.agentes-runner/git-cache` on a single-user computer, `/var/cache/agentes-git`
+on a computer that runs each agent as its own user (owned by a system user `agentes-git` the runner
+makes; each agent reads only the repositories GitHub let it fetch, through an ACL, so install the
+`acl` package there, or clones go without the cache). Remove a repository's folder there only once no
 agent's checkout of it is left.
 On Tailscale, install Tailscale on it and sign in to the same tailnet first. The runner runs on
 Bun 1.3.5 or newer: the computer's own, or one the installer downloads into
