@@ -16,6 +16,7 @@ import {
   type PartialUsage,
   ProviderError,
   type StopReason,
+  stableToolsFirst,
   systemText,
 } from "./types";
 
@@ -107,15 +108,13 @@ export function createOpenAIProvider(
 }
 
 function toTools(request: ModelRequest): FunctionTool[] {
-  return [...(request.tools ?? [])]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((t) => ({
-      type: "function",
-      name: t.name,
-      description: t.description,
-      parameters: t.inputSchema,
-      strict: false,
-    }));
+  return stableToolsFirst(request.tools ?? []).map((t) => ({
+    type: "function",
+    name: t.name,
+    description: t.description,
+    parameters: t.inputSchema,
+    strict: false,
+  }));
 }
 
 function toInput(messages: ModelMessage[]): ResponseInputItem[] {

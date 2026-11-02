@@ -5,7 +5,7 @@ import type { ModelUsage } from "./types";
  * so every cost is an exact integer. First-party Anthropic API list prices,
  * checked on Anthropic's pricing page (2026-10-20); cache reads are listed per
  * model (Opus 5.5: $0.20/MTok, Sonnet 5.5: $0.10/MTok), cache writes use the
- * 5-minute rate (1.25 × input).
+ * 5-minute rate (1.25 × input); 1-hour writes cost `LONG_CACHE_WRITE` × input.
  * Update this table when prices change: usage records store the computed cost,
  * so history is never repriced.
  */
@@ -402,11 +402,15 @@ function infoOf(model: string): ModelInfo {
   return info;
 }
 
+/** What a 1-hour cache write costs, in times the input price (Anthropic's extended TTL; only Claude is asked for one). */
+export const LONG_CACHE_WRITE = 2;
+
 const tokensCost = (p: TokenPrices, u: ModelUsage) =>
   u.inputTokens * p.input +
   u.outputTokens * p.output +
   u.cacheReadTokens * p.cacheRead +
-  u.cacheWriteTokens * p.cacheWrite;
+  u.cacheWriteTokens * p.cacheWrite +
+  (u.cacheWriteLongTokens ?? 0) * (LONG_CACHE_WRITE * p.input - p.cacheWrite);
 
 /**
  * What a call made at `at` pays per token: the introductory prices before their day. Budget reservations
@@ -439,22 +443,29 @@ export function summedCostNanoUsd(model: string, usage: ModelUsage): number {
 
 /**
  * Upper bound of a call's cost, for budget reservations: every prompt token at
- * the most expensive input rate (a cache write), every allowed output token
+ * the most expensive input rate (a cache write, a 1-hour one with `longCache`), every allowed output token
  * at the output rate, long-context prices when the prompt may cross the threshold.
  */
-export function maxCostNanoUsd(model: string, promptTokens: number, maxOutputTokens: number): number {
+export function maxCostNanoUsd(
+  model: string,
+  promptTokens: number,
+  maxOutputTokens: number,
+  longCache = false,
+): number {
   const info = infoOf(model);
   const p =
     info.longContext && promptTokens > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
-  return promptTokens * Math.max(p.input, p.cacheWrite) + maxOutputTokens * p.output;
+  const write = longCache ? Math.max(p.cacheWrite, LONG_CACHE_WRITE * p.input) : p.cacheWrite;
+  return promptTokens * Math.max(p.input, write) + maxOutputTokens * p.output;
 }
 
 /** Output tokens that fit in `nanoUsd` after paying for the prompt (worst case), or 0. */
-export function outputTokensWithin(model: string, promptTokens: number, nanoUsd: number): number {
+export function outputTokensWithin(model: string, promptTokens: number, nanoUsd: number, longCache = false): number {
   const info = infoOf(model);
   const p =
     info.longContext && promptTokens > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
-  const left = nanoUsd - promptTokens * Math.max(p.input, p.cacheWrite);
+  const write = longCache ? Math.max(p.cacheWrite, LONG_CACHE_WRITE * p.input) : p.cacheWrite;
+  const left = nanoUsd - promptTokens * Math.max(p.input, write);
   return left <= 0 ? 0 : Math.floor(left / p.output);
 }
 

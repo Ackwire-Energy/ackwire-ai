@@ -526,6 +526,7 @@ export function buildEngine(o: EngineOptions) {
     toolsOnDemand: o.toolsOnDemand ?? true,
     warmBrowser,
     brains,
+    prepareCode,
     machines: machineHub,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
