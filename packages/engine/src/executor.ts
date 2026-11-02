@@ -132,7 +132,7 @@ import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./miss
 import { postNoAiCard } from "./no-ai";
 import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-producers";
 import { enqueue, PermanentJobError } from "./outbox";
-import { personWords, runReadOutside } from "./outside";
+import { type OutsideMemo, personWords, runReadOutside } from "./outside";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
 import { reachWillHand } from "./reach";
@@ -1060,6 +1060,7 @@ async function executeRunInner(
   });
   /** Whether this run read outside content (`runReadOutside`): sticky once true. */
   let readOutside = false;
+  const outsideMemo: OutsideMemo = {};
   /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
   const post = async (
     tx: Executor,
@@ -1077,12 +1078,11 @@ async function executeRunInner(
     // A run that read outside content (ADR 0117) marks what it posts, so the next agent reads it as relayed and memory
     // from it stays low trust; once it has read outside, every later post is marked too. A credential in its reply is
     // masked unless a person wrote it here.
-    const authority = note ? null : await runAuthority(tx, current);
-    if (!note && !readOutside) readOutside = await runReadOutside(tx, current, authority ?? undefined);
+    if (!note && !readOutside) readOutside = await runReadOutside(tx, current, undefined, outsideMemo);
     const said =
       note || !carriesCredential(body)
         ? body
-        : fedByRoutine(authority)
+        : fedByRoutine(await runAuthority(tx, current))
           ? maskCredentials(body)
           : readOutside
             ? maskCredentialsExcept(body, await personWords(tx, run.orgId, run.channelId, threadId))

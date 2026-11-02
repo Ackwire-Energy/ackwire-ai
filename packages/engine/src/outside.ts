@@ -1,5 +1,6 @@
-import { and, desc, type Executor, eq, isNull, or, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
 import { type AuthorityRun, fedByRoutine, type RunAuthority, runAuthority } from "./authority";
+import { caches, cachesEnabled } from "./cache";
 
 const { agentRuns, agentRunSteps, messages } = schema;
 
@@ -11,29 +12,96 @@ const HARNESS_OUTSIDE = /^(?:WebFetch|WebSearch)\b|^\w+\(\s*(?:curl|wget|gh)\s/;
 
 export type OutsideRun = AuthorityRun;
 
+/** How many of a channel's newest top-level messages count as a top-level run's conversation (`runReadOutside`). */
+const CONVERSATION_WINDOW = 30;
+
 /**
- * Whether a run read content from outside the org (ADR 0117): a routine's reading feeds it, the message that woke
- * it (or its thread's root) relays outside content, one of its tool results came from outside (the gateway's
- * `outside` mark), or its computer brain fetched the web itself. What such a run posts carries
- * `meta.readOutside`, so the next agent reads it as relayed and memory built from it stays low trust. It
- * never stops, asks or refuses anything by itself.
+ * What a run read before it started, fixed for the run: a routine's reading feeds it, or its conversation relays
+ * outside content (a message with `meta.readOutside` that woke it, in its thread, or among the channel's newest
+ * top-level messages, which a thread's run reads too).
  */
-export async function runReadOutside(db: Executor, run: OutsideRun, authority?: RunAuthority): Promise<boolean> {
+async function conversationReadOutside(db: Executor, run: OutsideRun, authority?: RunAuthority): Promise<boolean> {
   if (fedByRoutine(authority ?? (await runAuthority(db, run)))) return true;
-  const tried = run.transcript?.harnessTried;
-  if (Array.isArray(tried) && tried.some((l) => typeof l === "string" && HARNESS_OUTSIDE.test(l))) return true;
   const [trigger] = await db
-    .select({ meta: messages.meta, threadId: messages.threadId })
+    .select({
+      meta: messages.meta,
+      threadId: messages.threadId,
+      channelId: messages.channelId,
+      createdAt: messages.createdAt,
+    })
     .from(messages)
     .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
-  if (trigger?.meta.readOutside === true) return true;
-  if (trigger?.threadId) {
-    const [root] = await db
-      .select({ meta: messages.meta })
+  if (!trigger) return false;
+  if (trigger.meta.readOutside === true) return true;
+  const topLevel = inArray(
+    messages.id,
+    db
+      .select({ id: messages.id })
       .from(messages)
-      .where(and(eq(messages.orgId, run.orgId), eq(messages.id, trigger.threadId)));
-    if (root?.meta.readOutside === true) return true;
+      .where(
+        and(
+          eq(messages.orgId, run.orgId),
+          eq(messages.channelId, trigger.channelId),
+          isNull(messages.threadId),
+          lte(messages.createdAt, trigger.createdAt),
+        ),
+      )
+      .orderBy(desc(messages.createdAt))
+      .limit(CONVERSATION_WINDOW),
+  );
+  const inConversation = trigger.threadId
+    ? or(eq(messages.id, trigger.threadId), eq(messages.threadId, trigger.threadId), topLevel)
+    : topLevel;
+  const [marked] = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, trigger.channelId),
+        isNull(messages.deletedAt),
+        sql`${messages.meta}->>'readOutside' = 'true'`,
+        inConversation,
+      ),
+    )
+    .limit(1);
+  return Boolean(marked);
+}
+
+/** Per run, once: what `conversationReadOutside` found (a run's conversation before it is fixed). */
+export interface OutsideMemo {
+  conversation?: boolean;
+}
+
+/**
+ * Whether a run read content from outside the org (ADR 0117): its computer brain fetched the web itself, one of its
+ * tool results came from outside (the gateway's `outside` mark), or its conversation already relays outside content
+ * (`conversationReadOutside`). What such a run posts carries `meta.readOutside`, so the next agent reads it as
+ * relayed and memory built from it stays low trust. It never stops, asks or refuses anything by itself. Once true it
+ * stays true, so it is remembered per run (`caches.readOutsideRuns`); `memo` keeps the conversation's answer for the
+ * rest of a run.
+ */
+export async function runReadOutside(
+  db: Executor,
+  run: OutsideRun,
+  authority?: RunAuthority,
+  memo: OutsideMemo = {},
+): Promise<boolean> {
+  const key = `${run.orgId}:${run.id}`;
+  if (caches.readOutsideRuns.get(key)) return true;
+  const tried = run.transcript?.harnessTried;
+  let read =
+    (Array.isArray(tried) && tried.some((l) => typeof l === "string" && HARNESS_OUTSIDE.test(l))) ||
+    (await stepReadOutside(db, run));
+  if (!read) {
+    memo.conversation ??= await conversationReadOutside(db, run, authority);
+    read = memo.conversation;
   }
+  if (read && cachesEnabled()) caches.readOutsideRuns.set(key, true);
+  return read;
+}
+
+async function stepReadOutside(db: Executor, run: OutsideRun): Promise<boolean> {
   const [step] = await db
     .select({ id: agentRunSteps.id })
     .from(agentRunSteps)
