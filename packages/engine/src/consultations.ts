@@ -193,6 +193,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
 
       const waitId = `${ASYNC_WAIT}${Bun.randomUUIDv7()}`;
       const consultationId = Bun.randomUUIDv7();
+      const relays = await runReadOutsideById(db, ctx.orgId, ctx.runId);
       const created = await db.transaction(async (tx) => {
         const channel = await openAgentDm(tx, ctx.orgId, ctx.agentId, target.id);
         const message = await insertMessage(tx, {
@@ -200,7 +201,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
           channelId: channel.id,
           author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: reached.hop },
           body: question,
-          meta: { consultation: { id: consultationId } },
+          meta: { consultation: { id: consultationId }, ...(relays ? { readOutside: true } : {}) },
         });
         // A run of the consulted agent still active in this DM for the same person reads the question at
         // its next step: the consultation waits on that run then. Another person's run never takes it.
@@ -384,6 +385,7 @@ export async function sendNote(
       meta: {
         agentNote: { runId: input.runId, ...(input.fromMention ? { mention: true } : {}) },
         consultation: { id: consultationId },
+        ...((await runReadOutsideById(tx, input.orgId, input.runId)) ? { readOutside: true } : {}),
       },
     });
     // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
