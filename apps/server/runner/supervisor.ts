@@ -157,7 +157,7 @@ function accountOf(req: MachineRequest): { kind: "claude_code" | "codex" | "curs
         ? req.executor
         : null;
   if (cli === null || !("account" in req) || typeof req.account !== "string" || !req.account) return null;
-  return { kind: cli === "codex" ? "codex" : "claude_code", account: req.account };
+  return { kind: cli === "codex" || cli === "cursor" ? cli : "claude_code", account: req.account };
 }
 
 /** What a request the server sent may use its agent's desktop for; null when it may not. */
