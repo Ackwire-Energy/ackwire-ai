@@ -15,6 +15,7 @@ import {
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
+import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
 import { isPlaybook } from "../audience";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
@@ -94,9 +95,10 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const channels = await visible(ctx);
+        const [channels, person] = await Promise.all([visible(ctx), personRequester(ctx)]);
+        const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         const kinds = Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined;
-        const [hits, steps] = await Promise.all([
+        const [found, steps] = await Promise.all([
           searchVisible(deps, {
             orgId: ctx.orgId,
             text: str(input.query),
@@ -104,19 +106,30 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             kinds,
             limit: typeof input.limit === "number" ? input.limit : 8,
           }).then(async (found) => wikiHitsForAgent(ctx.db, await wikiActorOfCall(ctx), found)),
-          kinds ? [] : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, channels, str(input.query)),
+          kinds ? [] : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, channels, str(input.query), dm),
         ]);
-        if (hits.length === 0 && steps.length === 0) return { content: "No results." };
+        if (found.length === 0 && steps.length === 0) return { content: "No results." };
         const items = new Map(
           (
             await getContextItems(
               ctx.db,
               ctx.orgId,
-              hits.filter((h) => h.kind === "context_item").map((h) => h.sourceId),
+              found.filter((h) => h.kind === "context_item").map((h) => h.sourceId),
             )
           ).map((i) => [i.id, i]),
         );
-        const person = await personRequester(ctx);
+        // In the agents' DM: of what was said there, only messages and memories made for the same person.
+        const dmReadable = dm
+          ? await Promise.all(
+              found.map((h) => {
+                if (!h.channelIds.includes(dm.channelId)) return true;
+                const item = items.get(h.sourceId);
+                if (h.kind === "message") return dm.ofMessages([h.sourceId]);
+                return h.kind === "context_item" && item ? dm.item(item) : false;
+              }),
+            )
+          : null;
+        const hits = found.filter((_, i) => dmReadable?.[i] !== false);
         const lines = hits
           .filter((h) => personMayRead(items.get(h.sourceId), person, ctx.agentId))
           .map((h) => {
@@ -214,6 +227,14 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         if (!root || !(await visible(ctx)).includes(root.channelId)) {
           return { content: "Thread not found.", isError: true };
         }
+        const dm = await agentsDmReads(ctx.db, ctx.orgId, root.channelId, () => readerOfCall(ctx));
+        if (dm) {
+          const thread = await ctx.db
+            .select({ id: messages.id })
+            .from(messages)
+            .where(and(eq(messages.orgId, ctx.orgId), or(eq(messages.id, threadId), eq(messages.threadId, threadId))));
+          if (!(await dm.ofMessages(thread.map((m) => m.id)))) return { content: "Thread not found.", isError: true };
+        }
         const summary = await ensureThreadSummary(deps, ctx.orgId, threadId, { force: true });
         return summary
           ? { content: `${itemLabel(summary)} ${summary.content}` }
@@ -235,9 +256,12 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const id = str(input.item_id);
         if (!/^[0-9a-f-]{36}$/i.test(id)) return { content: "Not found.", isError: true };
         const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
+        const person = await personRequester(ctx);
+        const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         if (
           !item?.channelIds.every((c) => allowed.includes(c)) ||
-          !personMayRead(item, await personRequester(ctx), ctx.agentId)
+          !personMayRead(item, person, ctx.agentId) ||
+          (dm && !(await dm.item(item)))
         ) {
           return { content: "Not found.", isError: true };
         }
@@ -612,6 +636,9 @@ const decidedBy = (p: Proposal) =>
 /** Memory tools only act on a person's request in the current turn (never on tool, webhook or document text). */
 /** The person behind the run (`authority.ts`); null for a routine's work and unattended runs. */
 const personRequester = (ctx: ToolContext): Promise<string | null> => personBehindCall(ctx);
+/** Whom the call's run works for in the agents' DM (`readerOf`); the trigger's person without a run. */
+const readerOfCall = (ctx: ToolContext): Promise<string | null> =>
+  ctx.runId ? readerOfRun(ctx.db, ctx.orgId, ctx.runId) : personBehindCall(ctx);
 
 const notRequested = {
   content:
@@ -812,6 +839,8 @@ export async function retrieveForRun(
     known?: string;
     /** The people this run is for (its requester, the trigger's author): their own preferences come in (ADR 0120). */
     personIds?: string[];
+    /** The run reading: in the agents' DM, whom it works for (`readerOf`); else the first of `personIds`. */
+    runId?: string;
   },
 ): Promise<{ text: string; itemIds: string[] }> {
   const { db } = deps;
@@ -827,6 +856,10 @@ export async function retrieveForRun(
   if (!hasAny) return { text: "", itemIds: [] };
   const allowed = await injectableChannels(db, input.orgId, input.agentId, input.channelId);
   const people = [...new Set(input.personIds ?? [])];
+  // In the agents' DM nobody writes in their own name: the one person a run there is for is the one behind it.
+  const dm = await agentsDmReads(db, input.orgId, input.channelId, () =>
+    input.runId ? readerOfRun(db, input.orgId, input.runId) : Promise.resolve(people[0] ?? null),
+  );
   const forPeople = (i: Pick<ContextItem, "scopeType" | "scopeId">) =>
     i.scopeType !== "person" || people.includes(i.scopeId ?? "");
   const base = and(
@@ -895,7 +928,12 @@ export async function retrieveForRun(
     searched = await withLinked(db, base, searched);
   }
   const budget = input.budgetChars ?? MEMORY_BUDGET_CHARS;
-  const picked = pickDistinct([...pinned, ...own, ...personal, ...shared, ...searched], input.known ?? "");
+  const candidates = [...pinned, ...own, ...personal, ...shared, ...searched];
+  const fromDm = dm ? await Promise.all(candidates.map((i) => dm.item(i))) : null;
+  const picked = pickDistinct(
+    candidates.filter((_, i) => fromDm?.[i] !== false),
+    input.known ?? "",
+  );
   const seen = new Set<string>();
   const lines: string[] = [];
   let used = 0;
@@ -983,6 +1021,7 @@ async function ownPastSteps(
   runId: string,
   channelIds: string[],
   query: string,
+  dm: AgentsDmReads | null,
 ): Promise<string[]> {
   const words = [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u))]
     .filter((w) => w.length >= 3 && !STEP_STOP_WORDS.has(w))
@@ -994,8 +1033,14 @@ async function ownPastSteps(
     patterns.map((p) => sql`(${input} ilike ${p})::int`),
     sql` + `,
   )})`;
-  const rows = rowsOf<{ data: { name?: string; input?: unknown }; created_at: string | Date; failed: boolean | null }>(
-    await db.execute(sql`select s.data, s.created_at, (select (x.data->>'isError')::boolean from agent_run_steps x
+  const rows = rowsOf<{
+    data: { name?: string; input?: unknown };
+    created_at: string | Date;
+    failed: boolean | null;
+    run_id: string;
+    channel_id: string;
+  }>(
+    await db.execute(sql`select s.data, s.created_at, s.run_id, r.channel_id, (select (x.data->>'isError')::boolean from agent_run_steps x
           where x.run_id = s.run_id and x.kind = 'tool_result' and x.data->>'toolUseId' = s.data->>'toolUseId'
           limit 1) as failed
       from agent_run_steps s
@@ -1014,9 +1059,12 @@ async function ownPastSteps(
         and ${score} >= ${Math.min(2, words.length)}
       -- More of the query's words first, then the newest.
       order by ${score} desc, s.created_at desc
-      limit ${STEPS_SHOWN}`),
+      limit ${dm ? STEPS_SHOWN * 4 : STEPS_SHOWN}`),
   );
+  // In the agents' DM, only the steps of runs for the same person.
+  const kept = dm ? await Promise.all(rows.map((r) => r.channel_id !== dm.channelId || dm.ofRun(r.run_id))) : null;
   return rows
+    .filter((_, i) => kept?.[i] !== false)
     .slice(0, STEPS_SHOWN)
     .map(
       (r) =>

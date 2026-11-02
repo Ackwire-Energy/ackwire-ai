@@ -7,6 +7,7 @@ import {
   gifLabel,
   gifMedia,
   gifMediaUrl,
+  hitText,
   isMediaAfterReply,
   mediaKindOf,
   messageMediaOf,
@@ -30,6 +31,7 @@ const WORDS: Record<string, string> = {
   "media.stickerOf_female": "Figurinha da {{name}}: {{mood}}",
   "media.moods.celebrate": "comemorando",
   "media.moods.love": "amei",
+  "voice.word": "Mensagem de voz",
 };
 const t = ((key: string, o: Record<string, string> = {}) =>
   (WORDS[o.context ? `${key}_${o.context}` : key] ?? WORDS[key] ?? key).replace(
@@ -166,6 +168,15 @@ describe("the word for a GIF or a sticker where text shows", () => {
     expect(gifLabel(t, "  ")).toBe("GIF");
     expect(stickerLabel(t, "Ada", "love")).toBe("Figurinha da Ada: amei");
     expect(stickerLabel(t, "Dev", "celebrate")).toBe("Figurinha do Dev: comemorando");
+  });
+
+  test("a search hit says its words, else what it was: only a voice message's hit says voice message", () => {
+    expect(hitText(t, { snippet: "deploy notes", mediaKind: "gif" })).toBe("deploy notes");
+    expect(hitText(t, { snippet: "", mediaKind: "voice" })).toBe("Mensagem de voz");
+    // Listed by filters alone: a GIF or a sticker sent with no words.
+    expect(hitText(t, { snippet: "", mediaKind: "gif" })).toBe("GIF");
+    expect(hitText(t, { snippet: "", mediaKind: "sticker" })).toBe("Figurinha");
+    expect(hitText(t, { snippet: "" })).toBe("");
   });
 });
 

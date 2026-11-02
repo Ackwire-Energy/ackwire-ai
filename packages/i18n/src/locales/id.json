@@ -1478,6 +1478,8 @@
     "failed_other": "{{names}} tidak bisa menjawab",
     "asking_other": "{{names}} menunggu jawabanmu",
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
+    "queued_other": "{{names}} sedang antre untuk komputer",
+    "away_other": "{{names}} menunggu komputer",
     "nobody": "Tidak ada agen yang akan menjawab",
     "status": {
       "seen": "Sudah melihat",
@@ -1486,6 +1488,8 @@
       "waiting": "Menunggu persetujuan",
       "asking": "Menunggu jawabanmu",
       "outage": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
+      "queued": "Antre untuk komputer",
+      "away": "Menunggu komputer",
       "handled": "Sudah menjawab",
       "failed": "Gagal",
       "referenced": "Hanya disebut",
@@ -1914,6 +1918,9 @@
     "rolesNone": "Workspace belum punya peran.",
     "rolesNeeded": "Pilih setidaknya satu peran.",
     "rolesLeave": "Siapa pun yang kehilangan peran keluar dari kanal.",
+    "rolesChoose": "Pilih peran",
+    "rolesChange": "Ubah peran",
+    "rolesDone": "Selesai",
     "publicTitle": "Jadikan #{{channel}} publik?",
     "publicBody": "Semua orang di workspace bisa bergabung dan membaca semua pesannya, termasuk yang lama.",
     "publicConfirm": "Jadikan publik",
@@ -2094,6 +2101,7 @@
       "waiting_approval": "Menunggu persetujuan",
       "waiting_answer": "Menunggu jawaban",
       "waiting_computer": "Menunggu komputer",
+      "queued_computer": "Antre untuk komputer",
       "waiting_plan": "Menunggu paket diatur ulang",
       "waiting_budget": "Menunggu anggaran diatur ulang",
       "provider_down": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
@@ -2774,6 +2782,7 @@
     "runsEmpty": "Tidak ada proses yang cocok dengan “{{q}}”.",
     "runsNone": "Belum ada proses.",
     "runNoText": "Tanpa teks",
+    "runPrivate": "Dalam percakapan yang tidak kamu ikuti",
     "runTokens": "{{input}} masuk · {{cached}} dari cache · {{output}} keluar",
     "runTokensTip": "{{input}} token input baru, {{cached}} dibaca dari cache (lebih murah), {{output}} output",
     "budgetHelp": "Saat mencapai batas, {{name}} berhenti dan memberi tahu di kanal. {{ownerNote}}",
@@ -6256,6 +6265,68 @@
       "symbols": "Simbol"
     }
   },
+  "voice": {
+    "word": "Pesan suara",
+    "wordTime": "Pesan suara · {{time}}",
+    "holdToRecord": "Tahan untuk merekam",
+    "slideToDelete": "Geser untuk menghapus",
+    "send": "Kirim audio",
+    "delete": "Hapus rekaman",
+    "deleted": "Rekaman dihapus.",
+    "pause": "Jeda",
+    "resume": "Lanjut merekam",
+    "listen": "Dengarkan rekamanmu",
+    "play": "Putar",
+    "stop": "Hentikan",
+    "speed": "Kecepatan",
+    "left": "Sisa {{seconds}} dtk",
+    "tooShort": "Terlalu singkat. Bicaralah sedikit lagi.",
+    "silent": "Tidak terdengar apa pun. Tidak ada yang dikirim.",
+    "notSent": "Audio tidak bisa dikirim.",
+    "limit": "Sudah banyak audio untuk hari ini. Tulis di sini dan coba lagi besok.",
+    "micBlocked": "Mikrofon diblokir",
+    "micBlockedHint": "Izinkan mikrofon di pengaturan perangkatmu untuk merekam.",
+    "openSettings": "Buka pengaturan",
+    "notNow": "Nanti saja",
+    "expired": "Audio kedaluwarsa",
+    "showText": "Tampilkan teks",
+    "hideText": "Sembunyikan teks",
+    "record": "Rekam audio",
+    "recording": "Merekam audio",
+    "discard": "Hapus rekaman",
+    "stopListening": "Berhenti mendengarkan",
+    "keys": "Enter mengirim · Esc menghapus",
+    "keysHold": "Lepas untuk mengirim · Esc menghapus",
+    "keysPaused": "Dijeda · Spasi mendengarkan · Enter mengirim · Esc menghapus",
+    "pausePlay": "Jeda",
+    "seek": "Posisi audio",
+    "speedAt": "Kecepatan {{speed}}×",
+    "waiting": "Terkirim begitu kamu online lagi",
+    "notUnderstood": "Audio tidak bisa dipahami. Tidak ada yang dikirim.",
+    "refused": "Audio tidak bisa dikirim di percakapan ini.",
+    "blockedMac": "Mikrofon diblokir. Di Mac: Pengaturan Sistem › Privasi & Keamanan › Mikrofon.",
+    "blockedWeb": "Mikrofon diblokir. Izinkan lewat ikon gembok di samping alamat situs.",
+    "noMic": "Mikrofon tidak ditemukan.",
+    "failed": "Mikrofon tidak bisa dibuka. Coba lagi.",
+    "noPlayback": "Tidak bisa diputar sekarang. Kamu tetap bisa mengirimnya atau lanjut merekam.",
+    "settings": {
+      "title": "Pesan suara",
+      "on": "Pesan suara",
+      "onHelp": "Orang di ruang kerja ini bisa mengirim audio di percakapan.",
+      "noEngine": "Pesan suara belum tersedia di sini.",
+      "engineTitle": "Yang mengubah suara menjadi teks",
+      "own": "Server milikmu sendiri",
+      "ownHelp": "Whisper atau Parakeet di mesinmu. Audionya tetap di sana.",
+      "address": "Alamat server",
+      "key": "Kunci {{name}}",
+      "keyPlaceholder": "Tempel di sini",
+      "test": "Uji",
+      "tested": "Berhasil. Sekarang semua orang melihat mikrofon.",
+      "sealed": "Disimpan terenkripsi di servermu dan tidak akan ditampilkan lagi.",
+      "leaves": "Audio dari pesan suara dikirim ke {{name}} untuk diubah menjadi teks.",
+      "invalid": "Kunci yang tersimpan tidak bisa dibuka di server ini. Tempel lagi."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -8589,6 +8660,7 @@
     "clearSearch": "Hapus pencarian",
     "noMatch": "Tidak ada hasil untuk “{{q}}”.",
     "noTools": "Server ini tidak menyediakan alat apa pun.",
+    "unreadable": "Tidak dapat membaca alat konektor: {{reason}}",
     "refresh": "Cari alat baru",
     "decideTitle": "Butuh keputusanmu · {{count}}",
     "decideHelp": "Namanya tidak menjelaskan fungsinya. Konfirmasi saran atau pilih yang lain.",
@@ -9382,6 +9454,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Jaringan sedang berubah. Sesi komputer yang terbuka akan dimulai ulang pukul {{when}}.",
+      "restart": "Sesi komputer sedang dimulai ulang untuk menerapkan jaringan. Pekerjaan baru menunggu sampai selesai.",
+      "line": "IP keluar {{ip}}",
+      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Perintah mati",
@@ -10066,6 +10144,7 @@
       "import": "Impor dan ekspor",
       "billing": "Paket dan tagihan",
       "media": "GIF dan stiker",
+      "voice": "Suara",
       "apps": "Aplikasi AI"
     },
     "sectionText": {
@@ -10084,6 +10163,7 @@
       "import": "Bawa agen dari aplikasi atau ruang kerja lain, dan bawa ruang kerja ini ke mana pun kamu mau.",
       "billing": "Paket agentes.chat, kartu, dan faktur ruang kerja ini ada di halaman kami, di luar aplikasi.",
       "media": "Apa yang bisa dikirim orang di percakapan, dan kapan agen mengirim GIF atau stiker.",
+      "voice": "Pesan suara di percakapan, dan siapa yang mengubah suara menjadi teks.",
       "apps": "Minta tugas ke agen ruang kerja ini dari Claude, Cursor, dan aplikasi lain."
     },
     "title": "Pengaturan",
@@ -10457,6 +10537,10 @@
       "answeredRequestFar": "{{to}} menjawab permintaan {{from}}",
       "see": "Lihat"
     },
+    "talk": {
+      "readAll": "Baca semua",
+      "more_other": "{{count}} baris lagi"
+    },
     "consultPanel": {
       "label": "Percakapan antara {{from}} dan {{to}}",
       "title": "{{from}} ⇄ {{to}}",
@@ -10755,6 +10839,7 @@
       "brain_unavailable": "{{brain}} tidak bisa menjawab sekarang. Aku akan menjawab saat ia kembali.",
       "provider_unavailable": "Penyedia AI-ku sedang tidak merespons. Aku akan menjawab begitu ia kembali.",
       "brain_busy": "Komputerku sedang sibuk dengan tugas lain. Aku akan menjawab begitu ia luang.",
+      "brain_queued": "Aku masih antre untuk komputer. Aku akan menjawab begitu ada tempat.",
       "brain_interrupted": "{{brain}} berhenti sebelum selesai. Sudah dikerjakan, tidak diulang: {{tools}}.",
       "plan_limit_cut": "Aku berhenti di batas paket {{plan}}. Aku akan melanjutkan dari titik terakhir {{when}}, saat batasnya direset.",
       "plan_limit_cut_unknown": "Aku berhenti di batas paket {{plan}}. Aku akan melanjutkan dari titik terakhir begitu batasnya direset.",
@@ -11719,6 +11804,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Kamu hanya menonton.",
+      "title": "Mau ambil kendali?",
+      "working": "{{name}} berhenti sejenak selama kamu yang mengendalikan."
+    },
     "sub": {
       "control": "Kamu yang mengendalikan · {{name}} menunggu",
       "control_female": "Kamu yang mengendalikan · {{name}} menunggu",

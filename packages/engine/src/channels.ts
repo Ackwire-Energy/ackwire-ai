@@ -1,13 +1,26 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, rowsOf, type SQL, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  rowsOf,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { caches } from "./cache";
 import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
-import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { agentOnlyNoticeSql } from "./notices";
-import { notificationSnippet } from "./notifications";
+import { clearChannelNotifications, notificationSnippet } from "./notifications";
 import {
   can,
   getMembership,
@@ -111,11 +124,19 @@ export async function dropRoleLeavers(
 
 /**
  * Tells everyone that people left channels (after the transaction that took them out): their live subscriptions end
- * first, then their sidebars and the channels hear it.
+ * first, then their sidebars and the channels hear it. Their notifications from those channels go with them, unless
+ * the channel stays readable to them (a forum).
  */
-export async function announceChannelLeavers(pubsub: PubSub | undefined, orgId: string, leavers: ChannelLeaver[]) {
+export async function announceChannelLeavers(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  leavers: ChannelLeaver[],
+  options: { clearNotifications?: boolean } = {},
+) {
+  const { pubsub } = deps;
   for (const { channelId, userId } of leavers) {
     caches.channelMembers.delete(`${orgId}:${channelId}`);
+    if (options.clearNotifications !== false) await clearChannelNotifications(deps, orgId, userId, channelId);
     const removed = {
       type: "channel.member_removed" as const,
       channelId,
@@ -192,7 +213,7 @@ export interface ChannelLastMessage {
   /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
   meta: PreviewMeta | null;
   /** A GIF or a sticker sent with no text (ADR 0091): the app says which where `preview` is empty; else null. */
-  mediaKind: "gif" | "sticker" | null;
+  mediaKind: "gif" | "sticker" | "voice" | null;
   createdAt: Date;
 }
 
@@ -323,7 +344,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
               authorType: r.last_author_type,
               authorId: r.last_author_type === "person" ? r.last_user_id : r.last_agent_id,
               authorName: r.last_author_name,
-              preview: notificationSnippet(r.last_body, CHANNEL_PREVIEW_LENGTH),
+              preview: notificationSnippet(readableBody(r.last_body ?? "", lastMeta), CHANNEL_PREVIEW_LENGTH),
               meta: previewMeta(lastMeta),
               mediaKind: previewMediaKind(r.last_body, lastMeta),
               createdAt: asDate(r.last_at),
@@ -404,6 +425,40 @@ export async function isChannelMember(db: Executor, orgId: string, channelId: st
       and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, userId)),
     );
   return row !== undefined;
+}
+
+/**
+ * Which of `channelIds` a person reads, by the rule of `requireChannelAccess`: a member, or a forum (open to the
+ * organization); archived channels left out. For screens that quote a conversation outside it (run history).
+ */
+export async function readableChannelIds(
+  db: Database,
+  orgId: string,
+  userId: string,
+  channelIds: readonly string[],
+): Promise<Set<string>> {
+  const ids = [...new Set(channelIds)];
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ id: channels.id })
+    .from(channels)
+    .leftJoin(
+      channelMembers,
+      and(
+        eq(channelMembers.channelId, channels.id),
+        eq(channelMembers.orgId, orgId),
+        eq(channelMembers.userId, userId),
+      ),
+    )
+    .where(
+      and(
+        eq(channels.orgId, orgId),
+        inArray(channels.id, ids),
+        isNull(channels.archivedAt),
+        or(isNotNull(channelMembers.id), eq(channels.kind, "forum")),
+      ),
+    );
+  return new Set(rows.map((r) => r.id));
 }
 
 /**
@@ -491,8 +546,21 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
 }
 
 /**
+ * Who manages a channel (its name, members, category, archiving): `manage_channels`, or its creator only while still
+ * in it, so a creator taken out of it can't put himself back. The apps mirror it (`managesChannel` in packages/client).
+ */
+export const managesChannel = async (
+  db: Database,
+  membership: Membership,
+  actorId: string,
+  channel: { id: string; orgId: string; createdByUserId: string | null },
+) =>
+  can(membership, "manage_channels") ||
+  (channel.createdByUserId === actorId && (await isChannelMember(db, channel.orgId, channel.id, actorId)));
+
+/**
  * Where `actorId` may put an agent of theirs (or any, with `manage_agents`) or take it out (ADR 0085 §5): a channel
- * they're in and may post in, or one they manage (its creator, `manage_channels`). One rule for an agent's page
+ * they're in and may post in or created, or any with `manage_channels`. One rule for an agent's page
  * (`setAgentChannels`) and a channel's members; the apps mirror it (`addsAgentsTo` in packages/client).
  */
 export const placesAgentsIn = (
@@ -500,7 +568,8 @@ export const placesAgentsIn = (
   actorId: string,
   channel: { createdByUserId: string | null },
   actorIn: boolean,
-) => (actorIn && can(membership, "post")) || channel.createdByUserId === actorId || can(membership, "manage_channels");
+) =>
+  (actorIn && (can(membership, "post") || channel.createdByUserId === actorId)) || can(membership, "manage_channels");
 
 /**
  * Refuses unless `actorId` may put `agentId` in `channel` or take it out: the agent theirs or `manage_agents`, and
@@ -552,7 +621,7 @@ export async function addChannelMember(
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
   if ("userId" in member) {
-    if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+    if (!(await managesChannel(db, membership, actorId, channel))) {
       throw new ForbiddenError("Only the channel's creator or an admin can add members");
     }
     if (!(await getMembership(db, member.userId, orgId))) {
@@ -611,7 +680,10 @@ export async function setChannelAgentAutoReply(
       ),
     );
   if (!row) throw new NotFoundError("That agent is not in this channel");
-  if (row.createdBy !== actorId && row.ownerUserId !== actorId && !can(membership, "manage_channels")) {
+  if (
+    row.ownerUserId !== actorId &&
+    !(await managesChannel(db, membership, actorId, { id: channelId, orgId, createdByUserId: row.createdBy }))
+  ) {
     throw new ForbiddenError("Only the channel's creator, an admin or the agent's owner can change this");
   }
   await db
@@ -658,7 +730,7 @@ export async function removeChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
-  if (!self && channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+  if (!self && !(await managesChannel(db, membership, actorId, channel))) {
     if ("userId" in member) throw new ForbiddenError("Only the channel's creator or an admin can remove members");
     await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   }
@@ -672,8 +744,11 @@ export async function removeChannelMember(
       ),
     );
   caches.channelMembers.delete(`${orgId}:${channelId}`);
+  // A forum stays readable to the whole organization (ADR 0022): only a channel or a DM takes its snippets along.
   if ("userId" in member) {
-    await announceChannelLeavers(options.pubsub, orgId, [{ channelId, userId: member.userId }]);
+    await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, [{ channelId, userId: member.userId }], {
+      clearNotifications: channel.kind !== "forum",
+    });
     return;
   }
   caches.scopes.deletePrefix(`${orgId}:${member.agentId}:visible`);
@@ -692,7 +767,7 @@ async function archivableChannel(db: Database, actorId: string, orgId: string, c
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+  if (!(await managesChannel(db, membership, actorId, channel))) {
     throw new ForbiddenError("Only the channel's creator or an admin can archive it");
   }
   return channel;

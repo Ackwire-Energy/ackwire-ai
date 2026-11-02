@@ -514,6 +514,7 @@ test.if(posix)("a desktop taken back by the next runner gets its Browser's socke
   before.close();
   const next = new DesktopSessions({ ...t.opts, openBrowser: async (agent) => void asked.push(agent.handle) });
   next.restore();
+  expect(next.hasActivity(dev.id)).toBe(true);
   const socket = path.join(t.home, "desktop", "01a142cb", "browser.sock");
   await waitFor(() => existsSync(socket));
   expect(await click(socket)).toBe("ok\n");
@@ -556,6 +557,8 @@ test("the screen server starts while the look is written; the session waits for 
   const t = setup();
   t.fake.hangs.add("agentes-look");
   const starting = t.desktops.ensure(dev);
+  expect(t.desktops.hasActivity(dev.id)).toBe(true);
+  expect(t.desktops.processId(dev.id)).toBeNull();
   await waitFor(() => t.fake.of("Xtigervnc").length === 1);
   // X is up and the look still writes XFCE's files: XFCE doesn't start before they are all there.
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -564,6 +567,7 @@ test("the screen server starts while the look is written; the session waits for 
   expect(await starting).toMatchObject({ started: true });
   expect(t.fake.of("dbus-launch")).toHaveLength(1);
   await t.desktops.stop(dev);
+  expect(t.desktops.hasActivity(dev.id)).toBe(false);
 
   // A screen server that doesn't start fails the start once the look is done, never under it.
   t.fake.failXvnc("no display");

@@ -1,7 +1,7 @@
 import type { Message, MessageMemory } from "@agenteschat/client";
 import { cacheMessageMemories, keys } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
-import { can } from "@agenteschat/client/lib/permissions";
+import { editsMemory } from "@agenteschat/client/lib/permissions";
 import { AgentReadingBook, Button, Input, Popover, useHoverCard } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -52,7 +52,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
   const openPanel = useOpenAgentPanel();
   const agent = dir.agentById.get(memory.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
-  const canEdit = can(org, "review_memory") || agent?.ownerUserId === me.user.id;
+  const canEdit = editsMemory(agent, me.user.id, org);
   // Hover shows the tip; a press, a key or Corrigir in the tip brings the card.
   const card = useHoverCard(HOVER_OPEN_MS);
   const [editing, setEditing] = useState(false);

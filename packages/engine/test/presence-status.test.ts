@@ -58,6 +58,7 @@ test("a written status clears itself when its time is up", () => {
   expect(memberStatus({ statusText: null, statusEmoji: null, statusUntil: null }, now)).toBeNull();
 });
 
+// This can be the shard's first database: allow the PGlite template to finish migrating.
 test("a person sets and clears their availability and line; the workspace hears it", async () => {
   f = await setup();
   const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -219,6 +220,16 @@ test("a waiting run says what it waits on, and keeps the agent online, not busy"
   const run = await runOf(f, { status: "waiting_approval" });
   await startRunStatus({ db: f.db }, run, [{ key: "c0", kind: "channel", subject: "general", text: "x" }], null);
   expect(await presenceOf(f)).toMatchObject({ presence: "online", status: { by: "wait", kind: "waiting_approval" } });
+});
+
+test("a run in line for room on its computer says so, not that the computer is gone", async () => {
+  f = await setup();
+  const machineId = crypto.randomUUID();
+  const waiting = (code: string) => ({ waitingForBrain: { kind: "claude_code", machineId, code, waitId: "w" } });
+  await runOf(f, { status: "waiting_input", waitingMachineId: machineId, transcript: waiting("busy") });
+  expect((await presenceOf(f))?.status).toMatchObject({ by: "wait", kind: "queued_computer" });
+  await f.db.update(schema.agentRuns).set({ transcript: waiting("machine_offline") });
+  expect((await presenceOf(f))?.status).toMatchObject({ by: "wait", kind: "waiting_computer" });
 });
 
 test("the run's line: public channels by name, nothing for a private conversation", async () => {

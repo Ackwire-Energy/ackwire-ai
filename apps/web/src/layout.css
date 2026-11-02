@@ -916,6 +916,13 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   justify-content: flex-end;
   margin-top: 6px;
 }
+/*
+ * A wide picture's tile is as wide as the picture's own size allows, while its thumbnail stops at 420px: the
+ * thumbnail (or a file's row) keeps to the tile's right edge, under the bubble, instead of its left.
+ */
+.ac-msg--own .artifact-tile > :is(.file-thumb, .file-row) {
+  margin-left: auto;
+}
 /* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
 .ac-msg--own .ac-msg__text .md__table {
   background: var(--bg);
@@ -8816,15 +8823,36 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   justify-content: space-between;
   gap: 12px;
 }
+/* A setting of the opened brain: its label sits on its picker (6px), and the settings stand apart (28px) so Modelo
+   and Conta never read as one list. */
 .agp-brainfield {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 .agp-brainfield__label {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--faint);
+  color: var(--ink2);
+}
+.agp-wdlg .ac-optrow__more--card {
+  gap: 28px;
+}
+/* The account and its plan's usage in one outline: the meters hang under the account's picker, on a sunken band. */
+.agp-acct {
+  display: flex;
+  flex-direction: column;
+}
+.agp-acct--use > .ac-select .ac-select__trigger {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.agp-acct--use > .ac-planmeter {
+  padding: 12px 14px;
+  border: 1px solid var(--field-line);
+  border-top: 0;
+  border-radius: 0 0 var(--control-r-md) var(--control-r-md);
+  background: var(--sunken);
 }
 .agp-brainseg {
   display: flex;
@@ -11787,6 +11815,117 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     box-sizing: border-box;
     padding-left: 44px;
   }
+}
+
+/* Configurações › Mensagens de voz: who turns voice into text (ADR 0100). */
+.voice-engine {
+  margin: var(--card-pad) calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+}
+.voice-engine__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px var(--card-pad);
+  border-top: 1px solid var(--line);
+}
+.voice-engine__title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.voice-engine__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.voice-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--spring),
+    box-shadow 0.15s;
+}
+.voice-tile:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.voice-tile:active {
+  transform: scale(0.98);
+}
+.voice-tile:has(.voice-tile__radio[data-state="checked"]) {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+/* The real radio covers its tile, unseen: arrows and clicks work as on any radio group. */
+.voice-tile__radio {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.voice-tile__name {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.voice-tile__own {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px 10px 10px 4px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.voice-tile__check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--pane);
+}
+.voice-tile:has(.voice-tile__radio[data-state="checked"]) .voice-tile__check {
+  display: grid;
+}
+@media (max-width: 640px) {
+  .voice-engine__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.voice-engine__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.voice-engine__field {
+  display: flex;
+  gap: 8px;
+}
+.voice-engine__field > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.voice-engine__saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 /*

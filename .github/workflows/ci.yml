@@ -199,13 +199,13 @@ jobs:
 
   # The backend suite (PGlite, servers) on three runners at once: packages/engine split by file name, and
   # apps/server on its own. Together they ran past the step's 20 minutes on one runner (2026-11-01: 683 s for
-  # 70 of engine's 82 files from n, 529 s for 97 of apps/server's 147). The globs together cover every file.
+  # 70 of engine's 82 files from n, 529 s for 97 of apps/server's 147). The groups preserve the existing selected test files.
   test-backend:
     name: Test (backend ${{ matrix.shard }}/3)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -224,7 +224,7 @@ jobs:
       - *cache-bun
       - *install
       - name: Test
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: bun test ${{ matrix.paths }} 2>&1 | tee test.log
       - &keep-test-errors
         name: Keep errors

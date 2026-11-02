@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
-import { type AgentUser, systemLauncher } from "./agent-users";
+import { type AgentUser, networkPrefix, systemLauncher } from "./agent-users";
 import { bindCheckArgs, POLICY_NOT_IN_FORCE_EXIT, PolicyNotInForce } from "./browser-bind-check";
 import { browserBand, browserPortsForUid, checkEphemeralRange, EPHEMERAL_RANGE_FILE } from "./browser-ports";
 import { agentSlice, agentTmp, type RunCommand, systemdBooted } from "./service";
@@ -142,7 +142,12 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
   applyBindPolicy(user, opts);
   // Pick currently unused ports. EADDRINUSE is not proof of
   // enforcement, and the child only succeeds for EPERM/EACCES on IPv4+6.
-  const sockets = run("ss", ["-Htln", "-e"]);
+  const network = networkPrefix(user);
+  const socketsInNetwork = () =>
+    network.length
+      ? run(network[0] as string, [...network.slice(1), "/usr/bin/ss", "-Htln", "-e"])
+      : run("ss", ["-Htln", "-e"]);
+  const sockets = socketsInNetwork();
   if (sockets.code !== 0) throw new Error(`Cannot inspect browser bind test ports: ${sockets.output.slice(0, 200)}`);
   const wrongOwner = conflictingBrowserPorts(sockets.output, [user.uid, user.uid]);
   if (wrongOwner.length)
@@ -201,7 +206,7 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
   if (!seen || seen !== own) {
     throw new Error(`Agent ${user.uid}'s /tmp isn't its own (${seen ?? "not said"}, its folder ${own ?? "missing"})`);
   }
-  const finalSockets = run("ss", ["-Htln", "-e"]);
+  const finalSockets = socketsInNetwork();
   if (finalSockets.code !== 0)
     throw new Error(`Cannot recheck browser listener owners: ${finalSockets.output.slice(0, 200)}`);
   const finalWrongOwner = conflictingBrowserPorts(finalSockets.output, [user.uid, user.uid]);

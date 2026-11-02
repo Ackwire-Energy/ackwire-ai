@@ -446,7 +446,8 @@ export function connectorRoutes(deps: AppDeps) {
   async function afterConnected(connection: Awaited<ReturnType<typeof completeOAuth>>["connection"], userId: string) {
     if (!isCustom(connection)) return;
     const judge = deps.extras?.context?.judge;
-    await syncCustomTools({ ...connectorDeps, judge, blobs: adapters.platformBlobs }, connection).catch(() => {});
+    const custom = { ...connectorDeps, judge, blobs: adapters.platformBlobs, log: deps.log };
+    await syncCustomTools(custom, connection).catch(() => {});
     if (presetForServer(connection.serverUrl)) {
       await acceptCustomSuggestion(connectorDeps, userId, connection.orgId, connection.id).catch(() => {});
     }

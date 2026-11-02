@@ -64,9 +64,10 @@ condition = "AND"
 paths = ['''^apps/server/runner/assets/start/manifest\.json\.txt$''']
 regexes = ['''^MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnhHkuBQUoz\+h1CDNDjKFRN6qmKBiey0bQXO4ala21CVMUbnDKeeaBpdxdpizXTti7He9go8\+XKN/pX\+dxPlvLmwCrx38awhaA0j3SFSYpN2HoSUuV22wZNKUPjthrVQeQQPUrzv/tuXrU5NlGEBkaGyH6Zp2Jc6P2acX7e9DiKnQJj6G1nfGVo3WXCC2Om1WwGPVzgM\+dBzi7yiigB2sI6EYWIXMB\+eNIb3vcxv4KNjk7BuldvLzBt9EwYyUVlVxkVSxnpvohUhicoMVZvqH1O6WHZCYsoQ2HF1tQQtr9QTgWx5asALgGtMkeKHWiKRiCuoUpG5/7SkZpyUban7ZUQIDAQAB$''']
 
-# A scenario test's made-up curl header and database password (a judge must read errors masked) in one
-# commit of an open branch the scan reads with all history. That commit only, for this rule only.
+# S78 feeds this exact made-up curl token to a failing tool to verify that judge evidence masks it.
 [[allowlists]]
-description = "Made-up curl header in a turn-end scenario test, in one branch commit"
+description = "Synthetic curl token in the autonomy error-masking test"
 targetRules = ["curl-auth-header"]
-commits = ["dfe8f62d8b2914c6e3e00e2e34fd5def395da0e7"]
+condition = "AND"
+paths = ['''^packages/engine/test/autonomy/turn-end\.test\.ts$''']
+regexes = ['''^abcdef0123456789$''']

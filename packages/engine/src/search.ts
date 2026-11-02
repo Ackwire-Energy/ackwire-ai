@@ -11,6 +11,8 @@ import { agentIdsSeen, isPlaybook } from "./audience";
 import { caches } from "./cache";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
+import { mediaOf } from "./media";
+import { readableBody, voiceOf } from "./message-preview";
 import { isAgentOnlyNotice } from "./notices";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -316,6 +318,11 @@ export interface HitSource {
   messageId: string | null;
   threadId: string | null;
   author: { type: "person" | "agent"; id: string; name: string } | null;
+  /**
+   * Message hits: a voice message (its snippet is empty: people hear it, ADR 0100), a GIF or a sticker (ADR 0091), so
+   * the app says what it was where no words show. A search by filters alone lists messages with no words too.
+   */
+  mediaKind?: "voice" | "gif" | "sticker";
 }
 
 /** Adds where a message hit lives and who wrote it (an action hit: the agent that did it), so the app can jump to it. */
@@ -329,6 +336,7 @@ export async function describeHits<H extends SearchHit>(
     ? await db
         .select({
           id: messages.id,
+          meta: messages.meta,
           threadId: messages.threadId,
           authorType: messages.authorType,
           userId: messages.authorUserId,
@@ -364,12 +372,16 @@ export async function describeHits<H extends SearchHit>(
     }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
     if (!m) return { ...h, messageId: null, threadId: null, author: null };
+    // A voice message is found by its words, and shows as its audio (ADR 0100).
+    const snippet = readableBody(h.snippet, m.meta);
+    const media = mediaOf(m.meta);
+    const mediaKind = voiceOf(m.meta) ? ("voice" as const) : media?.kind;
     const author =
       m.authorType === "agent" && m.agentId
         ? { type: "agent" as const, id: m.agentId, name: m.agentName ?? "" }
         : m.userId
           ? { type: "person" as const, id: m.userId, name: m.userName ?? "" }
           : null;
-    return { ...h, messageId: m.id, threadId: m.threadId, author };
+    return { ...h, snippet, messageId: m.id, threadId: m.threadId, author, ...(mediaKind ? { mediaKind } : {}) };
   });
 }

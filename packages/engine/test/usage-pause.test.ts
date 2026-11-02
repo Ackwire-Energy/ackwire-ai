@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, setSystemTime, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
@@ -35,6 +35,7 @@ import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(() => {
+  setSystemTime();
   clearPlanLimits();
   const fx: Fixture | undefined = f;
   // A test with no database leaves nothing to close (not the previous test's again).
@@ -128,6 +129,9 @@ async function storeOwnUsage(fx: Fixture, machineId: string, usage: Record<strin
 test("a turn cut by the plan after a tool waits in its session and picks up after the reset", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   await computerAgent(f);
+  // Keep the short reset window independent of database work and contention on the CI runner.
+  const now = Date.now();
+  setSystemTime(new Date(now));
   const resetsAt = later(150).toISOString();
   const { brain, seen } = scripted((n) =>
     n === 0
@@ -165,7 +169,7 @@ test("a turn cut by the plan after a tool waits in its session and picks up afte
   expect(note?.meta.usageWait).toEqual({ code: "plan_limit", runId: run?.id, forUserId: f.owner.id, resetsAt });
   expect(note?.meta.bodyParams).toEqual({ plan: "Claude" });
 
-  await Bun.sleep(200);
+  setSystemTime(new Date(now + 200));
   await drainOutbox(f.db, handlers, { now: later(RESUME_AFTER_MS + RESUME_GAP_MS) });
   expect(seen).toHaveLength(2);
   expect(seen[1]?.session?.id).toBe(seen[0]?.session?.id);

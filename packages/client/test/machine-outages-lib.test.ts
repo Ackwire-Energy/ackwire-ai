@@ -174,8 +174,33 @@ describe("offline computers", () => {
       msg("m2", "21:00"),
       msg("t1", "20:30", "theo"),
       msg("h1", "20:10", "ada", "thread-1"),
-      { ...msg("plain", "23:00"), meta: {} },
     ]);
     expect([...hide].sort()).toEqual(["m1", "m2"]);
+  });
+
+  test("a notice the agent moved past hides: it answered later in the same conversation", () => {
+    const note = { bodyCode: "brain_unavailable", brainUnavailable: { brain: "claude_code", code: "busy" } };
+    const msg = (
+      id: string,
+      at: string,
+      meta: Record<string, unknown>,
+      agent = "nova",
+      threadId: string | null = null,
+    ) => ({
+      id,
+      threadId,
+      author: { type: "agent", id: agent },
+      meta,
+      createdAt: `2026-11-02T${at}:00.000Z`,
+    });
+    const hide = supersededBrainNotices([
+      msg("n1", "10:00", note),
+      msg("answer", "10:20", {}),
+      msg("n2", "10:30", note),
+      // Another agent's words and another thread's leave them alone.
+      msg("rio", "10:40", {}, "rio"),
+      msg("t1", "10:05", note, "nova", "thread-1"),
+    ]);
+    expect([...hide].sort()).toEqual(["n1"]);
   });
 });

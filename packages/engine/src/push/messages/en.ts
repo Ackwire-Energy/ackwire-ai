@@ -44,6 +44,7 @@ export interface PushStrings {
   openBody: string;
   sentGif: string;
   sentSticker: string;
+  sentVoice: string;
 }
 
 export const en: PushStrings = {
@@ -91,4 +92,5 @@ export const en: PushStrings = {
   openBody: "Tap to open.",
   sentGif: "Sent a GIF",
   sentSticker: "Sent a sticker",
+  sentVoice: "Sent a voice message",
 };

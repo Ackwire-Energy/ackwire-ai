@@ -8,6 +8,7 @@ import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { notifySecretRequest, resolveSecretRequestNotifications } from "./notification-producers";
+import { requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
 import {
@@ -257,6 +258,8 @@ async function onRequestComputer<T>(
 }
 
 async function loadForRequester(db: Database, actorId: string, orgId: string, requestId: string) {
+  // Asked as a member: someone removed since, or in a closed workspace, can't read or answer it.
+  await requireActiveMembership(db, actorId, orgId);
   const [row] = await db
     .select()
     .from(secretRequests)
@@ -627,6 +630,27 @@ export async function withdrawSecretRequest(
   if (withdrawn)
     await publishSecret(deps, withdrawn, "secret.updated", { ...secretRequestView(withdrawn), withdrawn: true });
   return withdrawn;
+}
+
+/** Someone leaving the workspace: the requests waiting on them close, and the runs waiting on them go on. */
+export async function cancelSecretRequestsFor(tx: Executor, orgId: string, userId: string) {
+  const rows = await tx
+    .update(secretRequests)
+    .set({ status: "canceled" })
+    .where(
+      and(
+        eq(secretRequests.orgId, orgId),
+        eq(secretRequests.requestedForUserId, userId),
+        eq(secretRequests.status, "pending"),
+      ),
+    )
+    .returning();
+  for (const row of rows) {
+    await syncSecretMessage(tx, row);
+    await enqueue(tx, resumeJob(row));
+    await enqueueSecretDiscard(tx, row);
+  }
+  return rows;
 }
 
 /** A run canceled while waiting: its requests close too. */

@@ -12,6 +12,7 @@ import {
 import { eq, rowsOf, schema, sql } from "@agenteschat/db";
 import {
   type ArtifactDeps,
+  acceptVoiceClip,
   addFileVersion,
   artifactDownload,
   assertPublicHttpsUrl,
@@ -445,6 +446,49 @@ describe("org storage", () => {
     await expect(assertPublicHttpsUrl("https://s3.example.com", async () => ["93.184.216.34"])).resolves.toBeDefined();
     const metadata = assertPublicHttpsUrl("https://x.example.com", async () => ["169.254.169.254"]);
     await expect(metadata).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
+describe("voice recordings in a copy between storages", () => {
+  const voiceDeps = () => ({
+    db: f.db,
+    pubsub: f.pubsub,
+    blobs: f.artifactDeps.blobs,
+    engines: () => [
+      {
+        id: "groq" as const,
+        model: "fake",
+        nanoUsdPerHour: 0,
+        minBilledSeconds: 0,
+        file: async () => ({ text: "oi" }),
+      },
+    ],
+    limits: null,
+    retentionDays: 90,
+  });
+  const recording = () => ({
+    audio: new Uint8Array([1, 2, 3]),
+    contentType: "audio/mp4",
+    durationMs: 1000,
+    peaks: [],
+    clientId: crypto.randomUUID(),
+  });
+
+  test("kept recordings move, swept ones are skipped", async () => {
+    f = await setup();
+    const kept = await acceptVoiceClip(voiceDeps(), f.owner.id, f.org.id, f.general.id, recording());
+    const swept = await acceptVoiceClip(voiceDeps(), f.owner.id, f.org.id, f.general.id, recording());
+    const { voiceClips } = schema;
+    await f.db.update(voiceClips).set({ audioDeletedAt: new Date() }).where(eq(voiceClips.id, swept.clipId));
+    expect((await testStorage(f.storage, f.owner.id, f.org.id, bucket())).ok).toBe(true);
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    await drainOutbox(f.db, f.handlers);
+    const [moved] = await f.db.select().from(voiceClips).where(eq(voiceClips.id, kept.clipId));
+    const [left] = await f.db.select().from(voiceClips).where(eq(voiceClips.id, swept.clipId));
+    expect(moved?.storageConfigId).not.toBeNull();
+    expect(moved?.blobKey).toBe(`agentes/voice/${kept.clipId}`);
+    expect(left?.storageConfigId).toBeNull();
   });
 });
 

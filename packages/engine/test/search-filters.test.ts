@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
-import { createChannel, indexSource, searchForUser } from "../src";
+import { createChannel, describeHits, indexSource, searchForUser } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -151,6 +151,21 @@ describe("search filters (ADR 0123)", () => {
     expect((await find("", { messages: { authorType: "person" }, sort: "oldest" }))[0]?.snippet).toBe("deploy notes");
     // No words and no filter: nothing.
     expect(await find("", {})).toEqual([]);
+  });
+
+  test("a voice message is found by its words and comes back as audio; a GIF says what it was (ADR 0100)", async () => {
+    f = await setup();
+    await message(f, {
+      body: "ship the release on friday",
+      meta: { voice: { clipId: crypto.randomUUID(), durationMs: 4200, peaks: [] } },
+    });
+    await message(f, { body: "release party gif", meta: { media: { kind: "gif", id: "g2" } }, at: day("2026-10-16") });
+    const found = await searchForUser(deps(f), f.owner.id, f.org.id, { text: "release", sort: "newest" });
+    const hits = await describeHits(f.db, f.org.id, found);
+    expect(hits.map((h) => [h.snippet, h.mediaKind])).toEqual([
+      ["release party gif", "gif"],
+      ["", "voice"],
+    ]);
   });
 
   test("in: searches only those channels, never one the person can't read", async () => {

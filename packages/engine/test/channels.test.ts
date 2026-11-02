@@ -108,6 +108,22 @@ test("removing a channel member: self, creator or admin; publishes the revocatio
   ]);
 });
 
+test("a channel's creator taken out of it manages it no more: he can't put himself back or remove anyone", async () => {
+  const xico = await addMember(f.db, f.org.id, "member", "xico");
+  const room = await createChannel(f.db, xico.id, f.org.id, { name: "diretoria", visibility: "private" });
+  await addChannelMember(f.db, xico.id, f.org.id, room.id, { userId: f.owner.id });
+  await removeChannelMember(f.db, f.owner.id, f.org.id, room.id, { userId: xico.id });
+
+  await expect(addChannelMember(f.db, xico.id, f.org.id, room.id, { userId: xico.id })).rejects.toBeInstanceOf(
+    ForbiddenError,
+  );
+  await expect(removeChannelMember(f.db, xico.id, f.org.id, room.id, { userId: f.owner.id })).rejects.toBeInstanceOf(
+    ForbiddenError,
+  );
+  await expect(archiveChannel(f.db, xico.id, f.org.id, room.id)).rejects.toBeInstanceOf(ForbiddenError);
+  await expect(requireChannelAccess(f.db, xico.id, f.org.id, room.id)).rejects.toThrow(/Join this channel/);
+});
+
 test("archiving a channel: creator or admin; access ends and subscribers are told", async () => {
   const events: RealtimeEvent[] = [];
   f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e));

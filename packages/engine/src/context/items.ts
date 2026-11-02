@@ -5,8 +5,10 @@ import {
   desc,
   type Executor,
   eq,
+  gt,
   inArray,
   isNull,
+  like,
   ne,
   or,
   schema,
@@ -18,11 +20,11 @@ import { agentIdsSeen, isPlaybook, readsPlaybook, seesAgentDetails } from "../au
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
-import { can, requirePermission } from "../organizations";
+import { can, type Membership, requirePermission } from "../organizations";
 import { enqueueIndex, userVisibleChannels } from "../search";
 import { type Plan, planConsolidation } from "./judgments";
 
-const { agents, contextItems } = schema;
+const { agentActions, agents, contextItems } = schema;
 
 export type ContextItem = typeof contextItems.$inferSelect;
 export type ContextKind = ContextItem["kind"];
@@ -426,6 +428,15 @@ async function applyPlan(
 
 // ── Reading and editing (APIs: "What Ada knows") ────────────────────────────
 
+/** A person's preferences: theirs, and who reviews memory. Undefined: every item. */
+const preferencesSeenBy = (membership: Membership, actorId: string) =>
+  can(membership, "review_memory")
+    ? undefined
+    : or(ne(contextItems.scopeType, "person"), eq(contextItems.scopeId, actorId));
+
+const seesPreference = (membership: Membership, actorId: string, item: Pick<ContextItem, "scopeType" | "scopeId">) =>
+  item.scopeType !== "person" || item.scopeId === actorId || can(membership, "review_memory");
+
 /** Items a person may see: those whose every channel they can read (org-wide ones too). */
 export async function listContextItems(
   db: Database,
@@ -453,10 +464,7 @@ export async function listContextItems(
         eq(contextItems.orgId, orgId),
         // An agent's memory is part of how it works: only for who sees its details.
         or(isNull(contextItems.agentId), inArray(contextItems.agentId, [...seen.details])),
-        // A person's preferences: theirs, and who reviews memory.
-        can(membership, "review_memory")
-          ? undefined
-          : or(ne(contextItems.scopeType, "person"), eq(contextItems.scopeId, actorId)),
+        preferencesSeenBy(membership, actorId),
         filter.createdBy?.length ? inArray(contextItems.createdByKind, filter.createdBy) : undefined,
         filter.agentId ? eq(contextItems.agentId, filter.agentId) : undefined,
         filter.kinds?.length ? inArray(contextItems.kind, filter.kinds) : undefined,
@@ -488,6 +496,7 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
       and(
         eq(contextItems.orgId, orgId),
         eq(contextItems.agentId, agentId),
+        preferencesSeenBy(membership, actorId),
         arrayContained(contextItems.channelIds, visible),
       ),
     );
@@ -511,6 +520,7 @@ export async function listOrgMemoryRows(db: Database, actorId: string, orgId: st
         eq(contextItems.orgId, orgId),
         eq(contextItems.status, "active"),
         isNull(contextItems.supersededBy),
+        preferencesSeenBy(membership, actorId),
         arrayContained(contextItems.channelIds, visible),
       ),
     )
@@ -691,13 +701,37 @@ export async function getContextItems(db: Database, orgId: string, ids: string[]
  * Undoes a memory change made in conversation (the "desfazer" of the
  * "memory updated" card): a forgotten item comes back, an updated one
  * goes back to its previous version, a newly remembered one is archived.
- * Anyone in the org who can read the item's channels may undo.
+ * Who may edit it (`requireEdit`), or the person an agent changed it for,
+ * while that change's undo window is open. Someone else's preference is
+ * not found unless they review memory.
  */
-export async function revertMemoryChange(db: Database, actorId: string, orgId: string, itemId: string) {
+export async function revertMemoryChange(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  itemId: string,
+  now = new Date(),
+) {
   const item = await loadItem(db, orgId, itemId);
-  await requirePermission(db, actorId, orgId, "read");
+  const membership = await requirePermission(db, actorId, orgId, "read");
   const visible = await userVisibleChannels(db, orgId, actorId);
-  if (!itemVisibleIn(item, visible)) throw new NotFoundError("Item not found");
+  if (!itemVisibleIn(item, visible) || !seesPreference(membership, actorId, item))
+    throw new NotFoundError("Item not found");
+  const [asked] = await db
+    .select({ id: agentActions.id })
+    .from(agentActions)
+    .where(
+      and(
+        eq(agentActions.orgId, orgId),
+        eq(agentActions.targetType, "memory"),
+        eq(agentActions.targetId, item.id),
+        like(agentActions.kind, "memory.%"),
+        eq(agentActions.requestedByUserId, actorId),
+        gt(agentActions.undoableUntil, now),
+      ),
+    )
+    .limit(1);
+  if (!asked) await requireEdit(db, actorId, item);
   const [previous] = await db
     .select()
     .from(contextItems)

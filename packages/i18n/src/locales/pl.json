@@ -1658,6 +1658,14 @@
     "outage_few": "{{names}}: dostawca AI nie działa · ponowią sami",
     "outage_many": "{{names}}: dostawca AI nie działa · ponowią sami",
     "outage_other": "{{names}}: dostawca AI nie działa · ponowią sami",
+    "queued_one": "{{names}} czeka w kolejce do komputera",
+    "queued_few": "{{names}} czekają w kolejce do komputera",
+    "queued_many": "{{names}} czekają w kolejce do komputera",
+    "queued_other": "{{names}} czekają w kolejce do komputera",
+    "away_one": "{{names}} czeka na komputer",
+    "away_few": "{{names}} czekają na komputer",
+    "away_many": "{{names}} czekają na komputer",
+    "away_other": "{{names}} czekają na komputer",
     "nobody": "Żaden agent nie odpowie",
     "status": {
       "seen": "Widzi",
@@ -1666,6 +1674,8 @@
       "waiting": "Czeka na zatwierdzenie",
       "asking": "Czeka na twoją odpowiedź",
       "outage": "Dostawca AI nie działa · ponowi sam",
+      "queued": "W kolejce do komputera",
+      "away": "Czeka na komputer",
       "handled": "Odpowiedź wysłana",
       "failed": "Błąd",
       "referenced": "Tylko wspomniany",
@@ -2086,6 +2096,9 @@
     "rolesNone": "Workspace nie ma jeszcze ról.",
     "rolesNeeded": "Wybierz co najmniej jedną rolę.",
     "rolesLeave": "Kto traci rolę, opuszcza kanał.",
+    "rolesChoose": "Wybierz role",
+    "rolesChange": "Zmień role",
+    "rolesDone": "Gotowe",
     "publicTitle": "Ustawić #{{channel}} jako publiczny?",
     "publicBody": "Każdy w workspace będzie mógł dołączyć i czytać wszystkie wiadomości, także starsze.",
     "publicConfirm": "Ustaw jako publiczny",
@@ -2278,6 +2291,7 @@
       "waiting_approval": "Czeka na zatwierdzenie",
       "waiting_answer": "Czeka na odpowiedź",
       "waiting_computer": "Czeka na komputer",
+      "queued_computer": "W kolejce do komputera",
       "waiting_plan": "Czeka na odnowienie planu",
       "waiting_budget": "Czeka na odnowienie budżetu",
       "provider_down": "Dostawca AI nie działa · ponowi sam",
@@ -3029,6 +3043,7 @@
     "runsEmpty": "Brak uruchomień pasujących do „{{q}}”.",
     "runsNone": "Brak uruchomień.",
     "runNoText": "Bez tekstu",
+    "runPrivate": "W rozmowie, w której nie uczestniczysz",
     "runTokens": "{{input}} wej. · {{cached}} z cache · {{output}} wyj.",
     "runTokensTip": "{{input}} nowych tokenów wejściowych, {{cached}} odczytanych z cache (taniej), {{output}} wyjściowych",
     "budgetHelp": "Po osiągnięciu limitu {{name}} przerywa pracę i informuje o tym na kanale. {{ownerNote}}",
@@ -6978,6 +6993,68 @@
       "symbols": "Symbole"
     }
   },
+  "voice": {
+    "word": "Wiadomość głosowa",
+    "wordTime": "Wiadomość głosowa · {{time}}",
+    "holdToRecord": "Przytrzymaj, aby nagrać",
+    "slideToDelete": "Przesuń, aby usunąć",
+    "send": "Wyślij nagranie",
+    "delete": "Usuń nagranie",
+    "deleted": "Nagranie usunięte.",
+    "pause": "Wstrzymaj",
+    "resume": "Nagrywaj dalej",
+    "listen": "Odsłuchaj nagranie",
+    "play": "Odtwórz",
+    "stop": "Zatrzymaj",
+    "speed": "Prędkość",
+    "left": "Zostało {{seconds}} s",
+    "tooShort": "Za krótko. Powiedz trochę więcej.",
+    "silent": "Nic nie było słychać. Nic nie zostało wysłane.",
+    "notSent": "Nie udało się wysłać nagrania.",
+    "limit": "To dużo nagrań jak na dziś. Napisz tutaj i spróbuj ponownie jutro.",
+    "micBlocked": "Mikrofon jest zablokowany",
+    "micBlockedHint": "Zezwól na mikrofon w ustawieniach urządzenia, aby nagrywać.",
+    "openSettings": "Otwórz ustawienia",
+    "notNow": "Nie teraz",
+    "expired": "Nagranie wygasło",
+    "showText": "Pokaż tekst",
+    "hideText": "Ukryj tekst",
+    "record": "Nagraj dźwięk",
+    "recording": "Nagrywanie dźwięku",
+    "discard": "Usuń nagranie",
+    "stopListening": "Przestań słuchać",
+    "keys": "Enter wysyła · Esc usuwa",
+    "keysHold": "Puść, aby wysłać · Esc usuwa",
+    "keysPaused": "Wstrzymano · Spacja odtwarza · Enter wysyła · Esc usuwa",
+    "pausePlay": "Wstrzymaj",
+    "seek": "Pozycja nagrania",
+    "speedAt": "Prędkość {{speed}}×",
+    "waiting": "Wyślemy, gdy tylko wrócisz do sieci",
+    "notUnderstood": "Nie udało się zrozumieć nagrania. Nic nie zostało wysłane.",
+    "refused": "Nie udało się wysłać nagrania w tej rozmowie.",
+    "blockedMac": "Mikrofon jest zablokowany. Na Macu: Ustawienia systemowe › Prywatność i ochrona › Mikrofon.",
+    "blockedWeb": "Mikrofon jest zablokowany. Zezwól na niego przez kłódkę obok adresu strony.",
+    "noMic": "Nie znaleziono mikrofonu.",
+    "failed": "Nie udało się otworzyć mikrofonu. Spróbuj ponownie.",
+    "noPlayback": "Nie można teraz odtworzyć. Nadal możesz je wysłać lub nagrywać dalej.",
+    "settings": {
+      "title": "Wiadomości głosowe",
+      "on": "Wiadomości głosowe",
+      "onHelp": "Osoby w tej przestrzeni roboczej mogą wysyłać nagrania w rozmowach.",
+      "noEngine": "Wiadomości głosowe nie są tu jeszcze dostępne.",
+      "engineTitle": "Co zamienia głos na tekst",
+      "own": "Twój własny serwer",
+      "ownHelp": "Whisper lub Parakeet na twoim komputerze. Dźwięk tam zostaje.",
+      "address": "Adres serwera",
+      "key": "Klucz {{name}}",
+      "keyPlaceholder": "Wklej tutaj",
+      "test": "Sprawdź",
+      "tested": "Działa. Teraz wszyscy widzą mikrofon.",
+      "sealed": "Przechowywany w postaci zaszyfrowanej na twoim serwerze i nigdy więcej nie pokazywany.",
+      "leaves": "Dźwięk z wiadomości głosowych trafia do {{name}}, aby stać się tekstem.",
+      "invalid": "Zapisany klucz nie otwiera się na tym serwerze. Wklej go ponownie."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -9487,6 +9564,7 @@
     "clearSearch": "Wyczyść wyszukiwanie",
     "noMatch": "Nic nie znaleziono dla „{{q}}”.",
     "noTools": "Serwer nie udostępnił żadnych narzędzi.",
+    "unreadable": "Nie udało się odczytać narzędzi konektora: {{reason}}",
     "refresh": "Poszukaj nowych narzędzi",
     "decideTitle": "Potrzebna twoja decyzja · {{count}}",
     "decideHelp": "Ich nazwy nie mówią, co robią. Potwierdź sugestię albo wybierz inną.",
@@ -10349,6 +10427,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Sieć się zmienia. Otwarte sesje komputera uruchomią się ponownie o {{when}}.",
+      "restart": "Sesje komputera uruchamiają się ponownie, aby zastosować sieć. Nowa praca czeka, aż to się skończy.",
+      "line": "IP wyjściowe {{ip}}",
+      "hint": "Adres, który widzą strony, gdy agenci przeglądają sieć. Zmienia się razem z siecią komputera."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Polecenia wyłączone",
@@ -11076,6 +11160,7 @@
       "import": "Import i eksport",
       "billing": "Plan i płatności",
       "media": "GIF-y i naklejki",
+      "voice": "Głos",
       "apps": "Aplikacje AI"
     },
     "sectionText": {
@@ -11094,6 +11179,7 @@
       "import": "Przenieś agentów z innej aplikacji lub przestrzeni roboczej i zabierz tę, dokąd chcesz.",
       "billing": "Plan agentes.chat tej przestrzeni roboczej, karta i faktury są na naszej stronie, poza aplikacją.",
       "media": "Co osoby mogą wysyłać w rozmowie i kiedy agenci wysyłają GIF-a lub naklejkę.",
+      "voice": "Wiadomości głosowe w rozmowach i to, kto zamienia głos na tekst.",
       "apps": "Zlecaj zadania agentom tej przestrzeni roboczej z Claude, Cursor i innych aplikacji."
     },
     "title": "Ustawienia",
@@ -11527,6 +11613,13 @@
       "answeredRequestFar_female": "Odpowiedź od {{to}} na prośbę od {{from}}",
       "see": "Zobacz"
     },
+    "talk": {
+      "readAll": "Czytaj całość",
+      "more_one": "jeszcze {{count}} wiersz",
+      "more_few": "jeszcze {{count}} wiersze",
+      "more_many": "jeszcze {{count}} wierszy",
+      "more_other": "jeszcze {{count}} wiersza"
+    },
     "consultPanel": {
       "label": "Rozmowa między {{from}} a {{to}}",
       "title": "{{from}} ⇄ {{to}}",
@@ -11838,6 +11931,7 @@
       "brain_unavailable": "{{brain}} nie może teraz odpowiedzieć. Odpowiem, gdy wróci.",
       "provider_unavailable": "Mój dostawca AI teraz nie odpowiada. Odpowiem, gdy tylko wróci.",
       "brain_busy": "Mój komputer jest teraz zajęty innymi zadaniami. Odpowiem, gdy tylko się zwolni.",
+      "brain_queued": "Wciąż czekam w kolejce do komputera. Odpowiem, gdy tylko zwolni się miejsce.",
       "brain_interrupted": "{{brain}} przerwał przed zakończeniem. Już zrobione, bez powtarzania: {{tools}}.",
       "plan_limit_cut": "Praca zatrzymana na limicie planu {{plan}}. Wrócę do niej w tym samym miejscu {{when}}, gdy limit się odnowi.",
       "plan_limit_cut_unknown": "Praca zatrzymana na limicie planu {{plan}}. Wrócę do niej w tym samym miejscu, gdy tylko limit się odnowi.",
@@ -12847,6 +12941,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Tylko oglądasz.",
+      "title": "Chcesz przejąć kontrolę?",
+      "working": "{{name}} wstrzymuje pracę, gdy masz kontrolę."
+    },
     "sub": {
       "control": "Masz kontrolę · {{name}} czeka",
       "controlAsked": "Masz kontrolę · {{name}} o to prosi",

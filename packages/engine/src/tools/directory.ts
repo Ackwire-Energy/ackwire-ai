@@ -1,6 +1,7 @@
 import type { MissingConnector } from "../connectors/listing";
 import { cutText } from "../format";
 import { oneLine } from "../mail/text";
+import { PASS_TOOL } from "../reply-policy";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
 
@@ -358,6 +359,13 @@ const CORE_TOOLS: ReadonlySet<string> = new Set(["read_wiki_page", "search_wiki"
 
 export const isCore = (tool: Pick<ToolDefinition, "name" | "scope" | "connectionId">) =>
   CORE_GROUPS.has(toolGroupKey(tool)) || CORE_TOOLS.has(tool.name);
+
+/**
+ * A core tool whose definition is the same in every run of the agent (`ToolSpec.stable`, the cached start of the
+ * tool list): not the on-demand pair (it names what isn't loaded) nor `pass` (only a run nobody called gets it).
+ */
+export const isStableTool = (tool: Pick<ToolDefinition, "name" | "scope" | "connectionId">) =>
+  isCore(tool) && tool.name !== ON_DEMAND_FIND && tool.name !== ON_DEMAND_USE && tool.name !== PASS_TOOL;
 
 /** How a group is named for the model and the judge ("Browser", "GitHub", a connector's label). */
 const GROUP_LABELS: Record<string, string> = {

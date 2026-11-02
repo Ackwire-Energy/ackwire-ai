@@ -91,6 +91,8 @@ async function waitingRunsFor(db: Database, orgId: string, machineIds: string[],
       kind: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'kind'`,
       /** `machine_dropped`: its turn was cut and it waits quietly for a short while. */
       code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+      /** Its computer just went (within the grace): it waits without a word. */
+      quiet: sql<boolean>`coalesce((${agentRuns.transcript}->'waitingForBrain'->>'quiet')::boolean, false)`,
       executed: sql<number>`coalesce(jsonb_array_length(${agentRuns.transcript}->'interruptedTurn'->'executed'), 0)`,
       routineRunId: routineRuns.id,
     })
@@ -197,7 +199,7 @@ export async function listMachineOutages(
     // Just gone (our own restart, a blip, its runner dialing again): not an outage yet, unless a run already
     // said it waits for it. The grace's end tells open apps to look again (`interruptOfflineMachineTasks`).
     const fresh = now.getTime() - (m.lastSeenAt ?? m.updatedAt).getTime() < TASK_OFFLINE_GRACE_MS;
-    if (fresh && !waiting.some((r) => r.machineId === m.id && r.code !== "machine_dropped")) continue;
+    if (fresh && !waiting.some((r) => r.machineId === m.id && r.code !== "machine_dropped" && !r.quiet)) continue;
     const order = (id: string) => byId.get(id)?.createdAt.getTime() ?? 0;
     outages.push({
       machineId: m.id,

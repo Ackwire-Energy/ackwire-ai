@@ -1,13 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   approverIds,
+  createRole,
   decideApproval,
+  decidingKeys,
   drainOutbox,
   ForbiddenError,
+  getApproval,
   listApprovals,
   missingPermissions,
+  orgOverview,
   postPersonMessage,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -117,4 +121,52 @@ test("only admins decide it: the agent's owner who isn't one can't give the agen
   });
   await drainOutbox(f.db, f.handlers);
   expect(await scopes()).toContain("browser:use");
+});
+
+test("turning on access is decided by who gives it on the agent's page, not by approving actions; the grant is theirs", async () => {
+  f = await setup({ permissionTools: true, reply });
+  const sup = await addMember(f.db, f.org.id, "member", "sup");
+  const lead = await addMember(f.db, f.org.id, "member", "lead");
+  const approves = await createRole(f.db, f.owner.id, f.org.id, {
+    name: "Supervisor",
+    permissions: ["approve_actions"],
+  });
+  const manages = await createRole(f.db, f.owner.id, f.org.id, { name: "Agentes", permissions: ["manage_agents"] });
+  await f.db.insert(schema.organizationMemberRoles).values([
+    { orgId: f.org.id, userId: sup.id, roleId: approves.id },
+    { orgId: f.org.id, userId: lead.id, roleId: manages.id },
+  ]);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev open the site",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [row] = await f.db.select().from(schema.approvals);
+  if (!row) throw new Error("no approval");
+
+  expect((await approverIds(f.db, row)).sort()).toEqual([f.owner.id, lead.id].sort());
+  const [supView] = await listApprovals(f.db, sup.id, f.org.id, { status: "pending" });
+  expect(supView?.canDecide).toBe(false);
+  expect((await orgOverview(f.db, sup.id, f.org.id)).approvalsWaitingForMe).toBe(0);
+  await expect(
+    decideApproval({ db: f.db, pubsub: f.pubsub }, sup.id, f.org.id, row.id, { decision: "approve" }),
+  ).rejects.toBeInstanceOf(ForbiddenError);
+
+  expect((await orgOverview(f.db, lead.id, f.org.id)).approvalsWaitingForMe).toBe(1);
+  // Outside the channel, they still find and open what they decide.
+  await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, lead.id));
+  const [leadView] = await listApprovals(f.db, lead.id, f.org.id, { status: "pending" });
+  expect(leadView?.id).toBe(row.id);
+  expect((await getApproval(f.db, lead.id, f.org.id, row.id)).canDecide).toBe(true);
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, lead.id, f.org.id, row.id, { decision: "approve" });
+  await drainOutbox(f.db, f.handlers);
+  const [grant] = await f.db
+    .select()
+    .from(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, f.agent.id), eq(schema.agentScopes.scope, "browser:use")));
+  expect(grant?.grantedByUserId).toBe(lead.id);
+  // A browser profile also needs managing connectors, as on the agent's page.
+  expect(decidingKeys({ tool: "request_permission", params: { permission: "browser-profile:p1" } })).toEqual([
+    "manage_agents",
+    "manage_connectors",
+  ]);
 });

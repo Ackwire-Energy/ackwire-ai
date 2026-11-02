@@ -5,6 +5,7 @@ import { mediaKindOf, mediaWord } from "./media";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
 import { usageWindowText } from "./usage-pause";
+import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
 /** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
 const USAGE_NOTES = new Set([
@@ -60,7 +61,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     m.bodyParams && typeof m.bodyParams === "object" ? (m.bodyParams as Record<string, unknown>) : ({} as const);
   // Waiting for room on a busy computer, not for one that went away; no AI because its sign-in ended, or because the
   // computer's own sign-in of that CLI isn't there (`own`), not none at all.
-  const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
+  const waitNote =
+    code === "brain_unavailable" ? (m.brainUnavailable as { code?: unknown; long?: unknown } | undefined) : undefined;
+  const busy = waitNote?.code === "busy";
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
   const own =
@@ -93,7 +96,16 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   }
   // A secret request posted before the body named its agent.
   const anon = code === "secret_request" && typeof params.agent !== "string";
-  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : anon ? "secret_requestAnon" : code;
+  // Still in line after a long while (the only busy note posted now); older notes keep their words.
+  const shown = busy
+    ? waitNote?.long
+      ? "brain_queued"
+      : "brain_busy"
+    : signedOut
+      ? "no_ai_signed_out"
+      : anon
+        ? "secret_requestAnon"
+        : code;
   const key = `chat.body.${shown}`;
   // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
   return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });
@@ -106,6 +118,8 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
  * as is.
  */
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
+  // Never a voice message's words, even from a server that sent them (ADR 0100).
+  if (isVoiceMeta(meta) || mediaKindOf(mediaKind) === "voice") return voiceWord(t, voiceLength(meta));
   if (!text.trim()) {
     const kind = mediaKindOf(mediaKind) ?? mediaKindOf(meta?.mediaKind) ?? mediaKindOf(meta?.media);
     if (kind) return mediaWord(t, kind);

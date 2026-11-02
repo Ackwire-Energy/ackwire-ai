@@ -1537,6 +1537,10 @@
     "asking_other": "{{names}} yanıtınızı bekliyor",
     "outage_one": "{{names}}: yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
     "outage_other": "{{names}}: yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
+    "queued_one": "{{names}} bilgisayar için sırada",
+    "queued_other": "{{names}} bilgisayar için sırada",
+    "away_one": "{{names}} bilgisayarı bekliyor",
+    "away_other": "{{names}} bilgisayarı bekliyor",
     "nobody": "Hiçbir ajan yanıtlamayacak",
     "status": {
       "seen": "Gördü",
@@ -1545,6 +1549,8 @@
       "waiting": "Onay bekliyor",
       "asking": "Yanıtınızı bekliyor",
       "outage": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
+      "queued": "Bilgisayar için sırada",
+      "away": "Bilgisayarı bekliyor",
       "handled": "Yanıtladı",
       "failed": "Başarısız oldu",
       "referenced": "Yalnızca bahsedildi",
@@ -1959,6 +1965,9 @@
     "rolesNone": "Workspace'te henüz rol yok.",
     "rolesNeeded": "En az bir rol seç.",
     "rolesLeave": "Rolü kaybeden kanaldan çıkar.",
+    "rolesChoose": "Rolleri seç",
+    "rolesChange": "Rolleri değiştir",
+    "rolesDone": "Tamam",
     "publicTitle": "#{{channel}} herkese açık yapılsın mı?",
     "publicBody": "Çalışma alanındaki herkes katılabilecek ve eskiler dahil tüm mesajları okuyabilecek.",
     "publicConfirm": "Herkese açık yap",
@@ -2143,6 +2152,7 @@
       "waiting_approval": "Onay bekliyor",
       "waiting_answer": "Yanıt bekliyor",
       "waiting_computer": "Bilgisayarı bekliyor",
+      "queued_computer": "Bilgisayar için sırada",
       "waiting_plan": "Planın sıfırlanmasını bekliyor",
       "waiting_budget": "Bütçenin sıfırlanmasını bekliyor",
       "provider_down": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
@@ -2840,6 +2850,7 @@
     "runsEmpty": "“{{q}}” ile eşleşen çalıştırma yok.",
     "runsNone": "Henüz çalıştırma yok.",
     "runNoText": "Metin yok",
+    "runPrivate": "Dahil olmadığın bir konuşmada",
     "runTokens": "{{input}} giriş · {{cached}} önbellek · {{output}} çıkış",
     "runTokensTip": "{{input}} yeni giriş tokenı, önbellekten okunan {{cached}} (daha ucuz), {{output}} çıkış",
     "budgetHelp": "Sınıra ulaşınca {{name}} durur ve bunu kanalda söyler. {{ownerNote}}",
@@ -6428,6 +6439,68 @@
       "symbols": "Semboller"
     }
   },
+  "voice": {
+    "word": "Sesli mesaj",
+    "wordTime": "Sesli mesaj · {{time}}",
+    "holdToRecord": "Kaydetmek için basılı tutun",
+    "slideToDelete": "Silmek için kaydırın",
+    "send": "Sesi gönder",
+    "delete": "Kaydı sil",
+    "deleted": "Kayıt silindi.",
+    "pause": "Duraklat",
+    "resume": "Kayda devam et",
+    "listen": "Kaydınızı dinleyin",
+    "play": "Oynat",
+    "stop": "Durdur",
+    "speed": "Hız",
+    "left": "{{seconds}} sn kaldı",
+    "tooShort": "Çok kısa. Biraz daha konuşun.",
+    "silent": "Hiçbir şey duyulmadı. Hiçbir şey gönderilmedi.",
+    "notSent": "Ses gönderilemedi.",
+    "limit": "Bugün için epey ses oldu. Buraya yazın ve yarın tekrar deneyin.",
+    "micBlocked": "Mikrofon engellendi",
+    "micBlockedHint": "Kayıt yapmak için cihaz ayarlarınızdan mikrofona izin verin.",
+    "openSettings": "Ayarları aç",
+    "notNow": "Şimdi değil",
+    "expired": "Sesin süresi doldu",
+    "showText": "Metni göster",
+    "hideText": "Metni gizle",
+    "record": "Ses kaydet",
+    "recording": "Ses kaydediliyor",
+    "discard": "Kaydı sil",
+    "stopListening": "Dinlemeyi durdur",
+    "keys": "Enter gönderir · Esc siler",
+    "keysHold": "Göndermek için bırakın · Esc siler",
+    "keysPaused": "Duraklatıldı · Boşluk dinletir · Enter gönderir · Esc siler",
+    "pausePlay": "Duraklat",
+    "seek": "Ses konumu",
+    "speedAt": "Hız {{speed}}×",
+    "waiting": "Tekrar çevrimiçi olduğunuzda gider",
+    "notUnderstood": "Ses anlaşılamadı. Hiçbir şey gönderilmedi.",
+    "refused": "Ses bu konuşmada gönderilemedi.",
+    "blockedMac": "Mikrofon engellendi. Mac'te: Sistem Ayarları › Gizlilik ve Güvenlik › Mikrofon.",
+    "blockedWeb": "Mikrofon engellendi. Site adresinin yanındaki kilit simgesinden izin verin.",
+    "noMic": "Mikrofon bulunamadı.",
+    "failed": "Mikrofon açılamadı. Tekrar deneyin.",
+    "noPlayback": "Şu anda oynatılamıyor. Yine de gönderebilir veya kayda devam edebilirsiniz.",
+    "settings": {
+      "title": "Sesli mesajlar",
+      "on": "Sesli mesajlar",
+      "onHelp": "Bu çalışma alanındaki kişiler konuşmalarda ses gönderebilir.",
+      "noEngine": "Sesli mesajlar burada henüz kullanılamıyor.",
+      "engineTitle": "Sesi metne dönüştüren",
+      "own": "Kendi sunucunuz",
+      "ownHelp": "Makinenizdeki Whisper veya Parakeet. Ses orada kalır.",
+      "address": "Sunucu adresi",
+      "key": "{{name}} anahtarı",
+      "keyPlaceholder": "Buraya yapıştırın",
+      "test": "Test et",
+      "tested": "Çalışıyor. Artık herkes mikrofonu görüyor.",
+      "sealed": "Sunucunuzda şifreli olarak saklanır ve bir daha gösterilmez.",
+      "leaves": "Sesli mesajların sesi metne dönüşmek için {{name}} hizmetine gider.",
+      "invalid": "Kayıtlı anahtar bu sunucuda açılmıyor. Tekrar yapıştırın."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -8802,6 +8875,7 @@
     "clearSearch": "Aramayı temizle",
     "noMatch": "“{{q}}” için bir şey bulunamadı.",
     "noTools": "Sunucu hiç araç sunmadı.",
+    "unreadable": "Bağlayıcının araçları okunamadı: {{reason}}",
     "refresh": "Yeni araçları ara",
     "decideTitle": "Kararınız gerekiyor · {{count}}",
     "decideHelp": "Adları ne yaptıklarını söylemiyor. Öneriyi onaylayın ya da başka birini seçin.",
@@ -9618,6 +9692,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Ağ değişiyor. Bilgisayarın açık oturumları {{when}} saatinde yeniden başlayacak.",
+      "restart": "Bilgisayar oturumları ağı uygulamak için yeniden başlıyor. Yeni işler bu bitene kadar bekler.",
+      "line": "Çıkış IP’si {{ip}}",
+      "hint": "Ajanlar gezinirken sitelerin gördüğü adres. Bilgisayarın ağı değişince güncellenir."
+    },
     "online": "Çevrimiçi",
     "offline": "Çevrimdışı",
     "execOff": "Komutlar kapalı",
@@ -10316,6 +10396,7 @@
       "import": "İçe ve dışa aktarma",
       "billing": "Plan ve faturalandırma",
       "media": "GIF'ler ve çıkartmalar",
+      "voice": "Ses",
       "apps": "Yapay zeka uygulamaları"
     },
     "sectionText": {
@@ -10334,6 +10415,7 @@
       "import": "Başka bir uygulamadan ya da çalışma alanından ajan getirin ve bu çalışma alanını istediğiniz yere götürün.",
       "billing": "Bu çalışma alanının agentes.chat planı, kartı ve faturaları uygulamanın dışında, bize ait bir sayfada.",
       "media": "Kişilerin bir konuşmada neler gönderebileceği ve ajanların ne zaman GIF ya da çıkartma göndereceği.",
+      "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
       "apps": "Claude, Cursor ve diğer uygulamalardan bu çalışma alanının ajanlarına görev verin."
     },
     "title": "Ayarlar",
@@ -10719,6 +10801,11 @@
       "answeredRequestFar": "{{to}}, {{from}} ajanının isteğini yanıtladı",
       "see": "Gör"
     },
+    "talk": {
+      "readAll": "Tümünü oku",
+      "more_one": "{{count}} satır daha",
+      "more_other": "{{count}} satır daha"
+    },
     "consultPanel": {
       "label": "{{from}} ile {{to}} arasındaki konuşma",
       "title": "{{from}} ⇄ {{to}}",
@@ -11020,6 +11107,7 @@
       "brain_unavailable": "{{brain}} şu anda yanıt veremiyor. Geri gelince yanıt vereceğim.",
       "provider_unavailable": "Yapay zeka sağlayıcım şu anda yanıt vermiyor. Geri gelir gelmez yanıt vereceğim.",
       "brain_busy": "Bilgisayarım şu anda başka görevlerle meşgul. Boşalır boşalmaz yanıt vereceğim.",
+      "brain_queued": "Hâlâ bilgisayar için sıradayım. Yer açılır açılmaz yanıt vereceğim.",
       "brain_interrupted": "{{brain}} bitirmeden durdu. Zaten yapılanlar tekrarlanmadı: {{tools}}.",
       "plan_limit_cut": "{{plan}} planının sınırında durdum. Sıfırlandığında, {{when}}, kaldığım yerden devam edeceğim.",
       "plan_limit_cut_unknown": "{{plan}} planının sınırında durdum. Sıfırlanır sıfırlanmaz kaldığım yerden devam edeceğim.",
@@ -11959,6 +12047,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Yalnızca izliyorsunuz.",
+      "title": "Kontrolü almak ister misiniz?",
+      "working": "Kontrol sizdeyken {{name}} duraklar."
+    },
     "sub": {
       "control": "Kontrol sizde · {{name}} bekliyor",
       "controlAsked": "Kontrol sizde · {{name}} istedi",
