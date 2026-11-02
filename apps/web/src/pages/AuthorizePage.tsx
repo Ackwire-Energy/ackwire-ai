@@ -64,14 +64,25 @@ export function AuthorizePage({ requestId, error }: { requestId: string; error: 
   );
 }
 
+/** The page's end states: the card's own content, never a dashed box inside it. */
+const STATE = "consent__state";
+
 function ConsentErrorCard({ t, error, onRetry }: { t: TFunction; error: PageError; onRetry?: () => void }) {
   return (
     <Card padded as="div" className="consent">
       <EmptyState
+        className={STATE}
         icon={error === "expirado" ? "waiting" : error === "muitas_tentativas" ? "clock" : "block"}
         title={t(`apps.consent.error.${error}`)}
         actions={
-          error === "indisponivel" && onRetry ? <Button onClick={onRetry}>{t("common.retry")}</Button> : undefined
+          error === "indisponivel" && onRetry ? (
+            <Button onClick={onRetry}>{t("common.retry")}</Button>
+          ) : (
+            // A stale link or a refused app: a way into agentes.chat itself.
+            <Link to="/" className="ac-link small">
+              {t("apps.consent.goHome")}
+            </Link>
+          )
         }
       >
         {t(`apps.consent.error.${error}Text`)}
@@ -102,7 +113,7 @@ function Consent({ t, requestId }: { t: TFunction; requestId: string }) {
   if (outcome?.kind === "allowed") {
     return (
       <Card padded as="div" className="consent">
-        <EmptyState icon="check" title={t("apps.consent.doneTitle")}>
+        <EmptyState className={`${STATE} ${STATE}--ok`} icon="check" title={t("apps.consent.doneTitle")}>
           <span role="status">{t("apps.consent.done", { app: outcome.app })}</span>
         </EmptyState>
       </Card>
@@ -111,7 +122,7 @@ function Consent({ t, requestId }: { t: TFunction; requestId: string }) {
   if (outcome?.kind === "denied") {
     return (
       <Card padded as="div" className="consent">
-        <EmptyState icon="block" title={t("apps.consent.cancelledTitle")}>
+        <EmptyState className={STATE} icon="block" title={t("apps.consent.cancelledTitle")}>
           {t("apps.consent.cancelled")}
         </EmptyState>
       </Card>
@@ -141,6 +152,7 @@ function Consent({ t, requestId }: { t: TFunction; requestId: string }) {
     return (
       <Card padded as="div" className="consent">
         <EmptyState
+          className={STATE}
           icon="home"
           title={t("apps.consent.error.noWorkspace")}
           actions={

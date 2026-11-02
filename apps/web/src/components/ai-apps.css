@@ -12,6 +12,37 @@
   gap: 2px;
 }
 
+/*
+ * The server's card: its title and line with "Conectar um app" on the right, the address under both. On a phone the
+ * button goes under the address, so "Cole no app…" sits right above what it names.
+ */
+.ac-card.apps-server {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3) 12px;
+}
+.apps-server__text {
+  grid-area: 1 / 1;
+  gap: 2px;
+}
+.apps-server__connect {
+  grid-area: 1 / 2;
+}
+.apps-server__address {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+@media (max-width: 560px) {
+  .ac-card.apps-server {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .apps-server__connect {
+    grid-area: 3 / 1;
+    justify-self: start;
+  }
+}
+
 /* A label and what it names, stacked (a list-col grows in a column, this one doesn't). */
 .apps-field {
   display: flex;
@@ -229,6 +260,15 @@ html:not([data-pointer]) .apps-client:focus-visible {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+/* An end state is the card's content: no dashed box inside the card. */
+.consent__state {
+  border: 0;
+  padding: 16px 8px;
+}
+.consent__state--ok .ac-empty__icon {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
 }
 .consent__lang {
   display: flex;

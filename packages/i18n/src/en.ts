@@ -9053,6 +9053,7 @@ export const en: Translations = {
       done: "You can go back to {{app}}.",
       cancelledTitle: "Connection cancelled",
       cancelled: "Nothing was shared.",
+      goHome: "Go to agentes.chat",
       language: "Language",
       error: {
         app_desconhecido: "We don't recognize this app",
@@ -9297,7 +9298,7 @@ export const en: Translations = {
       import: "Bring agents from another app or workspace, and take this one wherever you want.",
       billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
       media: "What people can send in a conversation, and when agents send a GIF or a sticker.",
-      apps: "Ask this workspace's agents for tasks from Claude, ChatGPT, Cursor and more.",
+      apps: "Ask this workspace's agents for tasks from Claude, Cursor and other apps.",
     },
     title: "Settings",
     account: {

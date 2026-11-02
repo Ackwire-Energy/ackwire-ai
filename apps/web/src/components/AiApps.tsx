@@ -102,18 +102,18 @@ export function AiAppsSection() {
   return (
     <>
       <Card aria-labelledby="apps-server" className="apps-server">
-        <div className="apps-server__head">
-          <span className="list-col">
-            <h2 id="apps-server" className="ac-card__title">
-              {t("apps.server")}
-            </h2>
-            <span className="small muted">{t("apps.serverHelp")}</span>
-          </span>
-          <Button variant="primary" icon="plus" onClick={() => setConnecting(true)}>
-            {t("apps.connect")}
-          </Button>
+        <span className="list-col apps-server__text">
+          <h2 id="apps-server" className="ac-card__title">
+            {t("apps.server")}
+          </h2>
+          <span className="small muted">{t("apps.serverHelp")}</span>
+        </span>
+        <div className="apps-server__address">
+          {data ? <CommandBlock command={data.serverUrl} copied={t("apps.serverCopied")} /> : <LoadingList count={1} />}
         </div>
-        {data ? <CommandBlock command={data.serverUrl} copied={t("apps.serverCopied")} /> : <LoadingList count={1} />}
+        <Button className="apps-server__connect" variant="primary" icon="plus" onClick={() => setConnecting(true)}>
+          {t("apps.connect")}
+        </Button>
       </Card>
       {admin ? (
         <Tabs
@@ -403,8 +403,8 @@ export function ConnectAppDialog({
             ))}
           </div>
         ) : connected ? (
+          // The app's mark is already in the head: the body says it connected.
           <div className="apps-connected" role="status">
-            <AppMark app={connected} size="tile" />
             <span className="list-col">
               <b className="apps-connected__title">
                 <Icon name="check" size={16} />

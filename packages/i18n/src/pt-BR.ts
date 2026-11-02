@@ -9122,6 +9122,7 @@ export const ptBR = {
       done: "Pode voltar ao {{app}}.",
       cancelledTitle: "Conexão cancelada",
       cancelled: "Nada foi compartilhado.",
+      goHome: "Ir para o agentes.chat",
       language: "Idioma",
       error: {
         app_desconhecido: "Não reconhecemos este app",
@@ -9365,7 +9366,7 @@ export const ptBR = {
       import: "Traga agentes de outro app ou de outro workspace, e leve este para onde quiser.",
       billing: "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
       media: "O que dá para mandar na conversa, e quando os agentes mandam um GIF ou uma figurinha.",
-      apps: "Peça tarefas aos agentes deste workspace pelo Claude, ChatGPT, Cursor e outros.",
+      apps: "Peça tarefas aos agentes deste workspace pelo Claude, Cursor e outros apps.",
     },
     title: "Configurações",
     account: {

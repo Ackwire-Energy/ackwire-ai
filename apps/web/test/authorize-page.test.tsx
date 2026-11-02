@@ -279,6 +279,8 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0113)", () => {
   test("a request unknown, already answered or expired: back to the app; it never revokes anything", async () => {
     const { state } = await open();
     expect(page().textContent).toContain("Este pedido expirou");
+    expect(within(page()).getByRole("link", { name: "Ir para o agentes.chat" }).getAttribute("href")).toBe("/");
+    expect(page().querySelector(".ac-empty:not(.consent__state)")).toBeNull();
     expect(page().textContent).toContain("Volte ao app e conecte de novo.");
     expect(calls(state, "apps.decide")).toEqual([]);
     cleanup();
