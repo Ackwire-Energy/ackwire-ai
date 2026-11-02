@@ -386,6 +386,39 @@ async function setUsageCardState(
 }
 
 /**
+ * A run's "I'll answer when it resets" note while it is back at work (`ended`: true) or parked on it again (false):
+ * "Don't run it" shows only while it waits, never stopping a live answer or a run already over.
+ */
+export async function usageWaitNoteEnded(
+  deps: { db: Database; pubsub?: PubSub },
+  run: { id: string; orgId: string; channelId: string; createdAt: Date },
+  ended: boolean,
+) {
+  const { messages } = schema;
+  const rows = await deps.db
+    .update(messages)
+    .set({
+      meta: ended
+        ? sql`jsonb_set(${messages.meta}, '{usageWait,ended}', 'true'::jsonb)`
+        : sql`${messages.meta} #- '{usageWait,ended}'`,
+    })
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        sql`${messages.createdAt} >= ${run.createdAt.toISOString()}::timestamptz`,
+        sql`${messages.meta}->'usageWait'->>'runId' = ${run.id}`,
+        sql`${messages.meta}->'usageWait'->'canceled' is null`,
+        ended
+          ? sql`${messages.meta}->'usageWait'->'ended' is null`
+          : sql`${messages.meta}->'usageWait'->'ended' is not null`,
+      ),
+    )
+    .returning();
+  if (deps.pubsub) for (const row of rows) await publishMessageCreated(deps.pubsub, messageView(row));
+}
+
+/**
  * A run waiting on its plan or budget was stopped ("Don't run it", or any stop while it waited): what said it would run
  * later says it won't, quietly: its note (`meta.usageWait.canceled`) and its long-work card (`canceled`).
  */

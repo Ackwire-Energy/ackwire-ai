@@ -66,7 +66,9 @@ test("a run waiting on its limit can be canceled: its note names the run, and sa
     bodyParams: { plan: "Claude" },
     usageWait: { code: "plan_limit", runId: "r1", forUserId: "bia" },
   };
-  expect(usageWaitOf(note)).toEqual({ runId: "r1", forUserId: "bia", canceled: false });
+  expect(usageWaitOf(note)).toEqual({ runId: "r1", forUserId: "bia", canceled: false, ended: false });
+  // Back at work: nothing waits to cancel.
+  expect(usageWaitOf({ ...note, usageWait: { ...note.usageWait, ended: true } })?.ended).toBe(true);
   // An older note names no run: nothing to cancel from it. A card is canceled from the card.
   expect(usageWaitOf({ usageWait: { code: "plan_limit" } })).toBeNull();
   expect(usageWaitOf(meta())).toBeNull();

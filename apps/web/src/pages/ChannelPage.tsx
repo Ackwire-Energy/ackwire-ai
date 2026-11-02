@@ -3738,7 +3738,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
           {noAi && <NoAiCard message={m} />}
           {actionCard && <ActionCard message={m} />}
-          {usageWait && !usageWait.canceled && <UsageWaitCancel message={m} wait={usageWait} />}
+          {usageWait && !usageWait.canceled && !usageWait.ended && <UsageWaitCancel message={m} wait={usageWait} />}
           {question && <QuestionCard question={question} />}
           {secretRequest && <SecretCard request={secretRequest} />}
           {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}

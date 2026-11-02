@@ -249,6 +249,7 @@ import {
   usageCardResumed,
   usageNoticeText,
   usageWaitKey,
+  usageWaitNoteEnded,
   usageWaitPlace,
   wakePlanWaits,
 } from "./usage-pause";
@@ -792,6 +793,8 @@ async function executeRunInner(
   let fresh = false;
   /** It waited (on a person, a mission, its computer) and goes back to work with this job. */
   let backFromWait = false;
+  /** What it waited on, when it comes back from a wait for its computer, plan or budget. */
+  let waitedOn: string | undefined;
   const started = await transitionRun(db, runId, "queued", "running");
   if (started) {
     run = started;
@@ -823,6 +826,7 @@ async function executeRunInner(
       if (!resumed) return;
       run = resumed;
       backFromWait = true;
+      waitedOn = stored?.waitingForBrain?.code;
       // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
       // run instead of finding it no longer waiting and doing nothing.
       if (options.wait && options.jobId) {
@@ -875,6 +879,7 @@ async function executeRunInner(
   // back, its plan reset) passes here: the agent's status stops saying it waits now, not at the apps' next refetch,
   // and the conversations that asked a consulted one (ADR 0034) stop showing it held.
   if (backFromWait) await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
+  if (waitedOn && USAGE_WAIT_CODES.has(waitedOn)) await usageWaitNoteEnded(deps, run, true).catch(() => {});
   if (backFromWait && channelRow && isAgentOnlyDm(channelRow)) {
     await announceConsultationChange({ db, pubsub: deps.pubsub }, run).catch(() => {});
   }
@@ -2592,6 +2597,8 @@ async function executeRunInner(
           return m;
         })
       : null;
+    // Parked again on the same wait, with no new note: its old one offers "Don't run it" again.
+    if (!note) await usageWaitNoteEnded(deps, run, false).catch(() => {});
     t.postedUpTo = t.messages.length;
     if (!u.soon) t.brainNotice = u.code;
     delete t.roomWaitSince;

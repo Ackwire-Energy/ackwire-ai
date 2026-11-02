@@ -90,6 +90,8 @@ export interface UsageWait {
   runId: string;
   forUserId: string | null;
   canceled: boolean;
+  /** Its run is back at work, or over: nothing waits to cancel. */
+  ended: boolean;
 }
 
 /**
@@ -100,5 +102,5 @@ export function usageWaitOf(meta: Record<string, unknown> | null | undefined): U
   const raw = meta?.usageWait as Record<string, unknown> | undefined;
   const runId = str(raw?.runId);
   if (!runId || usagePauseCardOf(meta)) return null;
-  return { runId, forUserId: str(raw?.forUserId), canceled: raw?.canceled === true };
+  return { runId, forUserId: str(raw?.forUserId), canceled: raw?.canceled === true, ended: raw?.ended === true };
 }

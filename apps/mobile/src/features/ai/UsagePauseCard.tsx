@@ -56,7 +56,7 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
   const dir = useDirectory();
   const meId = useMeId();
   const wait = m.author.type === "agent" ? usageWaitOf(m.meta) : null;
-  if (!wait || wait.canceled) return null;
+  if (!wait || wait.canceled || wait.ended) return null;
   const owner = dir.agentById.get(m.author.id ?? "")?.ownerUserId;
   return (
     <View style={styles.acts}>

@@ -681,3 +681,32 @@ test("Don't run it: who asked cancels a reply waiting on the plan; its note says
   await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + RESUME_GAP_MS) });
   expect(seen).toHaveLength(1);
 });
+
+test("Don't run it goes away once the run is back at work, and comes back if it parks on the limit again", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const limit = (ms: number): BrainEvent[] => [
+    { type: "limit", resetsAt: later(ms).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ];
+  const { brain } = scripted((n) => (n < 2 ? limit(n === 0 ? 150 : 3600_000) : [{ type: "done", text: "oi" }]));
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const ended = async () =>
+    ((await notes(f, "plan_limit_wait"))[0]?.meta.usageWait as { ended?: boolean } | undefined)?.ended;
+  expect(await ended()).toBeUndefined();
+
+  // Back at the reset and still limited: parked again on the same note, which offers it again.
+  await Bun.sleep(200);
+  await drainOutbox(f.db, handlers, { now: later(RESUME_AFTER_MS + RESUME_GAP_MS) });
+  expect((await runs(f))[0]?.status).toBe("waiting_input");
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
+  expect(await ended()).toBeUndefined();
+
+  // Back again and the turn goes through: the note no longer offers to cancel.
+  clearPlanLimits();
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + RESUME_GAP_MS) });
+  expect((await runs(f))[0]?.status).toBe("done");
+  expect(await ended()).toBe(true);
+});
