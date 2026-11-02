@@ -26,7 +26,14 @@ function openRequestQueries(db: Executor, orgId: string, agentId: string, channe
   const place = { channelName: channels.name, channelKind: channels.kind };
   return {
     handoffs: db
-      .select({ row: browserHandoffs, ...place })
+      .select({
+        id: browserHandoffs.id,
+        kind: sql<OpenRequest["kind"]>`${browserHandoffs.screen}::text`.as("kind"),
+        what: sql<string>`${browserHandoffs.instructions}`.as("what"),
+        runId: sql<string | null>`${browserHandoffs.runId}`.as("run_id"),
+        createdAt: browserHandoffs.createdAt,
+        ...place,
+      })
       .from(browserHandoffs)
       .innerJoin(messages, and(eq(messages.orgId, browserHandoffs.orgId), eq(messages.id, browserHandoffs.id)))
       .innerJoin(channels, eq(channels.id, messages.channelId))
@@ -41,7 +48,14 @@ function openRequestQueries(db: Executor, orgId: string, agentId: string, channe
         ),
       ),
     secrets: db
-      .select({ row: secretRequests, ...place })
+      .select({
+        id: secretRequests.id,
+        kind: sql<OpenRequest["kind"]>`'secret'`.as("kind"),
+        what: sql<string>`${secretRequests.name} || ': ' || ${secretRequests.purpose}`.as("what"),
+        runId: sql<string | null>`${secretRequests.runId}`.as("run_id"),
+        createdAt: secretRequests.createdAt,
+        ...place,
+      })
       .from(secretRequests)
       .innerJoin(channels, eq(channels.id, secretRequests.channelId))
       .where(
@@ -54,7 +68,14 @@ function openRequestQueries(db: Executor, orgId: string, agentId: string, channe
         ),
       ),
     questions: db
-      .select({ row: agentQuestions, ...place })
+      .select({
+        id: agentQuestions.id,
+        kind: sql<OpenRequest["kind"]>`'question'`.as("kind"),
+        what: sql<string>`${agentQuestions.text}`.as("what"),
+        runId: sql<string | null>`${agentQuestions.runId}`.as("run_id"),
+        createdAt: agentQuestions.createdAt,
+        ...place,
+      })
       .from(agentQuestions)
       .innerJoin(channels, eq(channels.id, agentQuestions.channelId))
       .where(
@@ -85,34 +106,10 @@ export async function openRequestsOf(
   agentId: string,
   channelId: string,
 ): Promise<OpenRequest[]> {
+  // One statement: it is read before the model call on every turn with tools (packages/engine/test/budget-queries).
   const q = openRequestQueries(db, orgId, agentId, channelId);
-  const [handoffs, secrets, questions] = await Promise.all([q.handoffs, q.secrets, q.questions]);
-  return [
-    ...handoffs.map(({ row, ...p }) => ({
-      id: row.id,
-      kind: row.screen,
-      what: row.instructions,
-      runId: row.runId,
-      createdAt: row.createdAt,
-      ...p,
-    })),
-    ...secrets.map(({ row, ...p }) => ({
-      id: row.id,
-      kind: "secret" as const,
-      what: `${row.name}: ${row.purpose}`,
-      runId: row.runId,
-      createdAt: row.createdAt,
-      ...p,
-    })),
-    ...questions.map(({ row, ...p }) => ({
-      id: row.id,
-      kind: "question" as const,
-      what: row.text,
-      runId: row.runId,
-      createdAt: row.createdAt,
-      ...p,
-    })),
-  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const rows = await q.handoffs.unionAll(q.secrets).unionAll(q.questions);
+  return rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
 const KIND_TEXT: Record<OpenRequest["kind"], string> = {

@@ -2395,6 +2395,7 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   expect(cmd.cwd).toBe("/home/ag-a1b2c3d4");
   // Only the launcher's environment: never the root runner's own (its token, its home).
   expect(Object.keys(cmd.env).sort()).toEqual([
+    "AGENTES_SHARED_BIN",
     "ANDROID_ADB_SERVER_PORT",
     "HOME",
     "LANG",
