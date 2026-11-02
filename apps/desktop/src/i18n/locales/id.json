@@ -529,7 +529,9 @@
     "copied": "Disalin",
     "retry": "Coba lagi",
     "openTailscale": "Buka Tailscale",
-    "otherServer": "Pakai server lain"
+    "otherServer": "Pakai server lain",
+    "stuck": "agentes.chat tidak terbuka. Coba lagi, atau lihat halamannya apa adanya.",
+    "showAnyway": "Tetap tampilkan"
   },
   "menu": {
     "about": "Tentang agentes.chat",

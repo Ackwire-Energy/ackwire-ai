@@ -529,7 +529,9 @@
     "copied": "已复制",
     "retry": "重试",
     "openTailscale": "打开 Tailscale",
-    "otherServer": "使用其他服务器"
+    "otherServer": "使用其他服务器",
+    "stuck": "agentes.chat 没有打开。请重试，或按当前状态查看页面。",
+    "showAnyway": "仍然显示"
   },
   "menu": {
     "about": "关于 agentes.chat",
