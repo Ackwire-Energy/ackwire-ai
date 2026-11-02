@@ -18,6 +18,8 @@ export const mobilePtBR = {
     skyLabel: "Céu com agentes",
     social: {
       failed: "Não deu para entrar agora. Tente de novo.",
+      /** The browser's sign-in closed without a session (cancelled, or refused there). */
+      unfinished: "O login não terminou. Tente de novo ou use seu email.",
     },
     errors: {
       network: "Sem conexão. Confira a internet e tente de novo.",

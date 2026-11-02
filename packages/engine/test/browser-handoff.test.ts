@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { type BrowserInputEvent, channelTopic, type MachineRequest, type RealtimeEvent } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import {
+  type BrowserInputEvent,
+  channelTopic,
+  createFakePushSender,
+  type MachineRequest,
+  type RealtimeEvent,
+} from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   BROWSER_HANDOFF_TOPIC,
@@ -15,6 +21,7 @@ import {
   coalesceInput,
   createBrowserHandoffToolSource,
   createBrowserLive,
+  createJobHandlers,
   drainOutbox,
   endHandoffForRestart,
   expireBrowserHandoffs,
@@ -22,6 +29,7 @@ import {
   ForbiddenError,
   finishHandoff,
   grantScopes,
+  HANDOFF_REMIND_AFTER_MS,
   handoffInfo,
   handoffResultText,
   listMessages,
@@ -31,6 +39,8 @@ import {
   markPageRead,
   openPageInControl,
   postPersonMessage,
+  registerPushDevice,
+  remindBrowserHandoff,
   renderPush,
   requireBrowserAccess,
   requireBrowserControl,
@@ -319,8 +329,8 @@ describe("browser_ask_person", () => {
     await start();
     await post("@dev sign in please");
     await drainOutbox(f.db, f.handlers);
-    expect(await expireBrowserHandoffs(deps())).toBe(0);
-    expect(await expireBrowserHandoffs(deps(), new Date(Date.now() + 31 * 60_000))).toBe(1);
+    expect(await expireBrowserHandoffs(deps(), new Date(Date.now() + 23 * 3600_000))).toBe(0);
+    expect(await expireBrowserHandoffs(deps(), new Date(Date.now() + 24 * 3600_000 + 60_000))).toBe(1);
     await drainOutbox(f.db, f.handlers);
     expect((await handoffs())[0]?.status).toBe("expired");
     expect((await runs())[0]?.status).toBe("done");
@@ -371,13 +381,77 @@ describe("browser_ask_person", () => {
     );
   });
 
-  test("pending it waits 10 min by default; in control there's no deadline, only the grace while they're away", async () => {
+  /** Asks from `run` directly, as its model would. */
+  async function askFrom(run: { runId: string }) {
+    const ctx = { db: f.db, orgId: f.org.id, agentId: f.agent.id, runId: run.runId } as never;
+    const [tool] = await askSource().tools(ctx);
+    const out = await tool?.execute({ instructions: "Sign in to Stripe" }, ctx);
+    expect(out?.isError).toBeUndefined();
+    const [h] = await handoffs();
+    const notices = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.groupKey, `browser_handoff:${h?.id}`));
+    return { h, notices };
+  }
+  const leave = (userId: string) =>
+    f.db
+      .delete(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.userId, userId)));
+
+  test("asked from a conversation the person isn't in: the card is in their DM with the agent, and the notification opens it there", async () => {
+    await start();
+    const run = await runFor(f.owner.id);
+    await leave(f.owner.id);
+    const { h, notices } = await askFrom(run);
+    const [card] = await f.db
+      .select({ channelId: schema.messages.channelId, threadId: schema.messages.threadId })
+      .from(schema.messages)
+      .where(eq(schema.messages.id, h?.id ?? ""));
+    expect(card?.channelId).not.toBe(f.general.id);
+    const [dm] = await f.db
+      .select()
+      .from(schema.channels)
+      .where(eq(schema.channels.id, card?.channelId ?? ""));
+    expect(dm?.kind).toBe("dm");
+    expect(dm?.dmKey).toContain(`u:${f.owner.id}`);
+    expect(dm?.dmKey).toContain(`a:${f.agent.id}`);
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, dm?.id ?? "");
+    expect(timeline.find((m) => m.id === h?.id)?.meta.browserHandoff).toMatchObject({ id: h?.id, status: "pending" });
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.source).toEqual({
+      channelId: dm?.id,
+      dmId: dm?.id,
+      messageId: h?.id,
+      handoffId: h?.id,
+      agentId: f.agent.id,
+    });
+    // The computer's desktop app links to that DM, which has no channel page of its own.
+    if (!h) throw new Error("no handoff");
+    expect((await handoffInfo(f.db, h))?.link).toBe(`/org/${f.org.id}/dm/agent/${f.agent.id}`);
+    // Its take control works from there.
+    expect(await claimHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "")).toMatchObject({ status: "active" });
+  });
+
+  test("the owner who isn't in the asker's conversation gets no link to it: the request opens on the agent's computer", async () => {
+    await start();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    const run = await runFor(ana.id);
+    await leave(f.owner.id);
+    const { h, notices } = await askFrom(run);
+    const of = (userId: string) => notices.find((n) => n.userId === userId)?.source;
+    expect(of(ana.id)).toMatchObject({ channelId: f.general.id, messageId: h?.id, handoffId: h?.id });
+    expect(of(f.owner.id)).toEqual({ handoffId: h?.id, agentId: f.agent.id });
+  });
+
+  test("pending it waits 24 hours by default; in control there's no deadline, only the grace while they're away", async () => {
     await start();
     await post("@dev sign in please");
     await drainOutbox(f.db, f.handlers);
     const [pending] = await handoffs();
     const waited = (pending?.expiresAt.getTime() ?? 0) - (pending?.createdAt.getTime() ?? 0);
-    expect(Math.round(waited / 60_000)).toBe(10);
+    expect(Math.round(waited / 60_000)).toBe(24 * 60);
     const claimed = await claimHandoff(deps(), f.owner.id, f.org.id, pending?.id ?? "");
     expect(claimed.expiresAt).toBeNull();
     // While they're there (watching or typing) the grace keeps moving; once away, it ends after the grace.
@@ -553,6 +627,77 @@ describe("browser_ask_person", () => {
       title: "Dev precisa de você no navegador",
       body: "Entrar no Stripe",
     });
+    const reminder = { kind: "browser_handoff", waiting: true, actorName: "Ada", reminder: true };
+    expect(renderPush("pt-BR", reminder).title).toBe("Ada ainda precisa de você no navegador");
+    expect(renderPush("en", reminder).title).toBe("Ada still needs you in the browser");
+    expect(renderPush("en", { ...reminder, screen: "desktop" }).title).toBe("Ada still needs you on the computer");
+  });
+});
+
+describe("the reminder an hour later", () => {
+  const PHONE = "ExponentPushToken[owner-phone-0001]";
+  /** The owner, with a phone, asks the agent to sign in; `at(ms)` runs the jobs due `ms` from now. */
+  async function askedWithPhone() {
+    await start();
+    await registerPushDevice(f.db, f.owner.id, { token: PHONE, platform: "ios", locale: "pt-BR" });
+    const push = createFakePushSender();
+    const handlers = createJobHandlers({ ...f.jobDeps, push });
+    const at = (ms: number) => drainOutbox(f.db, handlers, { now: new Date(Date.now() + ms) });
+    await post("@dev sign in please");
+    await drainOutbox(f.db, handlers);
+    const [h] = await handoffs();
+    const titles = () => push.sent.map((m) => m.title);
+    const row = async () =>
+      (
+        await f.db
+          .select()
+          .from(schema.notifications)
+          .where(eq(schema.notifications.groupKey, `browser_handoff:${h?.id}`))
+      )[0];
+    return { id: h?.id ?? "", at, titles, row };
+  }
+  const reminded = "Dev ainda precisa de você no navegador";
+
+  test("unanswered after an hour, the person asked hears it once more, once: back unread, on their phone", async () => {
+    const { at, titles, row } = await askedWithPhone();
+    expect(titles()).toContain("Dev precisa de você no navegador");
+    await f.db.update(schema.notifications).set({ readAt: new Date() });
+    await at(HANDOFF_REMIND_AFTER_MS - 60_000);
+    expect(titles()).not.toContain(reminded);
+    await at(HANDOFF_REMIND_AFTER_MS + 60_000);
+    expect(titles().filter((x) => x === reminded)).toHaveLength(1);
+    const n = await row();
+    expect(n?.readAt).toBeNull();
+    expect(n?.latest).toMatchObject({ reminder: true, text: "Sign in to Stripe" });
+    await at(3 * HANDOFF_REMIND_AFTER_MS);
+    expect(titles().filter((x) => x === reminded)).toHaveLength(1);
+  });
+
+  test.each([["done"], ["failed"], ["in control"]] as const)(
+    "no reminder once it's answered or given back (%s)",
+    async (how) => {
+      const { id, at, titles, row } = await askedWithPhone();
+      if (how === "in control") await claimHandoff(deps(), f.owner.id, f.org.id, id);
+      else await finishHandoff(deps(), f.owner.id, f.org.id, id, { result: how });
+      await at(HANDOFF_REMIND_AFTER_MS + 60_000);
+      expect(titles()).not.toContain(reminded);
+      expect((await row())?.latest.reminder).toBeUndefined();
+    },
+  );
+
+  test("no reminder once it expired, even before the sweep ended it", async () => {
+    const { id, at, titles, row } = await askedWithPhone();
+    // Past its deadline but not yet swept: still pending in the database.
+    await f.db
+      .update(schema.browserHandoffs)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.browserHandoffs.id, id));
+    expect(await remindBrowserHandoff(deps(), f.org.id, id)).toBe(0);
+    await at(HANDOFF_REMIND_AFTER_MS + 60_000);
+    expect(titles()).not.toContain(reminded);
+    expect((await row())?.latest.reminder).toBeUndefined();
+    expect(await expireBrowserHandoffs(deps())).toBe(1);
+    expect((await handoffs())[0]?.status).toBe("expired");
   });
 });
 
@@ -735,6 +880,26 @@ describe("take over", () => {
     const admin = await addMember(f.db, f.org.id, "admin", "bia");
     await requireBrowserControl(f.db, admin.id, f.org.id, f.agent.id);
     await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+  });
+
+  test("a run consulted for someone outside the agent's audience: that person never sees its screen nor is asked for help", async () => {
+    await start();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    await f.db
+      .update(schema.agents)
+      .set({ audienceMode: "owner", ownerUserId: f.owner.id })
+      .where(eq(schema.agents.id, f.agent.id));
+    // Another agent asked it for her (ADR 0085 addendum): her run, though she may not talk to it.
+    const { runId } = await runFor(ana.id);
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, runId));
+    await expect(requireBrowserAccess(f.db, ana.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    const ctx = { db: f.db, orgId: f.org.id, agentId: f.agent.id, runId, threadRootId: "" } as never;
+    const [tool] = await askSource().tools(ctx);
+    await tool?.execute({ instructions: "Sign in to Stripe" }, ctx);
+    const [h] = await handoffs();
+    expect(h?.requestedForUserId).toBe(f.owner.id);
+    await expect(requireBrowserControl(f.db, ana.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   test("the person a request was asked of takes control only while it is open", async () => {
@@ -956,6 +1121,67 @@ describe("live view", () => {
       .map((e) => (e.kind === "mouse" ? e.type : e.kind));
     expect(types).toEqual(["mousePressed", "mouseMoved"]);
     live.close();
+  });
+
+  test("typing during a slow round trip: the text reaches the computer exactly as typed, few batches, each key its own text", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, inputBatchMs: 5 });
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    const real = live.sendInput;
+    live.sendInput = async (...args) => {
+      // Each round trip to the computer is slow (a far link).
+      await Bun.sleep(30);
+      return real(...args);
+    };
+    const typed = "Olá, mundo! ação 123";
+    const answers: Promise<unknown>[] = [];
+    for (const [i, ch] of [...typed].entries()) {
+      answers.push(live.input(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: ch }]));
+      // A Backspace in the middle stays a key, between the texts around it.
+      if (i === 3) {
+        answers.push(
+          live.input(f.owner.id, f.org.id, f.agent.id, [
+            { kind: "key", type: "keyDown", key: "Backspace" },
+            { kind: "key", type: "keyUp", key: "Backspace" },
+          ]),
+        );
+      }
+      await Bun.sleep(2);
+    }
+    await Promise.all(answers);
+    const batches = calls
+      .filter((c) => c.op === "browser.input")
+      .map((c) => (c as Extract<MachineRequest, { op: "browser.input" }>).events as BrowserInputEvent[]);
+    const events = batches.flat();
+    const text = events.map((e) => (e.kind === "text" ? e.text : e.kind === "key" && e.type === "keyDown" ? "⌫" : ""));
+    expect(text.join("")).toBe(`${typed.slice(0, 4)}⌫${typed.slice(4)}`);
+    // The first key goes alone; what was typed while it travelled goes together.
+    expect(batches.length).toBeLessThanOrEqual(4);
+    // Each key stays its own text: a one-box-per-digit code field moves focus on every character.
+    expect(events.filter((e) => e.kind === "text").map((e) => (e.kind === "text" ? e.text : ""))).toEqual([...typed]);
+    live.close();
+  });
+
+  test("coalesceInput: many hover moves before a click shrink to the last one, so the click lands where it was aimed", () => {
+    const moves: BrowserInputEvent[] = Array.from({ length: 60 }, (_, i) => ({
+      kind: "mouse",
+      type: "mouseMoved",
+      x: i,
+      y: i,
+    }));
+    const out = coalesceInput([
+      ...moves,
+      { kind: "mouse", type: "mousePressed", x: 59, y: 59, button: "left" },
+      { kind: "mouse", type: "mouseReleased", x: 59, y: 59, button: "left" },
+      { kind: "text", text: "a" },
+      { kind: "text", text: "b" },
+    ]);
+    expect(
+      out.map((e) => (e.kind === "mouse" ? `${e.type}:${e.x}` : `${e.kind}:${e.kind === "text" ? e.text : ""}`)),
+    ).toEqual(["mouseMoved:59", "mousePressed:59", "mouseReleased:59", "text:a", "text:b"]);
   });
 
   test("coalesceInput keeps keys, text and touches in order", () => {

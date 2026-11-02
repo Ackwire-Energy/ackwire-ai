@@ -1,6 +1,6 @@
 import { and, type Database, type Executor, eq, inArray, ne, schema, sql } from "@agenteschat/db";
 import { planOf } from "@agenteschat/providers/plans";
-import type { BrainKind } from "./brains/types";
+import { BRAIN_PLAN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { enqueue } from "./outbox";
 import { monthStartUtc } from "./usage";
 
@@ -33,7 +33,7 @@ export const nextMonthStart = (now: number) => {
 export function planName(kind: BrainKind, provider?: string): string {
   const plan = planOf(provider);
   if (plan) return provider === "opencode" ? plan.name : plan.maker;
-  return kind === "codex" ? "ChatGPT" : "Claude";
+  return isComputerBrain(kind) ? BRAIN_PLAN_NAMES[kind] : "Claude";
 }
 
 /** What groups the runs that wait on the same thing (they resume one after another): a plan's sign-in or a budget. */

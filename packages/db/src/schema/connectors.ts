@@ -1,5 +1,19 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, index, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -10,7 +24,10 @@ import { organizations } from "./tenancy";
  * (`CONNECTOR_CATALOG`), which maps each tool to one of our scopes.
  * Credentials (OAuth tokens or an API key, as JSON) are envelope-encrypted
  * like provider credentials and bound to (org_id, id). One active connection
- * per connector per organization.
+ * per catalog connector per organization; an MCP server by address may have
+ * several, one per account (ADR 0099). A service through Composio (ADR 0107)
+ * is a server by address too, at its toolkit's address, with Composio's
+ * connected account and no secret: Composio holds the tokens.
  */
 export const connectorConnections = pgTable(
   "connector_connections",
@@ -29,14 +46,36 @@ export const connectorConnections = pgTable(
     kekId: text(),
     /** When the OAuth access token expires (refreshed before calls). */
     tokenExpiresAt: timestamp({ withTimezone: true }),
-    /** Account on the other side, e.g. the GitHub org, for display. */
+    /** Account on the other side, as the provider names it ("Acme"), for display. */
     accountLabel: text(),
+    /** The provider's id of that account (`acct_…`): the same account connected again is that row. */
+    accountId: text(),
+    /**
+     * What this connection's tool names start with (`stripe` → `stripe_list_customers`), set once: renaming
+     * never changes a tool's name, so per-tool grants and denials keep applying. A catalog connector's is its id.
+     * A row the previous version inserts while this one deploys (or after a rollback) gets one from a trigger
+     * (migration 0157), named as that version named its tools.
+     */
+    toolPrefix: text().notNull(),
     /** Custom servers: when an admin last saved the tool classification (null = nothing exposed yet). */
     reviewedAt: timestamp({ withTimezone: true }),
     /** MCP-native OAuth: the client registered with the server's authorization server (`oauth_clients`). */
     oauthClientId: uuid(),
+    /** MCP-native OAuth: the protected resource it was authorized for (RFC 8707), sent again with every refresh. */
+    resource: text(),
+    /**
+     * While in the future, one call is refreshing the OAuth tokens and the others wait for them: one refresh at a time
+     * across processes, with no transaction open while the provider answers.
+     */
+    refreshingUntil: timestamp({ withTimezone: true }),
     /** Custom servers: the server's own icon, kept by us (`/api/app/connector-icons/…`); null = a monogram. */
     icon: text(),
+    /** A service through Composio: its connected account (`ca_…`). */
+    composioAccountId: text(),
+    /** `active`, or `needs_reconnect` (a Composio account that stopped working: no tools until Reconectar). */
+    status: text().notNull().default("active"),
+    /** Why it needs reconnecting. */
+    lastError: text(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -44,14 +83,17 @@ export const connectorConnections = pgTable(
   },
   (t) => [
     uniqueIndex("connector_connections_one_active").on(t.orgId, t.connector).where(sql`${t.revokedAt} is null`),
+    uniqueIndex("connector_connections_tool_prefix").on(t.orgId, t.toolPrefix).where(sql`${t.revokedAt} is null`),
     index().on(t.orgId),
+    index().on(t.composioAccountId),
   ],
 );
 
 /**
  * In-flight OAuth authorizations (state + PKCE). Only the SHA-256 of `state`
  * is stored; the PKCE verifier is sealed. Single use, 10-minute lifetime, and
- * bound to the person who started it.
+ * bound to the person who started it. A Composio sign-in has no verifier: it
+ * keeps the connected account its Connect Link made instead.
  */
 export const oauthStates = pgTable(
   "oauth_states",
@@ -65,9 +107,9 @@ export const oauthStates = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     stateHash: text().notNull().unique(),
-    verifierCiphertext: text().notNull(),
-    wrappedDataKey: text().notNull(),
-    kekId: text().notNull(),
+    verifierCiphertext: text(),
+    wrappedDataKey: text(),
+    kekId: text(),
     /** MCP endpoint to store on the connection (connectors without a default URL). */
     serverUrl: text(),
     /** Where the web app wants to land afterwards (a path on our origin). */
@@ -76,6 +118,10 @@ export const oauthStates = pgTable(
     oauthClientId: uuid(),
     resource: text(),
     label: text(),
+    /** "Reconectar": the connection whose sign-in this authorization replaces (null: a new account). */
+    connectionId: uuid(),
+    /** A Composio sign-in: the connected account its Connect Link made, the only one the return may complete. */
+    composioAccountId: text(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     usedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -102,8 +148,13 @@ export const oauthClients = pgTable(
     secretCiphertext: text(),
     wrappedDataKey: text(),
     kekId: text(),
-    /** Scopes to ask for (from the protected resource metadata), space separated. */
+    /** The scope it was registered with, space separated (each authorization asks for the scope of its day). */
     scope: text(),
+    /**
+     * How we authenticate at its token endpoint: `none`, `client_secret_post` or `client_secret_basic`. Null:
+     * registered before we chose, as `none`, and a secret it gave anyway goes in the form.
+     */
+    tokenAuthMethod: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("oauth_clients_org_issuer").on(t.orgId, t.issuer)],
@@ -153,6 +204,52 @@ export const customTools = pgTable(
 );
 
 /**
+ * An MCP tool's description and input schema as first listed (ADR 0117): the model sees these, not what the server
+ * says later, until an admin accepts a change. `pending_*`: the server's newer version, kept from its first listing
+ * (`changed_at`) and replaced if it changes again. Composio's tools and the ones we serve are never pinned.
+ */
+export const connectorToolPins = pgTable(
+  "connector_tool_pins",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    connectionId: uuid()
+      .notNull()
+      .references(() => connectorConnections.id, { onDelete: "cascade" }),
+    toolName: text().notNull(),
+    /** sha256 of the canonical JSON of `{description, inputSchema}`. */
+    fingerprint: text().notNull(),
+    description: text().notNull().default(""),
+    inputSchema: jsonb().$type<Record<string, unknown>>().notNull(),
+    pinnedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    pendingFingerprint: text(),
+    pendingDescription: text(),
+    pendingSchema: jsonb().$type<Record<string, unknown>>(),
+    changedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [unique().on(t.orgId, t.connectionId, t.toolName), index().on(t.connectionId)],
+);
+
+/**
+ * Composio tool calls per workspace and calendar month (UTC, `2026-11`), counted before each call (ADR 0107 §7):
+ * every workspace shares this server's Composio project and its bill. `capped_at`: when it reached
+ * `COMPOSIO_CALLS_PER_MONTH` (its admins were told).
+ */
+export const composioUsage = pgTable(
+  "composio_usage",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    month: text().notNull(),
+    calls: integer().notNull().default(0),
+    cappedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [uniqueIndex("composio_usage_org_month").on(t.orgId, t.month)],
+);
+
+/**
  * Installations of our GitHub App (git and pull requests), each bound to the
  * one organization that installed it from the app. The app is public, so a
  * repository's installation only yields tokens for the org it belongs to;
@@ -180,4 +277,67 @@ export const githubAppInstallations = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId)],
+);
+
+/** How a connector's tools reach it: our own code, an MCP server, or this server's Composio project. */
+export type ConnectorVia = "native" | "mcp" | "composio";
+
+/**
+ * How much agents use each connector, per UTC day (ADR 0103): one row per connector key (`github`, a preset's id, a
+ * custom server's hostname, `gmail`…), way (`native`, `mcp`, `composio`), workspace, agent and tool, whose counters
+ * one upsert per call adds to. Counts and keys only: never a label, a URL's path, a tool's input or its answer.
+ * `agent_id` has no foreign key: the counts outlive a deleted agent. Day first, so reads across workspaces are
+ * range scans.
+ * ponytail: kept for good, about 5K rows a day at a few hundred active workspaces. Fold days older than a year into
+ * months once the table passes about 10M rows.
+ */
+export const connectorUsageDays = pgTable(
+  "connector_usage_days",
+  {
+    day: date({ mode: "string" }).notNull(),
+    connector: text().notNull(),
+    via: text().$type<ConnectorVia>().notNull(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    /**
+     * The server's own tool name or our verb (`search`, `git_clone`), never the name the model sees. `other` for a
+     * custom server's tools without a preset: their owner names them.
+     */
+    tool: text().notNull(),
+    calls: integer().notNull().default(0),
+    /** Results with `isError`, and tools that threw. */
+    errors: integer().notNull().default(0),
+    /** Approval requests the gateway created. */
+    approvalsAsked: integer().notNull().default(0),
+    /** Approved actions that ran. */
+    approvalsGiven: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.connector, t.via, t.orgId, t.agentId, t.tool] }), index().on(t.orgId)],
+);
+
+/**
+ * What this server asked of its own Composio project, per UTC day (ADR 0103): tool executions, trigger events
+ * (webhook deliveries) and connected accounts, which Composio bills, by toolkit (the connector key) and action (the
+ * action's or trigger's slug, `connection` for connected accounts). Composio has no usage API, so this is the only
+ * count. Same ceiling as `connector_usage_days`.
+ */
+export const composioUsageDays = pgTable(
+  "composio_usage_days",
+  {
+    day: date({ mode: "string" }).notNull(),
+    toolkit: text().notNull(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    action: text().notNull(),
+    executions: integer().notNull().default(0),
+    /** Executions Composio answered as failed. */
+    failures: integer().notNull().default(0),
+    events: integer().notNull().default(0),
+    /** Connected accounts made, a reconnect's too: Composio bills each once past the free ones. */
+    connections: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.toolkit, t.orgId, t.action] }), index().on(t.orgId)],
 );

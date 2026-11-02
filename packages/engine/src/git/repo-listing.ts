@@ -1,9 +1,8 @@
-import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
-import { activeConnections, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
+import type { Database } from "@agenteschat/db";
+import { activeConnections, type ConnectorDeps } from "../connectors/connections";
 import { requirePermission } from "../organizations";
-import { type GitHubAppConfig, type GitHubHttp, installationReadToken } from "./github-app";
-
-const { githubAppInstallations } = schema;
+import { connectionToken } from "./branches";
+import { boundInstallations, type GitHubAppConfig, type GitHubHttp, installationReadToken } from "./github-app";
 
 export interface GitHubRepositoryView {
   /** `owner/name`, as GitHub spells it. */
@@ -43,9 +42,10 @@ export interface RepoListingDeps {
 const TTL_MS = 60_000;
 /** Pages of 100 read per source (connection, each installation). */
 const MAX_PAGES = 5;
-const cache = new Map<string, { at: number; value: OrgRepositoryListing }>();
+/** By organization, with the GitHub connection it was read with (null: none). */
+const cache = new Map<string, { at: number; connectionId: string | null; value: OrgRepositoryListing }>();
 
-/** Drops an organization's cached listing (a connection or an installation changed). */
+/** Drops an organization's cached listing (an installation changed: a new connection is noticed by itself). */
 export function forgetOrgRepositories(orgId: string) {
   cache.delete(orgId);
 }
@@ -63,7 +63,7 @@ interface GitHubRepo {
  * `GET …/github/repositories`: what the org's GitHub connection sees
  * (`/user/repos`) plus the repositories of the GitHub App installations
  * bound to it (`/installation/repositories`), merged by account. Cached for
- * a minute per organization; tokens stay on the server.
+ * a minute per organization and GitHub connection; tokens stay on the server.
  */
 export async function listOrgRepositories(
   deps: RepoListingDeps,
@@ -72,8 +72,11 @@ export async function listOrgRepositories(
 ): Promise<OrgRepositoryListing> {
   await requirePermission(deps.db, actorId, orgId, "read");
   const now = deps.now?.() ?? Date.now();
+  const connection = (await activeConnections(deps.db, orgId)).find((c) => c.connector === "github");
+  const connectionId = connection?.id ?? null;
   const hit = cache.get(orgId);
-  if (hit && now - hit.at < TTL_MS) return hit.value;
+  // A connection made, replaced or removed since shows at once (the app's events forget the listing themselves).
+  if (hit && now - hit.at < TTL_MS && hit.connectionId === connectionId) return hit.value;
   const github = deps.github ?? { apiUrl: "https://api.github.com", fetch };
   const found = new Map<string, GitHubRepo>();
   let truncated = false;
@@ -94,11 +97,8 @@ export async function listOrgRepositories(
     }
   };
 
-  const connection = (await activeConnections(deps.db, orgId)).find((c) => c.connector === "github");
   if (connection) {
-    const auth = (await connectionHeaders(deps.connectors, connection).catch(() => ({}) as Record<string, string>))
-      .authorization;
-    const token = auth?.replace(/^Bearer\s+/i, "");
+    const token = await connectionToken(deps.connectors, connection).catch(() => null);
     if (token) {
       await read(
         token,
@@ -108,12 +108,7 @@ export async function listOrgRepositories(
       ).catch(() => {});
     }
   }
-  const installations = deps.app
-    ? await deps.db
-        .select({ installationId: githubAppInstallations.installationId })
-        .from(githubAppInstallations)
-        .where(and(eq(githubAppInstallations.orgId, orgId), isNull(githubAppInstallations.suspendedAt)))
-    : [];
+  const installations = deps.app ? await boundInstallations(deps.db, orgId) : [];
   for (const i of installations) {
     if (!deps.app) break;
     const token = await installationReadToken(deps.app, github, { db: deps.db, orgId }, i.installationId).catch(
@@ -158,6 +153,6 @@ export async function listOrgRepositories(
       ),
     truncated,
   };
-  cache.set(orgId, { at: now, value });
+  cache.set(orgId, { at: now, connectionId, value });
   return value;
 }

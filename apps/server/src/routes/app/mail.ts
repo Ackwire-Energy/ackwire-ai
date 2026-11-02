@@ -137,12 +137,19 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
       summary: "Which mailboxes this server can connect (Gmail/Outlook through Composio, IMAP presets)",
       request: { params: OrgParams },
       responses: {
-        200: json(z.object({ composio: z.boolean(), imap: z.boolean(), presets: z.array(MailPreset) })),
+        200: json(
+          z.object({
+            composio: z.boolean(),
+            imap: z.boolean(),
+            presets: z.array(MailPreset),
+          }),
+        ),
         ...errors,
       },
     }),
     async (c) => {
-      await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "read");
       return c.json(mailProviders(adapters.mail), 200);
     },
   );

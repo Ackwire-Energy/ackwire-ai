@@ -13,7 +13,7 @@ export interface FakeMail {
   client: ApiClient["mail"];
   accounts: MailAccount[];
   providers: MailProviders;
-  /** The next IMAP connect or password change fails with this (once). */
+  /** The next IMAP connect or password change fails with this code (once). */
   nextError: MailConnectError | null;
   /** Per agent, per mailbox. */
   agentMail: Map<string, Map<string, AgentMailbox>>;
@@ -123,7 +123,10 @@ export function createFakeMail(
       return { accountId: mockId("mail"), redirectUrl: `https://composio.example/connect/${input.provider}` };
     },
     update: async (orgId, accountId, input) => {
-      log("mail.update", orgId, accountId, { ...input, ...(input.password ? { password: "[redacted]" } : {}) });
+      log("mail.update", orgId, accountId, {
+        ...input,
+        ...(input.password ? { password: "[redacted]" } : {}),
+      });
       if (input.password) failOnce();
       const a = find(accountId);
       if (input.label) a.label = input.label;

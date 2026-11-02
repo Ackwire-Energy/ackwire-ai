@@ -1,7 +1,8 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
-import { useDecideApproval } from "@agenteschat/client";
+import { useCancelApproval, useDecideApproval } from "@agenteschat/client";
 import {
   type ApprovalAction,
+  aheadPhase,
   approvalAction,
   approvalRisk,
   approvalTraits,
@@ -9,17 +10,19 @@ import {
 } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
+  aheadEndLine,
   approvalSummary,
   approvalTitle,
   approveAlwaysHint,
   decisionOutcome,
 } from "@agenteschat/client/lib/approval-words";
-import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
+import { nextLabel, timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { ApprovalCard, Button } from "@agenteschat/ui";
+import { ApprovalCard, Button, cx, Icon } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
+import { AgentWho } from "@/components/AgentAvatar";
 import { EmailLetter } from "@/components/EmailLetter";
 import { RequestDone } from "@/components/RequestCard";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
@@ -46,10 +49,16 @@ export function decisionLabel(
   members: Map<string, Member>,
   now = new Date(),
 ) {
-  // No one decided one that ran out: it expired at its deadline.
-  const at = approval.decidedAt ?? (approval.status === "expired" ? approval.expiresAt : null);
+  // Expired at its deadline (one approved ahead, at its time), not when someone decided it.
+  const at =
+    approval.status !== "expired"
+      ? approval.decidedAt
+      : aheadPhase(approval) === "lapsed"
+        ? approval.runAt
+        : approval.expiresAt;
   const when = at ? whenAt(t, locale, at, now) : t("common.now");
   if (approval.status === "expired") return t("approval.expiredChip", { when });
+  if (approval.status === "canceled") return t("approval.canceledChip", { when });
   const mine = approval.decidedByUserId === meId;
   const name = members.get(approval.decidedByUserId ?? "")?.name ?? "";
   if (approval.status === "approved")
@@ -122,6 +131,42 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
   );
 }
 
+/** A request for an action prepared ahead: that approving covers a later run, and when (its card, its details). */
+export function AheadLine({ approval, className }: { approval: Approval; className: string }) {
+  const { t, i18n } = useTranslation();
+  if (aheadPhase(approval) !== "asking" || !approval.runAt) return null;
+  return (
+    <p className={cx(className, "ac-iconline")}>
+      <Icon name="calendar" size={16} />
+      <span>{t("approval.ahead.line", { when: nextLabel(i18n.language, approval.runAt) })}</span>
+    </p>
+  );
+}
+
+/** Withdraws an action approved ahead before its time (`canCancel`): its card in the chat, its routine's page. */
+export function CancelAhead({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const cancel = useCancelApproval(org.id);
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      icon="close"
+      disabled={cancel.isPending}
+      loading={cancel.isPending}
+      onClick={(e) => {
+        // Inside a row that opens its details: canceling stays a click of its own.
+        e.stopPropagation();
+        cancel.mutate(id, { onSuccess: () => toast.show(t("approval.ahead.canceled"), "info") });
+      }}
+    >
+      {t("approval.ahead.cancel")}
+    </Button>
+  );
+}
+
 function Actions({ approval, secondary }: { approval: Approval; secondary?: React.ReactNode }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -168,9 +213,19 @@ export function InlineApproval({
   const { me } = useOrg();
   const name = agent?.name ?? t("channel.unknownAgent");
 
+  const ahead = aheadPhase(approval);
+  const runAt = approval.runAt ? nextLabel(i18n.language, approval.runAt) : "";
   if (approval.status !== "pending") {
-    // No one decided one that ran out: it expired at its deadline.
-    const ended = approval.decidedAt ?? (approval.status === "expired" ? approval.expiresAt : null);
+    // No one decided one that ran out: it expired at its deadline (one approved ahead, at its time).
+    const ended =
+      approval.decidedAt ??
+      (approval.status !== "expired" ? null : ahead === "lapsed" ? approval.runAt : approval.expiresAt);
+    const aheadText =
+      ahead === "scheduled"
+        ? t("approval.ahead.scheduled", { when: runAt })
+        : ahead === "ran" && approval.executedAt
+          ? t("approval.ahead.ran", { when: whenAt(t, i18n.language, approval.executedAt) })
+          : aheadEndLine(t, approval);
     const summary = approvalSummary(approval, i18n.language);
     return (
       <RequestDone
@@ -193,7 +248,8 @@ export function InlineApproval({
         {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}: <b>{approvalTitle(t, approval)}</b>
         {/* What was decided, so several requests for one tool are told apart. */}
         {summary && ` · ${summary}`}
-        {ended && ` · ${whenAt(t, i18n.language, ended)}`}
+        {aheadText ? ` · ${aheadText}` : ended && ` · ${whenAt(t, i18n.language, ended)}`}
+        {ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} />}
       </RequestDone>
     );
   }
@@ -207,7 +263,14 @@ export function InlineApproval({
       status="waiting"
       aria-label={t("approval.group")}
       sky={<CardSky color={colorOf(agent)} />}
-      who={<Trans i18nKey="approval.asks" values={{ agent: name }} components={{ b: <b /> }} {...TYPED_VALUES} />}
+      who={
+        <Trans
+          i18nKey="approval.asks"
+          values={{ agent: name }}
+          components={{ b: <AgentWho agentId={approval.agentId} name={name} /> }}
+          {...TYPED_VALUES}
+        />
+      }
       statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, agent, members)}
       origin={origin ? tt(origin.key, origin.values) : undefined}
       title={approvalTitle(t, approval)}

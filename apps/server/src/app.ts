@@ -2,12 +2,13 @@ import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
+import { requestId } from "hono/request-id";
 import composeFile from "../../../docker-compose.yml" with { type: "text" };
 import installScript from "../../../install.sh" with { type: "text" };
 import { registerAppLinks } from "./app-links";
-import { authHandler } from "./auth";
-import { apiError, domainErrorResponse, validationHook } from "./http/errors";
-import { createLogger, type Logger } from "./logger";
+import { authHandler, signInPageUrl } from "./auth";
+import { apiError, domainErrorResponse, routeOf, validationHook } from "./http/errors";
+import { createLogger, type Logger, loggedPath } from "./logger";
 import { accessRoutes } from "./routes/app/access";
 import { accountRoutes } from "./routes/app/account";
 import { actionRoutes } from "./routes/app/actions";
@@ -18,6 +19,7 @@ import { artifactRoutes } from "./routes/app/artifacts";
 import { auditRoutes } from "./routes/app/audit";
 import { billingRoutes } from "./routes/app/billing";
 import { browserRoutes } from "./routes/app/browser";
+import { browserProfileRoutes } from "./routes/app/browser-profiles";
 import { calendarRoutes } from "./routes/app/calendar";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
@@ -65,10 +67,11 @@ import { registerHealth } from "./routes/health";
 import { registerInstance } from "./routes/instance";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
 import { registerWaitlist } from "./routes/waitlist";
-import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
+import { registerRoutineHooks, registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
 export interface AppOptions {
   edition: Edition;
+  /** The package's version; the config's `APP_VERSION` (the deploy's) takes its place when set. */
   version: string;
   modules: AgentesModule[];
   pingDatabase: () => Promise<void>;
@@ -99,6 +102,7 @@ export interface AppOptions {
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
+ * - `/api/hooks/*`        public: a webhook routine's own address (POST, ADR 0106)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
@@ -107,8 +111,12 @@ export interface AppOptions {
  * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
  */
+const APP_CSP =
+  "frame-ancestors 'none'; base-uri 'self'; frame-src 'self' blob: data: https://challenges.cloudflare.com";
+
 export function createApp(options: AppOptions) {
   const log = options.log ?? createLogger("warn");
+  const version = options.services?.config.APP_VERSION ?? options.version;
   const api = new OpenAPIHono({ defaultHook: validationHook() });
   api.openAPIRegistry.registerComponent("securitySchemes", "session", {
     type: "apiKey",
@@ -118,7 +126,7 @@ export function createApp(options: AppOptions) {
   });
 
   registerHealth(api, {
-    version: options.version,
+    version,
     edition: options.edition,
     modules: options.modules.map((m) => m.name),
     pingDatabase: options.pingDatabase,
@@ -126,11 +134,20 @@ export function createApp(options: AppOptions) {
   });
 
   if (options.services) {
-    const { auth, db } = options.services;
+    const { auth, config, db } = options.services;
     const handleAuth = authHandler(auth, db);
-    api.on(["GET", "POST"], "/auth/*", (c) => handleAuth(c.req.raw));
+    const serverError = signInPageUrl(config.PUBLIC_URL, { error: "server_error" });
+    api.on(["GET", "POST"], "/auth/*", async (c) => {
+      const res = await handleAuth(c.req.raw);
+      // A browser's own navigation that failed on our side (an OAuth callback): the sign-in page says so, never an
+      // empty 500. A request the app made itself keeps its answer.
+      if (res.status >= 500 && c.req.method === "GET" && c.req.header("sec-fetch-mode") === "navigate") {
+        return c.redirect(serverError, 302);
+      }
+      return res;
+    });
     const deps: AppDeps = { log, ...options.services };
-    registerInstance(api, deps, options.version);
+    registerInstance(api, deps, version);
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));
@@ -150,6 +167,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
     api.route("/app", browserRoutes(deps));
+    api.route("/app", browserProfileRoutes(deps));
     api.route("/app", desktopRoutes(deps));
     api.route("/app", notificationRoutes(deps));
     api.route("/app", pushRoutes(deps));
@@ -180,6 +198,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);
+    registerRoutineHooks(api, deps);
     registerGitHubAppWebhook(api, deps);
     registerMachinePublicRoutes(api, deps);
     registerDesktopRoutes(
@@ -214,7 +233,7 @@ export function createApp(options: AppOptions) {
     openapi: "3.1.0",
     info: {
       title: "agentes.chat API",
-      version: options.version,
+      version,
       description: "Workspace where people and AI agents work together.",
     },
   });
@@ -228,17 +247,32 @@ export function createApp(options: AppOptions) {
   app.onError((error, c) => {
     const mapped = domainErrorResponse(error, c);
     if (mapped) return mapped;
-    log.error("unhandled error", { method: c.req.method, path: c.req.path, error: String(error), stack: error.stack });
+    log.error("unhandled error", {
+      method: c.req.method,
+      path: loggedPath(c.req.path),
+      route: routeOf(c),
+      status: 500,
+      requestId: c.get("requestId"),
+      orgId: c.req.param("orgId"),
+      userId: (c.var as { user?: { id: string } }).user?.id,
+      error,
+      stack: error.stack,
+    });
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
   });
+  // Ties a request's failure in the log to its report, and to what the client saw (`X-Request-Id`).
+  app.use("/api/*", requestId());
   // Security headers on every response: the app may not be framed (clickjacking of approval, merge and deploy
-  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS.
+  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS. `frame-src`
+  // keeps a frame on our pages from navigating itself to another site with what it holds: an agent's page has no
+  // other way out (ADR 0019), and no policy inside the page can stop that. Frames are our own blobs (pages, PDFs)
+  // and the bot check.
   const httpsPublicUrl = options.services?.config.PUBLIC_URL?.startsWith("https:") ?? false;
   app.use("*", async (c, next) => {
     await next();
     const h = c.res.headers;
     if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
-    if (!h.has("content-security-policy")) h.set("content-security-policy", "frame-ancestors 'none'; base-uri 'self'");
+    if (!h.has("content-security-policy")) h.set("content-security-policy", APP_CSP);
     if (httpsPublicUrl && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=63072000");
   });
   // A CDN in front may cache by the path's extension, whatever the type: without this, a private
@@ -303,6 +337,9 @@ export function createApp(options: AppOptions) {
         c.res.headers.set("cache-control", "public, max-age=31536000, immutable");
     });
     app.use("/*", (c, next) => (isApi(c.req.path) ? next() : assets(c, next)));
+    // A build file that isn't here (asked by a page from before a deploy) is a 404, never index.html: the boot fallback
+    // and `vite:preloadError` then load the new version. No CDN keeps the 404.
+    app.get("/assets/*", (c) => c.text("Not found", 404, { "cache-control": "no-store" }));
     app.get("/*", (c, next) => (isApi(c.req.path) ? next() : spa(c, next)));
   }
 

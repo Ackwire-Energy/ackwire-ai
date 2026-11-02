@@ -5,7 +5,7 @@
  * - `MailConnector.open` gives a `MailProvider` for one account: Gmail and
  *   Outlook through Composio (`via = composio`), anything else over IMAP/SMTP
  *   (`via = imap`).
- * - `MailPoller` (IMAP only) lists messages that arrived since the last check.
+ * - `MailPoller` (IMAP) lists messages that arrived since the last check.
  * - `ComposioClient` is the Composio-specific part (connect links, connected
  *   accounts, triggers, webhooks).
  *
@@ -172,7 +172,10 @@ export interface MailPollState {
   uidValidity: number;
 }
 
-/** IMAP: messages that arrived in a folder since `state` (null = start from now, return nothing). */
+/**
+ * Messages that arrived in a folder since `state` (null = start from now, return nothing). IMAP's state is a UID
+ * and its folder's `UIDVALIDITY`.
+ */
 export interface MailPoller {
   newMessages(
     account: MailAccountRef,
@@ -204,8 +207,29 @@ export interface MailPreset {
   appPasswordUrl: string | null;
 }
 
-/** Composio (Gmail and Outlook): the account lives there; we keep its id. */
-export type ComposioToolkit = "gmail" | "outlook";
+/** A Composio toolkit (`gmail`, `googledrive`, `slack`…): the account lives there; we keep its id. */
+export type ComposioToolkit = string;
+/** The toolkits mailboxes go through (ADR 0038), the only ones with "new message" triggers. */
+export type ComposioMailToolkit = "gmail" | "outlook";
+
+/** A connected account as a tool call names it. */
+export interface ComposioAccount {
+  connectedAccountId: string;
+  /** The user id it was linked for (`createConnectLink`'s `userId`). */
+  userId: string;
+  /** Its toolkit's slug (`gmail`), for `onExecute`: an action's slug doesn't say it (`ONE_DRIVE_GET_ITEM`). */
+  toolkit: string;
+}
+
+/** One of a toolkit's tools, at a pinned version. */
+export interface ComposioTool {
+  slug: string;
+  description: string;
+  /** JSON Schema of its arguments. */
+  inputSchema: Record<string, unknown>;
+  /** Composio's tags (`readOnlyHint`, `destructiveHint`…). */
+  tags: string[];
+}
 
 export interface ComposioClient {
   /** A link the person opens to connect; Composio redirects to `callbackUrl` after. */
@@ -218,21 +242,43 @@ export interface ComposioClient {
   /**
    * State of a connected account and its mailbox address, when active (`userId`: the one it was linked for).
    * The address is read with a profile tool call, which Composio bills; `readAddress: false` skips it.
+   * `displayName`: the name Composio keeps for the account, when it has one.
    */
   getConnectedAccount(
     id: string,
     userId: string,
     options?: { readAddress?: boolean },
-  ): Promise<{ status: "active" | "pending" | "failed" | "expired"; address: string | null }>;
+  ): Promise<{
+    status: "active" | "pending" | "failed" | "expired";
+    address: string | null;
+    displayName?: string | null;
+  }>;
   /**
    * Deletes a connected account. `revoke` (the default) also revokes its grant at Google or Microsoft, which every
    * connection of the same mailbox to this server's Composio project shares. `revoke: false`: Composio only forgets
    * the account.
    */
   deleteConnectedAccount(id: string, options?: { revoke?: boolean }): Promise<void>;
+  /** A toolkit's tools at a pinned version (no tool call: not billed). */
+  listTools(toolkit: ComposioToolkit, version: string): Promise<ComposioTool[]>;
+  /**
+   * Runs one tool for a connected account (`version`: the toolkit's pinned version); returns the tool's `data`.
+   * Throws `MailAuthError` (the account stopped working), `ComposioKeyError`, `ComposioLimitError` or `MailError`.
+   */
+  executeTool(
+    slug: string,
+    account: ComposioAccount,
+    args: Record<string, unknown>,
+    version?: string,
+  ): Promise<unknown>;
+  /**
+   * Downloads a file a tool returned as a link (`s3url`, short-lived: right away). https only. Past `maxBytes` it throws
+   * `FileTooLargeError` without reading the rest.
+   */
+  fetchFile(url: string, maxBytes?: number): Promise<Uint8Array>;
   /** A "new message" trigger on the account; `query` is a Gmail search (Outlook: filtered on our side). */
   createMailTrigger(input: {
-    toolkit: ComposioToolkit;
+    toolkit: ComposioMailToolkit;
     connectedAccountId: string;
     userId: string;
     query: string | null;
@@ -247,6 +293,42 @@ export type ComposioWebhookEvent =
   | { type: "account.expired"; connectedAccountId: string }
   | { type: "trigger.disabled"; triggerId: string }
   | { type: "other" };
+
+/** Composio refused this server's project key (401/403): nothing is wrong with the account it was called for. */
+export class ComposioKeyError extends MailError {
+  constructor(message: string) {
+    super(message, false);
+    this.name = "ComposioKeyError";
+  }
+}
+
+/**
+ * A tool Composio ran that failed (`successful: false`): the message is the service's own words. `retryable` reads
+ * those words (a mailbox's quota or rate limit), not Composio's health.
+ */
+export class ComposioActionError extends MailError {
+  constructor(message: string, retryable: boolean) {
+    super(message, retryable);
+    this.name = "ComposioActionError";
+  }
+}
+
+/** A file larger than its caller keeps (`fetchFile`'s `maxBytes`). */
+export class FileTooLargeError extends MailError {
+  constructor(readonly maxBytes: number) {
+    super(`the file is larger than ${maxBytes} bytes`, false);
+    this.name = "FileTooLargeError";
+  }
+}
+
+/** The workspace used its Composio calls for the month (`COMPOSIO_CALLS_PER_MONTH`): nothing reached Composio. */
+export class ComposioLimitError extends MailError {
+  readonly code = "composio.monthly_limit";
+  constructor(message: string) {
+    super(message, false);
+    this.name = "ComposioLimitError";
+  }
+}
 
 /** A webhook whose signature doesn't verify. */
 export class ComposioSignatureError extends Error {

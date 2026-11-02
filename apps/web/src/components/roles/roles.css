@@ -59,12 +59,11 @@ html:not([data-pointer]) .roles-row:focus-visible {
   font-size: 14.5px;
   font-weight: 650;
 }
+/* The summary wraps: an ellipsis would hide what the role allows. */
 .roles-row__text span {
-  overflow: hidden;
   font-size: 13px;
   color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-wrap: pretty;
 }
 .roles-row__people {
   flex: none;

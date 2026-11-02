@@ -11,10 +11,12 @@ import {
   sessionCookieScript,
 } from "../../src/features/computer/screen-page";
 import {
+  atDesktopEdge,
   boundCamera,
   controlScale,
   cursorGain,
   DEFAULT_DESKTOP,
+  dragView,
   fitScale,
   followCursor,
   lookAt,
@@ -86,16 +88,30 @@ describe("the pointer on its way to the page", () => {
     return { l, sent, schedule, tick: () => run?.() };
   };
 
-  test("moves wait for the tick, and only the newest goes", () => {
+  test("the first move goes at once; after it, only the newest goes at each tick", () => {
     const { l, sent, schedule, tick } = line();
     l.move(1, 1);
     l.move(2, 2);
     l.move(3, 3);
-    expect(sent).toEqual([]);
+    expect(sent).toEqual([[1, 1, 0]]);
     expect(schedule).toHaveBeenCalledTimes(1);
     expect(schedule.mock.calls[0]?.[1]).toBe(POINTER_MS);
     tick();
-    expect(sent).toEqual([[3, 3, 0]]);
+    expect(sent).toEqual([
+      [1, 1, 0],
+      [3, 3, 0],
+    ]);
+  });
+
+  test("a move after a quiet tick doesn't wait", () => {
+    const { l, sent, tick } = line();
+    l.move(1, 1);
+    tick();
+    l.move(2, 2);
+    expect(sent).toEqual([
+      [1, 1, 0],
+      [2, 2, 0],
+    ]);
   });
 
   test("a click lands after the move before it, down and then up", () => {
@@ -133,9 +149,10 @@ describe("the pointer on its way to the page", () => {
   test("nothing goes after the view leaves", () => {
     const { l, sent, tick } = line();
     l.move(1, 1);
+    l.move(2, 2);
     l.stop();
     tick();
-    expect(sent).toEqual([]);
+    expect(sent).toEqual([[1, 1, 0]]);
   });
 });
 
@@ -186,6 +203,32 @@ describe("the camera over the agent's screen", () => {
     expect(cursorGain(1.6, 0.4)).toBeGreaterThan(cursorGain(0.05, 0.4) * 2);
     expect(cursorGain(99, 0.4)).toBe(cursorGain(1.6, 0.4));
     expect(cursorGain(0.5, 0.8)).toBeCloseTo(cursorGain(0.5, 0.4) / 2);
+  });
+
+  test("an easy swipe across the trackpad crosses the view", () => {
+    const s = controlScale(PHONE, desk);
+    expect(300 * cursorGain(0.6, s) * s).toBeGreaterThan(PHONE.width);
+  });
+
+  test("a finger rolls the view first, and what's left goes to the page", () => {
+    const wide = { width: 932, height: 430 };
+    const s = controlScale(wide, desk);
+    const middle = { x: 0, y: 100 };
+    const inside = dragView(middle, s, { x: 0, y: -30 }, wide, desk);
+    expect(inside.camera.y).toBeCloseTo(100 + 30 / s);
+    expect(inside.left).toBeCloseTo(0);
+    const bottom = { x: 0, y: 900 - 430 / s };
+    const past = dragView(bottom, s, { x: 0, y: -30 }, wide, desk);
+    expect(past.camera.y).toBeCloseTo(bottom.y);
+    expect(past.left).toBeCloseTo(30);
+    expect(dragView({ x: 0, y: 0 }, s, { x: 0, y: 30 }, wide, desk).left).toBeCloseTo(-30);
+  });
+
+  test("the cursor knows when it has reached the desktop's edge", () => {
+    expect(atDesktopEdge({ x: 0, y: 300 }, desk)).toBe(true);
+    expect(atDesktopEdge({ x: 1280, y: 300 }, desk)).toBe(true);
+    expect(atDesktopEdge({ x: 640, y: 900 }, desk)).toBe(true);
+    expect(atDesktopEdge({ x: 640, y: 300 }, desk)).toBe(false);
   });
 });
 

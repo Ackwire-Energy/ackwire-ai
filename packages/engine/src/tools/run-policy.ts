@@ -14,16 +14,15 @@ import type { ToolDefinition } from "./types";
  *   `hand_off`; scopes and the tools' own approvals decide. A tool that needs a person's request
  *   refuses on its own when nobody is behind the run.
  * - `unattended` that a routine's report or work woke (`fedByRoutine`): what the routine read (inbound mail, a
- *   webhook) feeds it, so it keeps the routine's bounds (below, by the routine's `brief`), plus the reply where it
- *   is (`here`), never `hand_off` nor a mission's tools; every write to a connected app asks a person.
- * - `routine`, any access: nothing that speaks for someone (reactions, GIFs and stickers, questions,
- *   reminders, routines, events, forum, channels, secrets, permissions). It reports through `hand_off`.
- * - `routine`, access `read`: reads only, plus `hand_off`.
- * - `routine`, access `act`: also internal changes people can undo (issues, memory, wiki, Drive, its
- *   own branches and pull requests, its computer); every write to a connected app asks a person. It
- *   reaches other agents (`ask_agent`, `tell_agent`) and posts where its creator can post (`post_message`,
- *   `send_dm` to its creator): the tools hold it to its creator's rooms and agents (ADR 0053 §2, amended
- *   2026-10-31).
+ *   webhook) feeds it, so it keeps the routine's bounds (below), plus the reply where it is (`here`), never
+ *   `hand_off` nor a mission's tools; every write to a connected app asks a person.
+ * - `routine`: nothing that speaks for someone (reactions, GIFs and stickers, questions, reminders,
+ *   routines, events, forum, channels, secrets, permissions). It reports through `hand_off`. Otherwise it
+ *   works as the agent (ADR 0109: one permission model, the agent's own): reads, the web and the browser,
+ *   internal changes people can undo (issues, memory, wiki, Drive, its own branches and pull requests, its
+ *   computer); every write to a connected app asks a person. It reaches other agents (`ask_agent`,
+ *   `tell_agent`) and posts where its creator can post (`post_message`, `send_dm` to its creator): the
+ *   tools hold it to its creator's rooms and agents (ADR 0053 §2, amended 2026-10-31).
  *
  * Tool names are written here as plain strings (not imported) so the table loads before the tool
  * modules, which import the gateway.
@@ -40,7 +39,7 @@ export type ToolKind =
   | { kind: "hand_off" }
   /** `pass`: ends the run without a message. */
   | { kind: "pass" }
-  /** `set_status`: the agent's own line next to its name (ADR 0084), nothing else. */
+  /** `set_status` (the agent's own line next to its name, ADR 0084) and `withdraw_request` (its own open requests): nothing else. */
   | { kind: "self" }
   /** Speaks in the run's own conversation (a reaction, a question, a card people act on). */
   | { kind: "here" }
@@ -76,6 +75,7 @@ const ELSEWHERE = new Set([
   "tell_agent",
   "schedule_reminder",
   "cancel_reminder",
+  "schedule_action",
   "create_routine",
   "update_routine",
   "delete_routine",
@@ -90,7 +90,7 @@ const ELSEWHERE = new Set([
   "propose_event",
 ]);
 
-/** What a routine set to act may use of `ELSEWHERE`, by name. */
+/** What a routine may use of `ELSEWHERE`, by name. */
 const ROUTINE_REACH = new Set(["post_message", "send_dm", "ask_agent", "tell_agent"]);
 
 /** Speaks in the run's own conversation, by name. */
@@ -99,6 +99,8 @@ const HERE = new Set([
   "send_gif",
   "send_sticker",
   "ask_user",
+  "show_block",
+  "start_poll",
   "share_artifact",
   "suggest_forum_topic",
   "propose_mission",
@@ -124,6 +126,8 @@ const READS = new Set([
   "list_tasks",
   "task_status",
   "get_context",
+  "web_search",
+  "web_fetch",
 ]);
 
 /**
@@ -164,6 +168,8 @@ const isReadScope = (scope: string) => /[:.]read$/.test(scope);
 /** What a tool does (see `ToolKind`): provenance first, then built-in name and scope. */
 export function toolKind(tool: PolicyTool): ToolKind {
   if (directoryRole(tool as ToolDefinition)) return { kind: "directory" };
+  // A way in like a directory's: the gateway runs the action approved ahead it names, judged as that action.
+  if (tool.name === "run_approved_action" && !tool.connectionId && tool.scope === "") return { kind: "directory" };
   // These Git tools carry a connection ID for credentials, but they are our own
   // workspace-changing actions. Their exact scopes distinguish them from MCP tools.
   if (tool.name === "git_clone" && tool.scope === "github:git.read") return { kind: "internal", area: "code" };
@@ -177,7 +183,7 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "pass") return { kind: "pass" };
-  if (tool.name === "set_status") return { kind: "self" };
+  if (tool.name === "set_status" || tool.name === "withdraw_request") return { kind: "self" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
   if (MISSION.has(tool.name)) return { kind: "mission" };
   if (ELSEWHERE.has(tool.name)) return { kind: "elsewhere" };
@@ -196,23 +202,14 @@ export function toolKind(tool: PolicyTool): ToolKind {
 export const REFUSALS = {
   routineElsewhere:
     "This is a routine's background work: it can't manage routines or reminders, propose events, open forum topics, change channels, or ask for secrets or permissions. Put it in hand_off; the people decide.",
-  routineReachReadOnly:
-    "This routine only looks and tells, as its creator set it: it can't post, send DMs, or ask or tell other agents. Say in hand_off what you'd send and to whom; a person can set the routine to act so it does that itself.",
   routineAskUser:
     "This is a routine's background work: nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
   routineReact: "This is a routine's background work: there is no message to react to. Just finish, or use hand_off.",
   routineMedia:
     "This is a routine's background work: nobody is in its room to send a GIF or a sticker to. Just finish, or use hand_off.",
   routineHere: "This is a routine's background work in a room nobody reads: put it in hand_off; the people decide.",
-  routineReadOnly: "This routine only reads and reports: put what you'd do in hand_off; the people decide.",
-  routineBrowserReadOnly:
-    "This routine only reads and reports, and the browser can send data out: use your other tools, and say in hand_off what you'd check.",
-  routineDesktopReadOnly:
-    "This routine only reads and reports, and the desktop can run anything on the computer and send data out: use your other tools, and say in hand_off what you'd check.",
   fedElsewhere:
     "A routine's report or work started this, so you keep within what that routine may do: you can't manage routines or reminders, propose events, open forum topics, change channels, ask for secrets or permissions, or use this tool. Say it in your reply here; the people decide.",
-  fedReadOnly:
-    "A routine that only looks and tells started this, so you change nothing and reach no one else yourself (no browser, desktop, code, posts elsewhere or other agents). Say in your reply what you'd do; a person asks you to go ahead.",
   fedMission:
     "A routine's report or work started this, not the mission: say in your reply what you'd do; the people decide.",
   handOffOnly: "Only background work (a routine's run) hands off: just reply.",
@@ -220,12 +217,6 @@ export const REFUSALS = {
     "A routine's background work doesn't start a mission's tasks or upload its files: put what you'd do in hand_off; the people decide.",
   unknownTool: "A routine's background work can't use this tool: put what you'd do in hand_off; the people decide.",
 } as const;
-
-/** Areas whose refusal in a read-only routine says why they aren't reads. */
-const READ_ONLY_REFUSAL: Partial<Record<InternalArea, string>> = {
-  browser: REFUSALS.routineBrowserReadOnly,
-  desktop: REFUSALS.routineDesktopReadOnly,
-};
 
 /** Tools that speak here whose refusal in a routine says what it does instead, by name; any other: `routineHere`. */
 const ROUTINE_HERE_REFUSAL: Readonly<Record<string, string>> = {
@@ -246,8 +237,7 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
   const fed = authority.kind === "unattended" && fedByRoutine(authority);
   if (authority.kind !== "routine" && !fed) return what.kind === "hand_off" ? refuse(REFUSALS.handOffOnly) : ALLOW;
   // What a routine read feeds a run its report or work woke (`fedByRoutine`): that run keeps the routine's
-  // bounds (`brief`, read-only when unknown), replies where it is, and asks a person before writing to a connected app.
-  const acts = authority.brief?.access === "act";
+  // bounds, replies where it is, and asks a person before writing to a connected app.
   switch (what.kind) {
     case "read":
       return ALLOW;
@@ -255,15 +245,13 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
       return fed ? refuse(REFUSALS.handOffOnly) : ALLOW;
     case "elsewhere":
       if (!ROUTINE_REACH.has(tool.name)) return refuse(fed ? REFUSALS.fedElsewhere : REFUSALS.routineElsewhere);
-      if (acts) return ALLOW;
-      return refuse(fed ? REFUSALS.fedReadOnly : REFUSALS.routineReachReadOnly);
+      return ALLOW;
     case "here":
       return fed ? ALLOW : refuse(ROUTINE_HERE_REFUSAL[tool.name] ?? REFUSALS.routineHere);
     case "internal":
-      if (acts) return ALLOW;
-      return refuse(fed ? REFUSALS.fedReadOnly : (READ_ONLY_REFUSAL[what.area] ?? REFUSALS.routineReadOnly));
+      return ALLOW;
     case "external":
-      return acts || fed ? APPROVE : refuse(REFUSALS.routineReadOnly);
+      return APPROVE;
     case "mission":
       return refuse(fed ? REFUSALS.fedMission : REFUSALS.missionOnly);
     case "unknown":

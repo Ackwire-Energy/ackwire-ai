@@ -1051,14 +1051,14 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(document.querySelector(".onb__paid")).toBeNull();
     cleanup();
 
-    // A workspace that can't be read back opens as it is, never set up again.
+    // A workspace that can't be read back opens as it is (Início), never set up again.
     const lostState = seedState();
     const gone = createFakeApi(lostState);
     gone.orgs.settings = async () => {
       throw new Error("offline");
     };
     const lost = await open(`/org/${ORG_ID}/onboarding`, { state: null }, lostState, gone);
-    expect(lost.router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/c/`));
+    expect(lost.router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
   });
 
   test("back from paying before the billing service lifts the hold: the payment being confirmed, asked again every 5 s until it does", async () => {
@@ -1503,10 +1503,12 @@ describe("the onboarding where the workspace gets its own computer", () => {
         accountsIn = done;
       });
       const brain = r.api.agents.brain;
+      // The Cloud's computer has Cursor's CLI for every agent, as Claude's and Codex's: its tile is ready too.
+      const cursor = { kind: "cursor" as const, available: true, experimental: false, models: [], defaultModel: null };
       r.api.agents.brain = async (...args) => {
-        const answer = brain(...args);
+        const answer = await brain(...args);
         await viewBack;
-        return answer;
+        return { ...answer, options: [...answer.options, cursor] };
       };
       const accounts = r.api.machines.aiAccounts;
       r.api.machines.aiAccounts = async (...args) => {

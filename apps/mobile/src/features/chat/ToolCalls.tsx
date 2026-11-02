@@ -8,7 +8,10 @@ import {
   formatDuration,
   formatLineTime,
   oneCall,
+  quietLine,
+  quietWork,
   savedOneLine,
+  showsActivity,
   type ToolItem,
   type ToolLine,
   type ToolState,
@@ -31,6 +34,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
 import { stopBreath } from "@/agent/orbit";
+import { useOrg } from "@/providers/org";
 import {
   CHROME_MAX_SCALE,
   Icon,
@@ -104,6 +108,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   browsing: "globe",
   checkingComputer: "laptop",
   checkingUsage: "chart",
+  findingAgent: "agent",
   proposingMission: "flag",
   messagingMission: "flag",
   updatingPlan: "flag",
@@ -611,9 +616,12 @@ export function TurnTools({
   settled?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const blockItems = useBlockItems(items);
   const logo = useLogo();
-  const now = toolNow(items);
+  // A lone quick read that only fed the answer: no card, as if it called nothing. Done, its tools are the summary
+  // the person chose not to see (`showActivity`) unless they turned it on.
+  const now = quietWork(items) || (done && !showsActivity(org)) ? null : toolNow(items);
   if (!now) {
     // Done without a call: its words are the reply now; only the messages it read stay.
     const shown = done ? items.filter((i) => i.kind === "steer") : items;
@@ -690,6 +698,7 @@ export function SavedTools({
 }) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
+  const { org } = useOrg();
   const [open, setOpen] = useState(false);
   const run = useRun(orgId, open ? runId : null);
   const logo = useLogo();
@@ -703,11 +712,15 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  if (!compact || workSteps(compact) === 0) return null;
-  const calls = work ? toolCalls(items) : compact.steps;
-  const lone = savedOneLine(meta);
-  // Its only call has a card of its own on the message (where it browsed): the card says it.
-  if (lone && onCard(lone.tool)) return null;
+  // Nothing more to show than the message does: no tools (lookups and reactions aren't counted), or only the ones
+  // its own cards show (where it browsed).
+  const shown = compact ? workSteps(compact, onCard) : 0;
+  if (!compact || shown === 0 || !showsActivity(org)) return null;
+  const calls = work ? toolCalls(items) : shown;
+  const lone = savedOneLine(meta, onCard);
+  // Its one call (beside the screens' on their cards) only fed the answer (`quietLine`): the reply says it. Time
+  // unknown (saved before the server wrote it): kept, it may have failed.
+  if (lone && lone.ms !== null && quietLine(lone)) return null;
   const durationMs = work?.durationMs ?? compact.durationMs;
   const apps = work ? toolApps(items) : workApps(compact.calls.filter((c) => !onCard(c.name)));
   const note = (key: string, node: ReactNode): BlockItem => ({ kind: "note", key, node });
@@ -741,23 +754,14 @@ export function SavedTools({
       />
     );
   }
-  const status: BlockItem[] = pending
-    ? [note(run.isError ? "error" : "loading", pending)]
-    : items.length === 0
-      ? [
-          note(
-            "none",
-            <Text variant="footnote" tone="muted">
-              {t("chat.work.none")}
-            </Text>,
-          ),
-        ]
-      : [];
+  // Never a block that opens on nothing.
+  if (work && calls === 0) return null;
+  const status: BlockItem[] = pending ? [note(run.isError ? "error" : "loading", pending)] : [];
   return (
     <ToolBlock
       logos={apps.map((a) => ({ key: appKey(a), node: logo(a, 18) }))}
       head={{
-        text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.see", agentGrammar(t, agentName)),
+        text: t("chat.work.used", { count: calls }),
         time: durationMs !== null ? formatDuration(t, durationMs) : undefined,
       }}
       items={[...status, ...blockItems]}

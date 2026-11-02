@@ -16,8 +16,9 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
+import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceError, canTalkTo, talksToAgents } from "./audience";
+import { audienceError, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
 import { brainOf } from "./brain-settings";
 import type { BrainKind } from "./brains/types";
@@ -54,6 +55,13 @@ import {
 } from "./routine-brief";
 import { enqueueRoutineJob, queueEventRun, startGatheredRun } from "./routine-events";
 import { claimRoutineRun, haltRoutineRuns, makeWayForRun, skipRoutineRun, unclaimRoutineRun } from "./routine-firing";
+import {
+  ensureRoutineHook,
+  liveHookUrl,
+  type RoutineHookConfig,
+  routineHookKeys,
+  WEBHOOK_EVENT,
+} from "./routine-hooks";
 import { afterRoutineRunEnded, endRoutineRun } from "./routine-ledger";
 import { startRoutineRun } from "./routine-room";
 import { pauseRoutine, personCanPost, type RoutinePausedReason } from "./routine-state";
@@ -108,6 +116,8 @@ export const ROUTINE_EVENTS = [
   "deploy.succeeded",
   /** New mail in a watched mailbox folder (only through an `email` trigger: it needs a watch). */
   "email.received",
+  /** A call to the routine's own address (only through a `webhook` trigger: ADR 0106). */
+  "webhook.received",
 ] as const;
 export type RoutineEvent = (typeof ROUTINE_EVENTS)[number];
 /**
@@ -170,7 +180,12 @@ export type RoutineTrigger =
       folder: string;
       filter: MailFilter;
       status?: "active" | "needs_reconnect" | "error";
-    };
+    }
+  /**
+   * A call to its own address (ADR 0106), stored as the event `webhook.received` plus a `routine_hooks` row. `url`
+   * only for who may manage it (null for everyone else and for agents); `signed`: calls must carry a signature.
+   */
+  | { type: "webhook"; url: string | null; signed: boolean };
 
 /**
  * A routine run as Rotinas shows it (ADR 0053 §5): the open ledger states read with its agent run
@@ -264,6 +279,8 @@ export interface RoutineView {
   recentRuns: RoutineRunView[];
   /** The last week: runs that started the agent, tokens and cost; `plan` when a computer brain's plan paid. */
   usage: { runs: number; tokens: number; costNanoUsd: number; billedTo: "api" | "plan" | "mixed" };
+  /** Actions approved ahead for its runs (or waiting to be) that may still run, soonest first; readers only. */
+  ahead: RoutineAheadView[];
 }
 
 export interface RoutineInput {
@@ -277,6 +294,8 @@ export interface RoutineInput {
   access?: RoutineAccess;
   /** When it speaks (default `when_new`). */
   report?: RoutineReport;
+  /** Created paused: no next run, so the active-routine cap doesn't apply. */
+  paused?: boolean;
 }
 
 export type RoutineTriggerInput =
@@ -292,7 +311,9 @@ export type RoutineTriggerInput =
   /** Once, at this moment (ISO 8601). */
   | { type: "once"; at: string; timezone?: string }
   /** New mail in a mailbox the routine's agent can read; `folder` default the inbox. */
-  | { type: "email"; accountId: string; folder?: string; filter?: MailFilter };
+  | { type: "email"; accountId: string; folder?: string; filter?: MailFilter }
+  /** A call to an address of its own (made with it, kept while its trigger changes). */
+  | { type: "webhook" };
 
 export interface RoutineDeps {
   db: Database;
@@ -303,6 +324,8 @@ export interface RoutineDeps {
   context?: ContextDeps;
   /** Mail adapters: email routines on Gmail/Outlook create and delete Composio triggers. */
   mail?: MailAdapters | null;
+  /** Webhook routines' addresses: needed to make one, and to show it to who manages the routine. */
+  hooks?: RoutineHookConfig;
 }
 
 type RoutineRow = typeof routines.$inferSelect;
@@ -328,7 +351,14 @@ export function routineSlots(r: Pick<RoutineRow, "rule" | "cron" | "timezone">, 
   return out;
 }
 
-function triggerOf(r: RoutineRow, watch?: MailWatchRow): RoutineTrigger {
+function triggerOf(
+  r: RoutineRow,
+  watch?: MailWatchRow,
+  hook?: { url: string | null; signed: boolean },
+): RoutineTrigger {
+  if (r.triggerType === "event" && r.event === WEBHOOK_EVENT) {
+    return { type: "webhook", url: hook?.url ?? null, signed: hook?.signed ?? false };
+  }
   if (r.triggerType === "event" && r.event === "email.received" && watch) {
     return {
       type: "email",
@@ -539,6 +569,8 @@ interface ViewerRights {
   manages: boolean;
   /** Its prompt is shown even to who doesn't read it (a public channel's or a forum routine). */
   publicPrompt: boolean;
+  /** Withdraws what was approved ahead for its runs: who manages it, and who may approve the agent's actions. */
+  cancelsAhead: boolean;
 }
 
 /**
@@ -556,7 +588,10 @@ async function viewerRights(
   const [member, owners, channelRows, joined] = await Promise.all([
     lookup(viewerId ? [viewerId] : [], () =>
       db
-        .select({ may: maySql(orgId, viewerId ?? "", "manage_routines") })
+        .select({
+          may: maySql(orgId, viewerId ?? "", "manage_routines"),
+          approves: maySql(orgId, viewerId ?? "", "approve_actions"),
+        })
         .from(organizationMembers)
         .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, viewerId ?? ""))),
     ),
@@ -599,12 +634,13 @@ async function viewerRights(
       manages,
       reads: !viewerId || manages || target.type === "forum" || (!!channelId && inChannel.has(channelId)),
       publicPrompt: target.type === "forum" || (!!channelId && publicChannels.has(channelId)),
+      cancelsAhead: manages || me?.approves === true,
     });
   }
   return out;
 }
 
-const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex"];
+const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor"];
 const brainKindOf = (v: unknown): BrainKind => (BRAINS.includes(v as BrainKind) ? (v as BrainKind) : "model");
 
 /** Who paid the week: a computer brain's plan, the API, or both; no usage yet: what its brain would bill. */
@@ -618,11 +654,15 @@ function billedTo(
   return kind === "model" ? "api" : "plan";
 }
 
-/** Routines as `viewerId` sees them (see `viewerRights`), with their state, last week's health and usage. */
+/**
+ * Routines as `viewerId` sees them (see `viewerRights`), with their state, last week's health and usage; a webhook
+ * routine's address only for who manages it, and only with `hooks`.
+ */
 async function views(
   db: Database,
   rows: RoutineRow[],
   viewerId: string | null,
+  hooks?: RoutineHookConfig,
   now = new Date(),
 ): Promise<RoutineView[]> {
   const first = rows[0];
@@ -648,12 +688,16 @@ async function views(
   const inWeek = and(eq(routineRuns.orgId, orgId), inArray(routineRuns.routineId, ids), gte(routineRuns.at, since));
   const webhookOf = (r: RoutineRow) => (r.triggerType === "event" ? EVENT_WEBHOOK[r.event as RoutineEvent] : undefined);
   const wantedHooks = [...new Set(rows.flatMap((r) => webhookOf(r) ?? []))];
-  const [details, rights, watches, weekRows, usageRows, agentRows, hookRows] = await Promise.all([
+  const [details, rights, watches, hookKeys, weekRows, usageRows, agentRows, hookRows, ahead] = await Promise.all([
     runDetails(db, orgId, recentRows),
     viewerRights(db, orgId, rows, viewerId),
     watchesOf(
       db,
       rows.filter((r) => r.event === "email.received").map((r) => r.id),
+    ),
+    routineHookKeys(
+      db,
+      rows.filter((r) => r.event === WEBHOOK_EVENT).map((r) => r.id),
     ),
     db
       .select({
@@ -693,6 +737,7 @@ async function views(
           ),
         ),
     ),
+    routinesAhead(db, orgId, ids, viewerId, now),
   ]);
   const hooked = new Set(hookRows.map((h) => h.provider));
   const machineIds = [
@@ -715,6 +760,12 @@ async function views(
     week.set(w.routineId, [...(week.get(w.routineId) ?? []), entry]);
   }
   const usageOf = new Map(usageRows.map((u) => [u.routineId, u]));
+  const hookUrls = new Map<string, string>();
+  if (hooks) {
+    for (const [routineId, hook] of hookKeys) {
+      if (rights.get(routineId)?.manages) hookUrls.set(routineId, await liveHookUrl(db, hooks, hook));
+    }
+  }
   return rows.map((r): RoutineView => {
     const right = rights.get(r.id) as ViewerRights;
     const lastRuns = recent.get(r.id) ?? [];
@@ -775,13 +826,14 @@ async function views(
     const agent = agentById.get(r.agentId);
     const kind = brainKindOf(agent?.brain);
     const used = usageOf.get(r.id);
+    const hookKey = hookKeys.get(r.id);
     return {
       id: r.id,
       name: r.name,
       agentId: r.agentId,
       prompt: right.reads || right.publicPrompt ? r.prompt : null,
       target: targetOf(r),
-      trigger: triggerOf(r, watches.get(r.id)),
+      trigger: triggerOf(r, watches.get(r.id), hookKey && { url: hookUrls.get(r.id) ?? null, signed: hookKey.signed }),
       active: r.active,
       nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
       createdAt: r.createdAt.toISOString(),
@@ -807,14 +859,23 @@ async function views(
         costNanoUsd: Number(used?.cost ?? 0),
         billedTo: billedTo(used, kind),
       },
+      ahead: right.reads ? (ahead.get(r.id) ?? []).map((a) => ({ ...a, canCancel: right.cancelsAhead })) : [],
     };
   });
 }
 
 /** One routine as the person sees it (after a stop or a take-over, for instance). */
-export async function getRoutineView(db: Database, actorId: string, orgId: string, id: string) {
+export async function getRoutineView(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  id: string,
+  hooks?: RoutineHookConfig,
+) {
   await requirePermission(db, actorId, orgId, "read");
-  const [view] = await views(db, [await loadRoutine(db, orgId, id)], actorId);
+  const row = await loadRoutine(db, orgId, id);
+  if (!(await routineSeer(db, orgId, actorId))(row)) throw new NotFoundError("Routine not found");
+  const [view] = await views(db, [row], actorId, hooks);
   return view as RoutineView;
 }
 
@@ -937,8 +998,11 @@ async function resolveTrigger(
     normalizeMailFilter(trigger.filter);
     return { ...none, triggerType: "event", event: "email.received" as string | null, nextRunAt: null as Date | null };
   }
-  // Mail events need a mailbox and a folder: only through an `email` trigger.
-  if (!ROUTINE_EVENTS.includes(trigger.event) || trigger.event === "email.received")
+  if (trigger.type === "webhook") {
+    return { ...none, triggerType: "event", event: WEBHOOK_EVENT as string | null, nextRunAt: null as Date | null };
+  }
+  // Mail events need a mailbox and a folder, webhook calls an address: only through their own triggers.
+  if (!ROUTINE_EVENTS.includes(trigger.event) || trigger.event === "email.received" || trigger.event === WEBHOOK_EVENT)
     throw new ValidationError("Unknown event", "routine.unknown_event");
   return { ...none, triggerType: "event", event: trigger.event as string | null, nextRunAt: null as Date | null };
 }
@@ -1063,14 +1127,15 @@ export async function createRoutine(
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // A routine asks the agent on its creator's behalf: only people who can talk to it create one.
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
   await checkTarget(db, orgId, agent.id, input.target, actorId);
   const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
   checkFrequency(trigger, input.target);
-  if (startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
+  if (!input.paused && startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
   if (input.trigger.type === "email") await checkWatchable(db, orgId, agent.id, input.trigger.accountId);
+  const hooks = input.trigger.type === "webhook" ? hooksOf(deps) : null;
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Routine";
   const [row] = await db
     .insert(routines)
@@ -1081,6 +1146,7 @@ export async function createRoutine(
       prompt,
       target: input.target as unknown as Record<string, unknown>,
       ...trigger,
+      ...(input.paused ? { active: false, nextRunAt: null } : {}),
       access: routineAccessOf(input.access),
       report: routineReportOf(input.report),
       createdByUserId: actorId,
@@ -1088,6 +1154,7 @@ export async function createRoutine(
     .returning();
   if (!row) throw new Error("routine insert returned nothing");
   if (input.trigger.type === "email") await syncMailWatch(deps, row, emailWatch(input.trigger));
+  if (hooks) await ensureRoutineHook(db, hooks, row);
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -1095,19 +1162,57 @@ export async function createRoutine(
     target: { type: "routine", id: row.id },
     details: { agentId: agent.id, trigger: input.trigger.type, access: row.access, report: row.report },
   });
-  const [view] = await views(db, [row], actorId);
+  const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
 }
 
+/** The addresses' config, which a webhook routine can't be made without (the server always passes it). */
+function hooksOf(deps: RoutineDeps): RoutineHookConfig {
+  if (!deps.hooks) throw new Error("webhook routines need the server's address and secret");
+  return deps.hooks;
+}
+
 /** The organization's routines as the person sees them (ADR 0053 §9: outcomes only where they don't read). */
-export async function listRoutines(db: Database, actorId: string, orgId: string) {
+export async function listRoutines(db: Database, actorId: string, orgId: string, hooks?: RoutineHookConfig) {
   await requirePermission(db, actorId, orgId, "read");
   const rows = await db
     .select()
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
-  return views(db, rows, actorId);
+  const sees = await routineSeer(db, orgId, actorId);
+  return views(db, rows.filter(sees), actorId, hooks);
+}
+
+/**
+ * Whether `viewerId` sees a routine at all (its name, schedule, runs): who manages it (its creator, admins, the
+ * agent's owner), who manages agents, or who the agent answers. The agents list's own rule (`listsAgent` in the
+ * apps), so an agent hidden from someone doesn't show through its routines on Início, Rotinas or the calendar.
+ */
+export async function routineSeer(
+  db: Database,
+  orgId: string,
+  viewerId: string,
+): Promise<(r: Pick<RoutineRow, "agentId" | "createdByUserId">) => boolean> {
+  const [membership, agentRows] = await Promise.all([
+    getMembership(db, viewerId, orgId),
+    db
+      .select({
+        id: agents.id,
+        ownerUserId: agents.ownerUserId,
+        audienceMode: agents.audienceMode,
+        audienceUserIds: agents.audienceUserIds,
+        audienceRoleIds: agents.audienceRoleIds,
+        consultable: agents.consultable,
+        brain: agents.brain,
+      })
+      .from(agents)
+      .where(eq(agents.orgId, orgId)),
+  ]);
+  if (can(membership, "manage_routines") || can(membership, "manage_agents")) return () => true;
+  const talks = speakerOf(membership);
+  const listed = new Set(agentRows.filter((a) => canTalkTo(a, viewerId, talks)).map((a) => a.id));
+  return (r) => r.createdByUserId === viewerId || listed.has(r.agentId);
 }
 
 /**
@@ -1152,6 +1257,19 @@ async function requireRoutineEditor(db: Database, actorId: string, orgId: string
   }
 }
 
+/**
+ * A webhook routine whose address the person manages (ADR 0106): its creator, admins or the agent's owner, as for
+ * editing it. One without a webhook is not found.
+ */
+export async function managedWebhookRoutine(db: Database, actorId: string, orgId: string, id: string) {
+  const routine = await loadRoutine(db, orgId, id);
+  await requireRoutineEditor(db, actorId, orgId, routine);
+  if (routine.event !== WEBHOOK_EVENT) {
+    throw new NotFoundError("This routine isn't started by a webhook", "routine.no_webhook");
+  }
+  return routine;
+}
+
 export interface RoutinePatch {
   name?: string;
   prompt?: string;
@@ -1191,7 +1309,7 @@ export async function updateRoutine(
   }
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (set.agentId && !canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId)))
+  if (set.agentId && !canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId)))
     throw await audienceError(db, agent);
   if (patch.name !== undefined) {
     const name = patch.name.trim().slice(0, 120);
@@ -1210,15 +1328,11 @@ export async function updateRoutine(
   }
   if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
   if (patch.report !== undefined) set.report = routineReportOf(patch.report);
-  // A routine set to act reaches what its creator reaches (their rooms, the agents they talk to), so
-  // only its creator may decide what it does with that; anyone else takes it over first.
-  const access = set.access ?? current.access;
+  // A routine reaches what its creator reaches (their rooms, the agents they talk to), so only its
+  // creator may decide what it does with that; anyone else takes it over first.
   if (
     actorId !== current.createdByUserId &&
-    access === "act" &&
-    (access !== current.access ||
-      (set.prompt !== undefined && set.prompt !== current.prompt) ||
-      set.agentId !== undefined)
+    ((set.prompt !== undefined && set.prompt !== current.prompt) || set.agentId !== undefined)
   ) {
     throw new ForbiddenError("Take the routine over before setting what it does as it acts", "routine.act_take_over");
   }
@@ -1259,9 +1373,10 @@ export async function updateRoutine(
           ? (set.nextRunAt ?? current.nextRunAt)
           : null;
   }
+  const hooks = patch.trigger?.type === "webhook" ? hooksOf(deps) : null;
   const changed = Object.keys(set).filter((k) => k !== "nextRunAt") as (keyof typeof set)[];
   if (changed.length === 0 && set.nextRunAt === undefined) {
-    const [view] = await views(db, [current], actorId);
+    const [view] = await views(db, [current], actorId, deps.hooks);
     return view as RoutineView;
   }
   const [row] = await db
@@ -1270,10 +1385,17 @@ export async function updateRoutine(
     .where(and(eq(routines.id, current.id), eq(routines.orgId, orgId)))
     .returning();
   if (!row) throw new NotFoundError("Routine not found");
+  // What was approved ahead covered its next run at that time, for that agent: a run moved or gone (paused: a
+  // one-off resumed never fires again) or another agent needs a new approval.
+  const moved = current.nextRunAt?.getTime() !== row.nextRunAt?.getTime();
+  if (moved || row.agentId !== current.agentId) {
+    await cancelRoutineAhead(deps, orgId, row.id, actorId);
+  }
   if (mailTrigger || watched.has(current.id)) {
     if (mailTrigger && patch.active === true && !current.active) await resetMailWatchState(db, row.id);
     await syncMailWatch(deps, row, mailTrigger);
   }
+  if (hooks) await ensureRoutineHook(db, hooks, row);
   // Pausing also stops its work in progress (§6.7); resuming clears why it paused itself.
   if (patch.active === false && current.active) {
     await haltRoutineRuns(deps, orgId, row.id, { code: "paused", byUserId: actorId });
@@ -1293,7 +1415,7 @@ export async function updateRoutine(
     target: { type: "routine", id: row.id },
     details: { before, after },
   });
-  const [view] = await views(db, [row], actorId);
+  const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
 }
 
@@ -1320,6 +1442,7 @@ async function dropRoutine(deps: RoutineDeps, actorId: string, current: RoutineR
     .set({ active: false, nextRunAt: null, deletedAt: new Date(), updatedAt: new Date() })
     .where(eq(routines.id, current.id));
   await haltRoutineRuns(deps, orgId, current.id, { code: "deleted", byUserId: actorId });
+  await cancelRoutineAhead(deps, orgId, current.id, actorId);
   // A mail routine's watch (and its Composio trigger) goes with it.
   await syncMailWatch(deps, current, null);
   await recordAudit(deps.db, {
@@ -1347,7 +1470,7 @@ export async function duplicateRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   // Whoever copies it becomes its creator: they must be able to post where it reports.
   await checkTarget(db, orgId, agent.id, targetOf(current), actorId);
   const { id: _id, createdAt: _c, updatedAt: _u, lastRunAt: _l, deletedAt: _d, ...copy } = current;
@@ -1369,6 +1492,8 @@ export async function duplicateRoutine(
   if (watch) {
     await syncMailWatch(deps, row, { accountId: watch.accountId, folder: watch.folder, filter: watch.filter });
   }
+  // A webhook routine's copy gets an address of its own, without a signing secret: never the original's.
+  if (row.event === WEBHOOK_EVENT && deps.hooks) await ensureRoutineHook(db, deps.hooks, row);
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -1376,7 +1501,7 @@ export async function duplicateRoutine(
     target: { type: "routine", id: row.id },
     details: { from: current.id },
   });
-  const [view] = await views(db, [row], actorId);
+  const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
 }
 
@@ -1399,14 +1524,16 @@ export async function setRoutineActive(
     .set({ active, nextRunAt, updatedAt: new Date(), ...(active ? { pausedReason: null, failuresInRow: 0 } : {}) })
     .where(eq(routines.id, id))
     .returning();
-  if (!active) await haltRoutineRuns(deps, orgId, id, { code: "paused", byUserId: actorId });
-  else await resolveRoutinePaused(deps, orgId, id).catch(() => {});
+  if (!active) {
+    await haltRoutineRuns(deps, orgId, id, { code: "paused", byUserId: actorId });
+    await cancelRoutineAhead(deps, orgId, id, actorId);
+  } else await resolveRoutinePaused(deps, orgId, id).catch(() => {});
   const watch = row ? (await watchesOf(deps.db, [row.id])).get(row.id) : undefined;
   if (row && watch) {
     if (active && !current.active) await resetMailWatchState(deps.db, row.id);
     await syncMailWatch(deps, row, { accountId: watch.accountId, folder: watch.folder, filter: watch.filter });
   }
-  const [view] = await views(deps.db, row ? [row] : [], actorId);
+  const [view] = await views(deps.db, row ? [row] : [], actorId, deps.hooks);
   return view as RoutineView;
 }
 
@@ -1437,7 +1564,7 @@ export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: s
   const routine = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, routine.agentId);
   await queueRoutineRun(deps, routine, new Date(), "manual");
-  const [view] = await views(deps.db, [routine], actorId);
+  const [view] = await views(deps.db, [routine], actorId, deps.hooks);
   return view as RoutineView;
 }
 
@@ -1450,6 +1577,7 @@ export async function listRoutineRuns(
 ): Promise<RoutineRunView[]> {
   await requirePermission(db, actorId, orgId, "read");
   const routine = await loadRoutine(db, orgId, id, { deleted: true });
+  if (!(await routineSeer(db, orgId, actorId))(routine)) throw new NotFoundError("Routine not found");
   const [runs, rights] = await Promise.all([
     db
       .select()
@@ -1539,7 +1667,7 @@ export async function fireRoutineEvent(
   let fired = 0;
   for (const r of rows) {
     if (options.visibleTo && !(r.createdByUserId && (await options.visibleTo(r.createdByUserId)))) continue;
-    const outcome = await queueEventRun(deps, r, {
+    const { outcome } = await queueEventRun(deps, r, {
       event: { ...payload, type: event },
       dedupeKey: options.dedupeKey ?? null,
     });
@@ -1620,14 +1748,19 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const agent = await getAgent(db, routine.orgId, routine.agentId);
   if (!agent || agent.archivedAt) return paused("agent_archived");
   // Its creator can no longer talk to the agent.
-  if (!canTalkTo(agent, creator, can(membership, "talk_to_agents"))) return paused("audience");
+  if (!canTalkTo(agent, creator, speakerOf(membership))) return paused("audience");
   const once = routine.triggerType === "once";
   // It ran: a one-off is done (it stays listed, inactive).
-  const ran = () =>
-    db
+  const ran = async () => {
+    await db
       .update(routines)
       .set({ lastRunAt: new Date(), updatedAt: new Date(), ...(once ? { active: false, nextRunAt: null } : {}) })
       .where(eq(routines.id, routine.id));
+    // Run by hand before its time, a one-off never reaches it: what was approved ahead for that time can't run.
+    if (once && run.trigger === "manual" && routine.active && routine.nextRunAt) {
+      await cancelRoutineAhead(deps, routine.orgId, routine.id, null);
+    }
+  };
   const target = targetOf(routine);
   const ref = { orgId: routine.orgId, routineId: routine.id, routineRunId: run.id };
 
@@ -1798,7 +1931,7 @@ export async function takeOverRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   const target = targetOf(current);
   if (
     (target.type === "channel" || target.type === "conversation") &&
@@ -1823,7 +1956,7 @@ export async function takeOverRoutine(
     details: { from: current.createdByUserId },
   });
   await resolveRoutinePaused(deps, orgId, row.id).catch(() => {});
-  const [view] = await views(db, [row], actorId);
+  const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
 }
 
@@ -1883,7 +2016,7 @@ export async function createReminder(
   const membership = await requirePermission(db, requesterId, orgId, "post");
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, requesterId, can(membership, "talk_to_agents"))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, requesterId, speakerOf(membership))) throw await audienceError(db, agent);
   const message = input.message.trim().slice(0, 2000);
   if (!message) throw new ValidationError("Say what to remind", "reminder.text_required");
   if (input.forUserId && input.forUserId !== requesterId) {
@@ -1910,8 +2043,7 @@ export async function createReminder(
       prompt: message,
       target: target as unknown as Record<string, unknown>,
       triggerType: "once",
-      // Asked to do something at that time, not only to look and tell (ADR 0053, addendum of 2026-10-31).
-      ...(input.askAgent ? { access: "act" } : {}),
+      access: "act",
       timezone: input.timezone,
       description: input.description,
       nextRunAt: input.at,
@@ -1947,8 +2079,17 @@ export async function listReminders(db: Database, requesterId: string, orgId: st
   return rows.map(reminderView);
 }
 
-/** Cancels one of the person's own reminders; anyone else's is "not found". */
-export async function cancelReminder(db: Database, requesterId: string, orgId: string, id: string) {
+/**
+ * Cancels one of the person's own reminders, and what was approved ahead for it (`schedule_action`'s one-off);
+ * anyone else's is "not found".
+ */
+export async function cancelReminder(
+  deps: { db: Database; pubsub: PubSub },
+  requesterId: string,
+  orgId: string,
+  id: string,
+) {
+  const { db } = deps;
   const [row] = await db
     .update(routines)
     .set({ active: false, nextRunAt: null, updatedAt: new Date() })
@@ -1963,6 +2104,7 @@ export async function cancelReminder(db: Database, requesterId: string, orgId: s
     )
     .returning();
   if (!row) throw new NotFoundError("Reminder not found");
+  await cancelRoutineAhead(deps, orgId, id, requesterId);
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: requesterId },
@@ -2048,7 +2190,7 @@ export async function createReminderFromApp(
   } else if (message?.authorType === "agent" && message.authorAgentId && here.includes(message.authorAgentId)) {
     agentId = message.authorAgentId;
   } else {
-    const talks = await talksToAgents(db, orgId, requesterId);
+    const talks = await speakerFor(db, orgId, requesterId);
     for (const id of here) {
       const agent = await getAgent(db, orgId, id);
       if (agent && !agent.archivedAt && canTalkTo(agent, requesterId, talks)) {

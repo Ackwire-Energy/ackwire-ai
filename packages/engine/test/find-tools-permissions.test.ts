@@ -219,14 +219,17 @@ test("use_tool with the name of a tool not allowed yet answers as a direct call 
   );
 });
 
-test("a tool the run's policy refuses anyway is never named as not allowed yet", async () => {
+test("a routine's run is told the browser a person can turn on, never to ask for it itself (ADR 0109)", async () => {
   await browserAgent();
   const ctx = await nothingLoaded();
-  // A routine's background run, which only reads: the browser is refused whatever its grants.
+  // A routine's background run: the browser is the agent's like in any run; asking for permissions is not a routine's.
   await f.db.update(schema.agentRuns).set({ background: true }).where(eq(schema.agentRuns.id, ctx.runId));
   const text = await findTools(ctx, "open a web page");
-  expect(text).toStartWith('No other tool matches "open a web page".');
-  expect(text).not.toContain("browser_open");
+  expect(text).toStartWith(
+    "Not allowed for you yet: a person can turn these on for you; you can't ask for them from here.",
+  );
+  expect(text).toContain("browser_open");
+  expect(text).not.toContain("request_permission");
 });
 
 test("a run that can't call request_permission is never told to", async () => {
@@ -246,18 +249,21 @@ const connectorDeps = (): ConnectorDeps => ({
 });
 const TO_GET =
   "Connectors you don't have yet. If the person wants one, say how to get it, never that it doesn't exist.";
-const DRIVE = "- Google Drive: Search, read and write documents (any Drive-like MCP server).";
-const CONNECT_DRIVE = `${DRIVE} Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Google Drive (in Portuguese, Configurações › Conectores › Adicionar conector › Google Drive).`;
+const SENTRY = "- Sentry: Sentry errors, issues and releases.";
+const CONNECT_SENTRY = `${SENTRY} Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Sentry (in Portuguese, Configurações › Conectores › Adicionar conector › Sentry).`;
 
 test("a search for an app the workspace hasn't connected says it exists and how an admin connects it, after any other match", async () => {
   f = await setup({ artifactTools: true, catalog: { oauthApps: {} } });
   const ctx = await nothingLoaded();
-  const text = await findTools(ctx, "google drive");
+  expect(await findTools(ctx, "sentry")).toEndWith(`\n\n${TO_GET}\n${CONNECT_SENTRY}`);
+  expect(await findTools(ctx, "connect sentry")).toEndWith(`\n\n${TO_GET}\n${CONNECT_SENTRY}`);
+  // Through Composio, on a server without it: it exists, and this server can't connect it.
+  const drive = await findTools(ctx, "google drive");
   // The workspace's own Drive matches the word: Google Drive still closes the answer.
-  expect(text).toContain("- list_artifacts");
-  expect(text).toEndWith(`\n\n${TO_GET}\n${CONNECT_DRIVE}`);
-  // Its id names it too.
-  expect(await findTools(ctx, "connect my drive")).toEndWith(`\n\n${TO_GET}\n${CONNECT_DRIVE}`);
+  expect(drive).toContain("- list_artifacts");
+  expect(drive).toEndWith(
+    `\n\n${TO_GET}\n- Google Drive: Google Drive files and folders: search, read, create and share. Not available on this installation: whoever runs the installation has to turn it on first.`,
+  );
   expect(await findTools(ctx, "set up github")).toContain(
     "- GitHub: Repositories, pull requests, issues and Actions. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › GitHub",
   );
@@ -265,47 +271,46 @@ test("a search for an app the workspace hasn't connected says it exists and how 
 });
 
 test("an app connected in the workspace but not given to the agent says an admin gives it on the agent's page; once given, its tools", async () => {
-  let driveId = "";
-  const searchFiles = (): ToolDefinition => ({
-    name: "drive_search_files",
-    description: "[Google Drive] Search files",
+  let sentryId = "";
+  const searchIssues = (): ToolDefinition => ({
+    name: "sentry_search_issues",
+    description: "[Sentry] Search issues",
     inputSchema: { type: "object", properties: { query: { type: "string" } } },
-    scope: "drive:files.read",
-    connectionId: driveId,
-    connectorLabel: "Google Drive",
-    execute: async () => ({ content: "No files." }),
+    scope: "sentry:issues.read",
+    connectionId: sentryId,
+    connectorLabel: "Sentry",
+    execute: async () => ({ content: "No issues." }),
   });
   f = await setup({
     issueTools: true,
     catalog: { oauthApps: {} },
-    toolSources: [{ name: "drive", tools: async () => (driveId ? [searchFiles()] : []) }],
+    toolSources: [{ name: "sentry", tools: async () => (sentryId ? [searchIssues()] : []) }],
   });
-  const drive = await createApiKeyConnection(connectorDeps(), f.owner.id, f.org.id, {
-    connector: "drive",
-    label: "Drive do Financeiro",
+  const sentry = await createApiKeyConnection(connectorDeps(), f.owner.id, f.org.id, {
+    connector: "sentry",
+    label: "Sentry do Financeiro",
     apiKey: "not-a-real-key",
-    serverUrl: "https://drive.example.com/mcp",
   });
   const ctx = await nothingLoaded();
   // Connected but none of its tools listed (its server down): nothing says the agent lacks it.
-  expect(await findTools(ctx, "google drive")).not.toContain(TO_GET);
+  expect(await findTools(ctx, "sentry")).not.toContain(TO_GET);
 
-  driveId = drive.id;
+  sentryId = sentry.id;
   // A new connection is every agent's: take it away from this one, as an admin can.
-  await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.connectionId, drive.id));
-  const text = await findTools(ctx, "google drive");
+  await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.connectionId, sentry.id));
+  const text = await findTools(ctx, "sentry");
   expect(text).toEndWith(
-    `\n\n${TO_GET}\n${DRIVE} Connected in this workspace but not given to you: an admin gives you access on your page, in Tools and access (in Portuguese, Ferramentas e acesso).`,
+    `\n\n${TO_GET}\n${SENTRY} Connected in this workspace but not given to you: an admin gives you access on your page, in Tools and access (in Portuguese, Ferramentas e acesso).`,
   );
-  // The catalog's name only, never the connection's own label, address or key.
+  // The catalog's name only, never the connection's own label or key.
   const toGet = text.slice(text.indexOf(TO_GET));
-  for (const detail of ["Drive do Financeiro", "drive.example.com", "not-a-real-key"]) {
+  for (const detail of ["Sentry do Financeiro", "not-a-real-key"]) {
     expect(toGet).not.toContain(detail);
   }
 
-  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: drive.id, scope: CONNECTOR_ALL }]);
-  const given = await findTools(ctx, "google drive");
-  expect(given).toContain("- drive_search_files: [Google Drive] Search files");
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: sentry.id, scope: CONNECTOR_ALL }]);
+  const given = await findTools(ctx, "sentry");
+  expect(given).toContain("- sentry_search_issues: [Sentry] Search issues");
   expect(given).not.toContain(TO_GET);
 });
 
@@ -391,7 +396,7 @@ test("a server connected by address and named after a mailbox's service is that 
     authType: "none",
     secret: null,
   });
-  gmailId = gmail.id;
+  gmailId = gmail.connection.id;
   const text = await findTools(await nothingLoaded(), "gmail");
   expect(text).toContain("- gmail_search_mail: [Gmail] Search mail");
   expect(text).not.toContain(TO_GET);
@@ -402,14 +407,13 @@ test("what another workspace connected never shows: the search answers for this 
   const bia = await addUser(f.db, "bia");
   const { organization: other } = await createOrganization(f.db, bia.id, { name: "Bia Labs" });
   const theirs = await createApiKeyConnection(connectorDeps(), bia.id, other.id, {
-    connector: "drive",
-    label: "Drive da Bia",
+    connector: "sentry",
+    label: "Sentry da Bia",
     apiKey: "not-a-real-key-bia",
-    serverUrl: "https://drive.bia.example.com/mcp",
   });
-  const text = await findTools(await nothingLoaded(), "google drive");
-  expect(text).toEndWith(`\n\n${TO_GET}\n${CONNECT_DRIVE}`);
-  for (const detail of [theirs.id, "Drive da Bia", "drive.bia.example.com", "not-a-real-key-bia", "Bia Labs"]) {
+  const text = await findTools(await nothingLoaded(), "sentry");
+  expect(text).toEndWith(`\n\n${TO_GET}\n${CONNECT_SENTRY}`);
+  for (const detail of [theirs.id, "Sentry da Bia", "not-a-real-key-bia", "Bia Labs"]) {
     expect(text).not.toContain(detail);
   }
 });

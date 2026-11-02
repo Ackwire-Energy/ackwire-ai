@@ -8,7 +8,7 @@ import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
 import { setNavigateAway } from "@/lib/navigate";
-import { pick, service } from "./catalog";
+import { pick, rowMenu, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, CATALOG, createFakeApi, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -199,7 +199,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog).slice(-2)).toEqual(["Slack", "Não achou?"]);
     await click(tile);
     expect(
-      within(service("Asana")).getByRole("button", { name: "Conectar Asana de novo" }).hasAttribute("disabled"),
+      within(service("Asana")).getByRole("button", { name: "Adicionar outra conta do Asana" }).hasAttribute("disabled"),
     ).toBe(false);
   });
 
@@ -266,7 +266,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(screen().queryByRole("dialog", { name: "Adicionar conector" })).toBeNull();
   });
 
-  test("what's connected has a check on its icon and connects another account (a preset counts by its address)", async () => {
+  test("what's connected has a check; then an MCP server adds an account, a catalog connector signs in again", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     await api.customConnectors.connect(ORG_ID, {
@@ -286,17 +286,22 @@ describe("Adicionar conector: one catalog", () => {
     const detail = service("GitHub");
     expect(detail.querySelector(".catalog-icon__check")).toBeTruthy();
     expect(detail.textContent).toContain("Já conectado");
-    expect(within(detail).getByRole("button", { name: "Conectar GitHub de novo" }).textContent).toBe(
-      "Conectar outra conta",
-    );
+    // A catalog connector has one account: connected, it signs in again.
+    expect(within(detail).getByRole("button", { name: "Reconectar GitHub" }).textContent).toBe("Reconectar");
     await pressEsc(detail);
+    // A server by address takes another account (a preset counts by its address).
+    await click(within(dialog).getByRole("button", { name: "Zapier, conectado" }));
+    expect(within(service("Zapier")).getByRole("button", { name: "Adicionar outra conta do Zapier" }).textContent).toBe(
+      "Adicionar outra conta",
+    );
+    await pressEsc(service("Zapier"));
     await click(
       within(dialog).getByRole("radiogroup", { name: "Categorias" }).querySelectorAll("[role=radio]")[1] as Element,
     );
     expect(names(dialog)).toEqual(["GitHub", "Zapier", "Não achou?"]);
   });
 
-  test("what connecting does to who uses it: a new service is everyone's, again keeps it, a database starts with none", async () => {
+  test("what connecting does to who uses it: a new service is everyone's, a new sign-in keeps who uses it, another account starts with none", async () => {
     const api = createFakeApi(seedState());
     await api.customConnectors.connect(ORG_ID, {
       serverUrl: "https://oauth.zapier.example/mcp/",
@@ -317,30 +322,32 @@ describe("Adicionar conector: one catalog", () => {
       return text;
     };
     const everyone = "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.";
-    const keeps = "Os agentes mantêm o acesso que já têm. Em seguida, você pode mudar o de cada um.";
     expect(await detail("Notion", "Notion")).toContain(everyone);
-    expect(await detail("GitHub, conectado", "GitHub")).toContain(keeps);
-    expect(await detail("Zapier, conectado", "Zapier")).toContain(keeps);
+    expect(await detail("GitHub, conectado", "GitHub")).toContain("Substitui o login atual. Quem usa continua igual.");
+    expect(await detail("Zapier, conectado", "Zapier")).toContain("Cada conta tem quem usa e níveis próprios.");
     const database = await detail("Banco de dados", "Banco de dados");
     expect(database).toContain("Nenhum agente usa até você escolher.");
     expect(database).not.toContain(everyone);
 
-    // Connecting another account: step 1 says the agents keep what they have.
+    // A new sign-in for the catalog connector: step 1 says who uses it stays.
     const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
     await click(within(dialog).getByRole("button", { name: "GitHub, conectado" }));
-    await click(within(service("GitHub")).getByRole("button", { name: "Conectar GitHub de novo" }));
-    expect(screen().getByRole("dialog", { name: "Conectar GitHub" })).toBe(flow());
-    expect(flow().textContent).toContain("Os agentes mantêm o acesso que já têm. Você muda isso no passo 3.");
+    await click(within(service("GitHub")).getByRole("button", { name: "Reconectar GitHub" }));
+    expect(screen().getByRole("dialog", { name: "Reconectar GitHub" })).toBe(flow());
+    expect(flow().textContent).toContain("Substitui o login atual. Quem usa continua igual.");
     expect(flow().textContent).not.toContain("todos os agentes podem usar");
     await click(within(flow()).getByRole("button", { name: "Cancelar" }));
 
-    // By address: the note follows the address typed (a server already connected is connected again).
+    // By address: the note follows the address typed (a server already connected takes another account).
     dialog = await catalog();
     await click(within(dialog).getByRole("button", { name: /Não achou/ }));
     await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
     expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.");
     await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.zapier.example/mcp");
-    expect(flow().textContent).toContain("Os agentes mantêm o acesso que já têm. Você muda isso no passo 3.");
+    // No account here was named by its provider, so step 1 can't tell accounts apart and asks for one not yet here.
+    expect(flow().textContent).toContain(
+      "Entre numa conta que ainda não está conectada, a gente não consegue conferir. Ela começa sem agentes, menos os que têm acesso a tudo.",
+    );
   });
 
   test("rules: how it connects, search", () => {
@@ -472,12 +479,14 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(section.textContent).toContain("1 de 2 agentes");
   });
 
-  test("a server whose OAuth only lets in apps it approved says so, not 'no OAuth', and the key stays the way in", async () => {
+  test("a server whose OAuth only lets in apps it approved says so, with its own words, not 'no OAuth', and the key stays the way in", async () => {
     const state = seedState({ connections: [] });
     const api = createFakeApi(state);
     const connect = api.customConnectors.connect;
     api.customConnectors.connect = async (orgId, input) =>
-      input.apiKey ? connect(orgId, input) : { status: "needs_key", reason: "not_approved" };
+      input.apiKey
+        ? connect(orgId, input)
+        : { status: "needs_key", reason: "not_approved", detail: "invalid_redirect_uri: redirect_uri not allowed" };
     const { dialog } = await open(state, api);
     await pick(dialog, "Linear");
     const flow = screen().getByRole("dialog", { name: "Conectar Linear" });
@@ -486,12 +495,39 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(flow.textContent).toContain(
       "Linear só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
     );
+    // Under our words, the server's: which one refused and why.
+    expect(flow.querySelector(".cflow__said")?.textContent).toBe(
+      "O servidor respondeu: invalid_redirect_uri: redirect_uri not allowed",
+    );
     expect(flow.textContent).not.toContain("não aceita OAuth");
     expect(flow.querySelector("details.cflow__more")?.hasAttribute("open")).toBe(true);
     await type(within(flow).getByLabelText("Chave de API"), "lin_api_123456");
     await click(within(flow).getByRole("button", { name: "Conectar com a chave" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: REVIEW })).toBeTruthy();
+  });
+
+  test("a one-click server the catalog lists without a key (Intercom on the Cloud) offers no API key", async () => {
+    const state = seedState({ connections: [] });
+    const api = createFakeApi(state);
+    const intercom: ConnectorDef = {
+      ...(CATALOG.connectors.find((d) => d.id === "linear") as ConnectorDef),
+      id: "intercom",
+      label: "Intercom",
+      category: "support",
+      description: "Intercom conversations and contacts.",
+      serverUrl: "https://mcp.intercom.com/mcp",
+      iconUrl: "/connectors/intercom.svg",
+      brandColor: null,
+      auth: ["oauth"],
+    };
+    api.connectors.catalog = async () => ({ ...CATALOG, connectors: [intercom, ...CATALOG.connectors] });
+    const { dialog } = await open(state, api);
+    await pick(dialog, "Intercom");
+    const flow = screen().getByRole("dialog", { name: "Conectar Intercom" });
+    expect(within(flow).getByRole("button", { name: "Continuar no Intercom" })).toBeTruthy();
+    expect(flow.textContent).not.toContain("Conectar com uma chave de API");
+    expect(within(flow).queryByLabelText("Chave de API")).toBeNull();
   });
 
   test("'Todos os agentes' is a row like an agent's, on top and raised: it sets every agent, and shows none when they differ", async () => {
@@ -754,7 +790,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await click(within(review).getByRole("button", { name: "Cancelar" }));
     await settle(2);
 
-    await click(within(section()).getByRole("button", { name: "Desconectar Suporte" }));
+    await click(within(await rowMenu("Suporte")).getByRole("menuitem", { name: "Desconectar" }));
     const confirm = screen().getByRole("dialog", { name: "Desconectar Suporte?" });
     // Connected, it was every agent's.
     expect(confirm.textContent).toContain("2 agentes perdem o acesso na hora.");
@@ -762,5 +798,180 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "customConnectors.disconnect")?.args).toEqual([ORG_ID, res.server.id]);
     expect(section().textContent).toContain("Nenhum conector ainda.");
+  });
+});
+
+describe("several accounts of one service", () => {
+  /** Conectores with Zapier connected twice (the second account "Zapier 2"), and who uses each. */
+  const twoAccounts = async (oauthOnly = false) => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    if (oauthOnly) {
+      // The catalog lists this server without a key, as it lists Intercom on the Cloud.
+      const zapier: ConnectorDef = {
+        ...(CATALOG.connectors.find((d) => d.id === "linear") as ConnectorDef),
+        id: "zapier",
+        label: "Zapier",
+        serverUrl: "https://oauth.zapier.example/mcp",
+        auth: ["oauth"],
+      };
+      api.connectors.catalog = async () => ({ ...CATALOG, connectors: [zapier, ...CATALOG.connectors] });
+    }
+    const connect = async () => {
+      const res = await api.customConnectors.connect(ORG_ID, {
+        serverUrl: "https://oauth.zapier.example/mcp",
+        label: "Zapier",
+        returnTo: "/",
+      });
+      if (res.status !== "connected") throw new Error("expected connected");
+      return res.server;
+    };
+    const first = await connect();
+    const second = await connect();
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    return { state, api, first, second };
+  };
+  const section = () => screen().getByRole("region", { name: "Conectores" });
+  const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+
+  test("each account is a row with its own name; only an MCP server's ⋯ adds another account", async () => {
+    await twoAccounts();
+    const names = [...section().querySelectorAll(".connected-row__name > span:first-child")].map(
+      (el) => el.textContent,
+    );
+    expect(names).toEqual(["GitHub", "Zapier", "Zapier 2"]);
+    const zapier = await rowMenu("Zapier 2");
+    expect(
+      within(zapier)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Renomear", "Reconectar", "Adicionar outra conta", "Desconectar"]);
+    await pressEsc(zapier);
+    const github = await rowMenu("GitHub");
+    expect(
+      within(github)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Renomear", "Reconectar", "Desconectar"]);
+  });
+
+  test("Reconectar signs that account in again: its id goes along, a toast says it, nothing else to do", async () => {
+    const { state, second } = await twoAccounts();
+    await click(within(await rowMenu("Zapier 2")).getByRole("menuitem", { name: "Reconectar" }));
+    expect(screen().getByRole("dialog", { name: "Reconectar Zapier 2" })).toBe(flow());
+    expect(flow().textContent).toContain(
+      "Entre na mesma conta de antes. A gente não consegue conferir qual é, e quem usa continua igual.",
+    );
+    await click(within(flow()).getByRole("button", { name: "Continuar no Zapier" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "customConnectors.connect").at(-1)?.args[1]).toMatchObject({
+      serverUrl: "https://oauth.zapier.example/mcp",
+      connectionId: second.id,
+    });
+    expect(document.body.textContent).toContain("Zapier 2 reconectado.");
+    expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("an account of a server the catalog lists without a key: neither Reconectar nor another account offers one", async () => {
+    await twoAccounts(true);
+    await click(within(await rowMenu("Zapier 2")).getByRole("menuitem", { name: "Reconectar" }));
+    expect(within(flow()).getByRole("button", { name: "Continuar no Zapier" })).toBeTruthy();
+    expect(flow().textContent).not.toContain("Conectar com uma chave de API");
+    await pressEsc(flow());
+    await click(within(await rowMenu("Zapier")).getByRole("menuitem", { name: "Adicionar outra conta" }));
+    expect(flow().textContent).not.toContain("Conectar com uma chave de API");
+    expect(within(flow()).queryByLabelText("Chave de API")).toBeNull();
+  });
+
+  test("another account: its name first, then its tools, then nobody uses it until you choose", async () => {
+    const { state } = await twoAccounts();
+    await click(within(await rowMenu("Zapier")).getByRole("menuitem", { name: "Adicionar outra conta" }));
+    expect(screen().getByRole("dialog", { name: "Outra conta do Zapier" })).toBe(flow());
+    // No account here was named by its provider, so step 1 can't tell accounts apart and asks for one not yet here.
+    expect(flow().textContent).toContain(
+      "Entre numa conta que ainda não está conectada, a gente não consegue conferir. Ela começa sem agentes, menos os que têm acesso a tudo.",
+    );
+    await click(within(flow()).getByRole("button", { name: "Continuar no Zapier" }));
+    await settle(4);
+    const sent = state.calls.filter((c) => c.method === "customConnectors.connect").at(-1)?.args[1] as {
+      connectionId?: string;
+      label?: string;
+    };
+    expect([sent.connectionId, sent.label]).toEqual([undefined, "Zapier"]);
+    expect(document.body.textContent).toContain("Zapier 3 conectado.");
+    // A name the server numbered: asked above its tools, and a name another account has is refused there.
+    const name = within(flow()).getByLabelText("Nome desta conta") as HTMLInputElement;
+    expect(name.value).toBe("Zapier 3");
+    await type(name, "zapier 2");
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(flow().textContent).toContain("Já existe um conector com esse nome.");
+    expect(state.calls.some((c) => c.method === "customConnectors.saveTools")).toBe(false);
+    await type(name, "Zapier Loja");
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "customConnectors.saveTools")?.args[2]).toMatchObject({
+      label: "Zapier Loja",
+    });
+    expect(screen().getByRole("dialog", { name: "Quem pode usar Zapier Loja" })).toBe(flow());
+    expect(levels(flow(), ["Nível de todos os agentes", "Nível de Ada", "Nível de Atlas"])).toEqual([
+      "Sem acesso",
+      "Sem acesso",
+      "Sem acesso",
+    ]);
+  });
+
+  test("Quem usa is per account: the first is every agent's, the second nobody's", async () => {
+    await twoAccounts();
+    const who = async (name: string) => {
+      await click(within(section()).getByRole("button", { name: `Quem usa ${name}` }));
+      await settle(4);
+      const shown = levels(flow(), ["Nível de Ada", "Nível de Atlas"]);
+      await click(within(flow()).getByRole("button", { name: "Voltar" }));
+      await click(within(flow()).getByRole("button", { name: "Cancelar" }));
+      return shown;
+    };
+    expect(await who("Zapier")).toEqual(["Ler e escrever", "Ler e escrever"]);
+    expect(await who("Zapier 2")).toEqual(["Sem acesso", "Sem acesso"]);
+  });
+
+  test("Renomear: the new name everywhere, a name another connector has is refused in place", async () => {
+    const { state, second } = await twoAccounts();
+    await click(within(await rowMenu("Zapier 2")).getByRole("menuitem", { name: "Renomear" }));
+    const dialog = screen().getByRole("dialog", { name: "Renomear Zapier 2" });
+    const name = within(dialog).getByLabelText("Nome") as HTMLInputElement;
+    expect(name.value).toBe("Zapier 2");
+    await type(name, "GitHub");
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    expect(dialog.textContent).toContain("Já existe um conector com esse nome.");
+    await type(name, "Zapier Loja");
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "connectors.rename").at(-1)?.args).toEqual([
+      ORG_ID,
+      second.id,
+      "Zapier Loja",
+    ]);
+    expect(document.body.textContent).toContain("Agora se chama Zapier Loja.");
+    expect(within(section()).getByRole("button", { name: "Quem usa Zapier Loja" })).toBeTruthy();
+  });
+
+  test("back from OAuth, the outcome says what happened: only a new account goes on to its tools", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.zapier.example/mcp",
+      label: "Zapier",
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    await renderApp(`/org/${ORG_ID}/settings/connectors?connected=custom:${res.server.id}&outcome=reconnected`, {
+      api,
+    });
+    await settle(8);
+    expect(document.body.textContent).toContain("Zapier reconectado.");
+    expect(screen().queryByRole("dialog")).toBeNull();
   });
 });

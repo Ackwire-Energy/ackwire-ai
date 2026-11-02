@@ -72,6 +72,7 @@ function AppStack() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[channelId]" options={pushed} />
       <Stack.Screen name="consultation/[id]" options={pushed} />
+      <Stack.Screen name="block/[id]" options={pushed} />
       <Stack.Screen name="conversations/[kind]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-new" options={{ ...pushed, ...scrollUnder }} />
@@ -130,6 +131,8 @@ function AppStack() {
       <Stack.Screen name="invite-note" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="suggest-person" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/notifications" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/start" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/activity" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
@@ -176,6 +179,10 @@ function AppStack() {
       />
       <Stack.Screen
         name="computer/[agentId]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
+      <Stack.Screen
+        name="browser-profile/[profileId]"
         options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
       />
     </Stack>

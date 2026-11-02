@@ -679,16 +679,17 @@ export class Draft {
       });
   }
 
-  /** A remote MCP server to connect again (its address and header names only); one that runs a command is listed. */
-  connection(name: string, url: string, headers: string[], agents: string[] = []) {
+  /**
+   * A remote MCP server to connect again, labeled by its name (else its host) since the label reads inside a sentence
+   * ("Ada usa o HubSpot."); header values never come. One that runs a command is listed.
+   */
+  connection(name: string, url: string, agents: string[] = []) {
     const clean = cleanUrl(url);
     if (!clean) {
       this.left("connection", name);
       return;
     }
-    const host = hostOf(clean);
-    const label = [host ? `${name} (${host})` : name, headers.filter(Boolean).join(", ")].filter(Boolean).join(" · ");
-    this.need("connection", label, agents, clean);
+    this.need("connection", name.trim() || hostOf(clean), agents, clean);
   }
 
   channel(c: { key: string; name: string; topic?: string; agents: { key: string; autoReply: boolean }[] }) {

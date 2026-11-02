@@ -9,9 +9,25 @@ import {
   type MailProvider,
   type MailTestError,
 } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, like, ne, notInArray, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  ne,
+  notInArray,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
+import { countComposioConnection } from "../connector-usage";
+import { composioToolkitUrl } from "../connectors/presets";
 import { openSecret, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard";
@@ -20,7 +36,7 @@ import { closedRefusal, orgStanding } from "../standing";
 import { isEmailAddress, normalizeAddress } from "./text";
 import { restartMailWatches } from "./watches";
 
-const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes, users } = schema;
+const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes, connectorConnections, users } = schema;
 
 export type MailAccountRow = typeof mailAccounts.$inferSelect;
 
@@ -79,9 +95,12 @@ export type MailAction = (typeof MAIL_ACTIONS)[number];
 /** The actions that can be made to ask (the rest read, or always ask). */
 export const ASKABLE_MAIL_ACTIONS: readonly MailAction[] = ["draft", "organize"];
 
-const aadFor = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
+export const mailAccountAad = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
 /** Our Composio user id for an organization. */
 export const composioUserId = (orgId: string) => `org_${orgId}`;
+const COMPOSIO_USER = /^org_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+/** The organization of one of our Composio user ids (`composioUserId`), or null for anything else. */
+export const orgOfComposioUser = (userId: string) => COMPOSIO_USER.exec(userId)?.[1] ?? null;
 /** `from=desktop`: started in the desktop app's window, so the callback hands the return back to the app. */
 export const composioCallbackUrl = (publicUrl: string, accountId: string, desktop = false) =>
   `${publicUrl.replace(/\/$/, "")}/api/app/mail/composio/callback?account=${encodeURIComponent(accountId)}${desktop ? "&from=desktop" : ""}`;
@@ -382,7 +401,7 @@ export async function createImapAccount(
   if (!tested.ok) return tested;
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
-  const sealed = await sealSecret(wrapper, password, aadFor(orgId, id));
+  const sealed = await sealSecret(wrapper, password, mailAccountAad(orgId, id));
   const [row] = await deps.db
     .insert(mailAccounts)
     .values({
@@ -497,6 +516,9 @@ export async function applyComposioStateFor(
   if (known && remote.status === "active") return "active";
   const now = deps.now?.() ?? new Date();
   if (remote.status === "active" && remote.address) {
+    // Composio made a connected account, which it bills once past the free ones: a reconnect's too, and one that
+    // goes away below (ADR 0103).
+    if (row.status !== "active") await countComposioConnection(deps.db, { orgId: row.orgId, toolkit: row.provider });
     const address = normalizeAddress(remote.address);
     if (row.status === "needs_reconnect" && row.address && address !== row.address) {
       // Signed in to another mailbox: it doesn't take this one's place (its agents and rules are for this
@@ -595,7 +617,7 @@ export async function completeComposioConnect(
 
 /**
  * Renames, turns actions on or off, sets the mailbox's other addresses and
- * the one new mail goes out from, or (IMAP) replaces the app password after
+ * the one new mail goes out from, or replaces the IMAP app password after
  * testing it. An agent pinned to an address the mailbox no longer has goes
  * back to the default.
  */
@@ -660,7 +682,7 @@ export async function updateMailAccount(
     if (!tested.ok) return tested;
     const wrapper = deps.keyWrappers[0];
     if (!wrapper) throw new Error("no key wrapper");
-    const sealed = await sealSecret(wrapper, password, aadFor(orgId, row.id));
+    const sealed = await sealSecret(wrapper, password, mailAccountAad(orgId, row.id));
     Object.assign(set, {
       secretCiphertext: sealed.ciphertext,
       wrappedDataKey: sealed.wrappedDataKey,
@@ -722,11 +744,21 @@ export async function forgetAtComposio(
   if (failures.length > 0) throw failures[0];
 }
 
+/** The toolkits behind the same Google or Microsoft app as a mailbox's, which may share its grant. */
+const SAME_APP_TOOLKITS: Record<string, string[]> = {
+  gmail: ["googledrive", "googledocs", "googlesheets", "googlecalendar"],
+  outlook: ["one_drive", "microsoft_teams"],
+};
+
 /**
- * Whether another connection still in use, in this workspace or another, reaches the same mailbox through Composio:
- * they share one grant at Google or Microsoft, so forgetting this one must leave that grant alone.
+ * Whether another connection still in use, in this workspace or another, reaches the same mailbox's grant through
+ * Composio: another mailbox of the address, or a connector on the same provider's app (Drive, Calendar…) of that
+ * account, or of an account it can't name. Forgetting this one must then leave that grant alone.
  */
-export async function composioGrantShared(db: Pick<Database, "select">, box: { id: string; address: string }) {
+export async function composioGrantShared(
+  db: Pick<Database, "select">,
+  box: { id: string; address: string; provider: string },
+) {
   if (!box.address) return false;
   const [other] = await db
     .select({ id: mailAccounts.id })
@@ -740,7 +772,22 @@ export async function composioGrantShared(db: Pick<Database, "select">, box: { i
       ),
     )
     .limit(1);
-  return Boolean(other);
+  if (other) return true;
+  const toolkits = SAME_APP_TOOLKITS[box.provider];
+  if (!toolkits) return false;
+  const [connector] = await db
+    .select({ id: connectorConnections.id })
+    .from(connectorConnections)
+    .where(
+      and(
+        inArray(connectorConnections.serverUrl, toolkits.map(composioToolkitUrl)),
+        isNotNull(connectorConnections.composioAccountId),
+        isNull(connectorConnections.revokedAt),
+        or(isNull(connectorConnections.accountId), sql`lower(${connectorConnections.accountId}) = ${box.address}`),
+      ),
+    )
+    .limit(1);
+  return Boolean(connector);
 }
 
 /**
@@ -813,7 +860,7 @@ export async function accountRef(deps: MailDeps, row: MailAccountRow, password?:
     secret = await openSecret(
       deps.keyWrappers,
       { ciphertext: row.secretCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
-      aadFor(row.orgId, row.id),
+      mailAccountAad(row.orgId, row.id),
     );
   }
   return {
@@ -837,6 +884,8 @@ export function connectorFor(deps: Pick<MailDeps, "mail">, via: string) {
   return null;
 }
 
+const PATH_NAMES: Record<string, string> = { composio: "Gmail/Outlook", imap: "IMAP" };
+
 /** Opens one mailbox of the org (backend only; the caller closes it). */
 export async function openMailProvider(deps: MailDeps, orgId: string, accountId: string): Promise<MailProvider> {
   const row = await loadAccount(deps.db, orgId, accountId);
@@ -845,7 +894,7 @@ export async function openMailProvider(deps: MailDeps, orgId: string, accountId:
 
 export async function openAccount(deps: MailDeps, row: MailAccountRow): Promise<MailProvider> {
   const connector = connectorFor(deps, row.via);
-  if (!connector) throw new MailError(`${row.via === "imap" ? "IMAP" : "Gmail/Outlook"} mailboxes are off`, false);
+  if (!connector) throw new MailError(`${PATH_NAMES[row.via] ?? row.via} mailboxes are off`, false);
   return connector.open(await accountRef(deps, row));
 }
 
@@ -888,7 +937,11 @@ export async function suggestMailAddresses(deps: MailDeps, actorId: string, orgI
 
 /** Which paths this server offers (`GET …/mail/providers`). */
 export function mailProviders(mail: MailAdapters | null | undefined) {
-  return { composio: !!mail?.composio, imap: !!mail?.imap, presets: mail?.imap?.presets ?? [] };
+  return {
+    composio: !!mail?.composio,
+    imap: !!mail?.imap,
+    presets: mail?.imap?.presets ?? [],
+  };
 }
 
 /** Active mailboxes for agents: not pending, not disconnected. */

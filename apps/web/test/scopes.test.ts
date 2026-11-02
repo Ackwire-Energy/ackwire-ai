@@ -58,7 +58,7 @@ describe("agent permissions model", () => {
   test("approve button verb from the tool/scope; budget alert copy", () => {
     expect(approvalAction({ tool: "merge_pull_request", scope: "github:pr.merge" })).toBe("merge");
     expect(approvalAction({ tool: "run_workflow", scope: "github:actions.run" })).toBe("deploy");
-    expect(approvalAction({ tool: "share_file", scope: "drive:files.share" })).toBe("publish");
+    expect(approvalAction({ tool: "onedrive_create_share_link", scope: "custom:c1:write" })).toBe("publish");
     expect(approvalAction({ tool: "x", scope: "y" })).toBe("other");
     expect(budgetAlert(t, "pt-BR", { type: "budget.warning", agentId: "a", percent: 80.4 }, "Ada")).toBe(
       "Ada usou 80% do orçamento do mês.",

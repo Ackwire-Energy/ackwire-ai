@@ -338,7 +338,8 @@ COMPOSE_PROFILES=https
 and run `docker compose up -d`. The `caddy` service gets a Let's Encrypt certificate for `DOMAIN` and
 renews it, redirects http to https, and passes everything to the app, WebSockets included. Its
 certificates are kept in the `caddy-data` volume. Caddy sends the client's address as the only value
-of `X-Forwarded-For`, which the app trusts as is, so leave `TRUSTED_PROXIES` empty.
+of `X-Forwarded-For`, which the app trusts as is, so leave `TRUSTED_PROXIES` empty. While the app
+restarts or is down, Caddy answers with a page that says so and opens the app again once it's back.
 
 </details>
 
@@ -389,6 +390,25 @@ sudo certbot --nginx --redirect -d chat.example.com
 ```
 
 Then set `PUBLIC_URL=https://chat.example.com` in `.env` and run `docker compose up -d`.
+
+Optional: while the app restarts or is down, nginx can answer with the page Caddy shows, which opens
+the app again once it's back. Download it from the app while it's up, and again after each upgrade
+(straight from the app, since nginx then serves its own copy at that address):
+
+```sh
+sudo mkdir -p /var/www/agentes && sudo curl -fsSLo /var/www/agentes/unavailable.html http://127.0.0.1:3000/unavailable.html
+```
+
+Then add to the `server` block:
+
+```nginx
+    error_page 502 503 504 =503 /unavailable.html;
+
+    location = /unavailable.html {
+        root /var/www/agentes;
+        add_header Cache-Control no-store always;
+    }
+```
 
 Sign-in rate limits count per client address, read from `X-Forwarded-For`. A single value, as above,
 is trusted as is, and the client can't forge it (nginx replaces whatever the client sent). With
@@ -598,8 +618,10 @@ they go through a browser or a device in the tailnet. A few services call the in
 internet instead, and need it public:
 
 - Routines started by a GitHub or Sentry webhook (the address the routine shows, `/api/webhooks/…`).
+- Routines started by a webhook of their own (the address on the routine's page, `/api/hooks/…`).
 - A GitHub App's events (`/api/github-app/webhook`, with `GITHUB_APP_*`).
-- Composio's mail events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`).
+- Composio's events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`): new mail for routines, and connector
+  accounts that expired.
 
 **Tailscale Funnel** opens the same address to the internet, still with no domain and no open port.
 The whole instance becomes public, as on a domain: sign-up stays closed (the default), and the owner
@@ -657,6 +679,8 @@ ones a self-hosted instance usually touches:
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 | `TYPESAFE_API_KEY` | | Your TypeSafe key for Jev (AI: plans and keys). Wins over the key added in Settings → AI accounts. |
+| `COMPOSIO_API_KEY`, `COMPOSIO_WEBHOOK_SECRET` | | Your Composio project: Gmail and Outlook mailboxes and the services connected through Composio (below). |
+| `COMPOSIO_AUTH_CONFIGS`, `COMPOSIO_CALLS_PER_MONTH` | `0` for the cap (none) | Auth configs of your own per toolkit (`googledrive=ac_…`), and the Composio calls a workspace may make per month. |
 
 **Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai,
 MiniMax or OpenRouter) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
@@ -701,6 +725,20 @@ volume. With all four `S3_*` variables set they go to that bucket instead, and w
 Postgres. Choose before the first upload: a file stays in the store it was written to. An
 organization can also keep its files in a bucket of its own (**Settings → Storage**).
 
+**Services through Composio (optional).** Google Drive, Google Calendar, Sheets and Docs, Slack,
+Microsoft Teams, OneDrive, HubSpot, Salesforce and Zendesk have no server that connects to us directly;
+Asana, Figma, Intercom, Dropbox and Square have one that doesn't let us in yet. With `COMPOSIO_API_KEY`
+set to the key of a project of yours at https://composio.dev, they connect through it: people sign in on
+Composio's page with Composio's own app (in English, and the service's consent screen says "Composio"),
+with no key to paste. Without it they don't show in **Add connector**, and the ones waiting on their
+vendor show as coming soon. Composio bills your project per tool call; `COMPOSIO_CALLS_PER_MONTH` caps
+each workspace (0, the default, for none), and **Settings → Usage** shows each workspace its calls this
+month. To use an OAuth app of your own instead of Composio's, add it to your Composio project as an auth
+config for its toolkit and set `COMPOSIO_AUTH_CONFIGS=googledrive=ac_…` (several pairs separated by
+commas). Point a Composio webhook subscription at `{PUBLIC_URL}/api/webhooks/composio` and set its
+secret in `COMPOSIO_WEBHOOK_SECRET` so an expired account shows "Reconnect" right away. Disconnecting
+deletes the account at Composio, without revoking it at the service.
+
 **Deleting workspaces and accounts.** An owner deletes a workspace in **Settings → General**, with a
 code emailed to them (with no email set up, their password instead): it closes for everyone at once,
 its agents stop, and it is deleted for good 7 days later. Until then any owner can restore it. An
@@ -728,6 +766,8 @@ stops), and brings it back (with `SUPPORT_EMAIL` set, its people see where to wr
 `PUT /users/{userId}/block` signs an account out everywhere and keeps it out until you unblock it.
 `PUT /orgs/{orgId}/deletion-hold` keeps a workspace an owner deleted from going after its 7 days (a
 legal hold), closed, with everything in it, without telling it.
+`GET /analytics` and `GET /analytics/connectors/{connector}` say how much each connector is used,
+by day, workspace and agent, in counts the server always keeps: never what a tool was sent or answered.
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
 far each one is, and asks for a single-use code that the computer connects with
@@ -813,16 +853,35 @@ party only when you turn that service on:
 | OpenRouter | An organization's key | What the other model providers receive, passed on by OpenRouter to the model's own provider (the organization's OpenRouter privacy settings decide which may keep it). While a workspace has an OpenRouter key, the server also reads OpenRouter's public model list, with no key: about once an hour, and up to once a minute while agents' runs ask for a model the list lacks. |
 | TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI accounts** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
-| Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
+| Web search for agents | Always on: DuckDuckGo's HTML page with no key, unless `BRAVE_SEARCH_API_KEY` (Brave Search) or `SEARXNG_URL` (your own SearXNG) is set; an agent with a browser on its computer searches there instead (Google, then Bing or DuckDuckGo) | The words an agent searches for (`web_search`). `web_fetch` opens the public pages an agent asks for, from this server: never an internal or private address. |
+| Composio | `COMPOSIO_API_KEY` | Gmail and Outlook mailboxes for agents, and the services connected through it (Google Drive, Calendar, Sheets and Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox and Square): Composio holds those connections, and what agents read or write there passes through it, files included. IMAP mailboxes and the other connectors connect directly. |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
 | Your browser's push service (Google, Mozilla, Apple, Microsoft) | Someone turns on **Notifications in this browser** (`WEB_PUSH=off` hides it) | For each push to that browser: the notification encrypted to that browser (RFC 8291), which the push service can't read, the instance's public key, and a contact for the instance: `PUBLIC_URL` when it is a public https address, else the `EMAIL_FROM` address, else agentes.chat's site. |
+| A Sentry-compatible server you choose | `SENTRY_DSN`, `SENTRY_WEB_DSN` | Error reports, below. |
 | Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
+
+**Error reports (optional).** With `SENTRY_DSN` (a project's DSN on a Sentry-compatible server), the
+server reports its unexpected errors: crashes, requests that fail with a 500, background jobs that fail,
+socket handlers that fail, and a boot that fails. With `SENTRY_WEB_DSN`, the web app and the desktop app
+report theirs, and a page that breaks shows the code of its report. A report holds the error and its
+stack, the version (`APP_VERSION`, else the server's own), `SENTRY_ENVIRONMENT`, the route as a pattern
+(`/api/app/organizations/:orgId/channels`), the request id, the HTTP method and status, a job's kind and
+attempt, and internal ids of the workspace, person, agent, run and computer. It never holds messages or
+mail, files, prompts or what models answer, tool inputs or outputs, names, emails, IP addresses, cookies,
+auth headers, request or response bodies, or keys and tokens: emails, addresses and anything like a key
+are masked in error messages too, a failed database query keeps its SQL without its values, and a wiki
+page's name in an address is masked. A 4xx or an expected refusal (a computer that is offline) is not an error. Errors
+only: no traces, sessions or replays. Unset, nothing is reported and the reporting code isn't loaded.
+Browsers send their reports straight to that server, which sees their addresses as any server they
+reach does.
 
 A Gemini key without billing lets Google use what it receives.
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
-scopes you grant each agent.
+scopes you grant each agent. Installing a skill from a private GitHub repository downloads it from
+GitHub on the server, with the workspace's GitHub connection (a token pasted in **Settings → Connectors** works
+without an OAuth app) or the GitHub App.
 
 </details>
 
@@ -841,6 +900,16 @@ curl -fsSL https://chat.example.com/api/machines/install.sh | sh
 
 The computer must reach `PUBLIC_URL`: it downloads the runner from there, sends files back through
 it, and clones and pushes the agents' GitHub repositories through it.
+With a GitHub App set up (`GITHUB_APP_*`) and installed for a repository, agents' computers fetch
+that repository straight from github.com (a one-hour, read-only token for that repository alone)
+and still push through your server, so the computer must reach github.com too; without the App,
+clones go through your server. A computer runs at most two clones at once, and a clone goes on when
+your server restarts. Clones fetched from github.com share a cache that is never pruned (checkouts
+borrow its objects): `~/.agentes-runner/git-cache` on a single-user computer, `/var/cache/agentes-git`
+on a computer that runs each agent as its own user (owned by a system user `agentes-git` the runner
+makes; each agent reads only the repositories GitHub let it fetch, through an ACL, so install the
+`acl` package there, or clones go without the cache). Remove a repository's folder there only once no
+agent's checkout of it is left.
 On Tailscale, install Tailscale on it and sign in to the same tailnet first. The runner runs on
 Bun 1.3.5 or newer: the computer's own, or one the installer downloads into
 `~/.agentes-runner/runtime` and checks against the SHA-256 in the script before running it (Linux
@@ -854,10 +923,16 @@ your organization. Then it installs a background service
 no commands) and `--no-service`.
 
 That computer runs the commands agents execute, the browser they drive (Chrome for Testing, which the
-runner installs as it starts once the browser is turned on there), and Claude Code or Codex when an
-agent thinks with a subscription signed in there.
+runner installs as it starts once the browser is turned on there), and Claude Code, Codex or Cursor's
+CLI when an agent thinks with a subscription signed in there. Install the ones you want on that
+computer, as the user that runs the runner: Cursor's with `curl https://cursor.com/install -fsS | bash`
+(it lands in `~/.local/bin`, which the runner's PATH must include). A runner in system mode (each agent
+its own system user) needs the CLI where every agent's user can run it, not in one user's home: install it
+under a shared folder and link it into `/usr/local/bin`, for example
+`sudo env HOME=/opt/cursor sh -c 'curl https://cursor.com/install -fsS | bash'`, then
+`sudo chmod -R a+rX /opt/cursor` and `sudo ln -sf /opt/cursor/.local/bin/agent /usr/local/bin/agent`.
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
-`agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
+`agentes-runner tools disable commands` (or `claude`, `codex` or `cursor`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
 On Linux, Chrome for Testing loads system libraries that a minimal server doesn't have. The
@@ -977,6 +1052,22 @@ be, so agents should bind private servers to `127.0.0.1`; and abstract Unix sock
 have no owner, so a program an agent runs that listens on one without checking who connects is open to
 the other agents, and an agent can take a name another agent's program wants (an X display's: its
 desktop then starts on another one).
+
+**The shared folder.** Every computer has one folder all of its agents read and write, so what one of
+them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is
+`/srv/agentes/shared`, owned by root and the group `agentes-shared`, which the runner makes and adds
+every agent's user to; each agent also finds it at `~/shared`, in its desktop's file manager, and its
+`bin/` folder at the end of its `PATH`, so a command-line tool one agent installs there (without root)
+works for all of them. A tool there runs as whichever agent calls it, with that agent's files, so only
+agents you trust with each other's work should share a computer; the runner itself never starts Claude
+Code or Codex from there. Install the `acl` package (`apt install acl`): with it, what an agent makes there
+stays writable by the others whatever its umask; without it, it stays readable only, until the agent runs
+`chmod g+w`. The runner never changes anything inside the folder. On this server's own computer each
+organization gets a folder and a group of its own (`/srv/agentes/shared-<id>`), so nothing crosses between
+organizations. Without `--system` it is `shared` in the runner's workspace. Agents are told to look there
+before downloading anything big, to keep credentials, `.env` files and sign-in folders out of it, and to
+check the free space first. **Settings → Computers** shows its path, its size (measured hourly) and the
+free space on the disk, and the workspace's admins get a notification when that disk passes 85%.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals

@@ -1,4 +1,5 @@
 import {
+  cancelAheadApproval,
   decideApproval,
   decideApprovals,
   getApproval,
@@ -99,6 +100,14 @@ export const Approval = z
           '"Aprovar sempre" is offered: approving with `always` lets the agent run this server tool (each of these wrapped actions) without asking again, with any values. Null: not offered.',
         example: { tool: "COMPOSIO_MULTI_EXECUTE_TOOL", actions: ["GITHUB_CREATE_AN_ISSUE_COMMENT"] },
       }),
+    runAt: z.string().nullable().openapi({
+      description:
+        "Approved ahead (`schedule_action`): when the routine's run does it by itself, without asking again. Null: it runs once approved.",
+    }),
+    routineId: z.uuid().nullable().openapi({ description: "The routine whose run at `runAt` it is for." }),
+    canCancel: z
+      .boolean()
+      .openapi({ description: "Approved ahead and not run yet, and you may withdraw it (`…/cancel`)." }),
   })
   .openapi("Approval");
 
@@ -255,6 +264,27 @@ export function approvalRoutes(deps: AppDeps) {
       },
     );
   }
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/approvals/{approvalId}/cancel",
+      tags,
+      security,
+      summary:
+        "Withdraw an action approved ahead before its time (or its request, still waiting): its routine's run won't do it",
+      description:
+        "Of those who see it (as on the approvals list), who may decide it and who manages its routine: 404 for anyone else. 409 `approval.not_ahead` for an action that runs once approved, `approval.not_cancelable` once it ran or ended.",
+      request: { params: ApprovalParams },
+      responses: { 200: json(Approval), ...errors },
+    }),
+    async (c) => {
+      const { orgId, approvalId } = c.req.valid("param");
+      const view = await cancelAheadApproval({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, approvalId);
+      deps.wakeWorkers?.();
+      return c.json(view, 200);
+    },
+  );
 
   app.openapi(
     createRoute({

@@ -1,4 +1,5 @@
 import {
+  type Agent,
   type ArtifactDetail,
   type BrowserHandoff,
   type ConnectionStatus,
@@ -35,6 +36,8 @@ import {
   useThreadMission,
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
+import { canTalk } from "@agenteschat/client/lib/audience";
+import { runPosition } from "@agenteschat/client/lib/chat";
 import {
   type ConsultNoticeFold,
   consultBlocksNearEnd,
@@ -54,6 +57,7 @@ import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { voiceOf } from "@agenteschat/client/lib/voice";
+import { isIdHandle } from "@agenteschat/ui/names";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef, OnViewableItemsChanged } from "@legendapp/list/react-native";
 import * as DocumentPicker from "expo-document-picker";
@@ -111,6 +115,7 @@ import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { AskStore } from "./ask-store";
 import { AskBar, AskProbes, AskStoreProvider, useAskWatch, useAwayAsk } from "./asks";
+import { ChannelHello } from "./ChannelHello";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ChannelPicker } from "./ChannelPicker";
 import { ConversationSwitcher } from "./ConversationSwitcher";
@@ -167,7 +172,7 @@ import {
   type PlusPick,
   ThreadOptions,
 } from "./sheets";
-import { openingRuns, turnRuns, withOpacity } from "./turn";
+import { turnOrder, turnRuns, withOpacity } from "./turn";
 
 /** A run's messages this recent are asked whether a take over still holds the agent's browser. */
 const HELD_RECENT_MS = 12 * 60 * 60_000;
@@ -521,7 +526,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-        ...runRowsOf(openingRuns(shownRuns)),
+        ...runRowsOf(turnOrder(shownRuns)),
       ];
     }
     // A thread's replies live in the thread; the channel shows its link.
@@ -530,7 +535,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-      ...runRowsOf(openingRuns(shownRuns)),
+      ...runRowsOf(turnOrder(shownRuns)),
     ];
   }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
   const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
@@ -756,6 +761,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const createMission = useCreateMission(orgId);
   const channelAgents = (roster.data ?? []).filter((r) => r.type === "agent").map((r) => r.id);
   const soleAgent = dmAgentId ?? (channelAgents.length === 1 ? (channelAgents[0] ?? null) : null);
+  // An empty channel says hi through one of its agents that answers me, by a handle people can read (as the web).
+  const talkable = channelAgents.map((id) => dir.agentById.get(id)).filter((a): a is Agent => Boolean(a) && canTalk(a));
+  const helloAgent = talkable.find((a) => !isIdHandle(a.handle)) ?? talkable[0];
 
   const openNewMission = (goal = "", homeThreadId: string | null = threadId) =>
     sheet.open(
@@ -1198,14 +1206,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           dmAgentId ? (
             <AgentFace
               agentId={dmAgentId}
-              size={26}
+              size={32}
               framed={false}
               mode={dmDoing ? "run" : "idle"}
               presence
               ring={c.glassSolid}
             />
           ) : (
-            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} presence ring={c.glassSolid} />
+            <Face who={{ type: dm.with.type, id: dm.with.id }} size={32} live={false} presence ring={c.glassSolid} />
           )
         }
         title={dm.with.name}
@@ -1389,6 +1397,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               <MessageRow
                 message={item.message}
                 grouped={item.grouped}
+                run={runPosition(item.grouped, item.continued ?? false)}
+                above={item.above}
+                aboveThread={item.above && !isThread ? linkThreads.has(item.above.id) : false}
                 meId={meId}
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
                 onLongPress={onLongPress}
@@ -1659,6 +1670,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 <View style={StyleSheet.absoluteFill}>
                   {dmAgent && !isThread ? (
                     <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
+                  ) : channel && helloAgent && !dm && !isThread ? (
+                    <ChannelHello
+                      channel={channel.name}
+                      agent={helloAgent}
+                      bottomInset={composerHeight}
+                      keyboardLift={lift}
+                      onAsk={onSend}
+                    />
                   ) : (
                     <View style={[styles.center, { paddingBottom: composerHeight }]}>
                       <Text tone="faint" style={styles.emptyText}>

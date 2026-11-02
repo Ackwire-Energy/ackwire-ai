@@ -1,6 +1,8 @@
 import { keys, useApi } from "@agenteschat/client";
+import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { ThemeProvider as NavigationThemeProvider, router, Stack, usePathname } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +14,7 @@ import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
+import { ScreenError } from "@/features/shared/ScreenError";
 import { keepLastCrash } from "@/lib/last-crash";
 import { deletingOf, enteringShown, firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
@@ -24,13 +27,22 @@ import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+// Upright everywhere but the agent's screen (`useSideways`). iOS starts this way (the plugin); Android only from here.
+void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
 keepLastCrash();
 
-/** Root: the providers, then the session gate. */
+/**
+ * Root: the providers, then the session gate. What breaks while drawing outside `(app)`'s own boundary (the sign-in
+ * screens, the server and scan screens, an invitation, a reset, connect, not-found, and the first run, splash,
+ * suspended, deleting and entering overlays) gets the same screen, "Tentar de novo" drawing it again, instead of
+ * the app closing.
+ */
 export default function RootLayout() {
   return (
     <AppProviders>
-      <Gate />
+      <ErrorBoundary fallback={(error, reset) => <ScreenError error={error as Error} retry={async () => reset()} />}>
+        <Gate />
+      </ErrorBoundary>
     </AppProviders>
   );
 }

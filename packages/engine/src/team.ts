@@ -3,7 +3,7 @@ import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-
 import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiStates } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
-import { canTalkTo, talksToAgents } from "./audience";
+import { canTalkTo, type Speaker, speakerFor, speakerOf, viaAgent } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
@@ -12,8 +12,8 @@ import { agentDesktopUseStatus } from "./desktop/status";
 import { cutText, editDistance } from "./format";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
 import { parseMentionHandles } from "./messages";
-import { can, requirePermission } from "./organizations";
-import { personBehindCall } from "./requester";
+import { requirePermission } from "./organizations";
+import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
@@ -97,7 +97,17 @@ export const TEAM_IN_PROMPT = 15;
 
 type Teammate = Pick<
   typeof agents.$inferSelect,
-  "id" | "name" | "handle" | "role" | "instructions" | "ownerUserId" | "audienceMode" | "audienceUserIds"
+  | "id"
+  | "name"
+  | "handle"
+  | "role"
+  | "instructions"
+  | "ownerUserId"
+  | "audienceMode"
+  | "audienceUserIds"
+  | "audienceRoleIds"
+  | "consultable"
+  | "brain"
 >;
 
 /** The org's active agents, oldest first (per-process cache; agent writes drop it). */
@@ -113,6 +123,9 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
         ownerUserId: agents.ownerUserId,
         audienceMode: agents.audienceMode,
         audienceUserIds: agents.audienceUserIds,
+        audienceRoleIds: agents.audienceRoleIds,
+        consultable: agents.consultable,
+        brain: agents.brain,
       })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -150,14 +163,20 @@ const CLOSEST_HANDLES = 3;
  * so the run stops trying it and tells the person; any other gets the closest handles among the agents the
  * person behind the run can talk to (the ones `find_agent` lists).
  */
-export async function noAgentText(ctx: ToolContext, handles: string[]): Promise<string> {
+/** `viaAgent`: the tool asks the agent for the person (ask_agent, tell_agent), so agents that take consultations count. */
+export async function noAgentText(
+  ctx: ToolContext,
+  handles: string[],
+  options: { viaAgent?: boolean } = {},
+): Promise<string> {
   const person = await personBehindCall(ctx);
   const [archived, team, talks] = await Promise.all([
     loadArchived(ctx.db, ctx.orgId),
     loadTeam(ctx.db, ctx.orgId),
-    talksToAgents(ctx.db, ctx.orgId, person),
+    speakerFor(ctx.db, ctx.orgId, person),
   ]);
-  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks)).map((a) => a.handle);
+  const speaker = options.viaAgent ? viaAgent(talks) : talks;
+  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, speaker)).map((a) => a.handle);
   return handles
     .map((h) => {
       if (archived.includes(h)) {
@@ -201,14 +220,33 @@ export async function renamedAgentsPrompt(db: Database, orgId: string, texts: st
   return `# Renamed agents\nSome text here names agents by a handle they had before: ${renamed.join(", ")}. It is the same agent: ask and mention it by the handle it has now.`;
 }
 
-/** The org's other agents the person behind a run can talk to, `skip` left out: who "# Your team" lists. */
+/**
+ * The org's other agents a run may ask for the person behind it (they talk to them, or take consultations), `skip`
+ * left out: who "# Your team" lists.
+ */
 export const teammatesFor = (
   team: Teammate[],
   selfId: string,
   requester: string | null,
   skip: Set<string>,
-  talks = true,
-) => team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
+  talks: Speaker,
+) => team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, viaAgent(talks)));
+
+/**
+ * The teammates a run can reach, as `@handle (role)` (at most 10), for its general means (ADR 0109): those the
+ * person behind it, or its routine's creator, may talk to.
+ */
+export async function teammateMeans(
+  ctx: Pick<ToolContext, "db" | "orgId" | "agentId" | "runId" | "triggerMessageId">,
+  /** Whose agents they are, when the caller knows it already (the executor, from its run in memory). */
+  known?: string | null,
+) {
+  const person = known !== undefined ? known : ((await personBehindCall(ctx)) ?? (await routineCreatorOfCall(ctx)));
+  const [team, talks] = await Promise.all([loadTeam(ctx.db, ctx.orgId), speakerFor(ctx.db, ctx.orgId, person)]);
+  return teammatesFor(team, ctx.agentId, person, new Set(), talks)
+    .slice(0, 10)
+    .map((a) => `@${a.handle}${a.role ? ` (${cutText(a.role, 60)})` : ""}`);
+}
 
 /**
  * "# Your team" for the system prompt: the other agents the person
@@ -221,8 +259,8 @@ export function teamPrompt(
   selfId: string,
   requester: string | null,
   skip: Set<string>,
-  /** Whether the requester's roles let them talk to agents (`talksToAgents`). */
-  talks = true,
+  /** The requester as the audience rule reads them (`speakerFor`). */
+  talks: Speaker,
 ) {
   const others = teammatesFor(team, selfId, requester, skip, talks);
   if (others.length === 0) return "";
@@ -244,7 +282,7 @@ const words = (s: string) =>
 /**
  * The built-in `find_agent` tool: who else works here, searchable by
  * name, role or what they do. Lists only agents the person behind the run can
- * talk to, with what they can do (`rosterScopeNames`), who is responsible and
+ * talk to or that take consultations for them, with what they can do (`rosterScopeNames`), who is responsible and
  * whether they are busy. Read-only; asking one is `ask_agent`.
  */
 export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller, "status"> | null } = {}): ToolSource {
@@ -264,8 +302,10 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
     async execute(input, ctx) {
       const { db } = ctx;
       const person = await personBehindCall(ctx);
-      const talks = await talksToAgents(db, ctx.orgId, person);
-      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks));
+      const talks = await speakerFor(db, ctx.orgId, person);
+      const team = (await loadTeam(db, ctx.orgId)).filter(
+        (a) => a.id !== ctx.agentId && canTalkTo(a, person, viaAgent(talks)),
+      );
       const query = words(String(input.query ?? ""));
       const scored = team
         .map((a) => {
@@ -376,7 +416,7 @@ export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
  * a conversation between agents is private.
  */
 export async function getTeam(db: Database, actorId: string, orgId: string) {
-  const talks = can(await requirePermission(db, actorId, orgId, "read"), "talk_to_agents");
+  const talks = speakerOf(await requirePermission(db, actorId, orgId, "read"));
   const list = await db
     .select({
       id: agents.id,
@@ -387,6 +427,9 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       ownerUserId: agents.ownerUserId,
       audienceMode: agents.audienceMode,
       audienceUserIds: agents.audienceUserIds,
+      audienceRoleIds: agents.audienceRoleIds,
+      consultable: agents.consultable,
+      brain: agents.brain,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))

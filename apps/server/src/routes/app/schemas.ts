@@ -1,5 +1,5 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
+import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
 import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -33,6 +33,16 @@ const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_ro
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
 
 export const ModelTier = z.enum(MODEL_TIERS as ["small", "medium", "large"]);
+
+export const StartChoice = z
+  .object({
+    page: z.enum(START_PAGES),
+    channelId: z.uuid().nullable().openapi({ description: "With `channel`, else null." }),
+  })
+  .openapi("StartChoice", {
+    description:
+      "What opens when the app starts here (ADR 0108): `home` (Início, Conversas on the phone), `last` (where the person was, kept on each device) or `channel` (open the home when they are no longer in it).",
+  });
 
 export const Organization = z
   .object({
@@ -86,6 +96,13 @@ export const Organization = z
         description:
           "In `GET /me`, while an owner's deletion is pending: the workspace is closed (`org.deleting`), and any owner can restore it until `dueAt` (`DELETE …/deletion`). Absent: not being deleted.",
       }),
+    start: StartChoice.optional().openapi({
+      description: "In `GET /me`: what opens when the app starts here (`PUT …/me/start`). Absent elsewhere.",
+    }),
+    showActivity: z.boolean().optional().openapi({
+      description:
+        "In `GET /me`: whether you see what agents did under each reply (`PUT …/me/activity`), off by default. Absent elsewhere.",
+    }),
   })
   .openapi("Organization");
 
@@ -128,14 +145,35 @@ export const Credential = z
   })
   .openapi("Credential");
 
-/** Who can talk to an agent. `userIds` for `people` (under `owner`: the people a plan kept out); the owner always can. */
+/**
+ * Who can talk to an agent. `userIds` and `roleIds` for `people` (under `owner`: the ones a plan kept out); the owner
+ * always can. A role lets in whoever holds it at the time; `everyone` isn't one to pick (that's `mode: everyone`).
+ */
 export const AgentAudience = z
-  .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
+  .object({
+    mode: z.enum(["everyone", "people", "owner"]),
+    userIds: z.array(z.string()).max(500),
+    roleIds: z
+      .array(z.uuid())
+      .max(100)
+      .optional()
+      .openapi({ description: "Absent (older apps): a change keeps the roles already picked." }),
+    consultable: z.boolean().optional().openapi({
+      description:
+        "Other agents may consult it for people outside this audience; it answers them, never those people. On by default; absent = keep. A plan answering only its owner (ADR 0059 §5) still keeps them out.",
+    }),
+  })
   .openapi("AgentAudience");
 
 export const AgentAppearance = z
   .object({
-    color: z.enum(["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"]),
+    color: z.union([
+      z.enum(["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"]),
+      z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .openapi({ description: 'A custom color ("Personalizar"), stored lowercase.' }),
+    ]),
     eyes: z.enum(["round", "dots", "wide", "happy", "sleepy"]),
     accessory: z.enum([
       "none",
@@ -221,7 +259,7 @@ export const Agent = z
     }),
     brain: z
       .object({
-        kind: z.enum(["model", "claude_code", "codex"]),
+        kind: z.enum(["model", "claude_code", "codex", "cursor"]),
         model: z
           .string()
           .nullable()
@@ -507,7 +545,7 @@ export const Model = z
   .openapi("Model");
 
 /** ADR 0032: who thinks for an agent. */
-export const BrainKind = z.enum(["model", "claude_code", "codex"]).openapi("BrainKind");
+export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor"]).openapi("BrainKind");
 
 export const BrainOption = z
   .object({
@@ -517,7 +555,7 @@ export const BrainOption = z
       .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
       .optional()
       .openapi({ description: "Why it can't be chosen now (computer brains)." }),
-    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex.' }),
+    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex and Cursor.' }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
@@ -529,6 +567,10 @@ export const BrainOption = z
           .int()
           .optional()
           .openapi({ description: "Its context window in tokens: the context limits worth offering with it." }),
+        inPlan: z
+          .boolean()
+          .optional()
+          .openapi({ description: "Cursor: its CLI said the person's plan includes it (others cost API prices)." }),
       }),
     ),
     defaultModel: z.string().nullable(),

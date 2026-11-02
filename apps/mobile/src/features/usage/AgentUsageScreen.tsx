@@ -16,7 +16,7 @@ import {
   usageSourceName,
   usageSourcePart,
 } from "@agenteschat/client/lib/plan-usage";
-import { AGENT_GRADIENTS } from "@agenteschat/ui/agent/engine";
+import { gradientOf } from "@agenteschat/ui/agent/engine";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
@@ -51,7 +51,7 @@ export function AgentUsageScreen({ agentId }: { agentId: string }) {
   const data = usage.data;
   // Plan accounts in inks, in the order they come (now first); the API in the agent's own color.
   const planTones = [c.ink, c.faint, c.lineStrong];
-  const apiTone = (AGENT_GRADIENTS[agentLook(agent).color] ?? AGENT_GRADIENTS.sky)[1];
+  const apiTone = gradientOf(agentLook(agent).color)[1];
   const tones = new Map<string, string>();
   let plans = 0;
   for (const s of data?.sources ?? []) {

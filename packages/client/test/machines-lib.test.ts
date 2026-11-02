@@ -2,9 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "../src/api/http";
 import { keys } from "../src/api/keys";
-import type { AccountLoginStatus, MachineAccount } from "../src/api/types";
+import type { AccountLoginStatus, AppNotification, MachineAccount } from "../src/api/types";
 import {
   type AccountLoginInput,
+  allowedFolders,
   allowFolderCommand,
   allowsInApp,
   beginLogin,
@@ -28,10 +29,13 @@ import {
   normalizeUserCode,
   otherThanHint,
   platformOf,
+  sharedFolderFacts,
+  sharedFolderOf,
   shellQuote,
   toolOffReason,
   toolOnCommand,
 } from "../src/lib/machines";
+import { openTarget, workspaceHeadline } from "../src/lib/notifications";
 import { accessOf, applyComputerEvent, applyMachineEvent, pauseOf } from "../src/realtime/machines";
 
 describe("connected computers helpers (ADR 0036)", () => {
@@ -303,5 +307,49 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(loginRead(failing(LOGIN_RECONNECT_MS))).toBe("noAnswer");
     for (const error of gone) expect(loginRead({ isError: true, error, errorUpdatedAt: first })).toBe("failed");
     expect(loginRead({ isError: false, error: null, errorUpdatedAt: first })).toBeNull();
+  });
+});
+
+describe("the shared folder (ADR 0115)", () => {
+  test("is the folder granted to every agent; an agent's own list leaves it out; its disk notice opens the computer", () => {
+    const access = {
+      folders: [
+        { path: "/srv/data", agents: ["ada"] },
+        { path: "/srv/agentes/shared", agents: ["*"] },
+      ],
+      tools: { claude: true, codex: true, commands: true },
+    };
+    expect(sharedFolderOf(access)).toBe("/srv/agentes/shared");
+    expect(sharedFolderOf({ ...access, folders: [access.folders[0] as (typeof access.folders)[0]] })).toBeNull();
+    expect(sharedFolderOf(null)).toBeNull();
+    expect(foldersOfAgent(access, "ada").map((f) => f.path)).toEqual(["/srv/data"]);
+    const notice = {
+      kind: "computer_disk_full",
+      source: { machineId: "m1", label: "Build box" },
+      latest: { diskUse: 0.91 },
+    } as unknown as AppNotification;
+    expect(workspaceHeadline(notice)).toBe("machines.shared.diskFullNotice");
+    expect(openTarget(notice)).toEqual({
+      to: "/org/$orgId/settings/computers/$machineId",
+      params: { machineId: "m1" },
+    });
+  });
+
+  test("the folders people allowed leave it out (web and phone show it on its own row); its facts", () => {
+    const access = {
+      folders: [
+        { path: "/srv/data", agents: ["ada"] },
+        { path: "/srv/agentes/shared", agents: ["*"] },
+      ],
+      tools: { claude: true, codex: true, commands: true },
+    };
+    expect(allowedFolders(access).map((f) => f.path)).toEqual(["/srv/data"]);
+    expect(allowedFolders({ ...access, folders: [access.folders[1] as (typeof access.folders)[0]] })).toEqual([]);
+    expect(allowedFolders(null)).toEqual([]);
+    const t = ((key: string, o?: Record<string, unknown>) => `${key}${o ? JSON.stringify(o) : ""}`) as never;
+    expect(sharedFolderFacts(t, "en", { freeGb: 42.5, use: 0.8, sharedGb: 3.2 })).toBe(
+      'machines.shared.size{"size":"3.2 GB"} · machines.shared.free{"free":"43 GB"}',
+    );
+    expect(sharedFolderFacts(t, "en", null)).toBe("machines.shared.measuring");
   });
 });

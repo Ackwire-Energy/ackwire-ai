@@ -298,9 +298,9 @@ test("a reply counts its tools without the lookups: lookups alone leave no tools
   const replies = (await f.db.select().from(schema.messages))
     .filter((m) => m.authorType === "agent")
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  const work = replies.map((m) => (m.meta as { work?: { steps: number; calls: { name: string }[] } }).work);
+  const work = replies.map((m) => (m.meta as { work?: { steps: number; calls: { name: string; n?: number }[] } }).work);
   expect(work.map((w) => w?.steps)).toEqual([1, 0]);
-  expect(work[0]?.calls).toEqual([{ name: "list_issues" }]);
+  expect(work[0]?.calls).toEqual([{ name: "list_issues", n: 1 }]);
   expect(work[1]?.calls).toEqual([]);
 });
 

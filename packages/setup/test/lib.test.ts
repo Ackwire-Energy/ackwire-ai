@@ -1357,6 +1357,38 @@ describe("the compose file the setup drives", () => {
     expect(tailscale.ports ?? tailscale.cap_add ?? tailscale.devices).toBeUndefined();
   });
 
+  test("Caddy: its own Caddyfile, and while the app is down the page that says so, as a 503", () => {
+    const caddy = compose.services.caddy as { command?: unknown; configs?: { source: string; target: string }[] };
+    // The image's default command runs /etc/caddy/Caddyfile.
+    expect(caddy.command).toBeUndefined();
+    expect(caddy.configs).toEqual([
+      { source: "caddyfile", target: "/etc/caddy/Caddyfile" },
+      { source: "unavailable-page", target: "/etc/caddy/errors/unavailable.html" },
+    ]);
+    expect(compose.configs.caddyfile?.content).toBe(
+      [
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: Compose's interpolation, not a template literal
+        "${DOMAIN:-localhost} {",
+        "\treverse_proxy agentes:3000",
+        "\thandle_errors 502 503 504 {",
+        "\t\troot * /etc/caddy/errors",
+        "\t\trewrite * /unavailable.html",
+        "\t\theader Cache-Control no-store",
+        "\t\tfile_server {",
+        "\t\t\tstatus 503",
+        "\t\t}",
+        "\t}",
+        "}\n",
+      ].join("\n"),
+    );
+    // Holding requests through a restart stays agentes.chat Cloud's.
+    expect(file).not.toContain("lb_try_duration");
+    // The compose file is downloaded alone, so the page travels inside it (`bun run sync:unavailable`).
+    expect(compose.configs["unavailable-page"]?.content).toBe(
+      readFileSync(join(root, "apps/web/public/unavailable.html"), "utf8"),
+    );
+  });
+
   test("the serve config: HTTPS on 443 to the app, Funnel only with TAILSCALE_FUNNEL=true", () => {
     // Compose turns $$ into $; the container then fills in its name.
     const serve = (funnel: string) =>

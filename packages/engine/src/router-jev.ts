@@ -114,7 +114,7 @@ export function createJevRouterStrategy(options: {
               about: c.about || null,
               can: c.can ?? null,
             },
-            question: `Should \`agent\` reply to \`latest_message\`? ${whoFor()} Yes when the message speaks to this agent, even when what it asks needs another agent: it can ask that one. When it speaks to no agent in particular, yes when it asks this agent or anyone something its role and what it \`can\` do cover, or follows up on a conversation this agent was just part of (see \`agent_just_talking\`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer (its name, its computer, its status): then every agent should reply. No when it speaks to another agent, even when it names this one as someone to ask, involve or hand over to; when it is for a person; when it is a greeting or small talk not to this agent; and when it speaks to no agent in particular and this agent can't actually help with it, or it is about an app or tool (Sentry, GitHub, the Drive…) that is not in its \`can\`: it has no access to it.`,
+            question: `Should \`agent\` reply to \`latest_message\`? ${whoFor()} Yes when the message speaks to this agent, even when what it asks needs another agent: it can ask that one. When it speaks to no agent in particular, yes when it asks this agent or anyone something its role and what it \`can\` do cover, or follows up on a conversation this agent was just part of (see \`agent_just_talking\`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer about itself (its name, its own usage limit, its status): then every agent should reply. No when it speaks to another agent, even when it names this one as someone to ask, involve or hand over to; when it is for a person; when it is a greeting or small talk not to this agent; and when it speaks to no agent in particular and this agent can't actually help with it, or it is about an app or tool (Sentry, GitHub, the Drive…) that is not in its \`can\`: it has no access to it.`,
           },
           criteria: {
             true: "This agent should answer (alone, or along with the others when the message is for all of them).",
@@ -137,7 +137,7 @@ export function createJevRouterStrategy(options: {
         questions.for_everyone = {
           type: "noul",
           instructions:
-            'Does `latest_message` speak to all the agents (or the whole room: "everyone", "all of you", "gente", "vocês", "agentes") so that each one should give its own answer (its name, its computer, its status)? A question or task with one answer (a number, a report, a fix) is for one agent, even when several could do it.',
+            'Does `latest_message` speak to all the agents (or the whole room: "everyone", "all of you", "gente", "vocês", "agentes") so that each one should give its own answer about itself (its name, its own usage limit, its status)? A question or task with one answer (a number, a report, a fix) is for one agent, even when several could do it. Something they share (the workspace computer, a repo, the team numbers) has one answer, even when the message says "our" or comes right after a question to each of them.',
           criteria: {
             true: "Every agent should answer for itself.",
             false: "One answer is enough: one agent should take it.",

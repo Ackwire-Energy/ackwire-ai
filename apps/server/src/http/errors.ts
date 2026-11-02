@@ -14,6 +14,8 @@ import {
 import type { Hook } from "@hono/zod-openapi";
 import { z } from "@hono/zod-openapi";
 import type { Context, Env } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { matchedRoutes, routePath } from "hono/route";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /** Every API error has this shape. `code` is stable and machine-readable. */
@@ -58,25 +60,45 @@ export function validationHook<E extends Env>(): Hook<unknown, E, string, unknow
   };
 }
 
+/**
+ * The HTTP answer of a domain error from `@agenteschat/engine`, or of a request Hono refused: [status, code, message,
+ * params], or null for another.
+ */
+function domainError(error: unknown): [ContentfulStatusCode, string, string, Record<string, unknown>?] | null {
+  if (error instanceof UnauthorizedError) return [401, error.code, error.message];
+  if (error instanceof ForbiddenError) return [403, error.code, error.message, error.params];
+  if (error instanceof NotFoundError) return [404, error.code, error.message, error.params];
+  if (error instanceof ConflictError) return [409, error.code, error.message, error.params];
+  if (error instanceof ValidationError) return [400, error.code, error.message, error.params];
+  if (error instanceof TooManyError) return [429, error.code, error.message, error.params];
+  if (error instanceof BudgetExceededError) return [402, "budget_exceeded", error.message, { agentId: error.agentId }];
+  if (error instanceof MissingCredentialError) return [400, "missing_credential", error.message];
+  // A connected computer (ADR 0025, ADR 0036) that can't take the request now.
+  if (error instanceof MachineOfflineError) return [409, "machine.offline", error.message, { name: error.machineName }];
+  if (error instanceof MachinePausedError) {
+    return [409, "machine.paused", error.message, { name: error.machineName, until: error.until }];
+  }
+  // Not a 502: behind Cloudflare an origin's 502 never reaches the app (Cloudflare shows its own page instead).
+  if (error instanceof MachineRequestError) return [503, `machine.${error.code}`, error.message];
+  // Hono's own refusals: a body that isn't the JSON or form it claims to be (a dropped upload too).
+  if (error instanceof HTTPException && error.status < 500) return [error.status, "invalid_request", error.message];
+  return null;
+}
+
 /** Maps domain errors from `@agenteschat/engine` to HTTP responses. Returns null for unknown errors. */
 export function domainErrorResponse(error: unknown, c: Context) {
-  if (error instanceof UnauthorizedError) return apiError(c, 401, error.code, error.message);
-  if (error instanceof ForbiddenError) return apiError(c, 403, error.code, error.message, error.params);
-  if (error instanceof NotFoundError) return apiError(c, 404, error.code, error.message, error.params);
-  if (error instanceof ConflictError) return apiError(c, 409, error.code, error.message, error.params);
-  if (error instanceof ValidationError) return apiError(c, 400, error.code, error.message, error.params);
-  if (error instanceof TooManyError) return apiError(c, 429, error.code, error.message, error.params);
-  if (error instanceof BudgetExceededError) {
-    return apiError(c, 402, "budget_exceeded", error.message, { agentId: error.agentId });
-  }
-  if (error instanceof MissingCredentialError) return apiError(c, 400, "missing_credential", error.message);
-  // A connected computer (ADR 0025, ADR 0036) that can't take the request now.
-  if (error instanceof MachineOfflineError) {
-    return apiError(c, 409, "machine.offline", error.message, { name: error.machineName });
-  }
-  if (error instanceof MachinePausedError) {
-    return apiError(c, 409, "machine.paused", error.message, { name: error.machineName, until: error.until });
-  }
-  if (error instanceof MachineRequestError) return apiError(c, 502, `machine.${error.code}`, error.message);
-  return null;
+  const known = domainError(error);
+  return known ? apiError(c, ...known) : null;
+}
+
+/** A refusal the engine expects (what `domainErrorResponse` answers): logged quietly, never reported (ADR 0104). */
+export const isExpectedError = (error: unknown) => domainError(error) !== null;
+
+/**
+ * The route a request matched as registered (`/api/app/organizations/:orgId/channels`), so its ids stay out of
+ * reports: the last one with a method of its own, past the middlewares (`*`) that match everything.
+ */
+export function routeOf(c: Context): string {
+  const handlers = matchedRoutes(c).filter((route) => route.method !== "ALL" && !route.path.endsWith("*"));
+  return handlers.at(-1)?.path ?? routePath(c);
 }

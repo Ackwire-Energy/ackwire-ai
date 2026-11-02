@@ -7,10 +7,14 @@ import {
   describeWhen,
   duplicateRoutine,
   getRoutineView,
+  HOOK_OUTCOMES,
   listMyReminders,
   listRoutineRuns,
   listRoutines,
   localDateTimeOf,
+  managedWebhookRoutine,
+  newRoutineHookAddress,
+  newRoutineHookSecret,
   normalizeRule,
   parseScheduleForOrg,
   ROUTINE_ACCESS,
@@ -18,27 +22,33 @@ import {
   ROUTINE_REPORT,
   type RoutineDeps,
   readSchedule,
+  removeRoutineHookSecret,
   requirePermission,
+  routineHookView,
   routineTimezone,
   ruleOccurrences,
   ruleToCron,
   runRoutineNow,
   type ScheduleRule,
   schedulesOf,
+  sendRoutineHookTest,
   stopRoutineRun,
   takeOverRoutine,
   updateRoutine,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { errorResponse } from "../../http/errors";
 import {
   type AppDeps,
   body,
   createAppRouter,
   errors,
+  hookConfig,
   json,
   noContent,
   OrgParams,
   requireSession,
+  routineHookDeps,
   security,
 } from "./context";
 
@@ -128,7 +138,8 @@ const ScheduleRuleSchema = z
   .openapi("ScheduleRule");
 
 const Access = z.enum(ROUTINE_ACCESS).openapi({
-  description: "What it may do while nobody watches: `read` (look and report) or `act` (also change things).",
+  description:
+    "Always `act` (ADR 0109): every routine works with its agent's own permissions. `read` is accepted and ignored.",
 });
 const Report = z.enum(ROUTINE_REPORT).openapi({
   description: "When it speaks: `when_new` (only when there is something new) or `always` (a report every run).",
@@ -215,6 +226,13 @@ const Routine = z
           .optional()
           .openapi({ description: "`needs_reconnect`: the mailbox must be reconnected before it wakes the routine." }),
       }),
+      z.object({
+        type: z.literal("webhook"),
+        url: z.string().nullable().openapi({
+          description: "Its address (`POST` to start it); null unless you may manage the routine.",
+        }),
+        signed: z.boolean().openapi({ description: "Calls must carry an HMAC-SHA256 signature of the body." }),
+      }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
     nextRunAt: z.string().nullable(),
@@ -234,7 +252,7 @@ const Routine = z
       .nullable()
       .openapi({ description: "Its run waits for the agent's computer since then." }),
     brain: z.object({
-      kind: z.enum(["model", "claude_code", "codex"]),
+      kind: z.enum(["model", "claude_code", "codex", "cursor"]),
       machineName: z.string().nullable().openapi({ description: "The computer a computer brain runs on." }),
     }),
     health: z
@@ -266,6 +284,23 @@ const Routine = z
         billedTo: z.enum(["api", "plan", "mixed"]),
       })
       .openapi({ description: "The last 7 days: runs that started the agent, tokens and cost (zero on a plan)." }),
+    ahead: z
+      .array(
+        z.object({
+          id: z.uuid().openapi({ description: "The approval." }),
+          tool: z.string(),
+          scope: z.string(),
+          title: z.string(),
+          params: z.record(z.string(), z.unknown()).openapi({ description: "Exactly what will run." }),
+          status: z.enum(["pending", "approved"]),
+          runAt: z.string().openapi({ description: "When its run does it by itself." }),
+          canCancel: z.boolean().openapi({ description: "You may withdraw it (`POST …/approvals/{id}/cancel`)." }),
+        }),
+      )
+      .openapi({
+        description:
+          "Actions prepared for its runs (`schedule_action`) that may still run: waiting for a person, or approved ahead. Only those you see on the approvals list, none when you don't read it.",
+      }),
   })
   .openapi("Routine");
 
@@ -292,7 +327,32 @@ const TriggerInput = z.union([
       filter: MailFilterSchema.optional(),
     })
     .openapi({ description: "New mail in a mailbox the agent can read; `folder` default the inbox." }),
+  z
+    .object({ type: z.literal("webhook") })
+    .openapi({ description: "A call to an address of its own (`GET …/hook` gives it to who manages the routine)." }),
 ]);
+
+const HookCall = z
+  .object({
+    id: z.uuid(),
+    at: z.string(),
+    outcome: z.enum(HOOK_OUTCOMES).openapi({
+      description:
+        "`duplicate`: the same `Idempotency-Key` (or `X-GitHub-Delivery`) within 24 hours, nothing new ran; `rate_limited`: one line a minute while calls are refused.",
+    }),
+    status: z.number().int().openapi({ description: "The HTTP status it got." }),
+    bytes: z.number().int(),
+    runId: z.uuid().nullable().openapi({ description: "The routine run it went into." }),
+    test: z.boolean().openapi({ description: "Sent with Testar." }),
+  })
+  .openapi("RoutineHookCall");
+const Hook = z
+  .object({
+    url: z.string(),
+    signed: z.boolean(),
+    calls: z.array(HookCall).openapi({ description: "The latest calls, newest first (at most 20)." }),
+  })
+  .openapi("RoutineHook");
 
 const RoutineParams = OrgParams.extend({ routineId: z.uuid() });
 
@@ -301,13 +361,16 @@ export function routineRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
+  const hooks = hookConfig(deps.config);
   const routines: RoutineDeps = {
     db,
     pubsub: adapters.pubsub,
     context: deps.extras?.context,
     artifacts: deps.extras?.artifacts,
     mail: adapters.mail,
+    hooks,
   };
+  const hookDeps = routineHookDeps(deps);
 
   app.openapi(
     createRoute({
@@ -322,7 +385,7 @@ export function routineRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
-      return c.json({ routines: await listRoutines(db, actor, orgId) }, 200);
+      return c.json({ routines: await listRoutines(db, actor, orgId, hooks) }, 200);
     },
   );
 
@@ -533,7 +596,7 @@ export function routineRoutes(deps: AppDeps) {
             prompt: z.string().min(1).max(10_000),
             target: Target,
             trigger: TriggerInput,
-            access: Access.optional().openapi({ description: "Default `read`." }),
+            access: Access.optional().openapi({ description: "Ignored: every routine acts (ADR 0109)." }),
             report: Report.optional().openapi({ description: "Default `when_new`." }),
           }),
         ),
@@ -668,7 +731,7 @@ export function routineRoutes(deps: AppDeps) {
       const { orgId, routineId } = c.req.valid("param");
       const actor = c.get("user").id;
       await stopRoutineRun(routines, actor, orgId, routineId);
-      return c.json(await getRoutineView(db, actor, orgId, routineId), 200);
+      return c.json(await getRoutineView(db, actor, orgId, routineId, hooks), 200);
     },
   );
 
@@ -688,7 +751,7 @@ export function routineRoutes(deps: AppDeps) {
       const { orgId, routineId } = c.req.valid("param");
       const actor = c.get("user").id;
       await takeOverRoutine(routines, actor, orgId, routineId);
-      return c.json(await getRoutineView(db, actor, orgId, routineId), 200);
+      return c.json(await getRoutineView(db, actor, orgId, routineId, hooks), 200);
     },
   );
 
@@ -705,6 +768,97 @@ export function routineRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, routineId } = c.req.valid("param");
       return c.json({ runs: await listRoutineRuns(db, c.get("user").id, orgId, routineId) }, 200);
+    },
+  );
+
+  // A webhook routine's address (ADR 0106): its creator, admins and the agent's owner.
+  const managed = (actor: string, param: { orgId: string; routineId: string }) =>
+    managedWebhookRoutine(db, actor, param.orgId, param.routineId);
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/routines/{routineId}/hook",
+      tags,
+      security,
+      summary: "A webhook routine's address, whether calls must be signed, and its latest calls",
+      request: { params: RoutineParams },
+      responses: { 200: json(Hook), ...errors },
+    }),
+    async (c) => c.json(await routineHookView(hookDeps, await managed(c.get("user").id, c.req.valid("param"))), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/{routineId}/hook/address",
+      tags,
+      security,
+      summary: "A new address: the old one stops working at once",
+      request: { params: RoutineParams },
+      responses: { 200: json(Hook), ...errors },
+    }),
+    async (c) => {
+      const actor = c.get("user").id;
+      return c.json(await newRoutineHookAddress(hookDeps, actor, await managed(actor, c.req.valid("param"))), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/{routineId}/hook/secret",
+      tags,
+      security,
+      summary: "A new signing secret (shown this once): from now on calls must be signed with it",
+      description:
+        "A call carries the HMAC-SHA256 of its raw body as `X-Agentes-Signature: sha256=<hex>` (GitHub's `X-Hub-Signature-256` works too).",
+      request: { params: RoutineParams },
+      responses: { 200: json(z.object({ secret: z.string(), hook: Hook })), ...errors },
+    }),
+    async (c) => {
+      const actor = c.get("user").id;
+      return c.json(await newRoutineHookSecret(hookDeps, actor, await managed(actor, c.req.valid("param"))), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/routines/{routineId}/hook/secret",
+      tags,
+      security,
+      summary: "Calls no longer need a signature",
+      request: { params: RoutineParams },
+      responses: { 200: json(Hook), ...errors },
+    }),
+    async (c) => {
+      const actor = c.get("user").id;
+      return c.json(await removeRoutineHookSecret(hookDeps, actor, await managed(actor, c.req.valid("param"))), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/{routineId}/hook/test",
+      tags,
+      security,
+      summary:
+        "Testar: a sample call, as a real one would come (the agent knows it is a test and reports what it would do)",
+      description:
+        "Refused: `routine.webhook_paused` (409) while the routine is turned off, `routine.webhook_rate_limited` (429) past the routine's calls per minute.",
+      request: { params: RoutineParams },
+      responses: {
+        200: json(z.object({ runId: z.uuid().nullable(), hook: Hook })),
+        429: errorResponse("Too many calls to this routine"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const result = await sendRoutineHookTest(hookDeps, await managed(c.get("user").id, c.req.valid("param")));
+      deps.wakeWorkers?.();
+      return c.json(result, 200);
     },
   );
 
@@ -774,7 +928,7 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, reminderId } = c.req.valid("param");
-      return c.json(await cancelReminder(db, c.get("user").id, orgId, reminderId), 200);
+      return c.json(await cancelReminder(routines, c.get("user").id, orgId, reminderId), 200);
     },
   );
 

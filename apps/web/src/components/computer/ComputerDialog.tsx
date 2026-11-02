@@ -1,7 +1,7 @@
 import type { Agent } from "@agenteschat/client";
 import {
   controlledBy,
-  handoffMinutesLeft,
+  handoffTimeLeft,
   isWaitingHandoff,
   useBrowserHandoffMutations,
   useMachineOutages,
@@ -19,7 +19,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AGENT_GRADIENTS, Button, ComputerPortrait, cx, Dialog, Icon, SkyStrip } from "@agenteschat/ui";
+import { Button, ComputerPortrait, cx, Dialog, gradientOf, Icon, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,6 +27,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useKeyboardLock } from "@/hooks/useKeyboardLock";
 import { useNow } from "@/hooks/useNow";
+import { lookOf } from "@/lib/look";
 import { useSaid, useToast } from "@/lib/toast";
 import { BrowserCard, Cover, stepText } from "../browser/BrowserCard";
 import { DesktopView } from "../desktop/DesktopView";
@@ -184,6 +185,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const [full, setFull] = useState(false);
   useFullScreen(full, setFull);
   const g = agentGrammar(t, agent.name);
+  const who = { name: agent.name, appearance: lookOf(agent) };
   const handoff = view.facts?.handoff ?? null;
   const mine = controlledBy(handoff, me.user.id);
   const screenOnly = full && surface === "screen";
@@ -199,10 +201,10 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
     // The dialog is gone by the time the answer comes: a promise, not the mutation's own callbacks.
     if (handoff.kind === "takeover") {
       actions.done.mutateAsync(handoff.id).then(
-        () => toast.show(t("browser.now.handedBack", g)),
+        () => toast.show({ text: t("browser.now.handedBack", g), who }),
         () => toast.show(t("browser.live.actionFailed"), "error"),
       );
-    } else toast.show(t("agentComputer.closeAsk", g));
+    } else toast.show({ text: t("agentComputer.closeAsk", g), who });
   };
   return (
     <Dialog
@@ -394,13 +396,13 @@ function ComputerStage({
                   ? t("agentComputer.ask.banner", {
                       ...g,
                       ask: waiting.instructions,
-                      count: handoffMinutesLeft(waiting, now) ?? 0,
+                      time: handoffTimeLeft(t, waiting, now) ?? "",
                     })
                   : t("agentComputer.ask.bannerOther", {
                       ...g,
                       person: person(waiting.requestedForUserId),
                       ask: waiting.instructions,
-                      count: handoffMinutesLeft(waiting, now) ?? 0,
+                      time: handoffTimeLeft(t, waiting, now) ?? "",
                     })
               }
               action={
@@ -618,7 +620,7 @@ export function ComputerButton({ agent }: { agent: Agent }) {
       : entry.kind === "working" || entry.kind === "you" || entry.kind === "other"
         ? "live"
         : undefined;
-  const dot = { "--dot": (AGENT_GRADIENTS[colorOf(agent)] ?? AGENT_GRADIENTS.sky)[0] } as CSSProperties;
+  const dot = { "--dot": gradientOf(colorOf(agent))[0] } as CSSProperties;
   return (
     <Button
       size="sm"

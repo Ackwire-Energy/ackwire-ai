@@ -7,11 +7,11 @@ import {
   barFaces,
   barWords,
   isWriting,
-  PHRASE_TURN_MS,
+  waitsForWords,
 } from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
-import { formatDuration } from "@agenteschat/client/lib/work";
-import type { AgentColorName } from "@agenteschat/ui/agent/engine";
+import { formatDuration, waitStep } from "@agenteschat/client/lib/work";
+import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
 import { memo, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,8 +36,8 @@ import { useFrameTime } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReducedMotion, useTheme } from "@/ui";
-import { AgentFace, Face } from "../shared/Face";
-import { useDirectory, useNow } from "../shared/hooks";
+import { AgentFace, AgentWho, Face } from "../shared/Face";
+import { useDirectory, useNow, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import {
   type LineDrawn,
@@ -64,7 +64,9 @@ import {
   turnItems,
   turnOpener,
   turnPhase,
+  turnShows,
   WORD_FADE_MS,
+  waitDot,
   withOpacity,
 } from "./turn";
 
@@ -86,13 +88,16 @@ export const TurnRow = memo(function TurnRow({
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
+  const when = useWhen();
   const agent = dir.agentById.get(run.agentId);
   const color = agentLook(agent).color;
   const phase = turnPhase(run);
   const live = phase !== "stopped";
   const items = turnItems(run);
-  // It opens as if it had answered: a generic phrase until the first thing it says takes its place.
-  const { said, opener, lines } = turnOpener(run, items);
+  // The first thing it said opens the block, above its tools.
+  const { said, lines } = turnOpener(items);
+  // At work with no words yet: the waiting row (its face, the pixels and what it does now), no name.
+  const waiting = waitsForWords(run);
   const wordsOnTop = !said && lines.length === 0;
   const now = useNow(1000);
   const since = run.startedAt ?? run.since ?? null;
@@ -121,6 +126,15 @@ export const TurnRow = memo(function TurnRow({
   }, [quiet, dueAt]);
   if (quiet) return null;
 
+  if (waiting)
+    return (
+      <View style={styles.msg}>
+        <View style={styles.avslot}>
+          <AgentFace agentId={run.agentId} size={32} mode="think" />
+        </View>
+        <WaitLine work={run.work} color={color} />
+      </View>
+    );
   return (
     <View style={styles.msg}>
       <View style={styles.avslot}>
@@ -131,10 +145,13 @@ export const TurnRow = memo(function TurnRow({
           <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
             {agent?.name ?? ""}
           </Text>
-          {/* While it works, the line above the box says so; the block only says "parado". */}
+          {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
+              `RunClock`); "parado" once stopped. */}
           <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
             {live ? (
-              <PixelOrbit color={color} size={12} />
+              <Text variant="footnote" tone="faint">
+                {when.time(new Date(since ?? mountedAt).toISOString())}
+              </Text>
             ) : (
               <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                 {word}
@@ -147,9 +164,9 @@ export const TurnRow = memo(function TurnRow({
             with stays put when a tool call turns it into narration. */}
         {wordsOnTop && run.text ? (
           <RevealText text={run.text} live={phase === "writing"} accent={color} />
-        ) : said || opener !== null ? (
+        ) : said ? (
           <View style={styles.say}>
-            <MessageText body={said ?? t(`mobile.chat.turn.opener${opener}`)} selectable={false} />
+            <MessageText body={said} selectable={false} />
           </View>
         ) : null}
         {run.text && !wordsOnTop ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
@@ -159,6 +176,47 @@ export const TurnRow = memo(function TurnRow({
     </View>
   );
 });
+
+/**
+ * The waiting row's body beside the face, centered on it (as the web's `.ac-wait`): three 4px pixels in the agent's
+ * color lighting up in turn with a 2px hop (its light tone in the dark theme), then a muted line saying what it does
+ * now (`waitStep`), each new one fading in. Reduce Motion: the pixels stand still at 60%, the line just swaps.
+ */
+function WaitLine({ work, color }: { work: LiveRun["work"]; color: AgentColorName }) {
+  const { t } = useTranslation();
+  const { scheme } = useTheme();
+  const reduced = useReducedMotion();
+  const time = useFrameTime(!reduced, 0);
+  const [light, deep] = gradientOf(color);
+  const step = waitStep(t, work);
+  return (
+    <View style={styles.wait} accessible accessibilityLiveRegion="polite" accessibilityLabel={step}>
+      <View style={styles.waitDots}>
+        {[0, 1, 2].map((i) => {
+          const d = waitDot(time, i, reduced);
+          return (
+            <View
+              key={i}
+              style={[
+                styles.waitDot,
+                {
+                  backgroundColor: scheme === "dark" ? light : deep,
+                  opacity: d.opacity,
+                  transform: [{ translateY: d.lift }],
+                },
+              ]}
+            />
+          );
+        })}
+      </View>
+      <Animated.View key={step} entering={reduced ? undefined : FadeIn.duration(160)} style={styles.shrink}>
+        <Text variant="footnote" tone="muted" numberOfLines={1} ellipsizeMode="clip">
+          {step}
+        </Text>
+      </Animated.View>
+    </View>
+  );
+}
 
 /**
  * The words as they arrive: revealed word by word at a steady reading pace (a backlog drains faster, never
@@ -275,6 +333,7 @@ export function WorkingLine({
   // new pace reads the clock afresh (`useNow`).
   const now = useNow(asking || solo ? 1000 : 60_000);
   if (entries.length === 0) return null;
+  const soloRun = solo ? runs.find((r) => r.agentId === solo.id) : undefined;
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
   const stoppable = lineStops(entries, runs, canStop);
   const sentence = activitySentence(t, entries, markName);
@@ -290,7 +349,12 @@ export function WorkingLine({
       onTextLayout={onTextLayout}
     >
       {markedParts(text).map((p, i) =>
-        p.bold ? (
+        p.agentId ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+          <RNText key={i} style={{ color: c.ink }}>
+            <AgentWho agentId={p.agentId} name={p.text} size={13} />
+          </RNText>
+        ) : p.bold ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
           <RNText key={i} style={[styles.ink, { color: c.ink }]}>
             {p.text}
@@ -304,6 +368,8 @@ export function WorkingLine({
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
   const plate = [styles.tok, { backgroundColor: c.glassSolid }];
+  // One agent on its own: its face is on its row in the conversation once the row shows, not here again.
+  const faces = entries.length === 1 && soloRun && turnShows(soloRun, now) && !asking ? [] : barFaces(entries);
   // An agent working in its browser: the line says so, and a tap opens its browser card in the conversation.
   const browsing = browsingRuns(runs)[0];
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
@@ -323,7 +389,7 @@ export function WorkingLine({
         ) : null}
         {color ? <PixelOrbit color={color} size={14} /> : <TypingDots color={c.muted} />}
         <View style={styles.stack} importantForAccessibility="no-hide-descendants">
-          {barFaces(entries).map((e, i) => {
+          {faces.map((e, i) => {
             const gap = i > 0 ? styles.overlap : undefined;
             if (e.type === "person")
               return (
@@ -358,10 +424,10 @@ export function WorkingLine({
           accessibilityLabel={browsing ? t("browser.watch.open") : undefined}
           style={styles.wordsTap}
         >
-          <TurningWords entries={entries} runs={runs} piece={piece} reduced={reduced} />
+          <TurningWords entries={entries} piece={piece} reduced={reduced} />
           {took ? (
             <Text variant="caption" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.took}>
-              {took}
+              · {took}
             </Text>
           ) : null}
           {browsing ? (
@@ -438,30 +504,11 @@ const TURN = { duration: PHRASE_FADE_MS, easing: Easing.bezier(0.2, 0.7, 0.2, 1)
  * The phrase as it turns (`turnPhrase`): the one shown and, over it, the one leaving, the only two drawn. A phrase
  * keeps its key from coming in to leaving, so the words on screen are the ones that leave, at the widths they drew.
  * The first comes with the pill, and the words go with it at once; with Reduce Motion each phrase just takes the last
- * one's place. The phrase's tick mounts with the pill too, as on the web (`BarPhrase`): the line stays mounted while the
- * bar is gone, and a tick kept from the last turn would open the next on a light line instead of who is at work.
+ * one's place.
  */
-function TurningWords({
-  entries,
-  runs,
-  piece,
-  reduced,
-}: {
-  entries: ActivityEntry[];
-  runs: LiveRun[];
-  piece: LinePiece;
-  reduced: boolean;
-}) {
+function TurningWords({ entries, piece, reduced }: { entries: ActivityEntry[]; piece: LinePiece; reduced: boolean }) {
   const { t } = useTranslation();
-  const turning = entries.length === 1 && entries[0]?.type === "agent";
-  // The phrase reads the time of its tick, so a redraw between ticks (each second) never turns it.
-  const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));
-  useEffect(() => {
-    if (!turning) return;
-    const timer = setInterval(() => setTick((k) => ({ n: k.n + 1, at: Date.now() })), PHRASE_TURN_MS);
-    return () => clearInterval(timer);
-  }, [turning]);
-  const words = barWords(t, entries, runs, tick.n, tick.at, markName);
+  const words = barWords(t, entries, markName);
   const [shown, setShown] = useState<PhraseTurn>(() => ({ now: words, was: null, n: 0, since: Date.now() }));
   const [, wake] = useState(0);
   const next = turnPhrase(shown, words, Date.now());
@@ -560,6 +607,10 @@ const styles = StyleSheet.create({
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
+  // Centered on the 32px face (its slot starts 2px down); face, pixels and words one step apart.
+  wait: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 11, height: 32, marginTop: 2 },
+  waitDots: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
+  waitDot: { width: 4, height: 4 },
   who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 3, minHeight: 19 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   state: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 },

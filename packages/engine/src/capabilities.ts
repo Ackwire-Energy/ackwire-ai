@@ -1,5 +1,12 @@
 import { UNDOABLE_TOOLS } from "./agent-actions";
-import { type DirectoryRole, deferrableGroups, directoryRole, ON_DEMAND_FIND, ON_DEMAND_USE } from "./tools/directory";
+import {
+  type DirectoryRole,
+  deferrableGroups,
+  directoryRole,
+  ON_DEMAND_FIND,
+  ON_DEMAND_USE,
+  turnMeans,
+} from "./tools/directory";
 import { isSensitive } from "./tools/gateway";
 import type { ToolDefinition } from "./tools/types";
 
@@ -21,7 +28,6 @@ const GROUPS: Record<string, string> = {
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",
-  gdrive: "Google Drive",
 };
 
 const groupOf = (tool: Pick<ToolDefinition, "scope">) => {
@@ -84,6 +90,7 @@ export function describeCapabilities(
   pending: { label: string; reason: string }[] = [],
 ) {
   const lines = ["# What you can do"];
+  let means: string[] = [];
   if (tools.length === 0) {
     lines.push(
       "You only write messages in this chat: you have no tools and you don't act outside this conversation (files, code, external systems).",
@@ -134,6 +141,7 @@ export function describeCapabilities(
     }
     // What the guidance below is about: every tool the run can reach, loaded or on demand.
     const names = new Set([...tools, ...(onDemand?.tools ?? [])].map((t) => t.name));
+    means = turnMeans(names);
     if (names.has("create_artifact")) {
       lines.push(
         '- Requests for a PDF (or Word file): create a document with `create_artifact` (kind `document`); the file\'s card offers "Download PDF".',
@@ -152,7 +160,12 @@ export function describeCapabilities(
     }
     if (names.has("schedule_reminder")) {
       lines.push(
-        "- You can schedule reminders and routines: `schedule_reminder` (once, in the time zone of whoever asked) and `create_routine` (recurring; with `channel` it posts straight to that channel, not to this conversation). To change a routine that already exists (instructions, time, where it answers), use `list_routines` and `update_routine`, also when the person describes the change as how you handle something a routine does ('quando entrar um erro…'); never say it can't be changed. Confirm the time with the words the tool returns; if the time is ambiguous, ask first with `ask_user`. A routine works while nobody watches: by default it only looks and reports (`access` read) and speaks only when there is news (`report` when_new); set `access` act only when its work must change things (issues, files, its own branches), and `report` always when people want a report every time.",
+        "- You can schedule reminders and routines: `schedule_reminder` (once, in the time zone of whoever asked) and `create_routine` (recurring; with `channel` it posts straight to that channel, not to this conversation). To change a routine that already exists (instructions, time, where it answers), use `list_routines` and `update_routine`, also when the person describes the change as how you handle something a routine does ('quando entrar um erro…'); never say it can't be changed. Confirm the time with the words the tool returns; if the time is ambiguous, ask first with `ask_user`. A routine works while nobody watches, with everything you can use, and speaks only when there is news (`report` when_new); set `report` always when people want a report every time.",
+      );
+    }
+    if (names.has("schedule_action")) {
+      lines.push(
+        "- A connected app's action for later (a post at a set time, a message to send tomorrow): prepare it with `schedule_action`, with its exact tool and full content. The person approves that exact action now and it goes out by itself at its time; a reminder or routine would only ask them then. To change its content or time, call it again with `replaces`. Merge, deploy and rollback can't be approved ahead.",
       );
     }
     if (names.has("share_artifact")) {
@@ -185,6 +198,8 @@ export function describeCapabilities(
       "If someone asks for something from these connectors, say exactly what is missing and who can fix it. Never say the connector doesn't exist.",
     );
   }
+  // Last, after the approvals and the connectors not usable yet: those are what it doesn't have on its own.
+  if (means.length > 0) lines.push(`## Your means\n${means.map((m) => `- ${m}`).join("\n")}`);
   lines.push(CAPABILITIES_LIMIT);
   return lines.join("\n");
 }
@@ -207,7 +222,7 @@ const COMPUTER_CAPABILITIES_LIMIT =
 
 /** What a computer brain (Claude Code, Codex) is told about its own tools. */
 export const COMPUTER_TOOLS_NOTE =
-  "# Your computer's tools\nYou also have your computer's own tools (read files, search, shell and git in your folder and allowed folders). Use them freely to read and investigate; that needs no approval. Actions that change things for others (push, merge, deploy) still follow the rules above.";
+  "# Your computer's tools\nYou also have your computer's own tools (read files, search, shell and git in your folder and allowed folders). They are among your means too. Use them freely to read and investigate; that needs no approval. Actions that change things for others (push, merge, deploy) still follow the rules above.";
 
 /**
  * The system prompt as a computer brain reads it (ADR 0037): the limit line

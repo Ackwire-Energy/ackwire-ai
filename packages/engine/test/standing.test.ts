@@ -461,7 +461,7 @@ describe("user block", () => {
     expect(await isUserBlocked(f.db, bia.id)).toBe(true);
     expect(await f.db.select().from(schema.sessions).where(eq(schema.sessions.userId, bia.id))).toEqual([]);
     expect(await f.db.select().from(schema.pushDevices)).toEqual([]);
-    expect(events).toEqual([{ type: "membership.revoked", orgId: f.org.id, userId: bia.id }]);
+    expect(events).toEqual([{ type: "membership.revoked", orgId: f.org.id, userId: bia.id, quiet: true }]);
 
     expect(await getMembership(f.db, bia.id, f.org.id)).toBeNull();
     expect(await listMemberships(f.db, bia.id)).toEqual([]);

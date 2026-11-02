@@ -7,7 +7,8 @@ import type { ComputerBrain, MachineOutage, MachineOutages, OutageAgent, OutageT
  */
 
 /** The brain's product name (never translated). */
-export const brainName = (brain: string | null | undefined) => (brain === "codex" ? "Codex" : "Claude Code");
+export const brainName = (brain: string | null | undefined) =>
+  brain === "codex" ? "Codex" : brain === "cursor" ? "Cursor" : "Claude Code";
 
 /** `meta.brainUnavailable` of an agent's notice ("the computer brain can't answer; I'll answer when it's back"). */
 export interface BrainUnavailable {
@@ -29,7 +30,12 @@ export function brainUnavailableOf(meta: Record<string, unknown> | null | undefi
   const str = (v: unknown) => (typeof v === "string" && v ? v : null);
   const params =
     meta.bodyParams && typeof meta.bodyParams === "object" ? (meta.bodyParams as Record<string, unknown>) : {};
-  const brain = o.brain === "codex" || params.brain === "Codex" ? "codex" : "claude_code";
+  const brain =
+    o.brain === "codex" || params.brain === "Codex"
+      ? "codex"
+      : o.brain === "cursor" || params.brain === "Cursor"
+        ? "cursor"
+        : "claude_code";
   return {
     brain,
     code: str(o.code),

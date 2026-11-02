@@ -153,7 +153,7 @@ describe("OpenMausBot", () => {
     expect(b.todo).toEqual([
       {
         kind: "connection",
-        label: "CRM (mcp.example.com) · Authorization",
+        label: "CRM",
         agents: ["lead", "scout"],
         url: "https://mcp.example.com/crm",
       },
@@ -505,7 +505,7 @@ describe("OpenBot.run", () => {
     expect(b.todo).toEqual([
       {
         kind: "connection",
-        label: "status (status.example.com) · X-Api-Key",
+        label: "status",
         agents: [],
         url: "https://status.example.com/mcp",
       },
@@ -619,11 +619,11 @@ describe("OpenClaw", () => {
         trigger: { cron: "*/30 * * * *", timezone: null },
       },
     ]);
-    // The address without its query; header names, never values.
+    // Named by the server, the address without its query; never header values.
     expect(b.todo).toEqual([
       {
         kind: "connection",
-        label: "docs (mcp.example.com) · Authorization",
+        label: "docs",
         agents: ["main", "coder"],
         url: "https://mcp.example.com/docs",
       },
@@ -679,7 +679,7 @@ Keep the lights on.
     expect(ops.routines.map((r) => [r.key, r.prompt, r.trigger])).toEqual([
       ["standup", "Post the standup.", { cron: "0 9 * * 1-5", timezone: "Europe/Berlin" }],
     ]);
-    expect(ops.todo.map((t) => t.label)).toEqual(["tickets (tickets.example.com)"]);
+    expect(ops.todo.map((t) => t.label)).toEqual(["tickets"]);
     expect(groupLeftOut(ops.leftOut)).toEqual([
       { kind: "skill", labels: ["weather@1.2.0"] },
       { kind: "connection", labels: ["shell"] },
@@ -731,7 +731,7 @@ describe("Hermes Agent", () => {
     expect(b.todo).toEqual([
       {
         kind: "connection",
-        label: "papers (mcp.papers.example) · Authorization",
+        label: "papers",
         agents: ["research-bot"],
         url: "https://mcp.papers.example/sse",
       },

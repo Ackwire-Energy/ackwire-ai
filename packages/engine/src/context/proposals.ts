@@ -24,7 +24,7 @@ import {
   withAccessLines,
 } from "../access";
 import { type Agent, getAgent, updateAgent } from "../agents";
-import { audienceNotice, canTalkTo, talksToAgents } from "../audience";
+import { audienceNotice, canTalkTo, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { sha256 } from "../crypto";
@@ -606,7 +606,7 @@ async function cardAgents(db: Database, orgId: string, ids: string[], proposerId
         )
     : [];
   if (rows.length !== ids.length) throw new NotFoundError("Agent not found");
-  const talks = await talksToAgents(db, orgId, requesterId);
+  const talks = await speakerFor(db, orgId, requesterId);
   const out: string[] = [];
   for (const a of rows)
     if (a.id !== proposerId && !canTalkTo(a, requesterId, talks))

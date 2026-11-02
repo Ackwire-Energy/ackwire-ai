@@ -517,6 +517,7 @@ export async function setUserBlocked(
   });
   if (!done) return null;
   const { orgIds, ...state } = done;
-  for (const orgId of orgIds) await publishOrgEvent(deps.pubsub, { type: "membership.revoked", orgId, userId });
+  for (const orgId of orgIds)
+    await publishOrgEvent(deps.pubsub, { type: "membership.revoked", orgId, userId, quiet: true });
   return state;
 }

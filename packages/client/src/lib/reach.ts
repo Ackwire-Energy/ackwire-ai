@@ -1,10 +1,11 @@
 import type { Agent, RoutineAccess } from "../api/types";
-import { audienceAdmits, canTalk, modeOf } from "./audience";
+import { audienceAdmits, canTalk } from "./audience";
 import { MENTION } from "./markdown";
 
 /**
  * Why an agent's message didn't wake an agent it named (the server's `meta.reach`, `reach.ts`): `not_in_channel`, it
- * went to it as a note instead; `audience`, the person behind it can't talk to it; `routine_creator_reach`, a
+ * went to it as a note instead; `audience`, the person behind it can't talk to it (with a `consultationId`: it was
+ * consulted privately for them instead); `routine_creator_reach`, a
  * routine's creator can't (or the routine only looks and tells).
  */
 export type ReachReason = "not_in_channel" | "audience" | "routine_creator_reach";
@@ -21,7 +22,7 @@ export interface ReachEntry {
   private?: true;
   /** `not_in_channel` to an agent with no AI connected: nothing could answer it. */
   noAi?: true;
-  /** The own message of a routine set to only look and tell named it: such a message wakes nobody. */
+  /** Old messages: the own message of a routine then set to only look and tell named it, which woke nobody. */
   routinePost?: true;
   /** Whose reach fell short: the agent's owner may let them talk to it. */
   userId?: string;
@@ -38,13 +39,18 @@ export function reachOf(meta: Record<string, unknown> | null | undefined): Reach
   );
 }
 
-/** The routine only looks and tells: its access, not anyone's audience, keeps the agent out. */
+/** Old messages: the routine then only looked and told, so its access, not anyone's audience, kept the agent out. */
 export const reachByAccess = (e: ReachEntry) => e.reason === "routine_creator_reach" && e.routine?.access === "read";
 
-/** The line's text key: handed, a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
+/** Whether the line opens the hand-off beside it: not for an agent consulted for someone outside its audience (its words are the agents'). */
+export const reachOpens = (e: ReachEntry) => !!e.consultationId && e.reason === "not_in_channel";
+
+/** The line's text key: handed (or consulted for someone outside its audience), a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
 export const reachKey = (e: ReachEntry) =>
   e.consultationId
-    ? ("reach.handed" as const)
+    ? e.reason === "not_in_channel"
+      ? ("reach.handed" as const)
+      : ("reach.consulted" as const)
     : e.routinePost
       ? ("reach.routinePost" as const)
       : e.noAi
@@ -56,21 +62,21 @@ export const reachKey = (e: ReachEntry) =>
             : ("reach.blocked" as const);
 
 /**
- * The agents a routine's prompt names that it won't be able to call, for its dialog (a warning, never a block): set to
- * act, the ones its creator can't talk to (`creatorUserId` when someone else's routine is being edited, else the
- * viewer); set to only look and tell, the ones not open to everyone. Never the routine's own agent.
+ * The agents a routine's prompt names that it won't be able to call, for its dialog (a warning, never a block): the
+ * ones its creator can't talk to (`creatorUserId` when someone else's routine is being edited, else the viewer).
+ * Never the routine's own agent.
  */
 export function routineReachWarnings(
   prompt: string,
   agents: readonly Agent[],
-  options: { access: RoutineAccess; agentId: string | null; creatorUserId?: string | null },
-): { agent: Agent; kind: "blocked" | "read" }[] {
+  options: { agentId: string | null; creatorUserId?: string | null; creatorRoleIds?: readonly string[] },
+): { agent: Agent }[] {
   const handles = new Set([...prompt.matchAll(MENTION)].map((m) => (m[2] ?? "").toLowerCase()));
-  // ponytail: "read" ignores agents outside the report channel (their note is refused too); add once the dialog knows members.
-  return agents.flatMap((agent): { agent: Agent; kind: "blocked" | "read" }[] => {
+  return agents.flatMap((agent) => {
     if (agent.id === options.agentId || !handles.has(agent.handle.toLowerCase())) return [];
-    if (options.access === "read") return modeOf(agent) === "everyone" ? [] : [{ agent, kind: "read" }];
-    const reaches = options.creatorUserId ? audienceAdmits(agent, options.creatorUserId) : canTalk(agent);
-    return reaches ? [] : [{ agent, kind: "blocked" }];
+    const reaches = options.creatorUserId
+      ? audienceAdmits(agent, options.creatorUserId, options.creatorRoleIds)
+      : canTalk(agent);
+    return reaches ? [] : [{ agent }];
   });
 }

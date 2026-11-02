@@ -2,14 +2,15 @@ import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
 import { currentHandles } from "./agents";
-import { canTalkTo, talksToAgents } from "./audience";
+import { cancelAheadApproval, cancelableAhead } from "./approvals";
+import { canTalkTo, speakerFor } from "./audience";
 import { runAuthorityById } from "./authority";
 import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
 import { schedulesOf } from "./context/summaries";
 import { isAgentOnlyDm } from "./dms";
 import { cutText } from "./format";
-import { ROUTINE_ACCESS, ROUTINE_REPORT, routineAccessOf, routineReportOf } from "./routine-brief";
+import { ROUTINE_REPORT, routineReportOf } from "./routine-brief";
 import {
   cancelReminder,
   createReminder,
@@ -36,8 +37,10 @@ import { replyThreadOf } from "./runs";
 import { describeWhen, parseWhen } from "./schedule";
 import { localDateTimeOf } from "./schedule-reader";
 import { noAgentText } from "./team";
+import { RUN_APPROVED_ACTION } from "./tools/gateway";
+import { WHY_MAX_CHARS, WHY_MIN_CHARS } from "./tools/run-policy";
 import { hasScope } from "./tools/scopes";
-import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
+import type { AheadRequest, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 export const SCHEDULE_SCOPE = "schedule:write";
 
@@ -154,8 +157,13 @@ const noRequester: ToolOutput = {
   isError: true,
 };
 
-/** Events a routine can wait for instead of polling (mail comes through an email trigger: it needs a mailbox). */
-const TOOL_EVENTS: readonly RoutineEvent[] = ROUTINE_EVENTS.filter((e) => e !== "email.received");
+/**
+ * Events a routine can wait for instead of polling (mail comes through an email trigger, it needs a mailbox; a
+ * webhook call through a webhook trigger, it needs an address).
+ */
+const TOOL_EVENTS: readonly RoutineEvent[] = ROUTINE_EVENTS.filter(
+  (e) => e !== "email.received" && e !== "webhook.received",
+);
 
 /** What each event means, for the model and its answers (English). */
 const EVENT_WORDS: Record<RoutineEvent, string> = {
@@ -164,6 +172,7 @@ const EVENT_WORDS: Record<RoutineEvent, string> = {
   "issue.created": "a task is created here",
   "deploy.succeeded": "a deploy succeeds",
   "email.received": "new mail arrives",
+  "webhook.received": "its webhook address is called",
 };
 
 /** The zone a routine's times are read in (schedules and one-offs have their own). */
@@ -177,6 +186,8 @@ function whenText(t: RoutineTrigger) {
   }
   if (t.type === "once") return `once, ${t.description}`;
   if (t.type === "event") return `when ${EVENT_WORDS[t.event]}`;
+  // Never the address itself: it is a secret, shown only in Routines.
+  if (t.type === "webhook") return `when ${EVENT_WORDS["webhook.received"]}${t.signed ? " (signed calls only)" : ""}`;
   const from = t.filter.from?.length ? ` from ${t.filter.from.join(", ")}` : "";
   const subject = t.filter.subject ? ` with "${t.filter.subject}" in the subject` : "";
   return `when new mail arrives in ${t.folder}${from}${subject}`;
@@ -202,11 +213,11 @@ function whenParams(t: RoutineTrigger): AgentActionParams {
       return { trigger: "event", event: t.event };
     case "email":
       return { trigger: "email", folder: t.folder };
+    case "webhook":
+      return { trigger: "webhook" };
   }
 }
 
-const accessText = (r: RoutineView) =>
-  r.access === "act" ? "may act (changes inside agentes.chat; asks before changing connected apps)" : "only reads";
 const reportText = (r: RoutineView) =>
   r.report === "always" ? "reports every run" : "reports only when there is something new";
 
@@ -276,7 +287,7 @@ function routineLine(r: RoutineView, where: string, handle: string | null, promp
         : cutText(prompt.replace(/\s+/g, " "), 300);
   const runs = r.recentRuns.slice(0, LISTED_RUNS).map((run) => runText(run, zone));
   return [
-    `${r.id} — ${handle ? `@${handle} ` : ""}"${r.name}" (${stateText(r)}): ${whenText(r.trigger)}; next: ${next}; reports in ${where}; ${reportText(r)}; ${accessText(r)}`,
+    `${r.id} — ${handle ? `@${handle} ` : ""}"${r.name}" (${stateText(r)}): ${whenText(r.trigger)}; next: ${next}; reports in ${where}; ${reportText(r)}`,
     `  ${text}`,
     ...(runs.length > 0 ? [`  last runs: ${runs.join("; ")}`] : []),
   ].join("\n");
@@ -317,9 +328,22 @@ async function readableChannels(ctx: ToolContext, channelIds: string[], person: 
   return new Set(rows.map((r) => r.id));
 }
 
+/** Where a person connects a mailbox (agents can't), in the apps' words and the Portuguese they show. */
+const CONNECT_HOW =
+  "a person who manages connectors does it. On the web or the desktop app: Settings › Connectors › Add connector › Email, then the mailbox (Gmail, Outlook, iCloud or another), and its step Who can use it lets you read it (in Portuguese, Configurações › Conectores › Adicionar conector › Email, then Quem pode usar). Tell the person exactly this.";
+/** Where a person lets an agent read a mailbox that is connected. */
+const GIVE_HOW =
+  "a person who manages agents must let you. On the web or the desktop app: Settings › Connectors › Who uses it, on the mailbox's row (in Portuguese, Configurações › Conectores › Quem usa). On the phone app: You › Connectors, then the mailbox (in Portuguese, Você › Conectores). Tell the person exactly this.";
+
+/** No mailbox in the workspace: where a person connects one. */
+export const NO_MAILBOX_TEXT = `You can't read any mailbox yet, and you can't connect one yourself: ${CONNECT_HOW}`;
+/** Mailboxes, none of them this agent's to read: where a person lets it. */
+export const MAILBOX_NOT_GIVEN_TEXT = `You can't read any of this workspace's mailboxes: ${GIVE_HOW}`;
+
 /**
- * The mailbox an email trigger watches: one this agent may read, by its
- * address or label; left out, the only one it may read.
+ * The mailbox an email trigger watches: one this agent may read, by its address or label; left out, the only one
+ * it may read. A named one that isn't connected is told where a
+ * person connects it, one that is but isn't this agent's where a person lets it read it.
  */
 async function mailboxOf(ctx: ToolContext, raw: string) {
   const { mailAccounts } = schema;
@@ -333,23 +357,22 @@ async function mailboxOf(ctx: ToolContext, raw: string) {
   for (const a of accounts) {
     if (await hasScope(ctx.db, ctx.orgId, ctx.agentId, a.id, "mail:read")) readable.push(a);
   }
-  const want = raw.trim().toLowerCase();
-  const found = want
-    ? readable.filter((a) => a.address.toLowerCase() === want || a.label.toLowerCase() === want)
-    : readable;
-  if (found.length === 1 && found[0]) return found[0].id;
-  if (readable.length === 0) {
-    throw new Error("You can't read any mailbox: a person must connect one and let you read it first.");
+  const name = raw.trim();
+  const want = name.toLowerCase();
+  const named = (a: (typeof accounts)[number]) => a.address.toLowerCase() === want || a.label.toLowerCase() === want;
+  if (want && !accounts.some(named)) {
+    throw new Error(`"${name}" isn't a mailbox connected here, and you can't connect it yourself: ${CONNECT_HOW}`);
   }
-  throw new Error(
-    want
-      ? `You can't read a mailbox "${raw}". The ones you can: ${readable.map((a) => a.address).join(", ")}.`
-      : `Say which mailbox to watch (mailbox): ${readable.map((a) => a.address).join(", ")}.`,
-  );
+  const found = want ? readable.filter(named) : readable;
+  if (found.length === 1 && found[0]) return found[0].id;
+  if (want && found.length === 0) throw new Error(`You can't read "${name}" yet: ${GIVE_HOW}`);
+  if (found.length === 0) throw new Error(accounts.length === 0 ? NO_MAILBOX_TEXT : MAILBOX_NOT_GIVEN_TEXT);
+  throw new Error(`Say which mailbox to watch (mailbox): ${found.map((a) => a.address).join(", ")}.`);
 }
 
-/** A tool's `trigger` (an email filter or an event) as the routine's trigger. */
+/** A tool's `trigger` (an email filter, a webhook or an event) as the routine's trigger. */
 async function triggerOf(ctx: ToolContext, raw: Record<string, unknown>): Promise<RoutineTriggerInput> {
+  if (raw.type === "webhook") return { type: "webhook" };
   if (raw.type === "email") {
     const from = Array.isArray(raw.from) ? raw.from.filter((v): v is string => typeof v === "string") : [];
     return {
@@ -392,9 +415,9 @@ export const SCHEDULE_INPUT = {
 const TRIGGER_SCHEMA = {
   type: "object",
   description:
-    'Instead of a schedule: run when something happens. `type: "email"` with `mailbox` (its address; left out, the only one you can read), `folder` (default the inbox) and optional filters `from` (addresses or @domains), `subject` and `text` (words). `type: "event"` with `event`.',
+    'Instead of a schedule: run when something happens. `type: "email"` with `mailbox` (its address; left out, the only one you can read), `folder` (default the inbox) and optional filters `from` (addresses or @domains), `subject` and `text` (words). `type: "webhook"`: the routine gets an address of its own that another service calls (POST) to start it, with what it sends as the run\'s data. `type: "event"` with `event`.',
   properties: {
-    type: { type: "string", enum: ["email", "event"] },
+    type: { type: "string", enum: ["email", "webhook", "event"] },
     event: {
       type: "string",
       enum: TOOL_EVENTS,
@@ -414,17 +437,15 @@ export const REPORT_SCHEMA = {
   enum: ROUTINE_REPORT,
   description: '"when_new" (default): only when there is something new; "always": a report every run.',
 };
-export const ACCESS_SCHEMA = {
-  type: "string",
-  enum: ROUTINE_ACCESS,
-  description:
-    '"read" (default): only look and report. "act": may also change things (tasks, memory, wiki, Drive, its own branches and PRs; changes in connected apps still ask first), tell or ask other agents, and post where the person can (their channels, their DM with you). Only when the person clearly wants changes made or messages sent.',
-};
+
+/** A webhook routine's address is a secret the agent never sees: the person copies it from the routine's page. */
+const WEBHOOK_HINT =
+  " Its webhook address is secret and only on the routine's page: never write an address in the chat. Tell the person to open the routine in Routines to copy it (and to turn on signed calls there if the sending service can sign them).";
 
 /** The routine in one line for the agent to confirm. */
 const summaryOf = async (ctx: ToolContext, r: RoutineView) => {
   const next = r.nextRunAt ? `; next: ${describeWhen(new Date(r.nextRunAt), zoneOf(r.trigger))}` : "";
-  return `"${r.name}" (${r.active ? "active" : "paused"}): ${whenText(r.trigger)}${next}; reports in ${await whereOf(ctx, r)}; ${reportText(r)}; ${accessText(r)}`;
+  return `"${r.name}" (${r.active ? "active" : "paused"}): ${whenText(r.trigger)}${next}; reports in ${await whereOf(ctx, r)}; ${reportText(r)}`;
 };
 
 /**
@@ -442,7 +463,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "schedule_reminder",
       description:
-        'Schedule a one-off reminder in this conversation: at that time you post "Reminder: …" mentioning the person (the app shows it as a reminder in their language). `when` is what the person said, in their words and language ("amanhã às 9h", "tomorrow at 9am", "in 2 hours"), read in their time zone, or ISO 8601. Write `message` in the person\'s language. Set ask_agent when, at that time, you should do something (not just remind). If the time is ambiguous, ask with ask_user first.',
+        'Schedule a one-off reminder in this conversation: at that time you post "Reminder: …" mentioning the person (the app shows it as a reminder in their language). `when` is what the person said, in their words and language ("amanhã às 9h", "tomorrow at 9am", "in 2 hours"), read in their time zone, or ISO 8601. Write `message` in the person\'s language. Set ask_agent when, at that time, you should do something (not just remind); for a connected app\'s action then (a post, a message to send), use schedule_action instead, so the person approves it now and not at that time. If the time is ambiguous, ask with ask_user first.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -500,7 +521,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people (with `access` "act" it may also tell or ask other agents and post where the person can). That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks, `access` what it may do on its own. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
+        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people. It can do what you can (search the web, use your computer and browser, tell or ask other agents, post where the person can); changes in connected apps still ask a person first. That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again; "when another service calls it" or "by webhook" is a webhook trigger. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -511,7 +532,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           title: { type: "string", maxLength: 120 },
           channel: { type: "string", maxLength: 100, description: "Report in this channel instead of here" },
           report: REPORT_SCHEMA,
-          access: ACCESS_SCHEMA,
         },
         required: ["prompt"],
         additionalProperties: false,
@@ -555,7 +575,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                 ? channel.target
                 : { type: "conversation", ...conv, reminder: false },
             trigger,
-            access: routineAccessOf(input.access),
             report: routineReportOf(input.report),
           });
           // Recorded right after (reading the schedule may call a model: no transaction held around it).
@@ -577,7 +596,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ]);
           }
           return {
-            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.${needsText(routine)}`,
+            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.${needsText(routine)}${
+              routine.trigger.type === "webhook" ? WEBHOOK_HINT : ""
+            }`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {
@@ -611,6 +632,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               handle: agents.handle,
               audienceMode: agents.audienceMode,
               audienceUserIds: agents.audienceUserIds,
+              audienceRoleIds: agents.audienceRoleIds,
+              consultable: agents.consultable,
+              brain: agents.brain,
               ownerUserId: agents.ownerUserId,
             })
             .from(agents)
@@ -624,7 +648,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             agentId = found.id;
           }
           const mineOnly = agentId === ctx.agentId;
-          const talks = await talksToAgents(ctx.db, ctx.orgId, person);
+          const talks = await speakerFor(ctx.db, ctx.orgId, person);
           const list = (await listOrgRoutines(ctx.db, ctx.orgId, agentId ? { agentId } : {})).filter(
             (r) =>
               isRoutine(r) &&
@@ -672,7 +696,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "update_routine",
       description:
-        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `access` what it may do on its own ("act" only when the person clearly wants changes made or messages sent), `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
+        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -684,7 +708,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           trigger: TRIGGER_SCHEMA,
           title: { type: "string", minLength: 1, maxLength: 120 },
           report: REPORT_SCHEMA,
-          access: ACCESS_SCHEMA,
           active: { type: "boolean" },
         },
         required: ["id"],
@@ -715,7 +738,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ...(str(input.title) ? { name: str(input.title) } : {}),
             ...(trigger ? { trigger } : {}),
             ...(input.report !== undefined ? { report: routineReportOf(input.report) } : {}),
-            ...(input.access !== undefined ? { access: routineAccessOf(input.access) } : {}),
             ...(typeof input.active === "boolean" ? { active: input.active } : {}),
           });
           const afterRow = await routineRow(ctx.db, ctx.orgId, id);
@@ -753,7 +775,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             }
           }
           return {
-            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${needsText(routine)}`,
+            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${needsText(routine)}${
+              trigger?.type === "webhook" ? WEBHOOK_HINT : ""
+            }`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {
@@ -853,13 +877,135 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
         try {
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
-          const r = await cancelReminder(ctx.db, requester, ctx.orgId, str(input.id));
+          const r = await cancelReminder(routineDeps(ctx), requester, ctx.orgId, str(input.id));
           return { content: `Cancelled the reminder for ${r.description}: ${r.message}` };
         } catch (error) {
           return failed(error);
         }
       },
     },
+    {
+      name: "schedule_action",
+      description:
+        "Prepare a connected app's action for later (a post at a set time, a message to send tomorrow): the person approves that exact action now, on a card that says when it runs, and at that time it goes out by itself without asking again. Use it instead of a reminder or routine that would ask at the time. Give the exact `tool` and its full `arguments` (the whole text, the account: nothing left to decide later), `when` (the person's words or ISO 8601) or `routine` (the next run of one of your routines), a short `title` in the person's language and `why`. Your turn waits for their decision. To change its content or time later, call it again with `replaces`: that needs a new approval. Never for merge, deploy, rollback and the like: those always ask at the time.",
+      scope: SCHEDULE_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          tool: {
+            type: "string",
+            minLength: 1,
+            maxLength: 64,
+            description:
+              "The exact name of the tool that does it (behind a big connector: its real name, from find_tools)",
+          },
+          arguments: { type: "object", description: "Exactly what that tool takes, as its schema says" },
+          when: { type: "string", minLength: 1, maxLength: 120 },
+          routine: { type: "string", minLength: 36, maxLength: 36, description: "Instead of `when`" },
+          replaces: {
+            type: "string",
+            minLength: 36,
+            maxLength: 36,
+            description: "The id of one you prepared before: it is canceled (its time stays unless you give another)",
+          },
+          title: { type: "string", minLength: 1, maxLength: 120 },
+          why: {
+            type: "string",
+            minLength: WHY_MIN_CHARS,
+            maxLength: WHY_MAX_CHARS,
+            description: "Why, for the person deciding (on the card): what it is and why then, in their language",
+          },
+        },
+        required: ["tool", "arguments", "title", "why"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const requester = await requesterOf(ctx);
+          if (!requester) return noRequester;
+          const prepare = ctx.prepareAhead;
+          const args = input.arguments as Record<string, unknown>;
+          if (!prepare) return { content: "Approving ahead isn't available on this path.", isError: true };
+          const replaced = str(input.replaces)
+            ? await cancelableAhead(ctx.db, requester, ctx.orgId, str(input.replaces))
+            : null;
+          if (replaced && replaced.agentId !== ctx.agentId) {
+            return { content: `${replaced.id} was prepared by another agent: only it changes it.`, isError: true };
+          }
+          // The run it is for: one of the agent's routines, a new one-off at `when`, else the run it replaces.
+          let slot: AheadRequest["slot"];
+          const routineId = str(input.routine) || (str(input.when) ? "" : (replaced?.routineId ?? ""));
+          if (routineId) {
+            const own = await ownRoutine(ctx, routineId);
+            if (!own.row) return { content: own.error, isError: true };
+            const target = own.row.target as RoutineTarget;
+            if (target.type === "forum" || (target.type === "conversation" && target.reminder)) {
+              return { content: `Routine ${routineId} doesn't run you (a reminder or a forum topic).`, isError: true };
+            }
+            const runAt = str(input.routine) ? own.row.nextRunAt : replaced?.runAt;
+            if (!own.row.active || !runAt || runAt.getTime() <= Date.now()) {
+              return {
+                content: `Routine ${routineId} has no run coming (paused, done or starting now).`,
+                isError: true,
+              };
+            }
+            slot = async () => ({ routineId, runAt });
+          } else if (str(input.when)) {
+            const timezone = await routineTimezone(ctx.db, requester, ctx.orgId);
+            const reader = deps.context ? schedulesOf(deps.context) : null;
+            const when = await parseWhen(reader, { orgId: ctx.orgId, text: str(input.when), timezone });
+            if (!when.ok) {
+              return { content: `${when.error} Ask the person (ask_user) for a clear date and time.`, isError: true };
+            }
+            const conv = await conversationOf(ctx);
+            slot = async () => {
+              const r = await createReminder(routineDeps(ctx), requester, ctx.orgId, {
+                agentId: ctx.agentId,
+                ...conv,
+                at: when.at,
+                timezone: when.timezone,
+                description: when.description,
+                message: str(input.title),
+                askAgent: true,
+              });
+              return { routineId: r.id, runAt: when.at };
+            };
+          } else {
+            return {
+              content: "Say when it goes out (`when`), or for which routine's next run (`routine`).",
+              isError: true,
+            };
+          }
+          const prepared = await prepare({ tool: str(input.tool), input: args, why: str(input.why), slot });
+          if (!prepared.ok) return { content: prepared.message, isError: true };
+          // Changed content or time: the earlier approval covers nothing any more.
+          if (replaced) await cancelAheadApproval(routineDeps(ctx), requester, ctx.orgId, replaced.id);
+          return {
+            content: `Waiting for a person to approve «${prepared.approval.title}» ahead.`,
+            waitForApproval: prepared.approval,
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
   ];
-  return { name: "schedule", tools: async () => tools };
+  /** A routine's run does what was prepared for it (`schedule_action`) by its id: the gateway runs the stored call. */
+  const runApproved: ToolDefinition = {
+    name: RUN_APPROVED_ACTION,
+    description:
+      "Do an action prepared ahead for this run, by its id (your routine's instructions list them): exactly as it was stored. One a person approved for this time goes out without asking; any other asks a person first.",
+    scope: "",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", minLength: 36, maxLength: 36 } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    execute: async (input) => ({
+      content: `Nothing was prepared ahead with the id ${str(input.id)} for you: use an id your routine's instructions list.`,
+      isError: true,
+    }),
+  };
+  return { name: "schedule", tools: async (ctx) => (ctx.background ? [...tools, runApproved] : tools) };
 }

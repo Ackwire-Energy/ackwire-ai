@@ -320,7 +320,8 @@ export function presentTools(
     const chars = group.reduce((n, t) => n + sizeOf(t), 0);
     if (group.length <= DIRECTORY_MAX_TOOLS && chars <= DIRECTORY_MAX_CHARS) continue;
     const label = group[0]?.connectorLabel ?? "Connector";
-    let prefix = prefixOf(group, label);
+    // Two accounts of one server share their names' first word: each connection's own prefix keeps them apart.
+    let prefix = group[0]?.toolPrefix ?? prefixOf(group, label);
     // A name a real tool already has can't be taken by the directory.
     if (taken.has(`${prefix}_find_tools`) || taken.has(`${prefix}_use_tool`)) prefix = `${prefix}_dir`;
     big.set(id, directoryTools(prefix, label, group, id, sensitive));
@@ -372,7 +373,6 @@ const GROUP_LABELS: Record<string, string> = {
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",
-  gdrive: "Google Drive",
 };
 
 export interface ToolGroup {
@@ -440,7 +440,7 @@ function onDemandTools(
       additionalProperties: false,
     },
     scope: "",
-    execute: async (input) => ({
+    execute: async (input, ctx) => ({
       content: findTools(
         tools,
         "",
@@ -451,6 +451,13 @@ function onDemandTools(
         ON_DEMAND_USE,
         loaded,
         await blocked?.(),
+        await (async () => {
+          const names = new Set([...tools, ...loaded].map((t) => t.name));
+          const teammates = reachesTeammates(names)
+            ? await import("../team").then((m) => m.teammateMeans(ctx)).catch(() => [])
+            : [];
+          return turnMeans(names, teammates);
+        })(),
       ),
     }),
   };
@@ -573,6 +580,7 @@ function findTools(
   useName = `${prefix}_use_tool`,
   loaded: ToolDefinition[] = [],
   blocked: Awaited<ReturnType<BlockedTools>> = { tools: [], ask: null },
+  means: string[] = [],
 ) {
   const query = typeof input.query === "string" ? input.query : "";
   const limit = Math.min(Math.max(Number(input.limit) || FIND_DEFAULT, 1), FIND_MAX);
@@ -581,8 +589,14 @@ function findTools(
   const matches = ranked.filter((t) => !blockedOf.has(t)).slice(0, limit);
   const notAllowed = ranked.slice(0, limit).flatMap((t) => blockedOf.get(t) ?? []);
   const toGet = connectorsToGet(query, blocked.connectors);
+  // No dedicated tool, or only weak matches (the best one has under half the query's words): the general means.
+  const weak = !matches[0] || coverage(matches[0], prefix, query) < 0.5;
+  const general =
+    weak && means.length > 0
+      ? `General means you have for "${query}", whatever the words:\n${means.map((m) => `- ${m}`).join("\n")}`
+      : "";
   if (matches.length === 0 && notAllowed.length === 0) {
-    return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).${toGet ? `\n\n${toGet}` : ""}`;
+    return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).${general ? `\n\n${general}` : ""}${toGet ? `\n\n${toGet}` : ""}`;
   }
   const listed = new Set(loaded);
   const lead = matches.findIndex((t) => !listed.has(t));
@@ -630,6 +644,37 @@ function findTools(
       `Beyond your access to their connector; only an admin can change it, on your page in Tools and access (in Portuguese, Ferramentas e acesso):\n${beyond.join("\n")}`,
     );
   }
+  if (general) parts.push(general);
   if (toGet) parts.push(toGet);
   return parts.join("\n\n");
+}
+
+/** How many of the query's words a tool's text has, as a share (0 to 1). */
+function coverage(tool: ToolDefinition, prefix: string, query: string) {
+  const terms = [...new Set(words(query).map(stem))];
+  if (terms.length === 0) return 0;
+  const doc = new Set(docOf(tool, prefix));
+  return terms.filter((t) => doc.has(t)).length / terms.length;
+}
+
+/**
+ * The general means a run has beyond any task's own tools (ADR 0109), by the tool names it can reach (loaded or on
+ * demand): what the prompt's "Your means", `find_tools` with no good match and the turn-end judge all name, so none
+ * points the agent at something it lacks. `teammates`: their handles with what they do, when known.
+ */
+/** Whether a run reaches other agents (`ask_agent`, `tell_agent`): only then does `turnMeans` name its teammates. */
+export const reachesTeammates = (names: ReadonlySet<string>) => names.has("ask_agent") || names.has("tell_agent");
+
+export function turnMeans(names: ReadonlySet<string>, teammates: string[] = []): string[] {
+  const out: string[] = [];
+  if (names.has("web_search")) out.push("the web: `web_search` to search it, `web_fetch` to read any public page");
+  if (names.has("browser_open") || names.has("browser_do"))
+    out.push("your browser (`browser_*`): open any website and read it, search engines included");
+  if (names.has("run_code")) out.push("your computer's terminal (`run_code`): commands, scripts, files");
+  if (names.has("find_tools")) out.push("the tool directory (`find_tools`): tools for apps and services");
+  if (reachesTeammates(names))
+    out.push(
+      `teammates (\`ask_agent\`, \`tell_agent\`)${teammates.length > 0 ? `: ${teammates.join("; ")}` : ": the ones whose role covers it"}`,
+    );
+  return out;
 }

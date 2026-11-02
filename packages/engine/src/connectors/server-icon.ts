@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { BlobStore } from "@agenteschat/adapters";
+import { type BlobStore, readCapped } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { sniffImage, stripImageMetadata } from "../avatars";
 import { caches } from "../cache";
@@ -94,32 +94,6 @@ export function iconCandidates(serverUrl: string, icons: unknown): McpIcon[] {
     .map((icon, at) => ({ icon, at }))
     .sort((a, b) => score(a.icon) - score(b.icon) || a.at - b.at)
     .map((x) => x.icon);
-}
-
-/** Reads at most `max` bytes; null when the body is longer. */
-async function readCapped(res: Response, max: number): Promise<Uint8Array | null> {
-  if (Number(res.headers.get("content-length") ?? 0) > max) return null;
-  if (!res.body) return new Uint8Array(await res.arrayBuffer());
-  const reader = res.body.getReader();
-  const parts: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > max) {
-      await reader.cancel().catch(() => {});
-      return null;
-    }
-    parts.push(value);
-  }
-  const out = new Uint8Array(total);
-  let at = 0;
-  for (const p of parts) {
-    out.set(p, at);
-    at += p.byteLength;
-  }
-  return out;
 }
 
 /**

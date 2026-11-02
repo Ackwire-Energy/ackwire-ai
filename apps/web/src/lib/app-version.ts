@@ -4,6 +4,7 @@
  * (`/assets/index-<hash>.js`) is compared with the one the server's index.html names now; once
  * they differ the app is stale, and the next page change loads the new one.
  */
+import { STORAGE_KEYS, sessionStore } from "./storage";
 
 /** How often an open tab asks, besides on focus and after the realtime socket reconnects (a deploy). */
 export const VERSION_CHECK_MS = 5 * 60_000;
@@ -77,3 +78,33 @@ export function startVersionWatch(watch: VersionWatch) {
 }
 
 export const checkAppVersion = () => current?.check() ?? Promise.resolve();
+
+/** A page's file missing again within this long is a crash, not a deploy. */
+const VERSION_RELOAD_MS = 60_000;
+let reloading = false;
+let stayed: ReturnType<typeof setTimeout> | undefined;
+
+/** True once the app is reloading into a new version: nothing is reported, and the error screen is the boot sky. */
+export const reloadingForNewVersion = () => reloading;
+
+/**
+ * A page's code or styles from before a deploy are gone from the server (Vite's `vite:preloadError`): the app
+ * reloads into the new version, at most once a minute. True when it reloads.
+ */
+export function reloadForNewVersion(now = Date.now()): boolean {
+  if (now - Number(sessionStore.get(STORAGE_KEYS.versionReload)) < VERSION_RELOAD_MS) return false;
+  sessionStore.set(STORAGE_KEYS.versionReload, String(now));
+  // Storage that keeps nothing would reload forever.
+  if (sessionStore.get(STORAGE_KEYS.versionReload) !== String(now)) return false;
+  reloading = true;
+  window.location.reload();
+  // Still here a moment later: the reload didn't happen (the person stayed when a page asked before leaving).
+  stayed = setTimeout(resetVersionReload, 3000);
+  return true;
+}
+
+/** Not reloading: the page stayed, or a test starts. */
+export function resetVersionReload() {
+  clearTimeout(stayed);
+  reloading = false;
+}

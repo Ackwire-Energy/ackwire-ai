@@ -51,6 +51,7 @@ test("without mail adapters: no providers, Gmail connect is a conflict", async (
   const r = await owner(`/api/app/organizations/${orgId}/mail/accounts/composio`, { json: { provider: "gmail" } });
   expect(r.status).toBe(409);
   expect((await owner("/api/webhooks/composio", { json: {} })).status).toBe(404);
+  expect((await owner("/api/webhooks/millionsend", { json: {} })).status).toBe(404);
 });
 
 test("mail API: IMAP account (tested), Gmail through Composio, agent access, folders, disconnect", async () => {
@@ -62,7 +63,11 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
 
-  expect(await (await api("/mail/providers")).json()).toEqual({ composio: true, imap: true, presets: [ICLOUD] });
+  expect(await (await api("/mail/providers")).json()).toEqual({
+    composio: true,
+    imap: true,
+    presets: [ICLOUD],
+  });
 
   fake.tester.state.result = { ok: false, error: "auth" };
   const failed = await api("/mail/accounts/imap", {

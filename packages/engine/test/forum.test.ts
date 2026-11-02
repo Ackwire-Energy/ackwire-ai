@@ -37,6 +37,7 @@ import {
   splitStance,
   ValidationError,
 } from "../src";
+import { postsOf } from "../src/forum";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -183,6 +184,26 @@ const open = (input: Partial<Parameters<typeof createForumTopic>[3]> & { agentId
 const topicOf = (id: string) => getForumTopic(f.db, f.owner.id, f.org.id, id);
 const statuses = (t: Awaited<ReturnType<typeof topicOf>>, round: number) =>
   t.track.rounds.find((r) => r.round === round)?.entries.map((e) => e.status);
+
+describe("a post's tool work", () => {
+  test("an agent's post carries its run's meta.work, from whichever of its messages has it", () => {
+    const row = (id: string, meta: Record<string, unknown>) =>
+      ({
+        id,
+        authorType: "agent",
+        authorAgentId: "a-1",
+        authorUserId: null,
+        agentRunId: "r-1",
+        body: `part ${id}`,
+        meta,
+        createdAt: new Date(0),
+      }) as unknown as Parameters<typeof postsOf>[1][number];
+    const work = { steps: 3, calls: [{ name: "search_memory", n: 1 }], durationMs: 9000 };
+    const [post] = postsOf("t-1", [row("m-1", { forum: { round: 1 } }), row("m-2", { work })]);
+    expect(post?.meta).toEqual({ work });
+    expect(post?.body).toBe("part m-1\n\npart m-2");
+  });
+});
 
 describe("rounds", () => {
   test("one run per agent per round, in order, up to the limit; then the synthesis as a Drive document", async () => {

@@ -696,6 +696,43 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(folderRow(DOCS)).toBeNull();
   });
 
+  test("the shared folder (ADR 0115): its own row with its path, size and the free disk; no actions, not in the list", async () => {
+    const SHARED = "/Users/you/agentes/shared";
+    await open({
+      access: {
+        folders: [
+          { path: LOJA, agents: [ADA_ID] },
+          { path: SHARED, agents: ["*"] },
+        ],
+        tools: { claude: true, codex: false, commands: true },
+      },
+      disk: { freeGb: 42.5, use: 0.8, sharedGb: 3.2 },
+    });
+    const row = document.querySelector("[data-shared-folder]") as HTMLElement;
+    expect(row.textContent).toContain("Pasta compartilhada");
+    expect(row.textContent).toContain("Todos os agentes daqui leem e escrevem nela.");
+    expect(row.querySelector("code")?.textContent).toBe(SHARED);
+    expect(row.textContent).toContain("3,2 GB nela · 43 GB livres no disco");
+    expect(row.querySelector("button")).toBeNull();
+    expect(folderRow(SHARED)).toBeNull();
+    expect(folderRow(LOJA).textContent).toContain("loja-v5");
+  });
+
+  test("the shared folder before its size is measured, with no folder allowed; a runner without one has no row", async () => {
+    await open();
+    expect(document.querySelector("[data-shared-folder]")).toBeNull();
+    cleanup();
+    await open({
+      access: {
+        folders: [{ path: "/srv/agentes/shared", agents: ["*"] }],
+        tools: { claude: true, codex: false, commands: true },
+      },
+    });
+    expect(document.querySelector("[data-shared-folder]")?.textContent).toContain("Tamanho ainda não medido");
+    // Nobody allowed a folder: the shared one doesn't count as one.
+    expect(document.body.textContent).toContain("Nenhuma pasta a mais");
+  });
+
   test("owner: tools on/off; Desligar turns one off; granting is never a button here", async () => {
     const { state, m } = await open();
     const tools = screen().getByRole("region", { name: "Ferramentas" });
@@ -901,13 +938,13 @@ describe("agent page: which computer", () => {
     expect(screen().queryByRole("combobox", { name: "Computador" })).toBeNull();
   });
 
-  test("an error's code is said in the person's language; an unknown one keeps the server's words", () => {
+  test("an error's code is said in the person's language; an unknown one never in the server's words", () => {
     const i18n = createI18n("pt-BR");
     const t = i18n.t.bind(i18n);
     expect(errorText(t, new ApiError(413, "artifact.file_too_large", "too large"))).toBe(
       "O arquivo passa de 50 MB, o limite por arquivo.",
     );
-    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe("Server exploded");
+    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe("Algo deu errado. Tente de novo.");
     const en = createI18n("en");
     expect(errorText(en.t.bind(en), new ApiError(400, "machine.pairing_invalid", "x"))).toBe(
       "Invalid, used or expired code. Generate another one.",

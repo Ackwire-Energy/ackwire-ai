@@ -1,3 +1,4 @@
+import { connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import {
   agentSkillList,
   deleteSkill,
@@ -38,6 +39,10 @@ const Skill = z
     version: z.number(),
     source: z.string().openapi({ description: "`upload`, `url` or `manual`." }),
     sourceUrl: z.string().nullable(),
+    sourceVia: z.enum(["github_app", "github"]).nullable().openapi({
+      description:
+        "Which of the workspace's GitHub connections read its private repository (the GitHub App, or the GitHub connector): updating reads through it first, then through the other, and keeps the one that read it. Null: read with no credentials.",
+    }),
     defaultForNewAgents: z.boolean(),
     metadata: z.record(z.string(), z.unknown()),
     createdAt: z.string(),
@@ -90,10 +95,22 @@ export function skillRoutes(deps: AppDeps) {
   const { db } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
+  // Private repositories are read with the workspace's GitHub: the GitHub App's token for the repository, else the
+  // GitHub connection's. Tokens stay here.
+  const github = {
+    connectors: {
+      db,
+      keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
+      oauthApps: connectorOAuthApps(deps.config),
+      publicUrl: deps.config.PUBLIC_URL,
+      http: deps.extras?.http,
+    },
+    app: githubAppConfig(deps.config),
+  };
   const skills = (): SkillDeps => {
     const blobs = deps.extras?.artifacts?.blobs;
     if (!blobs) throw new Error("storage is not configured on this server");
-    return { db, blobs, fetch: deps.extras?.http, resolveHost: deps.extras?.resolveHost };
+    return { db, blobs, fetch: deps.extras?.http, resolveHost: deps.extras?.resolveHost, github };
   };
   const linkReadAllowed = async (userId: string) =>
     (await deps.adapters.rateLimiter.consume(`skill-link:${userId}`, LINK_READS)).allowed;
@@ -158,6 +175,8 @@ export function skillRoutes(deps: AppDeps) {
       security,
       summary:
         "Import a skill: a GitHub link (a skill's folder or a file in it, or a folder holding several to pick from) or a zip of the folder (base64)",
+      description:
+        "A private repository (github.com answers 404) is read through the workspace's GitHub: the GitHub App's token for it, else the GitHub connection's, never sent to the app. `github.repo_missing` says in `connection` how the GitHub connection fared (`none`; `refused`: GitHub no longer takes its token; `ok`: it works and can't see the repository) and in `app` whether the GitHub App is installed on some account for the workspace. `github.unreachable`: GitHub didn't answer, try again.",
       request: {
         params: OrgParams,
         body: body(
@@ -170,6 +189,9 @@ export function skillRoutes(deps: AppDeps) {
                 .max(100)
                 .optional()
                 .openapi({ description: "The skills picked among the link's `choices` (their `path`)." }),
+              list: z.boolean().optional().openapi({
+                description: "Answer with the skills the link holds to pick, even one, installing none.",
+              }),
             }),
             z.object({
               zipBase64: z
@@ -182,8 +204,12 @@ export function skillRoutes(deps: AppDeps) {
       },
       responses: {
         200: json(
-          z.object({ choices: z.array(SkillChoice), skipped: z.array(SkillSkipped).optional() }),
-          "The link holds several skills: nothing installed, send the ones picked in `paths`. `skipped`: those that can't be installed, with why",
+          z.object({
+            choices: z.array(SkillChoice),
+            skipped: z.array(SkillSkipped).optional(),
+            via: z.enum(["github_app", "github"]).optional(),
+          }),
+          "The link holds several skills (or `list`): nothing installed, send the ones picked in `paths`. `skipped`: those that can't be installed, with why. `via`: which of the workspace's GitHub connections read it",
         ),
         201: json(
           z.union([SkillDetail, z.object({ skills: z.array(SkillDetail) })]),
@@ -202,7 +228,7 @@ export function skillRoutes(deps: AppDeps) {
         if (input.paths) {
           return c.json({ skills: await importPickedSkills(skills(), actor, orgId, input.url, input.paths) }, 201);
         }
-        const result = await importSkillFromUrl(skills(), actor, orgId, input.url);
+        const result = await importSkillFromUrl(skills(), actor, orgId, input.url, { list: input.list });
         return "choices" in result ? c.json(result, 200) : c.json(result, 201);
       }
       let zip: Uint8Array;

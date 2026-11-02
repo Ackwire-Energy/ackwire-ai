@@ -1,11 +1,20 @@
-import type { Message } from "@agenteschat/client";
+import { type Message, usePinMessage } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { voiceOf } from "@agenteschat/client/lib/voice";
-import { Button, EmojiPickerPopover, Menu, MenuItem } from "@agenteschat/ui";
+import { Button, EmojiPickerPopover, Menu } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useChannelActions } from "@/components/channel-actions";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { useOrg } from "@/components/org-context";
-import { contextMenuHandler, copyText, type MenuEntry, QUICK_REACTIONS, selectedTextAt } from "@/lib/context-menu";
+import {
+  contextMenuHandler,
+  copyText,
+  type MenuEntry,
+  QUICK_REACTIONS,
+  selectedTextAt,
+  tidy,
+} from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { CorrectionDialog } from "./MessageFeedback";
 import { DOWN, ReactButton, reactionOf, useEmojiLabels, useMessageReactions } from "./Reactions";
@@ -15,50 +24,18 @@ import { SaveToWikiDialog } from "./SaveToWiki";
 export const messageLink = (origin: string, orgId: string, m: Pick<Message, "id" | "channelId">) =>
   `${origin}/org/${orgId}/c/${m.channelId}?m=${m.id}`;
 
-/** "…" on any message: Salvar na wiki, Copiar link, Responder. */
-export function MessageMoreMenu({ message, channelName }: { message: Message; channelName: string }) {
+/** "…" on any message: the same list as its right click (`useMessageMenu`'s `more`). */
+export function MessageMoreMenu({ entries }: { entries: MenuEntry[] }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const actions = useChannelActions();
-  const [saving, setSaving] = useState(false);
-  // Only a GIF, a sticker or files (ADR 0091): no words to save, as in the right-click menu.
-  const words = message.body.trim() !== "" && !voiceOf(message.meta);
+  if (!entries.length) return null;
   return (
-    <>
-      <Menu
-        align="end"
-        label={t("channel.more")}
-        trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={t("channel.more")} />}
-      >
-        {words && (
-          <MenuItem icon="book" onSelect={() => setSaving(true)}>
-            {t("wiki.save")}
-          </MenuItem>
-        )}
-        <MenuItem
-          icon="link"
-          onSelect={async () => {
-            await navigator.clipboard?.writeText(messageLink(window.location.origin, org.id, message));
-            toast.show(t("channel.linkCopied"));
-          }}
-        >
-          {t("channel.copyLink")}
-        </MenuItem>
-        {actions?.reply && !message.local && (
-          <MenuItem icon="reply" onSelect={() => actions.reply?.(message)}>
-            {t("channel.reply")}
-          </MenuItem>
-        )}
-      </Menu>
-      <SaveToWikiDialog
-        open={saving}
-        onClose={() => setSaving(false)}
-        text={message.body}
-        source={{ kind: "message", channelId: message.channelId, messageId: message.id }}
-        from={t("wiki.fromMessage", { channel: channelName })}
-      />
-    </>
+    <Menu
+      align="end"
+      label={t("channel.more")}
+      trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={t("channel.more")} />}
+    >
+      <MenuEntries entries={entries} />
+    </Menu>
   );
 }
 
@@ -84,11 +61,11 @@ export function ReplyButton({ message }: { message: Message }) {
 export function PersonMessageActions({
   message,
   authorName,
-  channelName,
+  more,
 }: {
   message: Message;
   authorName: string;
-  channelName: string;
+  more: MenuEntry[];
 }) {
   const { t } = useTranslation();
   const reactions = useMessageReactions(message.id, message.reactions);
@@ -96,22 +73,23 @@ export function PersonMessageActions({
     <div className="ac-msg__actions" role="toolbar" aria-label={t("channel.actions", { name: authorName })}>
       <ReactButton onPick={(emoji) => reactions.toggle(reactionOf(emoji))} />
       <ReplyButton message={message} />
-      <MessageMoreMenu message={message} channelName={channelName} />
+      <MessageMoreMenu entries={more} />
     </div>
   );
 }
 
 /**
- * A message's right click in the desktop app (lib/context-menu.ts): quick reactions, then what its "…" has
- * (Responder, Copiar link, Salvar na wiki) and Copiar texto. With text selected in it, the selection's own menu
- * (Copiar, Responder; Salvar na wiki saves the selection). `touch` is the same menu for a tap on touch, where it stands
- * in for the bar, so it also has the bar's every emoji, and an agent's reply (`feedback`) the bar's Não ajudou and
- * Corrigir resposta. `dialog` goes with the message.
+ * A message's menu (lib/context-menu.ts), one list for its right click and its "…" (`more`): reactions with every
+ * emoji, Responder, Copiar texto, Copiar link, Fixar mensagem, Salvar na wiki. With text selected in it, the
+ * selection's own menu (Copiar, Responder; Salvar na wiki saves the selection). `touch` is the same menu for a tap on
+ * touch, where it stands in for the bar, so an agent's reply (`feedback`) also has the bar's Não ajudou and Corrigir
+ * resposta. `dialog` goes with the message. Fixar needs `post` (the server's rule) and a conversation that isn't
+ * read only.
  */
 export function useMessageMenu(
   message: Message,
   channelName: string,
-  options: { feedback?: boolean; agentName?: string } = {},
+  options: { feedback?: boolean; agentName?: string; readOnly?: boolean } = {},
 ) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -123,6 +101,7 @@ export function useMessageMenu(
   const [correcting, setCorrecting] = useState(false);
   const [picking, setPicking] = useState(false);
   const labels = useEmojiLabels();
+  const pin = usePinMessage(org.id);
   const entries = (selected: string, touch = false): MenuEntry[] => {
     if (message.local) return [];
     const copy = (text: string, id: string, label: string): MenuEntry => ({
@@ -165,13 +144,28 @@ export function useMessageMenu(
     }
     // A file with no words has no text to copy or save.
     const words = message.body.trim() !== "" && !voiceOf(message.meta);
+    const pinned = Boolean(message.pinned);
+    const pinEntry: MenuEntry | null =
+      options.readOnly || !can(org, "post")
+        ? null
+        : {
+            kind: "item",
+            id: "pin",
+            label: t(pinned ? "contextMenu.unpin" : "contextMenu.pin"),
+            icon: "pin",
+            run: () =>
+              pin.mutate(
+                { channelId: message.channelId, messageId: message.id, pinned: !pinned },
+                { onSuccess: () => toast.show(t(pinned ? "contextMenu.unpinned" : "contextMenu.pinned")) },
+              ),
+          };
     return [
       {
         kind: "reactions",
         label: t("contextMenu.react"),
         emojis: QUICK_REACTIONS,
         pick: (emoji) => reactions.toggle(reactionOf(emoji)),
-        ...(touch ? { more: { label: t("reactions.add"), run: () => setPicking(true) } } : {}),
+        more: { label: t("reactions.add"), run: () => setPicking(true) },
       },
       ...reply,
       ...(touch && options.feedback
@@ -186,13 +180,17 @@ export function useMessageMenu(
             { kind: "item", id: "correct", label: t("channel.correct"), icon: "edit", run: () => setCorrecting(true) },
           ] satisfies MenuEntry[])
         : []),
+      { kind: "separator" },
       ...(words ? [copy(message.body, "copy-text", t("contextMenu.copyText"))] : []),
       copyLink,
-      ...(words ? ([{ kind: "separator" }, wiki(message.body)] satisfies MenuEntry[]) : []),
+      { kind: "separator" },
+      ...(pinEntry ? [pinEntry] : []),
+      ...(words ? [wiki(message.body)] : []),
     ];
   };
   const onContextMenu = contextMenuHandler((e) => entries(selectedTextAt(e.target)));
-  const touch = entries("", true);
+  const touch = tidy(entries("", true));
+  const more = tidy(entries(""));
   const dialog = (
     <>
       {saving !== null && (
@@ -226,5 +224,5 @@ export function useMessageMenu(
       )}
     </>
   );
-  return { onContextMenu, touch, dialog };
+  return { onContextMenu, touch, more, dialog };
 }

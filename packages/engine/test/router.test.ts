@@ -278,6 +278,7 @@ describe("routeMessage", () => {
         orgId: f.org.id,
         connector: "sentry",
         label: "Sentry",
+        toolPrefix: "sentry",
         serverUrl: "https://mcp.sentry.dev",
         authType: "none",
       })
@@ -1236,4 +1237,40 @@ describe("the team's coordinator (ADR 0093)", () => {
       decidedBy: { step: "rule", rule: "reply" },
     });
   });
+});
+
+describe("a question to each agent, then one fact they share", () => {
+  for (const [lang, each, shared] of [
+    ["pt-BR", "como tá o limite de uso de vocês?", "quanto de cpu e ram nossa máquina tá usando agora?"],
+    ["en", "how are your usage limits looking, all of you?", "how much cpu and ram is our machine using right now?"],
+  ] as const) {
+    test(`both answer the first; one answers the second, while both are still at work (${lang})`, async () => {
+      f = await setup();
+      const theo = await createAgent(
+        f.db,
+        f.owner.id,
+        f.org.id,
+        { name: "Theo", handle: "theo" },
+        { model: "claude-sonnet-5-5" },
+      );
+      await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: theo.id });
+      const deps = (scores: Record<string, number>, forEveryone: number) => ({
+        db: f.db,
+        strategy: fixedStrategy(scores, forEveryone).strategy,
+        policy: { ...DEFAULT_ROUTER_POLICY, maxHops: 3 },
+      });
+      const first = await post(each);
+      const both = await routeMessage(deps({ dev: 0.9, theo: 0.9 }, 0.9), { orgId: f.org.id, messageId: first.id });
+      expect([...(both.selected ?? [])].sort()).toEqual([f.agent.id, theo.id].sort());
+
+      const second = await post(shared);
+      const [stored] = await f.db.select().from(schema.messages).where(eq(schema.messages.id, second.id));
+      // Neither run in progress takes it on its own: the router decides who it is for.
+      expect(stored?.meta.steeredRunIds).toBeUndefined();
+      const one = await routeMessage(deps({ dev: 0.8, theo: 0.7 }, 0.1), { orgId: f.org.id, messageId: second.id });
+      expect(one.selected).toEqual([f.agent.id]);
+      const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, theo.id));
+      expect(runs.flatMap((r) => r.pendingMessageIds)).not.toContain(second.id);
+    });
+  }
 });

@@ -28,7 +28,7 @@ export const BrowserHandoff = z
     screen: z.enum(SCREEN_KINDS).openapi({ description: "Which of the agent's screens: one open handoff per screen." }),
     kind: z.enum(["ask", "takeover"]),
     instructions: z.string(),
-    status: z.enum(["pending", "active", "done", "failed", "expired", "cancelled"]),
+    status: z.enum(["pending", "active", "done", "failed", "expired", "cancelled", "withdrawn"]),
     requestedForUserId: z.string().nullable(),
     controllerUserId: z.string().nullable(),
     note: z.string().nullable(),

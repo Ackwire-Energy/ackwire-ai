@@ -4,10 +4,12 @@ import { documentPreview, KIND_ICON, patchCounts } from "@agenteschat/client/lib
 import { Icon } from "@agenteschat/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { LiveBlockCard } from "@/components/blocks/LiveBlock";
+import { PollCard } from "@/components/blocks/PollCard";
 import { useOrg } from "@/components/org-context";
 import { contextMenuHandler, copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
-import { useArtifactDownload } from "./ArtifactActions";
+import { useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "./ArtifactViewer";
 import { FileCardPreview } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
@@ -24,6 +26,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   const authorName = useAuthorName();
   const download = useArtifactDownload();
   const toast = useToast();
+  const remove = useDeleteArtifact();
   const query = useArtifact(org.id, ref.deleted ? null : ref.id, ref.version);
   const a = query.data;
   // Deleted (to the trash): a quiet placeholder, never a broken card.
@@ -43,8 +46,11 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
     );
   }
   if (!a) return <div className="artifact-card artifact-card--loading" aria-busy="true" />;
+  // What lives in the conversation isn't a file: the thing itself, not a card that opens it (ADR 0113).
+  if (a.kind === "block") return <LiveBlockCard id={a.id} version={a.shownVersion} />;
+  if (a.kind === "poll") return <PollCard id={a.id} version={a.shownVersion} />;
   const open = () => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined);
-  // The desktop app's right click: open, download, its link.
+  // The desktop app's right click: open, download, its link, and the trash for who may delete it.
   const onContextMenu = contextMenuHandler(() => [
     { kind: "header", label: a.title },
     { kind: "item", id: "open", label: t("contextMenu.open"), icon: "eye", run: open },
@@ -65,6 +71,19 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
           toast.show(t("contextMenu.linkCopied")),
         ),
     },
+    ...(a.canDelete
+      ? ([
+          { kind: "separator" },
+          {
+            kind: "item",
+            id: "delete",
+            label: t("artifacts.delete"),
+            icon: "trash",
+            danger: true,
+            run: () => remove.ask(a),
+          },
+        ] as const)
+      : []),
   ]);
   // Files are tiles that sit side by side (images as their thumbnail).
   if (a.content.kind === "file") {
@@ -72,6 +91,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
       // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
       <div className="artifact-tile" data-kind="file" onContextMenu={onContextMenu}>
         <FileCardPreview content={a.content} artifactId={a.id} version={a.shownVersion} title={a.title} onOpen={open} />
+        {remove.dialog}
       </div>
     );
   }
@@ -110,6 +130,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
       <div className="artifact-card__preview">
         <Preview content={a.content} title={a.title} />
       </div>
+      {remove.dialog}
     </div>
   );
 }
@@ -191,7 +212,9 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
         />
       );
     case "file":
-      // Files render as tiles (`ArtifactCard`), never inside a card.
+    case "block":
+    case "poll":
+      // Files render as tiles and blocks and votes as themselves (`ArtifactCard`), never inside a card.
       return null;
   }
 }

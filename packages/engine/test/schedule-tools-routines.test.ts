@@ -9,7 +9,7 @@ import {
   type ToolDefinition,
   undoAgentAction,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { type Fixture, SECRET, setup } from "./fixtures";
 
 /** A live webhook of `provider` in the fixture's workspace: its events can start routines. */
 const hook = (f: Fixture, provider: "github" | "sentry") =>
@@ -67,7 +67,11 @@ async function runContext(fx: Fixture, author: "person" | "agent" = "person"): P
 }
 
 async function tools(fx: Fixture, ctx: ToolContext) {
-  const all: ToolDefinition[] = await createScheduleToolSource({ pubsub: fx.pubsub, context: fx.context }).tools(ctx);
+  const all: ToolDefinition[] = await createScheduleToolSource({
+    pubsub: fx.pubsub,
+    context: fx.context,
+    hooks: HOOKS,
+  }).tools(ctx);
   return (name: string, input: Record<string, unknown>) => {
     const tool = all.find((t) => t.name === name);
     if (!tool) throw new Error(`no ${name}`);
@@ -75,13 +79,15 @@ async function tools(fx: Fixture, ctx: ToolContext) {
   };
 }
 
+const HOOKS = { publicUrl: "https://agentes.test", secret: SECRET };
+
 type RoutineRow = typeof schema.routines.$inferSelect;
 const routineOf = async (id: string) =>
   (await f.db.select().from(schema.routines).where(eq(schema.routines.id, id)))[0] as RoutineRow;
 const receipts = (runId: string) => f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, runId));
 
 describe("schedule tools: routines", () => {
-  test("create_routine with an event trigger, report and access; the receipt carries no English schedule", async () => {
+  test("create_routine with an event trigger and report, every routine acting; the receipt carries no English schedule", async () => {
     f = await setup();
     const ctx = await runContext(f);
     const call = await tools(f, ctx);
@@ -90,7 +96,6 @@ describe("schedule tools: routines", () => {
       prompt: "Investigue o erro novo e diga o que fazer.",
       trigger: { type: "event", event: "sentry.issue_created" },
       report: "always",
-      access: "act",
     });
     expect(out.isError).toBeFalsy();
     expect(out.content).toContain("when a new error comes in from Sentry");
@@ -116,10 +121,30 @@ describe("schedule tools: routines", () => {
       trigger: "schedule",
       timezone: "UTC",
       rule: { freq: "weekly", byWeekday: ["MO"], times: ["09:00"] },
-      access: "read",
+      access: "act",
       report: "when_new",
     });
     expect(receipt?.params).not.toHaveProperty("schedule");
+  });
+
+  test("create_routine with a webhook trigger: the routine gets an address the agent never sees or writes", async () => {
+    f = await setup();
+    const ctx = await runContext(f);
+    const call = await tools(f, ctx);
+    const out = await call("create_routine", { prompt: "Confira o pedido que chegou.", trigger: { type: "webhook" } });
+    expect(out.isError).toBeFalsy();
+    const id = (out.data?.routine as { id: string } | undefined)?.id ?? "";
+    expect(await routineOf(id)).toMatchObject({ triggerType: "event", event: "webhook.received" });
+    const [hook] = await f.db.select().from(schema.routineHooks).where(eq(schema.routineHooks.routineId, id));
+    expect(hook).toBeDefined();
+    expect(out.content).toContain("when its webhook address is called");
+    expect(out.content).toContain("never write an address in the chat");
+    const listed = await call("list_routines", { id });
+    const receipt = (await receipts(ctx.runId))[0];
+    expect(receipt?.params).toMatchObject({ trigger: "webhook" });
+    for (const text of [out.content, listed.content, JSON.stringify(out.data), JSON.stringify(receipt)]) {
+      expect(text).not.toContain("/api/hooks/");
+    }
   });
 
   test("an event no webhook brings here is refused with the setup step; one whose webhook goes away says it can't run", async () => {
@@ -189,6 +214,10 @@ describe("schedule tools: routines", () => {
     });
     expect(mail).toMatchObject({ isError: true });
     expect(mail.content).toContain("can't read any mailbox");
+    // Where a person connects one, in both languages.
+    expect(mail.content).toContain("Settings › Connectors › Add connector › Email");
+    expect(mail.content).toContain("Configurações › Conectores › Adicionar conector › Email");
+    expect(mail.content).not.toContain("MillionSend");
     const unknown = await call("create_routine", { prompt: "x", trigger: { type: "event", event: "email.received" } });
     expect(unknown.content).toContain("Say which event");
   });

@@ -3,6 +3,7 @@
  * session cookie: nothing auth-related is stored in JavaScript). Pages use
  * this interface; `better-auth.ts` implements it and tests pass a fake.
  */
+/** A refusal's `status` is 0 when the request got no answer at all (`code: "network"`). */
 export type AuthResult =
   | { ok: true }
   | {
@@ -37,10 +38,16 @@ export interface AuthClient {
   /** A new link confirming the signed-in person's own address (`email`). */
   sendVerificationEmail(email: string): Promise<AuthResult>;
   /**
-   * Redirects the browser to the provider; comes back to `callbackURL`, or to `/login?error=` when the server refuses.
-   * `earlyAccess`: the early-access link's token, carried through the provider's redirect.
+   * Redirects the browser to the provider; comes back to `callbackURL`, or to `errorCallbackURL` (`/login` by default)
+   * with `?error=` when the provider or the server refuses. `earlyAccess`: the early-access link's token, carried
+   * through the provider's redirect.
    */
-  signInSocial(provider: "google" | "github" | "apple", callbackURL: string, earlyAccess?: string): Promise<AuthResult>;
+  signInSocial(
+    provider: "google" | "github" | "apple",
+    callbackURL: string,
+    earlyAccess?: string,
+    errorCallbackURL?: string,
+  ): Promise<AuthResult>;
   /** E-mails a link to `redirectTo?token=…` (only when the server can send e-mail: `passwordReset`). */
   requestPasswordReset(input: { email: string; redirectTo: string }, humanCheck?: string): Promise<AuthResult>;
   /** The new password for the link's token; signs out every other session. */

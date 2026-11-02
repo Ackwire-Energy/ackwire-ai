@@ -1,10 +1,19 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { cgroupCounters, LoadWindow, machineSize, sampleLoad, TrafficWindow } from "@agenteschat/adapters/host-stats";
+import {
+  cgroupCounters,
+  diskFigures,
+  diskSpace,
+  LoadWindow,
+  machineSize,
+  sampleLoad,
+  TrafficWindow,
+} from "@agenteschat/adapters/host-stats";
 import {
   type AccountKind,
   type AgentScope,
+  ALL_AGENTS,
   isAccountId,
   isAccountKind,
   LOAD_SAMPLE_MS,
@@ -49,12 +58,23 @@ import {
 } from "./access";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
-import { type AgentUser, AgentUsers, agentGid, denySchedulers, readAgentUsers, systemLauncher } from "./agent-users";
+import {
+  type AgentUser,
+  AgentUsers,
+  agentGid,
+  denySchedulers,
+  ensureGitCacheUser,
+  GIT_CACHE_DIR,
+  grantGitCache,
+  readAgentUsers,
+  systemLauncher,
+} from "./agent-users";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import {
+  accessToStore,
   configPath,
   connectUrl,
   DEFAULT_AGENT_UID_RANGE,
@@ -75,6 +95,7 @@ import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
+import { systemGitCache } from "./git";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { tailLines } from "./logfile";
@@ -82,9 +103,18 @@ import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-gu
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
-import { agentWorkspace } from "./paths";
+import { agentId8, agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
 import { AGENTS_CGROUP } from "./service";
+import {
+  ensureSingleShared,
+  ensureSystemShared,
+  SHARED_SIZE_MS,
+  type SharedSpec,
+  sharedSizeGb,
+  systemShared,
+  withShared,
+} from "./shared-folder";
 import { DataSockets, RELAYED_FILE, RelayCount } from "./streams";
 import {
   launchWorker,
@@ -298,6 +328,9 @@ export class RunnerDaemon implements RequestObserver {
   private readonly load = new LoadWindow();
   /** The agents' browsers' last day of traffic (protocol 23). */
   private readonly traffic = new TrafficWindow();
+  /** The computer's shared folder (ADR 0115) once the session made it, and its last measured size. */
+  private shared: string | null = null;
+  private sharedGb: number | undefined;
   /** System mode: what this process relayed to the server, per stream (`relayed.json`). */
   private readonly relayed = new RelayCount();
   private resumeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -370,6 +403,7 @@ export class RunnerDaemon implements RequestObserver {
       onViewers: () => this.session?.supervisor?.stateChanged(),
       openBrowser: (agent, installing) => this.openBrowser(agent, installing),
       runner: this.self.command,
+      shared: () => this.shared,
       get agentUsers() {
         return daemon.session?.agentUser != null;
       },
@@ -489,7 +523,13 @@ export class RunnerDaemon implements RequestObserver {
       void sampleLoad()
         .then((l) => {
           const oomKills = cgroupCounters(path.join(AGENTS_CGROUP, "memory.events"))?.oom_kill;
-          this.load.add(l && oomKills !== undefined ? { ...l, oomKills } : l);
+          const workspace = this.session?.workspaceReal;
+          return (workspace ? diskSpace(workspace) : Promise.resolve(null)).then((d) =>
+            this.load.add(l && oomKills !== undefined ? { ...l, oomKills } : l, undefined, {
+              ...diskFigures(d),
+              ...(this.sharedGb === undefined ? {} : { sharedGb: this.sharedGb }),
+            }),
+          );
         })
         .catch(() => undefined);
     };
@@ -497,6 +537,9 @@ export class RunnerDaemon implements RequestObserver {
     const load = setInterval(sample, LOAD_SAMPLE_MS);
     load.unref?.();
     this.timers.push(load);
+    const sizes = setInterval(() => this.measureShared(), SHARED_SIZE_MS);
+    sizes.unref?.();
+    this.timers.push(sizes);
     // System mode: for the Cloud's guard, at most once a minute.
     const relayed = setInterval(() => {
       if (!this.session?.supervisor) return;
@@ -582,7 +625,12 @@ export class RunnerDaemon implements RequestObserver {
   }
 
   private writeAccess(next: RunnerAccess) {
-    this.write({ ...(this.stored ?? {}), access: next, exec: next.tools.commands });
+    // The shared folder's grant is the session's (`access()`), never the config's.
+    const access = {
+      ...next,
+      folders: next.folders.filter((f) => f.path !== this.shared && !f.agents.includes(ALL_AGENTS)),
+    };
+    this.write({ ...(this.stored ?? {}), access: accessToStore(this.stored, access), exec: next.tools.commands });
   }
 
   private applyStored(next: StoredConfig | null, text: string | null, initial: boolean) {
@@ -615,8 +663,8 @@ export class RunnerDaemon implements RequestObserver {
     }
     this.armResume();
 
-    const prevAccess = effectiveAccess(prev);
-    const nextAccess = effectiveAccess(next);
+    const prevAccess = withShared(effectiveAccess(prev), this.shared);
+    const nextAccess = withShared(effectiveAccess(next), this.shared);
     if (!initial && JSON.stringify(prevAccess) !== JSON.stringify(nextAccess)) {
       this.send({ type: "access.changed", access: nextAccess });
       this.emit({ kind: "access.changed", access: nextAccess });
@@ -700,6 +748,7 @@ export class RunnerDaemon implements RequestObserver {
     const label: Record<keyof RunnerTools, string> = {
       claude: "Claude Code",
       codex: "Codex",
+      cursor: "Cursor",
       commands: "commands",
       browser: "the browser",
       desktop: "the agents' desktops",
@@ -766,6 +815,15 @@ export class RunnerDaemon implements RequestObserver {
     const home = this.opts.home;
     const log = this.opts.log;
     const workspaceReal = prepareWorkspace(config.workspace);
+    // Tests of system mode (`workers`) never touch the computer's groups.
+    const sharedSpec =
+      config.mode === "system"
+        ? this.opts.workers
+          ? undefined
+          : systemShared(config.managedBy === "host" ? agentId8(config.machineId) : undefined)
+        : null;
+    this.shared = this.prepareShared(workspaceReal, sharedSpec);
+    this.measureShared();
     const secretsDir = path.join(home, "secrets");
     const socketPath = mcpSocketPath(home);
     const mcpCommand = { socketPath, command: this.self.command };
@@ -843,7 +901,7 @@ export class RunnerDaemon implements RequestObserver {
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
       const range = config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE;
-      const users = new AgentUsers({ home, range });
+      const users = new AgentUsers({ home, range, ...(sharedSpec && this.shared ? { shared: sharedSpec, log } : {}) });
       // Tests inject `workers`; a real guard (nft as root) belongs only to the real supervisor. On the
       // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
       // would replace the others' rules with its own.
@@ -902,6 +960,7 @@ export class RunnerDaemon implements RequestObserver {
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
         account: (agentId) => this.agentAccount(agentId),
+        ...(this.opts.workers ? {} : { gitCache: rootGitCache() }),
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
         token: config.token,
@@ -924,6 +983,8 @@ export class RunnerDaemon implements RequestObserver {
       server: config.server,
       secretsDir,
       gitDir: path.join(home, "git"),
+      // Agents here share the runner's user, so they share one cache (system mode: root's, through each worker).
+      gitCache: path.join(home, "git-cache"),
       tasks,
       brains,
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
@@ -1053,6 +1114,31 @@ export class RunnerDaemon implements RequestObserver {
     if (!this.config || state === this.connState) return;
     this.connState = state;
     this.queueStatus();
+  }
+
+  /** The shared folder's size, for the next load report (`du` in the background). */
+  private measureShared() {
+    const dir = this.shared;
+    if (!dir) return;
+    void sharedSizeGb(dir).then((gb) => {
+      if (gb !== null && this.shared === dir) this.sharedGb = gb;
+    });
+  }
+
+  /**
+   * The shared folder (ADR 0115), made where missing: system mode's (`spec`) or single-user mode's in the
+   * workspace (`null`); `undefined`: none. Null when it couldn't be made: the agents work on in their own folders.
+   */
+  private prepareShared(workspaceReal: string, spec: Required<SharedSpec> | null | undefined): string | null {
+    if (spec === undefined) return null;
+    try {
+      if (spec === null) return ensureSingleShared(workspaceReal);
+      for (const p of ensureSystemShared(spec)) this.opts.log(`shared folder: ${p}`);
+      return realpathSync(spec.path);
+    } catch (err) {
+      this.opts.log(`no shared folder: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
   }
 
   /** What `hello` says (asked again on each connection). */
@@ -1197,7 +1283,7 @@ export class RunnerDaemon implements RequestObserver {
   // ── State ──────────────────────────────────────────────────────────────────
 
   access(): RunnerAccess {
-    return effectiveAccess(this.stored);
+    return withShared(effectiveAccess(this.stored), this.shared);
   }
 
   pauseState(): RunnerPause {
@@ -1924,4 +2010,17 @@ function outcomeResult(req: MachineRequest, outcome: RequestOutcome): "ok" | "fa
 /** A path as one word for a shell command line people copy. */
 function shellWord(p: string) {
   return /^[\w./~:-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`;
+}
+
+/** Root's shared git cache on a system-mode computer (ADR 0116 §4); its owner is made on the first clone. */
+function rootGitCache() {
+  let owner: { uid: number; gid: number } | null = null;
+  return systemGitCache({
+    root: GIT_CACHE_DIR,
+    owner: () => {
+      owner ??= ensureGitCacheUser();
+      return owner;
+    },
+    grant: (dir, uid) => grantGitCache(dir, uid),
+  });
 }

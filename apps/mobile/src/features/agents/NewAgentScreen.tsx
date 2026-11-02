@@ -403,6 +403,7 @@ function NewAgentForm({
           : ids.length > 0
             ? t("mobile.newAgent.import.arrived", { count: ids.length, name: first?.label ?? "" })
             : t("onboarding.import.report.title"),
+        ...(counts.capped > 0 ? { subtitle: t("onboarding.import.report.capped", { count: counts.capped }) } : {}),
         ...(ids.length === 1 ? { agentId: ids[0] } : {}),
       });
       const land = landingOf(ids, { left: left.current });

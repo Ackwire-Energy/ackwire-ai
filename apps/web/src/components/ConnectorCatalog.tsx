@@ -1,6 +1,8 @@
 import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
+import { composioOffText, hiddenWithoutComposio } from "@agenteschat/client/lib/composio";
 import { CONNECTOR_MARK, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
 import type { MailChoice } from "@agenteschat/client/lib/mail";
+import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName, scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AgentSearching,
@@ -41,8 +43,9 @@ export function searchCatalog(list: ConnectorDef[], query: string, shown: (d: Co
   return q ? list.filter((d) => `${d.label} ${d.id} ${d.description} ${shown(d)}`.toLowerCase().includes(q)) : list;
 }
 
-/** How it connects, for the card: one click (OAuth), OAuth or a key, or a key only. */
-export function authKind(d: ConnectorDef): "oneClick" | "oauthOrKey" | "key" {
+/** How it connects, for the card: one click (OAuth), OAuth or a key, a key only, or through Composio. */
+export function authKind(d: ConnectorDef): "oneClick" | "oauthOrKey" | "key" | "composio" {
+  if (d.via === "composio") return "composio";
   if (d.kind === "remote_mcp") return "oneClick";
   return d.oauthConfigured && d.auth.includes("oauth") ? "oauthOrKey" : "key";
 }
@@ -95,7 +98,7 @@ export function ConnectorIcon({
 }
 
 /** How a service connects, for the detail pane. */
-type HowKind = "oneClick" | "oauthOrKey" | "key" | "appPassword" | "addressPassword";
+type HowKind = ReturnType<typeof authKind> | "appPassword" | "addressPassword";
 
 /** One service in the catalog: a catalog connector, a mailbox kind or the Postgres database. */
 interface Entry {
@@ -114,6 +117,8 @@ interface Entry {
   can: { text: string; asks: boolean }[];
   /** What connecting does to who can use it. */
   after: string;
+  /** Connected already, the button adds another account (mailboxes, databases, MCP servers) or signs in again. */
+  again: "add" | "reconnect";
   /** Starts this service's connect flow (the same flows as before). */
   pick: () => void;
 }
@@ -181,6 +186,8 @@ export function ConnectorCatalogDialog({
   const { org } = useOrg();
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<ConnectorCategory | "email" | "all" | "connected">("all");
+  // Without Composio here, the services that connect only through it are left out (admins read why at the end).
+  const composioOff = can(org, "manage_connectors") ? composioOffText(t, connectors, SUGGESTED) : null;
   const [selected, setSelected] = useState<string | null>(null);
   const exists = (key: string) => i18n.exists(key);
 
@@ -199,6 +206,7 @@ export function ConnectorCatalogDialog({
         how: mailAuthKind(c),
         can: capabilities(t, exists, `mail-${c}`),
         after: t("connectors.detail.afterText"),
+        again: "add",
         pick: () => mail?.onPick(c),
       }),
     ),
@@ -217,29 +225,40 @@ export function ConnectorCatalogDialog({
             how: "addressPassword",
             can: capabilities(t, exists, "database"),
             after: t("connectors.detail.afterText"),
+            again: "add",
             pick: database.onPick,
           } satisfies Entry,
         ]
       : []),
-    ...connectors.map(
-      (d): Entry => ({
-        key: d.id,
-        name: connectorName(t, d),
-        description: connectorDescription(t, d),
-        category: d.category,
-        connected: connected.has(d.id),
-        // One connected by its address (with a key) is a connection like any other: it opens, to connect again.
-        available: d.available || (d.soon === true && connected.has(d.id)),
-        soon: d.soon === true && !connected.has(d.id),
-        icon: (size) => <ConnectorIcon def={d} label={d.label} size={size} />,
-        brandColor: d.brandColor,
-        how: authKind(d),
-        can: capabilities(t, exists, d.id, d),
-        // As the server does: a first connection is every agent's, connecting again keeps who uses it.
-        after: t(connected.has(d.id) ? "connectors.detail.keepText" : "connectors.detail.allText"),
-        pick: () => onPick(d),
-      }),
-    ),
+    ...connectors
+      .filter((d) => !hiddenWithoutComposio(d) || connected.has(d.id))
+      .map(
+        (d): Entry => ({
+          key: d.id,
+          name: connectorName(t, d),
+          description: connectorDescription(t, d),
+          category: d.category,
+          connected: connected.has(d.id),
+          // One connected by its address (with a key) is a connection like any other: it opens, to connect again.
+          available: d.available || (d.soon === true && connected.has(d.id)),
+          soon: d.soon === true && !connected.has(d.id),
+          icon: (size) => <ConnectorIcon def={d} label={d.label} size={size} />,
+          brandColor: d.brandColor,
+          how: authKind(d),
+          can: capabilities(t, exists, d.id, d),
+          // As the server does: a first connection is every agent's; then an MCP server takes another account
+          // (no agent yet) and a catalog connector a new sign-in (who uses it stays).
+          after: t(
+            !connected.has(d.id)
+              ? "connectors.detail.allText"
+              : d.kind === "remote_mcp"
+                ? "connectors.detail.accountsText"
+                : "connectors.detail.replaceText",
+          ),
+          again: d.kind === "remote_mcp" ? "add" : "reconnect",
+          pick: () => onPick(d),
+        }),
+      ),
   ];
   // Ready to connect first; "Em breve" last.
   entries.sort((a, b) => Number(b.available) - Number(a.available));
@@ -435,6 +454,7 @@ export function ConnectorCatalogDialog({
                     </button>
                   </li>
                 </ul>
+                {composioOff && <p className="small muted catalog__note">{composioOff}</p>}
               </section>
             </>
           )}
@@ -472,6 +492,7 @@ const HOW_ICON: Record<HowKind, IconName> = {
   oneClick: "bolt",
   oauthOrKey: "bolt",
   key: "key",
+  composio: "plug",
   appPassword: "lock",
   addressPassword: "lock",
 };
@@ -549,12 +570,21 @@ function Detail({ entry, onConnect }: { entry: Entry; onConnect: () => void }) {
         {entry.available ? (
           <Button
             variant="primary"
-            aria-label={t(entry.connected ? "connectors.reconnectName" : "connectors.connectName", {
-              name: entry.name,
-            })}
+            aria-label={t(
+              !entry.connected
+                ? "connectors.connectName"
+                : entry.again === "add"
+                  ? "connectors.addAccountName"
+                  : "connectors.reconnectName",
+              { name: entry.name },
+            )}
             onClick={onConnect}
           >
-            {entry.connected ? t("connectors.detail.again") : t("connectors.connectName", { name: entry.name })}
+            {!entry.connected
+              ? t("connectors.connectName", { name: entry.name })
+              : entry.again === "add"
+                ? t("connectors.detail.addAccount")
+                : t("connectors.detail.reconnect")}
           </Button>
         ) : (
           <Button variant="primary" disabled>

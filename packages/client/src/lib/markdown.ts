@@ -155,6 +155,13 @@ export function firstMentioned<A extends { handle: string }>(text: string, agent
   return undefined;
 }
 
+/** Whether a text @mentions `handle`, ignoring case as the backend does. */
+export function mentionsHandle(text: string, handle: string): boolean {
+  const wanted = handle.toLowerCase();
+  for (const m of text.matchAll(MENTION)) if (m[2]?.toLowerCase() === wanted) return true;
+  return false;
+}
+
 /** `[[Processos/Onboarding|o onboarding]]` → { title: "Processos/Onboarding", label: "o onboarding" }. */
 export function parseWikiToken(token: string) {
   const inner = token.slice(2, -2);
@@ -208,6 +215,10 @@ export function plainLines(source: string): string[] {
     .map((line) => plainInline(line).replace(/\s+/g, " ").trim())
     .filter(Boolean);
 }
+
+/** A text with a code block or a table: it needs the conversation's whole width, never a bubble's. */
+export const hasWideBlock = (source: string) =>
+  /```|\|/.test(source) && parseMarkdown(source).some((b) => b.type === "code" || b.type === "table");
 
 /** Heading anchor ids for the outline: "Como pedimos acesso" → "como-pedimos-acesso". */
 export const headingId = (text: string) =>

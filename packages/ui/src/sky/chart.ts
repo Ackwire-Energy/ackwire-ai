@@ -3,7 +3,7 @@
  * a round ring) filled with a fine dither in the agent's tones. DOM-free: these return which tone each cell
  * takes; the web paints them on a canvas, the phone app on Skia. Cells are 2 points.
  */
-import { AGENT_GRADIENTS, type AgentColorName } from "../agent/engine.js";
+import { type AgentColorName, gradientOf } from "../agent/engine.js";
 import { bayerAt, mix } from "./math";
 
 /** Points per dither cell. */
@@ -11,7 +11,7 @@ export const CHART_CELL = 2;
 
 /** The fill ramp, light to deep (6 tones). */
 export function chartRamp(color: AgentColorName = "sky"): string[] {
-  const [top, bottom] = AGENT_GRADIENTS[color];
+  const [top, bottom] = gradientOf(color);
   return [
     mix(top, "#ffffff", 0.55),
     mix(top, "#ffffff", 0.25),
@@ -24,7 +24,7 @@ export function chartRamp(color: AgentColorName = "sky"): string[] {
 
 /** The line's stroke and its points. */
 export function chartInk(color: AgentColorName = "sky", dark = false): string {
-  const [top, bottom] = AGENT_GRADIENTS[color];
+  const [top, bottom] = gradientOf(color);
   return dark ? top : bottom;
 }
 
@@ -36,7 +36,7 @@ export function chartAreaTones(color: AgentColorName = "sky", dark = false): [st
 
 /** A pie's slices, strongest first (and the legend's swatches). */
 export function chartSlices(color: AgentColorName = "sky", dark = false): string[] {
-  const [top, bottom] = AGENT_GRADIENTS[color];
+  const [top, bottom] = gradientOf(color);
   return dark
     ? [
         top,

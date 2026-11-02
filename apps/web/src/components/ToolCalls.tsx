@@ -7,7 +7,10 @@ import {
   formatDuration,
   formatLineTime,
   oneCall,
+  quietLine,
+  quietWork,
   savedOneLine,
+  showsActivity,
   type ToolItem,
   type ToolLine,
   toolApps,
@@ -85,6 +88,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   pcFiles: "file",
   checkingComputer: "computer",
   checkingUsage: "chart",
+  findingAgent: "search",
   proposingMission: "flag",
   messagingMission: "flag",
   updatingPlan: "flag",
@@ -209,19 +213,26 @@ export function LiveTools({
   stopped?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const items = toolItemsLive(work, stopped);
   const blockItems = useBlockItems(items);
   const logo = useLogo();
   const calls = toolCalls(items);
   const steers = items.flatMap((i) => (i.kind === "steer" ? [i] : []));
-  const now = toolNow(items);
-  const said = items.flatMap((i) => (i.kind === "say" ? [i] : []));
+  // Done, its tools are the summary the person chose not to see (`showActivity`): what it read stays.
+  if (done && !showsActivity(org))
+    return steers.map((s) => <SteerWell key={s.key} now={s.now} note={steerNote?.(s.messageId)} />);
+  // A lone quick read that only fed the answer: no card, as if it called nothing (once done, what it said on the way
+  // is in its reply).
+  const quiet = quietWork(items);
+  const now = quiet ? null : toolNow(items);
+  const said = quiet && done ? [] : items.flatMap((i) => (i.kind === "say" ? [i] : []));
   if (!now) {
     // Nothing called yet: what it said and read, as lines.
     return said.length + steers.length > 0 ? (
       <div className="live-work-notes">
         {items.map((i) =>
-          i.kind === "say" ? (
+          i.kind === "say" && said.length > 0 ? (
             <p key={i.key} className="live-work__say">
               {i.text}
             </p>
@@ -301,12 +312,16 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  // Nothing to say: the server says it used no tools (lookups and reactions aren't counted).
-  if (compact && workSteps(compact) === 0) return null;
-  const calls = work ? toolCalls(items) : (compact?.steps ?? 0);
-  const lone = savedOneLine(meta);
-  // Its only call has a card of its own on the message (where it browsed): the card says it.
-  if (lone && onCard(lone.tool)) return null;
+  // Nothing more to show than the message does: no tools (lookups and reactions aren't counted), or only the ones
+  // its own cards show (where it browsed).
+  // No `meta.work` (a reply saved before it): a block that loads the run's steps when opened, gone if it called none.
+  const shown = compact ? workSteps(compact, onCard) : null;
+  if (shown === 0 || !showsActivity(org)) return null;
+  const calls = work ? toolCalls(items) : (shown ?? 0);
+  const lone = savedOneLine(meta, onCard);
+  // Its one call (beside the screens' on their cards) only fed the answer (`quietLine`): the reply says it. Time
+  // unknown (saved before the server wrote it): kept, it may have failed.
+  if (lone && lone.ms !== null && quietLine(lone)) return null;
   if (lone && (!work || oneCall(items) || !items.some((i) => i.kind === "call"))) {
     const line = blockLine(t, i18n.language, lone, logo(lone));
     const wait = run.isError ? (
@@ -327,6 +342,8 @@ export function SavedTools({
       />
     );
   }
+  // Never a block that opens on nothing.
+  if (work && calls === 0) return null;
   const durationMs = work?.durationMs ?? compact?.durationMs ?? null;
   const apps = work ? toolApps(items) : workApps((compact?.calls ?? []).filter((c) => !onCard(c.name)));
   const status: ToolBlockItem[] = run.isError
@@ -339,14 +356,12 @@ export function SavedTools({
             node: <PixelSpinner size={14} color={color} label={t("common.loading")} />,
           },
         ]
-      : items.length === 0
-        ? [{ kind: "note", key: "none", node: t("chat.work.none") }]
-        : [];
+      : [];
   return (
     <ToolBlock
       logos={apps.map((a) => <span key={appKey(a)}>{logo(a)}</span>)}
       head={{
-        text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.see", agentGrammar(t, agentName)),
+        text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.block", agentGrammar(t, agentName)),
         time: durationMs !== null ? formatDuration(t, durationMs) : undefined,
       }}
       items={[...status, ...blockItems]}

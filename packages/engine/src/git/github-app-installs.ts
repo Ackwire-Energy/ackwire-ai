@@ -135,14 +135,17 @@ export async function completeGitHubAppInstall(
     .select()
     .from(oauthStates)
     .where(and(eq(oauthStates.stateHash, sha256(input.state)), eq(oauthStates.connector, GITHUB_APP_STATE)));
-  if (!row || row.usedAt || row.expiresAt <= at) throw new ConflictError("This install link is invalid or expired");
-  if (row.userId !== user.id) throw new ForbiddenError("Finish installing with the account that started it");
+  if (row?.usedAt) throw new ConflictError("This install link was already used", "oauth.link_used");
+  if (!row || row.expiresAt <= at)
+    throw new ConflictError("This install link is invalid or expired", "oauth.link_expired");
+  if (row.userId !== user.id)
+    throw new ForbiddenError("Finish installing with the account that started it", "oauth.other_account");
   const claimed = await deps.db
     .update(oauthStates)
     .set({ usedAt: at })
     .where(and(eq(oauthStates.id, row.id), isNull(oauthStates.usedAt)))
     .returning({ id: oauthStates.id });
-  if (claimed.length === 0) throw new ConflictError("This install link was already used");
+  if (claimed.length === 0) throw new ConflictError("This install link was already used", "oauth.link_used");
   await requirePermission(deps.db, user.id, row.orgId, "manage_connectors");
 
   const h = http(deps);
@@ -160,7 +163,8 @@ export async function completeGitHubAppInstall(
     throw new ValidationError(`GitHub refused the authorization: ${token.error ?? res.status}`);
   }
   const seen = (await userInstallations(h, token.access_token)).find((i) => i.id === input.installationId);
-  if (!seen) throw new ForbiddenError("This installation isn't visible to your GitHub account");
+  if (!seen)
+    throw new ForbiddenError("This installation isn't visible to your GitHub account", "github_app.not_visible");
 
   const values = {
     accountLogin: seen.account?.login ?? "",

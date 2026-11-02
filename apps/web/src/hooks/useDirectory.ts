@@ -1,5 +1,5 @@
 import type { Agent, Member, Message } from "@agenteschat/client";
-import { useAgents, useFormerAgents, useMembers } from "@agenteschat/client";
+import { useAgents, useFormerAgents, useMembers, useRoles } from "@agenteschat/client";
 import { agentsByAnyHandle, formerById } from "@agenteschat/client/lib/directory";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +10,11 @@ export function useDirectory(orgId: string) {
   const agents = useAgents(orgId);
   const former = useFormerAgents(orgId);
   const members = useMembers(orgId);
+  const roles = useRoles(orgId);
   return useMemo(() => {
+    const roleById = new Map((roles.data?.roles ?? []).map((r) => [r.id, r]));
+    /** A role's name, for whom an agent answers ("Suporte"). */
+    const roleName = (id: string) => roleById.get(id)?.name;
     const agentById = new Map<string, Agent>((agents.data ?? []).map((a) => [a.id, a]));
     const gone = formerById(former.data);
     /** The team's agent, or one no longer in it (archived or deleted): what it left still names it. */
@@ -50,7 +54,8 @@ export function useDirectory(orgId: string) {
       authorName,
       mentionName,
       agentInitials,
+      roleName,
       loading: agents.isPending || members.isPending,
     };
-  }, [agents.data, former.data, members.data, agents.isPending, members.isPending, t]);
+  }, [agents.data, former.data, members.data, roles.data, agents.isPending, members.isPending, t]);
 }

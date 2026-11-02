@@ -2,7 +2,13 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { orgTopic } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { desc, eq, schema, sql } from "@agenteschat/db";
-import { enableOperatorEvents, purgeWorkspace, setRestrictionNotices } from "@agenteschat/engine";
+import {
+  countComposio,
+  countToolCall,
+  enableOperatorEvents,
+  purgeWorkspace,
+  setRestrictionNotices,
+} from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp, type OperatorDeps, serveOperatorApi } from "../src/operator/app";
 import { type Browser, browser, createTestServer, deletionCode, seedOrg, signUp, type TestServer } from "./harness";
@@ -413,7 +419,7 @@ test("user block: refused at once even with a cached session, signed out, no sig
 
   const blocked = await body(await put(`/users/${biaId}/block`, { blocked: true, reason: "Phishing" }));
   expect(blocked).toEqual({ blocked: true, blockedAt: expect.any(String), reason: "Phishing", sessionsRevoked: 1 });
-  expect(revoked).toEqual([{ type: "membership.revoked", orgId: acme.orgId, userId: biaId }]);
+  expect(revoked).toEqual([{ type: "membership.revoked", orgId: acme.orgId, userId: biaId, quiet: true }]);
   // The browser still holds the session in its signed cookie cache for minutes: refused all the same.
   expect(bia.cookie()).toContain("session_data");
   expect((await members()).status).toBe(403);
@@ -886,6 +892,7 @@ test("no answer carries a secret or a field named like one", async () => {
     "/signup",
     "/waitlist",
     "/early-access/invitations?limit=200",
+    `/analytics?from=${new Date().toISOString().slice(0, 10)}&to=${new Date().toISOString().slice(0, 10)}`,
   ]) {
     const text = await (await op(path)).text();
     for (const secret of secrets) expect(text).not.toContain(secret);
@@ -956,6 +963,71 @@ test("a workspace's deletion: its hold set and let go in silence, both in its de
   } finally {
     enableOperatorEvents(false);
   }
+});
+
+test("analytics: counts in the dates, and one connector's; 401 without the token, 400 for bad dates or keys", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const range = `from=${today}&to=${today}`;
+  for (const path of [`/analytics?${range}`, `/analytics/connectors/github?${range}`]) {
+    for (const authorization of [null, "Bearer wrong"]) expect((await op(path, authorization)).status).toBe(401);
+  }
+  const code = async (res: Response) => [res.status, ((await res.json()) as { error: { code: string } }).error.code];
+  for (const [from, to] of [
+    ["2026-10-31", "2026-10-01"],
+    // 401 days, both counted.
+    ["2025-10-01", "2026-11-05"],
+    ["2026-02-30", "2026-03-01"],
+    ["yesterday", today],
+  ]) {
+    for (const path of ["/analytics", "/analytics/connectors/github"]) {
+      expect({ path, from, to, got: await code(await op(`${path}?from=${from}&to=${to}`)) }).toEqual({
+        path,
+        from,
+        to,
+        got: [400, "analytics.range"],
+      });
+    }
+  }
+  expect((await op("/analytics?from=2025-10-02&to=2026-11-05")).status).toBe(200);
+  for (const key of ["GitHub", "-github", "two%20words", "x".repeat(101)]) {
+    expect(await code(await op(`/analytics/connectors/${key}?${range}`))).toEqual([400, "invalid_request"]);
+  }
+
+  const github = { key: "github", via: "mcp" as const, tool: "get_issue" };
+  await countToolCall(t.db, { orgId: acme.orgId, agentId: acme.agentId, connector: github, calls: 2, errors: 1 });
+  await countComposio(t.db, { orgId: acme.orgId, toolkit: "gmail", action: "GMAIL_FETCH_EMAILS", executions: 1 });
+  const all = await body<Record<string, unknown>>(await op(`/analytics?${range}`));
+  expect(all).toMatchObject({
+    from: today,
+    to: today,
+    since: today,
+    totals: { calls: 2, errors: 1, approvalsAsked: 0, approvalsGiven: 0, workspaces: 1, agents: 1 },
+    days: [{ day: today, via: "mcp", calls: 2, errors: 1, workspaces: 1 }],
+    connectorsMore: false,
+    composio: { days: [{ day: today, executions: 1, failures: 0, events: 0 }], month: { executions: 1 } },
+    product: { keptDays: 90 },
+  });
+  expect(all.connectors).toContainEqual(
+    expect.objectContaining({ connector: "github", label: "GitHub", via: "mcp", calls: 2, workspaces: 1 }),
+  );
+  expect(all.connectors).toContainEqual(
+    expect.objectContaining({ connector: "gmail", via: "composio", calls: 0, executions: 1 }),
+  );
+  expect(await body(await op(`/analytics/connectors/github?${range}`))).toMatchObject({
+    connector: "github",
+    label: "GitHub",
+    days: [{ day: today, via: "mcp", calls: 2, errors: 1, approvals: 0, executions: 0, events: 0 }],
+    tools: [{ via: "mcp", tool: "get_issue", calls: 2, errors: 1, approvals: 0, workspaces: 1 }],
+    actions: [],
+    orgs: [{ orgId: acme.orgId, via: "mcp", calls: 2, agents: 1, lastDay: today }],
+    orgsMore: false,
+  });
+  expect(await body(await op(`/analytics/connectors/nothing.example.com?${range}`))).toMatchObject({
+    days: [],
+    tools: [],
+    actions: [],
+    orgs: [],
+  });
 });
 
 test("the OpenAPI document is the committed contract (ADR 0056)", async () => {

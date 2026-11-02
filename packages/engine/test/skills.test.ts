@@ -1,23 +1,32 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { generateKeyPairSync } from "node:crypto";
+import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
+  createApiKeyConnection,
   createOrganization,
   deleteSkill,
   drainOutbox,
   enabledSkills,
+  ForbiddenError,
+  forgetInstallationTokens,
+  type GitHubAppConfig,
   getSkill,
   getSkillFile,
   importPickedSkills,
   importSkillFromUrl,
   importSkillZip,
   listAgentScopes,
+  listConnections,
   listSkills,
   NotFoundError,
   parseSkillMarkdown,
   postPersonMessage,
+  reimportSkill,
+  revokeConnection,
   SKILL_LIMITS,
+  type SkillDetail,
   saveSkill,
   setAgentAccess,
   setAgentSkills,
@@ -25,7 +34,7 @@ import {
   ValidationError,
 } from "../src";
 import { toolDetail } from "../src/tool-detail";
-import { addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -401,7 +410,7 @@ describe("import", () => {
     expect(await refusal("https://github.com/acme/secret/tree/main/x")).toEqual({
       kind: "ValidationError",
       code: "github.repo_missing",
-      params: { repo: "acme/secret" },
+      params: { repo: "acme/secret", connection: "none", app: false },
     });
     expect(await refusal("https://github.com/acme/skills/tree/v9/relatorio-semanal")).toEqual({
       kind: "ValidationError",
@@ -467,6 +476,286 @@ describe("import", () => {
         zip({ "SKILL.md": SKILL_MD, "book.md": "x".repeat(2_200_000) }),
       ),
     ).rejects.toThrow("too large");
+  });
+});
+
+const CONNECTION_TOKEN = "ghp_fake_connection_token";
+const APP_TOKEN = "ghs_fake_app_token";
+const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const APP: GitHubAppConfig = {
+  appId: "123",
+  privateKey: privateKey.export({ type: "pkcs1", format: "pem" }).toString(),
+};
+
+/** acme/private as the API's zipball holds it (`{owner}-{repo}-{commit}/`): two skills and a video. */
+const PRIVATE = {
+  "acme-private-0123abc/team/deploy/SKILL.md":
+    "---\nname: deploy\ndescription: Antes de qualquer deploy.\n---\n# Deploy",
+  "acme-private-0123abc/team/deploy/demo.mp4": "x".repeat(2_200_000),
+  "acme-private-0123abc/team/review/SKILL.md": "---\nname: review\ndescription: Revisa um pull request.\n---\n# Review",
+};
+
+/**
+ * Fake GitHub where acme/private is private: github.com answers 404 for it, and the API's zipball answers a token that
+ * sees it with a redirect to codeload carrying a short-lived link of its own. A token GitHub doesn't take is answered
+ * 401, one that doesn't see the repository 404 (`sees`, changed by a test as GitHub's side changes). `installed`: the
+ * GitHub App is installed on it (installation 77); `installation.status` is what the app's lookup gets instead.
+ */
+function privateGithub(options: { installed?: boolean } = {}) {
+  const requests: { url: string; auth: string | null }[] = [];
+  const valid = new Set([CONNECTION_TOKEN, APP_TOKEN]);
+  const sees = new Set([CONNECTION_TOKEN, APP_TOKEN]);
+  const installation = { status: options.installed ? 200 : 404 };
+  const fetch = async (url: string, init?: RequestInit) => {
+    const auth = new Headers(init?.headers).get("authorization");
+    requests.push({ url, auth });
+    const token = auth?.replace(/^Bearer /, "") ?? "";
+    if (url === "https://api.github.com/repos/acme/private/installation") {
+      const { status } = installation;
+      return status === 200 ? Response.json({ id: 77 }) : new Response("installation", { status });
+    }
+    if (url === "https://api.github.com/app/installations/77/access_tokens") {
+      return Response.json({ token: APP_TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() });
+    }
+    // The app's own requests go with a JWT (`ey…`); any other token GitHub doesn't take is refused.
+    if (url.startsWith("https://api.github.com/") && token && !token.startsWith("ey") && !valid.has(token)) {
+      return Response.json({ message: "Bad credentials" }, { status: 401 });
+    }
+    if (sees.has(token) && /^https:\/\/api\.github\.com\/repos\/acme\/private\/zipball(\/main)?$/.test(url)) {
+      const location = "https://codeload.github.com/acme/private/legacy.zip/refs/heads/main?token=short-lived";
+      return new Response(null, { status: 302, headers: { location } });
+    }
+    if (sees.has(token) && url === "https://api.github.com/repos/acme/private") {
+      return Response.json({ full_name: "acme/private", private: true });
+    }
+    if (url === "https://codeload.github.com/acme/private/legacy.zip/refs/heads/main?token=short-lived") {
+      return new Response(zip(PRIVATE));
+    }
+    return new Response("404: Not Found", { status: 404 });
+  };
+  return { fetch, requests, sees, installation };
+}
+
+/** The GitHub App installed for the fixture's workspace on `account` (installation `id`). */
+const installApp = (account = "acme", id = 77) =>
+  f.db.insert(schema.githubAppInstallations).values({
+    orgId: f.org.id,
+    installationId: id,
+    accountLogin: account,
+    accountType: "Organization",
+    repositorySelection: "selected",
+    createdByUserId: f.owner.id,
+  });
+
+/** What a refused read says: its code and params. */
+const refusalOf = (read: Promise<unknown>) =>
+  read.then(
+    () => null,
+    (e: ValidationError) => ({ code: e.code, params: e.params }),
+  );
+
+describe("private repositories", () => {
+  const connectors = () => ({ db: f.db, keyWrappers: [f.keyWrapper], publicUrl: "https://agentes.test" });
+  const connectGithub = () =>
+    createApiKeyConnection(connectors(), f.owner.id, f.org.id, { connector: "github", apiKey: CONNECTION_TOKEN });
+
+  test("read with the workspace's GitHub connection, its token sent to api.github.com only; updating reads through it", async () => {
+    f = await setup();
+    const github = privateGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors() } };
+    const url = "https://github.com/acme/private";
+    // No GitHub connected: the link looks private or missing, nothing tried.
+    expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, url).catch((e) => e)).toMatchObject({
+      code: "github.repo_missing",
+      params: { repo: "acme/private", connection: "none", app: false },
+    });
+
+    const connection = await connectGithub();
+    const listed = await importSkillFromUrl(deps, f.owner.id, f.org.id, url);
+    expect(listed).toEqual({
+      choices: [
+        { path: "team/deploy", name: "deploy", description: "Antes de qualquer deploy." },
+        { path: "team/review", name: "review", description: "Revisa um pull request." },
+      ],
+      via: "github",
+    });
+    // Without credentials first; the token only to the API, never to codeload.
+    expect(github.requests.slice(-3)).toEqual([
+      { url: "https://github.com/acme/private/archive/HEAD.zip", auth: null },
+      { url: "https://api.github.com/repos/acme/private/zipball", auth: `Bearer ${CONNECTION_TOKEN}` },
+      { url: "https://codeload.github.com/acme/private/legacy.zip/refs/heads/main?token=short-lived", auth: null },
+    ]);
+    expect(github.requests.filter((r) => r.auth && !r.url.startsWith("https://api.github.com/"))).toEqual([]);
+
+    // The same limits as a public link: the video is only listed.
+    const [deploy] = await importPickedSkills(deps, f.owner.id, f.org.id, url, ["team/deploy"]);
+    expect(deploy).toMatchObject({ name: "deploy", sourceVia: "github" });
+    expect(deploy?.files.map((x) => [x.path, x.status])).toEqual([["demo.mp4", "ignored"]]);
+
+    // Updating reads through the connection again, not without credentials first.
+    const before = github.requests.length;
+    expect(await reimportSkill(deps, f.owner.id, f.org.id, deploy?.id ?? "")).toMatchObject({ version: 2 });
+    expect(github.requests.slice(before).map((r) => r.url)).toEqual([
+      "https://api.github.com/repos/acme/private/zipball",
+      "https://codeload.github.com/acme/private/legacy.zip/refs/heads/main?token=short-lived",
+    ]);
+
+    // Disconnected: updating says the connection that read it is gone.
+    await revokeConnection(f.db, f.owner.id, f.org.id, connection.id);
+    expect(await reimportSkill(deps, f.owner.id, f.org.id, deploy?.id ?? "").catch((e) => e)).toMatchObject({
+      code: "skill.connection_gone",
+      params: { repo: "acme/private" },
+    });
+  });
+
+  test("the GitHub App's token for the repository comes first; a ref, a repository none reaches, and who may read", async () => {
+    f = await setup();
+    await installApp();
+    await connectGithub();
+    const github = privateGithub({ installed: true });
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors(), app: APP } };
+    const folder = "https://github.com/acme/private/tree/main/team/review";
+    const skill = (await importSkillFromUrl(deps, f.owner.id, f.org.id, folder)) as SkillDetail;
+    expect(skill).toMatchObject({ name: "review", sourceUrl: folder, sourceVia: "github_app" });
+    expect(github.requests.map((r) => r.auth).filter(Boolean)).not.toContain(`Bearer ${CONNECTION_TOKEN}`);
+    expect(github.requests.at(-2)).toEqual({
+      url: "https://api.github.com/repos/acme/private/zipball/main",
+      auth: `Bearer ${APP_TOKEN}`,
+    });
+
+    // `list`: the one skill a folder holds, to pick, nothing installed again.
+    expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, folder, { list: true })).toEqual({
+      choices: [{ path: "team/review", name: "review", description: "Revisa um pull request." }],
+      via: "github_app",
+    });
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toMatchObject([{ name: "review", version: 1 }]);
+
+    // A ref the repository lacks, told apart from a repository the token can't see.
+    const v9 = "https://github.com/acme/private/tree/v9/team/review";
+    expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, v9).catch((e) => e)).toMatchObject({
+      code: "github.ref_missing",
+      params: { repo: "acme/private", ref: "v9" },
+    });
+    // Neither the app nor the connection reaches it: private or missing, with a connection that works.
+    expect(
+      await importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/other").catch((e) => e),
+    ).toMatchObject({ code: "github.repo_missing", params: { repo: "acme/other", connection: "ok", app: true } });
+
+    // Reading through the workspace's GitHub is installing skills: a member who may not is refused before any read.
+    const member = await addMember(f.db, f.org.id, "member");
+    const before = github.requests.length;
+    await expect(importSkillFromUrl(deps, member.id, f.org.id, folder)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(importPickedSkills(deps, member.id, f.org.id, folder, ["team/review"])).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await expect(reimportSkill(deps, member.id, f.org.id, skill.id)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(github.requests.length).toBe(before);
+  });
+
+  test("updating falls back to the workspace's other GitHub connection when the one that read it no longer can, and keeps it", async () => {
+    f = await setup();
+    await installApp();
+    const connection = await connectGithub();
+    const github = privateGithub({ installed: true });
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors(), app: APP } };
+    const folder = "https://github.com/acme/private/tree/main/team/review";
+    const skill = (await importSkillFromUrl(deps, f.owner.id, f.org.id, folder)) as SkillDetail;
+    expect(skill.sourceVia).toBe("github_app");
+
+    // The repository left the app's installation: the connection reads it, and is the one updating reads through now.
+    github.sees.delete(APP_TOKEN);
+    github.installation.status = 404;
+    expect(await reimportSkill(deps, f.owner.id, f.org.id, skill.id)).toMatchObject({
+      version: 2,
+      sourceVia: "github",
+    });
+    // And back: the connection gone, the app reaching it again.
+    await revokeConnection(f.db, f.owner.id, f.org.id, connection.id);
+    github.sees.add(APP_TOKEN);
+    github.installation.status = 200;
+    expect(await reimportSkill(deps, f.owner.id, f.org.id, skill.id)).toMatchObject({
+      version: 3,
+      sourceVia: "github_app",
+    });
+  });
+
+  test("updating says GitHub didn't answer when it didn't, and that the connection is gone only when the workspace lost it", async () => {
+    f = await setup();
+    await installApp();
+    const github = privateGithub({ installed: true });
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors(), app: APP } };
+    const skill = (await importSkillFromUrl(
+      deps,
+      f.owner.id,
+      f.org.id,
+      "https://github.com/acme/private/tree/main/team/review",
+    )) as SkillDetail;
+    expect(skill.sourceVia).toBe("github_app");
+    forgetInstallationTokens(77);
+
+    // GitHub failing to answer the app's lookup is a refusal to try again, never a connection gone.
+    github.installation.status = 502;
+    expect(await refusalOf(reimportSkill(deps, f.owner.id, f.org.id, skill.id))).toEqual({
+      code: "github.unreachable",
+      params: undefined,
+    });
+    // Still installed on acme, the repository no longer in it: hidden, with the app on some account.
+    github.installation.status = 404;
+    expect(await refusalOf(reimportSkill(deps, f.owner.id, f.org.id, skill.id))).toEqual({
+      code: "github.repo_missing",
+      params: { repo: "acme/private", connection: "none", app: true },
+    });
+    // Uninstalled from acme: now the connection that read it is gone.
+    await f.db.delete(schema.githubAppInstallations).where(eq(schema.githubAppInstallations.installationId, 77));
+    expect(await refusalOf(reimportSkill(deps, f.owner.id, f.org.id, skill.id))).toEqual({
+      code: "skill.connection_gone",
+      params: { repo: "acme/private" },
+    });
+  });
+
+  test("a repository none reads says how the connection fared: a token GitHub refuses, the app on another account", async () => {
+    f = await setup();
+    const github = privateGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors(), app: APP } };
+    const url = "https://github.com/acme/private";
+    await createApiKeyConnection(connectors(), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_fake_revoked_token",
+    });
+    expect(await refusalOf(importSkillFromUrl(deps, f.owner.id, f.org.id, url))).toEqual({
+      code: "github.repo_missing",
+      params: { repo: "acme/private", connection: "refused", app: false },
+    });
+
+    // No connection, the app installed for this workspace on another account only.
+    const [connection] = await listConnections(f.db, f.owner.id, f.org.id);
+    await revokeConnection(f.db, f.owner.id, f.org.id, connection?.id ?? "");
+    await installApp("contoso", 88);
+    expect(await refusalOf(importSkillFromUrl(deps, f.owner.id, f.org.id, url))).toEqual({
+      code: "github.repo_missing",
+      params: { repo: "acme/private", connection: "none", app: true },
+    });
+  });
+
+  test("a link whose owner, repository or ref climbs out of the repository is never read with a token", async () => {
+    f = await setup();
+    await installApp();
+    await connectGithub();
+    const github = privateGithub({ installed: true });
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors(), app: APP } };
+    for (const url of [
+      "https://github.com/acme/private/tree/..%2F..%2Fuser/x",
+      "https://github.com/acme/..%2F..%2Fuser",
+      "https://github.com/..%2F..%2Fuser/x",
+      "https://raw.githubusercontent.com/acme/private/..%2F..%2Fuser/x/SKILL.md",
+      // Dot segments the URL itself resolves: no owner or repository left to read.
+      "https://github.com/%2E%2E/user",
+      "https://github.com/acme/%2E%2E",
+    ]) {
+      const refusal = await refusalOf(importSkillFromUrl(deps, f.owner.id, f.org.id, url));
+      expect([url, ["github.repo_missing", "invalid_request"].includes(refusal?.code ?? "")]).toEqual([url, true]);
+    }
+    expect(github.requests.filter((r) => r.auth)).toEqual([]);
   });
 });
 

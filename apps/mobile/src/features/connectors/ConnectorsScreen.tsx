@@ -1,5 +1,14 @@
-import { type ConnectorDef, useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
+import {
+  type ConnectorDef,
+  useCatalog,
+  useComposioUsage,
+  useConnections,
+  useCustomServers,
+  useMailAccounts,
+} from "@agenteschat/client";
+import { composioOffText, composioUsageText, nearComposioLimit } from "@agenteschat/client/lib/composio";
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { choiceOf, MAIL_BRANDS } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import { useLocalSearchParams } from "expo-router";
@@ -16,14 +25,26 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { openConnection } from "./ConnectionScreen";
 import { ConnectorIcon } from "./ConnectorIcon";
 import { AddressSheet, ConnectSheet, ServerSheet } from "./ConnectSheet";
-import { brandOf, brandTones, CATEGORIES, connectionOf, galleryTiles, searchConnectors, suggestionsOf } from "./logic";
+import {
+  brandOf,
+  brandTones,
+  CATEGORIES,
+  connectionOf,
+  galleryTiles,
+  SUGGESTED,
+  searchConnectors,
+  shownMailboxes,
+  suggestionsOf,
+} from "./logic";
+import { MailboxSheet } from "./MailboxSheet";
 
 /**
  * Conectores on the phone: what is connected as a row of icons
  * with a check (and "Endereço" to connect any server by its address), three suggestions with a strip in the
- * brand's tone, then every service as even tiles in two columns, filtered by category. A service not connected
- * opens a sheet over the gallery with the flow in four steps: what agents could do → connect → its tools → who
- * uses it; a connection opens its own screen (who uses it, its tools, disconnecting).
+ * brand's tone, then every service as even tiles in two columns, filtered by
+ * category. A service not connected opens a sheet over the gallery with the flow in four steps: what agents could
+ * do → connect → its tools → who uses it; a connection opens its own screen (who uses it, its tools,
+ * disconnecting). A mailbox, of any kind, opens a sheet of who uses it.
  */
 export function ConnectorsScreen() {
   return (
@@ -34,17 +55,21 @@ export function ConnectorsScreen() {
 }
 
 function Gallery() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
   const { org } = useOrg();
   const sheet = useSheet();
   const catalog = useCatalog();
+  const composio = useComposioUsage(orgId);
   const connections = useConnections(orgId);
   // Servers connected by address (a vendor's own, like Sentry's) come from their own list, as on the web.
   const servers = useCustomServers(orgId);
+  // Mailboxes (ADR 0038): rows of what is connected; they connect on the web.
+  const mailAccounts = useMailAccounts(orgId);
+  const mailboxes = shownMailboxes(mailAccounts.data ?? []);
   const pull = usePullRefresh(async () => {
-    await Promise.all([catalog.refetch(), connections.refetch(), servers.refetch()]);
+    await Promise.all([catalog.refetch(), connections.refetch(), servers.refetch(), mailAccounts.refetch()]);
   });
   // Connecting is for who manages connectors (the server checks it too).
   const admin = can(org, "manage_connectors");
@@ -64,6 +89,8 @@ function Gallery() {
     return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
+  // Without Composio here, the services that connect only through it are left out: admins read why.
+  const composioOff = admin ? composioOffText(t, list, SUGGESTED) : null;
   const open = (def: ConnectorDef) => {
     const existing = connectionOf(def, items);
     if (existing) openConnection(existing.id);
@@ -94,6 +121,11 @@ function Gallery() {
       title={t("mobile.connectors.title")}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
+      {composio.data && nearComposioLimit(composio.data) ? (
+        <Text variant="small" tone="muted" style={styles.usage}>
+          {composioUsageText(t, i18n.language, composio.data)}
+        </Text>
+      ) : null}
       <View style={styles.search}>
         <SearchField
           value={q}
@@ -121,10 +153,25 @@ function Gallery() {
         </View>
       ) : (
         <>
-          {searching ? null : items.length > 0 ? (
+          {searching ? null : items.length + mailboxes.length > 0 ? (
             <>
               <SectionHeader title={t("mobile.connectors.connected")} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+                {/* Mailboxes first, as on the web, by their name ("Suporte"). */}
+                {mailboxes.map((a) => (
+                  <Pressable
+                    key={a.id}
+                    onPress={() => sheet.open(<MailboxSheet accountId={a.id} />)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("mobile.connectors.connectedCheck", { name: a.label })}
+                    style={styles.mini}
+                  >
+                    <ConnectorIcon def={MAIL_BRANDS[choiceOf(a)] ?? null} label={a.label} size={48} check />
+                    <Text variant="caption" tone="muted" numberOfLines={1}>
+                      {a.label}
+                    </Text>
+                  </Pressable>
+                ))}
                 {/* Every connection, servers connected by their address included (oldest first, as on the web). */}
                 {items.map((item) => (
                   <Pressable
@@ -151,7 +198,13 @@ function Gallery() {
               <SectionHeader title={t("mobile.connectors.suggested", { org: org?.name ?? "" })} />
               <View style={styles.suggestions}>
                 {suggestions.map((d) => (
-                  <Suggestion key={d.id} def={d} name={name(d)} text={connectorDescription(t, d)} onPress={open} />
+                  <Suggestion
+                    key={d.id}
+                    mark={d}
+                    name={name(d)}
+                    text={connectorDescription(t, d)}
+                    onPress={() => open(d)}
+                  />
                 ))}
               </View>
             </>
@@ -186,6 +239,11 @@ function Gallery() {
               ))}
             </View>
           )}
+          {composioOff ? (
+            <Text variant="small" tone="muted" style={styles.note}>
+              {composioOff}
+            </Text>
+          ) : null}
         </>
       )}
     </PushedLargeTitle>
@@ -257,28 +315,28 @@ function AddressTile({ onPress }: { onPress: () => void }) {
 
 /** A suggestion: a strip of pixels in the brand's tone with its mark, the name and what it is. */
 function Suggestion({
-  def,
+  mark,
   name,
   text,
   onPress,
 }: {
-  def: ConnectorDef;
+  mark: Pick<ConnectorDef, "iconUrl" | "brandColor"> | null;
   name: string;
   text: string;
-  onPress: (def: ConnectorDef) => void;
+  onPress: () => void;
 }) {
   const c = useColors();
-  const brand = brandOf(def.brandColor) ?? c.ink2;
+  const brand = brandOf(mark?.brandColor ?? null) ?? c.ink2;
   return (
     <Pressable
-      onPress={() => onPress(def)}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${name}. ${text}`}
       style={({ pressed }) => [styles.card, { borderColor: c.line }, pressed && { backgroundColor: c.sunken }]}
     >
       <View style={styles.band}>
         <Dither kind="sky" tones={brandTones(c.bg, brand)} pixel={3} animated={false} style={StyleSheet.absoluteFill} />
-        <ConnectorIcon def={def} label={name} size={44} />
+        <ConnectorIcon def={mark} label={name} size={44} />
       </View>
       <View style={styles.cardText}>
         <Text variant="body" numberOfLines={1} style={styles.bold}>
@@ -337,6 +395,8 @@ function Tile({
 
 const styles = StyleSheet.create({
   search: { paddingHorizontal: 16, paddingBottom: 6 },
+  note: { paddingHorizontal: 16, paddingTop: 16 },
+  usage: { paddingHorizontal: 16, paddingBottom: 8 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   row: { gap: 14, paddingHorizontal: 16, paddingBottom: 6 },

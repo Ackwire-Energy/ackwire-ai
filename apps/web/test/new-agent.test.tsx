@@ -600,6 +600,25 @@ describe("Criar agente: what gets created", () => {
     ]);
   });
 
+  test("plan: Cursor's card shows only where a computer runs it, with Cursor's mark (ADR 0114)", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false), { ...plan("codex", true), kind: "cursor" as const }],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    const group = screen().getByRole("group", { name: "Pelo plano, num computador" });
+    const cursor = within(group).getByRole("button", { name: /^Cursor/ });
+    expect(cursor.querySelector(".ac-brand[data-mark='cursor']")).not.toBeNull();
+    expect(cursor.textContent).toContain("Usa o plano do Cursor de quem conectou o computador.");
+  });
+
   test("plan: Codex on the workspace's computer, whose own sign-in thinks for nobody: ChatGPT's sign-in opens once it's created", async () => {
     const state = seedState();
     state.credentials = [];
@@ -931,8 +950,9 @@ describe("Criar agente: what gets created", () => {
         .getAttribute("aria-checked"),
     ).toBe("true");
     await click(within(audience).getByRole("radio", { name: /^Só algumas pessoas/ }));
-    expect(document.body.textContent).toContain("João sempre pode, como responsável.");
+    expect(document.body.textContent).toContain("Só João, por enquanto");
     await click(screen().getAllByLabelText(/Walter/)[0] as HTMLElement);
+    expect(document.body.textContent).toContain("João sempre pode, como responsável.");
     await proceed(2);
     // The owner and who can talk each under a label of their own, in the review and the preview: under "Responde a",
     // next to who can talk, the owner would read as whom the agent replies to.

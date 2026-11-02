@@ -34,6 +34,7 @@ import {
   publishMachineAgentsChanged,
   reduceMachineAccess,
   setAgentComputerTarget,
+  sharedFolderText,
   startDeviceCode,
   type ToolContext,
   UNAVAILABLE_CODES,
@@ -699,6 +700,42 @@ describe("folders and tools on the machine (protocol 10)", () => {
     };
     expect(accessNotice(note, true)).toContain("Use /x now");
     expect(accessNotice({ body: "hi", meta: {} })).toBeNull();
+  });
+
+  test("the shared folder's block: look there first, share there, tools in bin, no credentials (ADR 0115)", () => {
+    const system = sharedFolderText("Build box", { dir: "/srv/agentes/shared", system: true });
+    expect(system).toStartWith('# Shared folder on "Build box"\n/srv/agentes/shared is shared by every agent');
+    expect(system).toContain("~/shared");
+    expect(system).toContain("look there first");
+    expect(system).toContain("/srv/agentes/shared/bin (on your PATH there)");
+    // A plain cp keeps the source's mode, which the default ACL then caps the group to: the others couldn't write.
+    expect(system).toContain("cp -r --no-preserve=mode");
+    expect(system).toContain("mv or a plain cp keeps it private or read-only to the others");
+    expect(system).toContain("chgrp -R --reference=/srv/agentes/shared");
+    // A runner's clone borrows from a cache only its agent reads; another agent's repository is "dubious" to git.
+    expect(system).toContain("git repack -a -d && rm -f .git/objects/info/alternates");
+    expect(system).toContain("git -c safe.directory=<its path>");
+    expect(system).toContain("flock /srv/agentes/shared/.lock");
+    expect(system).toContain("Never put credentials there");
+    expect(system).toContain("df -h");
+    // One person's own computer: every agent is the same user, so no group, no ~/shared, no PATH.
+    const single = sharedFolderText("MacBook", { dir: "/Users/ana/agentes/shared", system: false });
+    expect(single).not.toContain("~/shared");
+    expect(single).not.toContain("chgrp");
+    expect(single).not.toContain("safe.directory");
+    expect(single).not.toContain("PATH");
+    expect(single).toContain("/Users/ana/agentes/shared/bin");
+    // A Mac has no flock, Windows neither flock nor df: a lock and a space check they can do.
+    expect(single).not.toContain("flock");
+    expect(single).toContain("/Users/ana/agentes/shared/<name>.lock folder made with mkdir");
+    expect(single).toContain("df -h");
+    const windows = sharedFolderText("PC", { dir: "C:\\agentes\\shared", system: false, os: "windows" });
+    expect(windows).not.toContain("flock");
+    expect(windows).not.toContain("df -h");
+    expect(windows).toContain("Check the disk's free space");
+    expect(sharedFolderText("Box", { dir: "/home/me/agentes/shared", system: false, os: "linux" })).toContain(
+      "flock /home/me/agentes/shared/.lock",
+    );
   });
 
   test("the runner's new frames are parsed and cut", () => {

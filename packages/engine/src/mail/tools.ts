@@ -10,6 +10,7 @@ import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
 import { recordAudit } from "../audit";
 import { fedByRoutine, runAuthorityById } from "../authority";
+import { mailboxConnector } from "../connector-usage";
 import { cutText } from "../format";
 import { recordOperatorEvent } from "../operator-events";
 import { replyThreadOf } from "../runs";
@@ -302,10 +303,12 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         inputSchema: { type: "object", additionalProperties: false, ...inputSchema },
         scope: SCOPE_OF[effect],
         connectionId: account.id,
+        connector: { ...mailboxConnector(account), tool: verb },
         connectorLabel: "Email",
         service: account.preset ?? account.provider,
         sensitive:
           effect === "delete" || (effect === "send" && askToSend) || account.askActions.includes(actionOf(verb)),
+        ...(effect === "read" ? { readsOutside: true as const } : {}),
         ...extra,
       };
     };

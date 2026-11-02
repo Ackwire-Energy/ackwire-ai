@@ -134,7 +134,7 @@ const joinerOf = (t: TFunction, dir: Dir, n: AppNotification) => {
 };
 
 /** A face for an actor: agents are the living symbol, people their photo or initials. */
-function Face({
+export function Face({
   actor,
   dir,
   className,
@@ -164,12 +164,24 @@ function Face({
  * Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. Someone
  * asking to join isn't a member yet: their initials.
  */
-function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
+export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
   if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
   if (n.kind === "computer_ready")
     return (
       <span className="nt-sys" aria-hidden="true">
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
+      </span>
+    );
+  if (n.kind === "composio_limit" || n.kind === "connector_tool_changed")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="plug" size={16} />
+      </span>
+    );
+  if (n.kind === "computer_disk_full")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="drive" size={16} />
       </span>
     );
   if (n.kind !== "org_standing") return null;
@@ -222,9 +234,12 @@ function SourceChip({
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
   else if (n.kind === "join_request" || n.kind === "invitation_accepted")
     [icon, label] = ["members", t("notifications.source.members")];
+  else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];
+  else if (n.kind === "connector_tool_changed") [icon, label] = ["plug", t("notifications.source.connectors")];
   else if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||
+    n.kind === "computer_disk_full" ||
     (n.kind === "browser_handoff" && s.screen === "desktop")
   )
     [icon, label] = ["computer", t("notifications.source.machine")];
@@ -299,13 +314,22 @@ type WhatKey =
   | "secretRequest"
   | "joinRequest"
   | "joinRequestMany"
+  | "browserProfileRequest"
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
-function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; channelName: (id: string) => string }) {
+export function Headline({
+  n,
+  dir,
+  channelName,
+}: {
+  n: AppNotification;
+  dir: Dir;
+  channelName: (id: string) => string;
+}) {
   const { t } = useTranslation();
   const name = nameOf(t, dir, n.actors[0]);
   const names = namesText(
@@ -363,6 +387,8 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routineStalled", { name });
     case "agent_unreached":
       return k("agentUnreached", { name });
+    case "browser_profile_request":
+      return k("browserProfileRequest", { name, agent: n.source.label ?? "" });
     case "routine_waiting_plan":
       return k("routineWaitingPlan", { name });
     case "plan_reset_unknown":

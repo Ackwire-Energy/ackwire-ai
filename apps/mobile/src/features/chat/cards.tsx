@@ -18,9 +18,11 @@ import {
   cardDeadline,
   itemOwnWords,
 } from "@agenteschat/client/lib/approval-card";
+import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { approvalSummary, decisionOutcome } from "@agenteschat/client/lib/approval-words";
 import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
+import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -29,16 +31,18 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Count, HoldButton, Icon, Text, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
+  ApprovalAheadLine,
   ApprovalDetails,
   ApprovalEmailLetter,
   ApprovalMark,
   ApprovalTraits,
   ApproveAlways,
   approvalTitleText,
+  useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
 import { chatHref } from "../links/logic";
-import { AgentFace, Face } from "../shared/Face";
+import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
@@ -102,7 +106,7 @@ export function ConsultationCard({
       {open ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
-            {t(consultAskedKey(cs), { name: asker })}
+            {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
           </Text>
           <Text variant="small" tone="muted">
             {cs.question}
@@ -167,13 +171,21 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
   const meId = useMeId();
   const dir = useDirectory();
   const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
-  return (
+  // Approved ahead and still to run: when it goes out, said on its line, and a way to withdraw it.
+  const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
+  const cancelAhead = useCancelAhead();
+  const words = [
+    `${outcome}: ${markName(approvalTitleText(t, a))}`,
+    approvalSummary(a, i18n.language),
+    scheduled ? t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const done = (
     <AskDone
       done={a.status === "approved"}
-      words={[`${outcome}: ${markName(approvalTitleText(t, a))}`, approvalSummary(a, i18n.language)]
-        .filter(Boolean)
-        .join(" · ")}
-      at={askEndedAt(a)}
+      words={words}
+      at={scheduled ? null : askEndedAt(a)}
       more={
         a.reason
           ? {
@@ -187,6 +199,21 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
           : undefined
       }
     />
+  );
+  if (!scheduled || !a.canCancel) return done;
+  return (
+    <View>
+      {done}
+      <View style={styles.cancelAhead}>
+        <Button
+          variant="ghost"
+          size="sm"
+          label={t("approval.ahead.cancel")}
+          loading={cancelAhead.pending}
+          onPress={() => cancelAhead.cancel(a.id)}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -206,6 +233,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const asks = useAskStore();
   const one = useDecideApproval(orgId);
   const all = useDecideApprovals(orgId);
+  const cancelAhead = useCancelAhead();
   const first = items[0];
   if (!first) return null;
   const name = dir.agentById.get(first.agentId)?.name ?? "";
@@ -262,6 +290,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                 ? a.detail
                 : approvalSummary(a, i18n.language) || null;
             const own = itemOwnWords(a, leadItem);
+            const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
             return (
               <View key={a.id} style={[styles.item, { backgroundColor: c.sunken }, !pending && styles.itemDone]}>
                 <View style={styles.itemRow}>
@@ -285,6 +314,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                         {tt(own.origin.key, own.origin.values)}
                       </Text>
                     ) : null}
+                    <ApprovalAheadLine approval={a} />
                   </View>
                 </View>
                 {pending ? (
@@ -326,9 +356,27 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                     </View>
                   ) : null
                 ) : (
-                  <Text variant="footnote" tone="muted">
-                    {decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name)}
-                  </Text>
+                  <>
+                    <Text variant="footnote" tone="muted">
+                      {[
+                        decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name),
+                        scheduled && t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </Text>
+                    {scheduled && a.canCancel ? (
+                      <View style={styles.cancelAhead}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          label={t("approval.ahead.cancel")}
+                          loading={cancelAhead.pending}
+                          onPress={() => cancelAhead.cancel(a.id)}
+                        />
+                      </View>
+                    ) : null}
+                  </>
                 )}
                 {always.has(a.id) ? (
                   <ApproveAlways
@@ -436,7 +484,12 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           toast({
             ...(always
               ? approveAlwaysToast(t, name)
-              : { title: t("mobile.approval.approved"), subtitle: t(`mobile.approval.approvedSub${g}`, { name }) }),
+              : {
+                  title: t("mobile.approval.approved"),
+                  subtitle: a.runAt
+                    ? t("mobile.approval.approvedAhead", { when: nextLabel(i18n.language, a.runAt) })
+                    : t(`mobile.approval.approvedSub${g}`, { name }),
+                }),
             agentId: a.agentId,
           });
         },
@@ -488,6 +541,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           ),
         },
       }}
+      body={<ApprovalAheadLine approval={a} />}
       foot={
         <AskFoot expiry={<ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} />}>
           {a.canDecide ? (
@@ -580,11 +634,13 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       <AskDone
         done
         words={
-          q.answer === null
-            ? t("mobile.chat.question.closed")
-            : who
-              ? t("mobile.chat.question.answered", { name: who, answer: said })
-              : t("mobile.chat.question.answeredByYou", { answer: said })
+          q.withdrawn
+            ? t("question.withdrawn", agentGrammar(t, dir.anyAgent(q.agentId)?.name ?? t("channel.unknownAgent")))
+            : q.answer === null
+              ? t("mobile.chat.question.closed")
+              : who
+                ? t("mobile.chat.question.answered", { name: who, answer: said })
+                : t("mobile.chat.question.answeredByYou", { answer: said })
         }
       />
     );
@@ -728,6 +784,8 @@ const styles = StyleSheet.create({
   itemActs: { flexDirection: "row", gap: 8 },
   // A question's answers: full-width rows in the card's strip.
   opts: { gap: 8 },
+  // Under its done line, at the left edge where the line's words start.
+  cancelAhead: { alignSelf: "flex-start", marginTop: -4 },
   opt: {
     flexDirection: "row",
     alignItems: "center",

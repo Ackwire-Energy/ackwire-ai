@@ -1,15 +1,19 @@
 import { PERMISSION_TOOL } from "@agenteschat/adapters";
-import { and, eq, schema, sql } from "@agenteschat/db";
+import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { coveringRules, type RememberedKind } from "../approval-rules";
-import { fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
+import { fedByRoutine, type RunAuthority, runAuthorityById, UUID } from "../authority";
+import { countToolCall } from "../connector-usage";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { missingConnectors, type ServerCatalog } from "../connectors/listing";
-import { consultationOrigin } from "../consultations";
+import { answersAgentsOnly, consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
+import { recordRead } from "../outbound";
+import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
+import { describeWhen } from "../schedule";
 import {
   callTargets,
   checkTeamAction,
@@ -37,9 +41,9 @@ import {
   NOT_IN_ALL,
   toolAccess,
 } from "./scopes";
-import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
+import type { AheadOutcome, AheadRequest, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
-const { approvals, agents } = schema;
+const { approvals, agents, routines } = schema;
 type AuditOutcome = schema.AuditOutcome;
 
 /** Merge, deploy and rollback always need a person, whatever a connector says. */
@@ -59,7 +63,8 @@ const NEVER_FOR_GOOD =
  * run whatever their arguments say (`VERCEL_EXECUTE_SANDBOX_COMMAND`).
  */
 const NEVER_LEADS = new Set(["commit", "trigger", "run", "execute", "invoke"]);
-const alwaysAsks = (name: string) => {
+/** An action slug (`VERCEL_CREATE_NEW_DEPLOYMENT`) or tool name that "Aprovar sempre" never covers. */
+export const alwaysAsks = (name: string) => {
   const words = nameWords(name);
   return (
     ALWAYS_SENSITIVE.test(name) ||
@@ -95,6 +100,34 @@ export function rememberable(
   return { tool: tool.rememberAs, actions };
 }
 
+/**
+ * Approved ahead (ADR 0015 addendum, 2026-10-31): how long after its time the routine's run may still do an action
+ * a person approved for it (a computer waking up, a slow start). Later it asks a person again.
+ */
+export const AHEAD_GRACE_MS = 30 * 60_000;
+
+/** The built-in a routine's run does an action approved ahead with, by its id (the gateway runs the stored call). */
+export const RUN_APPROVED_ACTION = "run_approved_action";
+
+/** What a routine's run reads when it tries an action a person refused ahead of its time. */
+export const AHEAD_REFUSED =
+  "A person refused this exact action ahead of its time: don't do it, and don't try it another way. Say so in hand_off.";
+
+/**
+ * Why a call can't be approved ahead, or null when it can: a connected app's tool that allows it (`ahead`), whose
+ * wrapped actions, when it runs others, are a shape we know, with nothing in its names, scope or actions that always
+ * asks (merge, deploy, rollback and the rest of the never-for-good list above, GraphQL, SQL, a raw request).
+ */
+export function aheadRefusal(tool: ToolDefinition, input: Record<string, unknown>): string | null {
+  if (!tool.ahead || !tool.connectionId) return "Only a connected app's own action can be approved ahead.";
+  const actions = tool.actions ? tool.actions(input) : [];
+  if (!actions) return "This call doesn't say which actions it runs, so it can't be approved ahead.";
+  if ([tool.name, tool.rememberAs ?? "", tool.scope, ...actions].some((name) => name && alwaysAsks(name))) {
+    return "Merge, deploy, rollback and the like always ask a person at the time: they can't be approved ahead.";
+  }
+  return null;
+}
+
 /** Hash an approval is bound to: tool, scope, connection and the exact parameters. */
 export const actionHash = (action: {
   tool: string;
@@ -107,7 +140,8 @@ export const APPROVAL_TTL_MS = 24 * 3600_000;
 /** How much of a call's `describe().detail` an approval card keeps. */
 export const APPROVAL_DETAIL_CHARS = 2000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
-const MAX_RESULT_CHARS = 50_000;
+/** The most of a tool's output the model gets. */
+export const MAX_RESULT_CHARS = 50_000;
 /** Server-owned Git tools have a connection ID only to use that connection's credential. */
 const serverGitTool = (tool: ToolDefinition) =>
   (tool.name === "git_clone" && tool.scope === "github:git.read") ||
@@ -221,7 +255,8 @@ export type ToolCall = { toolUseId: string; name: string; input: Record<string, 
 export type Approval = typeof approvals.$inferSelect;
 
 export type InvokeResult =
-  | { type: "result"; output: ToolOutput }
+  /** `ran`: the action approved ahead this call did, as it is now (its cards are told, `invokeWithChip`). */
+  | { type: "result"; output: ToolOutput; ran?: Approval }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
   | { type: "question"; text: string; choices: string[] | null; why: string }
@@ -249,6 +284,10 @@ export type InvokeResult =
  *    computer) is held once when the team already did it to the same target,
  *    and recorded for the team once it went out (ADR 0064, `team-actions.ts`).
  */
+/** A tool's answer carries text from outside the org (ADR 0117): an external or reading tool that said something. */
+const readsOutsideText = (tool: ToolDefinition, output: ToolOutput) =>
+  Boolean(tool.external || tool.readsOutside) && output.content.trim() !== "";
+
 export function createToolGateway(deps: {
   sources: ToolSource[];
   now?: () => Date;
@@ -351,7 +390,23 @@ export function createToolGateway(deps: {
     return presentTools(await granted(ctx), isSensitive, ctx.loadedGroups);
   }
 
-  async function run(tool: ToolDefinition, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+  /** A connector's call counts toward its usage (ADR 0103), whatever it returned. `approvalsGiven` 1: an approved one. */
+  async function run(
+    tool: ToolDefinition,
+    input: Record<string, unknown>,
+    ctx: ToolContext,
+    approvalsGiven = 0,
+  ): Promise<ToolOutput> {
+    const output = await outputOf(tool, input, ctx);
+    if (tool.connector) {
+      const { orgId, agentId } = ctx;
+      const errors = output.isError ? 1 : 0;
+      await countToolCall(ctx.db, { orgId, agentId, connector: tool.connector, calls: 1, errors, approvalsGiven });
+    }
+    return output;
+  }
+
+  async function outputOf(tool: ToolDefinition, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
     try {
       const output = await tool.execute(input, ctx);
       if (output.outcome) {
@@ -379,6 +434,233 @@ export function createToolGateway(deps: {
     }
   }
 
+  /**
+   * `schedule_action` (`ToolContext.prepareAhead`, ADR 0015 addendum): the call a routine's run will make at its
+   * time, checked now as it will be then (a connected app's write that asks a person, the agent's scope, the input,
+   * no credential, the arguments' rules), then asked now: an approval of that exact call for that run (`routine_id`,
+   * `run_at`), where the person is. Deciding it resumes this run; the action itself waits for its time.
+   */
+  async function prepareAhead(
+    ctx: ToolContext,
+    authority: RunAuthority | null,
+    request: AheadRequest,
+  ): Promise<AheadOutcome> {
+    const no = (message: string): AheadOutcome => ({ ok: false, message });
+    if (authority?.kind !== "person") return no("Only a person's request can have an action approved ahead.");
+    const tool = (await allTools(ctx)).get(request.tool.trim());
+    if (!tool)
+      return no(`No tool named "${request.tool}": use its exact name (a big connector's find_tools gives it).`);
+    const input = takeWhy(tool.inputSchema, request.input).input;
+    const refusal = aheadRefusal(tool, input);
+    if (refusal) return no(refusal);
+    const actions = tool.actions?.(input) ?? [];
+    if (toolKind(tool).kind !== "external" || (actions.length > 0 && actions.every((a) => actionLevel(a) === "read"))) {
+      return no("This doesn't ask a person at its time: there is nothing to approve ahead.");
+    }
+    const access = accessWithNeeds(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
+    if (!isAllowed(access.state)) return no(`Not allowed: this agent lacks the scope ${access.of.scope}.`);
+    const problems = validateJson(tool.inputSchema, input);
+    if (problems.length > 0) {
+      return no(
+        `Invalid arguments: ${problems.join("; ")}\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}`,
+      );
+    }
+    // The routine's run is nobody's: it never sends a credential (ADR 0053 §3).
+    if (carriesCredential(input)) return no(CREDENTIAL_REFUSAL);
+    const check = await checkToolCall(tool, input, ctx);
+    if (!check.ok) return no(check.message);
+    const slot = await request.slot();
+    const [owner, origin] = await Promise.all([
+      ownerOf(ctx),
+      ctx.runId ? consultationOrigin(ctx.db, ctx.orgId, ctx.runId) : null,
+    ]);
+    const described = tool.describe?.(input) ?? { title: tool.name, detail: canonicalJson(input) };
+    const connectionId = tool.connectionId ?? null;
+    const [approval] = await ctx.db
+      .insert(approvals)
+      .values({
+        orgId: ctx.orgId,
+        runId: ctx.runId,
+        agentId: ctx.agentId,
+        channelId: origin?.channelId ?? ctx.channelId,
+        threadRootId: origin?.threadRootId ?? ctx.threadRootId,
+        toolUseId: ctx.toolUseId ?? crypto.randomUUID(),
+        tool: tool.name,
+        scope: tool.scope,
+        connectionId,
+        params: input,
+        actionHash: actionHash({ tool: tool.name, scope: tool.scope, connectionId, params: input }),
+        title: described.title.slice(0, 300),
+        detail: (described.detail ?? "").slice(0, APPROVAL_DETAIL_CHARS),
+        why: request.why,
+        ownerUserId: owner,
+        // Decided by its time at the latest (else its run asks then), and within a day like any request.
+        expiresAt: new Date(Math.min(slot.runAt.getTime(), now().getTime() + APPROVAL_TTL_MS)),
+        routineId: slot.routineId,
+        runAt: slot.runAt,
+      })
+      .returning();
+    if (!approval) throw new Error("approval insert returned nothing");
+    if (tool.connector) {
+      const { orgId, agentId } = ctx;
+      await countToolCall(ctx.db, { orgId, agentId, connector: tool.connector, approvalsAsked: 1 });
+    }
+    return { ok: true, approval };
+  }
+
+  /**
+   * What a person last decided ahead about this exact call (its hash) for this routine run's slot, while that slot
+   * is within its grace: approved and not run yet, or refused. The latest decision wins: the same post refused and
+   * then prepared again and approved goes out, and one approved and then refused on another card doesn't.
+   */
+  async function aheadFor(ctx: ToolContext, brief: RoutineBrief, hash: string) {
+    const slot = new Date(brief.dueAt);
+    if (!UUID.test(brief.routineId) || Number.isNaN(slot.getTime())) return null;
+    if (slot.getTime() < now().getTime() - AHEAD_GRACE_MS) return null;
+    const [row] = await ctx.db
+      .select()
+      .from(approvals)
+      .where(
+        and(
+          eq(approvals.orgId, ctx.orgId),
+          eq(approvals.agentId, ctx.agentId),
+          eq(approvals.routineId, brief.routineId),
+          eq(approvals.runAt, slot),
+          eq(approvals.actionHash, hash),
+          inArray(approvals.status, ["approved", "refused"]),
+          isNull(approvals.executedAt),
+        ),
+      )
+      .orderBy(desc(approvals.decidedAt), desc(approvals.createdAt))
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** The call an action approved ahead stores, by its id (`run_approved_action`), when it is this agent's. */
+  async function storedAhead(ctx: ToolContext, id: unknown) {
+    if (typeof id !== "string" || !UUID.test(id)) return null;
+    const [row] = await ctx.db
+      .select({ tool: approvals.tool, params: approvals.params, why: approvals.why, runAt: approvals.runAt })
+      .from(approvals)
+      .where(and(eq(approvals.id, id), eq(approvals.orgId, ctx.orgId), eq(approvals.agentId, ctx.agentId)));
+    return row?.runAt ? row : null;
+  }
+
+  /** What the run that asked reads once a person approved its action ahead: when it goes out by itself. */
+  async function aheadNote(ctx: ToolContext, approval: Approval & { runAt: Date }) {
+    const [routine] = approval.routineId
+      ? await ctx.db
+          .select({ timezone: routines.timezone })
+          .from(routines)
+          .where(and(eq(routines.id, approval.routineId), eq(routines.orgId, ctx.orgId)))
+      : [];
+    return `Approved ahead: «${approval.title}» goes out by itself ${describeWhen(approval.runAt, routine?.timezone ?? "UTC")}, without asking again. Tell the person it's set, with that day and time in their words. To change its content or time, call schedule_action again with replaces set to ${approval.id}.`;
+  }
+
+  /**
+   * Runs an approved action, exactly as hashed: the stored params, the same tool and scope, at most once. Scope and
+   * the arguments' rules are re-checked (they may have changed while it waited). `toolUseId`: the call it answers.
+   */
+  async function runApproved(ctx: ToolContext, approval: Approval, toolUseId: string): Promise<ToolOutput> {
+    if (approval.status !== "approved") return { content: "This action was not approved", isError: true };
+    if (approval.executedAt) return ranBefore(approval);
+    const expected = actionHash({
+      tool: approval.tool,
+      scope: approval.scope,
+      connectionId: approval.connectionId,
+      params: approval.params,
+    });
+    const tool = (await allTools(ctx)).get(approval.tool);
+    // Why the approved action can't run any more; null = it may.
+    const refusal = async (): Promise<string | null> => {
+      if (expected !== approval.actionHash) return "Approval does not match the action";
+      if (!tool || tool.scope !== approval.scope || (tool.connectionId ?? null) !== approval.connectionId)
+        return `The tool ${approval.tool} is no longer available`;
+      const access = accessWithNeeds(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
+      if (!isAllowed(access.state)) return `Not allowed: this agent lost the scope ${access.of.scope}`;
+      // Rules about the arguments again: a repository or recipient may have been removed while waiting.
+      const check = await checkToolCall(tool, approval.params, ctx);
+      return check.ok ? null : check.message;
+    };
+    let output: ToolOutput;
+    let outside = false;
+    const refused = await refusal();
+    if (refused || !tool) output = { content: refused ?? "Not allowed", isError: true };
+    else {
+      // Claim the execution first: a retried job never runs the action twice. One approved ahead may have been
+      // withdrawn or lapsed since it was read: only a row still approved runs.
+      const claimed = await ctx.db
+        .update(approvals)
+        .set({ executedAt: now() })
+        .where(
+          sql`${approvals.id} = ${approval.id} and ${approvals.executedAt} is null
+            and (${approvals.runAt} is null or ${approvals.status} = 'approved')`,
+        )
+        .returning({ id: approvals.id });
+      if (claimed.length === 0) {
+        const [row] = await ctx.db
+          .select({ result: approvals.result, status: approvals.status })
+          .from(approvals)
+          .where(sql`${approvals.id} = ${approval.id}`);
+        if (approval.runAt && row?.status !== "approved") {
+          return { content: "This action was not approved", isError: true };
+        }
+        return ranBefore(row ?? approval);
+      }
+      output = await run(tool, approval.params, { ...ctx, toolUseId, approved: true }, 1);
+      outside = readsOutsideText(tool, output);
+      // Team actions (ADR 0064): what a person approved and went out is the team's too.
+      if (isOutsideTool(tool) && !output.isError) {
+        await recordTeamAction(ctx.db, {
+          orgId: ctx.orgId,
+          agentId: ctx.agentId,
+          runId: ctx.runId || null,
+          channelId: approval.channelId,
+          source: "approval",
+          tool: tool.name,
+          summary: summarizeCall(tool, approval.params),
+          targets: callTargets(approval.params, output.data),
+        });
+      }
+    }
+    await ctx.db
+      .update(approvals)
+      .set({ result: { content: shown(output.content), isError: output.isError === true } })
+      .where(sql`${approvals.id} = ${approval.id}`);
+    recordRead(ctx.runId, approval.tool, output.content);
+    await addRunStep(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, "tool_result", {
+      toolUseId,
+      name: approval.tool,
+      approvalId: approval.id,
+      isError: output.isError === true,
+      content: shown(output.content),
+      ...(output.data || outside ? { data: { ...output.data, ...(outside ? { outside: true } : {}) } } : {}),
+    });
+    // The audit: the approved action ran (or couldn't any more). Who approved it is the approval's row.
+    if (tool) {
+      const kind = toolKind(tool).kind;
+      const outcome: AuditOutcome = refused ? "refused" : output.isError ? "failed" : "done";
+      if (auditsCall(kind, tool, outcome)) {
+        await recordToolCall(ctx.db, {
+          orgId: ctx.orgId,
+          agentId: ctx.agentId,
+          runId: ctx.runId || null,
+          channelId: approval.channelId,
+          authority: await authorityOf(ctx).catch(() => null),
+          tool: tool.name,
+          kind,
+          connector: tool.connectorLabel ?? null,
+          title: approval.title,
+          input: approval.params,
+          outcome,
+          reason: outcome === "done" ? null : shown(output.content),
+          approvalId: approval.id,
+        });
+      }
+    }
+    return output;
+  }
+
   return {
     list,
     granted,
@@ -393,6 +675,13 @@ export function createToolGateway(deps: {
       // through any `use_tool`, a directory's own and one already listed too: a computer brain's harness may still
       // list what it had when it started, and one the agent may not use is refused below, saying why.
       let call = requested;
+      // An action approved ahead, by its id (`run_approved_action`): its stored call goes the way a direct call
+      // does, with its reason, so the approval it meets below is the one a person gave for this run.
+      const named = all.get(call.name);
+      if (named?.name === RUN_APPROVED_ACTION && isBuiltIn(named)) {
+        const stored = await storedAhead(ctx, call.input.id);
+        if (stored) call = { ...call, name: stored.tool, input: { why: stored.why, ...stored.params } };
+      }
       let directoryTool: ToolDefinition | undefined;
       let unknownInDirectory: string | null = null;
       if (!all.has(call.name)) {
@@ -464,14 +753,21 @@ export function createToolGateway(deps: {
           ...extra,
         });
       };
-      /** `outcome`: what the audit says; none for a call that never really was one (a malformed input). */
-      const finish = async (output: ToolOutput, outcome?: AuditOutcome) => {
+      /**
+       * `outcome`: what the audit says; none for a call that never really was one (a malformed input). `ran`: the
+       * tool itself answered (not a gateway refusal).
+       */
+      const finish = async (output: ToolOutput, outcome?: AuditOutcome, ran = false) => {
+        // A result read from outside marks the run (`runReadOutside`, ADR 0117), an error too: its text came from there.
+        const outside = ran && tool && readsOutsideText(tool, output) ? { outside: true } : null;
+        const data = output.data || outside ? { ...output.data, ...outside } : null;
+        recordRead(ctx.runId, call.name, output.content);
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
           isError: output.isError === true,
           content: shown(output.content),
-          ...(output.data ? { data: output.data } : {}),
+          ...(data ? { data } : {}),
         });
         if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
         return { type: "result" as const, output };
@@ -550,7 +846,25 @@ export function createToolGateway(deps: {
         approvedBy = await coveringRules(ctx.db, at, remember);
         if (approvedBy) approves = false;
       }
-      if (whyMissing && !approvedBy)
+      // Approved ahead: the exact call a person approved for this routine run's slot runs like an allowed one, why
+      // or not; the one they refused never runs.
+      const ahead =
+        approves && authority?.kind === "routine" && authority.brief
+          ? await aheadFor(
+              ctx,
+              authority.brief,
+              actionHash({
+                tool: tool.name,
+                scope: tool.scope,
+                connectionId: tool.connectionId ?? null,
+                params: call.input,
+              }),
+            )
+          : null;
+      if (ahead?.status === "refused") {
+        return finish({ content: AHEAD_REFUSED, isError: true, data: { code: "approval.ahead_refused" } }, "refused");
+      }
+      if (whyMissing && !approvedBy && !ahead)
         return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
@@ -590,11 +904,21 @@ export function createToolGateway(deps: {
           ...input,
         });
 
+      // Its tool_result step, audit and team action are the approved action's own (`runApproved`).
+      if (ahead) {
+        const output = withRepo(await runApproved(ctx, ahead, call.toolUseId));
+        const [ran] = await ctx.db.select().from(approvals).where(eq(approvals.id, ahead.id));
+        return { type: "result", output, ...(ran ? { ran } : {}) };
+      }
       if (approves) {
         const owner = await ownerOf(ctx);
         // A routine's request goes to the conversation it reports to, never its room; one asked by another
         // agent (ADR 0034) where the person is, not in the agents' DM.
-        const deliverTo = authority?.kind === "routine" ? authority.brief?.deliverTo : undefined;
+        // Consulted for a creator outside its agent's audience: it stays in the agents' DM (`answersAgentsOnly`).
+        const deliverTo =
+          authority?.kind === "routine" && !(ctx.runId && (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId)))
+            ? authority.brief?.deliverTo
+            : undefined;
         const origin = deliverTo
           ? { channelId: deliverTo.channelId, threadRootId: deliverTo.threadId ?? ctx.threadRootId }
           : ctx.runId
@@ -627,6 +951,11 @@ export function createToolGateway(deps: {
           })
           .onConflictDoNothing()
           .returning();
+        // The same call asked again (a retried job) finds the first request: no second one to count.
+        if (approval && tool.connector) {
+          const { orgId, agentId } = ctx;
+          await countToolCall(ctx.db, { orgId, agentId, connector: tool.connector, approvalsAsked: 1 });
+        }
         const row =
           approval ??
           (
@@ -640,7 +969,10 @@ export function createToolGateway(deps: {
         await audit("pending", { reason: why || null, approvalId: row.id });
         return { type: "approval", approval: row };
       }
-      const output = withRepo(await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId }));
+      const runCtx: ToolContext = { ...ctx, toolUseId: call.toolUseId };
+      // Our own tools only (`schedule_action`), never a connected server's.
+      if (!tool.connectionId) runCtx.prepareAhead = (request) => prepareAhead(runCtx, authority, request);
+      const output = withRepo(await run(tool, call.input, runCtx));
       if (outside && !output.isError) {
         await recordAction({
           source: "tool",
@@ -666,107 +998,28 @@ export function createToolGateway(deps: {
       if (builtIn && output.waitForAnswer?.text) {
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
       }
+      const asked = tool.connectionId ? undefined : output.waitForApproval;
+      if (asked) {
+        await record(ctx.db, step, "approval", { approvalId: asked.id, toolUseId: call.toolUseId, title: asked.title });
+        await audit("pending", { reason: asked.why || null, approvalId: asked.id });
+        return { type: "approval", approval: asked };
+      }
       if (!tool.connectionId && output.waitForSecret?.requestId) {
         // The reader follows the request (delivered, declined, expired) from here.
         await audit("pending", { secretRequestId: output.waitForSecret.requestId });
         return { type: "secret", requestId: output.waitForSecret.requestId };
       }
-      return finish(output, prompt ? promptOutcome(prompt, output) : output.isError ? "failed" : "done");
+      return finish(output, prompt ? promptOutcome(prompt, output) : output.isError ? "failed" : "done", true);
     },
 
     /**
-     * Runs an approved action, exactly as hashed: the stored params, the same
-     * tool and scope, at most once. Scope is re-checked (it may have been
-     * revoked while waiting).
+     * What a decision resumes (the run that asked): the approved action, run once exactly as hashed. One approved
+     * ahead waits for its time instead: the routine's run then does it (`aheadFor`), and this run hears when.
      */
     async executeApproved(ctx: ToolContext, approval: Approval): Promise<ToolOutput> {
-      if (approval.status !== "approved") return { content: "This action was not approved", isError: true };
-      if (approval.executedAt) return ranBefore(approval);
-      const expected = actionHash({
-        tool: approval.tool,
-        scope: approval.scope,
-        connectionId: approval.connectionId,
-        params: approval.params,
-      });
-      const tool = (await allTools(ctx)).get(approval.tool);
-      // Why the approved action can't run any more; null = it may.
-      const refusal = async (): Promise<string | null> => {
-        if (expected !== approval.actionHash) return "Approval does not match the action";
-        if (!tool || tool.scope !== approval.scope || (tool.connectionId ?? null) !== approval.connectionId)
-          return `The tool ${approval.tool} is no longer available`;
-        const access = accessWithNeeds(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
-        if (!isAllowed(access.state)) return `Not allowed: this agent lost the scope ${access.of.scope}`;
-        // Rules about the arguments again: a repository or recipient may have been removed while waiting.
-        const check = await checkToolCall(tool, approval.params, ctx);
-        return check.ok ? null : check.message;
-      };
-      let output: ToolOutput;
-      const refused = await refusal();
-      if (refused || !tool) output = { content: refused ?? "Not allowed", isError: true };
-      else {
-        // Claim the execution first: a retried job never runs the action twice.
-        const claimed = await ctx.db
-          .update(approvals)
-          .set({ executedAt: now() })
-          .where(sql`${approvals.id} = ${approval.id} and ${approvals.executedAt} is null`)
-          .returning({ id: approvals.id });
-        if (claimed.length === 0) {
-          const [row] = await ctx.db
-            .select({ result: approvals.result })
-            .from(approvals)
-            .where(sql`${approvals.id} = ${approval.id}`);
-          return ranBefore(row ?? approval);
-        }
-        output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId, approved: true });
-        // Team actions (ADR 0064): what a person approved and went out is the team's too.
-        if (isOutsideTool(tool) && !output.isError) {
-          await recordTeamAction(ctx.db, {
-            orgId: ctx.orgId,
-            agentId: ctx.agentId,
-            runId: ctx.runId || null,
-            channelId: approval.channelId,
-            source: "approval",
-            tool: tool.name,
-            summary: summarizeCall(tool, approval.params),
-            targets: callTargets(approval.params, output.data),
-          });
-        }
-      }
-      await ctx.db
-        .update(approvals)
-        .set({ result: { content: shown(output.content), isError: output.isError === true } })
-        .where(sql`${approvals.id} = ${approval.id}`);
-      await addRunStep(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, "tool_result", {
-        toolUseId: approval.toolUseId,
-        name: approval.tool,
-        approvalId: approval.id,
-        isError: output.isError === true,
-        content: shown(output.content),
-        ...(output.data ? { data: output.data } : {}),
-      });
-      // The audit: the approved action ran (or couldn't any more). Who approved it is the approval's row.
-      if (tool) {
-        const kind = toolKind(tool).kind;
-        const outcome: AuditOutcome = refused ? "refused" : output.isError ? "failed" : "done";
-        if (auditsCall(kind, tool, outcome)) {
-          await recordToolCall(ctx.db, {
-            orgId: ctx.orgId,
-            agentId: ctx.agentId,
-            runId: ctx.runId || null,
-            channelId: approval.channelId,
-            authority: await authorityOf(ctx).catch(() => null),
-            tool: tool.name,
-            kind,
-            connector: tool.connectorLabel ?? null,
-            title: approval.title,
-            input: approval.params,
-            outcome,
-            reason: outcome === "done" ? null : shown(output.content),
-            approvalId: approval.id,
-          });
-        }
-      }
-      return output;
+      const runAt = approval.runAt;
+      if (approval.status === "approved" && runAt) return { content: await aheadNote(ctx, { ...approval, runAt }) };
+      return runApproved(ctx, approval, approval.toolUseId);
     },
   };
 

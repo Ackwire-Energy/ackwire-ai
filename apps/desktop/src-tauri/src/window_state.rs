@@ -71,7 +71,7 @@ pub fn remember(window: &tauri::Window, throttle: bool) {
         }
         *at = Some(Instant::now());
     }
-    if window.is_fullscreen().unwrap_or(false) || window.is_minimized().unwrap_or(false) {
+    if crate::main_window::in_full_screen(window) || window.is_minimized().unwrap_or(false) {
         return;
     }
     let maximized = window.is_maximized().unwrap_or(false);

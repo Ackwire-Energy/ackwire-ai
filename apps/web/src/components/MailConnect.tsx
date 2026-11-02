@@ -15,18 +15,20 @@ import {
   CUSTOM_PRESET,
   choiceOf,
   defaultPolicy,
+  fromMailLevel,
   isAddress,
   MAIL_ACTIONS,
   MAIL_BRANDS,
   type MailChoice,
   mailAccessOf,
+  mailActionsChanged,
   mailActionsFrom,
   mailErrorOf,
   mailReviewTools,
   normalizePolicy,
   notIcloudMail,
+  setMailLevel,
   splitEmails,
-  toMailLevel,
 } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -63,11 +65,11 @@ import { useToast } from "@/lib/toast";
 
 /**
  * People's mailboxes for agents (ADR 0038), in the connectors' own shapes:
- * catalog cards (Gmail, Outlook, iCloud, Outro email), the same 3-step
- * connect flow (conectar → o que faz → quem pode usar), a connected row and
- * "Reconectar". Gmail/Outlook sign in on the provider's page; iCloud and
- * the rest take an app password, then say which other addresses the
- * mailbox has (replies go out from the one the email arrived at).
+ * catalog cards (Gmail, Outlook, iCloud, Outro email), the same
+ * 3-step connect flow (conectar → o que faz → quem pode usar), a connected
+ * row and "Reconectar". Gmail/Outlook sign in on the provider's page;
+ * iCloud and the rest take an app password, then say which other
+ * addresses the mailbox has (replies go out from the one the email arrived at).
  */
 
 export const mailChoiceName = (t: TFunction, choice: MailChoice) => t(`mail.choice.${choice}.name`);
@@ -258,7 +260,7 @@ export function ImapStep({
   onConnected,
   onClose,
 }: {
-  choice: Exclude<MailChoice, "gmail" | "outlook">;
+  choice: "icloud" | "other";
   onConnected: (account: MailAccount) => void;
   onClose: () => void;
 }) {
@@ -620,8 +622,7 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
   const [state, setState] = useState<ToolReviewState>({ levels: {}, decided: new Set() });
   const next = () => {
     const chosen = mailActionsFrom(tools, state.levels);
-    const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
-    if (same(chosen.offActions, account.offActions) && same(chosen.askActions, account.askActions)) return onNext();
+    if (!mailActionsChanged(account, chosen)) return onNext();
     update.mutate({ accountId: account.id, ...chosen }, { onSuccess: onNext });
   };
   return (
@@ -654,9 +655,6 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
   );
 }
 
-const toLevel = (l: "none" | "read" | "read_write" | undefined): Level =>
-  l === "read_write" ? "write" : l === "read" ? "read" : "none";
-
 /**
  * Step 3: one level per agent; each saves that agent's access to this mailbox (rules kept). Then the rules. Only who
  * connected the mailbox gives access (to agents that talk to them); anyone else here may only lower it.
@@ -680,7 +678,7 @@ function WhoStep({
   const toast = useToast();
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
-  const current = (agentId: string) => toLevel(account.agents.find((a) => a.agentId === agentId)?.level);
+  const current = (agentId: string) => fromMailLevel(account.agents.find((a) => a.agentId === agentId)?.level);
   const levelsFor = (a: Agent): Level[] => {
     const may = mailAccessOf(account, {
       userId: me.user.id,
@@ -698,15 +696,7 @@ function WhoStep({
   const grant = useMutation({
     mutationFn: async () => {
       const changed = list.filter((a) => levelOf(a.id) !== current(a.id));
-      for (const a of changed) {
-        // Keep the agent's rules for this mailbox; only the level changes here.
-        const saved = (await api.mail.agent(org.id, a.id)).find((m) => m.accountId === account.id);
-        await api.mail.setAgent(org.id, a.id, account.id, {
-          level: toMailLevel(levelOf(a.id)),
-          canDelete: saved?.canDelete ?? false,
-          policy: saved?.policy ?? defaultPolicy(),
-        });
-      }
+      for (const a of changed) await setMailLevel(api, org.id, a.id, account.id, levelOf(a.id));
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.mail(org.id) });
@@ -987,7 +977,9 @@ export function MailRow({
   );
 }
 
-/** "Reconectar" for an IMAP mailbox: a new app password (Gmail/Outlook sign in again instead). */
+/**
+ * "Reconectar" for an IMAP mailbox (a new app password). Gmail and Outlook sign in again instead.
+ */
 export function MailReconnectDialog({ account, onClose }: { account: MailAccount | null; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -996,7 +988,7 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
   const { update } = useMailAction(org.id);
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
-  const [error, setError] = useState<MailConnectError | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const preset = providers.data?.presets.find((p) => p.id === account?.preset) ?? null;
   const close = () => {
     setPassword("");
@@ -1015,7 +1007,7 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
           toast.show(t("mail.reconnected", { address: saved.address }));
           close();
         },
-        onError: (e) => setError(mailErrorOf(e)),
+        onError: setError,
       },
     );
   };
@@ -1048,7 +1040,7 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
             url={preset?.appPasswordUrl ?? null}
             name={preset?.label ?? (account ? mailChoiceName(t, choiceOf(account)) : "")}
           />
-          {error && <Alert>{t(`mail.error.${error}`)}</Alert>}
+          {error ? <Alert>{t(`mail.error.${mailErrorOf(error)}`)}</Alert> : null}
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={close}>

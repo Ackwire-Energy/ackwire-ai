@@ -39,7 +39,7 @@ export const PUBLIC_URL = "http://localhost:3000";
  * mailbox behind both), the mail tool source in the Tool Gateway, and
  * `MailDeps` for accounts and inbound mail. No network.
  */
-export async function mailSetup(options: { composio?: boolean; imap?: boolean } = {}) {
+export async function mailSetup(options: { composio?: boolean; imap?: boolean; publicUrl?: string } = {}) {
   const box = createFakeMailConnector();
   const poller = createFakeMailPoller();
   const tester = createFakeMailTester();
@@ -59,11 +59,20 @@ export async function mailSetup(options: { composio?: boolean; imap?: boolean } 
     db: f.db,
     keyWrappers,
     mail,
-    publicUrl: PUBLIC_URL,
+    publicUrl: options.publicUrl ?? PUBLIC_URL,
     resolveHost: async (host) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]),
     composioPollMs: 0,
   };
-  return { f, deps, mail, box, poller, tester, composio, tools: f.tools as NonNullable<Fixture["tools"]> };
+  return {
+    f,
+    deps,
+    mail,
+    box,
+    poller,
+    tester,
+    composio,
+    tools: f.tools as NonNullable<Fixture["tools"]>,
+  };
 }
 
 export type MailFixture = Awaited<ReturnType<typeof mailSetup>>;

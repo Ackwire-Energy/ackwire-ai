@@ -1,6 +1,7 @@
 import type { Artifact } from "@agenteschat/client";
 import { useArtifact, useArtifactVersions } from "@agenteschat/client";
 import { patchCounts } from "@agenteschat/client/lib/artifacts";
+import { artifactPlace } from "@agenteschat/client/lib/drive";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { Button, Chip, DetailsDialog, DetailsSection, Icon, Menu, MenuItem } from "@agenteschat/ui";
@@ -9,25 +10,46 @@ import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { ArtifactMoreMenu, useArtifactDownload } from "@/components/artifacts/ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { goToTarget } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { itemIcon } from "./DriveItems";
 import { DrivePreview } from "./DrivePreview";
 
+/** Who can see a file, in plain words ("Só você e o Theo podem ver: veio de uma mensagem direta"). */
+export function AudienceLine({ artifact: a }: { artifact: Pick<Artifact, "audience"> }) {
+  const { t } = useTranslation();
+  const authorName = useAuthorName();
+  const aud = a.audience;
+  const text =
+    aud.kind === "workspace"
+      ? t("drive.audience.workspace")
+      : aud.kind === "channel"
+        ? t(aud.private ? "drive.audience.privateChannel" : "drive.audience.publicChannel", { name: aud.name })
+        : aud.with
+          ? t("drive.audience.dm", { name: authorName(aud.with) })
+          : t("drive.audience.dmGone");
+  const priv = aud.kind === "dm" || (aud.kind === "channel" && aud.private);
+  return (
+    <p className="drive-audience ac-iconline" data-private={priv || undefined}>
+      <Icon name={priv ? "lock" : "audienceEveryone"} size={16} />
+      <span>{text}</span>
+    </p>
+  );
+}
+
 /**
  * The selected item's details (the shared details dialog; full screen on a
- * phone): a large preview, Abrir / Baixar / Copiar link / …, who made it,
- * its versions and where it was shared.
+ * phone): a large preview, Abrir / Baixar / Copiar link / …, who can see it,
+ * who made it, its versions and the conversation it came from.
  */
 export function DriveDetails({
   artifact: a,
-  channelName,
   onClose,
   onDelete,
 }: {
   artifact: Artifact;
-  channelName: (id: string | null) => string | null;
   onClose: () => void;
   onDelete: (a: Artifact) => void;
 }) {
@@ -45,7 +67,8 @@ export function DriveDetails({
   const formats = downloads.formats(a.kind);
   const isAgent = a.createdBy.type === "agent";
   const role = isAgent ? dir.agentById.get(a.createdBy.id)?.role : undefined;
-  const channel = channelName(a.channelId);
+  const place = artifactPlace(a);
+  const aud = a.audience;
   const kind = t(`artifacts.kind.${a.kind}`);
   const when = (iso: string) => relativeTime(t, i18n.language, iso);
 
@@ -116,8 +139,9 @@ export function DriveDetails({
           title={t("artifacts.copyLink")}
           onClick={() => void copyLink()}
         />
-        <ArtifactMoreMenu artifact={a} onDelete={() => onDelete(a)} />
+        <ArtifactMoreMenu artifact={a} onDelete={() => onDelete(a)} plain />
       </div>
+      <AudienceLine artifact={a} />
 
       <DetailsSection title={isAgent ? t("drive.madeBy") : t("drive.sentBy")}>
         <div className="drive-author">
@@ -172,37 +196,62 @@ export function DriveDetails({
       )}
 
       <DetailsSection title={t("drive.whereShown")}>
-        {a.channelId && channel ? (
-          <button
-            type="button"
-            className="drive-where"
-            onClick={() =>
-              void navigate({
-                to: "/org/$orgId/c/$channelId",
-                params: { orgId: org.id, channelId: a.channelId ?? "" },
-              })
+        {a.channelId ? (
+          <WherePlace
+            icon={aud.kind === "dm" ? "message" : "channel"}
+            title={
+              aud.kind === "channel"
+                ? `#${aud.name}`
+                : aud.kind === "dm" && aud.with
+                  ? t("drive.dmWith", { name: authorName(aud.with) })
+                  : t("drive.dm")
             }
-          >
-            <span className="drive-where__icon">
-              <Icon name="channel" size={16} />
-            </span>
-            <span className="drive-where__text">
-              <b>{channel}</b>
-              <small>{t("drive.sharedIn")}</small>
-            </span>
-          </button>
+            text={a.threadId ? t("drive.inThread") : aud.kind === "dm" ? t("drive.inDm") : t("drive.sharedIn")}
+            onOpen={
+              place
+                ? () => {
+                    onClose();
+                    goToTarget(navigate, org.id, place);
+                  }
+                : undefined
+            }
+          />
         ) : (
-          <div className="drive-where">
-            <span className="drive-where__icon">
-              <Icon name="drive" size={16} />
-            </span>
-            <span className="drive-where__text">
-              <b>{t("drive.onlyDrive")}</b>
-              <small>{t("drive.onlyDriveText")}</small>
-            </span>
-          </div>
+          <WherePlace icon="drive" title={t("drive.onlyDrive")} text={t("drive.onlyDriveText")} />
         )}
       </DetailsSection>
     </DetailsDialog>
+  );
+}
+
+/** The conversation a file came from: a button that opens it, or a plain line when there's nowhere to go. */
+function WherePlace({
+  icon,
+  title,
+  text,
+  onOpen,
+}: {
+  icon: "message" | "channel" | "drive";
+  title: string;
+  text: string;
+  onOpen?: () => void;
+}) {
+  const body = (
+    <>
+      <span className="drive-where__icon">
+        <Icon name={icon} size={16} />
+      </span>
+      <span className="drive-where__text">
+        <b>{title}</b>
+        <small>{text}</small>
+      </span>
+    </>
+  );
+  return onOpen ? (
+    <button type="button" className="drive-where" onClick={onOpen}>
+      {body}
+    </button>
+  ) : (
+    <div className="drive-where">{body}</div>
   );
 }

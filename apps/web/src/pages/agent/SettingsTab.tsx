@@ -13,6 +13,7 @@ import {
   Card,
   CheckboxPill,
   Chip,
+  colorKey,
   Field,
   Icon,
   type IconName,
@@ -298,7 +299,7 @@ export function SettingsTab({
               <span className="agp-chips">
                 <Chip icon="agent">
                   {[
-                    t(`look.colors.${look.color}`),
+                    t(`look.colors.${colorKey(look.color)}`),
                     t(`look.eyesNames.${look.eyes}`),
                     ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
                   ].join(" · ")}
@@ -422,6 +423,7 @@ export function SettingsTab({
                   ownerUserId={ownerId}
                   agentName={agent.name}
                   idPrefix="agp-audience"
+                  onPlan={onPlan}
                 />
                 {blocked && (
                   <SettingNote icon="lock" live>
@@ -439,7 +441,9 @@ export function SettingsTab({
             ) : (
               <>
                 <span className="agp-chips">
-                  <Chip icon="message">{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</Chip>
+                  <Chip icon="message">
+                    {audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}
+                  </Chip>
                 </span>
                 <span className="small muted">{t("audience.notListed")}</span>
               </>

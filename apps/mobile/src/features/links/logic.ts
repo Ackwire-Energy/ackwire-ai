@@ -16,16 +16,19 @@ export type AppHref =
   | `/chat/${string}?handoff=${string}`
   | `/chat/${string}?thread=${string}&handoff=${string}`
   | `/agent/${string}`
+  | `/computer/${string}`
   | `/handoff/${string}`
   | `/issues/${number}`
   | `/routines/${string}`
+  | `/settings/computers/${string}`
   | `/consultation/${string}?channel=${string}`
   | "/routines"
   | "/activity"
   | "/threads"
   | "/join-requests"
   | "/computer-setup"
-  | "/connect-ai?ready=1";
+  | "/connect-ai?ready=1"
+  | "/usage";
 
 export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
@@ -159,12 +162,21 @@ export function notificationHref(
   if (n.kind === "computer_ready") return computerReadyHref(ai);
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return routineHref(s.routineId);
-  if (n.kind === "agent_unreached") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
+  // Asking for one more browser profile: the agent's page, where its browsers are.
+  if (n.kind === "agent_unreached" || n.kind === "browser_profile_request")
+    return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
   if (n.kind === "join_request") return "/join-requests";
+  // The month's Composio calls are counted in Uso.
+  if (n.kind === "composio_limit") return "/usage";
+  // A computer's disk is almost full (ADR 0115): that computer, where its shared folder's size shows.
+  if (n.kind === "computer_disk_full") return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : null;
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.
-  if (n.kind === "browser_handoff" && isSafeId(s.handoffId))
+  if (n.kind === "browser_handoff" && isSafeId(s.handoffId)) {
+    // Sent to someone who can't open its conversation (it names none): the agent's computer, the request there.
+    if (!isSafeId(s.channelId ?? s.dmId) && isSafeId(s.agentId)) return `/computer/${s.agentId}`;
     return handoffHref(s.handoffId, s.channelId ?? s.dmId, s.threadId);
+  }
   if ((n.kind === "mission_finished" || n.kind === "mission_stopped") && isSafeId(s.missionId))
     return `/mission/${s.missionId}`;
   if (s.topicId || s.issueId || s.issueNumber != null) return null;

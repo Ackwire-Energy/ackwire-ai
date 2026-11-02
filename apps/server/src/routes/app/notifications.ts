@@ -81,6 +81,8 @@ const Notification = z
         .array(z.string())
         .optional()
         .openapi({ description: "`join_request`: the first two people who asked, in the order they asked." }),
+      diskUse: z.number().optional().openapi({ description: "`computer_disk_full`: the share of the disk in use." }),
+      diskFreeGb: z.number().optional().openapi({ description: "`computer_disk_full`: the GB left on it." }),
       holdKind: z
         .string()
         .optional()

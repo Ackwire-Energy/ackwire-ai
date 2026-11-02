@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node
 import path from "node:path";
 import { ASK_AGAIN, inBrowserProfile } from "@agenteschat/adapters/command-policy";
 import {
+  type AccountKind,
   type AgentScope,
   browserSetupOf,
   type FileEntry,
@@ -23,6 +24,7 @@ import type { AccountGrant, AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
+import { type CursorBrainTurnRequest, handleCursorBrainTurn } from "./brain-cursor";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
 import { commandApproval, ownBranches } from "./command-gate";
@@ -30,9 +32,9 @@ import type { DesktopManager } from "./desktop";
 import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
-import { gitSync } from "./git";
+import { type CacheFill, type CloneSlots, gitSync } from "./git";
 import { isGitInternalPath, touchesGitInternals } from "./git-guard";
-import type { McpTaskInfo } from "./mcp";
+import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
@@ -130,6 +132,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "browser.batch": "agent",
   "browser.capture": "agent",
   "browser.warm": "agent",
+  // Root answers it, and refuses it (and every op with `profile`) in system mode until profiles have their own users.
+  "browser.profile.delete": "machine",
   // Root's: a stream's data socket needs the machine token, which no worker holds, and a desktop's password file
   // must be one its agent can't rewrite.
   "desktop.session.start": "machine",
@@ -169,6 +173,11 @@ export interface HandlerContext {
   gitDir?: string;
   /** Tests: the git command (default `git` on the PATH). */
   gitCommand?: string;
+  /** `<runner home>/git-cache`: shared read-only mirrors for clones (ADR 0116); single-user runners only. */
+  gitCache?: string;
+  /** A system-mode worker: root's clone slots and shared cache (ADR 0116), so both are the computer's. */
+  cloneSlot?: CloneSlots;
+  cacheFill?: CacheFill;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
   /**
@@ -188,8 +197,8 @@ export interface HandlerContext {
      * for an account root keeps (`agentHome`, protocol 29).
      */
     accounts?: {
-      accountDir(kind: "claude_code" | "codex", id: string): string | null;
-      agentHome?(kind: "claude_code" | "codex", id: string): string | null;
+      accountDir(kind: AccountKind, id: string): string | null;
+      agentHome?(kind: AccountKind, id: string): string | null;
     };
     /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
     spawn?: Spawn;
@@ -255,6 +264,7 @@ type Secrets = Awaited<ReturnType<typeof agentSecrets>>;
 const TOOL_LABEL: Record<keyof RunnerTools, string> = {
   claude: "Claude Code",
   codex: "Codex",
+  cursor: "Cursor",
   commands: "Commands",
   browser: "Browser",
   desktop: "The desktop",
@@ -333,6 +343,7 @@ async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested
 async function doRead(
   ctx: HandlerContext,
   req: Extract<MachineRequest, { op: "read" }>,
+  secrets: Secrets,
 ): Promise<MachineReplies["read"]> {
   const target = await resolvePath(ctx, requireString(req.path, "path"));
   if (!target.exists) return { base64: null, size: 0 };
@@ -346,6 +357,12 @@ async function doRead(
   if (st.size > limit) throw new RunnerError("too_large", `The file has ${st.size} bytes (max ${limit})`);
   const data = await readFile(target.abs);
   if (data.byteLength > limit) throw new RunnerError("too_large", `The file is larger than ${limit} bytes`);
+  // A file a command wrote a value into (`env > dump.txt`) goes back to the model like command output: redacted.
+  if (secrets) {
+    const text = data.toString("utf8");
+    const clean = secrets.redact(text);
+    if (clean !== text) return { base64: Buffer.from(clean).toString("base64"), size: Buffer.byteLength(clean) };
+  }
   return { base64: data.toString("base64"), size: data.byteLength };
 }
 
@@ -439,6 +456,8 @@ const workStream = (req: MachineRequest) =>
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
   if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+  // Protocol 34: a browser profile's session, never an agent's worker or folder (ADR 0110).
+  if (req.profile || req.op === "browser.profile.delete") return handleProfileBrowser(ctx, req, scope);
   if (ctx.systemMode?.() && OP_ROUTES[req.op] !== "machine") {
     if (!ctx.workers) {
       throw new RunnerError(
@@ -527,6 +546,9 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
           signal: scope.signal,
           ...(req.stream === true ? { output: scope.output } : {}),
           ...(ctx.gitCommand ? { gitCommand: ctx.gitCommand } : {}),
+          ...(ctx.gitCache ? { gitCache: ctx.gitCache } : {}),
+          ...(ctx.cloneSlot ? { cloneSlot: ctx.cloneSlot } : {}),
+          ...(ctx.cacheFill ? { cacheFill: ctx.cacheFill } : {}),
         },
         req,
       );
@@ -541,7 +563,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       return doExec(ctx, req, scope, secrets);
     case "read":
       await refuseSecretFile(ctx, secrets, requireString(req.path, "path"));
-      return doRead(ctx, req);
+      return doRead(ctx, req, secrets);
     case "write":
       return doWrite(ctx, req);
     case "list":
@@ -699,10 +721,18 @@ async function handleBrowser(
       return browser.streamStop(req.agent);
     case "browser.act":
       requireTool(ctx, "browser");
-      return browser.act(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
+      return redacted(
+        ctx,
+        req.agent,
+        await browser.act(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal),
+      );
     case "browser.batch":
       requireTool(ctx, "browser");
-      return browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
+      return redacted(
+        ctx,
+        req.agent,
+        await browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal),
+      );
     case "browser.capture":
       requireTool(ctx, "browser");
       return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
@@ -715,6 +745,63 @@ async function handleBrowser(
     case "browser.input":
       requireTool(ctx, "browser");
       return browser.input(req.agent, Array.isArray(req.events) ? req.events : []);
+  }
+}
+
+/** A browser answer (a snapshot, a page's text, a code field just typed into) with the agent's secrets redacted. */
+async function redacted<T>(ctx: HandlerContext, agent: AgentScope, reply: T): Promise<T> {
+  const secrets = await agentSecrets(ctx.secretsDir, agent);
+  return secrets ? (redactDeep(reply, secrets.redact) as T) : reply;
+}
+
+export const PROFILES_SYSTEM_MODE =
+  "Browser profiles don't work yet on a computer where each agent runs as its own user (system mode).";
+const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Protocol 34 (ADR 0110): a `browser.*` op in a browser profile's session. The session is keyed by the profile
+ * (`profile:<id>`), its folder is under the runner's home, and its Chrome is always headless; `agent` only says who
+ * acts. Single mode only: in system mode a profile needs an OS user of its own (phase 2), so it is refused.
+ */
+async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, scope: RequestScope) {
+  if (ctx.systemMode?.()) throw new RunnerError("not_allowed", PROFILES_SYSTEM_MODE);
+  const browser = ctx.browser;
+  if (!browser) throw new RunnerError("browser_unavailable", "This runner has no agent browser");
+  const id = req.profile?.id;
+  if (typeof id !== "string" || !PROFILE_ID.test(id)) throw new RunnerError("bad_request", "Which browser profile?");
+  const agent: AgentScope = {
+    id: `profile:${id.toLowerCase()}`,
+    handle: req.agent?.handle ?? "profile",
+    ...(req.agent?.name ? { name: req.agent.name } : {}),
+  };
+  const folder = browser.profileFolder(id.toLowerCase());
+  switch (req.op) {
+    case "browser.profile.delete":
+      return browser.deleteProfile(agent, folder);
+    case "browser.stop":
+      return browser.stop(agent);
+    case "browser.stream.stop":
+      return browser.streamStop(agent);
+    case "browser.act":
+      requireTool(ctx, "browser");
+      return browser.act(agent, folder, { ...req, desktop: false }, scope.signal);
+    case "browser.batch":
+      requireTool(ctx, "browser");
+      return browser.batch(agent, folder, { ...req, desktop: false }, scope.signal);
+    case "browser.capture":
+      requireTool(ctx, "browser");
+      return browser.capture(agent, folder, req.allowedDomains, scope.signal);
+    case "browser.warm":
+      requireTool(ctx, "browser");
+      return browser.warm(agent, folder, false);
+    case "browser.stream.start":
+      requireTool(ctx, "browser");
+      return browser.streamStart(agent, req.mode);
+    case "browser.input":
+      requireTool(ctx, "browser");
+      return browser.input(agent, Array.isArray(req.events) ? req.events : []);
+    default:
+      throw new RunnerError("bad_request", `${req.op} doesn't take a browser profile`);
   }
 }
 
@@ -783,10 +870,10 @@ async function doBrainTurn(
   scope: RequestScope,
   secrets: Secrets,
 ): Promise<MachineReplies["brain.turn"]> {
-  requireTool(ctx, req.kind === "codex" ? "codex" : "claude");
+  requireTool(ctx, req.kind === "codex" || req.kind === "cursor" ? req.kind : "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
-  if (req.kind === "codex") return doCodexTurn(ctx, req, scope, runId);
+  if (req.kind === "codex" || req.kind === "cursor") return doCodexTurn(ctx, req, scope, runId);
   if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
@@ -801,6 +888,9 @@ async function doBrainTurn(
   scope.emit?.({ type: "brain.done", runId });
   return { runId, final };
 }
+
+/** Cursor turns in progress: `brain.steer` answers `unsupported` for them (print mode takes nothing mid-turn). */
+const cursorRuns = new Set<string>();
 
 const STEER_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -825,6 +915,7 @@ function doBrainSteer(
     if (typeof m.text !== "string" || !m.text.trim()) throw new RunnerError("bad_request", "Empty message");
     return { uuid: m.uuid, text: m.text.slice(0, STEER_LIMITS.text), ...(m.urgent === true ? { urgent: true } : {}) };
   });
+  if (cursorRuns.has(runId)) return { status: "unsupported", reason: "Cursor reads messages only between turns" };
   if (ctx.codex?.runs.has(runId)) {
     return ctx.codex.app
       ? ctx.codex.app.steer(String(req.agent.id), { runId, session, messages })
@@ -849,7 +940,7 @@ function signedOut(
   const accounts = ctx.accounts;
   if (!accounts || typeof req.account !== "string" || !req.account || final?.type !== "error") return;
   if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
-  const kind = req.kind === "codex" ? "codex" : "claude_code";
+  const kind = req.kind === "codex" || req.kind === "cursor" ? req.kind : "claude_code";
   void (final.code === "not_logged_in" ? accounts.refused(kind, req.account) : Promise.resolve())
     .catch(() => undefined)
     .then(() => {
@@ -873,8 +964,11 @@ async function doCodexTurn(
   runId: string,
 ): Promise<MachineReplies["brain.turn"]> {
   const codex = ctx.codex;
-  if (!codex) throw new RunnerError("bad_request", "This runner runs no Codex brain turns");
-  let final: CodexBrainEvent = { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
+  const cursor = req.kind === "cursor";
+  if (!codex) throw new RunnerError("bad_request", `This runner runs no ${cursor ? "Cursor" : "Codex"} brain turns`);
+  let final: CodexBrainEvent = cursor
+    ? { type: "error", code: "cursor_failed", message: "Cursor ended without an answer." }
+    : { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
   let ended = false;
   const token = req.mcp?.token;
   // `handleRequest` made the workspace the agent's own folder already.
@@ -890,34 +984,50 @@ async function doCodexTurn(
       serverToken: token,
     });
   }
+  const emit = (event: CodexBrainEvent) => {
+    if (ended) return;
+    if (event.type === "done" || event.type === "error") {
+      final = event;
+      ended = true;
+    }
+    scope.emit?.({ type: "brain.event", runId, event });
+  };
+  if (cursor) cursorRuns.add(runId);
   try {
-    await handleCodexBrainTurn(
-      {
-        folder,
-        exec: toolOn(ctx, "codex"),
-        runnerHome: codex.runnerHome,
-        ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
-        ...(codex.mcp ? { mcp: codex.mcp } : {}),
-        ...(ctx.grants ? { grants: ctx.grants } : {}),
-        ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
-        ...(codex.app ? { app: codex.app } : {}),
-        ...(codex.spawn ? { spawn: codex.spawn } : {}),
-      },
-      req as unknown as CodexBrainTurnRequest,
-      {
-        signal: scope.signal,
-        emit: (event) => {
-          if (ended) return;
-          if (event.type === "done" || event.type === "error") {
-            final = event;
-            ended = true;
-          }
-          scope.emit?.({ type: "brain.event", runId, event });
+    if (cursor) {
+      await handleCursorBrainTurn(
+        {
+          folder,
+          exec: toolOn(ctx, "cursor"),
+          runnerHome: codex.runnerHome,
+          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(codex.mcp ? { mcp: codex.mcp } : {}),
+          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+          ...(codex.spawn ? { spawn: codex.spawn } : {}),
         },
-      },
-    );
+        req as unknown as CursorBrainTurnRequest,
+        { signal: scope.signal, emit },
+      );
+    } else
+      await handleCodexBrainTurn(
+        {
+          folder,
+          exec: toolOn(ctx, "codex"),
+          runnerHome: codex.runnerHome,
+          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(codex.mcp ? { mcp: codex.mcp } : {}),
+          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+          ...(codex.app ? { app: codex.app } : {}),
+          ...(codex.spawn ? { spawn: codex.spawn } : {}),
+        },
+        req as unknown as CodexBrainTurnRequest,
+        { signal: scope.signal, emit },
+      );
   } finally {
     codex.runs.delete(runId);
+    cursorRuns.delete(runId);
   }
   signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });

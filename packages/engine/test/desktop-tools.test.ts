@@ -15,7 +15,6 @@ import {
   type MachineCaller,
   MachineRequestError,
   type MachineStatus,
-  REFUSALS,
   type RunAuthority,
   SANDBOX_SCOPE,
   startTakeover,
@@ -393,7 +392,7 @@ test("routines that only read can't use the desktop, a run nobody is behind can;
   const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
   for (const name of TOOLS) {
     const tool = { name, scope: DESKTOP_SCOPE, connectionId: null };
-    expect(toolPolicy(routine("read"), tool)).toEqual({ action: "refuse", reason: REFUSALS.routineDesktopReadOnly });
+    expect(toolPolicy(routine("read"), tool).action).toBe("allow");
     expect(toolPolicy(unattended, tool).action).toBe("allow");
     expect(toolPolicy(routine("act"), tool).action).toBe("allow");
   }

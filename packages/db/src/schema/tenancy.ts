@@ -22,6 +22,10 @@ import { users } from "./auth";
 export const ONBOARDING_STEPS = ["workspace", "context", "import", "agents", "computer", "ai", "team", "done"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
+/** What opens when the app starts (ADR 0108; the apps' `StartPage`, `packages/client/src/api/types.ts`). */
+export const START_PAGES = ["home", "last", "channel"] as const;
+export type StartPage = (typeof START_PAGES)[number];
+
 /**
  * Top-level tenant. agentes.chat Cloud has many; a self-hosted install usually
  * has one. Every tenant-owned table carries `org_id` (docs/adr/0002-editions-and-modules.md).
@@ -123,10 +127,22 @@ export const organizationMembers = pgTable(
      */
     noticePrefs: jsonb().$type<Record<string, boolean>>().notNull().default({}),
     /**
+     * What opens when the app starts in this workspace (ADR 0108): `home` (Início, Conversas on the phone), `last`
+     * (where the person was, which each device keeps) or `channel` (`start_channel_id`).
+     */
+    startPage: text().$type<StartPage>().notNull().default("home"),
+    /** No foreign key: read against the person's channels, so one left, archived or deleted opens the home. */
+    startChannelId: uuid(),
+    /**
      * Where the person put each tool at the top of their sidebar (`{ "wiki": "always" }`); a tool not here keeps the
      * app's default (`sidebarItemsOf` in packages/engine/src/sidebar-items.ts).
      */
     sidebarItems: jsonb().$type<Record<string, string>>().notNull().default({}),
+    /**
+     * Whether the person sees the summary of what agents did under each reply ("Usou 4 ferramentas"); off, only the
+     * live step line while they work and the cards that carry content or wait for a person.
+     */
+    showActivity: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

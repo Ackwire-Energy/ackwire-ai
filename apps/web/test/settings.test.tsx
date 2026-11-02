@@ -5,7 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
-import { pick } from "./catalog";
+import { pick, rowMenu } from "./catalog";
 import { createFakeApi, OPENROUTER_KEY, OPENROUTER_MODELS, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -150,7 +150,7 @@ describe("Configurações do workspace", () => {
     expect(section.textContent).toContain("Conectado como acme");
     expect(section.textContent).toContain("3 ferramentas");
     expect(section.textContent).toContain("Nenhum agente ainda");
-    await click(within(section).getByRole("button", { name: "Desconectar GitHub" }));
+    await click(within(await rowMenu("GitHub")).getByRole("menuitem", { name: "Desconectar" }));
     const dialog = screen().getByRole("dialog", { name: "Desconectar GitHub?" });
     expect(dialog.textContent).toContain("Nenhum agente usa agora.");
     await click(within(dialog).getByRole("button", { name: "Desconectar" }));
@@ -195,17 +195,24 @@ describe("Configurações do workspace", () => {
     expect(screen().getByRole("region", { name: "Conectores" }).textContent).toContain("Sentry");
   });
 
-  test("a connector without a default server asks for an https address", async () => {
-    await go(seedState({ connections: [] }), "settings/connectors");
+  test("Google Drive connects through Composio: its page, no address or key of ours", async () => {
+    const left: string[] = [];
+    setNavigateAway((url) => left.push(url));
+    const { state } = await go(seedState({ connections: [] }), "settings/connectors");
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "drive");
     await pick(add, "Google Drive");
     const connect = screen().getByRole("dialog", { name: "Conectar Google Drive" });
-    await type(within(connect).getByLabelText("Endereço do servidor MCP"), "http://inseguro");
-    await type(within(connect).getByLabelText("Chave de API"), "chave-longa-123");
-    await click(within(connect).getByRole("button", { name: "Conectar com a chave" }));
-    expect(connect.textContent).toContain("Use um endereço que comece com https://.");
+    expect(connect.textContent).toContain("Você entra na página da Composio, em inglês, e volta para cá.");
+    expect(within(connect).queryByLabelText("Endereço do servidor MCP")).toBeNull();
+    expect(within(connect).queryByLabelText("Chave de API")).toBeNull();
+    await click(within(connect).getByRole("button", { name: "Continuar na Composio" }));
+    expect(state.calls.find((c) => c.method === "customConnectors.connect")?.args[1]).toMatchObject({
+      serverUrl: "https://backend.composio.dev/api/v3.1/toolkits/googledrive",
+      label: "Google Drive",
+    });
+    expect(left).toEqual(["https://composio.example/connect/ca_1?state=s"]);
   });
 
   test("a key that isn't the chosen provider's: it asks whose it is (any sk- key could be several) and saves it there", async () => {

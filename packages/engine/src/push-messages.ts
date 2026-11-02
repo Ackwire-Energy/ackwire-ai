@@ -43,6 +43,8 @@ export interface PushTextInput {
   routine?: string | null;
   /** `browser_handoff`: the agent's screen it is on, when not its browser. */
   screen?: string | null;
+  /** `browser_handoff` still unanswered an hour later: the title says the agent still needs them. */
+  reminder?: boolean;
 }
 
 interface Strings {
@@ -76,8 +78,10 @@ interface Strings {
   computerReadyTitle: string;
   computerReadyBody: string;
   browserHandoffTitle: (actor: string) => string;
+  browserHandoffReminderTitle: (actor: string) => string;
   browserHandoffBody: string;
   desktopHandoffTitle: (actor: string) => string;
+  desktopHandoffReminderTitle: (actor: string) => string;
   desktopHandoffBody: string;
   secretTitle: (actor: string) => string;
   secretBody: string;
@@ -124,8 +128,10 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     computerReadyTitle: "O computador do seu workspace está pronto",
     computerReadyBody: "Abra a página de um agente para ver ao vivo.",
     browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
+    browserHandoffReminderTitle: (a) => `${a} ainda precisa de você no navegador`,
     browserHandoffBody: "Toque para abrir a tela.",
     desktopHandoffTitle: (a) => `${a} precisa de você no computador`,
+    desktopHandoffReminderTitle: (a) => `${a} ainda precisa de você no computador`,
     desktopHandoffBody: "Abra o agentes.chat num notebook para ajudar.",
     secretTitle: (a) => `${a} precisa de um segredo seu`,
     secretBody: "Toque para enviar com segurança.",
@@ -169,8 +175,10 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     computerReadyTitle: "Your workspace's computer is ready",
     computerReadyBody: "Open an agent's page to see it live.",
     browserHandoffTitle: (a) => `${a} needs you in the browser`,
+    browserHandoffReminderTitle: (a) => `${a} still needs you in the browser`,
     browserHandoffBody: "Tap to open the screen.",
     desktopHandoffTitle: (a) => `${a} needs you on the computer`,
+    desktopHandoffReminderTitle: (a) => `${a} still needs you on the computer`,
     desktopHandoffBody: "Open agentes.chat on a laptop to help.",
     secretTitle: (a) => `${a} needs a secret from you`,
     secretBody: "Tap to send it securely.",
@@ -254,8 +262,15 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "browser_handoff":
       // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste"). A desktop doesn't
       // open on the phone: its body says where it does.
-      if (input.screen === "desktop") return out(s.desktopHandoffTitle(actor), text || s.desktopHandoffBody);
-      return out(s.browserHandoffTitle(actor), text || s.browserHandoffBody);
+      if (input.screen === "desktop")
+        return out(
+          (input.reminder ? s.desktopHandoffReminderTitle : s.desktopHandoffTitle)(actor),
+          text || s.desktopHandoffBody,
+        );
+      return out(
+        (input.reminder ? s.browserHandoffReminderTitle : s.browserHandoffTitle)(actor),
+        text || s.browserHandoffBody,
+      );
     case "secret_request":
       // What it is for, in the agent's words: the value is typed in the app, sealed there, never here.
       return out(s.secretTitle(actor), text || what || s.secretBody);

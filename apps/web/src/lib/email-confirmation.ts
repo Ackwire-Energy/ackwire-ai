@@ -1,4 +1,5 @@
 import type { Me } from "@agenteschat/client";
+import { authErrorText } from "@agenteschat/client/lib/errors";
 import type { TFunction } from "i18next";
 import type { AuthClient } from "@/auth/client";
 import type { ToastStore } from "@/lib/toast";
@@ -31,7 +32,7 @@ interface Deps {
 export async function sendNewLink({ auth, t, show }: Deps, email: string): Promise<boolean> {
   const result = await auth.sendVerificationEmail(email);
   if (result.ok) show(t("auth.newLinkSent", { email }));
-  else show(result.message || t("common.unknownError"), "error");
+  else show(authErrorText(t, result), "error");
   return result.ok;
 }
 

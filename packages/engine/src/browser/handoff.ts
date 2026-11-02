@@ -21,6 +21,9 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { isChannelMember } from "../channels";
+import { answersAgentsOnly } from "../consultations";
+import { openPersonAgentDm } from "../dms";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
@@ -32,14 +35,17 @@ import {
   browserHandoffRecipient,
   humanBehindRun,
   notifyBrowserHandoff,
+  remindBrowserHandoffNotifications,
   resolveBrowserHandoffNotifications,
 } from "../notification-producers";
 import { can, getMembership } from "../organizations";
+import { enqueue } from "../outbox";
 import { resumeRunWithResult } from "../run-resume";
 import { bodyCode, runWhere } from "../run-tools";
 import { closedRefusal } from "../standing";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import { getBrowserProfile, runBrowserProfile } from "./profiles";
 import { agentBrowserStatus, browserUnavailableText } from "./status";
 import {
   BROWSER_SCOPE,
@@ -50,15 +56,21 @@ import {
   DESKTOP_TOOL_INFO,
 } from "./types";
 
-const { browserHandoffs, agentRuns, agents, machines, messages, users } = schema;
+const { browserHandoffs, agentRuns, agents, channelMembers, channels, machines, messages, users } = schema;
 
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
 
-/** How long an agent waits by default for a person to open its request. */
-export const HANDOFF_TIMEOUT_DEFAULT_MINUTES = 10;
+/**
+ * How long an agent waits by default for a person to open its request, its browser held open meanwhile: a day,
+ * since people often see it later and an open browser costs its computer nothing more.
+ */
+export const HANDOFF_TIMEOUT_DEFAULT_MINUTES = 24 * 60;
 /** The longest an agent may ask to wait. */
-export const HANDOFF_TIMEOUT_MAX_MINUTES = 30;
+export const HANDOFF_TIMEOUT_MAX_MINUTES = 24 * 60;
+/** A request still unanswered this long after it was asked reminds the people asked, once (`remindBrowserHandoff`). */
+export const HANDOFF_REMIND_AFTER_MS = 60 * 60_000;
+export const HANDOFF_REMIND_JOB = "browser.handoff_remind";
 /**
  * Once a person has control there is no deadline; only their live view going
  * away for this long ends it (expired): time to reconnect and carry on.
@@ -229,6 +241,7 @@ function outcomeText(result: BrowserHandoffResult, kind: "ask" | "takeover", scr
   if (result.result === "failed") {
     return `The person couldn't do it. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
+  if (result.result === "withdrawn") return "You withdrew this request: nobody will do it.";
   if (result.result === "cancelled") {
     return `A person canceled the request. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
@@ -376,7 +389,10 @@ export async function requireBrowserAccess(
           .limit(5)
       ).map((r) => r.id);
   for (const runId of runs) {
-    if ((await humanBehindRun({ db }, orgId, runId)) === userId) return access;
+    // A run consulted for someone outside the agent's audience has nobody behind it for its screen.
+    if ((await humanBehindRun({ db }, orgId, runId)) === userId && !(await answersAgentsOnly(db, orgId, runId))) {
+      return access;
+    }
   }
   if (screen === "desktop" && agent.machineId) {
     const machine = await getMachine(db, orgId, agent.machineId);
@@ -587,13 +603,20 @@ export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise
     ? await db.select({ name: users.name }).from(users).where(eq(users.id, row.controllerUserId))
     : [];
   const where = await handoffPlace(db, row);
+  // A DM has no channel page of its own (`/c/<id>` says it doesn't exist): the web opens it by the agent.
+  const [conversation] =
+    where && !where.threadId
+      ? await db.select({ kind: channels.kind }).from(channels).where(eq(channels.id, where.channelId))
+      : [];
   // The conversation holding its card (an ask's message, a take over's run), else the agent's page with its browser open.
   const link = where
     ? where.threadId
       ? `/org/${row.orgId}/threads/${where.threadId}`
-      : row.kind === "ask"
-        ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
-        : `/org/${row.orgId}/c/${where.channelId}`
+      : conversation?.kind === "dm"
+        ? `/org/${row.orgId}/dm/agent/${row.agentId}`
+        : row.kind === "ask"
+          ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
+          : `/org/${row.orgId}/c/${where.channelId}`
     : agentBrowserLink(row.orgId, row.agentId);
   return {
     status: row.status === "active" && row.controllerUserId ? "active" : "pending",
@@ -689,6 +712,15 @@ export function createBrowserHandoffToolSource(
       typeof input.timeout_minutes === "number"
         ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
         : HANDOFF_TIMEOUT_DEFAULT_MINUTES;
+    // A profile is a whole shared account: only its drivers sign in to it, never the person who asked for the work.
+    const profileId = screen === "browser" ? await runBrowserProfile(ctx.db, ctx) : null;
+    if (profileId) {
+      const name = (await getBrowserProfile(ctx.db, ctx.orgId, profileId))?.name ?? "?";
+      return {
+        content: `You are in the shared browser profile "${name}": a person can't be asked to act in it from here. Tell the people what it needs; someone who manages apps and computers uses Fazer login on "${name}".`,
+        isError: true,
+      };
+    }
     const place = await places[screen](ctx);
     if ("unavailable" in place) return { content: place.unavailable, isError: true };
     if (!place.online) {
@@ -712,7 +744,6 @@ export function createBrowserHandoffToolSource(
         isError: true,
       };
     }
-    const where = runWhere(run);
     // A desktop goes only to who may drive its computer (ADR 0058 §4); a browser to who asked for the work.
     const drivers = screen === "desktop" ? await computerDrivers(ctx.db, ctx.orgId, ctx.agentId) : null;
     if (drivers?.length === 0) {
@@ -721,11 +752,46 @@ export function createBrowserHandoffToolSource(
         isError: true,
       };
     }
+    const agentsOnly = await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId);
     const recipient = drivers
       ? drivers.length === 1
         ? (drivers[0] ?? null)
         : null
-      : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      : await browserHandoffRecipient(
+          { db: ctx.db },
+          ctx.orgId,
+          // Consulted for someone outside its audience: its owner helps, never that person.
+          agentsOnly ? null : ctx.runId,
+          ctx.agentId,
+        );
+    // The card goes where the person asked can act on it: the run's conversation when they're in it, else their DM
+    // with the agent (a run in a room between agents, or one they aren't in, would leave the request unreachable).
+    // Several drivers: one in the conversation keeps it there, else whoever asked for the work's DM; else it stays
+    // in the conversation and every driver gets it on the computer (a DM with an arbitrary one would be a stranger's).
+    const runAt = runWhere(run);
+    let asked = recipient;
+    if (!asked && drivers) {
+      const [member] = await ctx.db
+        .select({ userId: channelMembers.userId })
+        .from(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.orgId, run.orgId),
+            eq(channelMembers.channelId, runAt.channelId),
+            inArray(channelMembers.userId, drivers),
+          ),
+        )
+        .limit(1);
+      const requester =
+        member?.userId || agentsOnly
+          ? null
+          : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      asked = member?.userId ?? (requester && drivers.includes(requester) ? requester : null);
+    }
+    const where =
+      asked && !(await isChannelMember(ctx.db, run.orgId, runAt.channelId, asked))
+        ? { channelId: (await openPersonAgentDm(ctx.db, run.orgId, asked, run.agentId)).id, threadId: null }
+        : runAt;
     const busy = {
       content: `A person is using your ${s.what}, or was just asked to; wait for that before asking.`,
       isError: true,
@@ -759,6 +825,15 @@ export function createBrowserHandoffToolSource(
           })
           .returning();
         if (!row) throw new Error("handoff not created");
+        if (minutes * 60_000 > HANDOFF_REMIND_AFTER_MS) {
+          await enqueue(tx, {
+            orgId: run.orgId,
+            kind: HANDOFF_REMIND_JOB,
+            payload: { handoffId: row.id },
+            dedupeKey: `${HANDOFF_REMIND_JOB}:${row.id}`,
+            runAt: new Date(Date.now() + HANDOFF_REMIND_AFTER_MS),
+          });
+        }
         await syncCard(tx, row);
         card.meta = { ...card.meta, browserHandoff: handoffView(row) };
         return { card, row };
@@ -776,7 +851,7 @@ export function createBrowserHandoffToolSource(
       drivers ?? undefined,
     ).catch(() => {});
     return {
-      content: `Asked for help (if nobody opens it within ${minutes} min you'll be told). End your turn now; you'll be woken with the result.`,
+      content: `Asked for help (if nobody opens it within ${formatDuration(minutes * 60)} you'll be told). End your turn now; you'll be woken with the result.`,
       // The run waits on this handoff and resumes with the result (`resumeRunWithResult`).
       data: { pause: { kind: "input", id: created.row.id }, handoffId: created.row.id },
     };
@@ -848,6 +923,7 @@ async function resumeWaitingRun(
   row: BrowserHandoffRow,
   result: BrowserHandoffResult,
   answeredBy?: string,
+  waitingOnly?: boolean,
 ) {
   if (!row.runId) return;
   await resumeRunWithResult(deps.db, {
@@ -857,6 +933,7 @@ async function resumeWaitingRun(
       content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row, answeredBy), row.screen),
     },
     pubsub: deps.pubsub,
+    waitingOnly,
   });
 }
 
@@ -865,6 +942,7 @@ function endedResult(row: BrowserHandoffRow): BrowserHandoffResult {
   const note = row.note ? { note: row.note } : {};
   if (row.status === "done") return { result: "done", ...note };
   if (row.status === "cancelled") return { result: "cancelled" };
+  if (row.status === "withdrawn") return { result: "withdrawn" };
   if (row.status === "failed") return { result: "failed", ...note };
   return { result: "expired" };
 }
@@ -989,6 +1067,33 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
   if (!row) throw new ConflictError("This is already over");
   await settle(deps, row);
   return handoffView(row);
+}
+
+/**
+ * The agent withdraws its own asked help (`withdraw_request`) while nobody took control: the card says it no
+ * longer needs it, the people asked stop waiting. A run still waiting on it resumes; the run withdrawing it
+ * (`byRunId`), or one that stopped waiting on it and ended, is told nothing more (no late notice, no new run). Null: not open anymore, or a person is in control.
+ */
+export async function withdrawHandoff(deps: HandoffDeps, handoffId: string, byRunId: string, reason: string | null) {
+  const [row] = await deps.db.transaction(async (tx) => {
+    const rows = await tx
+      .update(browserHandoffs)
+      .set({ status: "withdrawn", note: reason, resolvedAt: new Date() })
+      .where(
+        and(
+          eq(browserHandoffs.id, handoffId),
+          eq(browserHandoffs.kind, "ask"),
+          sql`(${browserHandoffs.status} = 'pending' or (${browserHandoffs.status} = 'active' and ${browserHandoffs.controllerUserId} is null))`,
+        ),
+      )
+      .returning();
+    if (rows[0]) await syncCard(tx, rows[0]);
+    return rows;
+  });
+  if (!row) return null;
+  if (row.runId !== byRunId) await resumeWaitingRun(deps, row, endedResult(row), undefined, true).catch(() => {});
+  await afterChange(deps, row).catch(() => {});
+  return row;
 }
 
 /**
@@ -1306,6 +1411,19 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
     await resumeWaitingRun(deps, handoff, endedResult(handoff)).catch(() => {});
   }
   return expired.length;
+}
+
+/**
+ * An hour after an agent asked (job `HANDOFF_REMIND_JOB`): while nobody answered, gave it back or took control,
+ * and it hasn't expired, the people asked hear it once more.
+ */
+export async function remindBrowserHandoff(deps: HandoffDeps, orgId: string, handoffId: string, now = new Date()) {
+  const [row] = await deps.db
+    .select()
+    .from(browserHandoffs)
+    .where(and(eq(browserHandoffs.id, handoffId), eq(browserHandoffs.orgId, orgId)));
+  if (row?.status !== "pending" || row.expiresAt <= now) return 0;
+  return remindBrowserHandoffNotifications(deps, orgId, handoffId);
 }
 
 /**

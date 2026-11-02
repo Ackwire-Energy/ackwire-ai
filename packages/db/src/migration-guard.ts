@@ -30,6 +30,13 @@ export class MigrationMismatchError extends Error {
  * always goes in a new migration.
  */
 export function checkMigrations(applied: AppliedMigration[], known: KnownMigration[]): string | null {
+  // Drizzle runs only migrations dated after the newest applied one: one dated earlier is skipped without a word.
+  for (let i = 1; i < known.length; i++) {
+    const [before, k] = [known[i - 1] as KnownMigration, known[i] as KnownMigration];
+    if (k.when <= before.when) {
+      return `Migration ${k.tag} is dated before ${before.tag} in the journal, so a database that has ${before.tag} would skip it. Regenerate it after the latest migration.`;
+    }
+  }
   if (applied.length > known.length) {
     return `The database has ${applied.length} migrations but this build knows ${known.length}: it was migrated by a newer version. Deploy that version (or newer) instead.`;
   }

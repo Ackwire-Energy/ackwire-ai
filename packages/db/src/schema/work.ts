@@ -227,6 +227,53 @@ export const routineRuns = pgTable(
 );
 
 /**
+ * A routine started by a webhook (ADR 0106): its own address, `<PUBLIC_URL>/api/hooks/<token>`. The token is an
+ * HMAC of `key_id` under a key derived from AGENTES_SECRET, so the address can be shown again while only its hash is
+ * stored; a new `key_id` (a new address) makes the old one unknown at once. The optional signing secret is sealed.
+ */
+export const routineHooks = pgTable("routine_hooks", {
+  routineId: uuid()
+    .primaryKey()
+    .references(() => routines.id, { onDelete: "cascade" }),
+  orgId: uuid().notNull(),
+  keyId: text().notNull(),
+  tokenHash: text().notNull().unique(),
+  secretCiphertext: text(),
+  secretWrappedKey: text(),
+  secretKekId: text(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * The calls a routine's address answered (the latest show on its page), with their idempotency keys: a call repeated
+ * within 24 hours answers with the first one's run and starts nothing.
+ */
+export const routineHookCalls = pgTable(
+  "routine_hook_calls",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    routineId: uuid()
+      .notNull()
+      .references(() => routines.id, { onDelete: "cascade" }),
+    /** `accepted`, `duplicate`, `bad_signature`, `too_large` or `rate_limited`. */
+    outcome: text().notNull(),
+    /** The HTTP status it got. */
+    status: integer().notNull(),
+    bytes: integer().notNull().default(0),
+    routineRunId: uuid(),
+    idempotencyKey: text(),
+    /** Sent from the routine's page ("Testar"). */
+    test: boolean().notNull().default(false),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.routineId, t.createdAt), index().on(t.routineId, t.idempotencyKey)],
+);
+
+/**
  * Incoming webhooks of an organization (GitHub, Sentry). The signing secret
  * is sealed; each request's signature is checked before anything runs.
  */

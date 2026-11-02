@@ -21,7 +21,7 @@ import {
   shuffleLook,
 } from "../../src/features/agents/edit";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, stepBlocked } from "../../src/features/agents/new-agent";
-import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES } from "../../src/features/shared/logic";
+import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, agentLook } from "../../src/features/shared/logic";
 import { translator } from "./fixtures";
 
 describe("an agent's look", () => {
@@ -33,6 +33,13 @@ describe("an agent's look", () => {
     });
     expect(fullLook({ color: "plaid", eyes: 3 })).toEqual({ color: "sky", eyes: "round", accessory: "none" });
     expect(fullLook(undefined)).toEqual({ color: "sky", eyes: "round", accessory: "none" });
+  });
+
+  test("a custom #rrggbb color is kept (lowercased); a malformed one falls back to sky", () => {
+    expect(fullLook({ color: "#AABBCC", eyes: "round" }).color).toBe("#aabbcc");
+    expect(agentLook({ appearance: { color: "#123abc", eyes: "dots" } }).color).toBe("#123abc");
+    expect(fullLook({ color: "#abc", eyes: "round" }).color).toBe("sky");
+    expect(agentLook({ appearance: { color: "#12345g" } }).color).toBe("sky");
   });
 
   test("Sortear always lands on a different look", () => {
@@ -74,17 +81,19 @@ describe("editing an agent", () => {
     instructions: "Responde clientes.",
     look: { color: "teal", eyes: "happy", accessory: "headset" },
     coordinator: false,
+    audience: { mode: "people", userIds: ["u-bia"], roleIds: [], consultable: true },
   };
 
   test("admins change everything, its person only the look, others nothing", () => {
     expect([...editableFields({ admin: true, owner: false })].sort()).toEqual([
+      "consultable",
       "coordinator",
       "instructions",
       "look",
       "name",
       "role",
     ]);
-    expect([...editableFields({ admin: false, owner: true })]).toEqual(["look"]);
+    expect([...editableFields({ admin: false, owner: true })]).toEqual(["look", "consultable"]);
     expect(editableFields({ admin: false, owner: false }).size).toBe(0);
   });
 
@@ -99,6 +108,14 @@ describe("editing an agent", () => {
     expect(agentChanges(saved, { ...saved, name: "Outra", instructions: "x" }, own)).toBeNull();
     // An emptied name is never sent.
     expect(agentChanges(saved, { ...saved, name: "  " }, all)).toBeNull();
+  });
+
+  test("other agents can consult it (ADR 0085 addendum): its person or an admin switches it, sent with its audience", () => {
+    const off = { ...saved, audience: { ...saved.audience, consultable: false } };
+    const sent = { audience: { mode: "people", userIds: ["u-bia"], roleIds: [], consultable: false } };
+    expect(agentChanges(saved, off, editableFields({ admin: false, owner: true }))).toEqual(sent);
+    expect(agentChanges(saved, off, editableFields({ admin: true, owner: false }))).toEqual(sent);
+    expect(agentChanges(saved, off, editableFields({ admin: false, owner: false }))).toBeNull();
   });
 
   test("who coordinates the team (ADR 0093): admins switch it, its person can't; the line says who does now", async () => {
@@ -127,7 +144,15 @@ describe("editing an agent", () => {
 });
 
 describe("renaming an agent on the phone", () => {
-  const saved: AgentDraft = { name: "Ada", handle: "ada", role: "Dev", instructions: "", look: fullLook(undefined) };
+  const saved: AgentDraft = {
+    name: "Ada",
+    handle: "ada",
+    role: "Dev",
+    instructions: "",
+    look: fullLook(undefined),
+    coordinator: false,
+    audience: { mode: "everyone", userIds: [], roleIds: [], consultable: true },
+  };
   const all = editableFields({ admin: true, owner: false });
 
   test("its @ follows the new name until one is typed in Menções; Salvar sends both", () => {
@@ -203,5 +228,15 @@ describe("creating an agent on the phone", () => {
     ];
     expect(presetChannels("dev", channels)).toEqual(["1"]);
     expect(presetChannels("assistant", channels)).toEqual(["2"]);
+  });
+
+  test("the custom color sheet: starts from the current color, applies it on done, keeps the drag from the scroll", async () => {
+    // The sheet is a component the tests can't render: what it wires in, as text.
+    const sheet = await Bun.file(new URL("../../src/features/agents/ColorSheet.tsx", import.meta.url).pathname).text();
+    expect(sheet).toContain("hexToHsv(pickerStart(value))");
+    expect(sheet).toContain("onResponderTerminationRequest: () => false");
+    expect(sheet).toMatch(/const done = \(\) => \{\s*onChange\(hex as `#\$\{string\}`\);\s*onClose\(\);/);
+    expect(sheet).toContain('label={t("look.useColor")} onPress={done}');
+    expect(sheet).toContain("onSubmitEditing={done}");
   });
 });

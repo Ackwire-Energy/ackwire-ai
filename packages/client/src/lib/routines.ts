@@ -1,3 +1,5 @@
+import type { Routine, RoutineHookOutcome } from "../api/types";
+
 /** A plain reminder the agent posted (`meta.reminder`): shown as the agent's message with a "Reminder" label. */
 export const isReminderMessage = (meta: Record<string, unknown> | undefined) => meta?.reminder === true;
 
@@ -41,6 +43,30 @@ export const isRoutineCall = (m: { author: { type: string }; meta?: Record<strin
   const r = m.meta?.routine as { id?: unknown } | undefined;
   return m.author.type === "person" && typeof r?.id === "string";
 };
+
+/** A webhook routine's address, for who may manage it (ADR 0106); null for any other routine or viewer. */
+export const routineHookUrl = (r: Pick<Routine, "trigger">) => (r.trigger.type === "webhook" ? r.trigger.url : null);
+
+/** A call its address refused (a wrong signature, too large, too many): nothing of it reached the routine. */
+export const isRefusedHookCall = (outcome: RoutineHookOutcome) =>
+  outcome === "bad_signature" || outcome === "too_large" || outcome === "rate_limited";
+
+/**
+ * A call to try a routine's address from a terminal. With `secret` (the signing secret, or a placeholder for it),
+ * the body is signed the way a sending service signs it: its HMAC-SHA256 in `X-Agentes-Signature`.
+ */
+export function hookCurl(url: string, secret: string | null) {
+  const body = `{"text":"hello"}`;
+  const post = (signature: string[], data: string) =>
+    [`curl -X POST '${url}' \\`, `  -H 'Content-Type: application/json' \\`, ...signature, `  -d ${data}`].join("\n");
+  if (secret === null) return post([], `'${body}'`);
+  return [
+    `SECRET='${secret}'`,
+    `BODY='${body}'`,
+    `SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')`,
+    post([`  -H "X-Agentes-Signature: sha256=$SIG" \\`], '"$BODY"'),
+  ].join("\n");
+}
 
 /** Zones people pick most often; the select also keeps whatever zone a routine already has. */
 export const COMMON_TIMEZONES = [

@@ -12,6 +12,7 @@ import {
   type NotificationSource,
   notificationSnippet,
   notify,
+  remindNotifications,
   resolveNotifications,
   retargetNotifications,
 } from "./notifications";
@@ -753,7 +754,7 @@ export async function notifyRoutineFailed(
 }
 
 /**
- * A routine set to act couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
+ * A routine couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
  * ask_agent, `consultations.ts`): the agent's owner hears it once per routine and agent, or who manages agents when
  * it has none. It opens the agent's page (who talks to it), the place they may not otherwise reach being private;
  * `source.userId` is the routine's creator, whom its one-click action lets talk to the agent.
@@ -1023,6 +1024,35 @@ export async function notifyMachineConnected(
   });
 }
 
+/** The share of a computer's workspace disk in use past which its admins hear it (ADR 0115). */
+export const DISK_WARN_USE = 0.85;
+/** Under this share the warning is armed again, so a disk hovering at the line doesn't notify on every report. */
+export const DISK_REARM_USE = 0.8;
+
+/**
+ * A computer's disk passed `DISK_WARN_USE` (ADR 0115): who configures the workspace hears it, once each time it
+ * crosses (the caller compares with the last report), since agents filling the shared folder fail together.
+ */
+export async function notifyComputerDiskFull(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string },
+  disk: { diskUse: number; diskFreeGb?: number },
+  at: Date,
+) {
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: await adminsOf(deps, machine.orgId, "configure"),
+    kind: "computer_disk_full",
+    groupKey: `computer_disk_full:${machine.id}:${at.getTime()}`,
+    source: { machineId: machine.id, label: machine.name },
+    latest: {
+      title: machine.name,
+      diskUse: disk.diskUse,
+      ...(disk.diskFreeGb === undefined ? {} : { diskFreeGb: disk.diskFreeGb }),
+    },
+  });
+}
+
 /**
  * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
  * from seconds to an approval hours later. One row each time it gets ready.
@@ -1041,6 +1071,46 @@ export async function notifyComputerReady(
     latest: { title: machine.name },
   });
 }
+
+/**
+ * The workspace used its Composio calls for the month (ADR 0107 §7): who manages its connectors hears it once that
+ * month (the caller marks the month capped first).
+ */
+export async function notifyComposioLimit(deps: NotificationDeps, orgId: string, month: string, calls: number) {
+  await notify(deps, {
+    orgId,
+    userIds: await adminsOf(deps, orgId, "manage_connectors"),
+    kind: "composio_limit",
+    groupKey: `composio_limit:${month}`,
+    source: {},
+    latest: { title: month, calls },
+  });
+}
+
+const toolChangedGroup = (connectionId: string) => `connector_tool_changed:${connectionId}:`;
+
+/**
+ * A connected MCP server changed tools an admin approved (ADR 0117): who manages connectors hears it once per change,
+ * `source.label` the connection's name and `latest.title` the tools. Resolved when nothing of it waits any more.
+ */
+export async function notifyToolChanged(
+  deps: NotificationDeps,
+  connection: { id: string; orgId: string; label: string },
+  tools: { name: string; fingerprint: string }[],
+) {
+  await notify(deps, {
+    orgId: connection.orgId,
+    userIds: await adminsOf(deps, connection.orgId, "manage_connectors"),
+    kind: "connector_tool_changed",
+    groupKey: `${toolChangedGroup(connection.id)}${tools[0]?.fingerprint ?? ""}`,
+    waiting: true,
+    source: { label: connection.label },
+    latest: { title: tools.map((t) => t.name).join(", ") },
+  });
+}
+
+export const resolveToolChanged = (deps: NotificationDeps, orgId: string, connectionId: string) =>
+  resolveNotifications(deps, orgId, { groupKeyPrefix: toolChangedGroup(connectionId) });
 
 // ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
 
@@ -1129,25 +1199,36 @@ export async function notifyBrowserHandoff(
     .select({ kind: channels.kind, name: channels.name })
     .from(channels)
     .where(eq(channels.id, where.channelId));
-  await notify(deps, {
+  const handoff = { handoffId: h.id, agentId: h.agentId, ...(h.screen !== "browser" ? { screen: h.screen } : {}) };
+  const base = {
     orgId: h.orgId,
-    userIds,
     kind: "browser_handoff",
     groupKey: `browser_handoff:${h.id}`,
     waiting: true,
     actor: agent(h.agentId),
+    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
+  } as const;
+  const members = await inChannel(deps, where.channelId, userIds);
+  await notify(deps, {
+    ...base,
+    userIds: members,
     source: {
       channelId: where.channelId,
       ...(where.threadId ? { threadId: where.threadId } : {}),
       messageId: h.id,
       ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
-      handoffId: h.id,
-      ...(h.screen !== "browser" ? { screen: h.screen } : {}),
+      ...handoff,
     },
-    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });
+  // Who can't open the card's conversation gets no link to it: the request opens on the agent's computer.
+  const others = userIds.filter((id) => !members.includes(id));
+  if (others.length > 0) await notify(deps, { ...base, userIds: others, source: handoff });
 }
+
+/** Still unanswered an hour later: back on top, unread, and pushed once more saying the agent still needs them. */
+export const remindBrowserHandoffNotifications = (deps: NotificationDeps, orgId: string, handoffId: string) =>
+  remindNotifications(deps, orgId, `browser_handoff:${handoffId}`, { reminder: true }, "reminder");
 
 /** Done, couldn't, canceled or expired: out of everyone's inbox. */
 export async function resolveBrowserHandoffNotifications(deps: NotificationDeps, orgId: string, handoffId: string) {

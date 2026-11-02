@@ -2,11 +2,13 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, count, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, shareArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
+import { answersAgentsOnly } from "./consultations";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
+import { runReadOutsideById } from "./outside";
 import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { personCanPost } from "./routine-state";
@@ -25,6 +27,10 @@ const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
 });
+
+/** A run consulted for someone outside its agent's audience answers the agent that asked, nowhere else. */
+const AGENTS_ONLY =
+  "You were consulted by another agent for someone who doesn't talk to you directly: answer that agent with what you found (it passes it on), never them or anyone else from here.";
 
 /** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
@@ -99,8 +105,9 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       }),
       async execute(input, ctx) {
         try {
+          if (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId)) return { content: AGENTS_ONLY, isError: true };
           const requester = await personBehindCall(ctx);
-          // A routine set to act posts where its creator can post, as itself: never with their files.
+          // A routine posts where its creator can post, as itself: never with their files.
           const routine = requester ? null : await actingRoutineOfCall(ctx);
           const creator = routine?.creatorUserId ?? null;
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
@@ -182,6 +189,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             meta: {
               ...(files.length > 0 ? { artifacts: files } : {}),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+              ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
           });
           await recordAudit(ctx.db, {
@@ -231,8 +239,9 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       }),
       async execute(input, ctx) {
         try {
+          if (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId)) return { content: AGENTS_ONLY, isError: true };
           const requester = await personBehindCall(ctx);
-          // A routine set to act writes in its creator's DM with the agent, and no one else's.
+          // A routine writes in its creator's DM with the agent, and no one else's.
           const routine = requester ? null : await actingRoutineOfCall(ctx);
           const creator = routine?.creatorUserId ?? null;
           if (!requester && !creator) return { content: "Only a person's request can send a DM.", isError: true };
@@ -286,6 +295,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             meta: {
               agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId },
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+              ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
           });
           await enqueue(ctx.db, {

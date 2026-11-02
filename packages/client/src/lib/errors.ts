@@ -1,5 +1,5 @@
-import type { TFunction } from "i18next";
-import { ApiError } from "../api/http";
+import i18next, { type TFunction } from "i18next";
+import { ApiError, NetworkError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
 import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
@@ -91,10 +91,14 @@ const KNOWN = {
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.act_take_over": "errors.routine.actTakeOver",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
+  "routine.webhook_paused": "errors.routine.webhookPaused",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
   "wiki.no_access": "errors.wiki.noAccess",
   "wiki.audience_forbidden": "errors.wiki.audienceForbidden",
   "wiki.audience_excludes_you": "errors.wiki.audienceExcludesYou",
+  "wiki.audience_wider_than_folder": "errors.wiki.audienceWiderThanFolder",
+  "wiki.edit_limited": "errors.wiki.editLimited",
+  "wiki.editors_exclude_you": "errors.wiki.editorsExcludeYou",
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
   "role.too_many": "errors.role.tooMany",
@@ -103,6 +107,14 @@ const KNOWN = {
   "role.base": "errors.role.base",
   "role.unknown": "errors.role.unknown",
   "role.order_incomplete": "errors.role.orderIncomplete",
+  "connector.label_taken": "errors.connector.labelTaken",
+  "connector.label_invalid": "errors.connector.labelInvalid",
+  "connector.other_account": "errors.connector.otherAccount",
+  "connector.account_unknown": "errors.connector.accountUnknown",
+  "connector.other_server": "errors.connector.otherServer",
+  "connector.gone": "errors.connector.gone",
+  "connector.unfinished": "errors.connector.unfinished",
+  "connector.unavailable": "errors.connector.unavailable",
   // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
   "org.create_unpaid": "standing.createInactive",
   "machine.managed": "computerSetup.managedNotRemovable",
@@ -152,12 +164,20 @@ const KNOWN = {
   "github.ref_missing": "errors.github.refMissing",
   // `count`: minutes until GitHub stops limiting the server.
   "github.limited": "errors.github.limited",
+  "github.unreachable": "errors.github.unreachable",
   "skill.no_skill_md": "errors.skill.noSkillMd",
   "skill.too_many_skills": "errors.skill.tooManySkills",
   "skill.invalid_name": "errors.skill.invalidName",
   "skill.invalid_description": "errors.skill.invalidDescription",
   "skill.too_large": "errors.skill.tooLarge",
   "skill.too_many_files": "errors.skill.tooManyFiles",
+  "skill.connection_gone": "errors.skill.connectionGone",
+  "handle.invalid": "errors.handle.invalid",
+  "handle.taken": "errors.handle.taken",
+  "handle.taken_by_agent": "errors.handle.takenByAgent",
+  slug_taken: "errors.wiki.titleTaken",
+  "wiki.title_characters": "errors.wiki.titleCharacters",
+  "wiki.title_empty_slug": "errors.wiki.titleNoLetters",
   // GIFs and stickers (ADR 0091): off in the workspace (or no GIF search on this server), a GIF gone, or the GIF
   // search not answering.
   "message.media_off": "errors.media.off",
@@ -295,9 +315,10 @@ export const errorCode = (error: unknown) => (error instanceof ApiError ? error.
 
 /**
  * What the proxy in front answers while the server restarts, is down or too slow: Caddy's 502, 503 and 504, and
- * Cloudflare's 520 to 524. The server's own errors carry a code of theirs (its 502 for a computer's error does).
+ * Cloudflare's 520 to 527 and 530 (as apps/web/public/unavailable.html reads them). The server's own errors carry a
+ * code of theirs (its 503 for a computer's error does).
  */
-const UNREACHABLE = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
+const UNREACHABLE = new Set([502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530]);
 
 /** No answer from the server itself, only from the proxy in front of it: it may be back in a moment. */
 export const serverUnreachable = (error: unknown) =>
@@ -309,6 +330,9 @@ export const serverUnreachable = (error: unknown) =>
  * bug, fails it.
  */
 export const sendWaits = (error: unknown) => error instanceof TypeError || serverUnreachable(error);
+
+/** No answer from the server: none at all (`NetworkError`), or only the proxy's while it restarts or is down. */
+export const noAnswer = (error: unknown) => error instanceof NetworkError || serverUnreachable(error);
 
 /**
  * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
@@ -324,7 +348,8 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
   if (error.code === "mail.owner_only" && !error.params?.ownerName)
     return t("errors.mail.ownerOnlyUnknown", error.params);
-  const key = KNOWN[error.code as keyof typeof KNOWN];
+  // Own keys only: a code from an address (`/login?error=toString`) names no line of Object's.
+  const key = Object.hasOwn(KNOWN, error.code) ? KNOWN[error.code as keyof typeof KNOWN] : undefined;
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
 }
@@ -337,18 +362,70 @@ export const invitedErrorText = (t: TFunction, error: unknown, locale?: string):
   errorCode(error) === "org.members_full" ? t("errors.org.membersFull") : knownErrorText(t, error, locale);
 
 /**
+ * The device says it has no network: a browser's `navigator.onLine`. React Native has none, so the phone says the
+ * server is out of reach instead.
+ */
+const deviceOffline = () => (globalThis as { navigator?: { onLine?: boolean } }).navigator?.onLine === false;
+
+/** No answer at all, in the person's words: offline, or the server out of reach. */
+const noAnswerText = (t: TFunction) => t(deviceOffline() ? "common.offline" : "common.unreachable");
+
+/**
+ * The words of a refusal the app doesn't translate: the server's own only for English readers and a 4xx, which the
+ * server writes for people (a 5xx's are for the log). The language: `locale`, else `useTranslation`'s `t` (its
+ * `lng`), else the app's i18next instance.
+ */
+function untranslatedText(t: TFunction, error: ApiError, locale?: string): string {
+  const language = locale ?? (t as { lng?: unknown }).lng ?? i18next.language;
+  const english = typeof language === "string" && language.startsWith("en");
+  return english && error.status < 500 && error.message ? error.message : t("common.unknownError");
+}
+
+/**
  * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
- * in the person's words: too many tries, a blocked account and the bot check by their codes, else its own message.
+ * in the person's words: too many tries, a blocked account and the bot check by their codes, no answer (status 0, or
+ * only the proxy's), else `untranslatedText`.
  */
 export function authErrorText(
   t: TFunction,
   refusal: { status: number; code?: string; message: string } & RestrictionFacts,
 ): string {
   if (refusal.status === 429) return t("auth.tooManyTries");
+  if (refusal.status === 0) return noAnswerText(t);
   const { kind, cloud } = refusal;
-  const known = knownErrorText(t, new ApiError(refusal.status, refusal.code ?? "", refusal.message, { kind, cloud }));
-  return known ?? (refusal.message || t("common.unknownError"));
+  const error = new ApiError(refusal.status, refusal.code ?? `http_${refusal.status}`, refusal.message, {
+    kind,
+    cloud,
+  });
+  return knownErrorText(t, error) ?? (noAnswer(error) ? noAnswerText(t) : untranslatedText(t, error));
 }
+
+type ProviderRefusal = "cancelled" | "linked" | "noEmail" | "expired" | "server" | "other";
+
+/** Better Auth's codes for a provider sign-in that didn't finish (`/login?error=`), by what the person can do. */
+const PROVIDER_REFUSALS: Record<string, ProviderRefusal> = {
+  access_denied: "cancelled",
+  account_not_linked: "linked",
+  unable_to_link_account: "linked",
+  account_already_linked_to_different_user: "linked",
+  email_does_not_match: "linked",
+  email_not_found: "noEmail",
+  email_not_verified: "noEmail",
+  state_mismatch: "expired",
+  state_not_found: "expired",
+  invalid_code: "expired",
+  no_code: "expired",
+  please_restart_the_process: "expired",
+  invalid_callback_request: "expired",
+  nonce_binding_missing: "expired",
+  issuer_mismatch: "expired",
+  issuer_missing: "expired",
+  server_error: "server",
+  internal_server_error: "server",
+  unable_to_get_user_info: "server",
+  oauth_provider_not_found: "server",
+  no_callback_url: "server",
+};
 
 /**
  * A provider sign-in the server refused (its code on `/login?error=`), in the person's words, or null for a code the
@@ -360,7 +437,45 @@ export function providerRefusalText(t: TFunction, code: string, emails: boolean)
   return knownErrorText(t, new ApiError(403, code, ""));
 }
 
-/** Translated text for a failed request. */
+/** A provider sign-in that didn't finish: a code the apps know, else Better Auth's by what the person can do. */
+export function signInRefusalText(t: TFunction, code: string, emails: boolean): string {
+  const known = providerRefusalText(t, code, emails);
+  if (known) return known;
+  const refusal: ProviderRefusal = (Object.hasOwn(PROVIDER_REFUSALS, code) && PROVIDER_REFUSALS[code]) || "other";
+  return t(`auth.refused.${refusal}`);
+}
+
+/**
+ * Why a provider's return didn't connect: the code the server's callback sends back (`?connector_error=`,
+ * `?github_app_error=`), or the API's own code when the app finished it (the desktop app's window).
+ */
+const OAUTH_RETURNS = {
+  cancelled: "oauthReturn.cancelled",
+  expired: "oauthReturn.expired",
+  "oauth.link_expired": "oauthReturn.expired",
+  used: "oauthReturn.used",
+  "oauth.link_used": "oauthReturn.used",
+  other_account: "oauthReturn.otherAccount",
+  "oauth.other_account": "oauthReturn.otherAccount",
+  not_allowed: "common.notAllowed",
+  forbidden: "common.notAllowed",
+  not_visible: "githubApp.notVisible",
+  "github_app.not_visible": "githubApp.notVisible",
+  requested: "githubApp.requested",
+} as const;
+
+/** A provider's return that didn't connect, by its code, in the person's words (any other code: it failed). */
+export const oauthReturnText = (t: TFunction, code: string): string => {
+  if (Object.hasOwn(OAUTH_RETURNS, code)) return t(OAUTH_RETURNS[code as keyof typeof OAUTH_RETURNS]);
+  // A connector account's own refusal comes as its full code (`connector.other_account`).
+  if (code.startsWith("connector.") && Object.hasOwn(KNOWN, code)) return t(KNOWN[code as keyof typeof KNOWN]);
+  return t("oauthReturn.failed");
+};
+
+/**
+ * A failed request in the person's words: a code the app knows, a file too big, a refusal, no answer (offline or the
+ * server out of reach), else `untranslatedText`. Never a raw error's own words ("Failed to fetch", "Bad Gateway").
+ */
 export function errorText(t: TFunction, error: unknown, locale?: string): string {
   if (error instanceof ApiError) {
     const known = knownErrorText(t, error, locale);
@@ -368,5 +483,6 @@ export function errorText(t: TFunction, error: unknown, locale?: string): string
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");
   }
-  return error instanceof Error && error.message ? error.message : t("common.unknownError");
+  if (noAnswer(error)) return noAnswerText(t);
+  return error instanceof ApiError ? untranslatedText(t, error, locale) : t("common.unknownError");
 }

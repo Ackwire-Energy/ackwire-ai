@@ -21,6 +21,7 @@ import {
   memberPresence,
   memberStatus,
   mySidebarItems,
+  mySidebarOrder,
   orgOverview,
   pickerModels,
   queueInvitationEmail,
@@ -30,16 +31,21 @@ import {
   runErrorDetail,
   SIDEBAR_ITEMS,
   SIDEBAR_PLACES,
+  SIDEBAR_SECTIONS,
   type SidebarItem,
+  START_PAGES,
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
   setAgentChannels,
   setInvitationRoles,
   setMySidebarItem,
   setMySidebarItems,
+  setMySidebarOrder,
   setMyStatus,
+  setShowActivity,
+  setStartPage,
   sidebarPlaceAllowed,
-  talksToAgents,
+  speakerFor,
   updateMyProfile,
   updateOrgSettings,
   usageReport,
@@ -47,7 +53,7 @@ import {
 import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role } from "./schemas";
+import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role, StartChoice } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -483,6 +489,51 @@ export function managementRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/start",
+      tags: ["Members"],
+      security,
+      summary: "Choose what opens when the app starts in this organization",
+      description:
+        "Yours, on every device (ADR 0108): `home` (Início, Conversas on the phone), `last` (where you were, which each device keeps) or `channel` (`channelId`, one of this organization's channels you are in, not archived: else 400 `start.channel_unknown`). `GET /me` sends it with each organization (`start`).",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            page: z.enum(START_PAGES),
+            channelId: z.uuid().nullable().optional().openapi({ description: "With `channel`; ignored otherwise." }),
+          }),
+        ),
+      },
+      responses: { 200: json(StartChoice), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await setStartPage(db, c.get("user").id, orgId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/activity",
+      tags: ["Members"],
+      security,
+      summary: "Show or hide what agents did under each reply in this organization",
+      description:
+        'Yours, on every device, off by default: on, each agent reply shows its tools ("Used 4 tools"); off, only the live step line while it works and the cards that carry content or wait for a person. `GET /me` sends it with each organization (`showActivity`).',
+      request: { params: OrgParams, body: body(z.object({ show: z.boolean() })) },
+      responses: { 200: json(z.object({ show: z.boolean() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const show = await setShowActivity(db, c.get("user").id, orgId, c.req.valid("json").show);
+      return c.json({ show }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "get",
       path: "/organizations/{orgId}/me/sidebar",
       tags: ["Members"],
@@ -541,6 +592,48 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json({ items: await setMySidebarItems(db, orgId, c.get("user").id, c.req.valid("json").items) }, 200);
+    },
+  );
+
+  const SidebarOrder = z
+    .array(z.enum(SIDEBAR_SECTIONS))
+    .length(SIDEBAR_SECTIONS.length)
+    .refine((order) => new Set(order).size === order.length, { message: "Each section once" })
+    .openapi("SidebarOrder", {
+      description:
+        "The sidebar's sections in your order: `tools` (the tools on top), `channels`, `agents`, `people` (direct messages).",
+    });
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/sidebar/order",
+      tags: ["Members"],
+      security,
+      summary: "The order of the sections in your sidebar in this workspace",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ order: SidebarOrder })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ order: await mySidebarOrder(db, orgId, c.get("user").id) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/sidebar/order",
+      tags: ["Members"],
+      security,
+      summary: "Order the sections of your sidebar in this workspace",
+      description: "Yours alone, on every device. `order: null` goes back to the default; the tools' places stay.",
+      request: { params: OrgParams, body: body(z.object({ order: SidebarOrder.nullable() })) },
+      responses: { 200: json(z.object({ order: SidebarOrder })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ order: await setMySidebarOrder(db, orgId, c.get("user").id, c.req.valid("json").order) }, 200);
     },
   );
 
@@ -921,7 +1014,7 @@ export function managementRoutes(deps: AppDeps) {
           pendingApprovals: d.pendingApprovals,
           audience: audienceOf(d.agent),
           audienceMode: d.agent.audienceMode,
-          canTalk: canTalkTo(d.agent, c.get("user").id, await talksToAgents(db, orgId, c.get("user").id)),
+          canTalk: canTalkTo(d.agent, c.get("user").id, await speakerFor(db, orgId, c.get("user").id)),
           appearance: v.appearance,
           mediaReplies: v.mediaReplies,
           channels: d.channels,

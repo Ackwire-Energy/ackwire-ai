@@ -16,10 +16,12 @@ import {
   useWaiting,
 } from "@agenteschat/client";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
+import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
+import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
@@ -27,7 +29,7 @@ import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notice
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { voiceOf } from "@agenteschat/client/lib/voice";
-import { splitCanceled } from "@agenteschat/client/lib/work";
+import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { memo, useEffect, useState } from "react";
@@ -45,8 +47,8 @@ import { MessageFiles } from "../files/MessageFiles";
 import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
-import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
+import { AgentFace, Face, withAgentFaces } from "../shared/Face";
+import { useColors, useDirectory, useMeId, useMyHandle, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { VoiceMessage } from "../voice/VoiceMessage";
@@ -61,6 +63,7 @@ import {
   approvalIdOf,
   artifactsOf,
   consultationsOf,
+  hangsUnder,
   hidesBody,
   mayStopRun,
   missionCardRef,
@@ -104,9 +107,17 @@ export const MessageRow = memo(function MessageRow({
   receipt,
   seenBy,
   readOnly = false,
+  run: runAt = "solo",
+  above,
+  aboveThread = false,
 }: {
   message: Message;
   grouped: boolean;
+  /** My own row's place in a run of my rows (`runPosition`): the corners it shares square off, the time ends it. */
+  run?: RunPosition;
+  /** The message it groups under, and whether that one shows its thread's link: what hangs under it ends the run. */
+  above?: Message;
+  aboveThread?: boolean;
   meId: string | null;
   /** Its thread, when it is the root of one the conversation shows as a link. */
   thread?: ThreadInfo;
@@ -138,6 +149,7 @@ export const MessageRow = memo(function MessageRow({
   const [reportOpen, setReportOpen] = useState(false);
   const qc = useQueryClient();
   const orgId = useOrgId();
+  const { org } = useOrg();
   const report = routine?.noticeId
     ? routineReportText(
         [
@@ -188,8 +200,7 @@ export const MessageRow = memo(function MessageRow({
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
-  const opened =
-    kept && m.agentRunId ? turnOpener({ runId: m.agentRunId, status: "running", text: "" }, kept.items) : null;
+  const opened = kept ? turnOpener(kept.items, body) : null;
   const approvalId = approvalIdOf(meta);
   const review = missionCardRef(meta, "missionReview");
   const decision = missionCardRef(meta, "missionDecision");
@@ -198,6 +209,13 @@ export const MessageRow = memo(function MessageRow({
   const setup = missionSetupOf(meta);
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
+  const aboveReactions = useReactions(orgId, above?.id ?? "", false).data;
+  const ownReactions = useReactions(orgId, m.id, false).data;
+  const run = runAround(
+    runAt,
+    above ? hangsUnder(above, aboveThread, aboveReactions, meId) : false,
+    hangsUnder(m, Boolean(thread), ownReactions, meId),
+  );
   const question = isAgent ? questionOf(meta) : null;
   // An agent asks a person for a secret for its computer (ADR 0027).
   const secret = isAgent ? secretRequestOf(meta) : null;
@@ -205,8 +223,9 @@ export const MessageRow = memo(function MessageRow({
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
   // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
+  // Step summaries, no picture: activity, so the person's setting hides them like the tool block.
   const trails =
-    isAgent && m.author.id && !m.local
+    isAgent && m.author.id && !m.local && showsActivity(org)
       ? {
           browser: browserTrailOf(meta),
           desktop: desktopTrailOf(meta),
@@ -224,6 +243,8 @@ export const MessageRow = memo(function MessageRow({
   const issueWork = issueWorkOf(meta);
   // My own message: a light bubble on the right, no face or name.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
+  const myHandle = useMyHandle();
+  const mentionsMe = !mine && !!myHandle && mentionsHandle(body, myHandle);
 
   // The cards it carries: above an agent's tools, which come last.
   const cards = (
@@ -279,7 +300,7 @@ export const MessageRow = memo(function MessageRow({
         <VoiceMessage message={m} />
       </View>
     ) : body ? (
-      <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
+      <View style={[styles.bubble, BUBBLE_RUN[run], styles.lead, { backgroundColor: c.bubble }]}>
         <MessageText
           body={body}
           muted={m.local === "pending"}
@@ -302,7 +323,12 @@ export const MessageRow = memo(function MessageRow({
         onLongPress={press}
         delayLongPress={380}
         accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
-        style={({ pressed }) => [styles.me, grouped && styles.meCont, pressed && press && styles.mePressed]}
+        style={({ pressed }) => [
+          styles.me,
+          grouped && styles.meCont,
+          (run === "start" || run === "mid") && styles.meRunOn,
+          pressed && press && styles.mePressed,
+        ]}
       >
         {m.pinned ? (
           <View style={[styles.pinLine, styles.meEnd]}>
@@ -335,6 +361,12 @@ export const MessageRow = memo(function MessageRow({
           {missionDecision}
           {foot}
         </View>
+        {/* One time per run of my rows (they group a few minutes apart), under its last; a send in flight says so. */}
+        {!m.local && (run === "end" || run === "solo") ? (
+          <Text variant="caption" tone="faint" style={styles.meTime}>
+            {when.time(m.createdAt)}
+          </Text>
+        ) : null}
       </Pressable>
     );
   }
@@ -344,7 +376,12 @@ export const MessageRow = memo(function MessageRow({
       onLongPress={press}
       delayLongPress={380}
       accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
-      style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && press && { backgroundColor: c.sunken }]}
+      style={({ pressed }) => [
+        styles.msg,
+        grouped && styles.cont,
+        mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
+        pressed && press && { backgroundColor: c.sunken },
+      ]}
     >
       <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
       <View style={styles.body}>
@@ -677,7 +714,11 @@ function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultat
   return (
     <>
       <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
-        {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+        {withAgentFaces(
+          t("chat.consultPanel.helping", { name: from.name, article: from.article }),
+          [{ name: from.name, agentId: c.agentId }],
+          12,
+        )}
       </Text>
       <Pressable
         onPress={() => router.push(consultationHref(c.id, channelId))}
@@ -761,6 +802,14 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   );
 }
 
+/** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
+const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
+  solo: {},
+  start: { borderBottomRightRadius: 6 },
+  mid: { borderTopRightRadius: 6, borderBottomRightRadius: 6 },
+  end: { borderTopRightRadius: 6 },
+};
+
 const styles = StyleSheet.create({
   // Readable turns: more room between turns, a quieter name and time.
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
@@ -775,17 +824,17 @@ const styles = StyleSheet.create({
   whoMark: { position: "absolute", top: 0, right: 0, height: 19, justifyContent: "center" },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
-  meCont: { paddingTop: 2, marginTop: 0 },
+  meCont: { paddingTop: 1, marginTop: 0 },
+  // A run of my rows sits 2px apart (1 under this one, 1 over the next).
+  meRunOn: { paddingBottom: 1 },
+  meTime: { marginTop: 4, textAlign: "right" },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
     maxWidth: "100%",
     paddingVertical: 10,
     paddingHorizontal: 15,
-    borderTopLeftRadius: 21,
-    borderTopRightRadius: 21,
-    borderBottomLeftRadius: 21,
-    borderBottomRightRadius: 6,
+    borderRadius: 18,
   },
   // My row keeps 64px free on the left, 48 of them past the screen's 16px edge: the receipt's mark stands there, on
   // the bubble's last line (10px under the text, 24px lines), so it never adds a line.

@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   ConflictError,
   completeComposioConnect,
+  composioToolkitUrl,
   createImapAccount,
   createOrganization,
   ForbiddenError,
@@ -24,6 +25,9 @@ import { addMember } from "./fixtures";
 import { giveMail, gmailAccount, imapAccount, type MailFixture, mailSetup, PUBLIC_URL } from "./mail-fixtures";
 
 let m: MailFixture;
+/** Connected accounts Composio made, as counted for its bill. */
+const connections = async () =>
+  (await m.f.db.select().from(schema.composioUsageDays)).map((r) => [r.orgId, r.toolkit, r.action, r.connections]);
 afterEach(async () => {
   await m?.f.close();
   m = undefined as never;
@@ -201,6 +205,7 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
   expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: false });
   expect(reads).toBeGreaterThan(1);
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({ status: "pending", address: "" });
+  expect(await connections()).toEqual([]);
   composio.activate("ca_1", "Team@Example.com");
   expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({
@@ -209,6 +214,7 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
     status: "active",
     address: "team@example.com",
   });
+  expect(await connections()).toEqual([[f.org.id, "gmail", "connection", 1]]);
   // Once connected, the callback no longer calls Composio.
   const before = reads;
   expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
@@ -227,6 +233,8 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
   if (remote) remote.status = "failed";
   expect(await completeComposioConnect(deps, second.accountId)).toEqual({ orgId: f.org.id, ok: false });
   expect(await listMailAccounts(f.db, f.owner.id, f.org.id)).toHaveLength(1);
+  // The callback read again and the connection that failed: still the one connection.
+  expect(await connections()).toEqual([[f.org.id, "gmail", "connection", 1]]);
 });
 
 test("the Composio callback reads again past an error that passes; a lasting one or a refusal is thrown", async () => {
@@ -317,6 +325,8 @@ test("Reconectar on a Gmail that needs it: the new sign-in takes the mailbox's p
   // Composio forgets the refused account and the other mailbox's, and nothing is revoked at Google.
   expect(composio.state.deletedAccounts).toEqual([gmail.connectedAccountId, other.link?.connectedAccountId ?? ""]);
   expect(composio.state.revokedAccounts).toEqual([]);
+  // Each sign-in Composio connected is billed: the first, the other mailbox's and the one that came back.
+  expect(await connections()).toEqual([[f.org.id, "gmail", "connection", 3]]);
 
   // Only a mailbox that needs it reconnects this way.
   await expect(
@@ -377,6 +387,46 @@ test("disconnecting a mailbox another workspace also connected leaves their shar
   await revokeMailAccount(deps, f.owner.id, f.org.id, gmail.accountId);
   expect(composio.state.deletedAccounts).toEqual([gmail.connectedAccountId]);
   expect(composio.state.grantsKept).toEqual([gmail.connectedAccountId]);
+});
+
+test("a connector on the mailbox's Google account, or one that can't name its account, keeps the grant they share", async () => {
+  m = await mailSetup();
+  const { f, deps, composio } = m;
+  const connector = async (toolkit: string, toolPrefix: string, accountId: string | null) => {
+    const id = crypto.randomUUID();
+    await f.db.insert(schema.connectorConnections).values({
+      id,
+      orgId: f.org.id,
+      connector: `custom:${id}`,
+      label: toolPrefix,
+      toolPrefix,
+      serverUrl: composioToolkitUrl(toolkit),
+      authType: "oauth",
+      composioAccountId: `ca_${toolPrefix}`,
+      accountId,
+    });
+    return id;
+  };
+  const disconnected = async () => {
+    const gmail = await gmailAccount(m);
+    await revokeMailAccount(deps, f.owner.id, f.org.id, gmail.accountId);
+    return gmail.connectedAccountId;
+  };
+  // Another Google account's Drive has a grant of its own.
+  await connector("googledrive", "google_drive", "bob@example.com");
+  const first = await disconnected();
+  expect(composio.state.revokedAccounts).toEqual([first]);
+  const drive = await connector("googledrive", "google_drive_2", "Team@Example.com");
+  const second = await disconnected();
+  expect(composio.state.grantsKept).toEqual([second]);
+  await f.db
+    .update(schema.connectorConnections)
+    .set({ revokedAt: new Date() })
+    .where(eq(schema.connectorConnections.id, drive));
+  await connector("googlecalendar", "google_calendar", null);
+  const third = await disconnected();
+  expect(composio.state.grantsKept).toEqual([second, third]);
+  expect(composio.state.revokedAccounts).toEqual([first]);
 });
 
 test("agent policies are normalised; sending without asking needs allowed recipients", async () => {

@@ -20,7 +20,7 @@ import type { TFunction } from "i18next";
  * What the card shows: waiting for someone, me in control, someone else helping, or how it ended. On the agent's
  * desktop the same states open its computer's view (ADR 0098).
  */
-export type CardState = "waiting" | "mine" | "helping" | "done" | "failed" | "expired" | "cancelled";
+export type CardState = "waiting" | "mine" | "helping" | "done" | "failed" | "expired" | "cancelled" | "withdrawn";
 
 export function cardStateOf(h: Pick<BrowserHandoff, "status" | "controllerUserId">, meId: string | null): CardState {
   if (h.status === "pending") return "waiting";

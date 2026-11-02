@@ -37,9 +37,18 @@ describe("web app serving", () => {
   test("hashed assets open from disk; index.html is always revalidated", async () => {
     const asset = await app.request("/assets/app.js");
     expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
-    for (const path of ["/", "/org/abc/c/def", "/assets/missing.js"]) {
+    for (const path of ["/", "/org/abc/c/def"]) {
       const res = await app.request(path);
       expect(res.headers.get("cache-control")).toBe("no-cache");
+    }
+  });
+
+  test("a build file that isn't there is a 404 nobody keeps, never index.html", async () => {
+    for (const path of ["/assets/missing.js", "/assets/index-old.css"]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(await res.text()).not.toContain('<div id="root">');
     }
   });
 
@@ -72,6 +81,14 @@ describe("web app serving", () => {
       expect(res.headers.get("x-frame-options")).toBe("DENY");
       expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
     }
+  });
+
+  test("a frame on our pages can't navigate to another site", async () => {
+    const policy = (await app.request("/")).headers.get("content-security-policy") ?? "";
+    const frames = policy.split(";").find((d) => d.trim().startsWith("frame-src")) ?? "";
+    expect(frames).toContain("blob:");
+    expect(frames).not.toContain("*");
+    expect(frames).not.toContain("https: ");
   });
 
   test("the runner bundle: JavaScript, revalidated, and never index.html when missing", async () => {

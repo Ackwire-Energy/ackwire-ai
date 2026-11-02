@@ -12,7 +12,10 @@
  * (notifications, approvals), but the run never acts as them.
  */
 
-/** What a routine may do while nobody watches. `read`: look and report. `act`: also change things. */
+/**
+ * What a routine may do while nobody watches: always `act`, the agent's own permissions (ADR 0109). `read`
+ * (look and report) is only an old stored value, read as `act`; the column stays for now.
+ */
 export type RoutineAccess = "read" | "act";
 /** When a routine speaks: `when_new` (its agent judges what is news) or `always` (a report every run). */
 export type RoutineReport = "always" | "when_new";
@@ -20,8 +23,8 @@ export type RoutineReport = "always" | "when_new";
 export const ROUTINE_ACCESS: readonly RoutineAccess[] = ["read", "act"];
 export const ROUTINE_REPORT: readonly RoutineReport[] = ["always", "when_new"];
 
-/** A stored or sent access level, read safely: anything but `act` is `read`. */
-export const routineAccessOf = (value: unknown): RoutineAccess => (value === "act" ? "act" : "read");
+/** A stored or sent access level: every routine acts (ADR 0109), whatever was stored or sent. */
+export const routineAccessOf = (_value?: unknown): RoutineAccess => "act";
 /** A stored or sent report policy, read safely: anything but `always` is `when_new`. */
 export const routineReportOf = (value: unknown): RoutineReport => (value === "always" ? "always" : "when_new");
 

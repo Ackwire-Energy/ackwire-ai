@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { ComputerSetup } from "@agenteschat/client";
+import { type ComputerSetup, NetworkError } from "@agenteschat/client";
 import { act, cleanup, fireEvent } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
@@ -90,7 +90,7 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
     const answer = api.machines.computerSetup;
     let down = true;
     api.machines.computerSetup = async (orgId) => {
-      if (down) throw new TypeError("Failed to fetch");
+      if (down) throw new NetworkError(new TypeError("Failed to fetch"));
       return answer(orgId);
     };
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
@@ -103,7 +103,7 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
     ])
       expect(region(name)).toBeNull();
     expect(body()).not.toContain("install.sh");
-    expect(body()).toContain("Não foi possível carregar. Confira a conexão e tente de novo.");
+    expect(body()).toContain("Sem conexão com o agentes.chat agora. Tente de novo em instantes.");
     down = false;
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Tentar de novo" })));
     await settle(8);

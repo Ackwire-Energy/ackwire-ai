@@ -23,6 +23,7 @@ import type {
   Channel,
   ChannelCategory,
   ChannelMember,
+  ComposioUsage,
   Connection,
   ConnectorCatalog,
   ConnectorDef,
@@ -71,6 +72,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SidebarItems,
+  SidebarSection,
   SignInOptions,
   SpeechKey,
   StoragePlatform,
@@ -177,6 +179,8 @@ export interface FakeState {
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
+  /** Agents that think with a person's plan, by person (`orgs.removal`); unset = none. */
+  removalLosesPlan?: Record<string, { id: string; name: string }[]>;
   agents: Agent[];
   /** The workspace's groups of agents (`agentGroups.*`); unset = none. */
   agentGroups?: AgentGroup[];
@@ -201,8 +205,12 @@ export interface FakeState {
   connections: Connection[];
   /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
   githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
+  /** The workspace's Composio calls this month (default: none counted, no cap). */
+  composioUsage?: ComposioUsage;
   /** What the organization's GitHub reaches (`githubApp.repositories`); unset = not connected. */
   githubRepos?: GitHubRepositories;
+  /** The GitHub connection whose token GitHub no longer takes (its id): skills from private links say so. */
+  refusedGithub?: string;
   /** Agents' GitHub repositories, in order (`repositories.get`); unset = every repository. */
   agentRepos?: Record<string, string[]>;
   scopes: Record<string, ScopeGrant[]>;
@@ -314,10 +322,12 @@ export interface FakeState {
   stalePushIds?: string[];
   /** What `orgs.previewInvitation` answers per token (an invitation link's page); else "valid" is an email one. */
   previews?: Record<string, InvitationPreview>;
+  /** Thrown by `orgs.previewInvitation`, one per call, before it answers (no answer from the server…). */
+  previewFails?: unknown[];
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
   askError?: ApiError;
-  /** Make `invites.requestNew` fail with this error (a replaced or cancelled invitation answers 404). */
-  requestNewError?: ApiError;
+  /** Make `invites.requestNew` fail with this error (a replaced or cancelled invitation answers 404, no answer…). */
+  requestNewError?: unknown;
   /** What `orgs.invitationState` answers per token (ADR 0090): an accepted or expired invitation; unset: null. */
   invitationStates?: Record<string, InvitationState>;
   /** What `invites.claim` answers, in turn (the last one repeats); unset: null (the key matches nothing). */
@@ -350,6 +360,8 @@ export interface FakeState {
   sidebarItems?: SidebarItems;
   /** Make `orgs.setSidebarItem` and `orgs.setSidebarItems` fail with this error. */
   sidebarItemsError?: ApiError;
+  /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
+  sidebarOrder?: SidebarSection[];
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -576,7 +588,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   return {
     me: {
       user: { id: walter.userId, name: walter.name, email: walter.email, image: null },
-      organizations: [{ id: ORG_ID, name: "Acme", role: "owner" }],
+      // On, so the chat tests read the tool blocks; off (the server's default) is tool-activity.test.tsx's.
+      organizations: [{ id: ORG_ID, name: "Acme", role: "owner", showActivity: true }],
     },
     members: [walter, joao],
     agents: [agent(ADA_ID, "Ada", "Dev", "u-joao", 40), agent(ATLAS_ID, "Atlas", "Ops", "u-joao", 20)],
@@ -913,10 +926,9 @@ const remote = (
   category,
   kind: "remote_mcp",
   description,
-  auth: ["oauth"],
+  auth: ["oauth", "api_key"],
   oauthConfigured: true,
   available: true,
-  needsServerUrl: false,
   serverUrl,
   iconUrl: icon ? `/connectors/${id}.svg` : null,
   brandColor,
@@ -934,7 +946,6 @@ export const CATALOG: ConnectorCatalog = {
       auth: ["oauth", "api_key"],
       oauthConfigured: true,
       available: true,
-      needsServerUrl: false,
       serverUrl: "https://api.githubcopilot.com/mcp/",
       iconUrl: "/connectors/github.svg",
       brandColor: null,
@@ -969,30 +980,24 @@ export const CATALOG: ConnectorCatalog = {
       auth: ["oauth", "api_key"],
       oauthConfigured: false,
       available: true,
-      needsServerUrl: false,
       serverUrl: "https://mcp.sentry.dev/mcp",
       iconUrl: "/connectors/sentry.svg",
       brandColor: null,
       scopes: [{ id: "sentry:issues.read", label: "Read errors", description: "Search issues.", sensitive: false }],
       tools: [{ name: "search_issues", scope: "sentry:issues.read", sensitive: false }],
     },
+    // Through Composio (ADR 0107): connected by its toolkit's address, on Composio's page.
     {
-      id: "drive",
-      label: "Google Drive",
-      category: "docs",
-      kind: "catalog",
-      description: "Search, read and write documents (any Drive-like MCP server).",
-      auth: ["oauth", "api_key"],
-      oauthConfigured: false,
-      available: true,
-      needsServerUrl: true,
-      serverUrl: null,
+      ...remote(
+        "drive",
+        "Google Drive",
+        "docs",
+        "Google Drive files and folders: search, read, create and share.",
+        "https://backend.composio.dev/api/v3.1/toolkits/googledrive",
+        "#4285F4",
+      ),
       iconUrl: "/connectors/googledrive.svg",
-      brandColor: "#4285F4",
-      scopes: [
-        { id: "drive:files.read", label: "Read documents", description: "Search and read files.", sensitive: false },
-      ],
-      tools: [],
+      via: "composio",
     },
     // Official remote MCP servers: one click, then the same review as a custom server.
     remote("linear", "Linear", "product", "Issues, projetos e ciclos.", "https://mcp.linear.app/mcp", "#5E6AD2"),
@@ -1424,6 +1429,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { ...m, ...presenceOf(state, m.userId), lastSeenAt: new Date().toISOString() };
       },
+      // What opens when the app starts (ADR 0108): kept on the membership `me` sends.
+      setStart: async (orgId, input) => {
+        log("orgs.setStart", orgId, input);
+        const org = state.me?.organizations.find((o) => o.id === orgId);
+        if (!org) throw new ApiError(404, "not_found", "Organization not found");
+        org.start = { page: input.page, channelId: input.page === "channel" ? (input.channelId ?? null) : null };
+        return org.start;
+      },
+      setShowActivity: async (orgId, show) => {
+        log("orgs.setShowActivity", orgId, show);
+        const org = state.me?.organizations.find((o) => o.id === orgId);
+        if (!org) throw new ApiError(404, "not_found", "Organization not found");
+        org.showActivity = show;
+        return show;
+      },
       sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
       setSidebarItem: async (orgId, item, place) => {
         log("orgs.setSidebarItem", orgId, item, place);
@@ -1439,6 +1459,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (state.sidebarItemsError) throw state.sidebarItemsError;
         state.sidebarItems = structuredClone(items);
         return structuredClone(items);
+      },
+      sidebarOrder: async () => [...(state.sidebarOrder ?? ["tools", "channels", "agents", "people"])],
+      setSidebarOrder: async (orgId, order) => {
+        log("orgs.setSidebarOrder", orgId, order);
+        state.sidebarOrder = order ? [...order] : undefined;
+        return [...(order ?? ["tools", "channels", "agents", "people"])];
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
@@ -1482,7 +1508,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.role = role;
       },
-      removeMember: async (orgId, userId) => log("orgs.removeMember", orgId, userId),
+      removal: async (_orgId, userId) => {
+        const heir = state.members.find((m) => m.userId === state.me?.user.id);
+        return {
+          heir: heir ? { userId: heir.userId, name: heir.name } : null,
+          agents: state.agents.filter((a) => a.ownerUserId === userId).map((a) => ({ id: a.id, name: a.name })),
+          losePlan: state.removalLosesPlan?.[userId] ?? [],
+          computers: [],
+          routines: 0,
+        };
+      },
+      removeMember: async (orgId, userId) => {
+        log("orgs.removeMember", orgId, userId);
+        state.members = state.members.filter((m) => m.userId !== userId);
+        for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
+      },
       invitations: async () => structuredClone(state.invitations),
       invite: async (orgId, input) => {
         log("orgs.invite", orgId, input);
@@ -1496,9 +1536,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.revokeInvitation", orgId, invitationId);
         state.invitations = state.invitations.filter((i) => i.id !== invitationId);
       },
-      previewInvitation: async (token) =>
-        state.previews?.[token] ??
-        (token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null),
+      previewInvitation: async (token) => {
+        if (state.previewFails?.length) throw state.previewFails.shift();
+        return (
+          state.previews?.[token] ??
+          (token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null)
+        );
+      },
       invitationState: async (token) => state.invitationStates?.[token] ?? null,
       acceptInvitation: async (token, mail) => {
         // With its email's proof only when the page had one (ADR 0090).
@@ -2050,7 +2094,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const brain = input.brain ?? b.brain;
         const changed = brain !== b.brain;
         // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's alone.
-        const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
+        const row = state.agents.find((a) => a.id === agentId);
+        // "Só algumas pessoas" with nobody picked already answers its owner alone: the server leaves it as it is.
+        const restricted = row?.audience?.mode === "people" && !answersOthers(audienceOf(row), row.ownerUserId);
+        const onlyOwner = restricted || (input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner));
         if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner) && !b.canUsePlans)
           throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
@@ -2069,8 +2116,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         brains.set(agentId, next);
         // Its row, as the server keeps it: onto a plan only its owner, its "who can talk" list kept; on, back to that
         // list, or everyone with none.
-        const row = state.agents.find((a) => a.id === agentId);
-        if (row && (changed || input.onlyOwner !== undefined)) {
+        if (row && !restricted && (changed || input.onlyOwner !== undefined)) {
           const was = audienceOf(row);
           const base: AgentAudience = changed && brain !== "model" ? { mode: "owner", userIds: was.userIds } : was;
           row.audience =
@@ -2516,6 +2562,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return decided;
       },
       refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      cancel: async (orgId, approvalId) => {
+        log("approvals.cancel", orgId, approvalId);
+        const a = state.approvals.find((x) => x.id === approvalId);
+        if (!a?.runAt) throw new ApiError(409, "approval.not_ahead", "Only an action approved ahead can be canceled");
+        if (a.executedAt || (a.status !== "pending" && a.status !== "approved")) {
+          throw new ApiError(409, "approval.not_cancelable", "This action already ran or ended");
+        }
+        Object.assign(a, {
+          status: "canceled",
+          decidedAt: new Date().toISOString(),
+          canDecide: false,
+          canCancel: false,
+        });
+        return { ...a };
+      },
       decideMany: async (orgId, input) => {
         log("approvals.decideMany", orgId, input.ids, input.decision);
         const out: Approval[] = [];
@@ -2556,7 +2617,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           id: id("conn"),
           connector: input.connector,
           label: CATALOG.connectors.find((d) => d.id === input.connector)?.label ?? input.connector,
-          serverUrl: input.serverUrl ?? "https://example.test/mcp",
+          serverUrl: CATALOG.connectors.find((d) => d.id === input.connector)?.serverUrl ?? "https://example.test/mcp",
           authType: "api_key",
           accountLabel: null,
           tokenExpiresAt: null,
@@ -2573,6 +2634,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       completeOAuth: async (orgId, input) => {
         log("connectors.completeOAuth", orgId, input);
         throw new Error("the web app finishes OAuth in the callback");
+      },
+      composioUsage: async () => structuredClone(state.composioUsage ?? { calls: 0, limit: null, month: "2026-11" }),
+      rename: async (orgId, connectionId, label) => {
+        log("connectors.rename", orgId, connectionId, label);
+        const conn = state.connections.find((c) => c.id === connectionId);
+        if (!conn) throw new ApiError(404, "not_found", "Connection not found");
+        conn.label = label;
+        return structuredClone(conn);
       },
       disconnect: async (orgId, connectionId) => {
         log("connectors.disconnect", orgId, connectionId);
@@ -2661,7 +2730,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { channelId };
       },
-      markRead: async () => {},
+      markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
       reads: async () => [],
     },
     questions: {
@@ -2930,6 +2999,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       channels: (orgId) => http.chat.channels(orgId),
       members: (orgId) => http.orgs.members(orgId),
       messages: async () => state.messages,
+      dms: async () => state.dms,
     },
   };
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));
@@ -2972,10 +3042,40 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     wiki: createFakeWiki(ctx, (method, ...args) => state.calls.push({ method, args })),
     threads,
     missions: createFakeMissions(ctx, (method, ...args) => state.calls.push({ method, args })),
-    skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
+    skills: createFakeSkills(
+      ctx,
+      (method, ...args) => state.calls.push({ method, args }),
+      () => {
+        const github = state.connections.find((c) => c.connector === "github" && !c.revokedAt);
+        return !github ? "none" : github.id === state.refusedGithub ? "refused" : "ok";
+      },
+    ),
     access,
     connectors: {
       ...http.connectors,
+      // Any kind: a server's account or a catalog connection. Names are unique in the workspace.
+      rename: async (orgId, connectionId, label) => {
+        const name = label.trim();
+        const all = [...(await http.connectors.list(orgId)), ...(await customConnectors.list(orgId))];
+        if (all.some((c) => c.id !== connectionId && c.label.toLowerCase() === name.toLowerCase())) {
+          state.calls.push({ method: "connectors.rename", args: [orgId, connectionId, name] });
+          throw new ApiError(409, "connector.label_taken", "Another connector already has this name");
+        }
+        const server = customConnectors.rename(orgId, connectionId, name);
+        if (!server) return http.connectors.rename(orgId, connectionId, name);
+        state.calls.push({ method: "connectors.rename", args: [orgId, connectionId, name] });
+        return {
+          id: server.id,
+          connector: `custom:${server.id}`,
+          label: server.label,
+          serverUrl: server.serverUrl,
+          authType: server.authType,
+          accountLabel: server.accountLabel ?? null,
+          tokenExpiresAt: null,
+          createdAt: server.createdAt,
+          revokedAt: null,
+        };
+      },
       // A first connection of a connector is every agent's (a new key for it keeps their grants).
       connectWithKey: async (orgId, input) => {
         const first = !(await http.connectors.list(orgId)).some((c) => c.connector === input.connector);

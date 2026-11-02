@@ -380,3 +380,57 @@ export function fakeMissionSource(computer = "MacBook da Marina") {
   const source: ToolSource = { name: "fake-missions", tools: async () => [tool] };
   return { source, proposals };
 }
+
+/**
+ * A fake web for `web_search` and `web_fetch` (ADR 0109): DuckDuckGo's HTML page answers the first `search` entry
+ * whose `when` words all appear in the query (no entry: no results), and each page answers from `pages` (any other
+ * address: 404). Nothing leaves the machine.
+ */
+export interface WebFixture {
+  search?: { when: string[]; results: { title: string; url: string; snippet: string }[] }[];
+  pages?: Record<string, { status?: number; body: string }>;
+}
+
+export function fakeWebFetch(web: WebFixture) {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  return async (url: string): Promise<Response> => {
+    if (url.startsWith("https://html.duckduckgo.com/")) {
+      const query = (new URL(url).searchParams.get("q") ?? "").toLowerCase();
+      const hit = web.search?.find((s) => s.when.every((w) => query.includes(w.toLowerCase())));
+      const html = (hit?.results ?? [])
+        .map(
+          (r) =>
+            `<div class="result results_links"><a class="result__a" href="${esc(r.url)}">${esc(r.title)}</a><a class="result__snippet" href="#">${esc(r.snippet)}</a></div>`,
+        )
+        .join("");
+      return new Response(`<html><body>${html || '<div class="no-results">No results.</div>'}</body></html>`);
+    }
+    const page = web.pages?.[url] ?? web.pages?.[url.replace(/\/$/, "")];
+    return page
+      ? new Response(page.body, { status: page.status ?? 200, headers: { "content-type": "text/html" } })
+      : new Response("Not found", { status: 404 });
+  };
+}
+
+/** The computer's `request_secret` with its real input (no computer): the card is only recorded. */
+export function fakeSecretRequestSource(): ToolSource {
+  const tool: ToolDefinition = {
+    name: "request_secret",
+    description:
+      "Ask the person who asked you for a secret your computer needs: a token or password for a CLI or an API, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or keys in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` or `file`. Your run pauses until they answer; you then get only whether it arrived.",
+    scope: "sandbox:run",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
+        purpose: { type: "string", minLength: 1, maxLength: 300 },
+        target: { enum: ["env", "file"] },
+        path: { type: "string", maxLength: 300 },
+      },
+      required: ["name", "purpose", "target"],
+      additionalProperties: false,
+    },
+    execute: async (input) => ({ content: `The person was sent a secure card for ${String(input.name)}; it arrived.` }),
+  };
+  return { name: "secret-request", tools: async () => [tool] };
+}

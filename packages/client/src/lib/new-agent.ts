@@ -269,8 +269,8 @@ export function stepErrors(step: NewAgentStep, d: DraftCheck): DraftError[] {
   }
   if (step === "where") {
     if (d.audience.mode === "owner" && !d.ownerUserId) out.push({ field: "audience", code: "noOwner" });
-    if (d.audience.mode === "people" && d.audience.userIds.length === 0 && !d.ownerUserId)
-      out.push({ field: "audience", code: "nobody" });
+    const nobody = d.audience.userIds.length === 0 && (d.audience.roleIds?.length ?? 0) === 0;
+    if (d.audience.mode === "people" && nobody && !d.ownerUserId) out.push({ field: "audience", code: "nobody" });
   }
   if (step === "model") {
     if (!d.modelOk) out.push({ field: "model", code: "unavailable" });

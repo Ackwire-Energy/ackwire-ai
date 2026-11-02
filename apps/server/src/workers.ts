@@ -18,18 +18,22 @@ import {
   expireQuestions,
   expireSecretRequests,
   fireDueRoutines,
+  isHandback,
   type JobHandlers,
   listenForRunCancels,
   type MailDeps,
-  pollImapWatches,
+  type OutboxJob,
+  pollMailWatches,
   pruneDeletionCodes,
   pruneJoinRequests,
   pruneMessageClientIds,
   pruneOperatorEvents,
+  pruneRoutineHookCalls,
   purgeDeletedArtifacts,
   queueApprovalDigests,
   reapRoutineRuns,
   reconcileComposioAccounts,
+  reconcileComposioConnectors,
   recoverStaleRuns,
   releaseJobs,
   sweepEndedInboxes,
@@ -37,7 +41,32 @@ import {
   type VoiceDeps,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
+import { isExpectedError } from "./http/errors";
 import type { Logger } from "./logger";
+
+/** An id from a job's payload, never the rest of it (it can hold people's text). */
+const idOf = (value: unknown) => (typeof value === "string" ? value : undefined);
+
+/**
+ * A failed attempt of an outbox job, as an error line (so reported, with its kind and attempt) unless it is a worker
+ * stopping, a refusal the engine expects, or a failure its code calls transient that will be tried again: one that
+ * runs out of attempts is reported too.
+ */
+export function logJobFailure(log: Logger, job: OutboxJob, error: unknown, outcome: "retry" | "failed") {
+  const transient = (error as { retryable?: unknown } | null)?.retryable === true && outcome === "retry";
+  const quiet = isHandback(error) || isExpectedError(error) || transient;
+  (quiet ? log.warn : log.error)("outbox job failed", {
+    kind: job.kind,
+    jobId: job.id,
+    attempt: job.attempts,
+    outcome,
+    orgId: job.orgId ?? undefined,
+    runId: idOf(job.payload.runId),
+    agentId: idOf(job.payload.agentId),
+    machineId: idOf(job.payload.machineId),
+    error,
+  });
+}
 
 export interface WorkerDeps {
   db: Database;
@@ -51,7 +80,7 @@ export interface WorkerDeps {
   voice?: VoiceDeps;
   /** Approval reminder emails. */
   approvalDigest?: { publicUrl: string; afterHours: number };
-  /** People's mailboxes (ADR 0038): IMAP polling for routines and Composio account checks. */
+  /** People's mailboxes (ADR 0038): IMAP polling for routines, and Composio account checks. */
   mail?: { deps: MailDeps; pollSeconds: number };
   /** The agent browser's live view (ADR 0040): expired handoffs are told to its viewers. */
   browserLive?: BrowserLive;
@@ -86,7 +115,7 @@ export const WORKER_INTERVALS_MS = {
   voiceExpiry: 24 * 3600_000,
   /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
   mailPoll: 30_000,
-  /** Composio accounts' state (expired → "Reconnect"). */
+  /** Composio accounts' state: mailboxes (expired → "Reconnect") and connectors marked to reconnect (working again → active). */
   mailReconcile: 15 * 60_000,
   /** Workspaces past their deletion's date that nothing keeps any more (a hold lifted, a job lost): also at boot. */
   deletions: 3600_000,
@@ -121,7 +150,7 @@ export function startWorkers(deps: WorkerDeps) {
       try {
         await job();
       } catch (error) {
-        log.error("background job failed", { job: name, error: String(error) });
+        log.error("background job failed", { job: name, error });
       } finally {
         running = false;
         if (again) {
@@ -139,14 +168,7 @@ export function startWorkers(deps: WorkerDeps) {
   const outboxPump = createOutboxPump(db, deps.handlers, {
     workerId,
     onSlotFree: () => void ticks.get("outbox")?.(),
-    onError: (job, error, outcome) =>
-      log.warn("outbox job failed", {
-        kind: job.kind,
-        jobId: job.id,
-        attempt: job.attempts,
-        outcome,
-        error: String(error),
-      }),
+    onError: (job, error, outcome) => logJobFailure(log, job, error, outcome),
     // How long each job waited to be claimed (ADR 0053 §10): a person's run should never queue behind routines.
     onTiming: (name, ms, attrs) => log.debug(name, { ms, ...attrs }),
   });
@@ -164,6 +186,8 @@ export function startWorkers(deps: WorkerDeps) {
     if (events > 0) log.info("pruned operator events", { pruned: events });
     const cleared = await clearOldOutboxPayloads(db);
     if (cleared > 0) log.info("cleared old job contents", { cleared });
+    const calls = await pruneRoutineHookCalls(db);
+    if (calls > 0) log.info("pruned webhook calls", { pruned: calls });
     // Requests to join answered or run out 90 days ago go; notices with nothing left waiting close (ADR 0068).
     const requests = await pruneJoinRequests({ db, pubsub: deps.pubsub });
     if (requests > 0) log.info("pruned join requests", { pruned: requests });
@@ -248,17 +272,21 @@ export function startWorkers(deps: WorkerDeps) {
   const mail = deps.mail;
   if (mail?.deps.mail?.imap) {
     every("mailPoll", Math.min(WORKER_INTERVALS_MS.mailPoll, mail.pollSeconds * 1000), async () => {
-      const r = await pollImapWatches(mail.deps, { intervalMs: mail.pollSeconds * 1000, concurrency: 5 });
+      const r = await pollMailWatches(mail.deps, { intervalMs: mail.pollSeconds * 1000, concurrency: 5 });
       if (r.fired > 0) {
         log.info("mail routines fired", r);
         void ticks.get("outbox")?.();
       } else if (r.failed > 0) log.warn("mail polls failed", r);
     });
   }
-  if (mail?.deps.mail?.composio) {
+  const composio = mail?.deps.mail?.composio;
+  if (mail && composio) {
     every("mailReconcile", WORKER_INTERVALS_MS.mailReconcile, async () => {
       const r = await reconcileComposioAccounts(mail.deps);
       for (const failure of r.failed) log.warn("mail account check failed", failure);
+      const connectors = await reconcileComposioConnectors(db, composio.client);
+      if (connectors.healed > 0) log.info("connectors working again at Composio", { healed: connectors.healed });
+      for (const failure of connectors.failed) log.warn("connector account check failed", failure);
     });
   }
 
@@ -295,7 +323,7 @@ export function startWorkers(deps: WorkerDeps) {
 
   // Confirmed waiting list entries from before contacts were synced (no-op for the rest: dedupe key).
   void enqueueWaitlistContacts(db).catch((error) =>
-    log.error("background job failed", { job: "waitlistContacts", error: String(error) }),
+    log.error("background job failed", { job: "waitlistContacts", error }),
   );
 
   const offWake = deps.pubsub.subscribe(WAKE_TOPIC, () => void ticks.get("outbox")?.());

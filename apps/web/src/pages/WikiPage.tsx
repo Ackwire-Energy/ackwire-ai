@@ -16,9 +16,12 @@ import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { WikiGraphView } from "@/components/WikiGraph";
 import { ObsidianMark } from "@/components/wiki/ObsidianMark";
+import { WikiAudienceDialog } from "@/components/wiki/WikiAudience";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
 import { AuthorAvatar, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
+import { copyText } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import type { VaultFile } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
 import "./wiki.css";
@@ -204,8 +207,32 @@ function WikiNav({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  // Who sees a folder: people who write the wiki and manage roles (the server checks the same).
+  const choosesAudience = can(org, "edit_wiki") && can(org, "manage_roles");
+  const [audienceFolder, setAudienceFolder] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const toast = useToast();
   const [q, setQ] = useState("");
   const [closed, setClosed] = useState<Set<string>>(new Set());
+  // A page's right click in the tree: open it, copy its [[link]] (its title's menu on the page has the rest).
+  const rowMenu = (p: WikiPageSummary) =>
+    entityMenu(() => [
+      { kind: "header", label: p.title },
+      {
+        kind: "item",
+        id: "open",
+        label: t("contextMenu.open"),
+        icon: "arrowRight",
+        run: () => void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: p.slug } }),
+      },
+      {
+        kind: "item",
+        id: "copy-link",
+        label: t("wiki.copyLink"),
+        icon: "link",
+        run: () => void copyText(`[[${p.title}]]`, () => toast.show(t("wiki.linkCopied", { title: p.title }))),
+      },
+    ]);
   const query = q.trim().toLowerCase();
   const filtering = Boolean(query || tag);
   const shown = useMemo(
@@ -230,6 +257,7 @@ function WikiNav({
       className="wiki-row"
       aria-current={p.slug === current ? "page" : undefined}
       onClick={onClose}
+      {...rowMenu(p)}
     >
       <Icon name={p.locked ? "lock" : "document"} size={14} />
       <span className="wiki-row__t">{p.title}</span>
@@ -238,24 +266,43 @@ function WikiNav({
   );
   const Folder = ({ f }: { f: WikiFolder<WikiPageSummary> }) => {
     const isOpen = filtering || !closed.has(f.path);
+    const limited = f.pages.some((p) => p.audienceFolder === f.path);
     return (
       <>
-        <button
-          type="button"
-          className="wiki-row wiki-row--folder"
-          aria-expanded={isOpen}
-          onClick={() => {
-            const next = new Set(closed);
-            if (next.has(f.path)) next.delete(f.path);
-            else next.add(f.path);
-            setClosed(next);
-          }}
-        >
-          <Icon name="chevronDown" size={14} className="wiki-row__car" />
-          <Icon name="drive" size={14} />
-          <span className="wiki-row__t">{f.name}</span>
-          <span className="wiki-row__n ac-num">{count(f)}</span>
-        </button>
+        <div className="wiki-folder-row">
+          <button
+            type="button"
+            className="wiki-row wiki-row--folder"
+            aria-expanded={isOpen}
+            onClick={() => {
+              const next = new Set(closed);
+              if (next.has(f.path)) next.delete(f.path);
+              else next.add(f.path);
+              setClosed(next);
+            }}
+          >
+            <Icon name="chevronDown" size={14} className="wiki-row__car" />
+            <Icon name="drive" size={14} />
+            <span className="wiki-row__t">{f.name}</span>
+            <span className="wiki-row__n ac-num">{count(f)}</span>
+          </button>
+          {choosesAudience ? (
+            <button
+              type="button"
+              className="wiki-folder-row__act"
+              data-on={limited || undefined}
+              aria-label={t("wiki.audienceFolderTitle", { folder: f.path })}
+              title={t("wiki.audienceFolderTitle", { folder: f.path })}
+              onClick={() => setAudienceFolder(f.path)}
+            >
+              <Icon name="eye" size={14} />
+            </button>
+          ) : limited ? (
+            <span className="wiki-folder-row__act" data-on title={t("wiki.restricted")}>
+              <Icon name="eye" size={14} />
+            </span>
+          ) : null}
+        </div>
         {isOpen && (
           <div className="wiki-sub">
             {f.folders.map((sub) => (
@@ -272,6 +319,7 @@ function WikiNav({
 
   return (
     <aside className="wiki-nav" data-open={open || undefined} aria-label={t("wiki.nav")}>
+      {audienceFolder && <WikiAudienceDialog folder={audienceFolder} onClose={() => setAudienceFolder(null)} />}
       <div className="wiki-nav__head">
         <b>{t("wiki.title")}</b>
         {can(org, "edit_wiki") && (

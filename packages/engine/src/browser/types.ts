@@ -29,6 +29,7 @@ export const BROWSER_TOOLS = [
   "browser_screenshot",
   "browser_ask_person",
   "browser_close",
+  "browser_profile",
 ] as const;
 
 export type BrowserToolName = (typeof BROWSER_TOOLS)[number];
@@ -64,6 +65,10 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
     description: "Asks a person to do something on the page (like signing in) and waits until they're done.",
   },
   browser_close: { label: "Close the browser", description: "Closes the agent's browser; logins stay saved." },
+  browser_profile: {
+    label: "Switch browser profile",
+    description: "Switches between the agent's own browser and the shared browser profiles it was given.",
+  },
 };
 
 /**
@@ -93,7 +98,7 @@ export const DESKTOP_TOOL_INFO = {
 
 /** How a handoff ended, as the agent reads it when it resumes (ADR 0040 §6). */
 export interface BrowserHandoffResult {
-  result: "done" | "failed" | "expired" | "cancelled";
+  result: "done" | "failed" | "expired" | "cancelled" | "withdrawn";
   /** The person's note, in their own words ("it asked for Ana's phone code", "signed in with the shop's account"). */
   note?: string;
 }

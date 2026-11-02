@@ -17,6 +17,7 @@ import {
   inboxOf,
   isAtWork,
   isDoneOnce,
+  isEventDriven,
   isPaused,
   laneTag,
   mailTrouble,
@@ -30,6 +31,7 @@ import {
   targetIcon,
   toastParts,
   whenIcon,
+  zoneOf,
 } from "../../src/features/routines/logic";
 import {
   defaultRule,
@@ -94,6 +96,7 @@ function run(over: Partial<RoutineRun> & Pick<RoutineRun, "id" | "at" | "status"
 const once = (at: string) => ({ type: "once" as const, at, timezone: SP, description: "" });
 const event = { type: "event" as const, event: "github.pr_opened" as const };
 const email = { type: "email" as const, accountId: "m1", folder: "INBOX", filter: {} };
+const webhook = { type: "webhook" as const, url: "https://app.agentes.test/api/hooks/x", signed: false };
 
 describe("what a routine is", () => {
   test("a title: the name, or the first line of a prompt it was named with", () => {
@@ -275,12 +278,11 @@ describe("the form", () => {
       timezone: SP,
       start: "2026-10-28",
     });
-    expect([d.kind, d.event, d.active, d.report, d.access, d.forumRounds]).toEqual([
+    expect([d.kind, d.event, d.active, d.report, d.forumRounds]).toEqual([
       "schedule",
       "sentry.issue_created",
       true,
       "when_new",
-      "read",
       "3",
     ]);
     const input = draftInput({ ...d, agentId: "dev", target: "c1", prompt: "  Resuma o dia  ", name: " " });
@@ -289,7 +291,6 @@ describe("the form", () => {
       prompt: "Resuma o dia",
       target: { type: "channel", channelId: "c1" },
       trigger: { type: "schedule", rule: toApiRule(d.rule) },
-      access: "read",
       report: "when_new",
     });
     expect(draftInput({ ...d, agentId: "dev", target: "dm", prompt: "x", name: " Bom dia " }).name).toBe("Bom dia");
@@ -323,10 +324,9 @@ describe("the form", () => {
     expect(draftChanges(r, d, saved)).toEqual({});
     expect(draftChanges(r, { ...d, name: "  Novo nome " }, saved)).toEqual({ name: "Novo nome" });
     expect(draftChanges(r, { ...d, target: "dm" }, saved)).toEqual({ target: { type: "dm" } });
-    expect(draftChanges(r, { ...d, active: false, report: "always", access: "act" }, saved)).toEqual({
+    expect(draftChanges(r, { ...d, active: false, report: "always" }, saved)).toEqual({
       active: false,
       report: "always",
-      access: "act",
     });
     const later10 = { ...d.rule, times: ["10:00"] };
     expect(draftChanges(r, { ...d, rule: later10 }, saved)).toEqual({
@@ -351,6 +351,23 @@ describe("the form", () => {
     const chat = routine({ id: "k", target: { type: "conversation", channelId: "c1", threadId: "t1" } });
     expect(draftOf(chat, SP, today).target).toBe("keep");
     expect(draftChanges(chat, draftOf(chat, SP, today), saved)).toEqual({});
+  });
+
+  test("a webhook routine: what starts it, never a zone, and only a switch to or from it is a change", () => {
+    const d = draftOf(undefined, SP, today);
+    expect(draftTrigger({ ...d, kind: "webhook" })).toEqual({ type: "webhook" });
+    const r = routine({ id: "w", trigger: webhook });
+    const saved = JSON.stringify(toApiRule(ruleOf(r, SP, today)));
+    const form = draftOf(r, SP, today);
+    expect(form.kind).toBe("webhook");
+    expect(zoneOf(r)).toBe("");
+    expect(draftChanges(r, form, saved)).toEqual({});
+    expect(draftChanges(routine({ id: "s" }), { ...form, kind: "webhook" }, saved)).toMatchObject({
+      trigger: { type: "webhook" },
+    });
+    expect(whenIcon(r)).toBe("globe");
+    expect(isEventDriven(r)).toBe(true);
+    expect(nextLine(r, NOW)).toEqual({ kind: "webhook", week: 0 });
   });
 
   test("a one-off and an email routine left as they were change nothing", () => {

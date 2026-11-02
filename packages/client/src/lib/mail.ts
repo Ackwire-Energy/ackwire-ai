@@ -3,6 +3,7 @@
  */
 
 import type { TFunction } from "i18next";
+import type { ApiClient } from "../api/client";
 import { ApiError } from "../api/http";
 import type {
   AgentMailbox,
@@ -111,6 +112,25 @@ export const DEFAULT_DAILY_CAP = 25;
 
 /** The connectors' level (Sem acesso · Ler · Ler e escrever) as the mail API says it. */
 export const toMailLevel = (level: Level): AgentMailbox["level"] => (level === "write" ? "read_write" : level);
+/** And back: the mail API's level as the connectors' (an agent without any is `none`). */
+export const fromMailLevel = (level: AgentMailbox["level"] | undefined): Level =>
+  level === "read_write" ? "write" : (level ?? "none");
+
+/** Sets an agent's level on a mailbox and keeps its delete switch and rules there (what "Quem usa" changes). */
+export async function setMailLevel(
+  api: Pick<ApiClient, "mail">,
+  orgId: string,
+  agentId: string,
+  accountId: string,
+  level: Level,
+) {
+  const saved = (await api.mail.agent(orgId, agentId)).find((m) => m.accountId === accountId);
+  return api.mail.setAgent(orgId, agentId, accountId, {
+    level: toMailLevel(level),
+    canDelete: saved?.canDelete ?? false,
+    policy: saved?.policy ?? defaultPolicy(),
+  });
+}
 
 /**
  * What a viewer may do with an agent's access to a mailbox (same rule as the backend): only who connected it gives
@@ -208,4 +228,13 @@ export function mailActionsFrom(tools: ReviewTool[], levels: Record<string, Tool
     offActions: names("off"),
     askActions: names("approval").filter((n) => ACTION_LEVELS[n].level !== "approval"),
   };
+}
+
+/** Whether the review's choices change the mailbox (unchanged, there is nothing to save). */
+export function mailActionsChanged(
+  account: Pick<MailAccount, "offActions" | "askActions">,
+  chosen: ReturnType<typeof mailActionsFrom>,
+) {
+  const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
+  return !same(chosen.offActions, account.offActions) || !same(chosen.askActions, account.askActions);
 }

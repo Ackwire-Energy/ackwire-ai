@@ -201,13 +201,29 @@ export function pairedConfig(stored: StoredConfig, file = "config.json"): Runner
 }
 
 /**
+ * The access to write back: while Cursor has no switch of its own (and this
+ * write doesn't set one), it keeps following Codex's, so a folder or Codex edit
+ * from an app without a Cursor switch never freezes Cursor on.
+ */
+export function accessToStore(prev: StoredConfig | null, next: RunnerAccess): RunnerAccess {
+  if (prev?.access?.tools.cursor !== undefined || next.tools.cursor !== effectiveAccess(prev).tools.cursor) return next;
+  const { cursor: _, ...tools } = next.tools;
+  return { ...next, tools: tools as RunnerAccess["tools"] };
+}
+
+/**
  * What the machine allows: the stored `access`, or for a home paired before
  * protocol 10 the old behaviour (commands, Claude Code and Codex follow `exec`).
+ * Stored before Cursor's switch (protocol 36), Cursor follows Codex's: both are
+ * a coding CLI on a person's own plan.
  */
 export function effectiveAccess(config: StoredConfig | null): RunnerAccess {
-  if (config?.access) return config.access;
+  if (config?.access) {
+    const { tools } = config.access;
+    return tools.cursor === undefined ? { ...config.access, tools: { ...tools, cursor: tools.codex } } : config.access;
+  }
   const on = config ? config.exec !== false : false;
-  return { folders: [], tools: { claude: on, codex: on, commands: on } };
+  return { folders: [], tools: { claude: on, codex: on, cursor: on, commands: on } };
 }
 
 /** The pause as the protocol says it (an `until` already past counts as not paused). */

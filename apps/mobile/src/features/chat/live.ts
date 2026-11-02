@@ -15,6 +15,7 @@ import {
   cacheMessageActions,
   cacheMessageMemories,
   cacheMessageMeta,
+  cachePinned,
   catchUpChannel,
   consultSeeds,
   consultsIn,
@@ -171,20 +172,6 @@ function cacheReactions(
 }
 
 /**
- * A message was pinned or unpinned: its mark in every loaded list of the
- * channel (the pins list itself is refetched). Also used optimistically by
- * "Fixar" / "Desafixar".
- */
-export function cachePinned(qc: QueryClient, orgId: string, channelId: string, messageId: string, pinned: boolean) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) => (m.id === messageId ? { ...m, pinned } : m));
-  });
-}
-
-/**
  * A stopped reply was continued (my own "Continuar"; others' arrive as `run.continued`, `useContinuedRun`):
  * its "Continuar" goes away in every loaded list of the channel (`meta.canceled.continuedRunId`).
  */
@@ -257,6 +244,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "message.reactions":
       cacheReactions(qc, orgId, channelId, event.messageId, event.reactions);
+      break;
+    case "poll.updated":
+      qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
       break;
     case "message.memories":
       // What an agent saved from a person's message: the memory mark under it.

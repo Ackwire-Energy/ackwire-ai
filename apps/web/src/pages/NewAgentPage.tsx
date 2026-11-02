@@ -15,6 +15,7 @@ import {
   useModels,
   useNewAgentSetup,
   usePlatformKey,
+  useRoles,
   useSettings,
   useSkills,
 } from "@agenteschat/client";
@@ -36,7 +37,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
-import { AUTO, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
+import { AUTO, apiProviderOf, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AffixInput,
@@ -45,6 +46,7 @@ import {
   Button,
   Card,
   CheckboxPill,
+  colorKey,
   EmptyState,
   type Expression,
   Field,
@@ -55,6 +57,7 @@ import {
   Kbd,
   Logo,
   modKey,
+  ProviderLogo,
   prefersReducedMotion,
   randomAppearance,
   SettingNote,
@@ -231,6 +234,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const { org, me } = useOrg();
   const api = useApi();
   const members = useMembers(org.id);
+  const roleList = useRoles(org.id);
   const agents = useAgents(org.id);
   const models = useModels();
   const credentials = useCredentials(org.id);
@@ -450,7 +454,12 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       : isAuto(model)
         ? t("brain.auto.label")
         : (modelInfo?.label ?? model);
-  const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
+  const apiProvider = apiProviderOf(model, models.data?.models ?? []);
+  const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null, apiProvider);
+  // The key's maker: the one picked, else the workspace's default key, else the model's.
+  const keyProvider =
+    (credentials.data ?? []).find((c) => c.id === (key === DEFAULT_KEY ? settings.data?.defaultCredentialId : key))
+      ?.provider ?? apiProvider;
   const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
   const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
   const grantedMail = mailboxes.filter((a) => (mailLevels[a.id] ?? "none") !== "none");
@@ -502,7 +511,12 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       instructions,
       model,
       ownerUserId: ownerId,
-      audience: { mode: audience.mode, userIds: audience.mode === "people" ? audience.userIds : [] },
+      audience: {
+        mode: audience.mode,
+        userIds: audience.mode === "people" ? audience.userIds : [],
+        roleIds: audience.mode === "people" ? (audience.roleIds ?? []) : [],
+        consultable: audience.consultable ?? true,
+      },
       credentialId: key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,
       appearance: look,
@@ -777,10 +791,15 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     if (audience.mode === "everyone") return t("audience.summary.everyone");
     if (audience.mode === "owner")
       return ownerFirst ? t("audience.summary.owner", { name: ownerFirst }) : t("audience.summary.nobody");
+    if (audience.userIds.length === 0 && ownerFirst)
+      return ownerId === me.user.id ? t("audience.onlyYouForNow") : t("audience.onlyOwnerForNow", { name: ownerFirst });
     const names = (members.data ?? [])
       .filter((m) => m.userId === ownerId || audience.userIds.includes(m.userId))
       .map((m) => m.name.split(/\s+/)[0] ?? m.name);
-    return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
+    const roles = (roleList.data?.roles ?? []).filter((r) => audience.roleIds?.includes(r.id)).map((r) => r.name);
+    return names.length + roles.length
+      ? joinNames([...roles, ...names], t("newAgent.and"))
+      : t("audience.summary.nobody");
   };
   const ownerTitle = (
     <h2>
@@ -1305,7 +1324,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
           {errorLine(errorOf("model"))}
           <div className="newag__sect">
             <h2>
-              <Icon name="key" />
+              {keyProvider ? <ProviderLogo id={keyProvider} size="xs" /> : <Icon name="key" />}
               {t("newAgent.key")}
             </h2>
           </div>
@@ -1392,7 +1411,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                 </span>
                 <span className="small muted">
                   {[
-                    t(`look.colors.${look.color}`),
+                    t(`look.colors.${colorKey(look.color)}`),
                     t(`look.eyesNames.${look.eyes}`),
                     ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
                   ].join(" · ")}

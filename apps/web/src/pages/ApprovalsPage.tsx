@@ -12,10 +12,11 @@ import {
   useRoles,
 } from "@agenteschat/client";
 import { approvalCards, approveAllScope } from "@agenteschat/client/lib/approval-card";
-import { approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
+import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { aheadEndLine } from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
-import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
+import { daysBetween, joinNames, nextLabel, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { everyoneOf, grants } from "@agenteschat/client/lib/roles";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -40,8 +41,9 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import {
+  AheadLine,
   ApproveAlways,
   approvalAction,
   approvalReadsOnly,
@@ -49,6 +51,7 @@ import {
   approvalTitle,
   approvalTraits,
   approvalValues,
+  CancelAhead,
   decisionLabel,
 } from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
@@ -78,13 +81,23 @@ const URGENT_MS = 3_600_000;
 const RUNNING_FOR_MS = 15 * 60_000;
 
 /** Where an approval goes on this screen. */
-export type ApprovalPhase = "waiting" | "running" | "done" | "failed" | "refused" | "expired" | "canceled";
+export type ApprovalPhase =
+  | "waiting"
+  | "running"
+  | "scheduled"
+  | "done"
+  | "failed"
+  | "refused"
+  | "expired"
+  | "canceled";
 
 export function approvalPhase(a: Approval, now = Date.now()): ApprovalPhase {
   if (a.status === "pending") return "waiting";
   if (a.status === "approved") {
     if (a.result) return a.result.ok ? "done" : "failed";
     if (a.executedAt) return "done";
+    // Approved ahead: it waits for its time, when its routine's run does it.
+    if (aheadPhase(a) === "scheduled") return "scheduled";
     const decided = a.decidedAt ? new Date(a.decidedAt).getTime() : 0;
     return now - decided < RUNNING_FOR_MS ? "running" : "done";
   }
@@ -94,7 +107,7 @@ export function approvalPhase(a: Approval, now = Date.now()): ApprovalPhase {
 const bucketOf = (p: ApprovalPhase): Exclude<Filter, "all"> =>
   p === "waiting" || p === "running"
     ? "pending"
-    : p === "done" || p === "failed"
+    : p === "done" || p === "failed" || p === "scheduled"
       ? "approved"
       : p === "refused"
         ? "refused"
@@ -374,7 +387,9 @@ export function ApprovalsPage() {
                         i18nKey="approvals.groupHead"
                         count={items.length}
                         values={{ name: agent?.name ?? t("channel.unknownAgent") }}
-                        components={{ b: <b /> }}
+                        components={{
+                          b: <AgentWho agentId={first.agentId} name={agent?.name ?? t("channel.unknownAgent")} />,
+                        }}
                         {...TYPED_VALUES}
                       />
                     </span>
@@ -915,6 +930,7 @@ function RequestCard({
         </button>
       </h3>
       <div className="ap-card__body">
+        <AheadLine approval={a} className="ap-card__ahead" />
         <ExactAction approval={a} max={4} />
         {why && (
           <p className="ap-said ac-iconline">
@@ -954,18 +970,20 @@ function RequestCard({
 function PhaseChip({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const p = approvalPhase(approval);
-  const [icon, key]: [IconName, "approved" | "failed" | "refused" | "expired" | "running" | "canceled"] =
+  const [icon, key]: [IconName, "approved" | "failed" | "refused" | "expired" | "running" | "canceled" | "scheduled"] =
     p === "done"
       ? ["check", "approved"]
-      : p === "failed"
-        ? ["alert", "failed"]
-        : p === "refused"
-          ? ["close", "refused"]
-          : p === "expired"
-            ? ["clock", "expired"]
-            : p === "running"
-              ? ["play", "running"]
-              : ["block", "canceled"];
+      : p === "scheduled"
+        ? ["calendar", "scheduled"]
+        : p === "failed"
+          ? ["alert", "failed"]
+          : p === "refused"
+            ? ["close", "refused"]
+            : p === "expired"
+              ? ["clock", "expired"]
+              : p === "running"
+                ? ["play", "running"]
+                : ["block", "canceled"];
   return (
     <Chip icon={icon} className={`ap-phase ap-phase--${p}`}>
       {t(`approvals.status.${key}`)}
@@ -983,11 +1001,14 @@ function HistoryRow({ approval: a, selected, onOpen }: { approval: Approval; sel
   const fresh = a.decidedAt && Date.now() - new Date(a.decidedAt).getTime() < 8000;
   const sub =
     p === "expired"
-      ? t("approvals.expiredLine")
-      : p === "canceled"
+      ? (aheadEndLine(t, a) ?? t("approvals.expiredLine"))
+      : p === "canceled" && !a.runAt
         ? t("approvals.canceledLine")
         : [
             decisionLabel(t, i18n.language, a, me.user.id, dir.memberById),
+            p === "scheduled" && a.runAt
+              ? t("approval.ahead.scheduled", { when: nextLabel(i18n.language, a.runAt) })
+              : "",
             p === "refused" && a.reason ? `“${a.reason}”` : "",
           ]
             .filter(Boolean)
@@ -1021,7 +1042,8 @@ function HistoryRow({ approval: a, selected, onOpen }: { approval: Approval; sel
         )}
       </div>
       <div className="ap-row__end">
-        {p === "expired" && <AskAgain approval={a} agent={agent} />}
+        {p === "expired" && aheadPhase(a) !== "lapsed" && <AskAgain approval={a} agent={agent} />}
+        {p === "scheduled" && a.canCancel && <CancelAhead id={a.id} />}
         <PhaseChip approval={a} />
       </div>
     </div>
@@ -1194,7 +1216,11 @@ function ApprovalDetails({
                   <ApproveButton approval={a} block />
                 </div>
                 <p className="ap-muted ap-center">
-                  {approvalRisk(a) === "high" ? t("approvals.holdNote") : t("approvals.clickNote")}
+                  {approvalRisk(a) === "high"
+                    ? t("approvals.holdNote")
+                    : a.runAt
+                      ? t("approvals.clickNoteAhead", { when: nextLabel(i18n.language, a.runAt) })
+                      : t("approvals.clickNote")}
                 </p>
                 {approveAlwaysOffered(a) && (
                   <div className="ap-decide__always">
@@ -1207,6 +1233,7 @@ function ApprovalDetails({
         )
       }
     >
+      <AheadLine approval={a} className="ap-card__ahead" />
       {p === "waiting" && (
         <div className="ap-traits">
           <Chip icon="clock">{expiryText(t, a)}</Chip>
@@ -1349,16 +1376,29 @@ function Outcome({ approval: a, agent }: { approval: Approval; agent: Agent | un
             {a.reason && <small className="ap-row__lesson">{t("approvals.lesson", { name, reason: a.reason })}</small>}
           </>
         )}
+        {p === "scheduled" && a.runAt && (
+          <>
+            <b>{t("approval.ahead.scheduled", { when: nextLabel(i18n.language, a.runAt) })}</b>
+            <small>{t("approvals.panel.approvedBy", { name: who, when })}</small>
+            {a.canCancel && (
+              <span className="ac-acts">
+                <CancelAhead id={a.id} />
+              </span>
+            )}
+          </>
+        )}
         {p === "expired" && (
           <>
             <b>{t("approvals.status.expired")}</b>
-            <small>{t("approvals.expiredLine")}</small>
-            <span>
-              <AskAgain approval={a} agent={agent} />
-            </span>
+            <small>{aheadEndLine(t, a) ?? t("approvals.expiredLine")}</small>
+            {aheadPhase(a) !== "lapsed" && (
+              <span>
+                <AskAgain approval={a} agent={agent} />
+              </span>
+            )}
           </>
         )}
-        {p === "canceled" && <small>{t("approvals.canceledLine")}</small>}
+        {p === "canceled" && <small>{aheadEndLine(t, a) ?? t("approvals.canceledLine")}</small>}
       </div>
       {a.result?.text && (
         <details className="ap-result">

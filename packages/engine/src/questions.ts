@@ -5,6 +5,7 @@ import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import type { ResourcefulDeps } from "./hand-off";
 import { resolveQuestionNotifications } from "./notification-producers";
 import { enqueue } from "./outbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -31,6 +32,8 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+  /** The agent took it back (`withdraw_request`): it no longer needs an answer. Kept on the card by later syncs. */
+  withdrawn?: true;
 }
 
 export function questionView(q: AgentQuestionRow): AgentQuestion {
@@ -67,8 +70,10 @@ export const questionCardMeta = (q: AgentQuestionRow, why: string) => ({
  * to the executor, which posts it in the thread and suspends the run
  * (`waiting_input`). A consulted agent asks from the agents' DM, which no
  * person reads: its card goes where the person behind it asked (ADR 0034).
+ * With a judge, a question for something the run could find, or a secret asked in the chat, is held first
+ * (`holdAsk`, ADR 0109 addendum).
  */
-export function createAskUserToolSource(): ToolSource {
+export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_USER_TOOL,
     description:
@@ -97,6 +102,9 @@ export function createAskUserToolSource(): ToolSource {
         };
       }
       const text = typeof input.question === "string" ? input.question.trim() : "";
+      // Loaded here: the check pulls in the controller, which imports most of the engine.
+      const held = await (await import("./hand-off")).holdAsk(deps, ctx, text);
+      if (held) return { content: held, data: { held: true } };
       const choices = Array.isArray(input.choices)
         ? [...new Set((input.choices as unknown[]).map((c) => String(c).trim()).filter(Boolean))]
         : [];
@@ -112,18 +120,21 @@ export function createAskUserToolSource(): ToolSource {
 /** What the model hears back once the question is closed. */
 export function questionResult(q: AgentQuestionRow | undefined): { content: string; isError?: boolean } {
   if (q?.status === "answered" && q.answer !== null) return { content: `The person answered: ${q.answer}` };
+  if (q?.status === "canceled") return { content: "You withdrew this question: nobody will answer it." };
   return {
     content:
       "No one answered within 24 hours. Go on with your best judgement if it is safe, or say what you still need.",
   };
 }
 
-/** Writes the current state of the question into its chat message (`meta.question`). */
-export async function syncQuestionMessage(db: Executor, q: AgentQuestionRow) {
+/** Writes the current state of the question into its chat message (`meta.question`), keeping `withdrawn`. */
+export async function syncQuestionMessage(db: Executor, q: AgentQuestionRow, view: AgentQuestion = questionView(q)) {
   if (!q.messageId) return;
   await db
     .update(messages)
-    .set({ meta: sql`jsonb_set(${messages.meta}, '{question}', ${JSON.stringify(questionView(q))}::jsonb)` })
+    .set({
+      meta: sql`jsonb_set(${messages.meta}, '{question}', coalesce(${messages.meta}->'question', '{}'::jsonb) || ${JSON.stringify(view)}::jsonb)`,
+    })
     .where(and(eq(messages.id, q.messageId), eq(messages.orgId, q.orgId)));
 }
 
@@ -139,8 +150,9 @@ export async function publishQuestion(
   pubsub: PubSub | undefined,
   q: AgentQuestionRow,
   type: "question.asked" | "question.answered",
+  view: AgentQuestion = questionView(q),
 ) {
-  await publishChannelEvent(pubsub, { type, channelId: q.channelId, threadId: q.threadId, question: questionView(q) });
+  await publishChannelEvent(pubsub, { type, channelId: q.channelId, threadId: q.threadId, question: view });
 }
 
 /**
@@ -203,6 +215,28 @@ export async function afterReplyAnswered(deps: { db: Database; pubsub?: PubSub }
   await syncQuestionMessage(deps.db, row);
   await publishQuestion(deps.pubsub, row, "question.answered");
   await resolveQuestionNotifications(deps, orgId, row.id).catch(() => {});
+}
+
+/** The agent withdraws its own open question (`withdraw_request`): the card closes and a run waiting on it goes on. */
+export async function withdrawQuestion(deps: { db: Database; pubsub?: PubSub }, agentId: string, questionId: string) {
+  const withdrawn = await deps.db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(agentQuestions)
+      .set({ status: "canceled" })
+      .where(
+        and(eq(agentQuestions.id, questionId), eq(agentQuestions.agentId, agentId), eq(agentQuestions.status, "open")),
+      )
+      .returning();
+    if (!row) return null;
+    await syncQuestionMessage(tx, row, { ...questionView(row), withdrawn: true });
+    await enqueue(tx, resumeJob(row));
+    return row;
+  });
+  if (withdrawn) {
+    await publishQuestion(deps.pubsub, withdrawn, "question.answered", { ...questionView(withdrawn), withdrawn: true });
+    await resolveQuestionNotifications(deps, withdrawn.orgId, withdrawn.id).catch(() => {});
+  }
+  return withdrawn;
 }
 
 /** Closes questions past their deadline and resumes their runs (worker, every minute). */

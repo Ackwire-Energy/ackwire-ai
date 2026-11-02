@@ -24,6 +24,7 @@ import {
   listInvitations,
   listMembers,
   listMemberships,
+  NotFoundError,
   needsWorkspaceAllowance,
   noticeInvitationAccepted,
   ONBOARDING_STEPS,
@@ -31,6 +32,7 @@ import {
   pinnedOwner,
   previewInvitation,
   queueInvitationEmail,
+  removalPreview,
   removeAvatar,
   removeMember,
   removeOrgLogo,
@@ -70,6 +72,7 @@ import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
 import { imageFile } from "../../http/image-file";
+import { releaseOf } from "../../version";
 import {
   type AppDeps,
   body,
@@ -195,6 +198,13 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "The bot check's site key (`TURNSTILE_SITE_KEY`, ADR 0075): pages run Cloudflare Turnstile and send its token in `x-captcha-response`. Null: no check, and nothing loads from Cloudflare.",
             }),
+            errorReports: z
+              .object({ dsn: z.string(), environment: z.string(), release: z.string() })
+              .nullable()
+              .openapi({
+                description:
+                  "Where the app reports its own errors (`SENTRY_WEB_DSN`, a Sentry-compatible server, ADR 0104), and under which environment and release. Null: it reports nothing and loads no reporting code.",
+              }),
           }),
         ),
       },
@@ -213,6 +223,9 @@ export function accountRoutes(deps: AppDeps) {
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
           billingUrl: config.BILLING_URL ?? null,
           turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
+          errorReports: config.SENTRY_WEB_DSN
+            ? { dsn: config.SENTRY_WEB_DSN, environment: config.SENTRY_ENVIRONMENT, release: releaseOf(config) }
+            : null,
         },
         200,
       );
@@ -497,6 +510,8 @@ export function accountRoutes(deps: AppDeps) {
               permissions: [...m.permissions],
               rank: m.rank,
               logo: m.orgLogo ?? null,
+              ...(m.start ? { start: m.start } : {}),
+              showActivity: m.showActivity ?? false,
               ...(m.standing
                 ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
                 : {}),
@@ -1151,6 +1166,37 @@ export function accountRoutes(deps: AppDeps) {
         pubsub: deps.adapters.pubsub,
       });
       return c.body(null, 204);
+    },
+  );
+
+  const Named = z.object({ id: z.string(), name: z.string() });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/members/{userId}/removal",
+      tags,
+      security,
+      summary: "What removing a member (or leaving) does",
+      description: "Refused exactly as the removal would be. 404 when they aren't a member.",
+      request: { params: MemberParams },
+      responses: {
+        200: json(
+          z.object({
+            heir: z.object({ userId: z.string(), name: z.string() }).nullable(),
+            agents: z.array(Named),
+            losePlan: z.array(Named),
+            computers: z.array(Named),
+            routines: z.number().int(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      const preview = await removalPreview(db, c.get("user").id, orgId, userId);
+      if (!preview) throw new NotFoundError("That user is not a member");
+      return c.json(preview, 200);
     },
   );
 

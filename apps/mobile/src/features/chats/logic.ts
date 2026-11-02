@@ -12,6 +12,8 @@ import type {
   ThreadInfo,
 } from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
+import type { FirstStepId } from "@agenteschat/client/lib/home";
+import type { IconName } from "@/ui";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -504,3 +506,14 @@ export function waitingTotal(input: {
 }): number {
   return input.approvals + input.missions.reduce((n, m) => n + missionWaitingItems(m), 0) + input.questions;
 }
+
+// ── A new workspace's first steps (ADR 0108) ────────────────────────────────
+
+/** The screen each of Conversas' first steps opens, and its tile. */
+export const FIRST_STEP_SCREENS: Record<FirstStepId, { icon: IconName; href: string }> = {
+  agent: { icon: "agent", href: "/new-agent" },
+  ai: { icon: "brain", href: "/connect-ai" },
+  ask: { icon: "chat", href: "/new-chat" },
+  team: { icon: "members", href: "/me/members" },
+  routine: { icon: "clock", href: "/routines/new" },
+};

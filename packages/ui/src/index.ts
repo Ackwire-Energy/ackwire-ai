@@ -15,6 +15,7 @@ export {
   bodyPath,
   bodySvg,
   bodyTones,
+  colorKey,
   drawAccessory,
   drawAgent,
   drawEyes,
@@ -22,7 +23,11 @@ export {
   type Expression,
   EYE_STYLES,
   eyeShapes,
+  gradientOf,
+  hexToHsv,
+  hsvToHex,
   idlePose,
+  isHexColor,
   type Pose,
   spriteGrid,
 } from "./agent/engine.js";
@@ -53,6 +58,14 @@ export {
   drawBrain,
 } from "./brain/portrait.js";
 export { channelQuery, insertChannelRef } from "./channel-refs";
+export {
+  type AccessBase,
+  AccessDialog,
+  type AccessDialogLabels,
+  type AccessDialogProps,
+  type AccessLevel,
+  type AccessSubject,
+} from "./components/AccessDialog";
 export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
@@ -98,6 +111,7 @@ export {
   Switch,
 } from "./components/Checkbox";
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge, CountChip } from "./components/Chip";
+export { ColorPicker, type ColorPickerLabels } from "./components/ColorPicker";
 export { CommandPalette, filterPalette, type PaletteItem } from "./components/CommandPalette";
 export {
   Composer,

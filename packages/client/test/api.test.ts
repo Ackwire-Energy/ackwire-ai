@@ -580,6 +580,30 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     ]);
   });
 
+  test("a webhook routine's address: read it, a new one, a signing secret or none, Testar", async () => {
+    const hook = { url: "https://app.agentes.test/api/hooks/t", signed: true, calls: [] };
+    const { fetch, calls } = fakeFetch({
+      [`${org}/routines/r1/hook`]: { status: 200, body: hook },
+      [`POST ${org}/routines/r1/hook/address`]: { status: 200, body: hook },
+      [`POST ${org}/routines/r1/hook/secret`]: { status: 200, body: { secret: "s3", hook } },
+      [`DELETE ${org}/routines/r1/hook/secret`]: { status: 200, body: { ...hook, signed: false } },
+      [`POST ${org}/routines/r1/hook/test`]: { status: 200, body: { runId: "rr1", hook } },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.routines.hook("o1", "r1")).toEqual(hook);
+    expect(await api.routines.newHookAddress("o1", "r1")).toEqual(hook);
+    expect((await api.routines.newHookSecret("o1", "r1")).secret).toBe("s3");
+    expect((await api.routines.removeHookSecret("o1", "r1")).signed).toBe(false);
+    expect((await api.routines.testHook("o1", "r1")).runId).toBe("rr1");
+    expect(calls.map((c) => `${c.init.method ?? "GET"} ${c.url}`)).toEqual([
+      `GET ${org}/routines/r1/hook`,
+      `POST ${org}/routines/r1/hook/address`,
+      `POST ${org}/routines/r1/hook/secret`,
+      `DELETE ${org}/routines/r1/hook/secret`,
+      `POST ${org}/routines/r1/hook/test`,
+    ]);
+  });
+
   test("calendar, custom MCP and invites", async () => {
     const { fetch, calls } = fakeFetch({
       [`${org}/calendar?from=2026-10-12&to=2026-10-19`]: {

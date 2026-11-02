@@ -13,7 +13,6 @@ import {
   type ProposalLine,
   proposalLines,
   proposalStatus,
-  routineAccessText,
   routineLeft,
   suggestedAiText,
 } from "@agenteschat/client/lib/action-cards";
@@ -313,10 +312,7 @@ function ProposalLines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDr
     const routine = draft.routine;
     return {
       icon: <Icon name="routines" size={14} />,
-      // What it may do on its own shows: one click makes it under the clicker's name.
-      text: routine
-        ? [routine.name, proposedRoutineWhen(t, i18n.language, routine), routineAccessText(t, routine)].join(" · ")
-        : l.id,
+      text: routine ? [routine.name, proposedRoutineWhen(t, i18n.language, routine)].join(" · ") : l.id,
     };
   };
   const needs = (l: ProposalLine) =>

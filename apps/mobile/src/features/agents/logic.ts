@@ -8,14 +8,13 @@ import type {
   DirectMessage,
   MediaKind,
   Memory,
-  Mission,
   OrgSummary,
   PreviewMeta,
-  WorkingRun,
 } from "@agenteschat/client";
 import { asksAt, levelOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { can } from "@agenteschat/client/lib/permissions";
+import { type WorkItem, workByAgent } from "@agenteschat/client/lib/working";
 import { daysAgo, previewOf } from "../shared/logic";
 
 /**
@@ -23,88 +22,13 @@ import { daysAgo, previewOf } from "../shared/logic";
  * Início, and what an agent's profile shows about its month.
  */
 
-const ACTIVE = new Set(["queued", "running", "waiting_approval", "waiting_input"]);
-
-/** Something an agent is on right now. */
-export interface WorkItem {
-  key: string;
-  agentId: string;
-  kind: "run" | "mission";
-  /** Mission: its title. Run: the thread's title or the start of its first message (null: say where instead). */
-  what: string | null;
-  channelId: string;
-  /** Null: the main timeline (DMs are flat). */
-  threadId: string | null;
-  /** Where, for a run without a label: a channel's name, or a DM (no name). */
-  where: { kind: "channel" | "dm"; name: string | null };
-  missionId: string | null;
-  plan: { done: number; total: number } | null;
-  /** Since when (the mission's or the run's start, else when it was created). */
-  since: string;
-  /** A run stopped on a person (your ok, your answer): it isn't working, it waits ("espera seu ok"). */
-  waiting: boolean;
-}
-
-/**
- * Active missions first (they are long work), then runs in progress (`GET
- * …/active-runs`, everyone's view of the conversations they are in), newest
- * first, one per agent and conversation. A routine's background runs are left out.
- */
-export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] | undefined): WorkItem[] {
-  const out: WorkItem[] = [];
-  const seen = new Set<string>();
-  const spot = (agentId: string, channelId: string, threadId: string | null) => `${agentId}:${threadId ?? channelId}`;
-  for (const m of missions ?? []) {
-    if (m.status !== "active") continue;
-    out.push({
-      key: `m:${m.id}`,
-      agentId: m.agentId,
-      kind: "mission",
-      what: m.title,
-      channelId: m.channelId,
-      threadId: m.threadId,
-      where: { kind: "channel", name: null },
-      missionId: m.id,
-      plan: { done: m.plan.done, total: m.plan.total },
-      since: m.startedAt ?? m.createdAt,
-      waiting: false,
-    });
-    seen.add(spot(m.agentId, m.channelId, m.threadId));
-  }
-  const newest = (r: WorkingRun) => r.startedAt ?? r.createdAt;
-  for (const r of [...(runs ?? [])].sort((a, b) => newest(b).localeCompare(newest(a)))) {
-    const at = spot(r.agentId, r.channelId, r.threadId);
-    // A routine's background run holds no conversation: never "trabalhando" (its report comes as a notice).
-    if (r.background || !ACTIVE.has(r.status) || seen.has(at)) continue;
-    seen.add(at);
-    out.push({
-      key: `r:${r.runId}`,
-      agentId: r.agentId,
-      kind: "run",
-      what: r.label?.trim() || null,
-      channelId: r.channelId,
-      threadId: r.threadId,
-      where: { kind: r.channelKind, name: r.channelName },
-      missionId: null,
-      plan: null,
-      since: newest(r),
-      waiting: r.status === "waiting_approval" || r.status === "waiting_input",
-    });
-  }
-  return out;
-}
+export { type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
 
 /** Agents with something in progress. */
 export const busyAgents = (work: WorkItem[]) => new Set(work.map((w) => w.agentId));
 
 /** Conversations where an agent is on something now (an agent DM shows "trabalhando…"). */
 export const busyChannels = (work: WorkItem[]) => new Set(work.map((w) => w.channelId));
-
-/** What each working agent is on: its first item (missions come first in `workingNow`). */
-export function workByAgent(work: WorkItem[]): WorkItem[] {
-  const seen = new Set<string>();
-  return work.filter((w) => !seen.has(w.agentId) && Boolean(seen.add(w.agentId)));
-}
 
 /** One agent on Agentes: what waits on you, what it is on (working) or its last conversation (free). */
 export interface TeamLine {
@@ -371,6 +295,8 @@ const FILE_KIND: Record<string, string> = {
   html: "document",
   diagram: "image",
   file: "file",
+  block: "document",
+  poll: "document",
 };
 
 /** "O que fez por você", in the profile's words (third person: "Abriu a issue #131"). */

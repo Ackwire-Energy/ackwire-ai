@@ -34,6 +34,7 @@ import {
 } from "@/ui";
 import { boldRuns } from "../chat/actions";
 import { AllowTalkPill } from "../chat/ReachLines";
+import { routineHref } from "../links/logic";
 import { ZoneList } from "../me/AccountPage";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
@@ -70,6 +71,7 @@ import {
   zoneOf,
 } from "./logic";
 import { fromApiRule, nextLabel, ruleSentence, runLabel, toApiRule, upcomingLabels } from "./rule";
+import { WebhookCard } from "./WebhookCard";
 import { setRoutineZone, useRoutineZone } from "./zone";
 
 type Open = "agent" | "target" | "mailbox" | "folder" | null;
@@ -264,7 +266,9 @@ function Form({ routine }: { routine: Routine | undefined }) {
 
   const promptHidden = routine !== undefined && routine.prompt === null;
   const scheduleOk =
-    d.kind === "event" || (d.kind === "email" ? Boolean(d.email.accountId) && !fromBad : !phraseFailed);
+    d.kind === "event" ||
+    d.kind === "webhook" ||
+    (d.kind === "email" ? Boolean(d.email.accountId) && !fromBad : !phraseFailed);
   const ready =
     !action.isPending && Boolean(d.agentId) && (promptHidden || d.prompt.trim().length > 0) && scheduleOk && !parsing;
 
@@ -280,6 +284,14 @@ function Form({ routine }: { routine: Routine | undefined }) {
     if (p.kind === "schedule") typePhrase(t(`routines.presets.${p.key}.phrase`));
   };
 
+  /**
+   * Saved: a routine that just became a webhook routine opens on its page, where its address is: the page under this
+   * form when it was opened from there, else in place of the form.
+   */
+  const done = (saved: Routine | undefined) => {
+    if (saved?.trigger.type === "webhook") router.dismissTo(routineHref(saved.id));
+    else close();
+  };
   const submit = () => {
     if (!ready) return;
     if (routine) {
@@ -302,7 +314,8 @@ function Form({ routine }: { routine: Routine | undefined }) {
               ),
               agentId: d.agentId,
             });
-            close();
+            if (routine.trigger.type !== "webhook") done(saved as Routine);
+            else close();
           },
           onError: failed,
         },
@@ -312,10 +325,10 @@ function Form({ routine }: { routine: Routine | undefined }) {
     action.mutate(
       { type: "create", input: draftInput(d) },
       {
-        onSuccess: () => {
+        onSuccess: (created) => {
           successHaptic();
           toast({ title: t("routines.form.created"), agentId: d.agentId });
-          close();
+          done(created as Routine);
         },
         onError: failed,
       },
@@ -480,6 +493,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
             { key: "schedule", label: t("routines.form.kind.schedule") },
             { key: "event", label: t("routines.form.kind.event") },
             ...(hasMail ? [{ key: "email", label: t("routines.form.kind.email") }] : []),
+            { key: "webhook", label: t("routines.form.kind.webhook") },
           ]}
           value={d.kind}
           onChange={(k) => set({ kind: k as TriggerKind })}
@@ -660,6 +674,14 @@ function Form({ routine }: { routine: Routine | undefined }) {
           )
         ) : null}
 
+        {d.kind === "webhook" ? (
+          routine?.trigger.type === "webhook" ? (
+            <WebhookCard routine={routine} runs={routine.recentRuns} />
+          ) : (
+            <GroupedFooter>{t("routines.webhook.newNote")}</GroupedFooter>
+          )
+        ) : null}
+
         <GroupedHeader>{t("routines.form.report")}</GroupedHeader>
         <GroupedList>
           {(["always", "when_new"] as const).map((v) => (
@@ -672,40 +694,25 @@ function Form({ routine }: { routine: Routine | undefined }) {
           ))}
         </GroupedList>
         <GroupedFooter>{t("routines.report.hint")}</GroupedFooter>
-        <GroupedHeader>{t("routines.form.access")}</GroupedHeader>
-        <GroupedList>
-          {(["read", "act"] as const).map((v) => (
-            <GroupedRow
-              key={v}
-              label={t(`routines.access.${v}`)}
-              checked={d.access === v}
-              onPress={() => set({ access: v })}
-            />
-          ))}
-        </GroupedList>
-        <GroupedFooter>{t("routines.access.hint")}</GroupedFooter>
         {routineReachWarnings(d.prompt, dir.agents, {
-          access: d.access,
           agentId: d.agentId || null,
           creatorUserId: creator === me ? null : creator,
+          creatorRoleIds: creator ? dir.memberById.get(creator)?.roleIds : undefined,
         }).map((w) => (
           <View key={w.agent.id} style={styles.warning}>
             <Text variant="footnote" tone="ink2" accessibilityLiveRegion="polite">
-              {boldRuns(
-                t(w.kind === "read" ? "routines.reachWarning.read" : "routines.reachWarning.blocked", {
-                  ...agentGrammar(t, w.agent.name),
-                }) as string,
-              ).map((r, i) =>
-                r.bold ? (
-                  <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
-                    {r.text}
-                  </Text>
-                ) : (
-                  r.text
-                ),
+              {boldRuns(t("routines.reachWarning.blocked", { ...agentGrammar(t, w.agent.name) }) as string).map(
+                (r, i) =>
+                  r.bold ? (
+                    <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
+                      {r.text}
+                    </Text>
+                  ) : (
+                    r.text
+                  ),
               )}
             </Text>
-            {w.kind === "blocked" && creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}
+            {creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}
           </View>
         ))}
         {routine && !isDoneOnce(routine) ? (

@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import type { Agent } from "./agents";
-import { audienceError, canTalkTo } from "./audience";
+import { audienceError, canTalkTo, speakerOf } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
@@ -9,7 +9,7 @@ import { publishChannelEvent } from "./events";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { agentOnlyNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
-import { can, getMembership, requirePermission } from "./organizations";
+import { getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users } = schema;
 
@@ -38,7 +38,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
       .from(agents)
       .where(and(eq(agents.id, target.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
     if (!agent) throw new NotFoundError("Agent not found");
-    if (!canTalkTo(agent, actorId, can(membership, "talk_to_agents"))) blockedAgent = agent;
+    if (!canTalkTo(agent, actorId, speakerOf(membership))) blockedAgent = agent;
     other = `a:${target.agentId}`;
   }
   const dmKey = keyOf([`u:${actorId}`, other]);

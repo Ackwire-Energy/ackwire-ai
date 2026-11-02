@@ -425,6 +425,64 @@ export const ROUTER_CASES: RouterCase[] = [
     message: "Agents, each of you tell me in one line what you're working on right now",
     answers: ALL,
   },
+  // Each about themselves, then one fact they share right after (a workspace's agents share its computer).
+  {
+    id: "pt-everyone-own-limit",
+    lang: "pt",
+    kind: "everyone",
+    message: "como tá o limite de uso de vocês?",
+    answers: ALL,
+  },
+  {
+    id: "en-everyone-own-limit",
+    lang: "en",
+    kind: "everyone",
+    message: "how are your usage limits looking, all of you?",
+    answers: ALL,
+  },
+  {
+    id: "pt-shared-machine",
+    lang: "pt",
+    kind: "anyone",
+    before: [
+      { from: "Ana", text: "como tá o limite de uso de vocês?" },
+      { from: "@ada", text: "Usei 40% do meu limite da semana." },
+      { from: "@theo", text: "Estou em 15% do meu." },
+      { from: "@atlas", text: "Uns 20% por aqui." },
+    ],
+    message: "quanto de cpu e ram nossa máquina tá usando agora?",
+    answers: ["atlas"],
+  },
+  {
+    id: "en-shared-machine",
+    lang: "en",
+    kind: "anyone",
+    before: [
+      { from: "Ana", text: "how are your usage limits looking, all of you?" },
+      { from: "@ada", text: "I've used 40% of my weekly limit." },
+      { from: "@theo", text: "About 15% of mine." },
+      { from: "@atlas", text: "Around 20% here." },
+    ],
+    message: "how much cpu and ram is our machine using right now?",
+    answers: ["atlas"],
+  },
+  // The same follow-up sent while every agent is still on the first question, before any reply.
+  {
+    id: "pt-shared-machine-mid-run",
+    lang: "pt",
+    kind: "anyone",
+    before: [{ from: "Ana", text: "como tá o limite de uso de vocês?" }],
+    message: "quanto de cpu e ram nossa máquina tá usando agora?",
+    answers: ["atlas"],
+  },
+  {
+    id: "en-shared-machine-mid-run",
+    lang: "en",
+    kind: "anyone",
+    before: [{ from: "Ana", text: "how are your usage limits looking, all of you?" }],
+    message: "how much cpu and ram is our machine using right now?",
+    answers: ["atlas"],
+  },
   {
     id: "pt-person",
     lang: "pt",
@@ -546,6 +604,7 @@ export async function routerEval() {
         .values({
           orgId: f.org.id,
           connector: label.toLowerCase().replaceAll(" ", "-"),
+          toolPrefix: label.toLowerCase().replaceAll(" ", "_"),
           label,
           serverUrl: "https://mcp.example.com",
           authType: "none",

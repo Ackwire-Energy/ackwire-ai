@@ -1,4 +1,4 @@
-import { AGENT_GRADIENTS, type AgentColorName, mixHex } from "@agenteschat/ui/agent/engine";
+import { type AgentColorName, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { BAYER, bayerAt, ditherIndex } from "@agenteschat/ui/sky/math";
 
 /** The web's soft tones (activity bar, cards): the same function, so both draw the same colors. */
@@ -35,7 +35,7 @@ export function hash2(a: number, b: number): number {
 
 /** Seven tones from a surface color into an agent color. */
 export function fromSurface(surface: string, depth = 1, color: AgentColorName = "sky"): string[] {
-  const [top, bot] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+  const [top, bot] = gradientOf(color);
   return [
     surface,
     mixHex(surface, top, 0.14 * depth),

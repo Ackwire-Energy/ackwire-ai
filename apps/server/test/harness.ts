@@ -12,6 +12,7 @@ import {
   createMemoryRateLimiter,
   createPostgresSearchResolver,
   type DatabaseDriver,
+  type ErrorReporter,
   type GifProvider,
   type HumanCheck,
   type MailAdapters,
@@ -97,6 +98,8 @@ export async function createTestServer(
     platformKind?: string;
     /** Browser push (ADR 0071); absent = a fake that records, null = off. */
     webPush?: WebPushSender | null;
+    /** Where error lines are reported (`createFakeErrorReporter`); absent = nowhere. */
+    errors?: ErrorReporter;
     /** GIF search (ADR 0091); absent = the fake provider (`createFakeGifs`), null = none, as without its key. */
     gifs?: GifProvider | null;
     /**
@@ -117,7 +120,7 @@ export async function createTestServer(
     AGENT_MAX_OUTPUT_TOKENS: "1000",
     ...options.env,
   });
-  const log = createLogger("error");
+  const log = createLogger("error", options.errors);
   const email = createFakeEmailSender();
   const push = createFakePushSender();
   const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;

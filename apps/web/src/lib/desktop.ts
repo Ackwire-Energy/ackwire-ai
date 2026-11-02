@@ -160,6 +160,11 @@ export function pageReady() {
   void tauri.invoke("page_ready", {}).catch(() => {});
 }
 
+/** `pageReady` once the screen just rendered is on the glass (two frames on): a first screen's mount effect. */
+export function pageReadyAfterPaint() {
+  if (inDesktopApp()) requestAnimationFrame(() => requestAnimationFrame(pageReady));
+}
+
 /**
  * Links that open a new window (`target="_blank"`) in the app: the window's `on_new_window` sends them on, a page
  * of this server to the window and anything else to the browser (main_window.rs). The app's shell plugin adds

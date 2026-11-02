@@ -1,0 +1,166 @@
+/* Início (ADR 0108): one column, the greeting, the ask composer, then sections of rows, each on a list card. */
+.page--list.home {
+  max-width: 760px;
+}
+
+.home-start {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.home-ask__agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.home-sec {
+  display: flex;
+  flex-direction: column;
+}
+.home-sec .list-group-head {
+  min-height: 24px;
+}
+/* "Ver tudo" and "Ocultar": quiet, at the head's end. */
+.home-sec__more {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+.home-sec__more:hover {
+  color: var(--ink);
+}
+html:not([data-pointer]) .home-sec__more:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+
+.home-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row: the face on top (32px), the text beside it, its one button at the end. */
+.home-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+.home-list > li:first-child > .home-row,
+.home-list > .home-row:first-child {
+  border-top: 0;
+}
+:is(a, button).home-row {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+:is(a, button).home-row:hover {
+  background: color-mix(in srgb, var(--sunken) 45%, transparent);
+}
+html:not([data-pointer]) :is(a, button).home-row:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+.home-row__face {
+  display: flex;
+  justify-content: center;
+}
+.home-row__face .ac-avatar {
+  width: 32px;
+  height: 32px;
+}
+.home-row__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.home-row__title {
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.home-row__sub {
+  font-size: 13.5px;
+  line-height: 19px;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-row__meta {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
+}
+/* The button sits on the first line, beside the title. */
+.home-row__act {
+  align-self: start;
+  margin-top: -4px;
+}
+/* A system face (a computer, a request to join): the same 32px tile as a person's. */
+.home-row__sys {
+  width: 32px;
+  height: 32px;
+}
+
+/* First steps: a check in place of the face; a done one reads quieter. */
+.home-step__mark {
+  align-items: center;
+  height: 20px;
+  color: var(--ink);
+}
+.home-step__mark:empty::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 1.6px solid var(--line-strong);
+  border-radius: 50%;
+}
+.home-step[data-done] .home-row__title {
+  color: var(--muted);
+}
+
+.home-calm {
+  margin-bottom: 0;
+}
+
+/* A phone: the button goes under the text, from its start, so the text keeps the row's width. */
+@media (max-width: 640px) {
+  .home-row {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .home-row__act {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 4px;
+  }
+  .home-start {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

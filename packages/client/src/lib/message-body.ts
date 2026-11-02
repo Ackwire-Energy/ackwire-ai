@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
 import { mediaKindOf, mediaWord } from "./media";
+import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
 import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
@@ -34,7 +35,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   // A computer brain stopped mid-turn after its tools ran: what it wrote, then which tools it used.
   const cut = m.brainInterrupted as { brain?: unknown; text?: unknown; tools?: unknown } | undefined;
   if (cut && typeof cut === "object" && typeof cut.text === "string") {
-    const brain = cut.brain === "codex" ? "Codex" : "Claude Code";
+    const brain = brainName(typeof cut.brain === "string" ? cut.brain : null);
     const tools = Array.isArray(cut.tools) ? cut.tools.filter((x) => typeof x === "string").join(", ") : "";
     const note = `_${t("chat.body.brain_interrupted", {
       brain,
@@ -61,9 +62,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
-  const own = signedOut && (noAi?.own === "codex" || noAi?.own === "claude_code") ? noAi.own : null;
+  const own =
+    signedOut && (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor") ? noAi.own : null;
   if (own) {
-    const brain = own === "codex" ? "Codex" : "Claude Code";
+    const brain = brainName(own);
     return t("chat.body.no_ai_not_signed_in", { brain, defaultValue: body });
   }
   if (USAGE_NOTES.has(code)) {
@@ -76,7 +78,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     const plan = params.brain === "Codex" ? "ChatGPT" : "Claude";
     return t("chat.body.plan_limit_wait_unknown", { plan, defaultValue: body });
   }
-  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : code;
+  // A secret request posted before the body named its agent.
+  const anon = code === "secret_request" && typeof params.agent !== "string";
+  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : anon ? "secret_requestAnon" : code;
   const key = `chat.body.${shown}`;
   // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
   return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });

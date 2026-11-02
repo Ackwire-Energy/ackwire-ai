@@ -26,9 +26,11 @@ import {
   type ContextDeps,
   createAgent,
   createAgentRuns,
+  createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
+  createBlockToolSource,
   createChannel,
   createChatToolSource,
   createContextToolSource,
@@ -51,6 +53,7 @@ import {
   createRoutine,
   createScheduleToolSource,
   createToolGateway,
+  createWebToolSource,
   createWorkspaceToolSource,
   drainOutbox,
   enqueue,
@@ -60,11 +63,13 @@ import {
   insertMessage,
   isNoReply,
   type Judge,
+  type JudgeRequest,
   openDm,
   postPersonMessage,
   type RoutineBrief,
   startRoutineRun,
   stretchCardOf,
+  type ToolGateway,
   type ToolSource,
   withJudgeFallback,
 } from "../src";
@@ -75,7 +80,15 @@ import {
   type EvalTurn,
   type Expectations,
 } from "./behavior-checks";
-import { type Canned, CONNECTORS, fakeConnectorSource, fakeMissionSource } from "./behavior-fakes";
+import {
+  type Canned,
+  CONNECTORS,
+  fakeConnectorSource,
+  fakeMissionSource,
+  fakeSecretRequestSource,
+  fakeWebFetch,
+  type WebFixture,
+} from "./behavior-fakes";
 
 // ── Cases ────────────────────────────────────────────────────────────────────
 
@@ -174,6 +187,8 @@ export interface BehaviorCase {
   workspace?: boolean;
   /** The real chat tools (`post_message`, `send_dm`): speaking elsewhere or for someone. */
   chat?: boolean;
+  /** The real `show_block` and `start_poll` (ADR 0113), next to the Drive's tools an agent could reach for instead. */
+  blocks?: boolean;
   /** A `propose_mission` with the real description and findings schema (no computer; recorded only). */
   missions?: boolean;
   /** Issues already in the workspace. */
@@ -182,6 +197,13 @@ export interface BehaviorCase {
   memory?: { kind?: "note" | "fact" | "decision" | "lesson"; title?: string; content: string }[];
   /** Canned results per tool: the first entry whose `when` words all appear in the input wins. */
   fixtures?: Record<string, Canned[]>;
+  /**
+   * The agent reads the web (`web_search`, `web_fetch`, ADR 0109) from this fake web, and how its turns end (and a
+   * routine's report) is judged as in production.
+   */
+  web?: WebFixture;
+  /** The computer's `request_secret` (recorded only, no computer): the secure way to ask for a key. */
+  secretRequest?: boolean;
   expect: Expectations & {
     /** What a good answer does, for the judge. */
     behavior: string;
@@ -310,7 +332,7 @@ export interface RunOptions {
 }
 
 /** The judgments of agents working together that a case where they do asks of production's judge. */
-const TOGETHER = new Set(["note_reply", "follow_through", "mention_needs_nothing"]);
+const TOGETHER = new Set(["note_reply", "follow_through", "mention_needs_nothing", "ask_check"]);
 
 /** A case's conversation with every person's line in one language. */
 function inLanguage(
@@ -374,6 +396,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       [
         ...(c.connectors ?? []).flatMap((id) => [...new Set(CONNECTORS[id].map((t) => t.scope))]),
         ...(c.issues ? ["issues:read", "issues:write"] : []),
+        ...(c.blocks ? ["drive:read", "drive:write"] : []),
+        ...(c.secretRequest ? ["sandbox:run"] : []),
       ].map((scope) => ({ connectionId: null, scope })),
     );
 
@@ -403,8 +427,10 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         "dias úteis às 9h": { rule: { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["09:00"] } },
       }),
     };
+    // With a web, a give-up report and a question to a person are judged first (ADR 0109).
+    const resourceful = c.web ? { name: "eval", ask: (r: JudgeRequest) => (context.judge as Judge).ask(r) } : null;
     const sources: ToolSource[] = [
-      createAskUserToolSource(),
+      createAskUserToolSource({ judge: resourceful, tools: () => tools }),
       ...(c.schedule ? [createAskAgentToolSource({ pubsub }), createScheduleToolSource({ pubsub, context })] : []),
       // Colleagues that really run: who they are, and ask_agent and tell_agent to reach them.
       ...(together ? [createFindAgentToolSource()] : []),
@@ -412,7 +438,10 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       createReactToolSource({ pubsub }),
       createMediaToolSource({ pubsub, gifs: c.noGifs ? null : createFakeGifs() }),
       // Routine cases run in the background and speak through it.
-      createHandOffToolSource({ pubsub }),
+      createHandOffToolSource({ pubsub, judge: resourceful, tools: () => tools }),
+      ...(c.web
+        ? [createWebToolSource({ fetch: fakeWebFetch(c.web), resolveHost: async () => ["93.184.216.34"] })]
+        : []),
       // Runs nobody called by name may pass (offered only to them, as in production).
       createPassToolSource(),
       createContextToolSource(context),
@@ -430,11 +459,23 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
             }),
           ]
         : []),
+      ...(c.blocks
+        ? (() => {
+            const blobs = createBlobStoreResolver({
+              db,
+              keyWrappers: [keyWrapper],
+              platform: createMemoryBlobStore(),
+            });
+            const deps = { db, blobs, pubsub };
+            return [createArtifactToolSource(deps), createBlockToolSource(deps)];
+          })()
+        : []),
       ...(c.missions ? [fakeMissionSource().source] : []),
+      ...(c.secretRequest ? [fakeSecretRequestSource()] : []),
       ...fakes.map((f) => f.source),
     ];
-    const tools = createToolGateway({ sources });
-    if (together) {
+    const tools: ToolGateway = createToolGateway({ sources });
+    if (together || c.web) {
       // How agents work together is judged as in production (ADR 0089, ADR 0095): Jev, the cheap model as fallback.
       const llmJudge = createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" });
       const real =

@@ -1,6 +1,6 @@
 import { and, type Executor, eq, inArray, isNull, or, type SQL, schema, sql } from "@agenteschat/db";
 
-const { wikiPages, wikiLinks } = schema;
+const { wikiPages, wikiLinks, channels, channelMembers, organizationMembers } = schema;
 
 /** One `[[…]]` in a text: `[[Title]]`, `[[Folder/Title|text]]`, `[[Page#section]]`. */
 export interface WikiLinkRef {
@@ -39,6 +39,50 @@ export function wikiPageVisibleSql(userId: string | SQL) {
       where vm.org_id = ${wikiPages.orgId} and vm.user_id = ${userId} and vm.role = 'owner')
     or exists (select 1 from organization_member_roles vr
       where vr.org_id = ${wikiPages.orgId} and vr.user_id = ${userId} and vr.role_id = any(${wikiPages.audienceRoleIds})))`;
+}
+
+/**
+ * Whether the agent `agentId` reads a wiki page, as a condition over `wiki_pages`: every page but one limited to other
+ * agents. `agentId` may be a column, to ask it for every row of another table.
+ */
+export function wikiPageAgentVisibleSql(agentId: string | SQL) {
+  return sql<boolean>`(not ${wikiPages.agentsLimited} or ${agentId} = any(${wikiPages.audienceAgentIds}))`;
+}
+
+/** Whose eyes an agent's work reaches: the agent, the person behind it, and who reads the conversation it answers in. */
+export interface WikiRun {
+  agentId: string;
+  /** Null when nobody is behind it: no limited page is read for nobody. */
+  personId: string | null;
+  channelId: string | null;
+}
+
+/**
+ * Whether a run may read a wiki page, as a condition over `wiki_pages` (ADR 0023 addendum): only when the agent, the
+ * person behind the run and everyone who reads its conversation all see it. An agent's output reaches them, so this is
+ * checked before the text ever reaches the agent, and a page that fails is simply not there. A public channel and a
+ * forum are read by the whole workspace, members of them or not.
+ */
+export function wikiPageRunVisibleSql(run: WikiRun) {
+  const parts = [
+    wikiPageAgentVisibleSql(run.agentId),
+    run.personId ? wikiPageVisibleSql(run.personId) : sql`not ${wikiPages.restricted}`,
+  ];
+  if (run.channelId) {
+    const inChannel = eq(channelMembers.channelId, run.channelId);
+    parts.push(
+      sql`not exists (select 1 from ${channelMembers} where ${inChannel} and ${channelMembers.userId} is not null
+        and not ${wikiPageVisibleSql(sql`${channelMembers.userId}`)})`,
+      sql`not exists (select 1 from ${channelMembers} where ${inChannel} and ${channelMembers.agentId} is not null
+        and not ${wikiPageAgentVisibleSql(sql`${channelMembers.agentId}`)})`,
+      sql`not exists (select 1 from ${channels}
+        join ${organizationMembers} on ${organizationMembers.orgId} = ${channels.orgId}
+        where ${channels.id} = ${run.channelId}
+        and (${channels.kind} = 'forum' or (${channels.kind} = 'channel' and ${channels.visibility} = 'public'))
+        and not ${wikiPageVisibleSql(sql`${organizationMembers.userId}`)})`,
+    );
+  }
+  return and(...parts) as SQL<unknown>;
 }
 
 /** Of these page ids, the ones `userId` sees. */

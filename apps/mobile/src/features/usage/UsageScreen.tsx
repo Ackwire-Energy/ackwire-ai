@@ -1,5 +1,13 @@
 import type { OrgPlanUsage, PlanAccountUsage } from "@agenteschat/client";
-import { useApi, usePlanUsage, useSettings, useUpdateSettings, useUsageReport } from "@agenteschat/client";
+import {
+  useApi,
+  useComposioUsage,
+  usePlanUsage,
+  useSettings,
+  useUpdateSettings,
+  useUsageReport,
+} from "@agenteschat/client";
+import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { formatPercent, formatShortDate, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { noWindowsText, partedUsage } from "@agenteschat/client/lib/plan-usage";
@@ -33,6 +41,8 @@ export function UsageScreen() {
   const usage = usePlanUsage(orgId);
   const allowed = can(org, "view_usage");
   const report = useUsageReport(orgId, allowed);
+  // Calls, not money: every member sees them (ADR 0107 §7).
+  const composio = useComposioUsage(orgId);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
@@ -87,6 +97,11 @@ export function UsageScreen() {
             </UsageCard>
             <ApiCard data={data} />
           </>
+        ) : null}
+        {composio.data && showsComposioUsage(composio.data) ? (
+          <UsageCard icon="chart" title={composioUsageText(t, i18n.language, composio.data)}>
+            {null}
+          </UsageCard>
         ) : null}
         {allowed && report.data ? (
           <UsageCard icon="chart" title={t("settings.usageTitle")}>

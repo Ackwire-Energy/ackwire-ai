@@ -122,6 +122,14 @@ export const agentRuns = pgTable(
      * "working now" from a live run, and "stalled" when none is alive.
      */
     issueId: uuid(),
+    /**
+     * The browser this run is in (ADR 0110), set by `browser_profile`: a profile, or null for the agent's default.
+     * `browserProfileTurnAt`: when it last took that profile's turn; a run that held a turn another took since
+     * doesn't run its next command (the page may have changed under it).
+     */
+    browserProfileId: uuid(),
+    browserProfileOwn: boolean(),
+    browserProfileTurnAt: timestamp({ withTimezone: true }),
     /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */
     heartbeatAt: timestamp({ withTimezone: true }),
     /**
@@ -400,6 +408,13 @@ export const approvals = pgTable(
      * server's own tool name and the actions it wraps, `approval_rules`). Null = not offered.
      */
     approveAlways: jsonb().$type<{ tool: string; actions: string[] }>(),
+    /**
+     * Approved ahead (ADR 0015 addendum, 2026-10-31): the routine whose run at `run_at` (that run's slot) this exact
+     * action is for. Once approved, that run does it without asking until `run_at` plus a short grace. Both null for
+     * an action that runs as soon as it is approved.
+     */
+    routineId: uuid(),
+    runAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -407,6 +422,7 @@ export const approvals = pgTable(
     unique().on(t.runId, t.toolUseId),
     index().on(t.orgId, t.status, t.createdAt),
     index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+    index().on(t.routineId, t.runAt).where(sql`${t.runAt} is not null`),
   ],
 );
 
@@ -697,6 +713,8 @@ export const secretRequests = pgTable(
     deliveredSize: integer(),
     /** Removed from the computer (the row stays for the record). */
     removedAt: timestamp({ withTimezone: true }),
+    /** When asked, the agent already held this name on this computer: a delivery replaces that value. */
+    replaces: boolean().notNull().default(false),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

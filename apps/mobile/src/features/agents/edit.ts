@@ -1,4 +1,4 @@
-import type { AgentInput } from "@agenteschat/client";
+import type { AgentAudience, AgentInput } from "@agenteschat/client";
 import {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
@@ -6,6 +6,7 @@ import {
   type AgentAccessory,
   type AgentColor,
   type AgentEyes,
+  colorOf,
 } from "../shared/logic";
 
 /**
@@ -26,7 +27,7 @@ const pick = <T extends string>(list: readonly T[], v: unknown, fallback: T): T 
 export function fullLook(appearance: unknown): FullLook {
   const o = (appearance && typeof appearance === "object" ? appearance : {}) as Record<string, unknown>;
   return {
-    color: pick(AGENT_COLORS, o.color, "sky"),
+    color: colorOf(o.color) ?? "sky",
     eyes: pick(AGENT_EYES, o.eyes, "round"),
     accessory: pick(AGENT_ACCESSORIES, o.accessory, "none"),
   };
@@ -45,12 +46,15 @@ export function shuffleLook(current: FullLook, rand: () => number = Math.random)
   return { ...current, color: AGENT_COLORS.find((c) => c !== current.color) ?? current.color };
 }
 
-export type AgentEditField = "name" | "role" | "instructions" | "look" | "coordinator";
+export type AgentEditField = "name" | "role" | "instructions" | "look" | "coordinator" | "consultable";
 
-/** Who manages agents changes everything here; the agent's own person, its look (as on the web). */
+/**
+ * Who manages agents changes everything here; the agent's own person, its look and whether other agents may consult
+ * it (who talks to it is theirs too, as on the web).
+ */
 export function editableFields(viewer: { admin: boolean; owner: boolean }): Set<AgentEditField> {
-  if (viewer.admin) return new Set(["name", "role", "instructions", "look", "coordinator"]);
-  if (viewer.owner) return new Set(["look"]);
+  if (viewer.admin) return new Set(["name", "role", "instructions", "look", "coordinator", "consultable"]);
+  if (viewer.owner) return new Set(["look", "consultable"]);
   return new Set();
 }
 
@@ -63,6 +67,8 @@ export interface AgentDraft {
   look: FullLook;
   /** It coordinates the team (ADR 0093). */
   coordinator: boolean;
+  /** Who talks to it; here only its `consultable` switch changes (ADR 0085 addendum). */
+  audience: AgentAudience;
 }
 
 /** What a save sends: only the fields that changed and may be changed; null when there is nothing. */
@@ -80,5 +86,7 @@ export function agentChanges(
   if (fields.has("instructions") && draft.instructions !== saved.instructions) out.instructions = draft.instructions;
   if (fields.has("look") && !sameLook(draft.look, saved.look)) out.appearance = { ...draft.look };
   if (fields.has("coordinator") && draft.coordinator !== saved.coordinator) out.coordinator = draft.coordinator;
+  if (fields.has("consultable") && draft.audience.consultable !== saved.audience.consultable)
+    out.audience = draft.audience;
   return Object.keys(out).length > 0 ? out : null;
 }

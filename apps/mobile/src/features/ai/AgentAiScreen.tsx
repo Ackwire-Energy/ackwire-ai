@@ -1,5 +1,5 @@
 import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
-import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
+import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines, useModels } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedSummary } from "@agenteschat/client/lib/brain-advanced";
@@ -7,21 +7,35 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { brainPlan, isPlanId, planOf } from "@agenteschat/client/lib/plans";
-import { isAuto, providerLabel } from "@agenteschat/client/lib/providers";
+import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, ProviderLogo, Text, useToast } from "@/ui";
+import {
+  Glass,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  ProviderLogo,
+  Text,
+  useReducedMotion,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { advancedOf, openAgentAdvanced } from "./AgentAdvancedScreen";
 import { openAgentSetup } from "./AgentSetupScreen";
+import { EffortRamp, useEffortChoice } from "./EffortRamp";
 import {
   accountInput,
   accountKindOf,
@@ -113,6 +127,9 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     (c) => c.machineId === view?.computer?.machineId,
   );
   const thinks = brainLine(t, agent?.brain, t("brain.model"), { agents: dir.agents });
+  // Through the API: its maker's mark.
+  const models = useModels().data?.models;
+  const thinksMark = thinks.mark ?? apiProviderOf(agent?.model, models ?? []);
   const model = view && kind ? modelRows(t, view, brainPlan(view)).find((r) => r.checked) : undefined;
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
@@ -167,7 +184,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
         <View style={styles.hero}>
-          {thinks.mark ? <ProviderLogo id={thinks.mark} size="hero" /> : null}
+          {thinksMark ? <ProviderLogo id={thinksMark} size="hero" /> : null}
           <Text variant="title2" tone="ink" style={styles.center}>
             {thinks.text}
           </Text>
@@ -315,9 +332,56 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   );
 }
 
+/** How far the dock travels to leave the screen, past its own height. */
+const DOCK_OUT = 28;
+const DOCK_SPRING = { stiffness: 240, damping: 26, mass: 1 };
+
+/**
+ * The effort, floating over the model list in the thumb's reach, whatever is scrolled under it. It slides away with
+ * "Automático", which picks the effort too.
+ */
+function EffortDock({ agentId, shown, onHeight }: { agentId: string; shown: boolean; onHeight: (h: number) => void }) {
+  const { colors, shadows } = useTheme();
+  const reduced = useReducedMotion();
+  const insets = useSafeAreaInsets();
+  const dir = useDirectory();
+  const { orgId } = useOrg();
+  const view = useAgentBrain(orgId, agentId).data;
+  const effort = useEffortChoice(agentId, view ? advancedOf(view).effort : undefined);
+  const out = useSharedValue(shown ? 0 : 1);
+  const height = useSharedValue(0);
+  useEffect(() => {
+    out.value = reduced ? (shown ? 0 : 1) : withSpring(shown ? 0 : 1, DOCK_SPRING);
+  }, [shown, reduced, out]);
+  const slid = useAnimatedStyle(() => ({
+    transform: [{ translateY: out.value * (height.value + insets.bottom + DOCK_OUT) }],
+  }));
+  return (
+    <Animated.View
+      pointerEvents={shown ? "auto" : "none"}
+      accessibilityElementsHidden={!shown}
+      importantForAccessibility={shown ? "auto" : "no-hide-descendants"}
+      onLayout={(e) => {
+        height.value = e.nativeEvent.layout.height;
+        onHeight(e.nativeEvent.layout.height);
+      }}
+      style={[styles.dock, { bottom: insets.bottom + 8, boxShadow: shadows.e2 }, slid]}
+    >
+      <Glass liquid intensity={70} style={[styles.dockGlass, { borderColor: colors.line2 }]}>
+        <EffortRamp
+          value={effort.value}
+          onChange={effort.change}
+          color={agentLook(dir.agentById.get(agentId)).color}
+          disabled={view?.canEdit !== true}
+        />
+      </Glass>
+    </Animated.View>
+  );
+}
+
 /**
  * The agent's model, pushed from its AI ("Modelo"): Automático, or one of its brain's models (every model of its
- * coding plan, with what each is sold as). A tap saves at once.
+ * coding plan, with what each is sold as), and with a fixed model how hard it thinks. A tap saves at once.
  */
 export function AgentModelScreen({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
@@ -333,12 +397,15 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
   const rows = view ? modelRows(t, view, plan) : [];
   // A model without a maker of its own wears its plan's mark, else its brain's.
   const mark = (plan && view?.accounts.find((a) => a.id === view.account)?.provider) || (view?.brain ?? "");
+  const hasModels = view !== undefined && view.brain !== "model";
+  const fixed = hasModels && !isAuto(view.effectiveModel);
+  const [dock, setDock] = useState(0);
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("agentPage.work.brain.planModel")} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 + (fixed ? dock : 0) }]}
       >
         {brain.isPending ? (
           <ActivityIndicator color={c.muted} style={styles.loading} />
@@ -376,6 +443,7 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
           ))
         )}
       </ScrollView>
+      {hasModels ? <EffortDock agentId={agentId} shown={fixed} onHeight={setDock} /> : null}
     </View>
   );
 }
@@ -389,4 +457,13 @@ const styles = StyleSheet.create({
   meter: { paddingHorizontal: 14, paddingVertical: 12 },
   // A list without a header keeps a header's room above it.
   advanced: { marginTop: 18 },
+  dock: { position: "absolute", left: 10, right: 10, borderRadius: 28 },
+  dockGlass: {
+    paddingHorizontal: 15,
+    paddingTop: 13,
+    paddingBottom: 10,
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
 });
