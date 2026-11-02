@@ -3206,6 +3206,7 @@ export const ptBR = {
         budget_exceeded: "O orçamento do mês acabou.",
         too_many_tool_calls: "Passou do limite de ferramentas numa execução.",
         stuck: "Parou porque travou.",
+        brain_interrupted: "A IA parou antes de terminar.",
         empty_reply: "O modelo não respondeu nada.",
         model_refused: "O modelo se recusou a responder.",
         agent_archived: "O agente foi arquivado.",
@@ -4244,6 +4245,7 @@ export const ptBR = {
     event: {
       work_update: "{{text}}",
       work_stopped: "parou o trabalho em segundo plano",
+      shared_everyone: "mostrou o cartão para todo o workspace",
       created: "criou a tarefa",
       renamed: "renomeou a tarefa",
       description_changed: "editou a descrição",

@@ -229,7 +229,7 @@ export async function setup(
     /** Add long work's tools (work_in_background, post_update, steer_work, stop_work; ADR 0121). */
     workTools?: boolean;
     /** Long work's safety net (ADR 0121 §1). None: off (no test moves by accident). */
-    workAuto?: { afterMs?: number; afterCalls?: number; tickMs?: number };
+    workAuto?: { afterMs?: number; afterCalls?: number; minMs?: number; tickMs?: number };
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -387,6 +387,7 @@ export async function setup(
     ...(options.quietMs ? { quietMs: options.quietMs } : {}),
     workAutoAfterMs: options.workAuto?.afterMs ?? 24 * 3600_000,
     workAutoAfterCalls: options.workAuto?.afterCalls ?? 100_000,
+    workAutoMinMs: options.workAuto?.minMs,
     workTickMs: options.workAuto?.tickMs ?? 60_000,
   };
   const handlers = createJobHandlers(jobDeps);

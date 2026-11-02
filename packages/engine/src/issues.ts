@@ -503,6 +503,8 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
       return s(data.text) ? out(event, { text: s(data.text) as string }) : {};
     case "work_stopped":
       return out(event, s(data.byUserId) ? { byUserId: s(data.byUserId) as string } : {});
+    case "shared_everyone":
+      return out(event, {});
     case "forum_opened":
     case "forum_evaluated":
       return s(data.title) ? out(event, { title: s(data.title) as string, topicId: s(data.topicId) ?? "" }) : {};
@@ -1267,8 +1269,14 @@ export async function linkIssueToWork(
   const actor: IssueActor = { type: "agent", agentId: run.agentId, channelId: run.channelId, runId: run.id };
   let issueId: string | null = null;
   if (input.number !== undefined) {
-    const found = await findVisible(deps.db, actor, run.orgId, { number: input.number }).catch(() => null);
-    issueId = found?.id ?? null;
+    // Only a card the person behind the work can read, in this conversation or workspace-wide: its updates must not
+    // carry the conversation to readers it doesn't have.
+    const found = work.requestedByUserId
+      ? await findVisible(deps.db, { type: "person", userId: work.requestedByUserId }, run.orgId, {
+          number: input.number,
+        }).catch(() => null)
+      : null;
+    issueId = found && (found.channelId === null || found.channelId === work.channelId) ? found.id : null;
   }
   issueId ??= run.issueId;
   if (!issueId) {
@@ -1368,15 +1376,43 @@ export async function setWorkIssueState(
   await announce(deps.pubsub, work.orgId, await one(deps.db, row), "issue.updated");
 }
 
-/** "Mostrar para todos" (ADR 0121 §4): a card someone can read is shared with the whole workspace. */
+/**
+ * "Mostrar para todos" (ADR 0121 §4): a card made from an agent's background work, seen by who reads its conversation,
+ * is shared with the whole workspace by who asked for that work, who created the card or an admin. Any other issue
+ * keeps its channel.
+ */
 export async function shareIssueWithEveryone(deps: IssueDeps, actor: IssueActor, orgId: string, issueId: string) {
   const current = await findVisible(deps.db, actor, orgId, { id: issueId });
   if (!current.channelId) return one(deps.db, current);
-  const [row] = await deps.db
-    .update(issues)
-    .set({ channelId: null, updatedAt: new Date() })
-    .where(eq(issues.id, current.id))
-    .returning();
+  if (actor.type !== "person") throw new ForbiddenError();
+  const [work] = await deps.db
+    .select({ requestedByUserId: schema.agentWorks.requestedByUserId })
+    .from(schema.agentWorks)
+    .where(and(eq(schema.agentWorks.orgId, orgId), eq(schema.agentWorks.issueId, current.id)))
+    .orderBy(desc(schema.agentWorks.createdAt))
+    .limit(1);
+  const source = current.source as { type?: string; workId?: string };
+  if (!work && !(source.type === "agent" && source.workId)) throw new ForbiddenError();
+  const membership = await requireActiveMembership(deps.db, actor.userId, orgId);
+  const creator = current.createdByType === "person" && current.createdById === actor.userId;
+  if (work?.requestedByUserId !== actor.userId && !creator && !can(membership, "manage_agents"))
+    throw new ForbiddenError();
+  const row = await deps.db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(issues)
+      .set({ channelId: null, updatedAt: new Date() })
+      .where(eq(issues.id, current.id))
+      .returning();
+    if (updated)
+      await addActivity(tx, updated, {
+        kind: "event",
+        author: actorOf(actor),
+        text: "showed the card to everyone in the workspace",
+        event: "shared_everyone",
+        data: { channelId: current.channelId },
+      });
+    return updated;
+  });
   const view = await one(deps.db, row ?? current);
   await announce(deps.pubsub, orgId, view, "issue.updated");
   return view;

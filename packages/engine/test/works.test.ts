@@ -8,6 +8,7 @@ import {
   checkInWork,
   continueRun,
   createAgent,
+  createChannel,
   createIssue,
   createJobHandlers,
   drainOutbox,
@@ -288,7 +289,7 @@ test("the safety net counts calls too", async () => {
   f = await setup({
     workTools: true,
     toolSources: [quick],
-    workAuto: { afterCalls: 2, tickMs: 10 },
+    workAuto: { afterCalls: 2, minMs: 50, tickMs: 10 },
     reply: (_req, call) =>
       call <= 4 ? { chunks: [], toolUses: [{ name: "look", input: {} }] } : { chunks: ["Feito."] },
   });
@@ -296,6 +297,35 @@ test("the safety net counts calls too", async () => {
   await drainOutbox(f.db, f.handlers);
   const [work] = await works();
   expect(work?.how).toBe("auto");
+});
+
+test("the safety net leaves a quick answer of many fast calls in the conversation", async () => {
+  const quick: ToolSource = {
+    name: "quick",
+    tools: async () => [
+      {
+        name: "look",
+        description: "Look",
+        scope: "context:read",
+        inputSchema: { type: "object", properties: {} },
+        execute: async () => {
+          await Bun.sleep(5);
+          return { content: "ok" };
+        },
+      },
+    ],
+  };
+  f = await setup({
+    workTools: true,
+    toolSources: [quick],
+    workAuto: { afterCalls: 2, tickMs: 10 },
+    reply: (_req, call) =>
+      call <= 6 ? { chunks: [], toolUses: [{ name: "look", input: {} }] } : { chunks: ["Está em config/upload.ts."] },
+  });
+  await ask("@dev onde está o limite de upload?");
+  await drainOutbox(f.db, f.handlers);
+  expect(await works()).toHaveLength(0);
+  expect((await messages()).at(-1)).toMatchObject({ body: "Está em config/upload.ts.", threadId: null });
 });
 
 test("the promise: a nudge when no update came, then exactly one update of the server's; a racing update wins", async () => {
@@ -464,6 +494,97 @@ test("a work 15 minutes old gets its card at its check-in", async () => {
   expect(w?.issueId).not.toBeNull();
 });
 
+test("a work that posts its updates on time still gets its card at 15 minutes", async () => {
+  f = await setup();
+  const run = await working("@dev roda a migração");
+  const { work } = await moved(run, { title: "Migrar a cobrança" });
+  const t0 = work.startedAt.getTime();
+  expect((await postWorkUpdate(deps(), run.id, { text: "Lendo o esquema." }, new Date(t0 + 8 * 60_000))).ok).toBe(true);
+  // The move queued the card's own check, at 15 minutes.
+  const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, WORK_CHECK_IN_JOB));
+  const card = jobs.find((j) => j.payload.phase === "card");
+  expect(card?.nextAttemptAt.getTime()).toBe(t0 + WORK_LIMITS.cardAfterMs);
+  await checkInWork(deps(), f.org.id, { workId: work.id, seq: 0, phase: "card" }, new Date(t0 + 15 * 60_000));
+  const [w] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, work.id));
+  expect(w?.issueId).not.toBeNull();
+});
+
+test("a fallback queued before a wait doesn't fire on the promise that restarted after it", async () => {
+  f = await setup();
+  const run = await working("@dev roda a migração");
+  const { work } = await moved(run);
+  const due = (work.nextUpdateAt as Date).getTime();
+  expect(await checkInWork(deps(), f.org.id, { workId: work.id, seq: 0, phase: "nudge" }, new Date(due + 1000))).toBe(
+    "nudged",
+  );
+  const [job] = (await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, WORK_CHECK_IN_JOB))).filter(
+    (j) => j.payload.phase === "fallback",
+  );
+  expect(job?.payload.due).toBe(due);
+  const { pauseWorkTimer, resumeWorkTimer } = await import("../src/works");
+  await pauseWorkTimer(deps(), { ...run, workId: work.id });
+  await resumeWorkTimer(deps(), { ...run, workId: work.id }, new Date(due + 2 * 60_000));
+  expect(
+    await checkInWork(
+      deps(),
+      f.org.id,
+      { workId: work.id, seq: 0, phase: "fallback", due },
+      new Date(due + WORK_LIMITS.graceMs),
+    ),
+  ).toBe("none");
+  expect((await messages()).some((m) => m.meta.workUpdate)).toBe(false);
+});
+
+test("updates are plain lines: a @handle in one calls nobody in", async () => {
+  f = await setup();
+  const run = await working("@dev roda a migração");
+  await moved(run);
+  const out = await postWorkUpdate(deps(), run.id, { text: "@dev pode revisar o PR? Falta o @ops." });
+  expect(out.ok && out.message.body).toBe("dev pode revisar o PR? Falta o ops.");
+  expect(await runs()).toHaveLength(1);
+});
+
+test("card_issue: only a card the asker reads, here or workspace-wide; elsewhere a new card is made", async () => {
+  f = await setup();
+  const finance = await createChannel(f.db, f.owner.id, f.org.id, { name: "financeiro", visibility: "private" });
+  await addChannelMember(f.db, f.owner.id, f.org.id, finance.id, { agentId: f.agent.id });
+  const elsewhere = await createIssue(deps(), { type: "person", userId: f.owner.id }, f.org.id, {
+    title: "Fechamento",
+    channelId: finance.id,
+    assignee: { type: "agent", id: f.agent.id },
+  });
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  const run = await working("pega a #1", undefined, dm.id);
+  const out = await moved(run, { card: elsewhere.number });
+  const [w] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, out.work.id));
+  expect(w?.issueId).not.toBe(elsewhere.id);
+  const [card] = await f.db
+    .select()
+    .from(schema.issues)
+    .where(eq(schema.issues.id, w?.issueId ?? ""));
+  expect(card).toMatchObject({ title: "Migrar a cobrança", channelId: dm.id });
+});
+
+test("Mostrar para todos: only a work's card, by who asked for it, its creator or an admin", async () => {
+  f = await setup();
+  const owner = { type: "person" as const, userId: f.owner.id };
+  const { shareIssueWithEveryone } = await import("../src");
+  const plain = await createIssue(deps(), owner, f.org.id, { title: "Confidencial", channelId: f.general.id });
+  await expect(shareIssueWithEveryone(deps(), owner, f.org.id, plain.id)).rejects.toThrow();
+  const run = await working("@dev monta o relatório");
+  const made = await moved(run, { card: true, title: "Relatório" });
+  const [w] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, made.work.id));
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await expect(
+    shareIssueWithEveryone(deps(), { type: "person", userId: bia.id }, f.org.id, w?.issueId ?? ""),
+  ).rejects.toThrow();
+  const shared = await shareIssueWithEveryone(deps(), owner, f.org.id, w?.issueId ?? "");
+  expect(shared.channelId).toBeNull();
+  const activity = await f.db.select().from(schema.issueActivity);
+  expect(activity.some((a) => a.event === "shared_everyone")).toBe(true);
+});
+
 test("caps: an agent's 4th work waits in line, with its place, and starts when one ends", async () => {
   f = await setup();
   const out = [];
@@ -523,6 +644,20 @@ test("restarts: a terminal run with a live work is closed once by the sweep, eve
   expect(ends[0]?.meta.workEnd).toMatchObject({ status: "failed", errorCode: "run.interrupted" });
 });
 
+test("the sweep closes a work whose run is gone without stopping at it", async () => {
+  f = await setup();
+  const orphan = await moved(await working("@dev um"), { title: "Um" });
+  const ended = await moved(await working("@dev dois"), { title: "Dois" });
+  await f.db.update(schema.agentRuns).set({ workId: null }).where(eq(schema.agentRuns.workId, orphan.work.id));
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "failed", error: "budget_exceeded" })
+    .where(eq(schema.agentRuns.workId, ended.work.id));
+  expect(await reconcileWorks(deps())).toBe(2);
+  const all = await works();
+  expect(all.map((w) => w.status)).toEqual(["failed", "failed"]);
+});
+
 test("the agent's status: one work, two, three, and one that waits", async () => {
   f = await setup();
   const status = async () => (await loadAgentStatuses(f.db, f.org.id)).find((s) => s.agentId === f.agent.id);
@@ -570,7 +705,14 @@ test("Continuar on a work stopped at its step limit carries the same work", asyn
   const [stopped] = await runs();
   const [work] = await works();
   expect(stopped?.workId).toBe(work?.id as string);
-  expect(work?.status).toBe("done");
+  // Out of steps isn't done: its line says it didn't finish and why, and the report (with Continuar) is home.
+  expect(work?.status).toBe("failed");
+  expect((await workView(f.db, f.org.id, work?.id ?? ""))?.errorCode).toBe("run.too_many_tool_calls");
+  const report = (await messages()).find((m) => m.id === work?.resultMessageId);
+  expect(report?.threadId).toBeNull();
+  expect(report?.meta.workEnd).toMatchObject({ id: work?.id, status: "failed", errorCode: "run.too_many_tool_calls" });
+  expect(report?.meta.stepLimit).toBeDefined();
+  expect((await messages()).some((m) => m.meta.workEnd && m.id !== report?.id)).toBe(false);
   const { runId } = await continueRun(deps(), f.owner.id, f.org.id, stopped?.id ?? "");
   const [next] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, runId));
   expect(next?.workId).toBe(work?.id as string);

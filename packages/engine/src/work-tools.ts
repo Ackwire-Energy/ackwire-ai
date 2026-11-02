@@ -29,6 +29,9 @@ export const movedNote = (minutes: number) =>
 export const queuedNote =
   "This is now background work (people were told), but it waits in line: enough of your work is already running. Stop here without a reply; you'll be resumed here by yourself when it starts.";
 
+/** What a work that waited in line reads when its turn comes. */
+export const workStartsNote = `Your background work's turn came: go on with it now. Post short progress with ${POST_UPDATE_TOOL}; your final message is your report.`;
+
 const planSchema = {
   type: "array",
   maxItems: WORK_LIMITS.planMax,

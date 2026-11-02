@@ -48,6 +48,8 @@ export const WORK_LIMITS = {
 /** The deterministic safety net (§1): a run still in the conversation after this much active time, or this many calls. */
 export const WORK_AUTO_AFTER_MS = 4 * 60_000;
 export const WORK_AUTO_AFTER_CALLS = 20;
+/** The call count moves a run only after this much active time: many fast calls are still a quick answer. */
+export const WORK_AUTO_MIN_MS = 90_000;
 
 /** An API-model work run hands its job back after this long (the outbox lease ceiling is hours away). */
 export const WORK_JOB_YIELD_MS = 60 * 60_000;
@@ -80,13 +82,19 @@ const clampNext = (n: unknown) =>
     ),
   );
 
+/** One plain line: credentials masked, and no @handle, so an update never calls another agent or person in. */
 const plainText = (s: unknown, max: number) =>
   cutText(
     maskCredentials(String(s ?? ""))
+      .replace(/(^|[^\w@.])@(?=[a-zA-Z0-9])/g, "$1")
       .replace(/\s+/g, " ")
       .trim(),
     max,
   );
+
+/** Moves and releases count live works against the caps one at a time per workspace (§7). */
+const lockWorkCaps = (tx: Executor, orgId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`agent-works:${orgId}`}))`);
 
 /** A plan as the agent gave it: at most 12 steps of plain text, each with its state. */
 export function cleanPlan(input: unknown): WorkPlanItem[] | null {
@@ -193,6 +201,18 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
         ).map((i) => [i.id, i.number]),
       )
     : new Map<string, number>();
+  // A run that ended `done` with a work that didn't finish (out of steps, stuck, cut off) says why on its report.
+  const reportIds = rows.flatMap((r) => (r.status === "failed" && r.resultMessageId ? [r.resultMessageId] : []));
+  const reportCodes = reportIds.length
+    ? new Map(
+        (
+          await db
+            .select({ id: messages.id, code: sql<string | null>`${messages.meta}->'workEnd'->>'errorCode'` })
+            .from(messages)
+            .where(and(eq(messages.orgId, orgId), inArray(messages.id, reportIds)))
+        ).map((m) => [m.id, m.code]),
+      )
+    : new Map<string, string | null>();
   for (const w of rows) {
     const run = runs.find((r) => r.workId === w.id);
     const status = w.status as WorkStatus;
@@ -239,7 +259,7 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
       queuePosition: state === "queued" ? Math.max(1, mine.findIndex((l) => l.id === w.id) + 1) : null,
       pausedUntil: state === "paused" ? (run?.until ?? null) : null,
       canceledByUserId: status === "canceled" && run?.error?.startsWith("canceled_by:") ? run.error.slice(12) : null,
-      errorCode: detail?.errorCode ?? null,
+      errorCode: detail?.errorCode ?? (w.resultMessageId ? (reportCodes.get(w.resultMessageId) ?? null) : null),
     });
   }
   return out;
@@ -320,6 +340,7 @@ export async function moveToBackground(
   const moved = await db.transaction(async (tx) => {
     const [run] = await tx.select().from(agentRuns).where(eq(agentRuns.id, runId)).for("update");
     if (!run || run.workId || isTerminal(run.status)) return null;
+    await lockWorkCaps(tx, run.orgId);
     const home = replyThreadOf(run);
     const ownThread = home === null;
     const requester = (await runAuthority(tx, run)).personId;
@@ -373,6 +394,15 @@ export async function moveToBackground(
       .set({ workId, ...(ownThread ? { threadRootId: anchor.id } : {}), updatedAt: now })
       .where(and(eq(agentRuns.id, run.id), isNull(agentRuns.workId)));
     if (!queued) await scheduleCheckIn(tx, work);
+    // The 15-minute card (§4) doesn't wait on a missed update: a work that reports on time gets it too.
+    await enqueue(tx, {
+      orgId: work.orgId,
+      kind: WORK_CHECK_IN_JOB,
+      payload: { workId: work.id, seq: 0, phase: "card" },
+      dedupeKey: `${WORK_CHECK_IN_JOB}:${work.id}:card`,
+      runAt: new Date(work.startedAt.getTime() + WORK_LIMITS.cardAfterMs),
+      maxAttempts: 4,
+    });
     // The work's thread is named after the work, not after "Vou cuidar disso…".
     if (ownThread) {
       await tx
@@ -554,7 +584,7 @@ export async function postWorkUpdate(
 export async function checkInWork(
   deps: { db: Database; pubsub?: PubSub },
   orgId: string,
-  input: { workId: string; seq: number; phase: "nudge" | "fallback" },
+  input: { workId: string; seq: number; phase: "nudge" | "fallback" | "card"; due?: number },
   now = new Date(),
 ): Promise<"none" | "nudged" | "posted"> {
   const { db } = deps;
@@ -562,8 +592,14 @@ export async function checkInWork(
     .select()
     .from(agentWorks)
     .where(and(eq(agentWorks.orgId, orgId), eq(agentWorks.id, input.workId)));
-  if (work?.status !== "live" || work.updateSeq !== input.seq || !work.nextUpdateAt) return "none";
+  if (work?.status !== "live") return "none";
+  // A live work this old gets its card whatever its updates did (§4).
+  if (!work.issueId && now.getTime() - work.startedAt.getTime() >= WORK_LIMITS.cardAfterMs)
+    await ensureWorkCard(deps, work.id, {}).catch(() => null);
+  if (input.phase === "card" || work.updateSeq !== input.seq || !work.nextUpdateAt) return "none";
   if (work.nextUpdateAt.getTime() > now.getTime() + 1000 && input.phase === "nudge") return "none";
+  // The fallback belongs to the promise it was queued for: a wait in between restarted the timer (same seq).
+  if (input.phase === "fallback" && input.due !== undefined && work.nextUpdateAt.getTime() !== input.due) return "none";
   const [run] = await db
     .select()
     .from(agentRuns)
@@ -573,8 +609,6 @@ export async function checkInWork(
   if (!run || isTerminal(run.status)) return "none";
   // Waiting on a person, its plan or its computer: the card that stopped it is the update.
   if (run.status !== "running" && run.status !== "queued") return "none";
-  if (!work.issueId && now.getTime() - work.startedAt.getTime() >= WORK_LIMITS.cardAfterMs)
-    await ensureWorkCard(deps, work.id, {}).catch(() => null);
   if (input.phase === "nudge") {
     const due = work.nextUpdateAt.toISOString().slice(11, 16);
     const delivered = await db.transaction((tx) =>
@@ -587,7 +621,7 @@ export async function checkInWork(
     await enqueue(db, {
       orgId,
       kind: WORK_CHECK_IN_JOB,
-      payload: { workId: work.id, seq: work.updateSeq, phase: "fallback" },
+      payload: { workId: work.id, seq: work.updateSeq, phase: "fallback", due: work.nextUpdateAt.getTime() },
       dedupeKey: `${WORK_CHECK_IN_JOB}:${work.id}:${work.updateSeq}:fallback:${work.nextUpdateAt.getTime()}`,
       runAt: new Date(now.getTime() + WORK_LIMITS.graceMs),
       maxAttempts: 4,
@@ -694,44 +728,54 @@ export async function workQueued(db: Executor, workId: string) {
 
 /**
  * The work's run ended (§3, §7): closes it once (`finished_at is null`), with its report home. A report the run
- * already posted home (`meta.workEnd`) is kept; otherwise (a stop, a failure, an end with nothing to say) the server
- * posts the end there. Its card moves with it and the next work in line starts.
+ * already posted home (`meta.workEnd`) is kept, and its own status counts (a run that ran out of steps, got stuck or
+ * was cut off by its brain ends `done` but its work didn't finish); otherwise (a stop, a failure, an end with nothing
+ * to say) the server posts the end there, with why and the last update. Its card moves with it and the next work in
+ * line starts.
  */
 export async function endWork(
   deps: { db: Database; pubsub?: PubSub },
   run: Pick<AgentRun, "id" | "orgId" | "workId" | "error" | "replyMessageId" | "hop">,
-  status: "done" | "failed" | "canceled",
+  runStatus: "done" | "failed" | "canceled",
   now = new Date(),
 ): Promise<WorkRow | null> {
   if (!run.workId) return null;
   const { db } = deps;
   const ended = await db.transaction(async (tx) => {
+    const [reply] = run.replyMessageId
+      ? await tx
+          .select({ id: messages.id, meta: messages.meta })
+          .from(messages)
+          .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.replyMessageId)))
+      : [];
+    const posted = reply?.meta.workEnd as { id?: unknown; status?: unknown } | undefined;
+    const report = posted?.id === run.workId ? reply : undefined;
+    const status = report && runStatus === "done" && posted?.status === "failed" ? "failed" : runStatus;
     const [work] = await tx
       .update(agentWorks)
       .set({ status, finishedAt: now, nextUpdateAt: null, updatedAt: now })
       .where(and(eq(agentWorks.id, run.workId as string), isNull(agentWorks.finishedAt)))
       .returning();
     if (!work) return null;
-    let resultId: string | null = null;
-    if (run.replyMessageId) {
-      const [reply] = await tx
-        .select({ id: messages.id, meta: messages.meta })
-        .from(messages)
-        .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.replyMessageId)));
-      if (reply && (reply.meta.workEnd as { id?: unknown } | undefined)?.id === work.id) resultId = reply.id;
-    }
+    let resultId = report?.id ?? null;
     let end: Message | null = null;
     if (!resultId) {
       const detail = status === "failed" ? runErrorDetail(run.error) : null;
       const minutes = Math.max(1, Math.round((now.getTime() - work.startedAt.getTime()) / 60_000));
       const byUserId = run.error?.startsWith("canceled_by:") ? run.error.slice(12) : null;
       const locale = await localeOf(tx, work.requestedByUserId);
+      const last = status !== "done" && work.updateSeq > 0 ? work.lastUpdateText : null;
       end = await insertMessage(tx, {
         orgId: work.orgId,
         channelId: work.channelId,
         threadId: work.homeThreadId,
         author: { type: "agent", agentId: work.agentId, runId: run.id, hop: run.hop },
-        body: endText(locale, status, minutes),
+        body: [
+          endText(locale, status, minutes),
+          last ? `${locale === "en" ? "Last update" : "Último update"}: ${last}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
         meta: {
           workEnd: {
             id: work.id,
@@ -739,6 +783,7 @@ export async function endWork(
             minutes,
             ...(detail ? { errorCode: detail.errorCode } : {}),
             ...(byUserId ? { byUserId } : {}),
+            ...(last ? { lastUpdate: last } : {}),
           },
           bodyCode: `work_end_${status}`,
           bodyParams: { minutes: String(minutes), title: work.title },
@@ -752,11 +797,11 @@ export async function endWork(
       .where(eq(agentWorks.id, work.id))
       .returning();
     const released = await releaseQueuedWorks(tx, work.orgId);
-    return { work: closed ?? work, end, released };
+    return { work: closed ?? work, end, released, status };
   });
   if (!ended) return null;
   if (ended.end && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(ended.end));
-  if (ended.work.issueId) await setWorkIssueState(deps, ended.work, { ended: status }).catch(() => null);
+  if (ended.work.issueId) await setWorkIssueState(deps, ended.work, { ended: ended.status }).catch(() => null);
   await announceWork(deps.pubsub, db, ended.work.orgId, ended.work.id);
   for (const id of ended.released) await announceWork(deps.pubsub, db, ended.work.orgId, id);
   return ended.work;
@@ -780,6 +825,7 @@ const endText = (locale: string, status: "done" | "failed" | "canceled", minutes
  * and its parked run is queued again. Returns the released ids.
  */
 export async function releaseQueuedWorks(tx: Executor, orgId: string, now = new Date()): Promise<string[]> {
+  await lockWorkCaps(tx, orgId);
   const queued = await tx
     .select()
     .from(agentWorks)
@@ -856,31 +902,57 @@ export async function reconcileWorks(deps: { db: Database; pubsub?: PubSub }): P
     .select({ id: agentWorks.id, orgId: agentWorks.orgId })
     .from(agentWorks)
     .where(inArray(agentWorks.status, ["live", "queued"]))
+    .orderBy(asc(agentWorks.createdAt))
     .limit(500);
   let closed = 0;
   const orgs = new Set<string>();
   for (const w of open) {
     orgs.add(w.orgId);
-    const [run] = await deps.db
-      .select()
-      .from(agentRuns)
-      .where(eq(agentRuns.workId, w.id))
-      .orderBy(desc(agentRuns.createdAt))
-      .limit(1);
-    if (run && !isTerminal(run.status)) continue;
-    const status = !run ? "failed" : run.status === "done" ? "done" : run.status === "canceled" ? "canceled" : "failed";
-    const ended = await endWork(
-      deps,
-      run ?? { id: "", orgId: w.orgId, workId: w.id, error: null, replyMessageId: null, hop: 1 },
-      status,
-    );
-    if (ended) closed++;
+    // One bad row never stops the sweep: the next tick tries it again.
+    try {
+      const [run] = await deps.db
+        .select()
+        .from(agentRuns)
+        .where(eq(agentRuns.workId, w.id))
+        .orderBy(desc(agentRuns.createdAt))
+        .limit(1);
+      if (run && !isTerminal(run.status)) continue;
+      if (!run) {
+        // Its run is gone: closed without a message (nothing to post it as).
+        const [gone] = await deps.db
+          .update(agentWorks)
+          .set({ status: "failed", finishedAt: new Date(), nextUpdateAt: null, updatedAt: new Date() })
+          .where(and(eq(agentWorks.id, w.id), isNull(agentWorks.finishedAt)))
+          .returning({ id: agentWorks.id });
+        if (gone) {
+          closed++;
+          await announceWork(deps.pubsub, deps.db, w.orgId, w.id);
+        }
+        continue;
+      }
+      const status = run.status === "done" ? "done" : run.status === "canceled" ? "canceled" : "failed";
+      if (await endWork(deps, run, status)) closed++;
+    } catch {}
   }
   for (const orgId of orgs) {
-    const released = await deps.db.transaction((tx) => releaseQueuedWorks(tx, orgId));
-    for (const id of released) await announceWork(deps.pubsub, deps.db, orgId, id);
+    try {
+      const released = await deps.db.transaction((tx) => releaseQueuedWorks(tx, orgId));
+      for (const id of released) await announceWork(deps.pubsub, deps.db, orgId, id);
+    } catch {}
   }
   return closed;
+}
+
+/**
+ * At its turn's end a work's run drops the check-ins and move notes it never read (agent-only `work_check_in`
+ * notices): its report, or the next turn, answers them, and they are no new input to go on with.
+ */
+export async function dropWorkNotices(db: Executor, runId: string) {
+  await db.execute(sql`update ${agentRuns} set pending_message_ids = coalesce(array(
+      select p from unnest(${agentRuns.pendingMessageIds}) p
+      where not exists (select 1 from ${messages} m where m.id = p and m.meta->'notice'->>'kind' = 'work_check_in')
+    ), '{}')
+    where ${agentRuns.id} = ${runId} and cardinality(${agentRuns.pendingMessageIds}) > 0`);
 }
 
 /** Live and queued works of an agent in one conversation (channel), newest first. */

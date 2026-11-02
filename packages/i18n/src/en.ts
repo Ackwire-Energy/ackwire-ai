@@ -3174,6 +3174,7 @@ export const en: Translations = {
         budget_exceeded: "The monthly budget ran out.",
         too_many_tool_calls: "Went over the tool limit for one run.",
         stuck: "Stopped because it got stuck.",
+        brain_interrupted: "The AI stopped before finishing.",
         empty_reply: "The model returned nothing.",
         model_refused: "The model refused to answer.",
         agent_archived: "The agent was archived.",
@@ -4198,6 +4199,7 @@ export const en: Translations = {
     event: {
       work_update: "{{text}}",
       work_stopped: "stopped the background work",
+      shared_everyone: "showed the card to the whole workspace",
       created: "created the task",
       renamed: "renamed the task",
       description_changed: "edited the description",

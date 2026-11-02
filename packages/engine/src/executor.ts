@@ -249,8 +249,9 @@ import {
 } from "./usage-pause";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
-import { movedNote, queuedNote } from "./work-tools";
+import { movedNote, queuedNote, workStartsNote } from "./work-tools";
 import {
+  dropWorkNotices,
   endWork,
   moveToBackground,
   pauseWorkTimer,
@@ -258,6 +259,7 @@ import {
   takeLocalMove,
   WORK_AUTO_AFTER_CALLS,
   WORK_AUTO_AFTER_MS,
+  WORK_AUTO_MIN_MS,
   WORK_IN_BACKGROUND_TOOL,
   WORK_JOB_YIELD_MS,
   WORK_LIMITS,
@@ -313,6 +315,8 @@ export interface EngineDeps {
   /** Long work's safety net (ADR 0121 §1): active time and model calls before a person's run moves, and how often it looks. */
   workAutoAfterMs?: number;
   workAutoAfterCalls?: number;
+  /** Active time before the call count may move it: a quick run of many fast calls stays in the conversation. */
+  workAutoMinMs?: number;
   workTickMs?: number;
   /**
    * How long a run started on a person's message waits for their next one before its first model call
@@ -624,6 +628,10 @@ const ACCOUNT_REFUSALS = new Set([401, 402, 403, 429]);
  */
 export const WRAP_UP_REPLY_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and reply with what you did, where you stopped and what is left, so the person can let you pick up from there.";
+
+/** What a background work's run near its cap reads once (ADR 0121): its report goes where it was asked. */
+export const WRAP_UP_WORK_NOTE =
+  "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and write your report now: what you did, where you stopped and what is left. It goes where you were asked, and the person can let you pick up from there.";
 
 /** The closing line of a conversation run that reached its cap mid-work (`bodyCode` `step_limit`). */
 const STEP_LIMIT_TEXT = "I ran out of steps before finishing.";
@@ -1077,6 +1085,19 @@ async function executeRunInner(
     await loadWorkHome();
     return true;
   };
+  /** Where a closing message goes: a work's report home (where it was asked), else where the run answers. */
+  const workThread = () => (workHome ? workHome.homeThreadId : replyThreadId);
+  /** A work's report marks how the work ended: done, or not finished and why (`errorCode`). */
+  const workEnd = (unfinished?: string) =>
+    workHome
+      ? {
+          workEnd: {
+            id: workHome.id,
+            status: unfinished ? "failed" : "done",
+            ...(unfinished ? { errorCode: unfinished } : {}),
+          },
+        }
+      : {};
   const needsContext = !run.transcript;
   /** What the run's policy refused of the tools the agent's scopes grant: who is behind it held them back. */
   const heldBack: string[] = [];
@@ -1937,12 +1958,14 @@ async function executeRunInner(
   ) => {
     await deferred;
     const t = transcript as Transcript;
+    // Long work (ADR 0121): this closing line is its report, home; out of steps or stuck, it didn't finish.
+    const unfinished = code === "step_limit" ? "run.too_many_tool_calls" : code === "stuck" ? "run.stuck" : undefined;
     const reply = await db.transaction(async (tx) => {
       const m = await post(
         tx,
-        replyThreadId,
+        workThread(),
         text,
-        withFallback(t, withCode({ ...takeMemoryUpdates(t), ...meta }, bodyCode(code))),
+        withFallback(t, withCode({ ...takeMemoryUpdates(t), ...meta, ...workEnd(unfinished) }, bodyCode(code))),
       );
       t.postedUpTo = t.messages.length;
       t.postedCount++;
@@ -2312,9 +2335,10 @@ async function executeRunInner(
       return fail(`brain_interrupted: ${failure.message}`, { code: failure.code, detail: failure.message });
     }
     const reply = await db.transaction(async (tx) => {
-      const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
+      const m = await post(tx, workThread(), said ? `${said}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
         brainInterrupted: { brain: from, code: failure.code, message: failure.message, text: said, tools: executed },
+        ...workEnd("run.brain_interrupted"),
       });
       t.postedUpTo = t.messages.length;
       t.postedCount++;
@@ -2656,6 +2680,17 @@ async function executeRunInner(
     // Released between the check and the park: it goes on now.
     if (!(await workQueued(db, workId))) await wakeQueuedRun(db, run.orgId, run.id, workId, "parked");
   };
+  /** Whether a move made in this turn (taken now) left the work waiting in line. */
+  const workWaitsInLine = async () => {
+    if (takeLocalMove(run.id)) await adoptWork();
+    return Boolean(run.workId && (await workQueued(db, run.workId)));
+  };
+  /** At a turn's end a queued work parks instead of ending: told to go on when its turn in line comes. */
+  const parkQueuedWork = () => {
+    appendUserText(transcript as Transcript, workStartsNote);
+    if (plan.kind !== "model") nextPrompt = workStartsNote;
+    return parkInWorkQueue();
+  };
   /** An API-model work run hands its job back (the lease's ceiling): the next job resumes the transcript as it is. */
   const yieldWorkJob = async () => {
     await deferred;
@@ -2737,10 +2772,14 @@ async function executeRunInner(
   const offWork = deps.pubsub?.subscribe(workTopic(run.id), () => void adoptWork().catch(() => {}));
   const autoAfterMs = deps.workAutoAfterMs ?? WORK_AUTO_AFTER_MS;
   const autoAfterCalls = deps.workAutoAfterCalls ?? WORK_AUTO_AFTER_CALLS;
+  const autoMinMs = deps.workAutoMinMs ?? WORK_AUTO_MIN_MS;
   let autoMoving = false;
+  /** Writing its final answer: nothing left to move. */
+  let closing = false;
   const autoMove = async () => {
-    if (autoMoving || run.workId) return;
-    if (activeMs() < autoAfterMs && run.turns < autoAfterCalls) return;
+    if (autoMoving || closing || run.workId) return;
+    const active = activeMs();
+    if (active < autoAfterMs && (run.turns < autoAfterCalls || active < autoMinMs)) return;
     autoMoving = true;
     if (autoTick) clearInterval(autoTick);
     const [current] = await db.select().from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -2789,6 +2828,7 @@ async function executeRunInner(
     }
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
+      closing = false;
       // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end
       // hands it to a run of its own). A routine's run fails there (its ledger says so), and so does a forum's;
       // any other says it ran out of steps, or that it got stuck, with Continuar.
@@ -2833,7 +2873,7 @@ async function executeRunInner(
         run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
       ) {
         transcript.wrapUpNoted = true;
-        appendUserText(transcript, run.background ? WRAP_UP_NOTE : WRAP_UP_REPLY_NOTE);
+        appendUserText(transcript, run.background ? WRAP_UP_NOTE : run.workId ? WRAP_UP_WORK_NOTE : WRAP_UP_REPLY_NOTE);
         await saveTranscript(db, transcript);
         later(() => addRunStep(db, run, "context", { wrapUp: true }));
       }
@@ -3343,6 +3383,11 @@ async function executeRunInner(
 
       // Final answer.
       if (result.stopReason === "refusal") return fail("model_refused");
+      closing = true;
+      // Long work (ADR 0121): a move its tool made in this turn is taken now, so the answer goes home as the report. A
+      // work still in line parks instead of ending, and the check-ins it never read are no new input.
+      if (await workWaitsInLine()) return parkQueuedWork();
+      if (run.workId) await dropWorkNotices(db, run.id);
       const updates = transcript.memoryUpdates ?? [];
       const saved = (transcript.artifacts ?? []).length > 0 ? "File saved." : "";
       const anythingPosted = transcript.postedCount > 0;
@@ -3425,6 +3470,8 @@ async function executeRunInner(
       // a sticker it sent is an answer: below.)
       if (
         policy.mayPass &&
+        // Background work owes its report.
+        !run.workId &&
         !transcript.answerOwed &&
         !transcript.reacted &&
         !transcript.mediaSent &&
@@ -3623,19 +3670,22 @@ async function executeRunInner(
         }
         continue;
       }
-      // A move its tool made in this turn (a computer brain's, through the bridge): the report goes home.
-      if (takeLocalMove(run.id)) await adoptWork();
+      // A move made since (a computer brain's tool, through the bridge): the report goes home, or it waits in line.
+      if (await workWaitsInLine()) return parkQueuedWork();
       const reply = await db.transaction(async (tx) => {
         // Told to wrap up near its cap, or found stuck twice: this is where it stands, and Continuar under it goes
         // on from here.
         const ended =
           t.stuck?.endAt !== undefined ? { stepLimit: { stuck: true } } : t.wrapUpNoted ? { stepLimit: {} } : {};
-        // Long work (ADR 0121): its report goes home, where it was asked, as a reply that notifies.
-        const home = workHome ? { workEnd: { id: workHome.id, status: "done" } } : {};
+        // Long work (ADR 0121): its report goes home, where it was asked, as a reply that notifies; one that wrapped up
+        // at its cap or stuck didn't finish.
+        const home = workEnd(
+          t.stuck?.endAt !== undefined ? "run.stuck" : t.wrapUpNoted ? "run.too_many_tool_calls" : undefined,
+        );
         const message = text
           ? await post(
               tx,
-              workHome ? workHome.homeThreadId : replyThreadId,
+              workThread(),
               text,
               withFallback(t, withCode({ ...takeMemoryUpdates(t), ...ended, ...home }, code)),
             )

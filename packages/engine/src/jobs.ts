@@ -647,7 +647,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await checkInWork(deps, orgOf(job), {
         workId: String(job.payload.workId),
         seq: Number(job.payload.seq),
-        phase: job.payload.phase === "fallback" ? "fallback" : "nudge",
+        phase: job.payload.phase === "fallback" ? "fallback" : job.payload.phase === "card" ? "card" : "nudge",
+        ...(typeof job.payload.due === "number" ? { due: job.payload.due } : {}),
       });
     },
     "secret.activate": async (job) => {
