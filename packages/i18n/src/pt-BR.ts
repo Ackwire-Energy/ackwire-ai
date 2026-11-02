@@ -6803,7 +6803,6 @@ export const ptBR = {
     audienceAddRow: "Adicionar",
     audienceAddSearch: "Buscar pessoas, papéis e agentes",
     audienceRoles: "Papéis",
-    audienceRemove: "Remover",
     audienceRoleDetail: "Papel",
     audienceAgentDetail: "Agente",
     audiencePeople: "Pessoas",

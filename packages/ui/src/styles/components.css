@@ -8788,7 +8788,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 .ac-access__row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-height: 48px;
   padding: 6px 0;
 }
@@ -8801,6 +8801,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   display: flex;
   justify-content: center;
   width: 32px;
+  margin-right: 4px;
 }
 .ac-access__who {
   flex: 1;
@@ -8820,6 +8821,12 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 .ac-access__row .ac-select {
   flex: none;
   width: 132px;
+}
+.ac-access__remove {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 32px;
 }
 .ac-access__start {
   margin-right: auto;

@@ -35,8 +35,8 @@ export interface AccessDialogLabels {
   addList: string;
   addSearch: string;
   noResults: string;
-  /** The option that takes someone out. */
-  remove: string;
+  /** Accessible name of the button that takes someone out ("Remover Ana"). */
+  removeOf: (name: string) => string;
   /** Accessible name of a row's level ("O que Ana pode fazer"). */
   levelOf: (name: string) => string;
   close: string;
@@ -66,20 +66,22 @@ export interface AccessDialogProps<L extends string = string> {
   onClose: () => void;
 }
 
-const REMOVE = "__remove";
-
 function AccessRow({
   subject,
   value,
   options,
   label,
   onChange,
+  onRemove,
+  removeLabel,
 }: {
   subject: AccessSubject;
   value: string;
   options: SelectOption[];
   label: string;
   onChange: (value: string) => void;
+  onRemove?: () => void;
+  removeLabel?: string;
 }) {
   return (
     <div className="ac-access__row">
@@ -89,6 +91,12 @@ function AccessRow({
         {subject.detail && <span className="ac-access__detail">{subject.detail}</span>}
       </span>
       <Select size="sm" aria-label={label} value={value} onValueChange={onChange} options={options} />
+      {/* A slot in every row, so the levels line up whether or not this one can be taken out. */}
+      <span className="ac-access__remove">
+        {onRemove && (
+          <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={removeLabel} onClick={onRemove} />
+        )}
+      </span>
     </div>
   );
 }
@@ -168,9 +176,11 @@ export function AccessDialog<L extends string = string>({
               key={s.id}
               subject={s}
               value={levelOf(s) as string}
-              options={[...levelsFor(s), { value: REMOVE, label: labels.remove }]}
+              options={levelsFor(s)}
               label={labels.levelOf(s.name)}
-              onChange={(v) => onLevelChange(s, v === REMOVE ? null : (v as L))}
+              onChange={(v) => onLevelChange(s, v as L)}
+              onRemove={() => onLevelChange(s, null)}
+              removeLabel={labels.removeOf(s.name)}
             />
           ))}
         </div>

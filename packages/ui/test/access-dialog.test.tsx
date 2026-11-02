@@ -18,7 +18,7 @@ const labels = {
   addList: "Quem adicionar",
   addSearch: "Buscar",
   noResults: "Ninguém",
-  remove: "Remover",
+  removeOf: (name: string) => `Remover ${name}`,
   levelOf: (name: string) => `Nível de ${name}`,
   close: "Fechar",
   cancel: "Cancelar",
@@ -85,13 +85,15 @@ describe("AccessDialog", () => {
     expect(d.getByRole("combobox", { name: "Nível de Todos" })).toBeTruthy();
     expect(d.getByRole("combobox", { name: "Nível de Ana" })).toBeTruthy();
     expect(d.queryByRole("combobox", { name: "Nível de Bia" })).toBeNull();
+    // Who is always there can't be taken out.
+    expect(d.queryByRole("button", { name: "Remover Todos" })).toBeNull();
   });
 
   test("changing a level, taking someone out and adding someone at the highest level", async () => {
     const { onLevelChange, onBase } = setup();
     await pick("Nível de Ana", "Editar");
     expect(onLevelChange.mock.calls.at(-1)?.slice(1)).toEqual(["edit"]);
-    await pick("Nível de Ana", "Remover");
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Remover Ana" })));
     expect(onLevelChange.mock.calls.at(-1)?.slice(1)).toEqual([null]);
     await pick("Nível de Todos", "Sem acesso");
     expect(onBase).toHaveBeenCalledWith("none");

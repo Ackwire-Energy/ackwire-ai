@@ -6744,7 +6744,6 @@ export const en: Translations = {
     audienceAddRow: "Add",
     audienceAddSearch: "Search people, roles and agents",
     audienceRoles: "Roles",
-    audienceRemove: "Remove",
     audienceRoleDetail: "Role",
     audienceAgentDetail: "Agent",
     audiencePeople: "People",

@@ -259,7 +259,7 @@ function AudienceForm({
         addList: t("wiki.audienceAdd"),
         addSearch: t("wiki.audienceAddSearch"),
         noResults: t("wiki.audienceNoMatch"),
-        remove: t("wiki.audienceRemove"),
+        removeOf: (name) => t("common.removeName", { name }),
         levelOf: (name) => t("wiki.audienceLevel", { name }),
         close: t("common.close"),
         cancel: t("common.cancel"),
