@@ -179,7 +179,13 @@ describe("own message styles", () => {
     // Beside a full-width bubble, at any width with a mouse, the 96px padding holds it (82px) left of the bubble.
     expect(r.get(".ac-msg--own")).toContain("padding-left: 96px");
     const css = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
-    expect(css).toContain("@media (max-width: 600px) and (hover: none) {\n  .ac-msg--own {\n    padding-left: 40px;");
+    // Any bubble may take a narrow row, so wrapped words, code, a table and a file share one left edge; a phone
+    // keeps 64px of it, and with a mouse the time of a run's row goes under the bar standing there.
+    expect(css).toContain("@media (max-width: 600px) {\n  .ac-msg--own > .ac-msg__body {\n    --own-max: 100%;");
+    expect(css).toContain("@media (max-width: 600px) and (hover: none) {\n  .ac-msg--own {\n    padding-left: 64px;");
+    expect(css).toContain(
+      "@media (max-width: 600px) and (hover: hover) and (pointer: fine) {\n  .ac-msg--own > .ac-msg__gutter {\n    margin-top: 40px;",
+    );
     const narrow = css.split("@media (hover: none), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
     expect(narrow).toContain(".ac-msg--own > .ac-msg__body > .ac-msg__actions");
     expect(narrow).toContain("top: -4px;\n    right: 8px;");
@@ -195,7 +201,57 @@ describe("own message styles", () => {
     expect(bubble).toContain("background: var(--own-bubble)");
     expect(bubble).not.toMatch(/#[0-9a-f]{3,8}\b/i);
     expect(r.get(".ac-msg--own.ac-msg--wide > .ac-msg__body")).toContain("--own-max: 100%");
+    // It may grow to the row but stays as wide as what it holds: a small table never sits in a wide empty bubble.
+    expect(r.get(".ac-msg--own.ac-msg--wide > .ac-msg__body")).not.toContain("flex:");
+    expect(r.get(".ac-msg--own.ac-msg--wide .ac-msg__text")).toBeUndefined();
     expect(r.get(".ac-msg--own > .ac-msg__body")).toContain("--own-max: min(70%, 640px)");
     expect(r.get(".ac-msg--own.ac-msg--failed .ac-msg__text")).toContain("var(--danger)");
+  });
+});
+
+describe("code, tables and reactions on my bubble", () => {
+  test("words and a code block in one message are one bubble, the code inside it", async () => {
+    await open([
+      said("j1", "u-joao", "Alguém olhou?", 9),
+      said("w1", "u-walter", "Achei a consulta:\n\n```sql\ncreate index orders_idx on orders (created_at);\n```", 8),
+    ]);
+    const bubbles = row("w1").querySelectorAll(".ac-msg__text");
+    expect(bubbles.length).toBe(1);
+    expect(bubbles[0]?.querySelector("p")?.textContent).toBe("Achei a consulta:");
+    expect(bubbles[0]?.querySelector(".code-card pre")?.textContent).toContain("create index");
+    expect(row("w1").classList.contains("ac-msg--wide")).toBe(true);
+  });
+
+  test("a code card in a message is one plate: the kit's bare-pre plate stays off it, a table takes the page color", async () => {
+    const css = (await Bun.file(`${ROOT}apps/web/src/layout.css`).text()).replace(/\/\*[\s\S]*?\*\//g, "");
+    const block = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    const code = block(".ac-msg__text .code-card__code");
+    for (const decl of ["margin: 0;", "padding: 0 16px 14px;", "background: none;", "border-radius: 0;"])
+      expect(code).toContain(decl);
+    expect(block(".ac-msg--own .ac-msg__text .md__table")).toContain("background: var(--bg);");
+    const kit = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
+    // As far from the bubble's top or bottom edge as from its sides.
+    expect(kit).toContain(
+      ".ac-msg--own .ac-msg__text .md > :is(.code-card, .md__table):first-child {\n  margin-top: 7px;",
+    );
+    expect(kit).toContain(
+      ".ac-msg--own .ac-msg__text .md > :is(.code-card, .md__table):last-child {\n  margin-bottom: 7px;",
+    );
+  });
+
+  test("the reactions' add button shows on touch screens for everyone's rows; mine only puts it first", async () => {
+    const kit = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
+    expect(kit).toContain("@media (hover: none) {\n  .ac-react--add {\n    opacity: 1;");
+    const own = kit.split("\n.ac-msg--own .ac-react--add {")[1]?.split("}")[0] ?? "";
+    expect(own.trim()).toBe("order: -1;");
+    await open([
+      said("j1", "u-joao", "Alguém olhou?", 9, {
+        reactions: [{ reaction: "+1", count: 1, userIds: ["u-walter"] }] as Message["reactions"],
+      }),
+      said("w1", "u-walter", "Olhei agora", 8, {
+        reactions: [{ reaction: "+1", count: 1, userIds: ["u-joao"] }] as Message["reactions"],
+      }),
+    ]);
+    for (const id of ["j1", "w1"]) expect(row(id).querySelector(".ac-reacts .ac-react--add")).toBeTruthy();
   });
 });

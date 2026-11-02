@@ -4991,21 +4991,25 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   flex-direction: column;
   align-items: flex-end;
 }
-/* A code block or a table needs the whole width: the bubble takes the row (`ac-msg--wide`). */
+/*
+ * A code block or a table may need the whole width (`ac-msg--wide`): the bubble can grow to the row, but stays as wide
+ * as what it holds, so a small table never sits in a wide empty bubble; a longer line scrolls inside it.
+ */
 .ac-msg--own.ac-msg--wide > .ac-msg__body {
   --own-max: 100%;
-  flex: 1 1 auto;
 }
-.ac-msg--own.ac-msg--wide .ac-msg__text {
-  align-self: stretch;
+/*
+ * A narrow window: any bubble may take the row, so long words, code, a table and a file all share one left edge. With
+ * a mouse the 96px stays (the bar stands in it, left of the bubble); a phone keeps 64px.
+ */
+@media (max-width: 600px) {
+  .ac-msg--own > .ac-msg__body {
+    --own-max: 100%;
+  }
 }
-/* A phone's width (a narrow window with a mouse keeps the 96px: the bar needs it, left of the bubble). */
 @media (max-width: 600px) and (hover: none) {
   .ac-msg--own {
-    padding-left: 40px;
-  }
-  .ac-msg--own > .ac-msg__body {
-    --own-max: 88%;
+    padding-left: 64px;
   }
 }
 .ac-msg--own .ac-msg__text {
@@ -5024,6 +5028,13 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 }
 .ac-msg--own .ac-msg__text .md > :last-child {
   margin-bottom: 0;
+}
+/* A code block or a table at the bubble's top or bottom edge: as far from it as from its sides (7px + 7px = 14px). */
+.ac-msg--own .ac-msg__text .md > :is(.code-card, .md__table):first-child {
+  margin-top: 7px;
+}
+.ac-msg--own .ac-msg__text .md > :is(.code-card, .md__table):last-child {
+  margin-bottom: 7px;
 }
 .ac-msg--own[data-run="start"] .ac-msg__text {
   border-bottom-right-radius: 6px;
@@ -5144,9 +5155,10 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   visibility: visible;
   opacity: 1;
 }
-@media (max-width: 600px) and (hover: none) {
-  .ac-msg--own.ac-msg--wide {
-    padding-left: 64px;
+/* A narrow window with a mouse: any bubble can reach that column, so every row's time goes under the bar. */
+@media (max-width: 600px) and (hover: hover) and (pointer: fine) {
+  .ac-msg--own > .ac-msg__gutter {
+    margin-top: 40px;
   }
 }
 /*
