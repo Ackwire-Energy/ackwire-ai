@@ -22,15 +22,16 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Row, SectionHeader, Segmented, Text, useToast } from "@/ui";
+import { Row, Text, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
+import { AccessList, type AccessListRow } from "../shared/AccessList";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { ActionList, PushedHeader, successHaptic, Tile } from "../shared/parts";
+import { PushedHeader, successHaptic, Tile } from "../shared/parts";
 
 /**
- * "Quem vê" a wiki page or folder (ADR 0023 addenda), the web's dialog as a screen: a level for everyone and one per
- * role, person and agent, people and agents apart. A tap walks a row through its levels. Owners always read and edit.
- * Inside a limited folder it can only be narrower.
+ * "Acesso" to a wiki page or folder (ADR 0023 addenda), the web's dialog as a screen on the shared `AccessList`: a level
+ * for everyone and one per role, person and agent. Owners always read and edit. Inside a limited folder it can only be
+ * narrower.
  */
 export function WikiAudienceScreen({ slug, folder }: { slug?: string; folder?: string }) {
   const orgId = useOrgId();
@@ -59,9 +60,9 @@ export function WikiAudienceScreen({ slug, folder }: { slug?: string; folder?: s
   );
 }
 
-/** The levels a row walks through: on or off beside "everyone can view", or each one it may reach. */
+/** The levels a row walks through: edits or not beside "everyone can view", or each one it may reach. */
 const rowLevels = (base: WikiLevel, cap: WikiLevel): WikiLevel[] =>
-  base === "view" ? ["none", "edit"] : cap === "edit" ? ["none", "view", "edit"] : ["none", "view"];
+  base === "view" ? ["view", "edit"] : cap === "edit" ? ["none", "view", "edit"] : ["none", "view"];
 
 function Form({
   slug,
@@ -113,12 +114,14 @@ function Form({
       );
     }
   };
-  const levelName = (level: WikiLevel, base: WikiLevel) =>
-    level === "edit"
-      ? t("wiki.audienceLevelEdit")
-      : level === "view" || base === "view"
-        ? t("wiki.audienceLevelView")
-        : t("wiki.audienceLevelNone");
+  const levelName = (level: WikiLevel) =>
+    t(
+      level === "edit"
+        ? "wiki.audienceLevelEdit"
+        : level === "view"
+          ? "wiki.audienceLevelView"
+          : "wiki.audienceLevelNone",
+    );
   const row = (
     group: "roles" | "users" | "agentRows",
     base: WikiLevel,
@@ -127,36 +130,28 @@ function Form({
     icon: "shield" | "person",
     label: string,
     hint?: string,
-  ) => {
+  ): AccessListRow<WikiLevel> => {
     const level = draft[group][key] ?? "none";
-    const levels = rowLevels(base, rowCap);
     return {
       key,
       icon,
       label,
       ...(hint ? { hint } : {}),
-      trailing: (
-        <Text variant="subhead" tone="faint">
-          {levelName(level, base)}
-        </Text>
-      ),
-      onPress: () =>
-        setDraft((d) => ({
-          ...d,
-          [group]: { ...d[group], [key]: levels[(levels.indexOf(level) + 1) % levels.length] ?? "none" },
-        })),
+      // With everyone viewing, a row is only "this one edits too".
+      level: base === "view" && level !== "edit" ? "view" : level,
+      levels: rowLevels(base, rowCap),
+      onChange: (next) => setDraft((d) => ({ ...d, [group]: { ...d[group], [key]: next } })),
     };
   };
-  const baseItems = (allowed: WikiLevel[]) =>
-    allowed.map((level) => ({
-      key: level,
-      label:
-        level === "edit"
-          ? t("wiki.audienceBaseEdit")
-          : level === "view"
-            ? t("wiki.audienceBaseView")
-            : t("wiki.audienceBaseChosen"),
-    }));
+  const base = (key: "people" | "agents", label: string, hint: string, icon: "person"): AccessListRow<WikiLevel> => ({
+    key,
+    icon,
+    label,
+    hint,
+    level: draft[key],
+    levels: [...wikiBaseLevels(cap[key])].reverse(),
+    onChange: (next) => setDraft((d) => ({ ...d, [key]: next })),
+  });
   const roleList = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r))).filter(
     (r) => wikiRowCap(cap.people, cap.roles[r.id]) !== "none",
   );
@@ -177,50 +172,39 @@ function Form({
             {t("wiki.audienceInFolder", { folder: above.folder })}
           </Text>
         ) : null}
-        <SectionHeader title={t("wiki.audiencePeople")} />
-        <View style={styles.list}>
-          <Segmented
-            items={baseItems(wikiBaseLevels(cap.people))}
-            value={draft.people}
-            onChange={(key) => setDraft((d) => ({ ...d, people: key as WikiLevel }))}
-          />
-        </View>
+        <AccessList
+          levelName={levelName}
+          rows={[
+            base("people", t("wiki.audienceEveryone"), t("wiki.audienceEveryoneText"), "person"),
+            base("agents", t("wiki.audienceAgentsAll"), t("wiki.audienceAgentsAllText"), "person"),
+          ]}
+        />
         {draft.people !== "edit" ? (
           <>
-            <SectionHeader title={t("wiki.audienceRoles")} />
-            <View style={styles.list}>
-              <ActionList
-                items={roleList.map((r) =>
-                  row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
-                )}
-              />
-            </View>
-            <SectionHeader title={t("wiki.audiencePeople")} />
-            <View style={styles.list}>
-              <ActionList
-                items={[...dir.memberById.values()].map((m) =>
-                  row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
-                )}
-              />
-            </View>
-          </>
-        ) : null}
-        <SectionHeader title={t("wiki.audienceAgents")} />
-        <View style={styles.list}>
-          <Segmented
-            items={baseItems(wikiBaseLevels(cap.agents))}
-            value={draft.agents}
-            onChange={(key) => setDraft((d) => ({ ...d, agents: key as WikiLevel }))}
-          />
-        </View>
-        {draft.agents !== "edit" ? (
-          <View style={[styles.list, styles.rows]}>
-            <ActionList
-              items={agents.map((a) =>
-                row("agentRows", draft.agents, wikiRowCap(cap.agents, cap.agentRows[a.id]), a.id, "person", a.name),
+            <AccessList
+              title={t("wiki.audienceRoles")}
+              levelName={levelName}
+              rows={roleList.map((r) =>
+                row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
               )}
             />
-          </View>
+            <AccessList
+              title={t("wiki.audiencePeople")}
+              levelName={levelName}
+              rows={[...dir.memberById.values()].map((m) =>
+                row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
+              )}
+            />
+          </>
+        ) : null}
+        {draft.agents !== "edit" ? (
+          <AccessList
+            title={t("wiki.audienceAgents")}
+            levelName={levelName}
+            rows={agents.map((a) =>
+              row("agentRows", draft.agents, wikiRowCap(cap.agents, cap.agentRows[a.id]), a.id, "person", a.name),
+            )}
+          />
         ) : null}
         <Text variant="footnote" tone="faint" style={styles.lead}>
           {t("wiki.audienceEditNote")}
@@ -242,6 +226,4 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { paddingBottom: 40 },
   lead: { paddingHorizontal: 20, paddingVertical: 12 },
-  list: { paddingHorizontal: 16 },
-  rows: { paddingTop: 12 },
 });

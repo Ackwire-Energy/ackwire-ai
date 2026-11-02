@@ -46,6 +46,23 @@ const go = async (path: string, state = seedState(), seed = true) => {
   return { ...r, state, api };
 };
 
+/** Opens one of the access dialog's dropdowns and picks an option (its rows mount a moment after the key). */
+const pickLevel = async (d: HTMLElement, select: string, option: string) => {
+  // The dialog and the last dropdown hand focus back first: a list opened before that closes on it.
+  await act(() => new Promise((r) => setTimeout(r, 30)));
+  const trigger = within(d).getByRole("combobox", { name: select });
+  trigger.focus();
+  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  for (let i = 0; i < 50; i++) {
+    const row = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((o) =>
+      o.textContent?.startsWith(option),
+    );
+    if (row) return click(row);
+    await act(() => new Promise((r) => setTimeout(r, 10)));
+  }
+  throw new Error(`no ${option}`);
+};
+
 describe("toggleTask", () => {
   test("checks and unchecks one task line, leaves other lines alone", () => {
     const body = "# Passos\n- [ ] Abrir\n- [x] Revisar\nTexto";
@@ -227,10 +244,10 @@ describe("the wiki", () => {
       fireEvent.keyUp(more, { key: "Enter" });
     });
     await act(() => new Promise((r) => setTimeout(r, 0)));
-    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Quem vê" }));
-    const dialog = screen().getByRole("dialog", { name: "Quem vê Deploy" });
-    await click(within(dialog).getByRole("radio", { name: /Só quem eu escolher/ }));
-    await click(within(dialog).getByRole("checkbox", { name: "Admin" }));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Acesso" }));
+    const dialog = screen().getByRole("dialog", { name: "Acesso a Deploy" });
+    await pickLevel(dialog, "O que Todos do workspace pode fazer", "Sem acesso");
+    await pickLevel(dialog, "Adicionar pessoa, papel ou agente", "Admin");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(6);
     const call = state.calls.find((c) => c.method === "wiki.audience");
@@ -250,11 +267,11 @@ describe("the wiki", () => {
       fireEvent.keyUp(more, { key: "Enter" });
     });
     await act(() => new Promise((r) => setTimeout(r, 0)));
-    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Quem vê" }));
-    const dialog = screen().getByRole("dialog", { name: "Quem vê Deploy" });
-    await click(within(dialog).getByRole("radio", { name: /^Todos podem ver/ }));
-    await click(within(dialog).getByRole("checkbox", { name: "Admin" }));
-    await click(within(dialog).getByRole("radio", { name: /^Só estes agentes/ }));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Acesso" }));
+    const dialog = screen().getByRole("dialog", { name: "Acesso a Deploy" });
+    await pickLevel(dialog, "O que Todos do workspace pode fazer", "Ver");
+    await pickLevel(dialog, "Adicionar pessoa, papel ou agente", "Admin");
+    await pickLevel(dialog, "O que Todos os agentes pode fazer", "Sem acesso");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(6);
     const call = state.calls.find((c) => c.method === "wiki.audience");
