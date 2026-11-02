@@ -683,6 +683,8 @@ describe("Members › Esperando você", () => {
     expect(ana.querySelector(".members-row__name")?.textContent).toBe("Ana Souza");
     expect(ana.textContent).toContain("ana@estudio.com");
     expect(stateOf(ana)).toBe("Pediu pelo link há 2 h");
+    // The state's icon on its words' first line, as every icon line.
+    expect(ana.querySelector(".members-row__state")?.classList.contains("ac-iconline")).toBe(true);
     // What they wrote, as they wrote it, in a well under the row.
     expect(noteOf(ana)).toBe("“Designer nova da Paula”");
     const chips = (el: HTMLElement) => [...el.querySelectorAll(".ac-chip")].map((c) => c.textContent);

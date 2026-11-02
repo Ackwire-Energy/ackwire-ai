@@ -108,7 +108,7 @@ function Who({ face, name, sub }: { face: ReactNode; name: string; sub: ReactNod
 /** A row's state, as an icon and words ("Expira em 5 dias", "Pediu pelo link há 3 h"). */
 function State({ icon, tone, children }: { icon: IconName; tone?: "soon" | "ok"; children: ReactNode }) {
   return (
-    <span className="members-row__state" data-tone={tone}>
+    <span className="members-row__state ac-iconline" data-tone={tone}>
       <Icon name={icon} size={14} />
       <span>{children}</span>
     </span>

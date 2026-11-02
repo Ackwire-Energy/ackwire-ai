@@ -41,9 +41,6 @@
 }
 .members-row__state {
   flex: 0 1 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   min-width: 0;
   font-size: 12.5px;
   color: var(--muted);
@@ -60,13 +57,20 @@
 .members-row__state[data-tone="ok"] > .ac-icon {
   color: var(--ok);
 }
+/* The actions never shrink into a stack of their own: when the row runs out of width they go under it whole. */
 .members-row__acts {
+  flex: none;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
   margin-left: auto;
+}
+/* The role picker as wide as its words, beside the buttons, not the field-wide trigger it is in a form. */
+.members-row__acts .roles-picker.ac-btn {
+  width: auto;
+  max-width: 180px;
 }
 /* Ghost buttons in a row of their own keep their plates' rhythm (`.ac-acts`). */
 .members-row__acts.ac-acts {
@@ -116,17 +120,17 @@
 .members-person > .members-roles:empty {
   display: none;
 }
-@media (max-width: 760px) {
-  /* The state and the actions go under the words, on the words' edge. */
-  .members-row__state,
-  .members-row__acts {
-    margin-left: calc(24px + var(--space-3));
+@media (max-width: 640px) {
+  /* The person and the state on the first line (the state's words wrap beside its icon), the actions under them on
+     the right. */
+  .members-page .ac-list__row.members-row > .ac-avatar:first-child + .list-col {
+    flex-basis: 0;
+  }
+  .members-row__state {
+    max-width: 45%;
   }
   .members-row__acts {
-    justify-content: flex-start;
-  }
-  .members-row__note {
-    margin-left: calc(24px + var(--space-3));
+    flex-basis: 100%;
   }
 }
 
