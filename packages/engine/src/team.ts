@@ -3,7 +3,7 @@ import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-
 import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiStates } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
-import { canTalkTo, type Speaker, speakerFor, speakerOf } from "./audience";
+import { canTalkTo, type Speaker, speakerFor, speakerOf, viaAgent } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
@@ -106,6 +106,8 @@ type Teammate = Pick<
   | "audienceMode"
   | "audienceUserIds"
   | "audienceRoleIds"
+  | "consultable"
+  | "brain"
 >;
 
 /** The org's active agents, oldest first (per-process cache; agent writes drop it). */
@@ -122,6 +124,8 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
         audienceMode: agents.audienceMode,
         audienceUserIds: agents.audienceUserIds,
         audienceRoleIds: agents.audienceRoleIds,
+        consultable: agents.consultable,
+        brain: agents.brain,
       })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -166,7 +170,7 @@ export async function noAgentText(ctx: ToolContext, handles: string[]): Promise<
     loadTeam(ctx.db, ctx.orgId),
     speakerFor(ctx.db, ctx.orgId, person),
   ]);
-  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks)).map((a) => a.handle);
+  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, viaAgent(talks))).map((a) => a.handle);
   return handles
     .map((h) => {
       if (archived.includes(h)) {
@@ -210,14 +214,17 @@ export async function renamedAgentsPrompt(db: Database, orgId: string, texts: st
   return `# Renamed agents\nSome text here names agents by a handle they had before: ${renamed.join(", ")}. It is the same agent: ask and mention it by the handle it has now.`;
 }
 
-/** The org's other agents the person behind a run can talk to, `skip` left out: who "# Your team" lists. */
+/**
+ * The org's other agents a run may ask for the person behind it (they talk to them, or take consultations), `skip`
+ * left out: who "# Your team" lists.
+ */
 export const teammatesFor = (
   team: Teammate[],
   selfId: string,
   requester: string | null,
   skip: Set<string>,
   talks: Speaker,
-) => team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
+) => team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, viaAgent(talks)));
 
 /**
  * The teammates a run can reach, as `@handle (role)` (at most 10), for its general means (ADR 0109): those the
@@ -269,7 +276,7 @@ const words = (s: string) =>
 /**
  * The built-in `find_agent` tool: who else works here, searchable by
  * name, role or what they do. Lists only agents the person behind the run can
- * talk to, with what they can do (`rosterScopeNames`), who is responsible and
+ * talk to or that take consultations for them, with what they can do (`rosterScopeNames`), who is responsible and
  * whether they are busy. Read-only; asking one is `ask_agent`.
  */
 export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller, "status"> | null } = {}): ToolSource {
@@ -290,7 +297,9 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
       const { db } = ctx;
       const person = await personBehindCall(ctx);
       const talks = await speakerFor(db, ctx.orgId, person);
-      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks));
+      const team = (await loadTeam(db, ctx.orgId)).filter(
+        (a) => a.id !== ctx.agentId && canTalkTo(a, person, viaAgent(talks)),
+      );
       const query = words(String(input.query ?? ""));
       const scored = team
         .map((a) => {
@@ -413,6 +422,8 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       audienceMode: agents.audienceMode,
       audienceUserIds: agents.audienceUserIds,
       audienceRoleIds: agents.audienceRoleIds,
+      consultable: agents.consultable,
+      brain: agents.brain,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))

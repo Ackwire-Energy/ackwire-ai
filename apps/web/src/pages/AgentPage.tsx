@@ -439,6 +439,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         mode: draft.audience.mode,
         userIds: draft.audience.mode === "people" ? draft.audience.userIds : [],
         roleIds: draft.audience.mode === "people" ? (draft.audience.roleIds ?? []) : [],
+        consultable: draft.audience.consultable ?? true,
       });
     }
     if (fields.has("look")) put("look", "appearance", normalizeAppearance(draft.look));

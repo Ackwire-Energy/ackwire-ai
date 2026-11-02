@@ -227,6 +227,19 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
   expect(await back.json()).toMatchObject({ brain: "model", model: null, fallback: false });
 });
 
+test("Outros agentes podem consultar: the audience carries the switch, on by default, kept when absent", async () => {
+  const { api, agentId } = await workspace();
+  const patch = async (audience: Record<string, unknown>) =>
+    (
+      (await (await api(`/agents/${agentId}`, { method: "PATCH", json: { audience } })).json()) as {
+        audience: { consultable?: boolean };
+      }
+    ).audience.consultable;
+  expect(await patch({ mode: "owner", userIds: [], consultable: false })).toBe(false);
+  expect(await patch({ mode: "owner", userIds: [] })).toBe(false);
+  expect(await patch({ mode: "owner", userIds: [], consultable: true })).toBe(true);
+});
+
 test("Quem pode falar by role: whoever holds it talks to the agent, from the moment they get it until they lose it", async () => {
   const { api, asBia, member, agentId } = await workspace();
   const biaId = ((await (await member("/api/app/me")).json()) as { user: { id: string } }).user.id;
@@ -244,6 +257,7 @@ test("Quem pode falar by role: whoever holds it talks to the agent, from the mom
     mode: "people",
     userIds: [],
     roleIds: [role.id],
+    consultable: true,
   });
   expect(await canTalk()).toBe(false);
   await api(`/members/${biaId}/roles`, { method: "PUT", json: { roleIds: [role.id] } });

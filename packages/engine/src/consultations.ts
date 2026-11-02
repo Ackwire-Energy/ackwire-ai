@@ -17,7 +17,8 @@ import {
 } from "@agenteschat/db";
 import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
-import { canTalkTo, speakerFor } from "./audience";
+import { canTalkTo, speakerFor, viaAgent } from "./audience";
+import { runAuthorityById } from "./authority";
 import { routineBriefOfRun } from "./background";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
@@ -29,7 +30,7 @@ import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
 import { notifyAgentUnreached } from "./notification-producers";
-import { actingRoutineOfCall, personBehindCall } from "./requester";
+import { actingRoutineOfCall, personBehindCall, routineCreatorOf } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
 import { type AgentRun, isTerminal, outageParkedSql, type RunStatus, replyThreadOf } from "./runs";
@@ -72,7 +73,7 @@ type AiCheck = Omit<AiStatusDeps, "db">;
 /**
  * Who an agent may ask or tell something: an active agent of the org, not
  * itself, one the person behind the run (a routine's: its creator) can talk
- * to, and one with an AI to think with (its run would only fail with `no_ai`,
+ * to or that takes consultations for them (`viaAgent`, ADR 0085 addendum), and one with an AI to think with (its run would only fail with `no_ai`,
  * so no answer would come). The asking run comes along: its hop and stretch
  * go on to the other agent.
  */
@@ -88,10 +89,12 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pu
   const behind = await personBehindCall(ctx);
   const routine = behind ? null : await actingRoutineOfCall(ctx);
   const person = behind ?? routine?.creatorUserId ?? null;
-  if (!canTalkTo(target, person, await speakerFor(db, ctx.orgId, person))) {
+  if (!canTalkTo(target, person, viaAgent(await speakerFor(db, ctx.orgId, person)))) {
     if (!routine?.creatorUserId) {
       return {
-        refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+        refused: refuse(
+          `@${handle} only works with some people and doesn't take questions from other agents for anyone else, and the person you are helping isn't one of them. Tell them @${handle} isn't open to them; its owner or an admin can let them in, or turn on "Other agents can consult" on its page.`,
+        ),
       };
     }
     // Never silent: the agent's owner hears it now, and the run's next message shows the line (`settleReach`).
@@ -1739,7 +1742,25 @@ export async function consultationOrigin(
     origin = { channelId: asker.channelId, threadRootId: asker.threadRootId, threadId: replyThreadOf(asker) };
     current = row.askerRunId;
   }
+  if (origin && (await answersAgentsOnly(db, orgId, runId))) return null;
   return origin;
+}
+
+/**
+ * The run was consulted for someone outside its agent's audience (`viaAgent`, ADR 0085 addendum): it answers the
+ * agent that asked and nothing of it reaches that person: no card where they asked (its approvals and questions
+ * stay in the agents' DM, for the people who decide for it), no DM, no post in their name.
+ */
+export async function answersAgentsOnly(db: Executor, orgId: string, runId: string): Promise<boolean> {
+  const [run] = await db
+    .select({ agent: agents })
+    .from(agentRuns)
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));
+  if (!run) return false;
+  const authority = await runAuthorityById(db, orgId, runId);
+  const person = authority.kind === "person" ? authority.personId : routineCreatorOf(authority);
+  return !!person && !canTalkTo(run.agent, person, await speakerFor(db, orgId, person));
 }
 
 /** Where a consulted run's cards go: the thread of whoever asked, or null for its main timeline. */

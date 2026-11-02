@@ -236,8 +236,8 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(await row()).toMatchObject({ audienceMode: "owner", audienceUserIds: [bia.id] });
     const changes = async () => (await audits("agent.audience_changed")).map((a) => a.details);
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "people", userIds: [bia.id], roleIds: [] },
-      to: { mode: "owner", userIds: [], roleIds: [] },
+      from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
     });
 
     // On, it replies to whoever its "who can talk" list lets in: Bia, not the whole workspace.
@@ -246,8 +246,8 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(shared.onlyOwner).toBe(false);
     expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "owner", userIds: [bia.id], roleIds: [] },
-      to: { mode: "people", userIds: [bia.id], roleIds: [] },
+      from: { mode: "owner", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
     });
     // Nothing about what it thinks with changed: no brain entry for it.
     expect(await audits("agent.brain")).toHaveLength(brainAudits);
@@ -258,8 +258,8 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: true })).onlyOwner).toBe(true);
     expect(await row()).toMatchObject({ audienceMode: "owner", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "people", userIds: [bia.id], roleIds: [] },
-      to: { mode: "owner", userIds: [], roleIds: [] },
+      from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
     });
     // Off and on again never widens it: still Bia alone.
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });

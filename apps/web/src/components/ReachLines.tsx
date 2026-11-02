@@ -82,7 +82,7 @@ function ReachRow({
           {t("reach.see")}
         </button>
       )}
-      {(handed || e.private) && addable && can(org, "manage_channels") && (
+      {((handed && e.reason === "not_in_channel") || e.private) && addable && can(org, "manage_channels") && (
         <button
           type="button"
           className="ag-rc__btn"

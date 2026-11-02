@@ -24,9 +24,14 @@ export interface AgentAudience {
   userIds: string[];
   /** For `people`: whoever holds one of these roles at the time (not `everyone`); kept under `owner` like `userIds`. */
   roleIds: string[];
+  /** Other agents may consult it for people outside it (ADR 0085 addendum); absent (older apps) = keep. */
+  consultable?: boolean;
 }
 
-type AudienceFields = Pick<Agent, "audienceMode" | "audienceUserIds" | "audienceRoleIds" | "ownerUserId">;
+type AudienceFields = Pick<
+  Agent,
+  "audienceMode" | "audienceUserIds" | "audienceRoleIds" | "ownerUserId" | "consultable" | "brain"
+>;
 
 export const OWNER_ONLY: AgentAudience = { mode: "owner", userIds: [], roleIds: [] };
 
@@ -35,12 +40,13 @@ export const audienceOf = (a: AudienceFields): AgentAudience => ({
   mode: a.audienceMode,
   userIds: a.audienceMode === "everyone" ? [] : a.audienceUserIds,
   roleIds: a.audienceMode === "everyone" ? [] : a.audienceRoleIds,
+  consultable: a.consultable,
 });
 
-/** Whether `to` lets someone talk to the agent whom `from` didn't (its owner always can). */
+/** Whether `to` lets someone talk to the agent whom `from` didn't (its owner always can), or consult it for them. */
 export function widensAudience(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
   if (to.mode === "owner" || from.mode === "everyone") return false;
-  if (to.mode === "everyone") return true;
+  if (to.mode === "everyone" || (to.consultable && from.consultable === false)) return true;
   const people = new Set(from.mode === "people" ? from.userIds : []);
   const roles = new Set(from.mode === "people" ? from.roleIds : []);
   return to.userIds.some((id) => id !== ownerUserId && !people.has(id)) || to.roleIds.some((id) => !roles.has(id));
@@ -73,6 +79,11 @@ export function planSharing(
 export interface Speaker {
   talks: boolean;
   roleIds: readonly string[];
+  /**
+   * Another agent asks for them (ask_agent, tell_agent, a mention or a hand-off between agents): an agent that
+   * takes consultations answers it even outside its audience (`consultable`, ADR 0085 addendum).
+   */
+  viaAgent?: true;
 }
 
 /** No person (a routine's run): talks, holds no role. */
@@ -83,6 +94,16 @@ export const speakerOf = (membership: Pick<Membership, "permissions" | "roleIds"
   roleIds: membership?.roleIds ?? [],
 });
 
+/** The same person, as another agent asking for them. */
+export const viaAgent = (s: Speaker): Speaker => ({ ...s, viaAgent: true });
+
+/**
+ * Whether other agents may consult it for people outside its audience: its switch, unless it thinks with a plan
+ * that answers only its owner (ADR 0059 §5): answering for someone else is answering others.
+ */
+export const takesConsultations = (a: Pick<AudienceFields, "consultable" | "brain" | "audienceMode">) =>
+  a.consultable && !(isComputerBrain(a.brain) && a.audienceMode === "owner");
+
 /** The `Speaker` for a person in a workspace (`NO_PERSON` for none). */
 export async function speakerFor(db: Database, orgId: string, userId: string | null): Promise<Speaker> {
   return userId ? speakerOf(await getMembership(db, userId, orgId)) : NO_PERSON;
@@ -91,11 +112,14 @@ export async function speakerFor(db: Database, orgId: string, userId: string | n
 /**
  * Can this person's message start a run of the agent? (`null` = no person: routines and webhooks check their
  * creator.) Its owner always can; anyone else needs the agent's audience (named, or holding one of its roles now)
- * and, through their roles, to talk to agents at all (`talk_to_agents`, ADR 0085). `audienceSql` is the same rule.
+ * and, through their roles, to talk to agents at all (`talk_to_agents`, ADR 0085). Asked by another agent
+ * (`viaAgent`) for a person, one that takes consultations is enough (with nobody behind it, nobody's reach widens). `audienceSql` is the same rule for a person (mentions
+ * between agents never dispatch in SQL: their agents' DM wakes nobody, `settleReach` asks the rest by note).
  */
 export function canTalkTo(a: AudienceFields, userId: string | null, person: Speaker): boolean {
   if (userId && a.ownerUserId === userId) return true;
   if (!person.talks) return false;
+  if (person.viaAgent && userId && takesConsultations(a)) return true;
   if (a.audienceMode === "everyone") return true;
   if (!userId || a.audienceMode !== "people") return false;
   return a.audienceUserIds.includes(userId) || a.audienceRoleIds.some((id) => person.roleIds.includes(id));
@@ -247,10 +271,17 @@ export async function setAgentAudience(
   if (audience.mode === "people" && userIds.length === 0 && roleIds.length === 0 && !agent.ownerUserId) {
     throw new ValidationError("Pick at least one person or role");
   }
-  planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds, roleIds });
+  const consultable = audience.consultable ?? agent.consultable;
+  planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds, roleIds, consultable });
   const [updated] = await db
     .update(agents)
-    .set({ audienceMode: audience.mode, audienceUserIds: userIds, audienceRoleIds: roleIds, updatedAt: new Date() })
+    .set({
+      audienceMode: audience.mode,
+      audienceUserIds: userIds,
+      audienceRoleIds: roleIds,
+      consultable,
+      updatedAt: new Date(),
+    })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
     .returning();
   if (!updated) throw new NotFoundError("Agent not found");

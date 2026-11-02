@@ -469,6 +469,8 @@ export interface AgentAudience {
   userIds: string[];
   /** For `people`: whoever holds one of these roles at the time (not `everyone`). Older servers leave it out. */
   roleIds?: string[];
+  /** Other agents may consult it for people outside the audience (it answers them only). Absent = on. */
+  consultable?: boolean;
 }
 
 export interface Agent {

@@ -1200,6 +1200,8 @@ async function visibleRoutines(
       audienceMode: agents.audienceMode,
       audienceUserIds: agents.audienceUserIds,
       audienceRoleIds: agents.audienceRoleIds,
+      consultable: agents.consultable,
+      brain: agents.brain,
     })
     .from(agents)
     .where(inArray(agents.id, ids));

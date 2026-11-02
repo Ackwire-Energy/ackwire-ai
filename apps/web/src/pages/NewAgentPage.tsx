@@ -515,6 +515,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
         mode: audience.mode,
         userIds: audience.mode === "people" ? audience.userIds : [],
         roleIds: audience.mode === "people" ? (audience.roleIds ?? []) : [],
+        consultable: audience.consultable ?? true,
       },
       credentialId: key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,

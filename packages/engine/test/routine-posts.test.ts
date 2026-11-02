@@ -184,7 +184,7 @@ test("a routine set to act hands its mention to an agent outside as a note, and 
   const bob = await addMember(f.db, f.org.id, "member", "bob");
   await f.db
     .update(schema.agents)
-    .set({ ownerUserId: bob.id, audienceMode: "owner" })
+    .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
     .where(eq(schema.agents.id, gil.id));
   const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);

@@ -7,8 +7,13 @@ import { can } from "./permissions";
 /** The agent's audience; absent = everyone (older servers). */
 export function audienceOf(agent: Agent): Required<AgentAudience> {
   if (agent.audience)
-    return { mode: agent.audience.mode, userIds: agent.audience.userIds ?? [], roleIds: agent.audience.roleIds ?? [] };
-  return { mode: agent.audienceMode ?? "everyone", userIds: [], roleIds: [] };
+    return {
+      mode: agent.audience.mode,
+      userIds: agent.audience.userIds ?? [],
+      roleIds: agent.audience.roleIds ?? [],
+      consultable: agent.audience.consultable ?? true,
+    };
+  return { mode: agent.audienceMode ?? "everyone", userIds: [], roleIds: [], consultable: true };
 }
 
 export const modeOf = (agent: Agent): AudienceMode => agent.audience?.mode ?? agent.audienceMode ?? "everyone";
@@ -53,7 +58,7 @@ export const listsAgent = (org: OrgSummary | null | undefined, agent: Pick<Agent
 /** Whether `to` lets someone talk to the agent whom `from` didn't; its owner always can (same rule as the backend). */
 export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
   if (to.mode === "owner" || from.mode === "everyone") return false;
-  if (to.mode === "everyone") return true;
+  if (to.mode === "everyone" || (to.consultable !== false && from.consultable === false)) return true;
   const people = new Set(from.mode === "people" ? from.userIds : []);
   const roles = new Set(from.mode === "people" ? (from.roleIds ?? []) : []);
   return (

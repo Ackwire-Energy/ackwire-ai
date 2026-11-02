@@ -1,4 +1,5 @@
 import { useUpdateAgent } from "@agenteschat/client";
+import { audienceOf } from "@agenteschat/client/lib/audience";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
@@ -53,6 +54,7 @@ export function AgentEditScreen({ id }: { id: string }) {
             instructions: agent.instructions,
             look: fullLook(agent.appearance),
             coordinator: agent.coordinator === true,
+            audience: audienceOf(agent),
           }
         : null,
     [agent],
@@ -208,6 +210,26 @@ export function AgentEditScreen({ id }: { id: string }) {
             </Text>
           ) : null}
         </View>
+
+        {/* Only an audience that leaves someone out has anyone to be consulted for. */}
+        {draft.audience.mode !== "everyone" ? (
+          <View style={styles.section}>
+            <GroupedList>
+              <GroupedRow
+                icon="agent"
+                label={t("audience.consultable", agentGrammar(t, agent.name))}
+                labelLines={2}
+                sub={t("audience.consultableHint", agentGrammar(t, agent.name))}
+                subLines={4}
+                toggle={draft.audience.consultable !== false}
+                disabled={!fields.has("consultable")}
+                onPress={() =>
+                  set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
+                }
+              />
+            </GroupedList>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text variant="title" accessibilityRole="header">

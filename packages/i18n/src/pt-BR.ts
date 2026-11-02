@@ -1730,6 +1730,7 @@ export const ptBR = {
   reach: {
     group: "Quem a mensagem não chamou direto",
     handed: "Entregue {{to}} <b>{{name}}</b> por mensagem direta, {{she}} não está {{place}}",
+    consulted: "Consultei {{article}} <b>{{name}}</b> em particular: {{she}} responde a mim, não direto aqui",
     private: "Não repassei {{to}} <b>{{name}}</b>: {{she}} não está {{place}}, e o que se fala aqui fica aqui",
     noAi: "Não consegui entregar {{to}} <b>{{name}}</b>: {{she}} não está {{place}} e ainda não tem IA conectada",
     inChannel: "em #{{name}}",
@@ -5888,6 +5889,9 @@ export const ptBR = {
     section: "Quem pode falar",
     title: "Quem pode falar com {{article}} {{name}}",
     notListed: "Quem não está na lista não recebe resposta.",
+    consultable: "Outros agentes podem consultar {{article}} {{name}}",
+    consultableHint:
+      "Para quem não está na lista, {{she}} responde só ao agente que perguntou, nunca direto à pessoa. Ações sensíveis continuam pedindo aprovação de quem cuida {{hers}}.",
     mode: { everyone: "Todos do workspace", people: "Só algumas pessoas ou papéis", owner: "Só o responsável" },
     modeText: {
       everyone: "Qualquer pessoa do workspace pode chamar {{article}} {{name}}.",

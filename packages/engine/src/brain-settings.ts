@@ -607,7 +607,7 @@ export async function setAgentBrain(
       actor: { type: "person", id: userId },
       action: "agent.audience_changed",
       target: { type: "agent", id: agentId },
-      details: { from: audienceOf(agent), to: audience },
+      details: { from: audienceOf(agent), to: { ...audience, consultable: agent.consultable } },
     });
   }
   if (next.from) {

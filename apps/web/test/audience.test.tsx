@@ -56,7 +56,7 @@ describe("Quem pode falar com a Ada", () => {
     );
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
-      audience: { mode: "people", userIds: ["u-walter"], roleIds: [] },
+      audience: { mode: "people", userIds: ["u-walter"], roleIds: [], consultable: true },
     });
   });
 
@@ -91,7 +91,25 @@ describe("Quem pode falar com a Ada", () => {
     );
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
-      audience: { mode: "people", userIds: [], roleIds: [ADMIN_ROLE_ID] },
+      audience: { mode: "people", userIds: [], roleIds: [ADMIN_ROLE_ID], consultable: true },
+    });
+  });
+
+  test("Outros agentes podem consultar: on by default when it leaves someone out, turned off and sent with the audience", async () => {
+    const state = await go(`agents/${ADA_ID}?tab=settings&sec=audience`);
+    const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
+    expect(within(section).queryByRole("switch", { name: "Outros agentes podem consultar a Ada" })).toBeNull();
+    await click(within(section).getByRole("radio", { name: /^Só o responsável/ }));
+    const toggle = within(section).getByRole("switch", { name: "Outros agentes podem consultar a Ada" });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(section.textContent).toContain("ela responde só ao agente que perguntou, nunca direto à pessoa");
+    await click(toggle);
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
+      audience: { mode: "owner", userIds: [], roleIds: [], consultable: false },
     });
   });
 
@@ -137,7 +155,7 @@ describe("Quem pode falar com a Ada", () => {
     await settle(6);
     expect(
       (state.calls.find((c) => c.method === "agents.create")?.args[1] as { audience?: unknown } | undefined)?.audience,
-    ).toEqual({ mode: "owner", userIds: [], roleIds: [] });
+    ).toEqual({ mode: "owner", userIds: [], roleIds: [], consultable: true });
   });
 });
 

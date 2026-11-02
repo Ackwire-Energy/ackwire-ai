@@ -248,9 +248,11 @@ describe("who can talk to the agent", () => {
     const widen = (actor: string, to: typeof everyone | typeof some) =>
       setAgentAudience(f.db, actor, f.org.id, f.agent.id, to).catch((e) => e);
     expect(await widen(caio.id, everyone)).toMatchObject({ code: "audience.plan_owner_only" });
-    expect(audienceOf(await widen(f.owner.id, some))).toEqual(some);
+    expect(audienceOf(await widen(f.owner.id, some))).toEqual({ ...some, consultable: true });
     const audits = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
-    expect(audits.map((a) => a.details)).toEqual([{ from: { mode: "owner", userIds: [], roleIds: [] }, to: some }]);
+    expect(audits.map((a) => a.details)).toEqual([
+      { from: { mode: "owner", userIds: [], roleIds: [], consultable: true }, to: { ...some, consultable: true } },
+    ]);
     expect((await widen(f.owner.id, everyone)).audienceMode).toBe("everyone");
     expect((await widen(caio.id, some)).audienceMode).toBe("people");
     expect(await widen(caio.id, everyone)).toBeInstanceOf(ForbiddenError);
@@ -267,7 +269,7 @@ describe("who can talk to the agent", () => {
       userIds: [],
       roleIds: [support.id],
     });
-    expect(audienceOf(agent)).toEqual({ mode: "people", userIds: [], roleIds: [support.id] });
+    expect(audienceOf(agent)).toEqual({ mode: "people", userIds: [], roleIds: [support.id], consultable: true });
     const mention = () => postPersonMessage(deps(), bia.id, f.org.id, f.general.id, { body: "@dev faz o relatório" });
     const teamSays = async () =>
       (await getTeam(f.db, bia.id, f.org.id)).agents.find((a) => a.id === f.agent.id)?.canTalk;

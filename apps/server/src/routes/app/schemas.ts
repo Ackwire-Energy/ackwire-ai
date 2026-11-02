@@ -154,6 +154,10 @@ export const AgentAudience = z
       .max(100)
       .optional()
       .openapi({ description: "Absent (older apps): a change keeps the roles already picked." }),
+    consultable: z.boolean().optional().openapi({
+      description:
+        "Other agents may consult it for people outside this audience; it answers them, never those people. On by default; absent = keep. A plan answering only its owner (ADR 0059 §5) still keeps them out.",
+    }),
   })
   .openapi("AgentAudience");
 

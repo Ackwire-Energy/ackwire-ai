@@ -202,7 +202,7 @@ test("a routine wakes only agents its creator can talk to", async () => {
   // Iris works only with Bob, its owner.
   await f.db
     .update(schema.agents)
-    .set({ ownerUserId: bob.id, audienceMode: "owner" })
+    .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
     .where(eq(schema.agents.id, iris.id));
   const routine = await channelRoutine(f, { access: "act", prompt: "Cobre a Iris até o PR #42 ficar pronto." });
   await fire(f, routine.id, new Date(Date.now() - 60_000));

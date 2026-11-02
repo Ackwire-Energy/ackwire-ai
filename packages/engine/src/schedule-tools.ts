@@ -633,6 +633,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               audienceMode: agents.audienceMode,
               audienceUserIds: agents.audienceUserIds,
               audienceRoleIds: agents.audienceRoleIds,
+              consultable: agents.consultable,
+              brain: agents.brain,
               ownerUserId: agents.ownerUserId,
             })
             .from(agents)

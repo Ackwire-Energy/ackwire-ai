@@ -1712,6 +1712,7 @@ export const en: Translations = {
   reach: {
     group: "Who the message didn't call directly",
     handed: "Handed to <b>{{name}}</b> by direct message, {{she}} isn't {{place}}",
+    consulted: "Asked <b>{{name}}</b> privately: {{she}} answers me, not here directly",
     private: "Didn't pass this on to <b>{{name}}</b>: {{she}} isn't {{place}}, and what's said here stays here",
     noAi: "Couldn't hand this to <b>{{name}}</b>: {{she}} isn't {{place}} and has no AI connected yet",
     inChannel: "in #{{name}}",
@@ -5838,6 +5839,9 @@ export const en: Translations = {
     section: "Who can talk",
     title: "Who can talk to {{name}}",
     notListed: "People not on the list get no reply.",
+    consultable: "Other agents can consult {{name}}",
+    consultableHint:
+      "For people not on the list, {{she}} answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after {{pronoun}}.",
     mode: { everyone: "Everyone in the workspace", people: "Only some people or roles", owner: "Only the owner" },
     modeText: {
       everyone: "Anyone in the workspace can call {{name}}.",

@@ -66,6 +66,7 @@ export const sameBrain = (a: BrainChoice, b: BrainChoice) =>
 const sorted = (list: string[]) => [...list].sort();
 export const sameList = (a: string[], b: string[]) => sorted(a).join("\n") === sorted(b).join("\n");
 export const sameAudience = (a: AgentAudience, b: AgentAudience) =>
+  (a.consultable ?? true) === (b.consultable ?? true) &&
   a.mode === b.mode &&
   (a.mode !== "people" || (sameList(a.userIds, b.userIds) && sameList(a.roleIds ?? [], b.roleIds ?? [])));
 

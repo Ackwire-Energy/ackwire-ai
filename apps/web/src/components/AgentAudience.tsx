@@ -17,6 +17,8 @@ import {
   RadioGroup,
   RoleMark,
   SearchField,
+  SettingRow,
+  Switch,
   Token,
   TokenList,
 } from "@agenteschat/ui";
@@ -71,7 +73,8 @@ export function AudienceChip({ agent }: { agent: Agent }) {
 
 /**
  * The three choices (Todos do workspace / Só algumas pessoas ou papéis / Só o
- * responsável), with the roles and people picker under the second.
+ * responsável), with the roles and people picker under the second, and whether other agents may consult it for
+ * the rest (ADR 0085 addendum).
  * `compact`: a segmented control and one line about the choice ("Criar agente").
  */
 export function AudienceChoice({
@@ -256,6 +259,19 @@ export function AudienceChoice({
             )}
           </div>
         </div>
+      )}
+      {value.mode !== "everyone" && (
+        <SettingRow
+          title={t("audience.consultable", g)}
+          description={t("audience.consultableHint", g)}
+          htmlFor={`${idPrefix}-consultable`}
+        >
+          <Switch
+            id={`${idPrefix}-consultable`}
+            checked={value.consultable ?? true}
+            onCheckedChange={(consultable) => onChange({ ...value, consultable })}
+          />
+        </SettingRow>
       )}
     </div>
   );
