@@ -1054,6 +1054,10 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+    // And their inbox here, snippets included: invited back later, nothing from before returns.
+    await tx
+      .delete(schema.notifications)
+      .where(and(eq(schema.notifications.orgId, orgId), eq(schema.notifications.userId, targetUserId)));
     // And the wiki pages and folders they were named on: rejoining later doesn't give a restricted page back.
     await tx
       .update(schema.wikiPages)

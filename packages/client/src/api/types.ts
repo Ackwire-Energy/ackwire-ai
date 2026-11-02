@@ -1861,8 +1861,10 @@ export interface Run {
   /** The error as a code (`run.budget_exceeded`…) and its values, to say it in the person's language. */
   errorCode?: string;
   errorParams?: Record<string, string>;
-  /** Start of the message that started the run. */
+  /** Start of the message that started the run; empty when `private`. */
   what: string;
+  /** The viewer isn't in the run's conversation: no `what` and no steps, only its numbers (older servers: absent). */
+  private?: boolean;
   turns: number;
   /** Every input token, cache included. */
   inputTokens: number;
