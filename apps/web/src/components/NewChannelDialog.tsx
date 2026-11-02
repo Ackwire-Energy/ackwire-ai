@@ -7,7 +7,7 @@ import {
 } from "@agenteschat/client/lib/channel-access";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Input, RadioCard, RadioGroup } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Input, Select } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -41,31 +41,22 @@ export function ChannelAccessChoice({
   const roles = useRoles(org.id);
   const candidates = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
   const picked = new Set(value.roleIds);
-  const legend = `${idPrefix}-vis`;
   return (
-    <fieldset style={{ margin: 0, padding: 0, border: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-      <legend className="ac-field__label" style={{ padding: 0, marginBottom: 8 }} id={legend}>
-        {t("newChannel.visibility")}
-      </legend>
-      <RadioGroup
-        value={value.mode}
-        onValueChange={(mode) => onChange({ ...value, mode: mode as ChannelAccessMode })}
-        aria-labelledby={legend}
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}
-      >
-        {ACCESS_MODES.map((mode) => (
-          <RadioCard
-            key={mode}
-            value={mode}
-            id={`${idPrefix}-${mode}`}
-            checked={value.mode === mode}
-            title={t(`newChannel.${mode}`)}
-            description={t(`newChannel.${mode}Desc`)}
-          />
-        ))}
-      </RadioGroup>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* A dropdown, as "Categoria" above it: three cards side by side broke their words in a narrow dialog. */}
+      <Field label={t("newChannel.visibility")} id={`${idPrefix}-vis`} help={t(`newChannel.${value.mode}Desc`)}>
+        <Select
+          value={value.mode}
+          onValueChange={(mode) => onChange({ ...value, mode })}
+          options={ACCESS_MODES.map((mode) => ({
+            value: mode,
+            label: t(`newChannel.${mode}`),
+            description: t(`newChannel.${mode}Desc`),
+          }))}
+        />
+      </Field>
       {value.mode === "roles" && (
-        // biome-ignore lint/a11y/useSemanticElements: a scroll region inside the fieldset
+        // biome-ignore lint/a11y/useSemanticElements: a scroll region under the field
         <div className="people-picker__results" role="region" aria-label={t("newChannel.rolesPick")}>
           {candidates.length === 0 && roles.isSuccess ? (
             <p className="small muted">{t("newChannel.rolesNone")}</p>
@@ -89,7 +80,7 @@ export function ChannelAccessChoice({
           {showError && !accessValid(value) ? t("newChannel.rolesNeeded") : t("newChannel.rolesLeave")}
         </span>
       )}
-    </fieldset>
+    </div>
   );
 }
 

@@ -16,6 +16,13 @@ const go = async (channel: string) => {
   await settle(8);
   return state;
 };
+/** "Quem pode entrar" is a dropdown: open it and pick. */
+const access = async (dialog: HTMLElement, option: RegExp) => {
+  const trigger = within(dialog).getByRole("combobox", { name: "Quem pode entrar" });
+  trigger.focus();
+  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  await click(screen().getByRole("option", { name: option }));
+};
 const calls = (state: ReturnType<typeof seedState>, method: string) =>
   state.calls.filter((c) => c.method === method).map((c) => c.args.at(-1));
 
@@ -33,7 +40,7 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     await settle(2);
     const dialog = screen().getByRole("dialog", { name: "Criar canal" });
     await act(async () => fireEvent.change(within(dialog).getByLabelText("Nome"), { target: { value: "vendas" } }));
-    await click(within(dialog).getByRole("radio", { name: /Departamentos ou papéis/ }));
+    await access(dialog, /Departamentos ou papéis/);
     await settle(3);
 
     await click(within(dialog).getByRole("button", { name: "Criar #vendas" }));
@@ -54,7 +61,7 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     await click(screen().getByRole("button", { name: "Detalhes do canal" }));
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
-    await click(within(dialog).getByRole("radio", { name: /Departamentos ou papéis/ }));
+    await access(dialog, /Departamentos ou papéis/);
     await settle(3);
     expect(calls(state, "chat.update")).toEqual([]);
     await click(within(dialog).getByRole("checkbox", { name: /Admin/ }));
@@ -71,7 +78,7 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     expect(calls(state, "chat.update")).toHaveLength(2);
 
     // Going public opens every message to the workspace: asked first.
-    await click(within(dialog).getByRole("radio", { name: /Público/ }));
+    await access(dialog, /Público/);
     await settle(3);
     expect(calls(state, "chat.update")).toHaveLength(2);
     const ask = screen().getByRole("dialog", { name: "Tornar #eng público?" });
@@ -80,7 +87,7 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     expect(calls(state, "chat.update")).toHaveLength(2);
 
     const again = screen().getByRole("dialog", { name: /^#eng/ });
-    await click(within(again).getByRole("radio", { name: /Público/ }));
+    await access(again, /Público/);
     await settle(3);
     await click(
       within(screen().getByRole("dialog", { name: "Tornar #eng público?" })).getByRole("button", {
