@@ -367,6 +367,19 @@ p {
   color: var(--ink-muted);
 }
 
+/* A consulted agent's answer, closed: only its start, two lines at most; the whole answer shows once opened. */
+.ac-consult-group .ac-tools__label small {
+  display: -webkit-box;
+  flex-basis: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.ac-consult-group .ac-tools__row[aria-expanded="true"] .ac-tools__label small {
+  display: none;
+}
+
 /* The agent's one card while it waits for its computer (instead of repeated messages); a card face, never the well. */
 .waitcard {
   display: flex;
