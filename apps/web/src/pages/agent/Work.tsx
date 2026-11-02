@@ -1448,7 +1448,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         )}
       </DialogBody>
       <Footer
-        disabled={unchanged || needsAccount || adding !== false || (kind !== "model" && !home)}
+        // Moving onto a plan needs a computer that runs it now. Its own settings (model, account, effort) save while
+        // none does: the server checks the computer only when the brain changes, and the agent waits for it anyway.
+        disabled={unchanged || needsAccount || adding !== false || (kind !== "model" && !home && card !== savedCard)}
         busy={busy}
         primary={t("agentPage.work.use")}
         onClose={onClose}
