@@ -1371,7 +1371,12 @@ export function attachedLine(m: Pick<Message, "authorUserId" | "meta">): string 
 /** What the agent's computer allows it (protocol 10); null when it doesn't say (an older runner) or is gone. */
 async function machineAccessOf(db: Database, orgId: string, agentId: string, machineId: string) {
   const [m] = await db
-    .select({ name: schema.machines.name, access: schema.machines.access, executors: schema.machines.executors })
+    .select({
+      name: schema.machines.name,
+      os: schema.machines.os,
+      access: schema.machines.access,
+      executors: schema.machines.executors,
+    })
     .from(schema.machines)
     .where(and(eq(schema.machines.orgId, orgId), eq(schema.machines.id, machineId), isNull(schema.machines.deletedAt)));
   if (!m?.access) return null;
@@ -1380,7 +1385,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
     name: m.name,
     folders: m.access.folders.filter((f) => f.path !== shared && grantedTo(f, agentId)).map((f) => f.path),
     tools: m.access.tools,
-    shared: shared ? { dir: shared, system: m.executors?.mode === "system" } : null,
+    shared: shared ? { dir: shared, system: m.executors?.mode === "system", os: m.os } : null,
   };
 }
 
@@ -1414,8 +1419,11 @@ export function machineAccessText(a: {
  * The computer's shared folder (ADR 0115): every agent there reads and writes it, so what one fetched the others
  * needn't fetch again. Agents look there first and leave there what others will need, tools in `bin/` included.
  */
-export function sharedFolderText(computer: string, shared: { dir: string; system: boolean }) {
+export function sharedFolderText(computer: string, shared: { dir: string; system: boolean; os?: string }) {
   const { dir, system } = shared;
+  // System mode is Linux only; a person's own computer may be a Mac (no flock) or Windows (neither command).
+  const linux = system || shared.os === "linux";
+  const windows = shared.os === "windows";
   return [
     `# Shared folder on "${computer}"`,
     `${dir} is shared by every agent on that computer${system ? " (also ~/shared in your home there)" : ""}.`,
@@ -1423,13 +1431,19 @@ export function sharedFolderText(computer: string, shared: { dir: string; system
     `- Put there what other agents will need too. A command-line tool others will use goes in ${dir}/bin${system ? " (on your PATH there)" : ""}, installed once for everyone and without root, not in your own folder.`,
     ...(system
       ? [
-          `- To move something of yours there, copy it and then delete your copy (mv keeps it private to you), or afterwards run chgrp -R --reference=${dir} and chmod -R g+rwX on it.`,
+          // With the folder's default ACL, a file's group access is capped by the mode it is created with: a plain
+          // cp keeps the source's (0644 and 0755 leave it read-only to the others), mv keeps its owner's group.
+          `- To move something of yours there, copy it with cp -r --no-preserve=mode and then delete your copy; mv or a plain cp keeps it private or read-only to the others. Something already there that they can't write: chgrp -R --reference=${dir} it and chmod -R g+rwX it.`,
         ]
       : []),
-    `- Clone or download into it under a lock, so two agents never write the same thing at once: flock ${dir}/.lock git clone …`,
+    linux
+      ? `- Clone or download into it under a lock, so two agents never write the same thing at once: flock ${dir}/.lock git clone …`
+      : `- Clone or download into it under a lock (a ${dir}/<name>.lock folder made with mkdir, removed when done), so two agents never write the same thing at once.`,
     "- Never put credentials there: no .env files, tokens, keys, passwords or sign-in folders.",
     "- Read a script someone left there before you run it.",
-    "- Check the free space with df -h before putting more than 1 GB there.",
+    windows
+      ? "- Check the disk's free space before putting more than 1 GB there."
+      : "- Check the free space with df -h before putting more than 1 GB there.",
   ].join("\n");
 }
 

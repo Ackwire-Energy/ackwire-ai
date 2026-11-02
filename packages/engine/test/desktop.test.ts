@@ -708,7 +708,9 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(system).toContain("~/shared");
     expect(system).toContain("look there first");
     expect(system).toContain("/srv/agentes/shared/bin (on your PATH there)");
-    expect(system).toContain("mv keeps it private");
+    // A plain cp keeps the source's mode, which the default ACL then caps the group to: the others couldn't write.
+    expect(system).toContain("cp -r --no-preserve=mode");
+    expect(system).toContain("mv or a plain cp keeps it private or read-only to the others");
     expect(system).toContain("chgrp -R --reference=/srv/agentes/shared");
     expect(system).toContain("flock /srv/agentes/shared/.lock");
     expect(system).toContain("Never put credentials there");
@@ -719,6 +721,17 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(single).not.toContain("chgrp");
     expect(single).not.toContain("PATH");
     expect(single).toContain("/Users/ana/agentes/shared/bin");
+    // A Mac has no flock, Windows neither flock nor df: a lock and a space check they can do.
+    expect(single).not.toContain("flock");
+    expect(single).toContain("/Users/ana/agentes/shared/<name>.lock folder made with mkdir");
+    expect(single).toContain("df -h");
+    const windows = sharedFolderText("PC", { dir: "C:\\agentes\\shared", system: false, os: "windows" });
+    expect(windows).not.toContain("flock");
+    expect(windows).not.toContain("df -h");
+    expect(windows).toContain("Check the disk's free space");
+    expect(sharedFolderText("Box", { dir: "/home/me/agentes/shared", system: false, os: "linux" })).toContain(
+      "flock /home/me/agentes/shared/.lock",
+    );
   });
 
   test("the runner's new frames are parsed and cut", () => {
