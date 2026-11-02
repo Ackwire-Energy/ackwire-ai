@@ -1,4 +1,12 @@
-import { type Issue, type IssueActivity, keys, useApi, useIssueAction, useIssueActivity } from "@agenteschat/client";
+import {
+  type Issue,
+  type IssueActivity,
+  keys,
+  useApi,
+  useIssueAction,
+  useIssueActivity,
+  useIssueLive,
+} from "@agenteschat/client";
 import { whenAt } from "@agenteschat/client/lib/format";
 import { issueEventText } from "@agenteschat/client/lib/issues";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,7 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chip, Composer, Icon, type IconName, SectionHeader, Text, useToast } from "@/ui";
 import { MessageText } from "../chat/MessageText";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { useColors, useConnection, useDirectory, useOrgId } from "../shared/hooks";
 import { ActionList, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 
@@ -27,6 +35,8 @@ export function IssueActivityFeed({ issue }: { issue: Issue }) {
   const dir = useDirectory();
   const orgId = useOrgId();
   const activity = useIssueActivity(orgId, issue.id);
+  // A comment or a change from someone else (a person, an agent) shows up while the task is open.
+  useIssueLive(orgId, useConnection(), issue);
   const list = activity.data ?? [];
   const when = (iso: string) => whenAt(t, i18n.language, iso);
   return (

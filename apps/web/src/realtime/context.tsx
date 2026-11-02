@@ -72,6 +72,7 @@ import {
   touchRun,
   typingThrottle,
   unmarkStopping,
+  useIssueLive,
   useSendWaiting,
 } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
@@ -822,6 +823,11 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams]);
+}
+
+/** An open task's activity, live: comments and events from others land in its feed (`useIssueLive`). */
+export function useIssueRealtime(orgId: string, issue: { id: string; channelId: string | null }) {
+  useIssueLive(orgId, useRealtime().connection, issue);
 }
 
 /** Each live event of a channel while mounted and `enabled` (the handler is read through a ref). */

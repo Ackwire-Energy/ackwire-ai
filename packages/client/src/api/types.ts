@@ -1328,6 +1328,17 @@ export type ChannelEvent =
       file?: string;
     };
 
+/**
+ * Something landed on a task's activity (packages/engine/src/issues.ts): a comment or an event. It comes on the
+ * task's channel, or as an org broadcast (no `channelId`) for a task with none.
+ */
+export type IssueActivityEvent = {
+  type: "issue.comment";
+  channelId?: string;
+  issueId: string;
+  activity: IssueActivity;
+};
+
 /** You followed or unfollowed a thread (on any of your devices). */
 export type ThreadFollowEvent = { type: "thread.follow" } & ThreadFollow;
 
