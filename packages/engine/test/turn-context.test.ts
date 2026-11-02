@@ -302,7 +302,7 @@ describe("# This turn", () => {
       .set({
         access: {
           folders: [{ path: "/Users/w/agentes/shared", agents: ["*"] }],
-          tools: { claude: true, codex: true, commands: true },
+          tools: { claude: true, codex: true, cursor: true, commands: true },
         },
       })
       .where(eq(schema.machines.id, paired.machineId));
@@ -313,8 +313,12 @@ describe("# This turn", () => {
       online: true,
       execAllowed: true,
       os: "darwin",
-      protocol: 8,
-      executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+      protocol: MACHINE_PROTOCOL_VERSION,
+      executors: {
+        claude: { version: "2.1.300", loggedIn: true },
+        cursor: { version: "2026.10.1", loggedIn: true },
+        detectedAt: new Date().toISOString(),
+      },
     });
     const seen: { prompt: string; system: string; resume: boolean }[] = [];
     const brain: Brain = {
@@ -327,7 +331,7 @@ describe("# This turn", () => {
     };
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      brains: { claude_code: () => brain },
+      brains: { claude_code: () => brain, cursor: () => ({ ...brain, kind: "cursor" }) },
       machines: { status: async (id) => status(id) },
     });
     const question = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -360,6 +364,14 @@ describe("# This turn", () => {
     const stored = (second?.transcript as { system: ContextBlock[] } | undefined)?.system ?? [];
     expect(stored.at(-1)?.turn).toBe(true);
     expect(stored.some((b) => b.text.startsWith("# Now"))).toBe(true);
+
+    // On Cursor, whose sandbox can't write outside the turn's workspace, no shared folder to be told to use.
+    await f.db.update(schema.agents).set({ brain: "cursor" }).where(eq(schema.agents.id, f.agent.id));
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, handlers);
+    expect(seen).toHaveLength(3);
+    expect(seen[2]?.system).toContain("Only your own folder there");
+    expect(seen[2]?.system).not.toContain("# Shared folder");
   });
 });
 

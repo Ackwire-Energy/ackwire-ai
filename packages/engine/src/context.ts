@@ -762,7 +762,11 @@ export async function buildRunContext(
     ...(machineAccess
       ? await machineAccess.then((a) =>
           a
-            ? [{ text: machineAccessText(a) }, ...(a.shared ? [{ text: sharedFolderText(a.name, a.shared) }] : [])]
+            ? [
+                { text: machineAccessText(a) },
+                // Cursor's sandbox can't write a folder outside the turn's workspace (ADR 0114), so its shell couldn't use it.
+                ...(a.shared && agent.brain !== "cursor" ? [{ text: sharedFolderText(a.name, a.shared) }] : []),
+              ]
             : [],
         )
       : []),
