@@ -25,6 +25,7 @@ import {
   useHeldPlaces,
   useJoinChannel,
   useMarkChannelRead,
+  useMarkThreadRead,
   useMessages,
   useMissionControl,
   usePins,
@@ -140,6 +141,7 @@ import {
   mergeTimeline,
   parseSlash,
   pinTarget,
+  readMark,
   stoppableInLine,
   workingEntries,
 } from "./logic";
@@ -711,13 +713,16 @@ function Chat({
   }, []);
 
   // ── Read ──
-  // Seen up to the latest message: the list's badges (channel and DM) clear at once.
+  // Seen up to the latest message: the list's badges (a channel's or DM's, or a thread's) clear at once.
   const markRead = useMarkChannelRead(orgId).mutate;
+  const markThreadRead = useMarkThreadRead(orgId).mutate;
   const lastId = list.at(-1)?.id;
   useEffect(() => {
     if (!member || !lastId || lastId.startsWith("local-")) return;
-    markRead(channelId);
-  }, [markRead, channelId, member, lastId]);
+    const mark = readMark(channelId, threadId);
+    if (mark.kind === "thread") markThreadRead(mark.id);
+    else markRead(mark.id);
+  }, [markRead, markThreadRead, channelId, threadId, member, lastId]);
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);

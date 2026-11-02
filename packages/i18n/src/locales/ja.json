@@ -1054,6 +1054,8 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "システム",
     "markRead": "既読にする",
+    "muteChannel": "チャンネルをミュート",
+    "unmuteChannel": "ミュートを解除",
     "mention": "メンション",
     "copyHandle": "@{{handle}}をコピー",
     "handleCopied": "@をコピーしました。",
@@ -1261,6 +1263,8 @@
     "pendingApprovals_other": "{{count}}件の承認待ち",
     "home": "ホーム",
     "notifications": "通知",
+    "unreadMentions_other": "あなたへのメンション {{count}} 件",
+    "unreadThreads_other": "スレッド: 未読の返信あり {{count}} 件",
     "unreadNotifications_other": "{{count}}件の未読の通知"
   },
   "agentGroups": {

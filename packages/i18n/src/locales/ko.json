@@ -1054,6 +1054,8 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "시스템",
     "markRead": "읽음으로 표시",
+    "muteChannel": "채널 알림 끄기",
+    "unmuteChannel": "채널 알림 켜기",
     "mention": "멘션",
     "copyHandle": "@{{handle}} 복사",
     "handleCopied": "@를 복사했어요.",
@@ -1261,6 +1263,8 @@
     "pendingApprovals_other": "대기 중인 승인 {{count}}개",
     "home": "홈",
     "notifications": "알림",
+    "unreadMentions_other": "나를 언급한 메시지 {{count}}개",
+    "unreadThreads_other": "스레드: 읽지 않은 답글이 있는 스레드 {{count}}개",
     "unreadNotifications_other": "읽지 않은 알림 {{count}}개"
   },
   "agentGroups": {

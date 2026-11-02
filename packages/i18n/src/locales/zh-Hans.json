@@ -1054,6 +1054,8 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "系统",
     "markRead": "标为已读",
+    "muteChannel": "将频道设为静音",
+    "unmuteChannel": "取消频道静音",
     "mention": "提及",
     "copyHandle": "复制 @{{handle}}",
     "handleCopied": "@ 已复制。",
@@ -1261,6 +1263,8 @@
     "pendingApprovals_other": "{{count}} 个待审批",
     "home": "首页",
     "notifications": "通知",
+    "unreadMentions_other": "{{count}} 条提及你的消息",
+    "unreadThreads_other": "话题：{{count}} 个有未读回复",
     "unreadNotifications_other": "{{count}} 条未读通知"
   },
   "agentGroups": {

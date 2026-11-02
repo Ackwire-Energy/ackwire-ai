@@ -61,6 +61,17 @@ export const seesDetails = (agent: { seesDetails?: boolean } | undefined) => age
 export const listsAgent = (org: OrgSummary | null | undefined, agent: Pick<Agent, "canTalk"> | undefined) =>
   can(org, "manage_agents") || canTalk(agent);
 
+/**
+ * The agents my lists leave out (`listsAgent`, from the server's `canTalk`): unless I manage agents, the ones not
+ * answering me.
+ */
+export const hiddenAgentIds = (org: OrgSummary | null | undefined, agents: readonly Pick<Agent, "id" | "canTalk">[]) =>
+  new Set(agents.filter((a) => !listsAgent(org, a)).map((a) => a.id));
+
+/** A DM with one of `hiddenAgents` (`hiddenAgentIds`): off the lists and their counts. */
+export const hiddenDm = (d: { with: { type: string; id: string } }, hiddenAgents: ReadonlySet<string> | undefined) =>
+  d.with.type === "agent" && hiddenAgents?.has(d.with.id) === true;
+
 /** Whether `to` lets someone talk to the agent whom `from` didn't; its owner always can (same rule as the backend). */
 export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
   if (to.mode === "owner" || from.mode === "everyone") return false;

@@ -286,9 +286,12 @@ describe("a row's buttons on hover or focus", () => {
     expect(stops.every((el) => el.tabIndex === 0)).toBe(true);
   });
 
-  test("a member who didn't make the channel gets none, and keeps its unread count", async () => {
+  test("a member who didn't make the channel gets none, and keeps its unread marks", async () => {
     const state = asMember();
-    for (const c of state.channels) c.unreadCount = c.id === ENG_ID ? 2 : 0;
+    for (const c of state.channels) {
+      c.unreadCount = c.id === ENG_ID ? 2 : 0;
+      c.mentionCount = c.id === ENG_ID ? 2 : 0;
+    }
     await go(state);
     const link = nav().querySelector('a.sidebar__item[title="#eng"]') as HTMLElement;
     expect(link.parentElement?.classList.contains("sidebar__row")).toBe(false);

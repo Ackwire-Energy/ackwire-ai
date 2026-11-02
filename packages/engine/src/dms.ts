@@ -5,7 +5,7 @@ import { audienceError, canTalkTo, speakerOf } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent } from "./events";
+import { publishChannelEvent, publishUserEvent } from "./events";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { agentOnlyNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
@@ -393,13 +393,37 @@ export async function markChannelRead(
     userIds: [actorId],
     kind: "agent_reply",
   });
-  if (member.kind === "dm")
-    await publishChannelEvent(pubsub, {
-      type: "channel.read",
-      channelId,
-      userId: actorId,
-      lastReadAt: at.toISOString(),
-    });
+  const read = { type: "channel.read" as const, channelId, userId: actorId, lastReadAt: at.toISOString() };
+  if (member.kind === "dm") await publishChannelEvent(pubsub, read);
+  // My other devices: the conversation stops looking unread there too.
+  await publishUserEvent(pubsub, orgId, actorId, read);
+}
+
+/**
+ * Mutes (or unmutes) a channel or DM for me: it never looks unread to me, though a mention of me still counts. My
+ * other devices hear `channel.muted`.
+ */
+export async function setChannelMuted(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  muted: boolean,
+  pubsub?: PubSub,
+) {
+  const [member] = await db
+    .select({ id: channelMembers.id, joinedAt: channelMembers.createdAt })
+    .from(channelMembers)
+    .where(
+      and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, actorId)),
+    );
+  if (!member) throw new NotFoundError("Channel not found");
+  // Never read yet: the new row reads from my joining (listChannels' fallback), so muting marks nothing read.
+  await db
+    .insert(channelReads)
+    .values({ orgId, channelId, userId: actorId, muted, lastReadAt: member.joinedAt })
+    .onConflictDoUpdate({ target: [channelReads.channelId, channelReads.userId], set: { muted } });
+  await publishUserEvent(pubsub, orgId, actorId, { type: "channel.muted", channelId, muted });
 }
 
 /**

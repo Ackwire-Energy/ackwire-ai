@@ -31,15 +31,17 @@ import {
   usePrefetchRecent,
   useSidebarItems,
   useSkills,
+  useUnreadThreads,
 } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
-import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
+import { audienceChip, audienceNotice, hiddenAgentIds, listsAgent } from "@agenteschat/client/lib/audience";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
+import { looksUnread } from "@agenteschat/client/lib/unread";
 import {
   type AgentColor,
   Avatar,
@@ -88,6 +90,7 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { useUnreadTitle } from "@/hooks/useUnreadTitle";
 import { requestAgentPanel } from "@/lib/agent-panel-ask";
 import { requestChannelDetails } from "@/lib/channel-details";
 import type { MenuEntry } from "@/lib/context-menu";
@@ -234,9 +237,13 @@ export function Sidebar() {
   // Threads: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
   const missionList = useMissionList(orgId, MISSIONS_WAITING_COUNT);
   const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
+  // …and whether a thread I follow has a reply I haven't read: the entry lights like an unread channel.
+  const unreadThreads = useUnreadThreads(orgId).data ?? 0;
   // The tools on top, each where I put it (the rest in More); one there "when there's something" while its count is.
   const sidebarItems = useSidebarItems(orgId).data;
-  const counts: Partial<Record<SidebarItem, number>> = { approvals: pending, threads: missionsWaiting };
+  // An unread reply counts as "something" for a Threads set to show "when there's something": it comes into the list
+  // lit, and leaves once read, as Approvals does once nothing waits.
+  const counts: Partial<Record<SidebarItem, number>> = { approvals: pending, threads: missionsWaiting + unreadThreads };
   const listed = SIDEBAR_ITEMS.filter((id) => inSidebarList(sidebarPlace(sidebarItems, id), counts[id] ?? 0));
   const inMore = SIDEBAR_ITEMS.filter((id) => !listed.includes(id));
   const countOf = (id: SidebarItem) =>
@@ -253,7 +260,16 @@ export function Sidebar() {
       </CountChip>
     ) : null;
   const toolRow = (id: SidebarItem) => (
-    <Link key={id} to={SIDEBAR_TOOLS[id].to} params={{ orgId }} className="sidebar__item" title={t(`shell.${id}`)}>
+    <Link
+      key={id}
+      to={SIDEBAR_TOOLS[id].to}
+      params={{ orgId }}
+      className="sidebar__item"
+      title={
+        id === "threads" && unreadThreads > 0 ? t("shell.unreadThreads", { count: unreadThreads }) : t(`shell.${id}`)
+      }
+      data-unread={id === "threads" && unreadThreads > 0}
+    >
       <Icon name={SIDEBAR_TOOLS[id].icon} />
       <span className="sidebar__item-label">{t(`shell.${id}`)}</span>
       {countOf(id)}
@@ -266,6 +282,9 @@ export function Sidebar() {
   const waitingFor = useMemo(() => waitingAgents(outages.data), [outages.data]);
   // The agents' presence and lines (ADR 0084): the one place that polls them; every face reads the same list.
   useAgentStatuses(orgId);
+  // The tab's title: "(3) agentes.chat", what the sidebar's numbers add up to (agents it doesn't list left out).
+  const hiddenAgents = useMemo(() => hiddenAgentIds(org, dir.agents), [org, dir.agents]);
+  useUnreadTitle(orgId, hiddenAgents);
   const dms = useDms(orgId);
   const dmChannels = new Set((dms.data ?? []).map((d) => d.channelId));
   // Unread per DM partner (agents show it on their "Agentes" row; people under "Mensagens diretas").
@@ -1067,7 +1086,10 @@ function SidebarChannels({
   };
 
   const row = (c: Channel) => {
-    const unread = c.unreadCount ?? 0;
+    // Discord's marks: something new lights the row (a pill on its left edge, the name in full ink); only a mention
+    // of me gets a number. Muted, it rests dim whatever comes, but a mention still shows.
+    const unread = looksUnread(c);
+    const mentions = c.mentionCount ?? 0;
     const link = (
       <Link
         key={c.id}
@@ -1075,7 +1097,9 @@ function SidebarChannels({
         params={{ orgId, channelId: c.id }}
         className="sidebar__item"
         title={`#${c.name}`}
-        data-unread={unread > 0}
+        data-conv
+        data-unread={unread}
+        data-muted={c.muted || undefined}
         data-drop={dropMark(`channel:${c.id}`)}
         draggable={categories.data !== undefined && mayChange(c)}
         onDragStart={(e) => startDrag(e, { kind: "channel", id: c.id })}
@@ -1092,7 +1116,7 @@ function SidebarChannels({
           {channelInitials(c.name)}
         </span>
         <span className="sidebar__item-label">{c.name}</span>
-        {unread > 0 && <UnreadCount count={unread} />}
+        {mentions > 0 && <UnreadCount count={mentions} mentions />}
       </Link>
     );
     // On hover or focus, like Discord's invite and settings: who manages the channel adds members or opens its details.
@@ -1102,7 +1126,7 @@ function SidebarChannels({
       void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } });
     };
     return (
-      <div key={c.id} className="sidebar__row" data-unread={unread > 0} data-acts={2}>
+      <div key={c.id} className="sidebar__row" data-unread={unread} data-acts={2}>
         {link}
         <span className="sidebar__row-acts">
           <RowAction icon="personAdd" label={t("shell.sidebarMenu.addMembers")} onClick={open("add")} />
@@ -1130,7 +1154,7 @@ function SidebarChannels({
       <MoveChannelDialog channel={moving} onOpenChange={(open) => !open && setMoving(null)} canCreate={manages} />
     </>
   );
-  const unread = channels.reduce((n, c) => n + (c.unreadCount ?? 0), 0);
+  const mentions = channels.reduce((n, c) => n + (c.isMember ? (c.mentionCount ?? 0) : 0), 0);
 
   return (
     <>
@@ -1140,7 +1164,7 @@ function SidebarChannels({
         sections={sections}
         className="sidebar__section--part"
         headProps={headProps}
-        summary={unread > 0 && <UnreadCount count={unread} />}
+        summary={mentions > 0 && <UnreadCount count={mentions} mentions />}
         action={<SectionAdd label={t("shell.sidebarMenu.addToChannels")} entries={addEntries} />}
         // The channels with no category take a channel dragged out of one.
         drop={shown.length > 0 ? { "data-drop": dropMark("loose"), onDragOver: overLoose, onDrop: drop } : undefined}
@@ -1344,6 +1368,7 @@ function AgentRow({
         onMouseEnter={onPrefetch}
         onFocus={onPrefetch}
         onClick={onOpen}
+        data-conv
         data-unread={unread > 0}
         data-busy={busy}
         data-presence={shown?.presence}
@@ -1438,6 +1463,7 @@ function PersonRow({
       params={{ orgId: org.id, userId: m.userId }}
       className="sidebar__item"
       title={[m.name, word, line?.text].filter(Boolean).join(" · ")}
+      data-conv
       data-unread={unread > 0}
       data-presence={shown?.presence}
       onMouseEnter={onPrefetch}
@@ -1457,12 +1483,16 @@ function PersonRow({
   );
 }
 
-/** Unread count: neutral (attention is for what waits on a person, not for unread chat). */
-function UnreadCount({ count }: { count: number }) {
+/** The number on a row: unread messages of a DM, or mentions of me in a channel (`mentions`), as Discord counts. */
+function UnreadCount({ count, mentions = false }: { count: number; mentions?: boolean }) {
   const { t } = useTranslation();
   return (
-    <span className="sidebar__unread" role="img" aria-label={t("shell.unread", { count })}>
-      {count}
+    <span
+      className="sidebar__unread"
+      role="img"
+      aria-label={t(mentions ? "shell.unreadMentions" : "shell.unread", { count })}
+    >
+      {count > 99 ? "99+" : count}
     </span>
   );
 }

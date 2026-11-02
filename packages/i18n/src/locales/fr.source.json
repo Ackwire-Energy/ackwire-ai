@@ -2687,6 +2687,12 @@
   "contextMenu.markRead": {
     "value": "Mark as read"
   },
+  "contextMenu.muteChannel": {
+    "value": "Mute channel"
+  },
+  "contextMenu.unmuteChannel": {
+    "value": "Unmute channel"
+  },
   "contextMenu.mention": {
     "value": "Mention"
   },
@@ -3193,6 +3199,18 @@
   },
   "shell.notifications": {
     "value": "Notifications"
+  },
+  "shell.unreadMentions": {
+    "value": {
+      "one": "{{count}} mention of you",
+      "other": "{{count}} mentions of you"
+    }
+  },
+  "shell.unreadThreads": {
+    "value": {
+      "one": "Threads: {{count}} with unread replies",
+      "other": "Threads: {{count}} with unread replies"
+    }
   },
   "shell.unreadNotifications": {
     "value": {

@@ -11,7 +11,8 @@ export function recentConversations(
 ): string[] {
   const all = new Map<string, { at: string; unread: number }>();
   for (const c of channels) {
-    if (c.isMember && c.lastMessage) all.set(c.id, { at: c.lastMessage.createdAt, unread: c.unreadCount ?? 0 });
+    if (c.isMember && c.lastMessage)
+      all.set(c.id, { at: c.lastMessage.createdAt, unread: c.muted ? 0 : (c.unreadCount ?? 0) });
   }
   for (const d of dms) {
     if (d.lastMessage) all.set(d.channelId, { at: d.lastMessage.createdAt, unread: d.unread });

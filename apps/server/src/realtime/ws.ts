@@ -1,5 +1,6 @@
 import {
   channelTopic,
+  chatActivityTopic,
   MAX_FRAME_BYTES,
   orgTopic,
   type Presence,
@@ -11,6 +12,7 @@ import {
 import type { Config } from "@agenteschat/config";
 import { and, type Database, eq, inArray, isNotNull, isNull, or, schema } from "@agenteschat/db";
 import {
+  activityAudience,
   announcePresence,
   type BrowserLive,
   closedRefusal,
@@ -229,6 +231,33 @@ export function createRealtime(deps: RealtimeDeps) {
   const send = (ws: BrowserSocket, frame: unknown): void => {
     ws.send(JSON.stringify(frame));
   };
+  // A new message reaches its members' sockets on this replica as `channel.activity` (no content): their lists
+  // count it as unread without subscribing to every channel. The author's own sockets never hear it.
+  // ponytail: one audience query per message per replica with sockets; a per-channel member cache if that shows up.
+  const browsers = new Set<BrowserSocket>();
+  deps.pubsub.subscribe(chatActivityTopic, (raw) => {
+    if (browsers.size === 0) return;
+    const { channelId, threadId, authorUserId } = raw as {
+      channelId?: unknown;
+      threadId?: unknown;
+      authorUserId?: unknown;
+    };
+    if (typeof channelId !== "string" || !UUID.test(channelId)) return;
+    const thread = typeof threadId === "string" && UUID.test(threadId) ? threadId : null;
+    void activityAudience(deps.db, channelId, thread)
+      .then(({ orgId, dm, userIds }) => {
+        const event = { type: "channel.activity", channelId, threadId: thread, dm };
+        for (const ws of browsers)
+          if (
+            ws.readyState === 1 &&
+            ws.data.orgId === orgId &&
+            ws.data.user.id !== authorUserId &&
+            userIds.has(ws.data.user.id)
+          )
+            send(ws, { type: "event", scope: "user", event });
+      })
+      .catch(() => {});
+  });
 
   async function liveSession(ws: BrowserSocket, force = false): Promise<boolean> {
     if (ws.readyState !== 1) return false;
@@ -419,6 +448,7 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isStream(socket)) return deps.streams?.open(socket);
         const ws = socket as BrowserSocket;
         if (!(await liveSession(ws, true))) return;
+        browsers.add(ws);
         const { orgId, user } = ws.data;
         const drop = (channelId: string, reason: string) => {
           const pending = ws.data.pending.get(channelId);
@@ -573,6 +603,7 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isMachine(socket)) return deps.machines?.close(socket);
         if (isStream(socket)) return deps.streams?.close(socket, code);
         const ws = socket as BrowserSocket;
+        browsers.delete(ws);
         if (ws.data.sessionTimer) clearInterval(ws.data.sessionTimer);
         ws.data.sessionTimer = null;
         for (const off of ws.data.subscriptions.values()) off();

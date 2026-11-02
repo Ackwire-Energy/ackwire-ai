@@ -27,6 +27,9 @@ export const orgTopic = (orgId: string) => `org:${orgId}`;
 /** Events for one person in one organization (approvals waiting for them, DMs). */
 export const userTopic = (orgId: string, userId: string) => `user:${orgId}:${userId}`;
 
+/** Server-side: each new message's channel, for the unread marks of its members' sockets. Never forwarded as is. */
+export const chatActivityTopic = "chat-activity";
+
 /** Server-side signal that one upload to the Drive finished (`upload_file`, ADR 0025). Never forwarded to clients. */
 export const uploadTopic = (uploadId: string) => `upload:${uploadId}`;
 

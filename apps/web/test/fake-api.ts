@@ -177,6 +177,8 @@ export interface FakeState {
   answeredElsewhere?: Set<string>;
   /** Answers to questions wait for this before the server replies (a slow network). */
   answerHold?: Promise<void>;
+  /** Threads I follow with an unread reply (`reads.unreadThreads`). */
+  unreadThreads?: number;
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
@@ -2753,6 +2755,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
       reads: async () => [],
+    },
+    reads: {
+      mute: async (orgId, channelId, muted) => {
+        log("reads.mute", orgId, channelId, muted);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (c) c.muted = muted;
+      },
+      markThreadRead: async (orgId, threadId) => log("reads.markThreadRead", orgId, threadId),
+      unreadThreads: async () => state.unreadThreads ?? 0,
     },
     questions: {
       // Same rules as the server: the choice must be one of the options; answering twice is 409.

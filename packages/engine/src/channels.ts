@@ -17,7 +17,7 @@ import { caches } from "./cache";
 import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
-import { followsThreadSql } from "./follows";
+import { followsThreadSql, threadReadAtSql } from "./follows";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { agentOnlyNoticeSql } from "./notices";
 import { clearChannelNotifications, notificationSnippet } from "./notifications";
@@ -238,6 +238,10 @@ export interface ChannelListItem {
    * `MAX_CHANNEL_UNREAD`; 0 when I'm not a member.
    */
   unreadCount: number;
+  /** Of those, the ones that mention me (the sidebar's number, even while muted). */
+  mentionCount: number;
+  /** I muted it: it never looks unread to me. */
+  muted: boolean;
   /**
    * The latest top-level message, skipping a routine's call (hidden in the chat, only the agent's answer
    * shows); null when I'm not a member (I can't read it) or it's empty.
@@ -258,6 +262,8 @@ interface ChannelListRow {
   position: number | string;
   is_member: boolean;
   unread_count: number | string | null;
+  mention_count: number | string | null;
+  muted: boolean | null;
   last_id: string | null;
   last_body: string | null;
   last_meta: Record<string, unknown> | null;
@@ -280,10 +286,21 @@ const uuidArray = (v: string[] | string | null) =>
  */
 export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
   await requirePermission(db, userId, orgId, "read");
+  // Message `u` I haven't read in channel `c`: not mine, after my read (or my joining), a thread's reply only in one I
+  // follow and haven't read there.
+  const unread = sql`cm.id is not null and u.org_id = ${orgId}::uuid and u.channel_id = c.id and u.deleted_at is null
+    and u.created_at > coalesce(cr.last_read_at, cm.created_at)
+    and (u.author_user_id is null or u.author_user_id <> ${userId})
+    and not ${agentOnlyNoticeSql(sql`u.meta`)}
+    and (u.thread_id is null or (${followsThreadSql(orgId, userId, sql`u.thread_id`)}
+      and u.created_at > ${threadReadAtSql(userId, sql`u.thread_id`)}))
+    -- Nor one more unread (ADR 0091): it is silent.
+    and u.meta->>'mediaAfter' is null`;
   const rows = rowsOf<ChannelListRow>(
     await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.audience_role_ids, c.created_by_user_id, c.created_at,
         c.category_id, c.position,
-        (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count,
+        (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count, coalesce(un.m, 0) as mention_count,
+        coalesce(cr.muted, false) as muted,
         lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
         lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
         coalesce(lu.name, la.name) as last_author_name
@@ -305,17 +322,11 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       left join ${schema.users} lu on lu.id = lm.author_user_id
       left join ${agents} la on la.id = lm.author_agent_id
       left join lateral (
-        select count(*)::int as n from (
-          select 1 from ${schema.messages} u
-          where cm.id is not null and u.org_id = ${orgId}::uuid and u.channel_id = c.id and u.deleted_at is null
-            and u.created_at > coalesce(cr.last_read_at, cm.created_at)
-            and (u.author_user_id is null or u.author_user_id <> ${userId})
-            and not ${agentOnlyNoticeSql(sql`u.meta`)}
-            and (u.thread_id is null or ${followsThreadSql(orgId, userId, sql`u.thread_id`)})
-            -- Nor one more unread (ADR 0091): it is silent.
-            and u.meta->>'mediaAfter' is null
-          limit ${MAX_CHANNEL_UNREAD}
-        ) unread
+        select
+          (select count(*)::int from (select 1 from ${schema.messages} u where ${unread} limit ${MAX_CHANNEL_UNREAD}) x) as n,
+          -- Mentions apart, capped on their own: a busy channel's first 100 unread may not hold the one that names me.
+          (select count(*)::int from (select 1 from ${schema.messages} u
+            where ${unread} and ${userId} = any(u.mentioned_user_ids) limit ${MAX_CHANNEL_UNREAD}) y) as m
       ) un on true
       where c.org_id = ${orgId}::uuid and c.archived_at is null and c.kind = 'channel'
         and (c.visibility = 'public' or cm.id is not null or ${channelAudienceSql("c", sql`${userId}`)})
@@ -337,6 +348,8 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       position: Number(r.position),
       isMember: r.is_member === true,
       unreadCount: Number(r.unread_count ?? 0),
+      mentionCount: Number(r.mention_count ?? 0),
+      muted: r.muted === true,
       lastMessage:
         r.last_id && r.last_at && r.last_author_type
           ? {

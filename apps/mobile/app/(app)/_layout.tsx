@@ -3,6 +3,7 @@ import { type ErrorBoundaryProps, Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { useConnection, useRememberAgentLooks } from "@/features/shared/hooks";
+import { useAppIconBadge } from "@/features/shared/queries";
 import { ScreenError } from "@/features/shared/ScreenError";
 import { useUserEvents } from "@/features/shared/userEvents";
 import { useVoiceOutbox } from "@/features/voice/useVoiceOutbox";
@@ -46,6 +47,7 @@ function AppStack() {
   const { colors } = useTheme();
   useUserEvents();
   useVoiceOutbox();
+  useAppIconBadge();
   // The app's sounds (ADR 0070): the player and its audio session.
   useSounds();
   useRememberAgentLooks();

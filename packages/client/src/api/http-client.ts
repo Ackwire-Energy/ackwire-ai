@@ -271,6 +271,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       unfollow: (orgId, threadId) =>
         request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "DELETE" }),
     },
+    reads: {
+      mute: (orgId, channelId, muted) =>
+        request<void>(
+          `${org(orgId)}/channels/${enc(channelId)}/mute`,
+          muted ? { method: "PUT", json: {} } : { method: "DELETE" },
+        ),
+      markThreadRead: (orgId, threadId) => request<void>(`${org(orgId)}/threads/${enc(threadId)}/read`, { json: {} }),
+      unreadThreads: async (orgId) => (await request<{ count: number }>(`${org(orgId)}/unread-threads`)).count,
+    },
     working: {
       list: async (orgId) => (await request<{ runs: WorkingRun[] }>(`${org(orgId)}/active-runs`)).runs,
     },

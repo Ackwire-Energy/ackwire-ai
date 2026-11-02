@@ -60,6 +60,7 @@ describe("a channel", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(items()).toEqual([
       "Marcar como lida",
+      "Silenciar canal",
       "Editar canal",
       "Nova categoria com este canal",
       "Copiar link",
@@ -80,7 +81,7 @@ describe("a channel", () => {
   test("the channel's header has the same menu", async () => {
     await go();
     await rightClick(screen().getByRole("heading", { level: 1, name: "# eng" }));
-    expect(items()).toEqual(["Editar canal", "Copiar link", "Arquivar canal"]);
+    expect(items()).toEqual(["Silenciar canal", "Editar canal", "Copiar link", "Arquivar canal"]);
   });
 });
 

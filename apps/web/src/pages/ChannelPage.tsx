@@ -53,6 +53,7 @@ import {
   useHeldPlaces,
   useJoinChannel,
   useMarkChannelRead,
+  useMarkThreadRead,
   useMessages,
   useMissionControl,
   useModels,
@@ -831,6 +832,19 @@ function ChannelView({
     document.addEventListener("visibilitychange", mark);
     return () => document.removeEventListener("visibilitychange", mark);
   }, [markChannelRead, channel.id, isMember, lastId]);
+  // A thread open in view: its replies are read (its unread and the Threads mark clear, on every device).
+  const markThreadRead = useMarkThreadRead(org.id).mutate;
+  const threadId = thread?.id;
+  const lastReplyId = threadId ? threadMessages.data?.at(-1)?.id : undefined;
+  useEffect(() => {
+    if (!threadId || !isMember || !lastReplyId || lastReplyId.startsWith("local-")) return;
+    const mark = () => {
+      if (document.visibilityState === "visible") markThreadRead(threadId);
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
+  }, [markThreadRead, threadId, isMember, lastReplyId]);
 
   // The skeleton was on screen: the real messages fade in (once).
   const hadSkeleton = useRef(messages.isLoading);

@@ -1,5 +1,5 @@
 import type { Agent, Channel } from "@agenteschat/client";
-import { keys, useArchiveChannel, useDms, useMarkChannelRead } from "@agenteschat/client";
+import { keys, useArchiveChannel, useDms, useMarkChannelRead, useMuteChannel } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
@@ -118,12 +118,29 @@ export function useChannelMenu() {
   const toast = useToast();
   const navigate = useNavigate();
   const markRead = useMarkRead();
+  const mute = useMuteChannel(org.id);
   const archive = useArchiveChannelWithUndo();
   return (c: Channel, extra: MenuEntry[] = []): MenuEntry[] => {
     const manages = managesChannel(c, me.user.id, org);
     return [
       { kind: "header", label: `#${c.name}` },
       ...markRead(c.id, c.unreadCount ?? 0),
+      // Muted, it never looks unread to me (a mention of me still counts).
+      ...(c.isMember
+        ? [
+            {
+              kind: "item" as const,
+              id: "mute",
+              label: c.muted ? t("contextMenu.unmuteChannel") : t("contextMenu.muteChannel"),
+              icon: c.muted ? ("eye" as const) : ("eyeOff" as const),
+              run: () =>
+                mute.mutate(
+                  { channelId: c.id, muted: !c.muted },
+                  { onError: (e) => toast.show(errorText(t, e), "error") },
+                ),
+            },
+          ]
+        : []),
       {
         kind: "item",
         id: "edit",

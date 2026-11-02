@@ -84,9 +84,33 @@ export const channelReads = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     lastReadAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Muted by this person: never looks unread to them; mentions of them still count. */
+    muted: boolean().notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.channelId, t.userId] }),
+    foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * Where each person stopped reading a thread's replies (the thread list's unread). A followed thread's reply stays
+ * unread until this passes it, whatever the channel's read (`channel_reads`) says. Keyed by the root message (no
+ * foreign key to the partitioned `messages`).
+ */
+export const threadReads = pgTable(
+  "thread_reads",
+  {
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    rootMessageId: uuid().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.rootMessageId, t.userId] }),
     foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
   ],
 );

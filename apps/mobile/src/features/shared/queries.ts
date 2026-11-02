@@ -7,11 +7,18 @@ import {
   useThreadList,
   useWorkingRuns,
 } from "@agenteschat/client";
-import { useMemo } from "react";
+import * as Notifications from "expo-notifications";
+import { useEffect, useMemo } from "react";
 import { useOrg } from "@/providers/org";
 import { busyChannels, workingNow } from "../agents/logic";
 import { waitingApprovals } from "../approvals/logic";
-import { buildConversations, hiddenAgentIds, unreadConversationCount, unreadThreadCount } from "../chats/logic";
+import {
+  appBadgeCount,
+  buildConversations,
+  hiddenAgentIds,
+  unreadConversationCount,
+  unreadThreadCount,
+} from "../chats/logic";
 import { useDirectory, useNow, useOrgId } from "./hooks";
 
 /**
@@ -92,6 +99,23 @@ export function useUnreadConversations() {
         : unreadConversationCount({ channels: channels.data ?? [], dms: dms.data ?? [], hiddenAgents: hidden }),
     [channels.data, dms.data, hidden, loading],
   );
+}
+
+/** Keeps the app icon's number on the web tab title's total, live while the app runs; 0 once signed out. */
+export function useAppIconBadge() {
+  const orgId = useOrgId();
+  const channels = useChannels(orgId);
+  const dms = useDms(orgId);
+  const { hidden, loading } = useHiddenAgents();
+  const total =
+    loading || !channels.data || !dms.data
+      ? null
+      : appBadgeCount({ channels: channels.data, dms: dms.data, hiddenAgents: hidden });
+  useEffect(() => {
+    if (total !== null) void Notifications.setBadgeCountAsync(total).catch(() => {});
+  }, [total]);
+  // Signed out (the app's stack goes away): no workspace's number stays on the icon.
+  useEffect(() => () => void Notifications.setBadgeCountAsync(0).catch(() => {}), []);
 }
 
 /** The badge of Threads: thread and mission rows with something unread. */

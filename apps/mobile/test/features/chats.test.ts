@@ -4,6 +4,7 @@ import { previewBody, serverBody } from "@agenteschat/client/lib/message-body";
 import { resources } from "@agenteschat/i18n";
 import i18next from "i18next";
 import {
+  appBadgeCount,
   buildConversations,
   hiddenAgentIds,
   homeSections,
@@ -336,11 +337,20 @@ describe("the home by kind", () => {
   });
 
   test("the Threads badge counts only its own unread rows (an unread DM is Conversas')", () => {
-    // The server sends no per-thread unread (reads are per channel): nothing to count yet.
     expect(unreadThreadCount(rows)).toBe(0);
     const withUnread = rows.map((r) => (r.key === "t:t2" || r.key === "d:d0" ? { ...r, unread: 2 } : r));
     expect(unreadThreadCount(withUnread)).toBe(1);
     expect(unreadThreadCount(withUnread.filter((r) => r.kind !== "mission"))).toBe(0);
+  });
+
+  test("a thread's unread replies (threads I follow) come from the server and light its row", () => {
+    const built = buildConversations({
+      channels: [],
+      dms: [],
+      threads: [thread({ id: "t9", title: "Deploy", unread: 2 })],
+    });
+    expect(built[0]?.unread).toBe(2);
+    expect(unreadThreadCount(built)).toBe(1);
   });
 
   test("the pushed lists are the sections' Ver todos; threads are a tab", () => {
@@ -599,5 +609,35 @@ describe("last-message previews in the reader's language", () => {
     expect(serverBody(i18n.t, "…", back)).toBe("MacBook voltou: “App” retomou de onde parou.");
     await i18n.changeLanguage("en");
     expect(serverBody(i18n.t, english, done)).toBe("“Rodar os testes” finished.");
+  });
+});
+
+describe("unread marks, as on the web", () => {
+  test("a muted channel never looks unread; its mentions of me still count", () => {
+    const channels = [
+      channel("c1", "geral", true, { unreadCount: 4, mentionCount: 1 }),
+      channel("c2", "ruido", true, { unreadCount: 9, mentionCount: 2, muted: true }),
+    ];
+    const rows = buildConversations({ channels, dms: [], threads: [] });
+    expect(rows.map((r) => (r.kind === "channel" ? [r.name, r.unread, r.mentions] : null))).toEqual([
+      ["geral", 4, 1],
+      ["ruido", 0, 2],
+    ]);
+    expect(unreadConversationCount({ channels, dms: [] })).toBe(1);
+  });
+
+  test("the app icon's number: DM messages and mentions of me, DMs the home hides left out", () => {
+    const channels = [channel("c1", "geral", true, { unreadCount: 30, mentionCount: 2 })];
+    const dms = [dm("d1", "Atlas", 3, 1), dm("d2", "Hidden", 5, 1)];
+    expect(appBadgeCount({ channels, dms })).toBe(10);
+    expect(appBadgeCount({ channels, dms, hiddenAgents: new Set(["a-Hidden"]) })).toBe(5);
+  });
+});
+
+describe("the app icon's number", () => {
+  test("goes back to 0 when the app's stack goes away (signed out)", async () => {
+    const src = await Bun.file(new URL("../../src/features/shared/queries.ts", import.meta.url)).text();
+    const hook = src.slice(src.indexOf("export function useAppIconBadge"));
+    expect(hook).toContain("() => () => void Notifications.setBadgeCountAsync(0)");
   });
 });

@@ -1054,6 +1054,8 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Sistem",
     "markRead": "Tandai sudah dibaca",
+    "muteChannel": "Bisukan saluran",
+    "unmuteChannel": "Bunyikan saluran",
     "mention": "Sebut",
     "copyHandle": "Salin @{{handle}}",
     "handleCopied": "@ disalin.",
@@ -1261,6 +1263,8 @@
     "pendingApprovals_other": "{{count}} persetujuan tertunda",
     "home": "Beranda",
     "notifications": "Notifikasi",
+    "unreadMentions_other": "{{count}} sebutan untuk Anda",
+    "unreadThreads_other": "Thread: {{count}} dengan balasan belum dibaca",
     "unreadNotifications_other": "{{count}} notifikasi belum dibaca"
   },
   "agentGroups": {

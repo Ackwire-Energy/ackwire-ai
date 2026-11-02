@@ -1,4 +1,4 @@
-import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
+import { channelTopic, chatActivityTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import { modelProvider } from "@agenteschat/providers";
 import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
@@ -493,7 +493,7 @@ export type ChannelEvent =
       change: ThreadChange;
       state?: ThreadState;
       /** Without `following` (each person reads their own from the API). */
-      thread?: Omit<ThreadInfo, "following">;
+      thread?: Omit<ThreadInfo, "following" | "unread">;
       messageIds?: string[];
     }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
@@ -597,6 +597,16 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
     messageId: message.id,
     ...(inline ? { message } : {}),
   });
+  try {
+    await pubsub.publish(chatActivityTopic, {
+      type: "channel.activity",
+      channelId: message.channelId,
+      threadId: message.threadId,
+      authorUserId: message.author.type === "person" ? message.author.id : null,
+    });
+  } catch {
+    // Best effort: the lists catch up when they're read again.
+  }
 }
 
 /** Receipts of a routed message (`message.routed`), then "thinking" for each run it started, where the message is. */
