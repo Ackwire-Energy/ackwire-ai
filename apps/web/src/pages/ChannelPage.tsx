@@ -1145,8 +1145,15 @@ function ChannelView({
   useEffect(() => {
     const el = scroller.current;
     if (!el || typeof ResizeObserver === "undefined") return;
+    // What grew during a glide down (the activity bar opening as the message goes out, the first words) is
+    // followed once the glide ends: the glide stops at the end it was given, and nothing else may grow after it.
+    let later: ReturnType<typeof setTimeout> | undefined;
     const pin = () => {
-      if (stick.current && Date.now() >= autoScrollUntil.current) followRef.current();
+      if (!stick.current) return;
+      const wait = autoScrollUntil.current - Date.now();
+      clearTimeout(later);
+      if (wait > 0) later = setTimeout(pin, wait);
+      else followRef.current();
     };
     const ro = new ResizeObserver(pin);
     for (const child of Array.from(el.children)) ro.observe(child);
@@ -1160,6 +1167,7 @@ function ChannelView({
           });
     mo?.observe(el, { childList: true });
     return () => {
+      clearTimeout(later);
       ro.disconnect();
       mo?.disconnect();
     };
@@ -3554,8 +3562,9 @@ export const TimelineMessage = memo(function TimelineMessage({
       ) : live ? (
         <Parts resetKey={m}>
           {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
+          {/* Keyed like the saved message's parts: its text stays the same element when the message takes its place. */}
           {wordsOnTop && !liveFailed && revealed ? (
-            <MessageText>
+            <MessageText key="body">
               <MessageBody
                 body={revealed}
                 resolveMention={dir.mentionName}
@@ -3565,14 +3574,14 @@ export const TimelineMessage = memo(function TimelineMessage({
             </MessageText>
           ) : (
             opening.said && (
-              <MessageText>
+              <MessageText key="said">
                 <MessageBody body={opening.said} resolveMention={dir.mentionName} />
               </MessageText>
             )
           )}
           {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
           {!liveFailed && revealed && !wordsOnTop && (
-            <MessageText>
+            <MessageText key="body">
               <MessageBody
                 body={revealed}
                 resolveMention={dir.mentionName}
@@ -3630,7 +3639,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       ) : (
         <Parts resetKey={m}>
           {keptSaid?.kind === "say" && (
-            <MessageText>
+            <MessageText key="said">
               <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
             </MessageText>
           )}
@@ -3654,7 +3663,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             !(question && body.trim() === question.text.trim()) &&
             !choiceReply &&
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
-              <MessageText style={workOver ? { opacity: 0.6 } : undefined}>
+              <MessageText key="body" style={workOver ? { opacity: 0.6 } : undefined}>
                 <MessageBody
                   body={body}
                   resolveMention={dir.mentionName}

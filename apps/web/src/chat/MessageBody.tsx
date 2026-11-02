@@ -62,27 +62,25 @@ export function MessageBody({
       ),
     [],
   );
-  if (!live)
-    return (
-      <ChartAccent.Provider value={accent}>
-        <Markdown source={body} variant="message" mention={mention} channel={channel} wikiLink={wikiLink} />
-      </ChartAccent.Provider>
-    );
-  const { settled, tail } = splitSettled(body);
+  // One `.md--message` around every block, live or final: the space between blocks never changes as a block settles
+  // or as the final message takes the live row's place (two wrappers had none between them).
+  const { settled, tail } = live ? splitSettled(body) : { settled: "", tail: body };
   return (
     <ChartAccent.Provider value={accent}>
-      {settled && (
-        <SettledBlocks source={settled} mention={stableMention} channel={stableChannel} wikiLink={stableWiki} />
-      )}
-      <Markdown
-        source={tail}
-        variant="message"
-        mention={mention}
-        channel={channel}
-        wikiLink={wikiLink}
-        words
-        className="md--tail"
-      />
+      <div className="md md--message">
+        {settled && (
+          <SettledBlocks source={settled} mention={stableMention} channel={stableChannel} wikiLink={stableWiki} />
+        )}
+        <Markdown
+          source={tail}
+          variant="message"
+          mention={mention}
+          channel={channel}
+          wikiLink={wikiLink}
+          words={live}
+          bare
+        />
+      </div>
     </ChartAccent.Provider>
   );
 }
@@ -99,5 +97,5 @@ const SettledBlocks = memo(function SettledBlocks({
   channel: ChannelRenderer;
   wikiLink: WikiLinkRenderer;
 }) {
-  return <Markdown source={source} variant="message" mention={mention} channel={channel} wikiLink={wikiLink} />;
+  return <Markdown source={source} variant="message" mention={mention} channel={channel} wikiLink={wikiLink} bare />;
 });
