@@ -515,14 +515,15 @@ export interface ClaudeLaunch {
 }
 
 /**
- * Claude Code's own tools a brain keeps: reading, searching, editing and running code in its folder. Ours come
- * through MCP, the web included: our `web_search` and `web_fetch` mark what they read as outside content (ADR 0117),
- * so Claude Code's WebFetch and WebSearch are left out (`WEB_BUILTIN_TOOLS`). Names Claude Code doesn't know are
- * ignored by it.
+ * Claude Code's own tools a brain keeps: reading, searching, editing and running code in its folder, and ToolSearch,
+ * which loads our MCP tools that aren't always listed (`ALWAYS_LOADED` in mcp.ts; without it in `--tools` Claude Code
+ * lists them all, measured on 2.1.316). Ours come through MCP, the web included: our `web_search` and `web_fetch` mark
+ * what they read as outside content (ADR 0117), so Claude Code's WebFetch and WebSearch are left out
+ * (`WEB_BUILTIN_TOOLS`). Names Claude Code doesn't know are ignored by it.
  */
-export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep"] as const;
-/** A plan turn's own tools (ADR 0053 §3, 0109): reading and a shell our prompt tool keeps read-only; no edits. */
-export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep"] as const;
+export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "ToolSearch"] as const;
+/** A plan turn's own tools (ADR 0053 §3, 0109): reading, a shell our prompt tool keeps read-only, ToolSearch; no edits. */
+export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep", "ToolSearch"] as const;
 /** Claude Code's web tools, which ours replace on a brain turn. */
 export const WEB_BUILTIN_TOOLS = ["WebFetch", "WebSearch"] as const;
 

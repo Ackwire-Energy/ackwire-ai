@@ -350,7 +350,7 @@ test("command line: stream-json both ways, opus falls back to sonnet, strict MCP
   const lean = claudeBrainArgs({ ...base, settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS });
   expect(lean.join(" ")).toContain("--setting-sources project");
   // Our web tools instead of Claude Code's (they mark what they read as outside content, ADR 0117).
-  expect(lean.join(" ")).toContain("--tools Bash,Read,Edit,Write,Glob,Grep");
+  expect(lean.join(" ")).toContain("--tools Bash,Read,Edit,Write,Glob,Grep,ToolSearch");
   expect(lean.join(" ")).not.toContain("WebFetch");
   expect(lean.slice(-2)).toEqual(["--session-id", SESSION(1)]);
   expect(fallbackModelFor("claude-opus-5-5")).toBe("sonnet");
@@ -378,7 +378,8 @@ test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no ed
   expect(plan).toContain("--strict-mcp-config");
   expect(at(plan, "--setting-sources")).toBe("");
   expect(at(plan, "--permission-mode")).toBe("default");
-  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep");
+  // ToolSearch loads our tools that aren't always listed (without it Claude Code lists them all).
+  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep,ToolSearch");
   expect(at(plan, "--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
   const work = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", false) });
   expect(at(work, "--permission-mode")).toBe("acceptEdits");
@@ -660,7 +661,7 @@ test.if(posix)(
     expect(args).toContain("--strict-mcp-config");
     expect(at("--setting-sources")).toBe("");
     expect(at("--permission-mode")).toBe("default");
-    expect(at("--tools")).toBe("Bash,Read,Glob,Grep");
+    expect(at("--tools")).toBe("Bash,Read,Glob,Grep,ToolSearch");
     expect(at("--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
     const settings = JSON.parse(readFileSync(at("--settings") as string, "utf8")) as {
       permissions: { allow: string[]; deny: string[] };
