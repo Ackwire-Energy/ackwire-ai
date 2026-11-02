@@ -225,6 +225,14 @@ export function namedRepo(repos: readonly string[], texts: readonly string[]): s
   return null;
 }
 
+/** What `prepareAgentCode` gives a turn: where it starts, "# Your code" for the system text, and the start line. */
+export interface CodeSetup {
+  cwd: string;
+  prompt: string;
+  /** "You start in …" for the turn's prompt; absent or "" when it starts in no checkout. */
+  start?: string;
+}
+
 /** What a chat turn needs from `prepareAgentCode`. */
 export interface CodeTurn {
   orgId: string;
@@ -240,7 +248,8 @@ export interface CodeTurn {
  * machine: updates the agent's checkouts (fetch + fast-forward of the default
  * branch, bounded, never failing the turn), picks where the turn starts (the
  * repository the conversation names, else the agent's first repository, else
- * its first checkout) and writes the "# Your code" block. Null when there is
+ * its first checkout) and writes the "# Your code" block for the system text, and where it starts ("You start in …")
+ * for the turn's own prompt: the system text stays the same from turn to turn. Null when there is
  * nothing to do: a mission turn (it has its own folder), an older runner, no
  * GitHub or no git access, or nothing granted or checked out.
  */
@@ -248,7 +257,7 @@ export async function prepareAgentCode(
   deps: MachineGitDeps,
   turn: CodeTurn,
   options: { signal?: AbortSignal } = {},
-): Promise<{ cwd: string; prompt: string } | null> {
+): Promise<CodeSetup | null> {
   // A chat turn starts in the agent's folder (""); a mission's turn has its own folder; a session started afresh
   // there because its folder was gone stays there.
   const session = turn.session?.cwd === "" && !turn.session.ownFolder ? turn.session : null;
@@ -333,14 +342,8 @@ export async function prepareAgentCode(
       ...(r.defaultBranch ? { defaultBranch: r.defaultBranch } : {}),
       ...(r.status === "failed" ? { stale: r.message || "the update failed" } : {}),
     }));
-    const prompt = codePrompt({
-      handle: agent.handle,
-      checkouts,
-      notCloned,
-      downloading,
-      cwd: start ? (start.path ?? start.dir) : null,
-    });
-    return { cwd: start?.dir ?? "", prompt };
+    const prompt = codePrompt({ handle: agent.handle, checkouts, notCloned, downloading });
+    return { cwd: start?.dir ?? "", prompt, start: start ? `You start in ${start.path ?? start.dir}.` : "" };
   } catch {
     // Offline, slow, refused: the turn goes on in the agent's folder, as before.
     return null;
