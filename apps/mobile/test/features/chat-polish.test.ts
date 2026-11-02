@@ -98,8 +98,8 @@ describe("my message's clock from the moment it is sent", () => {
     expect(screen).toContain(
       "if (channel && channelAgents.length > 0 && !isMediaAlone(message)) live.picking(message.id);",
     );
-    expect(src("features/chat/live.ts")).toContain(
-      'dispatch({ type: "event", event: { type: "message.routing", channelId, messageId, step: "plan" }, at: Date.now() })',
+    expect(src("features/chat/live.ts").replace(/\s+/g, " ")).toContain(
+      'dispatch({ type: "event", event: { type: "message.routing", channelId, messageId, step: "plan" }, at: Date.now(), })',
     );
     const picking = applyReceiptEvent({}, { type: "message.routing", channelId: "c", messageId: "m", step: "plan" });
     expect(receiptTicks(picking.m)).toBe("clock");
