@@ -586,6 +586,8 @@ describe("the agent asks for help on its desktop", () => {
   test("who is asked: the owner when they may drive it, else everyone who may; nobody on a computer nobody paired", async () => {
     const { setMachine, systemMode } = await start();
     const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    // A plain member never drives it, in system mode either.
+    await addMember(f.db, f.org.id, "member", "caio");
     await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
     expect(await computerDrivers(f.db, f.org.id, f.agent.id)).toEqual([f.owner.id]);
     await systemMode();
