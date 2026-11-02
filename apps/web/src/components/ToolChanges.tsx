@@ -1,21 +1,34 @@
 import type { ToolChange } from "@agenteschat/client";
-import { useAcceptToolChange, useToolChanges } from "@agenteschat/client";
-import { inputFields } from "@agenteschat/client/lib/custom-tools";
+import { useAcceptConnectionToolChanges, useAcceptToolChange, useToolChanges } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button } from "@agenteschat/ui";
+import { Button, Diff } from "@agenteschat/ui";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
+import { type ToolChangeDiff, toolChangeDiff } from "@/lib/tool-changes";
+
+/** Tools shown per connection before "Mostrar todas": a server that changed many doesn't push the page down. */
+const FIRST_TOOLS = 5;
 
 /**
  * Settings → Conectores, for connector admins (ADR 0117): approved tools whose server changed what they say or take.
- * Agents keep the approved version until an admin accepts the new one here, side by side. Nothing when none waits.
+ * Agents keep the approved version until an admin accepts the new one. One block per connection ("Aceitar todas"),
+ * one line per tool saying what changed, and only the changed sentences and fields behind "Ver a mudança".
+ * Nothing when none waits.
  */
 export function ToolChanges({ orgId }: { orgId: string }) {
   const { t } = useTranslation();
   const changes = useToolChanges(orgId);
-  const accept = useAcceptToolChange(orgId);
-  const toast = useToast();
   const list = changes.data ?? [];
+  const groups = useMemo(() => {
+    const by = new Map<string, { connectionId: string; label: string; tools: ToolChange[] }>();
+    for (const c of list) {
+      const group = by.get(c.connectionId) ?? { connectionId: c.connectionId, label: c.connectionLabel, tools: [] };
+      group.tools.push(c);
+      by.set(c.connectionId, group);
+    }
+    return [...by.values()];
+  }, [list]);
   if (list.length === 0) return null;
   return (
     <section className="tool-changes" aria-labelledby="tool-changes-title">
@@ -23,77 +36,152 @@ export function ToolChanges({ orgId }: { orgId: string }) {
         {t("connectors.toolChanges.title")}
       </h3>
       <p className="small muted">{t("connectors.toolChanges.intro")}</p>
-      {list.map((c) => (
-        <article key={`${c.connectionId}:${c.toolName}`} className="tool-change">
-          <div className="tool-change__head">
-            <span className="tool-change__name">
-              {c.connectionLabel} · <code>{c.toolName}</code>
-            </span>
-            <Button
-              size="sm"
-              loading={accept.isPending && accept.variables?.toolName === c.toolName}
-              onClick={() =>
-                accept.mutate(c, {
-                  onSuccess: () => toast.show(t("connectors.toolChanges.accepted", { tool: c.toolName })),
-                  onError: (e) => toast.show(errorText(t, e), "error"),
-                })
-              }
-            >
-              {t("connectors.toolChanges.accept")}
-            </Button>
-          </div>
-          <div className="tool-change__sides">
-            <Version label={t("connectors.toolChanges.before")} version={c.before} other={c.after} />
-            <Version label={t("connectors.toolChanges.after")} version={c.after} other={c.before} />
-          </div>
-        </article>
+      {groups.map((g) => (
+        <ConnectionChanges key={g.connectionId} orgId={orgId} {...g} />
       ))}
     </section>
   );
 }
 
-/** One side: its description and each input field as the model reads it, a field that differs on the other side marked. */
-function Version({
+function ConnectionChanges({
+  orgId,
+  connectionId,
   label,
-  version,
-  other,
+  tools,
 }: {
+  orgId: string;
+  connectionId: string;
   label: string;
-  version: ToolChange["before"];
-  other: ToolChange["before"];
+  tools: ToolChange[];
 }) {
   const { t } = useTranslation();
-  const fields = inputFields(version.inputSchema);
-  const otherJson = new Map(inputFields(other.inputSchema).map((f) => [f.name, f.json]));
+  const toast = useToast();
+  const acceptAll = useAcceptConnectionToolChanges(orgId);
+  const [all, setAll] = useState(false);
+  const shown = all ? tools : tools.slice(0, FIRST_TOOLS);
+  const titleId = `tool-changes-${connectionId}`;
   return (
-    <div className="tool-change__side">
-      <div className="small muted">{label}</div>
-      <p className="tool-change__text">{version.description}</p>
-      {fields.length > 0 ? (
-        <>
-          <div className="small muted">{t("connectors.toolChanges.input")}</div>
-          <ul className="tool-change__fields">
-            {fields.map((f) => {
-              const changed = otherJson.get(f.name) !== f.json;
-              return (
-                <li
-                  key={f.name}
-                  className={changed ? "tool-change__field tool-change__field--changed" : "tool-change__field"}
-                >
-                  <code>{f.name}</code>
-                  {f.type ? <span className="muted"> · {f.type}</span> : null}
-                  {changed ? (
-                    <span className="tool-change__tag">{t("connectors.toolChanges.fieldChanged")}</span>
-                  ) : null}
-                  {f.description ? <div className="tool-change__text">{f.description}</div> : null}
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      ) : (
-        <div className="small muted">{t("connectors.toolChanges.noInput")}</div>
+    <article className="tool-changes__group" aria-labelledby={titleId}>
+      <div className="tool-changes__head">
+        <div className="tool-changes__who">
+          <span id={titleId} className="tool-changes__name">
+            {label}
+          </span>
+          <span className="small muted">{t("connectors.toolChanges.count", { count: tools.length })}</span>
+        </div>
+        {tools.length > 1 && (
+          <Button
+            size="sm"
+            loading={acceptAll.isPending}
+            onClick={() =>
+              acceptAll.mutate(connectionId, {
+                onSuccess: () => toast.show(t("connectors.toolChanges.acceptedAll", { name: label })),
+                onError: (e) => toast.show(errorText(t, e), "error"),
+              })
+            }
+          >
+            {t("connectors.toolChanges.acceptAll")}
+          </Button>
+        )}
+      </div>
+      <ul className="tool-changes__tools">
+        {shown.map((c) => (
+          <ToolRow key={c.toolName} orgId={orgId} change={c} />
+        ))}
+      </ul>
+      {tools.length > FIRST_TOOLS && !all && (
+        <Button size="sm" variant="ghost" className="tool-changes__more" onClick={() => setAll(true)}>
+          {t("connectors.toolChanges.showAll", { total: tools.length })}
+        </Button>
       )}
-    </div>
+    </article>
   );
+}
+
+/** One tool: its name, what changed in a few words, and the change itself on demand. */
+function ToolRow({ orgId, change }: { orgId: string; change: ToolChange }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const accept = useAcceptToolChange(orgId);
+  const [open, setOpen] = useState(false);
+  const diff = useMemo(() => toolChangeDiff(change), [change]);
+  const detailsId = `tool-change-${change.connectionId}-${change.toolName}`;
+  return (
+    <li className="tool-change">
+      <div className="tool-change__row">
+        <div className="tool-change__what">
+          <code className="tool-change__name">{change.toolName}</code>
+          <span className="small muted">{summary(t, diff)}</span>
+        </div>
+        <div className="tool-change__actions">
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-expanded={open}
+            aria-controls={detailsId}
+            onClick={() => setOpen(!open)}
+          >
+            {t(open ? "connectors.toolChanges.hide" : "connectors.toolChanges.show")}
+          </Button>
+          <Button
+            size="sm"
+            loading={accept.isPending}
+            aria-label={t("connectors.toolChanges.acceptOne", { tool: change.toolName })}
+            onClick={() =>
+              accept.mutate(change, {
+                onSuccess: () => toast.show(t("connectors.toolChanges.accepted", { tool: change.toolName })),
+                onError: (e) => toast.show(errorText(t, e), "error"),
+              })
+            }
+          >
+            {t("connectors.toolChanges.accept")}
+          </Button>
+        </div>
+      </div>
+      {open && (
+        <div id={detailsId} className="tool-change__details">
+          <ChangeDetails diff={diff} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ChangeDetails({ diff }: { diff: ToolChangeDiff }) {
+  const { t } = useTranslation();
+  const labels = { addedLabel: t("connectors.toolChanges.added"), removedLabel: t("connectors.toolChanges.removed") };
+  return (
+    <>
+      {diff.description && (
+        <div className="tool-change__part">
+          <div className="small muted">{t("connectors.toolChanges.description")}</div>
+          <Diff aria-label={t("connectors.toolChanges.description")} lines={diff.description} {...labels} />
+        </div>
+      )}
+      {diff.fields.map((f) => (
+        <div key={f.name} className="tool-change__part">
+          <div className="small muted">
+            <code>{f.name}</code>
+            {f.type ? ` · ${f.type}` : ""} · {t(`connectors.toolChanges.field.${f.status}`)}
+          </div>
+          {f.lines.length > 0 && <Diff aria-label={f.name} lines={f.lines} code={f.code} {...labels} />}
+        </div>
+      ))}
+      {diff.schema && (
+        <div className="tool-change__part">
+          <div className="small muted">{t("connectors.toolChanges.input")}</div>
+          <Diff aria-label={t("connectors.toolChanges.input")} lines={diff.schema} code {...labels} />
+        </div>
+      )}
+    </>
+  );
+}
+
+/** "O texto mudou · 2 campos mudaram": what changed, in a few words. */
+function summary(t: ReturnType<typeof useTranslation>["t"], diff: ToolChangeDiff): string {
+  const parts: string[] = [];
+  if (diff.description) parts.push(t("connectors.toolChanges.textChanged"));
+  if (diff.fields.length > 0) parts.push(t("connectors.toolChanges.fieldsChanged", { count: diff.fields.length }));
+  if (parts.length === 0) parts.push(t("connectors.toolChanges.inputChanged"));
+  return parts.join(" · ");
 }

@@ -12,6 +12,7 @@
  * - DELETE /api/app/organizations/{orgId}/connectors/custom/{id}
  * - GET    /api/app/organizations/{orgId}/connectors/tool-changes → { changes } (seeded with `addToolChange`)
  * - POST   /api/app/organizations/{orgId}/connectors/{connectionId}/tools/{toolName}/accept-change
+ * - POST   /api/app/organizations/{orgId}/connectors/{connectionId}/tool-changes/accept → { accepted }
  * The mock never talks to the URL: it pretends the server offers a ticket
  * tool set, needs an API key unless the URL contains "oauth", and gains one
  * new tool on the first refresh. Tools come classified as the backend does
@@ -173,6 +174,14 @@ export function createMockCustomConnectors(
         orgId,
         list.filter((c) => c.connectionId !== connectionId || c.toolName !== toolName),
       );
+    },
+    acceptConnectionToolChanges: async (orgId, connectionId) => {
+      log("customConnectors.acceptConnectionToolChanges", orgId, connectionId);
+      const list = changesByOrg.get(orgId) ?? [];
+      const accepted = list.filter((c) => c.connectionId === connectionId).length;
+      if (accepted === 0) throw new MockNotFoundError("No change waits on this connection");
+      changesByOrg.set(orgId, list.filter((c) => c.connectionId !== connectionId));
+      return { accepted };
     },
     disconnect: async (orgId, id) => {
       log("customConnectors.disconnect", orgId, id);
