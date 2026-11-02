@@ -330,7 +330,7 @@ export async function setup(
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent
       ? [
-          createAskAgentToolSource({ pubsub, ai: { gateway, machines: machineHub } }),
+          createAskAgentToolSource({ pubsub, ai: { gateway, machines: machineHub }, judge: context.judge }),
           createFindAgentToolSource({ machines: machineHub }),
         ]
       : []),

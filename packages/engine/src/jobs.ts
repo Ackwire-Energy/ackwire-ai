@@ -16,10 +16,11 @@ import type { ArtifactDeps } from "./artifacts";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
-import { brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
+import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import { crowdedAgents } from "./computer-queue";
 import type { ConnectorDeps } from "./connectors/connections";
+import { startNoteRun } from "./consultations";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
@@ -496,10 +497,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       const message = await getMessage(deps.db, orgId, String(job.payload.messageId));
       const agentId = String(job.payload.agentId);
       if (!message) return;
+      const reportIn = job.payload.reportIn as BrakeReport | undefined;
       const { wake } = await brakeWakes({ db: deps.db, pubsub: deps.pubsub, judge: null }, message, [agentId], {
         look: Number(job.payload.look) || 0,
+        ...(reportIn ? { reportIn } : {}),
       });
-      if (wake.length > 0)
+      // A tell_agent note (agents' DM, no mention) starts its run itself.
+      if (wake.length > 0 && message.meta.agentNote) await startNoteRun(deps.db, message, agentId);
+      else if (wake.length > 0)
         await dispatchMentions(
           deps.db,
           { orgId, messageId: message.id },
@@ -555,7 +560,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         if (where && isAgentOnlyDm(where)) return;
         // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
         // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
-        if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
+        // The brakes' digest and loop stop (ADR 0131) are for a person too.
+        if (message.meta.notice || message.meta.noAi || message.meta.actionCard || message.meta.autonomyNote) return;
         // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01): its mentions wake
         // the agents it names for its creator, like any agent's (the router stays out). With no creator left it
         // has nobody's reach and wakes nobody. Never silently: the agents it named and its run's tell_agent

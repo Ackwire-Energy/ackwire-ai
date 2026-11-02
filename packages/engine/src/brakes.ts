@@ -87,6 +87,7 @@ export function costlyKind(name: string, input: Record<string, unknown>): CostKi
  */
 export const unrequested = (authority: RunAuthority | null) => authority?.kind === "unattended";
 
+
 /** A proposal card's meta (`meta.actionCard`). The card keeps its state; the signal row is the source of truth. */
 export interface ProposalCard {
   kind: "autonomy_proposal";
@@ -451,6 +452,15 @@ export const LATER_JOB = "autonomy.later";
 
 export type BrakeOutcome = "linked" | "digest" | "loop" | "later";
 
+/**
+ * Where people hear about a held item (the digest, the loop stop): the message's own conversation, or for a note into
+ * agents' private DM, the conversation of the run that sent it.
+ */
+export interface BrakeReport {
+  channelId: string;
+  threadId: string | null;
+}
+
 /** The cheap triage a wake on an unrequested item meets (ADR 0131 §5): work on it now, or noise for the digest. */
 export async function triageItem(judge: Judge, input: { orgId: string; agentId: string | null; body: string }) {
   const answers = await judge.ask({
@@ -487,7 +497,7 @@ export async function brakeWakes(
   deps: { db: Database; pubsub?: PubSub; judge?: Judge | null },
   message: Message,
   agentIds: string[],
-  options: { look?: number } = {},
+  options: { look?: number; reportIn?: BrakeReport } = {},
 ): Promise<{ wake: string[]; held: Map<string, BrakeOutcome> }> {
   const held = new Map<string, BrakeOutcome>();
   if (agentIds.length === 0) return { wake: [], held };
@@ -519,6 +529,7 @@ export async function brakeWakes(
         return triage;
       },
       options.look ?? 0,
+      options.reportIn ?? { channelId: message.channelId, threadId: message.threadId ?? message.id },
     );
     if (outcome) held.set(agentId, outcome);
   }
@@ -536,6 +547,7 @@ async function brakeOne(
   crowded: boolean,
   triage: () => Promise<"work" | "noise">,
   look: number,
+  at: BrakeReport,
 ): Promise<BrakeOutcome | null> {
   const { db } = deps;
   const orgId = message.orgId;
@@ -548,7 +560,7 @@ async function brakeOne(
         kind,
         signature: sig?.key ?? null,
         title: sig?.title ?? cutText(unmention(message.body), 200),
-        channelId: message.channelId,
+        channelId: at.channelId,
         messageId: message.id,
         runId: extra.runId ?? null,
         ...(extra.doneAt ? { doneAt: extra.doneAt } : {}),
@@ -628,7 +640,7 @@ async function brakeOne(
       return "linked";
     }
     if ("loop" in checked) {
-      if (checked.loop) await postLoopStop(deps, message, agentId, sig.title);
+      if (checked.loop) await postLoopStop(deps, message, at, agentId, sig.title);
       return "loop";
     }
     claim = checked.claim;
@@ -651,7 +663,7 @@ async function brakeOne(
     await enqueue(db, {
       orgId,
       kind: LATER_JOB,
-      payload: { messageId: message.id, agentId, look: look + 1 },
+      payload: { messageId: message.id, agentId, look: look + 1, reportIn: at },
       dedupeKey: `${LATER_JOB}:${message.id}:${agentId}:${look + 1}`,
       runAt: new Date(Date.now() + (look < LATER_LOOKS ? LATER_LOOK_MS : LATER_SLOW_LOOK_MS)),
     });
@@ -697,13 +709,19 @@ async function ownerOfAgent(db: Executor, orgId: string, agentId: string) {
 }
 
 /** One line where the item came in: the agent stopped after repeated attempts and asks a person (§6). */
-async function postLoopStop(deps: { db: Database; pubsub?: PubSub }, message: Message, agentId: string, title: string) {
+async function postLoopStop(
+  deps: { db: Database; pubsub?: PubSub },
+  message: Message,
+  at: BrakeReport,
+  agentId: string,
+  title: string,
+) {
   const forUserId = await ownerOfAgent(deps.db, message.orgId, agentId);
   const posted = await deps.db.transaction(async (tx) => {
     const m = await insertMessage(tx, {
       orgId: message.orgId,
-      channelId: message.channelId,
-      threadId: message.threadId ?? message.id,
+      channelId: at.channelId,
+      threadId: at.threadId,
       author: { type: "agent", agentId, runId: null, hop: message.hop + 1, stretchId: message.stretchId },
       body: `I stopped working on this on my own: it came back ${LOOP_MAX} times in a day (${title}). Tell me how you want it handled.`,
       meta: {
