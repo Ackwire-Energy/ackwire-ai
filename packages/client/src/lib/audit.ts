@@ -74,9 +74,9 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
   }
   // AI apps (ADR 0113): the app's or the token's name, as it was shown when it happened.
   if (area === "apps") {
-    const what = (["connected", "disconnected", "token_created", "token_revoked", "message_sent"] as const).find(
-      (s) => s === rest,
-    );
+    const what = (
+      ["connected", "scopes_changed", "disconnected", "token_created", "token_revoked", "message_sent"] as const
+    ).find((s) => s === rest);
     const app = auditStr(row.details.app) ?? auditStr(row.details.client);
     if (what && app) return t(`audit.change.apps.${what}`, { app });
   }

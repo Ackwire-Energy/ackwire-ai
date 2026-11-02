@@ -9132,6 +9132,7 @@ export const en: Translations = {
       },
       apps: {
         connected: "Connected {{app}}",
+        scopes_changed: "Let {{app}} send tasks",
         disconnected: "Disconnected {{app}}",
         token_created: "Created the personal token {{app}}",
         token_revoked: "Revoked the personal token {{app}}",

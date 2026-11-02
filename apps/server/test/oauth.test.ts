@@ -450,6 +450,35 @@ describe("consent", () => {
     expect(audit.filter((a) => a.action === "apps.disconnected").length).toBe(1);
   });
 
+  test("a live connection given write is audited and emailed; given read again, nothing changes", async () => {
+    const { b, orgId } = await owner();
+    const app = await connectApp(t, b, orgId, { access: "read" });
+    await connectApp(t, b, orgId, { clientId: app.clientId, access: "write" });
+    await connectApp(t, b, orgId, { clientId: app.clientId, access: "read" });
+    await t.drain();
+    expect(t.email.sent.filter((m) => /app (was|foi) conectado/.test(m.subject)).length).toBe(2);
+    const audit = await t.db.select().from(schema.auditLog);
+    expect(audit.filter((a) => a.action.startsWith("apps.")).map((a) => a.action)).toEqual([
+      "apps.connected",
+      "apps.scopes_changed",
+    ]);
+  });
+
+  test("a personal token revoked with itself is audited", async () => {
+    const { b, orgId } = await owner();
+    const created = await b(`/api/app/organizations/${orgId}/tokens`, {
+      json: { name: "Script", access: "read", expiresInDays: 30 },
+    });
+    const { secret } = (await created.json()) as { secret: string };
+    await t.app.request("/api/oauth/revoke", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: secret }).toString(),
+    });
+    const [row] = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "apps.token_revoked"));
+    expect([row?.actorType, (row?.details as { reason?: string }).reason]).toEqual(["system", "revoked_with_token"]);
+  });
+
   test("a request expires after 30 minutes (410)", async () => {
     const { b } = await owner();
     const req = await pending();

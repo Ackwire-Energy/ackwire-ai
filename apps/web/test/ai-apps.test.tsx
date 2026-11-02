@@ -181,6 +181,7 @@ describe("apps in words", () => {
     const row = (action: string, details: Record<string, unknown>) =>
       ({ action, details, actor: { type: "person", id: "u", name: "Ana" }, target: {} }) as unknown as AuditRow;
     expect(auditPhrase(t, row("apps.connected", { app: "Claude" }))).toBe("Conectou o Claude");
+    expect(auditPhrase(t, row("apps.scopes_changed", { app: "Claude" }))).toBe("Deixou o Claude mandar tarefas");
     expect(auditPhrase(t, row("apps.message_sent", { client: "Cursor" }))).toBe("Mandou uma mensagem pelo Cursor");
     expect(auditPhrase(t, row("apps.token_revoked", { app: "Blender" }))).toBe("Revogou o token pessoal Blender");
     expect(signInFor("/autorizar?req=abc")).toEqual({ authorize: "app" });

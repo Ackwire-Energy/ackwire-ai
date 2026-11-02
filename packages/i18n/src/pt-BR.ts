@@ -9199,6 +9199,7 @@ export const ptBR = {
       },
       apps: {
         connected: "Conectou o {{app}}",
+        scopes_changed: "Deixou o {{app}} mandar tarefas",
         disconnected: "Desconectou o {{app}}",
         token_created: "Criou o token pessoal {{app}}",
         token_revoked: "Revogou o token pessoal {{app}}",

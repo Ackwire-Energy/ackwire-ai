@@ -230,13 +230,15 @@ export async function decideConsent(
     const created = !before || before.revokedAt !== null;
     // Connected again: whatever the old connection minted stays dead.
     if (before?.revokedAt) await revokeGrantTokens(tx, [before.id]);
-    if (created) {
+    // A live connection given more than it had (read, now write) is a new access too: audited and emailed.
+    const widened = !created && grant.scopes.length > (before?.scopes.length ?? 0);
+    if (created || widened) {
       await recordAudit(tx, {
         orgId: grant.orgId,
         actor: { type: "person", id: userId },
-        action: "apps.connected",
+        action: created ? "apps.connected" : "apps.scopes_changed",
         target: { type: "app_grant", id: grant.id },
-        details: { app: grant.displayName, kind: grant.displayKind, host: grant.displayHost, scopes },
+        details: { app: grant.displayName, kind: grant.displayKind, host: grant.displayHost, scopes: grant.scopes },
       });
       await queueReceipt(
         tx,
