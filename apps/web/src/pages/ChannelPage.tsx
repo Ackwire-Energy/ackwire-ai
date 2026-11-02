@@ -309,6 +309,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
+import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { useDocumentTitle } from "@/lib/desktop";
@@ -662,6 +663,16 @@ function ChannelView({
     setConsultId(null);
     setProfile({ agentId, tab });
   }, []);
+  // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
+  useEffect(() => {
+    if (chrome?.panel) return;
+    const open = () => {
+      const ask = takeAgentPanel();
+      if (ask) openAgentPanel(ask.agentId, ask.tab);
+    };
+    open();
+    return onAgentPanel(open);
+  }, [chrome?.panel, openAgentPanel]);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
   // `/summary` and `/plan`: a card only I see, under the conversation.
