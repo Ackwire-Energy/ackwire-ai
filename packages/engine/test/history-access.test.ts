@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { type RealtimeEvent, userTopic } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import {
   drainOutbox,
@@ -16,6 +17,8 @@ import {
   removeMember,
   revertMemoryChange,
   setMemberRoles,
+  snoozeNotification,
+  wakeSnoozedNotifications,
 } from "../src";
 import { addMember, type Fixture, makeAdmin, setup } from "./fixtures";
 
@@ -53,6 +56,21 @@ describe("run history quotes a conversation only to who reads it", () => {
     expect(inGeneral?.private).toBe(false);
     expect(inGeneral?.what).toBe("@dev check the deploy");
     expect((await getRun(f.db, f.owner.id, f.org.id, inGeneral?.id ?? "")).steps.length).toBeGreaterThan(0);
+  });
+    await f.db.insert(schema.agentRuns).values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId,
+      threadRootId: msg.id,
+      triggerMessageId: msg.id,
+      trigger: "mention",
+      hop: 1,
+      background: true,
+    });
+    const [run] = await listRuns(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    expect(run?.private).toBe(true);
+    expect(run?.what).toBe("");
+    expect(run?.routine).toBe(true);
   });
 });
 
@@ -222,5 +240,27 @@ describe("notifications follow access", () => {
     // Given the key back, it returns.
     await makeAdmin(f.db, f.org.id, admin.id);
     expect(await inbox(admin.id)).toEqual(["approval:merge it"]);
+  });
+
+  test("a snoozed approval its person may no longer decide wakes without reaching them", async () => {
+    f = await setup();
+    const admin = await addMember(f.db, f.org.id, "admin", "admin");
+    await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [admin.id],
+      kind: "approval",
+      groupKey: "approval:1",
+      waiting: true,
+      source: { channelId: f.general.id, approvalId: crypto.randomUUID() },
+      latest: { text: "deploy the secret build" },
+    });
+    const [row] = (await listNotifications(deps(), admin.id, f.org.id)).items;
+    const until = new Date(Date.now() + 60_000);
+    await snoozeNotification(deps(), admin.id, f.org.id, row?.id ?? "", until);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, admin.id, []);
+    const events: RealtimeEvent[] = [];
+    f.pubsub.subscribe(userTopic(f.org.id, admin.id), (e) => events.push(e));
+    expect(await wakeSnoozedNotifications({ ...deps(), now: () => new Date(until.getTime() + 1000) })).toBe(1);
+    expect(events.filter((e) => e.type === "notification.upserted")).toEqual([]);
   });
 });

@@ -619,6 +619,13 @@ export async function wakeSnoozedNotifications(deps: NotificationDeps): Promise<
   const users = new Map<string, string>();
   for (const r of rows) {
     users.set(`${r.orgId}:${r.userId}`, r.orgId);
+    if (r.kind === "approval") {
+      const [still] = await deps.db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(and(eq(notifications.id, r.id), stillDecides(r.orgId, r.userId)));
+      if (!still) continue;
+    }
     await publishUserEvent(deps.pubsub, r.orgId, r.userId, {
       type: "notification.upserted",
       notification: notificationView(r),
