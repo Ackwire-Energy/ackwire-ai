@@ -125,7 +125,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "save_how_to",
       description:
-        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, the names of the secrets it uses, never their values) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same title replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
+        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, which key it needs from a person through request_secret, never a secret's value, name or where it is kept) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same title replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
