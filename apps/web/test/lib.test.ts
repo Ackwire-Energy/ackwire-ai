@@ -2,13 +2,16 @@ import { describe, expect, test } from "bun:test";
 import { ApiError, handoffTimeLeft, type Me } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import {
+  clockAt,
   dayLabel,
   formatInt,
   formatPercent,
+  formatTime,
   formatTokensShort,
   formatUsd,
   joinNames,
   namesText,
+  nextLabel,
   parseDayInput,
   relativeTime,
   shortModel,
@@ -46,6 +49,7 @@ import {
   passwordState,
   slugify,
 } from "@agenteschat/client/lib/text";
+import { timeSpan } from "@agenteschat/client/lib/threads";
 import { en, ptBR } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
 import { createBetterAuthClient } from "@/auth/better-auth";
@@ -89,6 +93,22 @@ describe("format (pt-BR, machine numbers precise)", () => {
     expect(dayLabel(t, "pt-BR", at(5), now)).toBe("Hoje");
     expect(dayLabel(t, "pt-BR", at(24 * 60), now)).toBe("Ontem");
     expect(whenAt(t, "pt-BR", at(1), now)).toBe("hoje 10:43");
+  });
+  test("12-hour clocks have no leading zero; 24-hour ones keep theirs", () => {
+    const morning = new Date(2026, 9, 14, 8, 39).toISOString();
+    const evening = new Date(2026, 9, 14, 20, 39).toISOString();
+    // ICU puts a narrow no-break space before AM/PM in some versions, a plain one in others.
+    const read = (s: string) => s.replace(/\s/g, " ");
+    expect(read(formatTime("en-US", morning))).toBe("8:39 AM");
+    expect(read(formatTime("en-US", evening))).toBe("8:39 PM");
+    expect(formatTime("pt-BR", morning)).toBe("08:39");
+    expect(formatTime("pt-BR", evening)).toBe("20:39");
+    expect(formatTime("en-GB", morning)).toBe("08:39");
+    // Every clock built from it, and the ones beside it: a thread's span, a pause's end, the next run.
+    expect(read(timeSpan("en-US", morning, evening))).toBe("8:39 AM–8:39 PM");
+    expect(read(clockAt("en-US", morning, new Date(morning)))).toBe("8:39 AM");
+    expect(nextLabel("en-US", morning)).not.toMatch(/\b0\d:/);
+    expect(nextLabel("pt-BR", morning)).toContain("08:39");
   });
   test("time left", () => {
     expect(timeLeft(t, new Date(now.getTime() + 23 * 3_600_000).toISOString(), now)).toBe("23 h");

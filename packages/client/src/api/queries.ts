@@ -132,6 +132,7 @@ import type {
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
+  WorkView,
 } from "./types";
 
 /**
@@ -2309,6 +2310,21 @@ export function cacheMessageActions(
     const list = data as Message[];
     if (!list.some((m) => m && m.id === messageId)) return data;
     return list.map((m) => (m.id === messageId ? { ...m, actions } : m));
+  });
+}
+
+/** A long work changed (`agent.work`, ADR 0121): its anchor's cached message carries the new view. */
+export function cacheMessageWork(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  work: WorkView,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === work.anchorMessageId)) return data;
+    return list.map((m) => (m.id === work.anchorMessageId ? { ...m, longWork: work } : m));
   });
 }
 

@@ -67,8 +67,8 @@ AGPL and self-hostable) waits for human translators.
    `relativeTime`, `dayMonthOrder`. Lists of names go through `joinNames(names, t)`, i18next's `list` format in
    `format.list` (Intl.ListFormat: "Ada, Atlas, and Theo", "Ada、Atlas、Theo"); "and N more" is the list's last item.
    A typed day follows `dayMonthOrder`. No case change on `t()` itself (a lowercase form is its own key); a fragment's
-   first letter changes only through `lowerFirst`/`capitalize` in `client/lib/format` with the language (German keeps
-   it, a name like "GitHub" stays, Turkish dotted i). No two `t()` glued with a space (`common.joinSentences`); guards
+   first letter changes only through `lowerFirst`/`capitalize` in `client/lib/format`, with the language where the
+   caller has it (German keeps it, Turkish dotted i); a name like "GitHub" always stays. No two `t()` glued with a space (`common.joinSentences`); guards
    in the web's tests cover the web, the phone, the desktop and the client.
 8. **Fonts.** No web font download: Japanese, Korean and Chinese use each system's face after the Latin one, no
    `font-size-adjust`, strict line breaks, no italics; the desktop's Russian titles use Onest (Funnel Display has no

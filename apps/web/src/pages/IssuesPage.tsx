@@ -31,6 +31,7 @@ import { type DragEvent, useDeferredValue, useEffect, useRef, useState } from "r
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
+import { IssueCardWork } from "@/components/BackgroundWork";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -564,6 +565,7 @@ function IssueCard({
       </span>
       <span className="issue-card__title">{i.title}</span>
       <Criteria issue={i} />
+      <IssueCardWork issue={i} />
       <span className="issue-card__foot">
         <WhoLine issue={i} />
         <span className="issue-card__grow" />

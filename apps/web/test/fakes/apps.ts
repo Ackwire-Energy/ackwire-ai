@@ -11,6 +11,8 @@ export interface FakeApps {
   client: ApiClient["apps"];
   apps: ConnectedApp[];
   tokens: PersonalToken[];
+  /** Whether apps on the internet reach this server (a self-hosted one on a private host: false). */
+  serverPublic: boolean;
   consents: Map<string, AppConsent & { decided?: boolean; redirectUri: string; state: string }>;
   /** The next call fails with this (once). */
   nextError: ApiError | null;
@@ -25,6 +27,7 @@ export function createFakeApps(log: (method: string, ...args: unknown[]) => void
   const fake: FakeApps = {
     apps: [],
     tokens: [],
+    serverPublic: true,
     consents: new Map(),
     nextError: null,
     client: undefined as never,
@@ -111,6 +114,7 @@ export function createFakeApps(log: (method: string, ...args: unknown[]) => void
       const person = { id: "u-joao", name: "João" };
       return structuredClone({
         serverUrl: SERVER_URL,
+        serverPublic: fake.serverPublic,
         apps: all ? fake.apps.map((a) => ({ ...a, person: a.person ?? person })) : fake.apps,
         tokens: all ? fake.tokens.map((x) => ({ ...x, person: x.person ?? person })) : fake.tokens,
       });

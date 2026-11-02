@@ -223,6 +223,42 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
     ).toBe("true");
   });
 
+  test("an app that asks to manage: creating agents, routines and skills is offered but not picked, said plainly, and goes once", async () => {
+    const { state } = await open((apps) =>
+      apps.addConsent(
+        REQ,
+        {},
+        {
+          request: {
+            id: REQ,
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            access: { requested: ["read", "write", "manage"] },
+            client: {
+              displayKind: "verified",
+              name: "Claude",
+              host: "claude.ai",
+              brand: "claude",
+              returnsTo: "claude.ai",
+              reservedNameWarning: false,
+            },
+          },
+        },
+      ),
+    );
+    expect(
+      within(page())
+        .getByRole("radio", { name: /Ler e mandar tarefas/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    const can = page().querySelector(".consent__list--can") as HTMLElement;
+    expect(can.textContent).toContain("Mandar mensagens como você");
+    expect(can.textContent).not.toContain("Criar e editar");
+    await click(within(page()).getByRole("radio", { name: /Criar e editar agentes, rotinas e skills/ }));
+    expect(can.textContent).toContain("Criar e editar agentes, rotinas e skills como você.");
+    await click(within(page()).getByRole("button", { name: "Permitir" }));
+    expect(calls(state, "apps.decide")).toEqual([[REQ, { decision: "allow", orgId: ORG_ID, access: "manage" }]]);
+  });
+
   test("several workspaces: a picker, paused ones shown and not choosable; a workspace paused meanwhile says so", async () => {
     const OTHER = "00000000-0000-4000-8000-0000000000f2";
     const PAUSED = "00000000-0000-4000-8000-0000000000f3";

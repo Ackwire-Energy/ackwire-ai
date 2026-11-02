@@ -1,4 +1,5 @@
 import type { Routine, RoutineHookOutcome } from "../api/types";
+import { clockHour } from "./format";
 
 /** A plain reminder the agent posted (`meta.reminder`): shown as the agent's message with a "Reminder" label. */
 export const isReminderMessage = (meta: Record<string, unknown> | undefined) => meta?.reminder === true;
@@ -250,7 +251,7 @@ export function onceParts(locale: string, at: string, timeZone: string) {
   return {
     weekday: get("weekday").replace(/\.$/, ""),
     date: fmt({ day: "2-digit", month: "2-digit" }),
-    time: fmt({ hour: "2-digit", minute: "2-digit" }),
+    time: fmt({ hour: clockHour(locale), minute: "2-digit" }),
     zone: timezoneName(timeZone, locale),
   };
 }

@@ -23,7 +23,7 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-const CHALLENGE = `Bearer resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="read write"`;
+const CHALLENGE = `Bearer resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="read write manage"`;
 /** Words that direct a model instead of stating facts: directory reviews refuse them. */
 const DIRECTIVE = /\b(always|never|must|should|prefer|important|instead of|do not|don't|make sure|call this)\b/i;
 
@@ -126,7 +126,8 @@ describe("protocol", () => {
 
   test("tools/list: small, no $schema, every directory rule, nothing that directs the model", async () => {
     const { b, orgId } = await setup();
-    const app = await connectApp(t, b, orgId);
+    // Every tool there is: the manage ones too.
+    const app = await connectApp(t, b, orgId, { access: "manage", scope: "read write manage" });
     const res = await mcp(t, app.access, { jsonrpc: "2.0", id: 1, method: "tools/list" });
     expect(Number(res.headers.get("content-length"))).toBeGreaterThan(0);
     const raw = await res.text();

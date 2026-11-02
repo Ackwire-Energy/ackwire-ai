@@ -147,6 +147,8 @@ export async function continuationVerdict(
      * extra model call on any turn.
      */
     onLearn?: (signal: LearnSignal) => void;
+    /** The call with the `learn` question failed and the verdict was asked again without it (error reports). */
+    onLearnFailed?: (error: unknown) => void;
   },
 ): Promise<ContinuationVerdict> {
   const ask = (learn: boolean) =>
@@ -191,6 +193,7 @@ export async function continuationVerdict(
     // verdict must never fail because of the extra question, so it is asked again alone.
     if (!learned) throw error;
     learned = false;
+    input.onLearnFailed?.(error);
     answers = await ask(false);
   }
   if (input.onLearn) {

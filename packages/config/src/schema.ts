@@ -348,6 +348,12 @@ export const envVars = {
       "Maximum model calls in one agent run (each tool round trip is one, browser and desktop steps included). A backstop for runaway runs: a run that goes in circles stops long before it. Near it the agent wraps up, and a conversation run ends with Continuar.",
     section: "Agents",
   },
+  AGENT_WORK_MAX_PER_ORG: {
+    schema: z.coerce.number().int().min(1).max(1000).default(10),
+    description:
+      "How many background works (long tasks agents moved out of a conversation) may run at once in one workspace. Past it a new one waits in line and starts by itself when one ends. Each agent runs at most 3 at once.",
+    section: "Agents",
+  },
   AGENT_CONTEXT_MESSAGES: {
     schema: z.coerce.number().int().min(1).max(500).default(30),
     description: "How many recent channel (or thread) messages are included in an agent's context.",

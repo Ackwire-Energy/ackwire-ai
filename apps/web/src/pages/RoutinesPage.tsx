@@ -29,6 +29,8 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import {
   capitalize,
+  clockHour,
+  formatTime,
   formatTokensShort,
   formatUsd,
   nextLabel,
@@ -946,11 +948,10 @@ function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: D
       day: midnight,
       label: midnight
         ? new Intl.DateTimeFormat(i18n.language, { weekday: "short" }).format(d).replace(/\./g, "")
-        : new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(d),
+        : formatTime(i18n.language, d.toISOString()),
     });
   }
-  const timeOf = (iso: string) =>
-    new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  const timeOf = (iso: string) => formatTime(i18n.language, iso);
   const later = lanes.filter((r) => futureOf(r).length === 0).length;
   const nowAt = pos(now);
   return (
@@ -2182,7 +2183,7 @@ function runLabel(locale: string, iso: string, timeZone: string) {
     .replace(/\./g, "")
     .replace(/ de /g, " ");
   const time = new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
+    hour: clockHour(locale),
     minute: "2-digit",
     timeZone,
   }).format(d);

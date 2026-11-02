@@ -1,5 +1,6 @@
 import { useArtifact, useBlockReply, useKeepBlock } from "@agenteschat/client";
 import { type BlockEvent, blockEvent, blockPage, DRAFT_SETTLE_MS } from "@agenteschat/client/lib/blocks";
+import { clockHour } from "@agenteschat/client/lib/format";
 import { chartRamp } from "@agenteschat/ui/sky/chart";
 import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
@@ -208,7 +209,9 @@ export function LiveBlock({
 
   const same = sent !== null && sent.text === draft?.text;
   const time = sent
-    ? new Intl.DateTimeFormat(i18n.language, { hour: "numeric", minute: "2-digit" }).format(new Date(sent.at))
+    ? new Intl.DateTimeFormat(i18n.language, { hour: clockHour(i18n.language), minute: "2-digit" }).format(
+        new Date(sent.at),
+      )
     : "";
   return (
     <View style={screen ? styles.fill : undefined}>

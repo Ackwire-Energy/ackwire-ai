@@ -113,20 +113,30 @@ export function roleGrants(keys: Iterable<string>): ReadonlySet<RolePermission> 
 }
 
 /**
+ * Wraps a value (a column, a param, SQL) one level down. Drizzle renders a column that sits directly in a select
+ * field of a single-table query as a bare `"user_id"`, which inside these subqueries binds to the subquery's own
+ * table (`pm.user_id = "user_id"` is always true); one level down it keeps its table name.
+ */
+const qualified = (v: unknown) => sql`${v}`;
+
+/**
  * The keys of every role a member holds, as SQL over `organization_members` aliased `m`: theirs and `everyone`.
  * Used where a membership is read (`getMembership`, `listMemberships`).
  */
-export const memberKeysSql = (m: { orgId: unknown; userId: unknown }) => sql<string[]>`coalesce((
+export const memberKeysSql = ({ orgId, userId }: { orgId: unknown; userId: unknown }) => {
+  const m = { orgId: qualified(orgId), userId: qualified(userId) };
+  return sql<string[]>`coalesce((
   select array_agg(distinct k) from org_roles r, unnest(r.permissions) as k
   where r.org_id = ${m.orgId}
     and (r.kind = 'everyone' or r.id in (
       select mr.role_id from organization_member_roles mr where mr.org_id = ${m.orgId} and mr.user_id = ${m.userId}))
 ), '{}'::text[])`;
+};
 
 /** The position of a member's highest role (0 the top), null with none but `everyone`. */
-export const memberRankSql = (m: { orgId: unknown; userId: unknown }) => sql<number | null>`(
+export const memberRankSql = ({ orgId, userId }: { orgId: unknown; userId: unknown }) => sql<number | null>`(
   select min(r.position) from org_roles r join organization_member_roles mr on mr.org_id = r.org_id and mr.role_id = r.id
-  where r.org_id = ${m.orgId} and mr.user_id = ${m.userId} and r.kind = 'custom')`;
+  where r.org_id = ${qualified(orgId)} and mr.user_id = ${qualified(userId)} and r.kind = 'custom')`;
 
 /**
  * Whether the member `userId` of `orgId` may `permission`, as a SQL condition: an owner, or a role of theirs (or
@@ -136,7 +146,7 @@ export const memberRankSql = (m: { orgId: unknown; userId: unknown }) => sql<num
 export function maySql(orgId: unknown, userId: unknown, permission: RolePermission): SQL<boolean> {
   return sql<boolean>`exists (
     select 1 from organization_members pm
-    where pm.org_id = ${orgId} and pm.user_id = ${userId}
+    where pm.org_id = ${qualified(orgId)} and pm.user_id = ${qualified(userId)}
       and (pm.role = 'owner' or exists (
         select 1 from org_roles pr
         where pr.org_id = pm.org_id

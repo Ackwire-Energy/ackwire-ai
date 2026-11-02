@@ -34,6 +34,7 @@ import {
 import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
+import { IssueWorkLine } from "../chat/WorkLine";
 import { chatHref } from "../links/logic";
 import { useOpenDm } from "../new/useOpenDm";
 import { Face } from "../shared/Face";
@@ -129,6 +130,7 @@ function IssueView({ number }: { number: number }) {
         >
           <Head issue={i} />
           <WorkCard issue={i} />
+          <IssueWorkLine issue={i} />
           <Description issue={i} />
           <Criteria issue={i} />
           <Linked issue={i} />

@@ -26,6 +26,7 @@ import { dayLabel, formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { Button, Chip, type ChipProps, Icon, Menu, MenuItem, Segmented, Select, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { DetailsLink } from "@/components/details-link";
@@ -150,7 +151,13 @@ export function AuditSection() {
           </Button>
         </div>
       )}
-      {open && <AuditPanel row={open} onClose={() => setOpenId(null)} />}
+      {/* Hung from the shell, like a thread's panel beside its channel: inside the page it would scroll away with
+          the list, because the page's entrance animation (`page-in`, fill `both`) keeps it a containing block. */}
+      {open &&
+        createPortal(
+          <AuditPanel row={open} onClose={() => setOpenId(null)} />,
+          document.querySelector(".shell") ?? document.body,
+        )}
     </section>
   );
 }

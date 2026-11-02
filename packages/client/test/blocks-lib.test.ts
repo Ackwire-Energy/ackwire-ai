@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Poll } from "../src/api/types";
-import { BLOCK_KIT_JS } from "../src/lib/block-kit";
+import { BLOCK_KIT_CSS, BLOCK_KIT_JS } from "../src/lib/block-kit";
 import { blockEvent, blockPage, pollAnswered, pollIsOpen, pollTally, pollToggle } from "../src/lib/blocks";
 
 const HOST = {
@@ -29,6 +31,58 @@ describe("a block's page", () => {
     expect(BLOCK_KIT_JS).not.toContain("</script");
     expect(BLOCK_KIT_JS).toContain("window.ReactNativeWebView");
     expect(BLOCK_KIT_JS).toContain("parent.postMessage");
+  });
+
+  test("nothing in the kit outweighs a plain button's look", () => {
+    // That look sits in `:where`, which weighs nothing: a bare `button{...}` reset would take its padding and weight.
+    expect(BLOCK_KIT_CSS).toContain(":where(button){");
+    expect(BLOCK_KIT_CSS).not.toMatch(/(^|[\n}])button\{/);
+  });
+
+  test("what the kit shares with the app has the app's values, in both themes", () => {
+    const tokens = readFileSync(join(import.meta.dir, "../../ui/src/styles/tokens.css"), "utf8");
+    const brief = (v: string | undefined) =>
+      v
+        ?.toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/\b0\./g, ".")
+        .replace(/#([0-9a-f])\1([0-9a-f])\2([0-9a-f])\3\b/, "#$1$2$3");
+    const value = (sheet: string, name: string) => new RegExp(`--${name}:\\s*([^;}]+)`).exec(sheet)?.[1];
+    const app = tokens.split('[data-theme="dark"]');
+    const kit = BLOCK_KIT_CSS.split("html[data-theme=dark]");
+    for (const name of "ink ink2 muted faint line line2 raised sunken ok warn danger plate".split(" "))
+      for (const [ours = "", theirs = ""] of [
+        [kit[0], app[0]],
+        [kit[1], app[1]],
+      ]) {
+        expect(value(ours, name)).toBeDefined();
+        expect(brief(value(ours, name))).toBe(brief(value(theirs, name)));
+      }
+  });
+
+  test("plain HTML wears the app's look at no weight, so an agent's CSS always wins", () => {
+    for (const rule of ["h1,h2,h3", "ul,ol", "table:not([class])", "progress,meter", "code,kbd", "label"])
+      expect(BLOCK_KIT_CSS).toContain(`:where(${rule})`);
+    expect(BLOCK_KIT_CSS).toContain("select:not([class])");
+  });
+
+  test("the parts an agent builds from are there, and its tones follow the theme", () => {
+    for (const part of ["ac-card", "ac-result"]) expect(BLOCK_KIT_JS).toContain(`E("${part}"`);
+    expect(BLOCK_KIT_CSS).toContain("ac-actions{display:flex");
+    // The answer keeps the block's width in a centered layout, and its actions follow it.
+    expect(BLOCK_KIT_CSS).toContain("ac-result{width:100%}");
+    expect(BLOCK_KIT_CSS).toContain("ac-result + ac-actions,ac-actions[align=center]{justify-content:center}");
+    expect(BLOCK_KIT_JS).toContain('d.style.setProperty("--s"+(i+1),c)');
+  });
+
+  test("a plain button stacked tight under something gets room, measured from the page", () => {
+    expect(BLOCK_KIT_CSS).toContain(":where(button[data-air]:not([class])){margin-top:12px}");
+    expect(BLOCK_KIT_JS).toContain('b.setAttribute("data-air","")');
+  });
+
+  test("the only plain button showing is the block's main action", () => {
+    expect(BLOCK_KIT_CSS).toContain(":where(button[data-lead]:not([class])){");
+    expect(BLOCK_KIT_JS).toContain('b.toggleAttribute("data-lead",live.length===1&&live[0]===b)');
   });
 });
 

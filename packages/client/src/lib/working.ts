@@ -14,7 +14,7 @@ export const WORKING_POLL_MS = 20_000;
 export interface WorkItem {
   key: string;
   agentId: string;
-  kind: "run" | "mission";
+  kind: "run" | "mission" | "work";
   /** Mission: its title. Run: the thread's title or the start of its first message (null: say where instead). */
   what: string | null;
   channelId: string;
@@ -65,14 +65,15 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
     out.push({
       key: `r:${r.runId}`,
       agentId: r.agentId,
-      kind: "run",
-      what: r.label?.trim() || null,
+      // Long work (ADR 0121): its title and plan, since it started.
+      kind: r.work ? "work" : "run",
+      what: r.work?.title || r.label?.trim() || null,
       channelId: r.channelId,
       threadId: r.threadId,
       where: { kind: r.channelKind, name: r.channelName },
       missionId: null,
-      plan: null,
-      since: newest(r),
+      plan: r.work?.plan ?? null,
+      since: r.work?.since ?? newest(r),
       waiting: r.status === "waiting_approval" || r.status === "waiting_input",
     });
   }

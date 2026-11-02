@@ -14,6 +14,7 @@
       "approval.email.cc",
       "approvals.panel.admin",
       "apps.consent.workspace",
+      "apps.created.skill",
       "apps.dialog.client.claude_code",
       "apps.dialog.client.cursor",
       "apps.dialog.clientText.chatgpt",
@@ -191,7 +192,10 @@
       "wiki.form.tags",
       "wiki.import.stat.links",
       "wiki.legend.obsidian",
-      "wiki.tags"
+      "wiki.tags",
+      "work.duration.hours",
+      "work.duration.hoursMinutes",
+      "work.duration.minutes"
     ]
   },
   "mobile-base": {

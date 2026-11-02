@@ -162,9 +162,8 @@ export function Message({
       }}
       {...rest}
     >
-      {own && (status || run === "solo" || run === "end") ? null : grouped || own ? (
-        // Same width as the avatar column; the time shows here on hover (it's also in the hidden header). My own
-        // rows before a run's last have no time under them: theirs shows here, in the same column as everyone's.
+      {own ? null : grouped ? (
+        // Same width as the avatar column; the time shows here on hover (it's also in the hidden header).
         <span className="ac-msg__gutter" aria-hidden="true">
           <span className="ac-msg__gutter-time">
             {time}
@@ -207,7 +206,7 @@ export function Message({
           )}
           {aside && !grouped && !own && <span className="ac-msg__aside">{aside}</span>}
         </div>
-        {aside && (grouped || own) && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
+        {aside && grouped && !own && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
         {children}
         {own &&
           (status ? (
@@ -217,11 +216,14 @@ export function Message({
             </span>
           ) : run === "end" || run === "solo" ? (
             // The head (hidden) reads the time; here it is for the eye, its details on hover. One per run: its rows
-            // are minutes apart at most (they group).
-            <span className="ac-msg__own-time" aria-hidden="true">
-              {time}
-              {meta && <span className="ac-msg__tip">{meta}</span>}
-            </span>
+            // are minutes apart at most (they group). The receipt's mark ends this line, so it never adds one.
+            <div className="ac-msg__own-foot">
+              <span className="ac-msg__own-time" aria-hidden="true">
+                {time}
+                {meta && <span className="ac-msg__tip">{meta}</span>}
+              </span>
+              {aside && <span className="ac-msg__aside">{aside}</span>}
+            </div>
           ) : null)}
         {foot && <div className="ac-msg__foot">{foot}</div>}
       </div>

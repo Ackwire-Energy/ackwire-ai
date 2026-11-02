@@ -1,5 +1,5 @@
 import type { ApiRule, ProposedRoutine } from "@agenteschat/client";
-import { joinNames, toYmd } from "@agenteschat/client/lib/format";
+import { clockHour, joinNames, toYmd } from "@agenteschat/client/lib/format";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import {
   BUSINESS_DAYS,
@@ -120,7 +120,7 @@ export function runLabel(locale: string, iso: string | Date, timeZone: string): 
     .format(d)
     .replace(/\./g, "")
     .replace(/ de /g, " ");
-  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone }).format(d);
+  const time = new Intl.DateTimeFormat(locale, { hour: clockHour(locale), minute: "2-digit", timeZone }).format(d);
   return `${date} · ${time}`;
 }
 

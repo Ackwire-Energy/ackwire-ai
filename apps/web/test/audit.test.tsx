@@ -137,6 +137,14 @@ describe("Configurações → Auditoria", () => {
     expect(screen().queryByRole("complementary", { name: "Detalhe da auditoria" })).toBeNull();
   });
 
+  test("the panel hangs from the shell, so it stays put while the list scrolls", async () => {
+    await go();
+    await click(section().querySelector(".audit-row") as HTMLElement);
+    const panel = screen().getByRole("complementary", { name: "Detalhe da auditoria" });
+    expect(panel.closest(".shell__main")).toBeNull();
+    expect(panel.parentElement?.classList.contains("shell")).toBe(true);
+  });
+
   test("a waiting call links to its request", async () => {
     await go();
     await click(section().querySelector(".audit-row") as HTMLElement);

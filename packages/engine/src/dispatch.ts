@@ -7,7 +7,7 @@ import { enqueue } from "./outbox";
 import { routineCreatorOf } from "./requester";
 import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
-import { inChannelRun } from "./run-scope";
+import { inChannelRun, workKeepsThread } from "./run-scope";
 import type { AgentRun } from "./runs";
 import { holdOf, hopLimitReached, pauseStretch, stretchOf, stretchStop } from "./stretch";
 
@@ -111,6 +111,7 @@ export async function startOrJoinRun(
           eq(agentRuns.channelId, message.channelId),
           inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
           eq(agentRuns.background, false),
+          workKeepsThread(sql`${agentRuns}`),
           // In a DM the main timeline is one conversation; each thread (a mission's) is its own.
           sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or ${
             message.threadId

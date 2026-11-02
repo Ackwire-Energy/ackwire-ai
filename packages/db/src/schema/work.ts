@@ -96,6 +96,8 @@ export const issues = pgTable(
     /** `[{ number, url, openedBy }]`. */
     pullRequests: jsonb().$type<Record<string, unknown>[]>().notNull().default([]),
     artifactIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Long work stopped on something (ADR 0121 §4): a badge on the card, the card stays in its stage. */
+    blocked: jsonb().$type<{ reason: string; since: string; text?: string }>(),
     createdByType: text().notNull(),
     createdById: text().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

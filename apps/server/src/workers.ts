@@ -35,6 +35,7 @@ import {
   reapRoutineRuns,
   reconcileComposioAccounts,
   reconcileComposioConnectors,
+  reconcileWorks,
   recoverStaleRuns,
   releaseJobs,
   sweepEndedInboxes,
@@ -232,6 +233,9 @@ export function startWorkers(deps: WorkerDeps) {
   every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
     const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
     if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
+    // Long work whose run ended without closing it (a crash between the two) gets its end, once (ADR 0121 §7).
+    const closed = await reconcileWorks({ db, pubsub: deps.pubsub });
+    if (closed > 0) log.warn("background works closed by the sweep", { works: closed });
   });
 
   every("inboxes", WORKER_INTERVALS_MS.inboxes, async () => {

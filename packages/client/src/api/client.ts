@@ -899,6 +899,8 @@ export interface ApiClient {
     create(orgId: string, input: IssueInput): Promise<Issue>;
     update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
+    /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
+    share(orgId: string, id: string): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */

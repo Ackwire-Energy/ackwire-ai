@@ -11,6 +11,7 @@ import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
 import type { MessageMemory } from "./message-memories";
 import type { MessageView, ReactionCount } from "./messages";
+import type { WorkView } from "./works";
 
 /** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
 export interface MemoryUpdate {
@@ -245,6 +246,16 @@ export type ChannelEvent =
     }
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws from `work`. */
+  | {
+      type: "agent.work";
+      channelId: string;
+      /** Where the anchor is (the ask's thread; null: the main timeline). */
+      threadId: string | null;
+      agentId: string;
+      runId: string | null;
+      work: WorkView;
+    }
   /** The agent stopped (done, failed or waiting for approval). */
   | {
       type: "agent.idle";
