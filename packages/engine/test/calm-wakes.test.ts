@@ -379,14 +379,14 @@ describe("report once for @mentions", () => {
 });
 
 describe("deeper chains on a crowded computer", () => {
-  test("a stretch an agent opened holds sooner while the woken agent's computer has work waiting for room", async () => {
+  test("a crowded computer never lowers a stretch's limit: it only orders and parks turns", async () => {
     f = await setup();
     const rio = await agentOf("Rio", "rio");
     const machineId = await computerFor(f.agent.id, rio.id);
     const root = await agentWrites(rio.id, "vou chamar o time");
-    const asked = await post("um pedido");
-    const runsIn = (stretchId: string) =>
-      Array.from({ length: STRETCH.crowdedRuns }, () => {
+    // Past the old crowded cap (5), below the limit for work nobody asked for.
+    await f.db.insert(agentRuns).values(
+      Array.from({ length: STRETCH.unattendedRuns - 1 }, () => {
         const id = Bun.randomUUIDv7();
         return {
           orgId: f.org.id,
@@ -396,21 +396,12 @@ describe("deeper chains on a crowded computer", () => {
           triggerMessageId: id,
           trigger: "mention" as const,
           hop: 2,
-          stretchId,
+          stretchId: root.id,
           status: "done" as const,
         };
-      });
-    await f.db.insert(agentRuns).values([...runsIn(root.id), ...runsIn(asked.id)]);
-    expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id)).toBeNull();
-    const waiting = await inLine(rio.id, machineId);
-    expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id)).toEqual({
-      reason: "runs",
-      limit: STRETCH.crowdedRuns,
-    });
-    // Work a person asked for and a mission's turns keep their limits.
-    expect(await stretchStop(f.db, f.org.id, asked.id, f.agent.id)).toBeNull();
-    expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id, null, { mission: true })).toBeNull();
-    await done(waiting.id);
+      }),
+    );
+    await inLine(rio.id, machineId);
     expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id)).toBeNull();
   });
 

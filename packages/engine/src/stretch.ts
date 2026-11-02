@@ -4,7 +4,6 @@ import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { messageRoot } from "./authority";
 import { routineBriefOfRun } from "./background";
-import { computerCrowdedSql } from "./computer-queue";
 import { eligibleChannelAgents, type RunTrigger, startOrJoinRun, takeConsultation } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { ForbiddenError } from "./errors";
@@ -27,12 +26,11 @@ const { agentConsultations, agentRuns, agents, channels, messages, usageRecords 
  * their stretch next to their hop, so every way agents wake each other is counted.
  *
  * No limit reads words. Agents start at most `runs` runs on their own in one stretch (`unattendedRuns` when nobody
- * asked for the work; `crowdedRuns` in a stretch an agent opened while the woken agent's computer has runs waiting
- * for room, ADR 0032 "Calm wakes": work a person asked for, a routine's and a mission's keep theirs), and each agent
- * spends at most `budgetShare` of its monthly budget there. Past either, the wake-up is held and one card in the
- * conversation says why, with Continuar. Waiting costs nothing: only runs and API spend count.
+ * asked for the work), and each agent spends at most `budgetShare` of its monthly budget there. Past either, the
+ * wake-up is held and one card in the conversation says why, with Continuar. Waiting costs nothing: only runs and
+ * API spend count. A crowded computer never lowers these: its line orders and parks turns (ADR 0032 "Calm wakes").
  */
-export const STRETCH = { runs: 50, unattendedRuns: 10, crowdedRuns: 5, budgetShare: 0.2 } as const;
+export const STRETCH = { runs: 50, unattendedRuns: 10, budgetShare: 0.2 } as const;
 
 /**
  * How long work a person asked for (a stretch they opened) goes before agents' own in a computer's line
@@ -92,15 +90,11 @@ export async function stretchStop(
   stretchId: string,
   agentId: string,
   triggerId: string | null = null,
-  /** A mission's keep-going turn: long work a person started, never held at `crowdedRuns`. */
-  options: { mission?: boolean } = {},
 ): Promise<StretchStop | null> {
   const [row] = rowsOf<{
     started: boolean;
     runs: number;
     unattended: boolean;
-    agents_own: boolean;
-    crowded: boolean;
     spent: string | number | null;
   }>(
     await db.execute(sql`with runs as (
@@ -111,21 +105,13 @@ export async function stretchStop(
           and s.trigger_message_id = ${triggerId}::uuid and s.agent_id = ${agentId}::uuid) as started,
         (select count(*) from runs)::int as runs,
         ${unattendedSql(orgId, stretchId)} as unattended,
-        exists (select 1 from ${messages} m where m.org_id = ${orgId}::uuid and m.id = ${stretchId}::uuid
-          and m.author_type = 'agent' and not (m.meta ? 'routineBrief')) as agents_own,
-        ${computerCrowdedSql(sql`${agentId}::uuid`)} as crowded,
         (select sum(u.cost_nano_usd) from ${usageRecords} u
           where u.org_id = ${orgId}::uuid and u.agent_id = ${agentId}::uuid and u.billed_to = 'org'
             and u.created_at >= (select min(created_at) from mine) and u.run_id in (select id from mine)) as spent`),
   );
   if (!row || row.started === true || (row.started as unknown) === "t") return null;
   const yes = (v: unknown) => v === true || v === "t";
-  const limit =
-    !options.mission && yes(row.agents_own) && yes(row.crowded)
-      ? STRETCH.crowdedRuns
-      : yes(row.unattended)
-        ? STRETCH.unattendedRuns
-        : STRETCH.runs;
+  const limit = yes(row.unattended) ? STRETCH.unattendedRuns : STRETCH.runs;
   if (Number(row.runs) >= limit) return { reason: "runs", limit };
   const spent = Number(row.spent ?? 0);
   if (spent <= 0) return null;
