@@ -2,12 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { BRAIN_PROTOCOL, userTopic } from "@agenteschat/adapters";
 import { eq, rowsOf, schema, sql } from "@agenteschat/db";
 import {
+  acceptInvitation,
   addChannelMember,
   audienceOf,
   audienceSql,
   canTalkTo,
   createAgent,
   createOrganization,
+  createRole,
   createRoutine,
   dispatchMentions,
   drainOutbox,
@@ -15,16 +17,18 @@ import {
   ForbiddenError,
   getAgentBrain,
   insertMessageWithRuns,
+  inviteMany,
   NotFoundError,
   openDm,
   postPersonMessage,
   type RouterStrategy,
+  removeMember,
   routeMessage,
   setAgentAudience,
   setAgentBrain,
-  ValidationError,
+  setInvitationRoles,
 } from "../src";
-import { addMember, addUser, type Fixture, makeAdmin, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -67,13 +71,11 @@ describe("who can talk to the agent", () => {
       "owner",
     );
     const zed = await addUser(f.db, "zed");
-    await expect(
-      setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [zed.id] }),
-    ).rejects.toBeInstanceOf(ValidationError);
     const updated = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, {
       mode: "people",
-      userIds: [bia.id],
+      userIds: [bia.id, zed.id],
     });
+    expect(updated.audienceUserIds).toEqual([bia.id]);
     expect(canTalkTo(updated, bia.id)).toBe(true);
     expect(canTalkTo(updated, f.owner.id)).toBe(true); // the owner always can
     const audit = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
@@ -83,6 +85,39 @@ describe("who can talk to the agent", () => {
     await expect(
       setAgentAudience(f.db, zed.id, organization.id, f.agent.id, { mode: "everyone", userIds: [] }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test("someone invited with a role changed before accepting can be given the agent; one who left drops out", async () => {
+    const { bia } = await world();
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    const [sent] = await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["teo@example.com"], secret: SECRET });
+    if (sent?.status !== "invited") throw new Error("expected an invitation");
+    await setInvitationRoles(f.db, f.owner.id, f.org.id, sent.invitationId, [support.id]);
+    await f.db.insert(schema.users).values({ id: "u_teo", name: "Teo", email: "teo@example.com" });
+    await acceptInvitation(f.db, { id: "u_teo", email: "teo@example.com" }, sent.token);
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
+    // bia leaves: her id no longer stays on the agent, and the list the apps still hold is saved without her.
+    await removeMember(f.db, bia.id, f.org.id, bia.id);
+    const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(row?.audienceUserIds).toEqual([]);
+    const updated = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, {
+      mode: "people",
+      userIds: [bia.id, "u_teo"],
+    });
+    expect(updated.audienceUserIds).toEqual(["u_teo"]);
+  });
+
+  test("the migration takes people no longer in the workspace off the agents' lists, keeping the order", async () => {
+    const { bia } = await world();
+    const cid = await addMember(f.db, f.org.id, "member", "cid");
+    const gone = await addUser(f.db, "gone");
+    const stale = [cid.id, gone.id, bia.id];
+    await f.db.update(schema.agents).set({ audienceMode: "people", audienceUserIds: stale });
+    const file = await Bun.file(new URL("../../db/migrations/0169_agent_audience_members.sql", import.meta.url)).text();
+    await f.db.execute(sql.raw(file));
+    await f.db.execute(sql.raw(file));
+    const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(row?.audienceUserIds).toEqual([cid.id, bia.id]);
   });
 
   test("a mention from someone not allowed starts nothing and only they get the notice", async () => {

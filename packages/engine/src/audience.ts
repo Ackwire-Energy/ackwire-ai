@@ -201,8 +201,8 @@ export async function setAgentAudience(
       .select({ userId: organizationMembers.userId })
       .from(organizationMembers)
       .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds)));
+    // Someone no longer in the workspace drops out rather than failing the save: the apps' list may still hold them.
     const known = new Set(members.map((m) => m.userId));
-    if (userIds.some((id) => !known.has(id))) throw new ValidationError("Everyone in the list must be a member");
     userIds = userIds.filter((id) => known.has(id));
   }
   if (audience.mode === "people" && userIds.length === 0 && !agent.ownerUserId) {
