@@ -29,7 +29,9 @@ Four ways out stayed open after ADR 0109:
 1. **Outbound address check** (`packages/adapters/src/outbound-url.ts`, `outboundUrlProblem`; engine
    `packages/engine/src/outbound.ts`, `checkOutboundUrl`). In order:
    - An address that appeared as is passes, whatever it carries: in the thread's messages, the channel's latest 50,
-     or any tool result of this run (a search result, a page's `Page:` line, a link in a mail). Compared normalized:
+     or any tool result of this run (a search result, a page's `Page:` line, a link in a mail). Not when the run made
+     it: what this agent posted in the conversation since the run started, and an address in a private tool result
+     that copies text the run read in an earlier one (printed by `run_code`, echoed by any tool) don't count. Compared normalized:
      https, lowercase host, no fragment, no trailing slash. A redirect target is the site's choice, not checked, and
      its `Page:` line makes it seen for the rest of the run.
    - `outbound.credential`: a key shape anywhere in the decoded address (`sk-`, `sk-ant-`, `gh[pousr]_`,
@@ -38,7 +40,9 @@ Four ways out stayed open after ADR 0109:
      (`KEY_SHAPES`, `SIGNED_SHAPES`, `PRIVATE_KEY`), which masking still uses.
    - `outbound.long`: decoded query plus fragment over 512 characters, or a path segment over 200.
    - `outbound.private_text`: 24 characters in a row of the decoded query or fragment (whitespace collapsed, case
-     folded) found in any tool result of this run except `web_search` and `web_fetch`.
+     folded) found in any tool result of this run except `web_search` and `web_fetch`. The gateway hands the check
+     each tool's whole output (`recordRead`, per process); run steps keep only the first 4000 characters, which is
+     all a run resumed on another replica checks.
    - Each refusal says how to finish the job (search, or open the link as it appeared) and comes back as a tool
      error with `data.code`. The run's reads are cached per run and read again only past the last step seen.
    - Where: `web_fetch` before its GET; the browser's `open` steps (`browser_open`, `browser_do`) and
@@ -81,7 +85,10 @@ Four ways out stayed open after ADR 0109:
 - Every address a person, a search, a page or a tool gave keeps working. Search is never checked. Previews keep
   their CDN scripts. Changed MCP tools stay usable. Work turns keep the repo's top-level instructions.
 - Accepted residuals: data the agent rewords before sending, or hides in a path segment under 200 characters, isn't
-  caught. A preview's script can still navigate its own frame. The browser's sub-resources aren't filtered (that
+  caught. Neither is data in the host's labels (`https://<data>.evil.io/`): checking hosts against what the run read
+  would refuse a site a mail names without a link. The browser can carry data out by `fill` and `click` on a form
+  of a page opened with a plain address: only `open` is checked, since a form's fields are what people ask agents to
+  fill. A preview's script can still navigate its own frame. The browser's sub-resources aren't filtered (that
   breaks real browsing). A work turn no longer gets the checkout's nested CLAUDE.md files, project skills, agents or
   commands from `.claude/`. The permissions.allow check on the real CLI was seen ignored in an untrusted folder
   only; with `""` no project file loads either way.
