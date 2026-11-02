@@ -11863,6 +11863,10 @@ export const ptBR = {
       working: "Trabalhando",
       ok: "Espera seu ok",
       answer: "Espera resposta",
+      computerBusy: "Computador cheio",
+      computerOffline: "Computador desligado",
+      plan: "Esperando o plano",
+      budget: "Esperando o orçamento",
       queued: "Na fila",
       stopping: "Parando…",
       stopped: "Parada",
@@ -11940,5 +11944,11 @@ export const ptBR = {
     activityOf: "O que {{name}} fez nos últimos 30 min",
     activityAll: "O que os agentes fizeram nos últimos 30 min",
     panel: { steps: "Passos", noSteps: "Nenhum passo ainda." },
+    agentPanel: {
+      now_one: "{{count}} agora",
+      now_other: "{{count}} agora",
+      wells: { now: "Agora", waiting: "Esperam você", done: "Feitas hoje" },
+      none: "{{name}} está livre agora.",
+    },
   },
 } satisfies LocaleStrings;

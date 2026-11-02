@@ -1,5 +1,5 @@
-/* The task manager's pieces (ADR 0125), on its page and in the chat's strip: a task's mark, what it uses now, its
-   stop, the confirmations. */
+/* The task manager's pieces (ADR 0125), on its page and in an agent's panel beside its DM: a task's mark, what it
+   uses now, its stop, the confirmations. */
 
 /* The mark before a task's title: the orbit, the waiting square, the queue's clock. */
 .tm-mark {
@@ -122,97 +122,33 @@
   gap: 8px;
 }
 
-/* The chat's strip: a well pressed in above the composer; its rows open upward over the line. */
-.tm-strip {
-  margin: 0 0 8px;
-  overflow: hidden;
-  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
-  background: var(--card-well);
-  box-shadow: var(--card-well-shadow);
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--muted);
-}
-.tm-strip__rows {
-  max-height: min(240px, 40vh);
-  margin: 0;
-  padding: 4px 6px;
-  overflow-y: auto;
-  list-style: none;
-  border-bottom: 1px solid var(--line);
-}
-.tm-strip__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 4px 2px 4px 6px;
-}
-.tm-strip__label {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-.tm-strip__label b,
-.tm-strip__label small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tm-strip__label b {
-  font-weight: 500;
-  color: var(--ink2);
-}
-.tm-strip__label small {
-  font-size: 12px;
-  color: var(--faint);
-}
-.tm-strip__label small[data-wait] {
-  font-weight: 600;
-  color: var(--warn);
-}
-.tm-strip__time {
-  flex: none;
-  font-size: 12px;
-  color: var(--faint);
-  white-space: nowrap;
-}
-.tm-here.ac-chip {
-  flex: none;
-}
-.tm-strip__line {
-  display: flex;
-  align-items: center;
+/* The pill in a DM's header ("3 tarefas · 1 espera você"): the header's button, the waiting count in amber. */
+.tm-pill.ac-btn {
   gap: 6px;
-  min-height: 40px;
-  padding: 4px 4px 4px 12px;
 }
-.tm-strip__mark {
+.tm-pill__mark {
   display: inline-grid;
   flex: none;
   place-items: center;
   width: 14px;
   height: 14px;
-  margin-right: 2px;
 }
-.tm-strip__text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tm-strip__text b {
-  font-weight: 600;
-  color: var(--ink2);
-}
-.tm-strip__waiting {
+.tm-pill__wait {
   font-weight: 600;
   color: var(--warn);
 }
+.tm-pill__chevron {
+  color: var(--muted);
+  transition: transform 0.15s var(--out);
+}
+.tm-pill[aria-expanded="true"] .tm-pill__chevron {
+  transform: rotate(180deg);
+}
+.tm-here.ac-chip {
+  flex: none;
+}
 
-/* "Parar todas" confirmed in the strip's own line: the question, the reason, Cancelar and Parar. */
+/* "Parar todas" confirmed in one line (an agent's panel's foot): the question, the reason, Cancelar and Parar. */
 .tm-cfm {
   display: flex;
   align-items: center;
@@ -261,9 +197,6 @@
   }
   .tm-cfm__text > :last-child {
     white-space: normal;
-  }
-  .tm-strip__time {
-    display: none;
   }
 }
 
@@ -386,4 +319,75 @@
 }
 .tm-panel__foot > .tm-panel__stop {
   margin-left: auto;
+}
+
+/* An agent's tasks beside its DM (the thread's panel): three wells, then a card per task. */
+.tm-agentpanel__wells {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.tm-agentpanel__wells dd {
+  font-size: 17px;
+  font-weight: 650;
+}
+.tm-agentpanel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tm-taskcard.ac-card {
+  --card-pad: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.tm-taskcard__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 10px 8px 14px;
+}
+.tm-taskcard__label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+.tm-taskcard__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tm-taskcard__title b,
+.tm-taskcard__label small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-taskcard__title b {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.tm-taskcard__label small {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.tm-taskcard__label small[data-wait] {
+  font-weight: 600;
+  color: var(--warn);
+}
+.tm-taskcard__steps {
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--line);
+}
+.tm-panel__foot > .tm-cfm {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
 }

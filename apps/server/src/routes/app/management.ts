@@ -320,6 +320,12 @@ const ManagedTask = z
     steps: z.number().int(),
     pendingMessageIds: z.array(z.uuid()),
     canStop: z.boolean(),
+    held: z
+      .enum(["computer_busy", "computer_offline", "plan", "budget"])
+      .nullable()
+      .openapi({
+        description: "What it waits on when it isn't a person: its computer (full or away), its plan, the budget.",
+      }),
   })
   .openapi("ManagedTask");
 

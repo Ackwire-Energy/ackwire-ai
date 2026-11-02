@@ -14,9 +14,34 @@ export type TaskState = "working" | "waiting" | "queued";
 export const taskState = (t: Pick<ManagedTask, "status">): TaskState =>
   t.status === "running" ? "working" : t.status === "queued" ? "queued" : "waiting";
 
-/** What the waiting is for: your ok (an approval) or an answer. */
-export const waitsFor = (t: Pick<ManagedTask, "status">): "ok" | "answer" | null =>
-  t.status === "waiting_approval" ? "ok" : t.status === "waiting_input" ? "answer" : null;
+/**
+ * What the waiting is for: your ok (an approval), an answer, or no person: its computer (full or away), its plan's
+ * limit, the budget (`held`).
+ */
+export type WaitReason = "ok" | "answer" | "computer_busy" | "computer_offline" | "plan" | "budget";
+
+export const waitsFor = (t: Pick<ManagedTask, "status" | "held">): WaitReason | null =>
+  t.status === "waiting_approval" ? "ok" : t.status === "waiting_input" ? (t.held ?? "answer") : null;
+
+/** A wait on a person (your ok, an answer): "espera você". The others wait on a computer, a plan or a budget. */
+export const waitsOnPerson = (t: Pick<ManagedTask, "status" | "held">) => {
+  const w = waitsFor(t);
+  return w === "ok" || w === "answer";
+};
+
+/** The words of a wait (`taskManager.state.*`). */
+export const waitKey = (w: WaitReason) =>
+  w === "ok"
+    ? "taskManager.state.ok"
+    : w === "answer"
+      ? "taskManager.state.answer"
+      : w === "computer_busy"
+        ? "taskManager.state.computerBusy"
+        : w === "computer_offline"
+          ? "taskManager.state.computerOffline"
+          : w === "plan"
+            ? "taskManager.state.plan"
+            : "taskManager.state.budget";
 
 /** Since when it counts (a long work's start, else the run's), in ms. */
 export const taskSince = (t: Pick<ManagedTask, "startedAt" | "createdAt">) => Date.parse(t.startedAt ?? t.createdAt);
@@ -76,7 +101,8 @@ export function taskProgram(t: Pick<ManagedTask, "brain" | "now" | "status">): T
   if (t.status === "queued") return { kind: "none" };
   const inner = programOf(t.now);
   if (t.brain && COMPUTER_BRAINS.has(t.brain)) {
-    return { kind: "brain", brain: t.brain as "claude_code" | "codex" | "cursor", inner, detail: t.now?.detail ?? null };
+    const brain = t.brain as "claude_code" | "codex" | "cursor";
+    return { kind: "brain", brain, inner, detail: t.now?.detail ?? null };
   }
   return inner ?? { kind: "none" };
 }
@@ -140,7 +166,7 @@ export function groupTasks(tasks: ManagedTask[], stopping: ReadonlySet<string> =
       agentId,
       tasks: sorted,
       working: sorted.filter((t) => taskState(t) === "working").length,
-      waiting: sorted.filter((t) => taskState(t) === "waiting").length,
+      waiting: sorted.filter((t) => waitsOnPerson(t)).length,
       stoppable: sorted.filter((t) => t.canStop && !stopping.has(t.runId)).map((t) => t.runId),
     };
   });
@@ -159,7 +185,7 @@ export function agentSummary(tasks: ManagedTask[]) {
   return {
     tasks: tasks.length,
     working: tasks.filter((t) => taskState(t) === "working").length,
-    waiting: tasks.filter((t) => taskState(t) === "waiting").length,
+    waiting: tasks.filter((t) => waitsOnPerson(t)).length,
   };
 }
 

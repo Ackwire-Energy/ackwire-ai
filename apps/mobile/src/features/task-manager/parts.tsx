@@ -10,10 +10,10 @@ import { useCallLogo } from "../chat/ToolCalls";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { type RowState, stateText, usingNow } from "./logic";
+import { isHeld, type RowState, stateText, usingNow } from "./logic";
 
 /**
- * The pieces the task manager's list, a task's screen and a DM's strip share (ADR 0125): a task's mark and state,
+ * The pieces the task manager's list, a task's screen and an agent's tasks share (ADR 0125): a task's mark and state,
  * what it uses now, its "Parar", and the confirmation that stopping several asks for.
  */
 
@@ -29,7 +29,7 @@ export function TaskMark({ state, color, size = 12 }: { state: RowState; color: 
         <PixelOrbit color={color} size={size} />
       ) : state === "stopping" ? (
         <PixelStopped size={size} />
-      ) : state === "queued" ? (
+      ) : state === "queued" || isHeld(state) ? (
         <Icon name="clock" size={size + 1} color={c.faint} />
       ) : (
         <Icon name="wait" size={size + 1} color={c.amber} />

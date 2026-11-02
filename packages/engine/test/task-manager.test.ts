@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import {
   addRunStep,
   cancelRun,
@@ -139,5 +139,21 @@ describe("the task manager", () => {
 
     const outsider = await addMember(f.db, f.org.id, "member", "caio");
     await expect(taskSteps(f.db, outsider.id, f.org.id, run.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test("a task waiting for room on its computer is listed, and says so (not as waiting on a person)", async () => {
+    f = await setup();
+    await ask("@dev roda os testes");
+    const [run] = await runs();
+    if (!run) throw new Error("no run");
+    await f.db
+      .update(schema.agentRuns)
+      .set({
+        status: "waiting_input",
+        transcript: { waitingForBrain: { kind: "claude_code", code: "busy", waitId: "w1" } },
+      })
+      .where(eq(schema.agentRuns.id, run.id));
+    const view = await taskManager(f.db, f.owner.id, f.org.id);
+    expect(view.tasks[0]).toMatchObject({ runId: run.id, status: "waiting_input", held: "computer_busy" });
   });
 });

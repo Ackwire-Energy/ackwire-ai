@@ -11503,6 +11503,10 @@ export const en = {
       working: "Working",
       ok: "Waits for your ok",
       answer: "Waits for an answer",
+      computerBusy: "Waits for room on the computer",
+      computerOffline: "Waits for the computer",
+      plan: "Waits for the plan",
+      budget: "Waits for the budget",
       queued: "Queued",
       stopping: "Stopping…",
       stopped: "Stopped",
@@ -11580,6 +11584,12 @@ export const en = {
     activityOf: "What {{name}} did in the last 30 min",
     activityAll: "What the agents did in the last 30 min",
     panel: { steps: "Steps", noSteps: "No steps yet." },
+    agentPanel: {
+      now_one: "{{count}} now",
+      now_other: "{{count}} now",
+      wells: { now: "Now", waiting: "Waiting for you", done: "Done today" },
+      none: "{{name}} is free now.",
+    },
   },
 };
 

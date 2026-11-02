@@ -295,7 +295,8 @@ import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { TeamChecks } from "@/components/TeamChecks";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
-import { TaskStrip } from "@/components/tasks/TaskStrip";
+import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
+import { AgentTasksContext } from "@/components/tasks/agent-tasks-context";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -662,6 +663,17 @@ function ChannelView({
   const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
+  // A DM with an agent: its tasks (ADR 0125), from the pill in the header; one panel too, any other one closes it.
+  const [tasksOpen, setTasksOpen] = useState(false);
+  useEffect(() => {
+    if (panel || profile || consultId) setTasksOpen(false);
+  }, [panel, profile, consultId]);
+  const toggleTasks = useCallback(() => {
+    setPanel(null);
+    setProfile(null);
+    setConsultId(null);
+    setTasksOpen((open) => !open);
+  }, []);
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
     setPanel(null);
@@ -1202,20 +1214,18 @@ function ChannelView({
   const [askRegistry] = useState(createAskRegistry);
   const asksOut = useAsksOutOfView(scroller, askRegistry, isMember);
   const seeAsk = (id: string) => showRequest(scroller.current, id, !reducedMotion);
-  // A DM with an agent: the agent's tasks (ADR 0125) in the strip above the composer while it has any. The strip is
-  // the one place for its work here (the activity pill gives way to it); a request out of view still goes first.
-  const stripAgentId = chrome?.dmAgentId && !thread ? chrome.dmAgentId : null;
-  // Asked every 5 s: a line beside the conversation, not the page that follows every task (3 s).
+  // A DM with an agent: its tasks (ADR 0125), a pill in the header while it has any, opening them in the side panel.
+  const tasksAgentId = chrome?.dmAgentId && !thread ? chrome.dmAgentId : null;
+  // Asked every 5 s: a pill beside the conversation, not the page that follows every task (3 s).
   const taskView = useTaskManager(org.id, {
     since: todayStart(),
-    enabled: Boolean(stripAgentId) && isMember,
+    enabled: Boolean(tasksAgentId) && isMember,
     pollMs: 5_000,
   });
-  const stripTasks = useMemo(
-    () => (stripAgentId ? tasksOf(taskView.data?.tasks ?? [], stripAgentId) : []),
-    [taskView.data, stripAgentId],
+  const agentTasks = useMemo(
+    () => (tasksAgentId ? tasksOf(taskView.data?.tasks ?? [], tasksAgentId) : []),
+    [taskView.data, tasksAgentId],
   );
-  const stripShown = Boolean(stripAgentId) && stripTasks.length > 0 && asksOut.length === 0 && !adjustThreadId;
   /** "Ver" on that line: back to the agent's block. */
   const seeRun = (runId: string) => {
     const row = Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-run-id]") ?? []).find(
@@ -1732,6 +1742,10 @@ function ChannelView({
 
   // A DM with an agent: the agent's chip sits in the composer's toolbar row.
   const agentDm = Boolean(chrome?.dmAgentId) && !thread;
+  const tasksControl = useMemo(
+    () => (tasksAgentId ? { tasks: agentTasks, open: tasksOpen, toggle: toggleTasks } : null),
+    [tasksAgentId, agentTasks, tasksOpen, toggleTasks],
+  );
   const Tag = chrome?.panel ? "section" : "main";
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
@@ -1752,7 +1766,10 @@ function ChannelView({
           {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
             are a left-aligned team chat. */}
           <Tag className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}>
-            {chrome?.header ?? (
+            {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
+            {chrome?.header ? (
+              <AgentTasksContext.Provider value={tasksControl}>{chrome.header}</AgentTasksContext.Provider>
+            ) : (
               <header className="channel__header">
                 <NavToggle />
                 <div
@@ -1995,11 +2012,7 @@ function ChannelView({
                     onSeeAsk={seeAsk}
                     stoppable={stopTarget?.runId}
                     consultBlocks={consultGroups.nearEnd}
-                    strip={stripShown}
                   />
-                  {stripShown && stripAgentId && (
-                    <TaskStrip agentId={stripAgentId} channelId={channel.id} tasks={stripTasks} />
-                  )}
                   {adjustThreadId ? (
                     <RangeBar adjust={adjust} />
                   ) : chrome?.composerReplacement ? (
@@ -2181,6 +2194,15 @@ function ChannelView({
                   <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
                 </ErrorBoundary>
               )}
+            />
+          )}
+          {tasksOpen && tasksAgentId && (
+            <AgentTasksPanel
+              agentId={tasksAgentId}
+              channelId={channel.id}
+              tasks={agentTasks}
+              ended={taskView.data?.ended ?? []}
+              onClose={() => setTasksOpen(false)}
             />
           )}
         </ChannelThreadsContext.Provider>
@@ -2940,7 +2962,6 @@ function ActivityBar({
   onSeeAsk,
   stoppable,
   consultBlocks,
-  strip = false,
 }: {
   channelId: string;
   /** A thread view: who types there (null: who types in the conversation itself). */
@@ -2959,8 +2980,6 @@ function ActivityBar({
   stoppable?: string;
   /** Runs whose questions a block near the end shows (`ConsultGroup`): the line doesn't say them again. */
   consultBlocks: ReadonlySet<string>;
-  /** An agent DM's task strip shows (`TaskStrip`): it stands for the work here, so no pill says it again. */
-  strip?: boolean;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -3010,7 +3029,7 @@ function ActivityBar({
   // A request waiting for you, out of view: the bar says that instead (waiting beats working).
   const ask = asks[0];
   const askName = ask ? (dir.anyAgent(ask.agentId)?.name ?? t("channel.unknownAgent")) : "";
-  const pill = !ask && active && !strip;
+  const pill = !ask && active;
   return (
     <>
       {coding.map((r) =>
@@ -3028,7 +3047,7 @@ function ActivityBar({
       <div
         className="ac-typing"
         aria-live="polite"
-        data-active={pill || Boolean(ask)}
+        data-active={active || Boolean(ask)}
         data-ask={ask ? true : undefined}
         data-browser={pill && openBrowser ? true : undefined}
         onClick={

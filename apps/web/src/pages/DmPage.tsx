@@ -16,6 +16,7 @@ import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { AgentTasksPill } from "@/components/tasks/AgentTasksPanel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
@@ -92,6 +93,8 @@ export function DmPage({ target }: { target: DmTarget }) {
         )}
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
+      {/* Its tasks (ADR 0125), while it has any: they open in the side panel. */}
+      {agent && <AgentTasksPill />}
       {agent && <ComputerButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
     </header>

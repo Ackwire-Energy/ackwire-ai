@@ -80,6 +80,12 @@ export interface ManagedTask {
   pendingMessageIds: string[];
   /** The caller may stop it (`mayStopRun`: who asked, the agent's owner, an admin; the server checks again). */
   canStop: boolean;
+  /**
+   * What a `waiting_input` run waits on when it isn't a person: its computer with no room for the turn
+   * (`computer_busy`), its computer away (`computer_offline`), its plan's limit (`plan`) or the agent's budget
+   * (`budget`). Null: it waits on a person's answer, or it isn't waiting.
+   */
+  held: "computer_busy" | "computer_offline" | "plan" | "budget" | null;
 }
 
 export interface EndedTask {
@@ -137,6 +143,8 @@ type Row = {
   last_at: string | Date | null;
   steps: number | string | null;
   stopper_name: string | null;
+  wait_code: string | null;
+  wait_source: string | null;
 };
 
 const iso = (v: string | Date | null) => (v === null ? null : new Date(v).toISOString());
@@ -152,7 +160,7 @@ async function visibleRuns(
   which: { active: true } | { active: false; since: Date },
 ): Promise<Row[]> {
   const status = which.active
-    ? sql`r.status in ('queued', 'running', 'waiting_approval', 'waiting_input') and r.waiting_machine_id is null`
+    ? sql`r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')`
     : sql`r.status in ('done', 'failed', 'canceled') and r.finished_at >= ${which.since.toISOString()}::timestamptz`;
   const limit = which.active ? TASK_MANAGER_MAX : TASK_MANAGER_ENDED_MAX;
   return rowsOf<Row>(
@@ -164,7 +172,8 @@ async function visibleRuns(
         rt.id as routine_id, rt.name as routine_name, w.title as work_title, w.plan as work_plan,
         last.data as last_data, last.created_at as last_at,
         (select count(*) from ${agentRunSteps} s where s.run_id = r.id and s.kind = 'tool_call') as steps,
-        su.name as stopper_name
+        su.name as stopper_name,
+        r.transcript->'waitingForBrain'->>'code' as wait_code, r.transcript->'waitingForBrain'->>'source' as wait_source
       from ${agentRuns} r
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
         and c.archived_at is null and c.kind in ('channel', 'dm')
@@ -200,6 +209,16 @@ async function visibleRuns(
       order by ${which.active ? sql`r.created_at desc` : sql`r.finished_at desc`}, r.id desc
       limit ${limit}`),
   );
+}
+
+/** What a run waiting on no person waits on (`waitingForBrain`: the executor's wait for its computer or plan). */
+function heldOf(r: Row): ManagedTask["held"] {
+  if (r.status !== "waiting_input" || !r.wait_code) return null;
+  if (r.wait_code === "busy") return "computer_busy";
+  if (r.wait_code === "plan_limit") return "plan";
+  if (r.wait_code === "budget") return "budget";
+  if (r.wait_code === "usage_pause") return r.wait_source === "budget" ? "budget" : "plan";
+  return "computer_offline";
 }
 
 const planOf = (raw: { state: string }[] | string | null) => {
@@ -264,6 +283,7 @@ export async function taskManager(
     steps: Number(r.steps ?? 0),
     pendingMessageIds: pendingIds(r.pending),
     canStop: manages || r.requester_id === userId || r.owner_user_id === userId,
+    held: heldOf(r),
   }));
   const endedTasks: EndedTask[] = ended.map((r) => {
     const by = r.error?.startsWith("canceled_by:") ? r.error.slice("canceled_by:".length) : null;

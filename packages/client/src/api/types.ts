@@ -5449,6 +5449,8 @@ export interface ManagedTask {
   pendingMessageIds: string[];
   /** You may stop it (who asked, the agent's owner, an admin). */
   canStop: boolean;
+  /** What it waits on when it isn't a person: its computer (full or away), its plan's limit, the budget. */
+  held?: "computer_busy" | "computer_offline" | "plan" | "budget" | null;
 }
 
 /** A task that ended (`ended` of the task manager). */

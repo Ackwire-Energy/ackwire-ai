@@ -10,7 +10,9 @@ import {
   taskProgram,
   taskSince,
   taskState,
+  waitKey,
   waitsFor,
+  waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { callLogo } from "@agenteschat/client/lib/work";
 import { Button, Chip, cx, Icon, Input, PixelStop, Popover, ProviderLogo, Spinner } from "@agenteschat/ui";
@@ -28,8 +30,8 @@ import { useLiveStore } from "@/realtime/context";
 import "./tasks.css";
 
 /*
- * The task manager's pieces (ADR 0125), the same on its page and in the chat's strip: a task's state, what it uses
- * now, its stop and the confirmation that stops several at once.
+ * The task manager's pieces (ADR 0125), the same on its page and in an agent's panel beside its DM: a task's state,
+ * what it uses now, its stop and the confirmation that stops several at once.
  */
 
 /** A task's time on its clock, as the "Tempo" column shades it: full at 40 minutes. */
@@ -137,12 +139,17 @@ export function TaskStateChip({ task, stopping = false }: { task: ManagedTask; s
   const state = taskState(task);
   if (state === "working")
     return <Chip lead={<AgentSpinner agentId={task.agentId} size={14} />}>{t("taskManager.state.working")}</Chip>;
-  if (state === "waiting")
-    return (
+  if (state === "waiting") {
+    const wait = waitsFor(task) ?? "answer";
+    // A wait on a computer, a plan or a budget isn't "espera você": grey, with the clock.
+    return waitsOnPerson(task) ? (
       <Chip tone="waiting" lead={<WaitMark />}>
-        {t(waitsFor(task) === "ok" ? "taskManager.state.ok" : "taskManager.state.answer")}
+        {t(waitKey(wait))}
       </Chip>
+    ) : (
+      <Chip icon="clock">{t(waitKey(wait))}</Chip>
     );
+  }
   return <Chip icon="clock">{t("taskManager.state.queued")}</Chip>;
 }
 
@@ -153,7 +160,7 @@ export function TaskMark({ task }: { task: ManagedTask }) {
     <span className="tm-mark" aria-hidden="true">
       {state === "working" ? (
         <AgentSpinner agentId={task.agentId} size={14} />
-      ) : state === "waiting" ? (
+      ) : state === "waiting" && waitsOnPerson(task) ? (
         <WaitMark />
       ) : (
         <Icon name="clock" size={14} />
@@ -427,8 +434,8 @@ export function StopAllConfirm({
 }
 
 /**
- * The same confirmation in one line, in place of the chat's strip: "Parar as 3 tarefas de Dev? Dev fica sabendo que
- * você parou." [Por quê?] Cancelar · Parar 3.
+ * The same confirmation in one line, in place of an agent's panel's foot: "Parar as 3 tarefas de Dev? Dev fica
+ * sabendo que você parou." [Por quê?] Cancelar · Parar 3.
  */
 export function StopAllInline({
   agentId,

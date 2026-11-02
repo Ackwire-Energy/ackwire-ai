@@ -65,7 +65,8 @@ import "./task-manager.css";
 /** Points on a card's line: the last half hour, one per minute. */
 const LINE_POINTS = 30;
 
-export function TaskManagerPage() {
+/** `agent`: that agent's card chosen as the page opens (`?agent=`, from its tasks' panel in a DM). */
+export function TaskManagerPage({ agent }: { agent?: string }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -75,7 +76,10 @@ export function TaskManagerPage() {
   const { stop, stopping, said } = useTaskStop();
   const [q, setQ] = useState("");
   // The agent card chosen (null: Todos), the row chosen (a run id, or `agent:<id>`), agents folded in the table.
-  const [card, setCard] = useState<string | null>(null);
+  const [card, setCard] = useState<string | null>(agent ?? null);
+  useEffect(() => {
+    if (agent) setCard(agent);
+  }, [agent]);
   const [selected, setSelected] = useState<string | null>(null);
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
   const [endedOpen, setEndedOpen] = useState(false);

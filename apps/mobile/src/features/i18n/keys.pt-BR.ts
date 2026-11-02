@@ -1173,6 +1173,11 @@ export const featureKeysPtBR = {
     steps: "Passos",
     noSteps: "Nada feito ainda.",
     gone: "Essa tarefa não está mais aqui.",
+    // An agent's tasks, from its DM's header.
+    nowCount_one: "{{count}} agora",
+    nowCount_other: "{{count}} agora",
+    wells: { waiting: "Esperam você", doneToday: "Feitas hoje" },
+    agentFree: "{{name}} está livre agora.",
   },
   // intentional: chats/activity/ui
   homeNow: {

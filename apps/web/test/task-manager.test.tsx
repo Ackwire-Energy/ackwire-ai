@@ -449,60 +449,93 @@ describe("the task manager page", () => {
   });
 });
 
-describe("the strip in a DM with an agent", () => {
-  test("one line: the agent's tasks, who waits, Ver and Parar esta (this conversation's task)", async () => {
-    const state = withDm({ taskManager: busy() });
-    await open(state, `dm/agent/${ADA_ID}`);
-    const strip = screen().getByRole("region", { name: "Tarefas de Ada" });
-    expect(strip.closest(".channel__composer")).toBeTruthy();
-    expect(strip.querySelector(".tm-strip__text")?.textContent).toBe("Ada em 3 tarefas · 1 espera você");
-    // The strip stands for her work here: no second bar above the composer says it.
-    expect(document.querySelector(".ac-typing")?.getAttribute("data-active")).toBe("false");
-    await click(within(strip).getByRole("button", { name: "Parar esta" }));
-    await settle(4);
-    expect(stopCalls(state)).toEqual([["r-link"]]);
-  });
+describe("an agent's tasks beside its DM", () => {
+  const PILL = "3 tarefas · 1 espera você";
 
-  test("Ver opens her tasks, this one marked; Parar todas turns the line into its confirmation", async () => {
-    const state = withDm({ taskManager: busy() });
+  test("the header's pill says her tasks and who waits; it opens them in the thread's side panel", async () => {
+    const view = busy();
+    view.ended.push(ended({ runId: "r-price", agentId: ADA_ID, status: "done", label: "Atualizar o preço" }));
+    const state = withDm({ taskManager: view });
     await open(state, `dm/agent/${ADA_ID}`);
-    const strip = screen().getByRole("region", { name: "Tarefas de Ada" });
-    await click(within(strip).getByRole("button", { name: "Ver" }));
-    const rows = within(strip).getAllByRole("listitem");
-    // People's tasks first, oldest first, then her routine's.
-    expect(rows.map((r) => r.querySelector(".tm-strip__label b")?.textContent)).toEqual([
+    const pill = screen().getByRole("button", { name: PILL });
+    expect(pill.closest(".channel__header")).toBeTruthy();
+    expect(pill.getAttribute("aria-expanded")).toBe("false");
+    await click(pill);
+    expect(pill.getAttribute("aria-expanded")).toBe("true");
+    const panel = screen().getByRole("complementary", { name: "Tarefas de Ada" });
+    expect(panel.classList.contains("thread-panel")).toBe(true);
+    expect(panel.querySelector(".thread-head__meta")?.textContent).toBe("3 agora · 1 espera você");
+    const wells = [...panel.querySelectorAll(".tm-agentpanel__wells > div")].map((w) => w.textContent);
+    expect(wells).toEqual(["Agora3", "Esperam você1", "Feitas hoje1"]);
+    // People's tasks first, oldest first, then her routine's; this conversation's is marked.
+    const cards = [...panel.querySelectorAll(".tm-taskcard")];
+    expect(cards.map((c) => c.querySelector(".tm-taskcard__title b")?.textContent)).toEqual([
       "Revisar o PR #231",
       "Corrigir o link de cancelar",
       "Backups",
     ]);
-    expect(rows[0]?.querySelector(".tm-strip__label small")?.textContent).toBe("Espera seu ok · #eng");
-    expect(rows[1]?.querySelector(".tm-here")?.textContent).toBe("aqui");
-    expect(rows[2]?.querySelector(".tm-strip__label small")?.textContent).toBe("Rotina «Backups»");
-    expect(within(strip).getByRole("button", { name: "Fechar" }).getAttribute("aria-expanded")).toBe("true");
-
-    await click(within(strip).getByRole("button", { name: "Parar todas" }));
-    const ask = within(strip).getByRole("alertdialog", { name: "Parar as 3 tarefas de Ada?" });
-    expect(ask.textContent).toContain("Ada fica sabendo que você parou.");
-    // In place of the line, not a card over the conversation.
-    expect(strip.querySelector(".tm-strip__line")).toBeNull();
+    expect(cards[0]?.querySelector(".tm-taskcard__label small")?.textContent).toBe("Espera seu ok · #eng");
+    expect(cards[1]?.querySelector(".tm-here")?.textContent).toBe("aqui");
+    expect(cards[2]?.querySelector(".tm-taskcard__label small")?.textContent).toMatch(/^Rotina «Backups» · /);
+    // Esc closes it, and stops nothing.
+    await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
+    expect(screen().queryByRole("complementary", { name: "Tarefas de Ada" })).toBeNull();
     expect(stopCalls(state)).toEqual([]);
-    const why = "Vou fazer eu mesmo";
-    await type(within(ask).getByRole("textbox", { name: "Por quê? (opcional)" }), why);
-    await click(within(ask).getByRole("button", { name: "Parar 3" }));
-    await settle(4);
-    expect(stopCalls(state).sort()).toEqual([
-      ["r-backup", why],
-      ["r-link", why],
-      ["r-pr", why],
-    ]);
   });
 
-  test("only in a DM with an agent that has tasks: never in a channel", async () => {
+  test("a card: Passos opens its steps in place, Parar stops it; Parar todas confirms in the foot", async () => {
+    const state = withDm({ taskManager: busy(), taskSteps: { "r-link": linkSteps() } });
+    await open(state, `dm/agent/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: PILL }));
+    const panel = screen().getByRole("complementary", { name: "Tarefas de Ada" });
+    const card = (title: string) => {
+      const cards = [...panel.querySelectorAll<HTMLElement>(".tm-taskcard")];
+      return cards.find((c) => c.textContent?.includes(title)) as HTMLElement;
+    };
+    // Passos only while it works: not on the one waiting for my ok.
+    expect(within(card("Revisar o PR #231")).queryByRole("button", { name: "Passos" })).toBeNull();
+    await click(within(card("Corrigir o link de cancelar")).getByRole("button", { name: "Passos" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "working.taskSteps")?.args).toEqual([ORG_ID, "r-link"]);
+    const lines = [...card("Corrigir o link de cancelar").querySelectorAll(".ac-tools__line")];
+    expect(lines.map((l) => l.getAttribute("data-s"))).toEqual(["done", "run"]);
+    await click(within(card("Corrigir o link de cancelar")).getByRole("button", { name: /^Parar: / }));
+    await settle(4);
+    expect(stopCalls(state)).toEqual([["r-link"]]);
+
+    await click(within(panel).getByRole("button", { name: "Parar todas" }));
+    const ask = within(panel).getByRole("alertdialog", { name: "Parar as 2 tarefas de Ada?" });
+    // In place of the foot, not a card over the panel.
+    expect(ask.closest(".tm-panel__foot")).toBeTruthy();
+    expect(within(panel).queryByRole("button", { name: "Abrir no gerenciador" })).toBeNull();
+    const why = "Vou fazer eu mesmo";
+    await type(within(ask).getByRole("textbox", { name: "Por quê? (opcional)" }), why);
+    await click(within(ask).getByRole("button", { name: "Parar 2" }));
+    await settle(4);
+    expect(stopCalls(state).sort()).toEqual([["r-backup", why], ["r-link"], ["r-pr", why]]);
+  });
+
+  test("Abrir no gerenciador opens the page with her card chosen", async () => {
+    const { router } = await open(withDm({ taskManager: busy() }), `dm/agent/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: PILL }));
+    await click(screen().getByRole("button", { name: "Abrir no gerenciador" }));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/task-manager`);
+    expect(router.state.location.search).toEqual({ agent: ADA_ID });
+    expect(screen().getByRole("heading", { level: 2, name: "Tarefas de Ada" })).toBeTruthy();
+  });
+
+  test("a click beside the panel closes it; no pill in a channel, nor for an agent with nothing on", async () => {
+    await open(withDm({ taskManager: busy() }), `dm/agent/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: PILL }));
+    await click(document.querySelector(".thread-panel__scrim") as HTMLElement);
+    expect(screen().queryByRole("complementary", { name: "Tarefas de Ada" })).toBeNull();
+    cleanup();
     await open(seedState({ taskManager: busy() }), `c/${ENG_ID}`);
-    expect(document.querySelector(".tm-strip")).toBeNull();
+    expect(document.querySelector(".tm-pill")).toBeNull();
     cleanup();
     await open(withDm({ taskManager: { tasks: [], ended: [], activity: {} } }), `dm/agent/${ADA_ID}`);
-    expect(document.querySelector(".tm-strip")).toBeNull();
+    expect(document.querySelector(".tm-pill")).toBeNull();
   });
 });
 

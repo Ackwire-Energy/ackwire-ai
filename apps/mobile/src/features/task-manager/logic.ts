@@ -10,12 +10,13 @@ import {
   taskState,
   taskWhere,
   waitsFor,
+  waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import type { TFunction } from "i18next";
 
 /**
- * What the phone's task manager says (ADR 0125): its list, a task's screen and the strip over an agent's DM composer,
- * from the shared model (`@agenteschat/client/lib/task-manager`).
+ * What the phone's task manager says (ADR 0125): its list, a task's screen, an agent's tasks screen and the count in
+ * its DM's header, from the shared model (`@agenteschat/client/lib/task-manager`).
  */
 
 /** A conversation: a channel's (or a DM's) main timeline, or one of its threads. */
@@ -28,15 +29,33 @@ export interface Place {
 export const isHere = (task: Pick<ManagedTask, "channelId" | "threadId">, place: Place) =>
   task.channelId === place.channelId && (task.threadId ?? null) === place.threadId;
 
-export type RowState = "working" | "ok" | "answer" | "queued" | "stopping";
+/** `held`: it waits on no person but on its computer (full or away), its plan's limit or the budget (`held`). */
+export type RowState = "working" | "ok" | "answer" | "queued" | "stopping" | HeldState;
+export type HeldState = "computerBusy" | "computerOffline" | "plan" | "budget";
+
+const HELD: Record<NonNullable<ManagedTask["held"]>, HeldState> = {
+  computer_busy: "computerBusy",
+  computer_offline: "computerOffline",
+  plan: "plan",
+  budget: "budget",
+};
 
 /** A task's state on its row: one asked to stop here says so until it leaves the list. */
-export function rowState(task: Pick<ManagedTask, "runId" | "status">, stopping: ReadonlySet<string>): RowState {
+export function rowState(
+  task: Pick<ManagedTask, "runId" | "status" | "held">,
+  stopping: ReadonlySet<string>,
+): RowState {
   if (stopping.has(task.runId)) return "stopping";
   const state = taskState(task);
-  if (state === "waiting") return waitsFor(task) === "answer" ? "answer" : "ok";
-  return state;
+  if (state !== "waiting") return state;
+  const wait = waitsFor(task);
+  if (wait === "ok" || wait === "answer" || wait === null) return wait ?? "answer";
+  return HELD[wait];
 }
+
+/** It waits on no person (a computer, a plan, a budget): grey, not "espera você". */
+export const isHeld = (state: RowState): state is HeldState =>
+  state === "computerBusy" || state === "computerOffline" || state === "plan" || state === "budget";
 
 export function stateText(t: TFunction, state: RowState): string {
   switch (state) {
@@ -50,6 +69,14 @@ export function stateText(t: TFunction, state: RowState): string {
       return t("taskManager.state.queued");
     case "stopping":
       return t("taskManager.state.stopping");
+    case "computerBusy":
+      return t("taskManager.state.computerBusy");
+    case "computerOffline":
+      return t("taskManager.state.computerOffline");
+    case "plan":
+      return t("taskManager.state.plan");
+    case "budget":
+      return t("taskManager.state.budget");
   }
 }
 
@@ -163,42 +190,53 @@ export function usingNow(
   }
 }
 
-/** The strip over an agent's DM composer (ADR 0125). */
-export interface Strip {
-  /** The agent's tasks, people's first then its routines', oldest first; `here`: asked in this conversation. */
+/** One agent's tasks now: its DM header's count and its tasks screen (ADR 0125). */
+export interface AgentTaskView {
+  /** People's first, then its routines', oldest first; `here`: asked in the conversation it was opened from. */
   rows: { task: ManagedTask; here: boolean }[];
-  /** Some task works now (the strip's orbit); otherwise they wait. */
-  working: boolean;
+  /** How many work now. */
+  working: number;
   /** How many wait on a person. */
   waiting: number;
-  /** "Parar esta": the task here one may stop. */
-  stopHere: ManagedTask | null;
-  /** The task here was just asked to stop. */
-  stoppingHere: boolean;
   /** "Parar todas": every task one may stop that isn't stopping yet. */
   stoppable: string[];
 }
 
-/**
- * The agent's tasks for the strip over its DM's composer, or null while it works only here (or not at all): the
- * working line already says what it does here and stops it, so the strip shows only when there is more to see.
- */
-export function stripOf(
+/** An agent's tasks, or null while it has none; `here` tags the ones asked in that conversation. */
+export function agentTasksOf(
   tasks: readonly ManagedTask[],
   agentId: string,
-  place: Place,
+  here: Place | null,
   stopping: ReadonlySet<string>,
-): Strip | null {
+): AgentTaskView | null {
   const mine = tasksOf([...tasks], agentId);
-  const rows = mine.map((task) => ({ task, here: isHere(task, place) }));
-  if (!rows.some((r) => !r.here)) return null;
-  const free = (task: ManagedTask) => task.canStop && !stopping.has(task.runId);
+  if (mine.length === 0) return null;
   return {
-    rows,
-    working: mine.some((task) => taskState(task) === "working"),
-    waiting: mine.filter((task) => taskState(task) === "waiting").length,
-    stopHere: rows.find((r) => r.here && free(r.task))?.task ?? null,
-    stoppingHere: rows.some((r) => r.here && stopping.has(r.task.runId)),
-    stoppable: mine.filter(free).map((task) => task.runId),
+    rows: mine.map((task) => ({ task, here: here !== null && isHere(task, here) })),
+    working: mine.filter((task) => taskState(task) === "working").length,
+    waiting: mine.filter((task) => waitsOnPerson(task)).length,
+    stoppable: mine.filter((task) => task.canStop && !stopping.has(task.runId)).map((task) => task.runId),
   };
+}
+
+/** "Feitas hoje" on an agent's tasks screen: what it finished today (stopped and failed ones aren't done). */
+export const doneTodayOf = (ended: readonly EndedTask[], agentId: string) =>
+  ended.filter((e) => e.agentId === agentId && endedState(e) === "done").length;
+
+/** An agent's tasks screen, opened from a conversation (its tasks there are tagged "aqui"). */
+export function agentTasksHref(agentId: string, from: Place | null) {
+  if (!from) return `/agent-tasks/${agentId}` as const;
+  const thread = from.threadId ? `&thread=${from.threadId}` : "";
+  return `/agent-tasks/${agentId}?channel=${from.channelId}${thread}` as const;
+}
+
+/**
+ * What an agent's DM header shows of its tasks: how many there are, and how many wait on you when some also work; its
+ * mark is the orbit while some work, else the waiting mark (or queued). `room` is its width in the bar's buttons (44
+ * points each), which the conversation's title gives up.
+ */
+export function tasksBadge(view: Pick<AgentTaskView, "rows" | "working" | "waiting">) {
+  const both = view.working > 0 && view.waiting > 0;
+  const mark: RowState = view.working > 0 ? "working" : view.waiting > 0 ? "ok" : "queued";
+  return { count: view.rows.length, mark, waiting: both ? view.waiting : null, room: both ? 1.9 : 1.3 };
 }

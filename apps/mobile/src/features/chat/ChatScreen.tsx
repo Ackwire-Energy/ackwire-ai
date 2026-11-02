@@ -110,7 +110,8 @@ import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { useDmStatusLine, usePresenceWord } from "../status/hooks";
 import { PersonStatusCard } from "../status/StatusCard";
-import { TaskStrip, useTaskStrip } from "../task-manager/TaskStrip";
+import { AgentTasksButton, useDmAgentTasks } from "../task-manager/AgentTasksButton";
+import { agentTasksHref, tasksBadge } from "../task-manager/logic";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { AskStore } from "./ask-store";
@@ -393,9 +394,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       },
     };
   }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
-  // An agent's DM shows its tasks elsewhere too (ADR 0125): while it has some, their strip takes the working line's
-  // place over the box (one line, never two); work only in this conversation stays the working line's.
-  const agentTasks = useTaskStrip(member ? dmAgentId : null, channelId, threadId);
+  // An agent's DM header counts its tasks, here and elsewhere (ADR 0125); a tap opens them, pushed like a thread.
+  const agentTasks = useDmAgentTasks(member && !isThread ? dmAgentId : null);
 
   // ── Agents' blocks ──
   // An agent at work in its browser: its card in the conversation, open on demand.
@@ -1219,7 +1219,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
-        extraActions={dmAgentId ? 1 : 0}
+        extraActions={(dmAgentId ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
         label={
@@ -1261,10 +1261,21 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
-  // An agent's DM also opens its computer (as the web's DM header), for whoever may watch it.
+  // An agent's DM also opens its tasks while it has some (ADR 0125), pushed like a thread, and its computer (as the
+  // web's DM header), for whoever may watch it.
   const right =
     (isThread && info) || dm || channel ? (
       <>
+        {dmAgentId && agentTasks ? (
+          <AgentTasksButton
+            agentId={dmAgentId}
+            view={agentTasks}
+            onPress={() => {
+              leavePlace();
+              router.push(agentTasksHref(dmAgentId, { channelId, threadId }));
+            }}
+          />
+        ) : null}
         {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} onOpen={leavePlace} /> : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
@@ -1728,8 +1739,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               <Connection status={realtime} />
               {banner ? <NoAiBanner banner={banner} /> : null}
               {/* Who is working, right above the composer (as on the web), while they work; a request waiting out
-                  of view takes the line, with "Ver" (and the working line's stop while one agent works). In an
-                  agent's DM, while it also works elsewhere, the strip of its tasks is that line (ADR 0125). */}
+                  of view takes the line, with "Ver" (and the working line's stop while one agent works). */}
               {member && awayAsk ? (
                 <AskBar
                   away={awayAsk}
@@ -1740,15 +1750,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                   onStop={stopRun}
                 />
               ) : null}
-              {member && !awayAsk && dmAgentId && agentTasks.strip ? (
-                <TaskStrip
-                  agentId={dmAgentId}
-                  strip={agentTasks.strip}
-                  stopping={agentTasks.stopping}
-                  onStop={agentTasks.stop}
-                />
-              ) : null}
-              {member && !awayAsk && !agentTasks.strip ? (
+              {member && !awayAsk ? (
                 <WorkingLine
                   runs={runs}
                   consults={lineConsults}

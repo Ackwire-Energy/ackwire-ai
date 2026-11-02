@@ -4,13 +4,16 @@ import { join } from "node:path";
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
 import { taskProgram, taskTitle } from "@agenteschat/client/lib/task-manager";
 import {
+  agentTasksHref,
+  agentTasksOf,
+  doneTodayOf,
   endedLatestFirst,
   endedText,
   groupLine,
   isHere,
   rowState,
   stateText,
-  stripOf,
+  tasksBadge,
   taskSubline,
   usingNow,
 } from "../../src/features/task-manager/logic";
@@ -164,7 +167,7 @@ describe("what ended today", () => {
   });
 });
 
-describe("the strip over an agent's DM composer", () => {
+describe("an agent's tasks, from its DM's header", () => {
   const here = task({ runId: "here", createdAt: "2026-11-02T14:00:00.000Z" });
   const review = task({
     runId: "review",
@@ -184,45 +187,67 @@ describe("the strip over an agent's DM composer", () => {
   const other = task({ runId: "other", agentId: "infra", channelId: "c2" });
   const place = { channelId: "dm1", threadId: null };
 
-  test("people's tasks first, then the routines', the one here flagged; it stops the one here or all", () => {
-    const strip = stripOf([here, review, routine, other], "dev", place, NONE);
-    expect(strip?.rows.map((r) => [r.task.runId, r.here])).toEqual([
+  test("people's tasks first, then the routines', the ones asked here tagged; how many work, wait, can stop", () => {
+    const view = agentTasksOf([here, review, routine, other], "dev", place, NONE);
+    expect(view?.rows.map((r) => [r.task.runId, r.here])).toEqual([
       ["review", false],
       ["here", true],
       ["routine", false],
     ]);
-    expect(strip?.working).toBe(true);
-    expect(strip?.waiting).toBe(1);
-    expect(strip?.stopHere?.runId).toBe("here");
-    expect(strip?.stoppingHere).toBe(false);
-    expect(strip?.stoppable).toEqual(["review", "here", "routine"]);
+    expect(view?.working).toBe(2);
+    expect(view?.waiting).toBe(1);
+    expect(view?.stoppable).toEqual(["review", "here", "routine"]);
   });
 
-  test("the one here asked to stop says so, and nobody stops what they may not", () => {
-    const strip = stripOf([here, { ...review, canStop: false }, routine], "dev", place, new Set(["here"]));
-    expect(strip?.stopHere).toBeNull();
-    expect(strip?.stoppingHere).toBe(true);
-    expect(strip?.stoppable).toEqual(["routine"]);
+  test("one asked to stop, or one they may not stop, isn't stopped again by 'Parar todas'", () => {
+    const view = agentTasksOf([here, { ...review, canStop: false }, routine], "dev", place, new Set(["here"]));
+    expect(view?.stoppable).toEqual(["routine"]);
   });
 
-  test("no strip while the agent works only here, or not at all: the working line says it", () => {
-    expect(stripOf([here, other], "dev", place, NONE)).toBeNull();
-    expect(stripOf([other], "dev", place, NONE)).toBeNull();
+  test("nothing while the agent has no tasks; nothing tagged when opened from nowhere", () => {
+    expect(agentTasksOf([other], "dev", place, NONE)).toBeNull();
+    expect(agentTasksOf([here], "dev", null, NONE)?.rows.map((r) => r.here)).toEqual([false]);
   });
 
   test("in a thread, here is that thread; the DM's main timeline is elsewhere", () => {
     const inThread = task({ runId: "thread", threadId: "t1" });
     expect(isHere(inThread, { channelId: "dm1", threadId: "t1" })).toBe(true);
     expect(isHere(here, { channelId: "dm1", threadId: "t1" })).toBe(false);
-    const strip = stripOf([here, inThread], "dev", { channelId: "dm1", threadId: "t1" }, NONE);
-    expect(strip?.stopHere?.runId).toBe("thread");
+    const view = agentTasksOf([here, inThread], "dev", { channelId: "dm1", threadId: "t1" }, NONE);
+    expect(view?.rows.filter((r) => r.here).map((r) => r.task.runId)).toEqual(["thread"]);
+  });
+
+  test("the header's count: the orbit while some work, the waiting mark otherwise, and who waits when both", () => {
+    const both = agentTasksOf([here, review], "dev", place, NONE);
+    expect(both && tasksBadge(both)).toEqual({ count: 2, mark: "working", waiting: 1, room: 1.9 });
+    const waits = agentTasksOf([review], "dev", place, NONE);
+    expect(waits && tasksBadge(waits)).toEqual({ count: 1, mark: "ok", waiting: null, room: 1.3 });
+    const queued = agentTasksOf([{ ...here, status: "queued" }], "dev", place, NONE);
+    expect(queued && tasksBadge(queued).mark).toBe("queued");
+  });
+
+  test("'Feitas hoje' counts what the agent finished, not what was stopped or failed", () => {
+    const list = [
+      ended({ runId: "a" }),
+      ended({ runId: "b", status: "canceled" }),
+      ended({ runId: "c", status: "failed" }),
+      ended({ runId: "d", agentId: "infra" }),
+    ];
+    expect(doneTodayOf(list, "dev")).toBe(1);
+  });
+
+  test("its screen knows the conversation it came from", () => {
+    expect(agentTasksHref("dev", { channelId: "dm1", threadId: null })).toBe("/agent-tasks/dev?channel=dm1");
+    expect(agentTasksHref("dev", { channelId: "dm1", threadId: "t1" })).toBe("/agent-tasks/dev?channel=dm1&thread=t1");
+    expect(agentTasksHref("dev", null)).toBe("/agent-tasks/dev");
   });
 });
 
 describe("navigation", () => {
-  test("the task manager and a task are pushed screens, in the stack", () => {
+  test("the task manager, a task and an agent's tasks are pushed screens, in the stack", () => {
     const layout = readFileSync(join(APP, "_layout.tsx"), "utf8");
     expect(layout).toContain(`name="task-manager/index" options={{ ...pushed, ...scrollUnder }}`);
     expect(layout).toContain(`name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }}`);
+    expect(layout).toContain(`name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }}`);
   });
 });
