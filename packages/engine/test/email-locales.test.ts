@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { LOCALE_CODES } from "@agenteschat/i18n/locale";
+import { deepMerge } from "@agenteschat/i18n/tree";
 import { type EmailTemplate, emailLocale, renderEmail } from "../src";
 import { wordsFor } from "../src/email/words";
+import { en } from "../src/email/words/en";
 import { EMAIL_SAMPLES } from "./email-samples";
 
 /** Each sample once (its English variant), in every language of the app. */
@@ -32,7 +34,8 @@ describe("every email in every language (ADR 0122)", () => {
   });
 
   test("a language without a word falls back to English's", () => {
-    expect(wordsFor("ja").verify.subject).toBe(wordsFor("en").verify.subject);
+    const partial = deepMerge(en, { verify: { headline: "Bestätige" } });
+    expect(partial.verify.subject).toBe(en.verify.subject);
     expect(wordsFor("pt-BR").verify.subject).not.toBe(wordsFor("en").verify.subject);
   });
 

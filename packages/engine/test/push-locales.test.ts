@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 import { LOCALE_CODES } from "@agenteschat/i18n/locale";
+import { PUSH } from "../src/push/messages";
+import { strings as ru } from "../src/push/messages/ru";
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, pushStrings, renderPush } from "../src/push-messages";
 
 const KINDS = [
@@ -41,6 +43,12 @@ test("every push kind in every language: words, within the phone's limits (ADR 0
 });
 
 test("a language without a word says it in English", () => {
-  expect(pushStrings("ru").forumTitle).toBe(pushStrings("en").forumTitle);
+  PUSH.ru = {};
+  try {
+    expect(pushStrings("ru").forumTitle).toBe(pushStrings("en").forumTitle);
+  } finally {
+    PUSH.ru = ru;
+  }
+  expect(pushStrings("ru").forumTitle).not.toBe(pushStrings("en").forumTitle);
   expect(pushStrings("pt-BR").forumTitle).not.toBe(pushStrings("en").forumTitle);
 });

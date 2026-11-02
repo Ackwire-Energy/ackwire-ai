@@ -1,1 +1,1626 @@
-{}
+{
+  "app": {
+    "failed": "잘 안 됐어요. 다시 시도해 주세요.",
+    "send": "보내기"
+  },
+  "categories": {
+    "title": "카테고리",
+    "where": "#{{channel}}이(가) 표시되는 곳",
+    "whereHelp": "모두에게 바뀌어요. 채널에 참여하는 사람은 그대로예요.",
+    "create": "만들기",
+    "endOfList": "모두의 목록 맨 끝으로 가요.",
+    "channelCount_other": "채널 {{count}}개",
+    "none": "아직 카테고리가 없어요.",
+    "manageHelp": "카테고리를 탭해서 이름을 바꾸거나, 옮기거나, 삭제하세요.",
+    "manageHint": "순서, 이름, 삭제",
+    "deleteTitle": "{{name}}을(를) 삭제할까요?",
+    "order": "목록에서의 위치",
+    "up": "위로 이동",
+    "down": "아래로 이동",
+    "position": "{{count}}개 중 {{at}}번째.",
+    "channelPosition": "{{count}}개 중 {{at}}번째.",
+    "itsChannels": "채널",
+    "seeAll": "모두 보기"
+  },
+  "blocks": {
+    "send": "보내기",
+    "more": "더 보기",
+    "thousand": "천",
+    "building": "준비하는 중…",
+    "openBig": "전체 화면으로 열기",
+    "keep": "Drive에 보관",
+    "kept": "Drive에 보관됨",
+    "wake": "탭해서 열기",
+    "goesTo": "{{name}}에게 보내요:",
+    "sentAt": "{{time}}에 보냈어요",
+    "sendFailed": "잘 안 됐어요. 다시 시도해 주세요.",
+    "someone": "누군가",
+    "pollCloses": "{{time}}에 마감",
+    "pollClosed": "투표 마감",
+    "pollMultiple": "여러 개를 고를 수 있어요.",
+    "pollAnswered_other": "{{total}}명 중 {{count}}명 응답",
+    "voteFailed": "투표가 반영되지 않았어요."
+  },
+  "chart": {
+    "pending": "차트를 만드는 중…",
+    "table": "표",
+    "item": "항목",
+    "share": "공유",
+    "gone": "이 차트는 더 이상 열려 있지 않아요."
+  },
+  "code": {
+    "label": "코드",
+    "copy": "코드 복사",
+    "copied": "복사됨",
+    "fullScreen": "전체 화면",
+    "wrap": "줄 바꿈",
+    "more": "{{count}}줄 모두 보기",
+    "gone": "이 코드는 더 이상 열려 있지 않아요."
+  },
+  "time": {
+    "today": "오늘",
+    "yesterday": "어제",
+    "justNow": "지금",
+    "minutesAgo_other": "{{count}}분 전",
+    "hoursAgo_other": "{{count}}시간 전",
+    "daysAgo_other": "{{count}}일 전"
+  },
+  "names": {
+    "two": "{{first}}, {{second}}",
+    "more": "{{first}}, {{second}} 외 {{count}}명"
+  },
+  "tabs": {
+    "chats": "채팅",
+    "threads": "스레드",
+    "agents": "에이전트",
+    "activity": "활동",
+    "search": "검색",
+    "withCount": "{{label}}, {{count}}"
+  },
+  "home": {
+    "greeting": {
+      "morning": "좋은 아침이에요, {{name}}님",
+      "afternoon": "좋은 오후예요, {{name}}님",
+      "evening": "좋은 저녁이에요, {{name}}님"
+    },
+    "hello": {
+      "morning": "좋은 아침이에요",
+      "afternoon": "좋은 오후예요",
+      "evening": "좋은 저녁이에요"
+    },
+    "waiting": "내 확인 대기",
+    "workingNow": "지금 작업 중",
+    "missionTitle": "미션 {{title}}",
+    "directChat": "1:1 채팅",
+    "stepAsk": "에이전트와 대화를 시작하세요."
+  },
+  "approval": {
+    "asksIn": "승인을 요청해요 · #{{channel}}",
+    "asksYou": "승인을 요청해요",
+    "expiresIn_other": "{{count}}분 후 만료",
+    "refuse": "거절",
+    "approve": "승인",
+    "hold": "길게 눌러 승인",
+    "holding": "계속 누르고 있어요…",
+    "holdNote": "위험도 높음: 버튼을 1초 동안 누르고 있어 주세요.",
+    "tapNote": "승인하면 바로 실행돼요.",
+    "tapNoteAhead": "지금 승인하면 {{when}}에 실행돼요.",
+    "refuseTitle": "요청 거절",
+    "whyPlaceholderF": "이유가 뭔가요? 선택 사항이지만 {{name}}이(가) 배워요",
+    "whyPlaceholderM": "이유가 뭔가요? 선택 사항이지만 {{name}}이(가) 배워요",
+    "approved": "승인됨",
+    "approvedSubF": "{{name}}이(가) 진행하고 있어요.",
+    "approvedSubM": "{{name}}이(가) 진행하고 있어요.",
+    "approvedAhead": "{{when}}에 다시 묻지 않고 알아서 실행돼요.",
+    "refused": "거절됨",
+    "refusedSubF": "{{name}}이(가) 다음에 기억할 거예요.",
+    "refusedSubM": "{{name}}이(가) 다음에 기억할 거예요.",
+    "alwaysUndoF": "되돌리려면 프로필의 항상 승인됨에서 해제하세요.",
+    "alwaysUndoM": "되돌리려면 프로필의 항상 승인됨에서 해제하세요.",
+    "via": "경유",
+    "why": "{{name}}이(가) 전에 한 말: “{{text}}”",
+    "saidText": "“{{text}}”",
+    "answers": "“{{subject}}”에 답장",
+    "answersFrom": "{{from}}의 “{{subject}}”에 답장",
+    "forwards": "“{{subject}}” 전달",
+    "forwardsFrom": "{{from}}의 “{{subject}}” 전달",
+    "onlyOwner": "{{name}} 또는 관리자만 결정할 수 있어요.",
+    "onlyAdmins": "관리자만 결정할 수 있어요.",
+    "notFound": "이 요청은 더 이상 없거나 볼 수 없어요.",
+    "trait": {
+      "production": "프로덕션, 모두에게 적용",
+      "irreversible": "되돌릴 수 없음",
+      "reversible": "되돌릴 수 있음",
+      "external": "회사 밖으로 나가요",
+      "unsent": "아무것도 보내지 않아요",
+      "deletable": "삭제할 수 있음"
+    },
+    "status": {
+      "approved": "이미 승인됐어요.",
+      "refused": "이미 거절됐어요.",
+      "expired": "응답 없이 만료됐어요.",
+      "canceled": "에이전트가 요청을 취소했어요.",
+      "scheduled": "승인됐어요. {{when}}에 알아서 실행돼요."
+    }
+  },
+  "chats": {
+    "title": "채팅",
+    "serverError": {
+      "offline": "휴대폰이 인터넷에 연결되어 있지 않아요.",
+      "text": "서버가 꺼져 있거나 네트워크 밖에 있을 수 있어요. 다시 켜지면 채팅이 알아서 나타나요.",
+      "kept": "앱에 이미 있던 내용을 보여 드리고 있어요."
+    },
+    "section": {
+      "agents": "에이전트",
+      "channels": "채널",
+      "people": "사람"
+    },
+    "seeAll": {
+      "agents": "모든 에이전트 보기",
+      "channels": "모든 채널 보기",
+      "people": "모든 사람 보기"
+    },
+    "wait": {
+      "verb": {
+        "approval": "승인을 기다려요",
+        "question": "질문이 있어요",
+        "mission": "검토를 기다려요"
+      },
+      "line": "{{name}} {{verb}}",
+      "chip": {
+        "approval": "승인",
+        "question": "질문",
+        "mission": "미션"
+      },
+      "review": "검토",
+      "more_other": "외 {{count}}건이 나를 기다려요",
+      "open": "나를 기다리는 일 보기"
+    },
+    "thread": "스레드",
+    "missionState": {
+      "working": "작업 중…",
+      "waiting": "내 확인 대기",
+      "paused": "일시 중지됨",
+      "done": "완료",
+      "canceled": "취소됨",
+      "active": "진행 중",
+      "proposed": "제안됨"
+    },
+    "empty": "아직 채팅이 없어요.",
+    "sayHi": "{{name}}에게 인사해 보세요.",
+    "channelEmpty": "아직 메시지가 없어요. 대화를 시작해 보세요.",
+    "closed": "닫힘",
+    "working": "작업 중…",
+    "missionProgress": "{{total}}개 중 {{done}}개 항목",
+    "missionIn": "{{where}}의 미션",
+    "missionWith": "{{who}}와(과) 함께하는 미션",
+    "mission": "미션",
+    "unreadLabel_other": "안 읽음 {{count}}개",
+    "newChannel": "새 채널",
+    "newChannelHint": "팀이나 주제별로",
+    "channelPlaceholder": "채널 이름, 예: 마케팅",
+    "createChannel": "채널 만들기",
+    "waitIn": "{{where}}에서",
+    "workingNowLine_other": "지금 에이전트 {{count}}명이 작업 중",
+    "nobodyWorking": "지금 작업 중인 에이전트가 없어요",
+    "first": {
+      "title": "첫 에이전트부터 시작해 보세요",
+      "subtitle": "이름을 지어 주고 무슨 일을 할지 알려 주세요. 여기에 채팅으로 나타나요.",
+      "examples": "이런 일을 할 수 있어요",
+      "example": {
+        "support": {
+          "title": "고객 응대",
+          "hint": "질문에 답하고 급한 일이 있으면 나를 불러요",
+          "what": "고객의 질문에 답하고 급한 일이 있으면 나를 불러 줘"
+        },
+        "reports": {
+          "title": "보고서 작성",
+          "hint": "숫자를 모아 문서로 전달해요",
+          "what": "이번 주 숫자를 모아서 보고서로 전달해 줘"
+        },
+        "weekly": {
+          "title": "매주 하는 일",
+          "hint": "채팅으로 요청하세요: “매주 월요일에 …을 보내 줘”",
+          "what": "매주 월요일 아침에 그 주에 있었던 일을 요약해서 보내 줘"
+        }
+      }
+    }
+  },
+  "new": {
+    "title": "새로 만들기",
+    "chat": "채팅할 상대…",
+    "name": "이름",
+    "channelFine": "팀이나 주제별로.",
+    "chatSearch": "사람이나 에이전트 검색",
+    "people": "사람",
+    "nobody": "아직 아무도 없어요.",
+    "ask": {
+      "question": "무엇이 필요하세요?",
+      "placeholder": "예: 금요일 전에 가격 페이지 문구 검토하기",
+      "to": "대상",
+      "sendF": "{{name}}에게 요청",
+      "sendM": "{{name}}에게 요청",
+      "more": "또는 새로 시작하기",
+      "person": "사람과 채팅",
+      "noAgents": "에이전트에게 일을 맡기려면 먼저 에이전트를 만들어 주세요."
+    },
+    "agent": {
+      "question": "어떤 일을 하나요?"
+    }
+  },
+  "chat": {
+    "someone": "누군가",
+    "messageTo": "{{name}}에게 메시지 보내기",
+    "messageIn": "{{channel}}에 메시지 보내기",
+    "reply": "답장",
+    "people_other": "{{count}}명",
+    "agentsHere_other": "에이전트 {{count}}명",
+    "threadIn": "#{{channel}}의 스레드",
+    "closedThreadIn": "#{{channel}}의 닫힌 스레드",
+    "missionIn": "#{{channel}}의 미션",
+    "threadWith": "{{name}}와(과)의 스레드",
+    "closedThreadWith": "{{name}}와(과)의 닫힌 스레드",
+    "missionWith": "{{name}}와(과) 함께하는 미션",
+    "startedIn": "#{{channel}}에서 시작됨",
+    "startedWith": "{{name}}와(과)의 대화에서 시작됨",
+    "replies_other": "답장 {{count}}개",
+    "repliesWord_other": "답장",
+    "thread": "스레드",
+    "closed": "닫힘",
+    "options": "옵션",
+    "profile": "프로필",
+    "here_other": "{{count}}명 참여 중",
+    "headerAgent": "{{who}}. 프로필 열기",
+    "headerChannel": "{{who}}. 옵션",
+    "switchHint": "길게 눌러 대화 전환",
+    "switchTitle": "대화 전환",
+    "switchSearch": "대화 검색",
+    "switchAgents": "에이전트",
+    "switchChannels": "채널",
+    "switchPeople": "사람",
+    "switchNone": "그런 이름의 대화가 없어요.",
+    "switchWorking": "작업 중",
+    "join": "채널 참여",
+    "empty": "아직 아무도 글을 쓰지 않았어요.",
+    "sending": "보내는 중…",
+    "failed": "전송 안 됨 · 다시 시도",
+    "notSent": "메시지가 전송되지 않았어요.",
+    "toLatest": "최신 메시지로 이동",
+    "stopAgent": "{{name}} 중지",
+    "offlineWait": "연결되면 전송돼요",
+    "turn": {
+      "thinking": "생각 중",
+      "working": "작업 중",
+      "writing": "작성 중",
+      "stopped": "중지됨"
+    },
+    "steer": {
+      "waiting": "{{name}}이(가) 다음에 멈출 때 읽어요",
+      "now": "{{name}}이(가) 멈추고 읽었어요",
+      "delivered": "{{name}}이(가) 받았어요",
+      "held": "{{name}}이(가) 내 결정 후에 읽어요",
+      "read": "{{name}}이(가) 읽었어요",
+      "resolved": "{{name}}이(가) 도움 요청을 닫았어요",
+      "well": "메모를 읽었어요",
+      "wellNow": "멈추고 메모를 읽었어요"
+    },
+    "stopped": {
+      "byYou": "내가 중지함",
+      "by": "{{name}}이(가) 중지함",
+      "plain": "중지됨",
+      "limit": "단계 한도에 도달함",
+      "stuck": "막혀서 중지됨",
+      "continue": "계속",
+      "failed": "계속하지 못했어요. 다시 시도해 주세요."
+    },
+    "unseen": {
+      "count_other": "새 메시지 {{count}}개",
+      "working": "{{names}} 작성 중",
+      "divider": "새 메시지"
+    },
+    "connection": {
+      "down": "연결되어 있지 않아요. 보낸 내용은 다시 연결되면 알아서 전송돼요.",
+      "back": "다시 연결됐어요"
+    },
+    "longPressHint": "길게 눌러 반응하고 더 많은 작업 보기",
+    "consult": {
+      "answered": "{{name}}이(가) 답했어요",
+      "expiredF": "{{name}}이(가) 제때 답하지 못했어요",
+      "expiredM": "{{name}}이(가) 제때 답하지 못했어요",
+      "failedF": "{{name}}이(가) 답할 수 없었어요",
+      "failedM": "{{name}}이(가) 답할 수 없었어요",
+      "answerOfF": "{{name}}의 답변",
+      "answerOfM": "{{name}}의 답변",
+      "noAnswer": "답변이 없어요.",
+      "privateFF": "{{from}}와(과) {{to}}의 비공개 채팅",
+      "privateFM": "{{from}}와(과) {{to}}의 비공개 채팅",
+      "privateMF": "{{from}}와(과) {{to}}의 비공개 채팅",
+      "privateMM": "{{from}}와(과) {{to}}의 비공개 채팅"
+    },
+    "file": "파일",
+    "fileOpen": "탭해서 열기",
+    "fileDeleted": "파일이 삭제됨",
+    "fileFailed": "파일을 열 수 없어요.",
+    "question": {
+      "fromF": "{{name}}의 질문",
+      "fromM": "{{name}}의 질문",
+      "own": "직접 답하기",
+      "placeholder": "내 답변",
+      "answered": "{{name}}의 답: {{answer}}",
+      "answeredByYou": "내 답: {{answer}}",
+      "taken": "이미 답했거나 닫힌 질문이에요.",
+      "closed": "답변 없이 닫혔어요."
+    },
+    "approvalPreview": "승인 요청",
+    "reactionLabel": "{{emoji}} {{count}}",
+    "agentReacted": "에이전트가 {{emoji}}(으)로 반응했어요",
+    "reactWith": "{{emoji}}(으)로 반응",
+    "replyInThread": "스레드에서 답장",
+    "openThread": "스레드 열기",
+    "toMission": "미션으로 전환",
+    "copy": "텍스트 복사",
+    "copied": "복사됨",
+    "seeAgent": "{{name}} 보기",
+    "summaryMessage": "채팅을 요약해 줘. 내가 없는 동안 무슨 일이 있었어?",
+    "noMission": "이 채팅에는 미션이 없어요.",
+    "missionDone": {
+      "pause": "미션 일시 중지됨",
+      "resume": "미션 재개됨",
+      "stop": "미션 중지됨"
+    },
+    "uploading": "파일을 보내는 중…",
+    "uploadFailed": "파일을 보내지 못했어요.",
+    "intent": {
+      "suggest": {
+        "merge": "머지 진행해 줘",
+        "review": "{{name}}에게 먼저 검토 요청해 줘",
+        "seeChange": "무엇이 바뀌었는지 보여 줘",
+        "summarize": "3가지로 요약해 줘",
+        "nextStep": "다음 단계는 뭐야?"
+      },
+      "arrived": "{{name}}이(가) 팀에 합류했어요",
+      "meet": "{{name}}와(과)의 첫 대화",
+      "roleIntro": "팀의 {{role}}이에요. 편하게 말로 요청하세요.",
+      "noIntro": "필요한 걸 편하게 말로 요청하세요.",
+      "firstTitle": "이렇게 시작해 보세요",
+      "sendHint": "탭해서 보내기",
+      "first": {
+        "support": {
+          "how": "급한 일인지 어떻게 판단해?",
+          "task": "마감일을 묻는 사람들에게 보낼 답장을 써 줘",
+          "routine": "매일 아침 급하게 들어온 걸 보내 줘"
+        },
+        "ops": {
+          "how": "뭔가 다운되면 어떻게 알아?",
+          "task": "지금 모든 게 잘 돌아가는지 확인해 줘",
+          "routine": "매일 아침 밤사이 어땠는지 알려 줘"
+        },
+        "qa": {
+          "how": "무엇부터 테스트할지 어떻게 정해?",
+          "task": "로그인 테스트 케이스를 작성해 줘",
+          "routine": "매주 고장 난 걸 보내 줘"
+        },
+        "dev": {
+          "how": "우리 코드에서 뭘 할 수 있어?",
+          "task": "가장 최근에 열린 pull request를 검토해 줘",
+          "routine": "매주 금요일에 코드에서 바뀐 걸 보내 줘"
+        },
+        "research": {
+          "how": "어떤 리서치를 가장 잘해?",
+          "task": "경쟁사 세 곳을 조사해서 가격을 비교해 줘",
+          "routine": "매주 월요일에 시장의 새 소식을 보내 줘"
+        },
+        "writing": {
+          "how": "어떤 글을 가장 잘 써?",
+          "task": "내 글을 검토하고 개선할 점을 알려 줘",
+          "routine": "매주 금요일에 이번 주에 쓴 걸 알려 줘"
+        },
+        "product": {
+          "how": "우선순위는 어떻게 정해?",
+          "task": "작업 중에 늦어진 걸 정리해 줘",
+          "routine": "매주 월요일에 그 주 계획을 보내 줘"
+        },
+        "sales": {
+          "how": "좋은 리드는 어떻게 찾아?",
+          "task": "제품을 소개하는 이메일을 써 줘",
+          "routine": "매주 월요일에 새 리드를 보내 줘"
+        },
+        "general": {
+          "how": "나를 위해 뭘 해 줄 수 있어?",
+          "task": "네가 하는 일의 예시를 보여 줘",
+          "routine": "매주 월요일에 이번 주에 한 일을 알려 줘"
+        }
+      }
+    }
+  },
+  "plus": {
+    "camera": "카메라",
+    "photos": "사진",
+    "file": "파일",
+    "audio": "오디오",
+    "audioSoon": "오디오는 곧 지원돼요.",
+    "noCamera": "카메라에 접근할 수 없어요. 휴대폰 설정에서 허용해 주세요.",
+    "mission": "미션 시작",
+    "missionHint": "계획을 세워 처음부터 끝까지 하는 긴 작업",
+    "summary": "채팅 요약",
+    "summaryHint": "내가 없는 동안 있었던 일",
+    "remind": "나중에 알림",
+    "remindHint": "에이전트가 여기서 알려 드려요"
+  },
+  "remind": {
+    "title": "리마인더",
+    "sub": "여기 있는 에이전트가 이 채팅에서 알려 드려요",
+    "what": "무엇을 알려 드릴까요?",
+    "placeholder": "무엇을 알려 드릴까요? 예: 가격 페이지 검토하기",
+    "aboutThis": "이 일 다시 알려 줘",
+    "preset": {
+      "inHour": "1시간 후",
+      "tonight": "오늘 밤",
+      "tomorrowMorning": "내일 아침"
+    },
+    "custom": "시간 선택…",
+    "tomorrow": "내일",
+    "todayAt": "오늘 {{time}}",
+    "tomorrowAt": "내일 {{time}}",
+    "dayAt": "{{day}} {{time}}",
+    "hour": "시",
+    "hourLess": "1시간 앞으로",
+    "hourMore": "1시간 뒤로",
+    "minute": "분",
+    "minuteLess": "{{n}}분 앞으로",
+    "minuteMore": "{{n}}분 뒤로",
+    "submit": "이 시간에 알려 줘",
+    "quick": "빠른 시간 보기",
+    "done": "리마인더 설정됨",
+    "error": {
+      "noAgent": "여기에는 알려 줄 에이전트가 없어요",
+      "past": "이미 지난 시간이에요",
+      "tooFar": "리마인더는 최대 1년 후까지 설정할 수 있어요",
+      "noText": "무엇을 알려 드릴지 써 주세요",
+      "failed": "리마인더를 설정하지 못했어요. 다시 시도해 주세요."
+    }
+  },
+  "pins": {
+    "title": "고정됨",
+    "pin": "고정",
+    "unpin": "고정 해제",
+    "pinned": "메시지를 고정했어요",
+    "unpinned": "메시지 고정을 해제했어요",
+    "full": "이 채팅에는 이미 100개가 고정되어 있어요. 먼저 하나를 해제하세요.",
+    "mark": "고정됨",
+    "none": "아직 고정된 항목이 없어요",
+    "empty": "아직 여기에 고정된 항목이 없어요. 메시지를 길게 누르고 고정을 탭하세요."
+  },
+  "thread": {
+    "threadIn": "#{{channel}}의 스레드",
+    "missionIn": "#{{channel}}의 미션",
+    "seePlan": "계획과 진행 상황 보기",
+    "pause": "미션 일시 중지",
+    "pauseHintF": "{{name}}이(가) 지금 항목을 마치고 멈춰요",
+    "pauseHintM": "{{name}}이(가) 지금 항목을 마치고 멈춰요",
+    "resume": "미션 재개",
+    "conclude": "미션 마치기",
+    "concludeHint": "결정 사항을 Wiki에 남겨요",
+    "toMissionHint": "계획이 있는 작업이 돼요",
+    "follow": "팔로우",
+    "followHint": "누군가 답장하면 알려 줘요",
+    "close": "닫기",
+    "closeHint": "해결됐어요. 누군가 답장하면 다시 열려요",
+    "reopen": "다시 열기",
+    "archive": "보관",
+    "archiveHint": "목록과 검색에서 사라져요",
+    "done": {
+      "close": "스레드를 닫았어요",
+      "closeSub": "누군가 답장하면 다시 열려요.",
+      "reopen": "스레드를 다시 열었어요",
+      "archive": "보관됨",
+      "paused": "미션 일시 중지됨",
+      "resumed": "미션 재개됨",
+      "concluded": "미션 완료"
+    }
+  },
+  "newMission": {
+    "title": "새 미션",
+    "intro": "에이전트가 계획을 세우고, 내가 시작하라고 해야 시작해요.",
+    "placeholder": "무엇을 해야 하나요?",
+    "submit": "계획 요청",
+    "created": "{{name}}이(가) 계획을 세우고 있어요",
+    "noAgents": "아직 미션을 실행할 수 있는 에이전트가 없어요. 웹사이트에서 컴퓨터를 연결해 주세요.",
+    "reason": {
+      "no_computer": "연결된 컴퓨터가 필요해요",
+      "exec_off": "컴퓨터에서 명령 실행을 허용하지 않아요",
+      "runner_outdated": "컴퓨터 업데이트가 필요해요",
+      "not_in_audience": "나와 함께 일하지 않아요"
+    }
+  },
+  "mission": {
+    "kind": "미션",
+    "in": "#{{channel}}의 미션",
+    "working": "{{name}} 작업 중",
+    "ofTotal": "/ {{total}}",
+    "waitingYou_other": "{{count}}건이 나를 기다려요",
+    "cardLabel": "미션 {{title}}, {{total}}개 항목 중 {{done}}개 완료",
+    "owner": "담당: {{name}}",
+    "since": "{{when}}부터",
+    "hours_other": "작업 {{count}}시간",
+    "itemsDone": "/ {{total}}개 항목 완료",
+    "computerOn": "{{name}} · 켜짐",
+    "computerOff": "{{name}} · 꺼짐",
+    "computerNotAnswering": "{{name}} · 응답 없음",
+    "computerOffPlain": "컴퓨터 꺼짐",
+    "computerNotAnsweringPlain": "컴퓨터 응답 없음",
+    "running_other": "항목 {{count}}개 진행 중",
+    "conversation": "미션 채팅",
+    "onComputer": "지금 컴퓨터에서 진행 중",
+    "queued": "대기 중",
+    "base": "{{base}} 기준",
+    "setupTitle": "프로젝트 준비",
+    "readOnly": "읽기 전용",
+    "setup": {
+      "cap": "프로젝트",
+      "preparing": "프로젝트를 준비하는 중…",
+      "failedShort": "프로젝트를 준비하지 못했어요",
+      "failedTitle": "프로젝트를 준비하지 못했어요",
+      "retry": "다시 시도",
+      "retrying": "프로젝트를 다시 준비하는 중",
+      "ready": "프로젝트 준비 완료: 미션을 이어 가요",
+      "waiting": "미션 담당자가 다시 시도할 수 있어요.",
+      "lostTitle": "미션 작업이 이 컴퓨터에서 사라졌어요",
+      "lostText": "{{branch}} 브랜치가 더 이상 없어요. 처음부터 다시 하면 기준 브랜치에서 새로 복사해요.",
+      "restart": "처음부터 다시"
+    },
+    "minutes_other": "{{count}}분",
+    "decisions": "결정 사항",
+    "notFound": "이 미션은 더 이상 없거나 볼 수 없어요.",
+    "status": {
+      "proposed": "승인할 계획",
+      "active": "진행 중",
+      "paused": "일시 중지됨",
+      "awaiting_close": "마칠 준비 완료",
+      "done": "완료됨",
+      "canceled": "취소됨"
+    },
+    "plan": {
+      "section": "계획",
+      "title": "미션 계획",
+      "titleCount_other": "계획 · 항목 {{count}}개",
+      "more_other": "외 {{count}}개",
+      "planningF": "{{name}}이(가) 계획을 세우고 있어요…",
+      "planningM": "{{name}}이(가) 계획을 세우고 있어요…",
+      "change": "수정 요청",
+      "changeTitle": "계획에서 무엇을 바꿀까요?",
+      "changePlaceholder": "예: 로그인 화면부터 시작해 줘",
+      "changeSent": "메모를 전달했어요",
+      "changeQueued": "메모 저장됨: 컴퓨터가 켜지면 전달돼요",
+      "start": "시작",
+      "started": "미션 시작: {{title}}",
+      "startedToast": "미션이 시작됐어요",
+      "startedSubF": "볼 게 생기면 {{name}}이(가) 보여 드릴 거예요.",
+      "startedSubM": "볼 게 생기면 {{name}}이(가) 보여 드릴 거예요.",
+      "doing": "진행 중",
+      "waiting": "내 확인 대기"
+    },
+    "review": {
+      "ready": "확인할 준비가 됐어요",
+      "approve": "승인",
+      "askChanges": "수정 요청",
+      "whatChange": "무엇을 바꿀까요?",
+      "changesPlaceholder": "예: Android에서 보내기 버튼이 작아요",
+      "sendChanges": "수정 요청 보내기",
+      "changesSent": "수정 요청을 보냈어요",
+      "changesSentSubF": "{{name}}이(가) 고쳐서 다시 보여 드려요.",
+      "changesSentSubM": "{{name}}이(가) 고쳐서 다시 보여 드려요.",
+      "approvedSubF": "{{name}}이(가) 다음 항목으로 넘어가요.",
+      "approvedSubM": "{{name}}이(가) 다음 항목으로 넘어가요.",
+      "approved": "승인함: {{title}}",
+      "changes": "수정 요청함: {{title}}"
+    },
+    "decision": {
+      "title": "결정",
+      "decided": "결정됨",
+      "recommended": "추천",
+      "noted": "결정을 기록했어요",
+      "notedSub": "미션의 결정 사항에 남아요."
+    }
+  },
+  "threads": {
+    "title": "스레드와 미션",
+    "section": {
+      "missions": "미션",
+      "threads": "스레드"
+    },
+    "empty": "아직 스레드나 미션이 없어요",
+    "emptyHint": "메시지를 길게 눌러 스레드에서 답장하거나 미션으로 전환하세요."
+  },
+  "agents": {
+    "title": "에이전트",
+    "subtitle_other": "팀에 {{count}}명 · {{working}}명 작업 중",
+    "free": "대기 중",
+    "workingLabel": "{{name}}, 작업 중",
+    "new": "새 에이전트",
+    "namePlaceholder": "이름, 예: Nina",
+    "whatPlaceholder": "예: 이메일로 고객에게 답하고 급한 일이 있으면 알려 줘",
+    "create": "에이전트 만들기",
+    "created": "{{name}}이(가) 팀에 합류했어요",
+    "createFailed": "에이전트를 만들지 못했어요. 이미 있는 이름일 수 있어요.",
+    "empty": "아직 에이전트가 없어요.",
+    "noneForYou": "아직 나와 함께 일하는 에이전트가 없어요.",
+    "noneForYouHint": "관리자에게 접근 권한을 요청하세요.",
+    "freeSection": "대기 중",
+    "noGroupSection": "그룹 없음"
+  },
+  "agentEdit": {
+    "missing": "이 에이전트는 더 이상 없어요.",
+    "saved": "변경 사항을 저장했어요",
+    "adminsOnly": "이름, 역할, 지침은 관리자만 바꿀 수 있어요.",
+    "discardTitle": "변경 사항을 버릴까요?",
+    "discardText": "바꾼 내용이 아직 저장되지 않았어요.",
+    "discard": "버리기",
+    "keepEditing": "계속 편집"
+  },
+  "newAgent": {
+    "leaveTitle": "만들지 않고 나갈까요?",
+    "leaveText": "만들던 에이전트는 생성되지 않아요.",
+    "keepGoing": "계속 만들기",
+    "partly": "에이전트는 만들어졌지만, 역할에 포함된 일부가 반영되지 않았어요. 프로필에서 조정해 주세요.",
+    "import": {
+      "where": {
+        "openbotrun": "openbot-import.json(OpenBot의 Migrator에서) 또는 openbot-transfer.json(인스턴스 이전에서)을 선택하세요. .zip은 먼저 파일 앱에서 열어요. 탭하면 압축이 풀려요.",
+        "openmausbot": "OpenMausBot에서 팀을 오른쪽 클릭 › 팀 공유… › 파일 저장을 선택하세요. 그런 다음 여기서 그 파일을 고르세요.",
+        "hermes": "Hermes는 터미널에서 내보내요(hermes profile export). 휴대폰에서 열 수 없는 .tar.gz 파일이에요. 컴퓨터에서 가져오거나, 여기서 프로필의 .md와 .yaml 파일을 고르세요.",
+        "openclaw": "OpenClaw는 컴퓨터의 ~/.openclaw 폴더에 에이전트를 보관해요. 여기서 워크스페이스의 .md 파일을 고르거나, 컴퓨터에서 폴더 전체를 가져오세요.",
+        "paperclip": "아래에 패키지의 GitHub 링크를 붙여넣거나, COMPANY.md와 나머지 .md 파일을 고르세요.",
+        "agenteschat": "다른 워크스페이스에서 설정 › 가져오기 및 내보내기 › 파일 다운로드를 선택하세요. 그런 다음 여기서 .json을 고르세요."
+      },
+      "pick": "파일 선택",
+      "pasteTitle": "또는 다른 앱의 답변이나 GitHub 링크 붙여넣기",
+      "paste": "붙여넣기",
+      "read": "읽기",
+      "copyFailed": "복사하지 못했어요. 다시 시도해 주세요.",
+      "archive": "휴대폰에서는 .zip이나 .tar.gz 파일을 열 수 없어요. 파일 앱에서 .zip을 탭해 압축을 풀고 안에 있는 파일을 고르거나, 컴퓨터에서 가져오세요.",
+      "privacy": "이 휴대폰에서 읽어요. 키와 로그인 파일은 절대 열지 않아요.",
+      "also": "함께 가져와요",
+      "change": "변경",
+      "arrived_other": "에이전트 {{count}}명이 도착했어요",
+      "partial": "{{total}}명 중 {{done}}명이 도착했어요. 다시 가져오면 나머지도 가져와요."
+    }
+  },
+  "agent": {
+    "talk": "채팅",
+    "task": "작업",
+    "owner": "소유자: {{name}}",
+    "cantTalk": "이 에이전트는 나와 함께 일하지 않아요.",
+    "now": "지금",
+    "freeHint": "필요할 때 불러 주세요",
+    "does": "하는 일",
+    "canUse": "사용할 수 있는 것",
+    "month": "이번 달",
+    "ofBudget": "/ 월 {{budget}}",
+    "ofMonthBudget": "/ 이번 달 예산",
+    "exhaustedF": "{{name}}이(가) 이번 달 예산을 모두 썼어요.",
+    "exhaustedM": "{{name}}이(가) 이번 달 예산을 모두 썼어요.",
+    "taskForF": "{{name}}에게 맡길 작업",
+    "taskForM": "{{name}}에게 맡길 작업",
+    "taskPlaceholder": "무엇을 해야 하나요?",
+    "sendTask": "작업 보내기",
+    "taskSent": "작업을 보냈어요"
+  },
+  "activity": {
+    "title": "활동",
+    "filter": {
+      "all": "전체",
+      "waiting": "내 확인 대기"
+    },
+    "day": {
+      "today": "오늘",
+      "yesterday": "어제",
+      "week": "이번 주",
+      "older": "이전"
+    },
+    "kind": {
+      "mention_other": "{{names}}이(가) 나를 멘션했어요",
+      "thread_reply_other": "{{names}}이(가) 스레드에 답장했어요",
+      "agent_reply_other": "{{names}}이(가) 답했어요",
+      "dm_other": "{{names}}이(가) 메시지를 보냈어요",
+      "agent_question_other": "{{names}}이(가) 질문해요",
+      "issue_assigned_other": "나에게 온 작업",
+      "issue_comment_other": "{{names}}이(가) 작업에 댓글을 남겼어요",
+      "issue_status_other": "{{names}}이(가) 작업을 변경했어요",
+      "forum_turn_other": "포럼에서 내 차례예요",
+      "forum_synthesis_other": "포럼 요약이 준비됐어요",
+      "approval_other": "{{names}}이(가) 승인을 요청해요",
+      "mission_finished_other": "미션 완료",
+      "mission_stopped_other": "미션 중지됨",
+      "routine_finished_other": "루틴 완료",
+      "routine_failed_other": "루틴 실패",
+      "run_failed_other": "마치지 못했어요",
+      "routine_paused_other": "루틴 일시 중지됨",
+      "routine_stalled_other": "루틴이 컴퓨터를 기다리는 중",
+      "agent_unreached_other": "루틴이 에이전트를 부르지 못했어요",
+      "routine_waiting_plan_other": "루틴이 요금제 한도 초기화를 기다리는 중",
+      "plan_reset_unknown_other": "{{plan}}이(가) 한도 초기화 시점을 알려 주지 않았어요",
+      "reaction_other": "{{names}}이(가) 반응했어요",
+      "browser_handoff_other": "{{names}}이(가) 브라우저에서 나를 찾아요",
+      "secret_request_other": "{{names}}이(가) 비밀 정보를 요청해요",
+      "desktop_handoff_other": "{{names}}이(가) 컴퓨터에서 나를 찾아요",
+      "org_standing_other": "워크스페이스 상태가 바뀌었어요",
+      "computer_ready_other": "워크스페이스 컴퓨터가 준비됐어요",
+      "invitation_accepted_other": "{{names}}이(가) 초대를 수락했어요",
+      "composio_limit_other": "이 워크스페이스는 이번 달 Composio 호출을 모두 썼어요",
+      "browser_profile_request_other": "{{names}}이(가) 브라우저 프로필을 하나 더 요청해요",
+      "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
+      "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
+      "app_created_other": "AI 앱이 나를 위해 항목을 만들었어요"
+    },
+    "markRead": "읽음으로 표시",
+    "markUnread": "안 읽음으로 표시",
+    "unread": "안 읽음",
+    "done": "완료",
+    "more": "더 보기",
+    "empty": "나를 기다리는 일이 없어요. 한숨 돌리세요."
+  },
+  "find": {
+    "title": "검색",
+    "short": "검색",
+    "recent": "최근",
+    "placeholder": "채팅, 에이전트, 메시지 검색",
+    "actions": "작업",
+    "agents": "에이전트",
+    "conversations": "채팅",
+    "messages": "메시지",
+    "files": "파일",
+    "filter": {
+      "all": "전체"
+    },
+    "nothing": "“{{q}}”에 대한 결과가 없어요.",
+    "action": {
+      "newConversation": "새 채팅",
+      "newTask": "작업 요청",
+      "newAgent": "에이전트 만들기"
+    }
+  },
+  "channelRef": {
+    "list": "채널",
+    "a11y": "#{{name}} 채널",
+    "archivedA11y": "#{{name}} 채널, 보관됨",
+    "archived": "#{{name}}이(가) 보관됐어요",
+    "notMember": "참여하지 않은 채널"
+  },
+  "mention": {
+    "list": "사람과 에이전트",
+    "inChannel": "이 채널에 있음",
+    "outside": "채널에 없음",
+    "agent": "에이전트",
+    "person": "사람",
+    "add": "추가",
+    "addA11y": "{{name}}을(를) 채널에 추가",
+    "added": "{{name}}이(가) 채널에 참여했어요"
+  },
+  "me": {
+    "title": "나",
+    "role": {
+      "owner": "소유자",
+      "member": "멤버"
+    },
+    "appearance": "화면 모드",
+    "notifications": "알림",
+    "pushOff": "알림이 꺼져 있어요",
+    "pushOffSub": "알림을 받으려면 휴대폰 설정에서 켜 주세요.",
+    "language": "언어",
+    "start": "앱을 열 때",
+    "startHome": "대화",
+    "startLast": "마지막으로 보던 곳",
+    "startChannels": "채널",
+    "startHint": "이 워크스페이스에 적용돼요. 여기와 컴퓨터 모두에서요. 컴퓨터에서는 홈이 첫 페이지예요.",
+    "startFailed": "저장하지 못했어요. 다시 시도해 주세요.",
+    "activity": "에이전트 답변",
+    "activityShow": "답변마다 에이전트가 한 일 보기",
+    "activityHint": "사용한 도구와 걸린 시간이에요. 이 워크스페이스에서 여기와 컴퓨터 모두에 적용돼요. 작업하는 동안에는 무엇을 하는지 계속 보여요.",
+    "activityFailed": "저장하지 못했어요. 다시 시도해 주세요.",
+    "sounds": "소리",
+    "soundsOn": "앱 소리",
+    "soundsOff": "끔",
+    "soundsHint": "앱이 열려 있을 때 조용하게 들려요. 무음 모드에서는 아무 소리도 나지 않아요.",
+    "soundStyle": "스타일",
+    "soundTactile": "촉감",
+    "soundSky": "하늘",
+    "soundPixel": "픽셀",
+    "signOut": "로그아웃",
+    "signOutConfirm": "이 계정에서 로그아웃할까요?",
+    "signOutConfirmText": "다시 오려면 이메일로 다시 로그인하세요.",
+    "deleteAccount": "계정 삭제",
+    "deleteAccountHint": "나만의 모든 것과 함께 영구 삭제",
+    "accountSub": "@{{handle}} · 사진, 이름, 계정",
+    "workspaceSub_other": "{{role}} · 워크스페이스 {{count}}개",
+    "switchOrg": "전환",
+    "fromWorkspace": "워크스페이스에서",
+    "issues": "작업",
+    "issuesWithMe_other": "나와 관련된 작업 {{count}}개",
+    "drive": "Drive",
+    "connectors": "커넥터",
+    "usage": "사용량",
+    "preferences": "환경설정",
+    "editProfile": "프로필 편집",
+    "switchWorkspace": "워크스페이스 전환",
+    "yourAgents": "내 에이전트",
+    "newAgent": "새로 만들기",
+    "thinksWith": "사용하는 AI",
+    "ownOn": "{{computer}}에서 로그인됨",
+    "on": "켜짐",
+    "off": "꺼짐",
+    "notificationsPhone": "이 휴대폰의 알림",
+    "notificationsOnHint": "브라우저와 데스크톱 앱에서 알림을 켜 두었다면 그곳에도 도착해요.",
+    "notificationsOffHint": "여기서 알림을 받으려면 켜 주세요. 아래 종류는 모든 기기에 적용돼요.",
+    "notificationsKindsHint": "활동에는 모든 게 남아요. 이 설정은 이 워크스페이스의 모든 기기에 적용돼요.",
+    "version": "agentes.chat · 버전 {{version}}",
+    "workspaces": "워크스페이스",
+    "workspacesIn": "참여 중",
+    "account": {
+      "title": "계정",
+      "save": "확인",
+      "changePhoto": "사진 변경",
+      "fromLibrary": "보관함에서 선택",
+      "fromCamera": "사진 찍기",
+      "removePhoto": "사진 삭제",
+      "noCamera": "카메라에 접근할 수 없어요",
+      "photoSaved": "사진을 저장했어요",
+      "photoRemoved": "사진을 삭제했어요",
+      "photoFailed": "사진을 올리지 못했어요",
+      "photoTooBig": "사진이 너무 커요. 다른 사진을 골라 주세요.",
+      "name": "이름",
+      "namePlaceholder": "내 이름",
+      "email": "이메일",
+      "inWorkspace": "이 워크스페이스에서 · {{org}}",
+      "handle": "내 @",
+      "timezone": "시간대",
+      "timezoneHint": "프로필 카드에 표시되고 루틴과 리마인더가 실행되는 시간의 기준이 돼요.",
+      "orgZone": "워크스페이스 시간대",
+      "nameEmpty": "이름을 입력해 주세요.",
+      "handleInvalid": "@는 영문 소문자, 숫자, - 또는 _로 2~32자여야 해요.",
+      "handleTaken": "다른 사람이 쓰고 있는 @예요.",
+      "handleAgent": "에이전트가 쓰고 있는 @예요.",
+      "saved": "계정을 저장했어요"
+    },
+    "zone": {
+      "title": "시간대",
+      "search": "도시나 시간대 검색",
+      "useOrg": "워크스페이스 시간대 사용",
+      "suggested": "추천",
+      "all": "전체",
+      "none": "그런 이름의 시간대가 없어요"
+    }
+  },
+  "delete": {
+    "title": "계정 삭제",
+    "intro": "되돌릴 수 없어요.",
+    "goes": {
+      "account": "계정, 접근 권한, 세션이 모두 사라져요.",
+      "orgs": "내가 유일한 멤버인 워크스페이스는 삭제돼요.",
+      "phones": "이 휴대폰과 다른 기기에서 더 이상 알림을 받지 않아요."
+    },
+    "stays": "내가 쓴 메시지는 이름 없이 채팅에 남아요.",
+    "blocked": "{{names}}의 유일한 소유자예요. 웹사이트의 사람 메뉴에서 다른 사람을 소유자로 지정한 다음 다시 오세요.",
+    "addPasswordFirst": "먼저 웹사이트에서 계정에 비밀번호를 추가한 다음 여기에 입력하세요.",
+    "addPasswordWeb": "웹사이트에서 비밀번호 추가",
+    "otherAccount": "다른 계정으로 로그인했어요. 아무것도 삭제되지 않았어요.",
+    "hold": "길게 눌러 삭제",
+    "holding": "계속 누르고 있어요…"
+  },
+  "files": {
+    "type": {
+      "image": "이미지",
+      "pdf": "PDF",
+      "document": "문서",
+      "table": "표",
+      "code": "코드",
+      "archive": "압축 파일",
+      "diff": "코드 변경",
+      "diagram": "다이어그램",
+      "page": "페이지",
+      "text": "텍스트",
+      "file": "파일"
+    },
+    "more": "더 많은 옵션",
+    "share": "공유",
+    "savePhotos": "사진에 저장",
+    "drive": "Drive에서 보기",
+    "saved": "사진에 저장했어요",
+    "photosDenied": "사진에 접근할 수 없어요",
+    "photosDeniedSub": "사진을 저장하려면 설정에서 허용해 주세요.",
+    "shareFailed": "파일을 공유하지 못했어요.",
+    "saveFailed": "사진을 저장하지 못했어요.",
+    "loadFailed": "파일을 열지 못했어요.",
+    "openImage": "사진 열기",
+    "imageOf": "사진 {{count}}장 중 {{index}}번째",
+    "place": "{{count}}개 중 {{index}}번째",
+    "noPreview": "이 파일은 앱에서 열리지 않아요. 공유해서 다른 앱으로 열어 보세요."
+  },
+  "issues": {
+    "title": "작업",
+    "new": "새 작업",
+    "filters": "작업 필터",
+    "section": {
+      "todo": "할 일",
+      "in_progress": "진행 중",
+      "in_review": "검토 중",
+      "done": "완료",
+      "canceled": "취소됨"
+    },
+    "columnEmpty": "지금은 아무것도 없어요.",
+    "commentHere": "댓글…",
+    "state": {
+      "running": "작업 중",
+      "waiting": "내 확인 대기",
+      "stalled": "멈춤",
+      "review": "검토 중",
+      "reviewPr": "검토 중 · PR #{{number}}",
+      "progress": "진행 중",
+      "todo": "할 일",
+      "done": "완료",
+      "canceled": "취소됨"
+    },
+    "until": "마감 {{date}}",
+    "empty": "여기에는 작업이 없어요",
+    "emptyOpen": "채팅에서 요청할 수도 있어요.",
+    "loadFailed": "작업을 불러오지 못했어요.",
+    "createdBy": "{{name}}이(가) 만듦",
+    "fromMessage": "메시지에서",
+    "fromForum": "포럼에서",
+    "fromAgent": "에이전트 요청에서",
+    "fromWebhook": "{{provider}}에서",
+    "workingFor_other": "{{count}}분째 작업 중",
+    "justStarted": "방금 시작함",
+    "waitsYou": "나를 기다리고 있어요",
+    "stalledSince": "{{when}} 멈춤",
+    "criteriaOf": "{{total}}개 중 {{done}}개",
+    "linkMessage": "#{{channel}}의 메시지",
+    "linkMessagePlain": "원래 메시지",
+    "subIssues": "하위 작업",
+    "talk": "채팅",
+    "finish": "완료로 표시",
+    "reopen": "다시 열기",
+    "finished": "#{{number}} 완료",
+    "reopened": "#{{number}} 다시 열림",
+    "changed": "작업이 업데이트됐어요",
+    "moved": "#{{number}}을(를) {{column}}(으)로 옮겼어요",
+    "more": "더 많은 옵션",
+    "actions": {
+      "status": "열",
+      "priority": "우선순위",
+      "assignee": "담당자",
+      "cancel": "작업 취소",
+      "canceled": "#{{number}} 취소됨"
+    },
+    "nobody": "없음",
+    "you": "나",
+    "form": {
+      "title": "새 작업",
+      "create": "만들기",
+      "titlePlaceholder": "해야 할 일",
+      "description": "설명 (선택 사항)",
+      "who": "담당자",
+      "agentStarts": "작업을 만들면 에이전트가 바로 시작해요.",
+      "details": "세부 정보",
+      "due": "마감일",
+      "dueChoice": {
+        "none": "없음",
+        "today": "오늘",
+        "tomorrow": "내일",
+        "friday": "금요일",
+        "nextWeek": "일주일 후"
+      },
+      "created": "작업 #{{number}}을(를) 만들었어요",
+      "createFailed": "작업을 만들지 못했어요."
+    }
+  },
+  "drive": {
+    "title": "Drive",
+    "search": "Drive 검색",
+    "types": "파일 형식",
+    "type": {
+      "all": "전체",
+      "documents": "문서",
+      "images": "이미지",
+      "tables": "표",
+      "diffs": "코드 변경"
+    },
+    "section": {
+      "today": "오늘",
+      "week": "이번 주"
+    },
+    "kind": {
+      "document": "문서",
+      "table": "표",
+      "diff": "코드 변경",
+      "image": "이미지",
+      "file": "파일"
+    },
+    "by": "{{name}} · {{when}}",
+    "empty": "아직 Drive에 아무것도 없어요",
+    "emptySub": "에이전트와 사람이 채팅에서 만들거나 보낸 것이 여기에 나타나요.",
+    "noResults": "이 필터에 맞는 항목이 없어요.",
+    "loadFailed": "Drive를 불러오지 못했어요.",
+    "more": "더 보기"
+  },
+  "constellation": {
+    "openHint": "하늘에서 탭한 항목을 열어요"
+  },
+  "memory": {
+    "title": "메모리",
+    "subtitle": "에이전트가 팀에게서 배운 것들이에요.",
+    "search": "메모리 검색",
+    "all": "전체",
+    "sky": "별자리",
+    "recent": "방금 배운 것",
+    "mostUsed": "가장 많이 쓴 것",
+    "noMatch": "그런 메모리가 없어요.",
+    "emptyTitle": "아직 배운 게 없어요",
+    "empty": "에이전트가 함께 일하면서 배운 것을 여기에 남겨요.",
+    "gone": "이 메모리는 더 이상 없어요.",
+    "of": "{{name}}의 메모리",
+    "line_other": "{{name}} · {{count}}번 사용됨",
+    "agentLine_other": "메모리 {{count}}개",
+    "uses_other": "{{count}}번 사용됨",
+    "confirmed": "사람이 확인함",
+    "unconfirmed": "아직 확인되지 않음",
+    "before": "이전 내용: {{text}}",
+    "fix": "수정",
+    "forgetTitle": "이 메모리를 잊게 할까요?",
+    "forgetText": "{{name}}이(가) 앞으로 대화에서 이 내용을 쓰지 않아요."
+  },
+  "wiki": {
+    "map": "페이지 맵",
+    "mapAgent": "이번 주에 페이지를 읽은 에이전트",
+    "usedBy": "사용하는 에이전트",
+    "readsWeek_other": "이번 주 {{count}}회 읽음",
+    "empty": "새 페이지를 탭해서 첫 페이지를 써 보세요.",
+    "missing": "이 페이지는 더 이상 없거나 이름이 바뀌었어요.",
+    "blank": "빈 페이지예요.",
+    "folderGone": "이 폴더에는 이제 페이지가 없어요.",
+    "reads_other": "{{count}}회",
+    "taskConflict": "페이지가 바뀌어서 지금 최신 상태예요. 다시 확인해 주세요.",
+    "view": "보기",
+    "notSaved": "미리보기 · 아직 저장 안 됨",
+    "placeholder": "여기에 쓰세요. [[로 다른 페이지를 링크해요.",
+    "hideKeyboard": "키보드 숨기기",
+    "createLink": "“{{title}}” 만들기",
+    "discardTitle": "저장하지 않고 나갈까요?",
+    "discardText": "여기에 쓴 내용은 사라져요.",
+    "discard": "버리기",
+    "keepWriting": "계속 쓰기",
+    "conflictText": "저장된 버전이 이제 v{{version}}이에요. 차이를 보고 어느 쪽을 남길지 고르세요.",
+    "conflictDiff": "차이: 저장된 버전 → 내 버전",
+    "createAndWrite": "만들고 쓰기",
+    "exists": "같은 제목의 페이지가 이미 있어요.",
+    "openExisting": "페이지 열기"
+  },
+  "routines": {
+    "loadFailed": "루틴을 불러오지 못했어요.",
+    "anyAgent": "모든 에이전트",
+    "create": "만들기"
+  },
+  "homeNow": {
+    "working_other": "{{count}}명 작업 중",
+    "finished": {
+      "run": "“{{what}}”을(를) 마쳤어요",
+      "mission": "미션 “{{what}}”을(를) 마쳤어요",
+      "routine": "루틴 “{{what}}”을(를) 마쳤어요",
+      "plain": "작업을 마쳤어요"
+    },
+    "rowWait": {
+      "approval": "승인을 기다려요",
+      "question": "답변을 기다려요",
+      "mission": "검토를 기다려요"
+    },
+    "doingLabel": "작업 중: {{what}}",
+    "first": {
+      "subtitle": "여기에 채팅으로 나타나요.",
+      "create": "첫 에이전트 만들기",
+      "examples": "또는 이 중 하나로 시작하기"
+    }
+  },
+  "activityNow": {
+    "kind": {
+      "approval": "승인",
+      "question": "질문",
+      "forum": "내 차례",
+      "browser": "브라우저",
+      "secret": "비밀 정보",
+      "join": "멤버"
+    },
+    "review": "검토",
+    "answer": "답장",
+    "open": "열기",
+    "clear": {
+      "title": "나를 기다리는 일이 없어요",
+      "text": "에이전트가 나를 찾으면 여기에 먼저 나타나요."
+    },
+    "next": {
+      "title": "다음: {{name}}",
+      "routineOf": "{{agent}}의 루틴 · {{when}}",
+      "routine": "루틴 · {{when}}",
+      "today": "오늘 {{time}}",
+      "tomorrow": "내일 {{time}}",
+      "later": "{{day}} {{time}}"
+    }
+  },
+  "intentAgents": {
+    "waitingSection": "내 확인 대기",
+    "waitingLine": "{{title}} · 승인 필요",
+    "waitingMore_other": "{{title}} · 외 {{count}}건이 나를 기다려요",
+    "waitingLabel": "{{name}}, 승인 필요",
+    "owner": "소유자: {{name}}",
+    "ownerYou": "소유자: 나",
+    "nowWaiting": "승인 필요: {{title}}",
+    "did": {
+      "title": "나를 위해 한 일",
+      "title_female": "나를 위해 한 일",
+      "month_other": "이번 달 {{count}}건",
+      "seeAll": "모두 보기",
+      "seeLess": "간단히 보기",
+      "emptyF": "아직 없어요.",
+      "emptyM": "아직 없어요.",
+      "file": "{{title}}",
+      "approval": "{{title}}",
+      "fileKind": {
+        "document": "문서",
+        "table": "표",
+        "diff": "코드 변경",
+        "image": "이미지",
+        "file": "파일"
+      },
+      "waitingOnYou": "승인 필요",
+      "youApproved": "내가 승인함",
+      "youRefused": "내가 거절함",
+      "action": {
+        "issueCreated": "작업 #{{number}}을(를) 열었어요",
+        "issueUpdated": "작업 #{{number}}을(를) 변경했어요",
+        "issueAssigned": "작업 #{{number}}을(를) 넘겼어요",
+        "routineCreated": "루틴 {{name}}을(를) 만들었어요",
+        "routineUpdated": "루틴 {{name}}을(를) 변경했어요",
+        "agentAdded": "{{name}}을(를) #{{channel}}에 데려왔어요",
+        "pageCreated": "페이지 {{title}}을(를) 만들었어요",
+        "pageEdited": "페이지 {{title}}을(를) 편집했어요",
+        "pageEditedRestricted": "제한된 페이지를 편집했어요",
+        "threadRenamed": "스레드 이름을 {{to}}(으)로 바꿨어요",
+        "threadClosed": "스레드 {{title}}을(를) 닫았어요"
+      }
+    },
+    "knows": {
+      "title": "나에 대해 아는 것",
+      "title_female": "나에 대해 아는 것",
+      "footF": "탭해서 수정하거나 잊게 하세요.",
+      "footM": "탭해서 수정하거나 잊게 하세요.",
+      "footOwner": "{{name}} 또는 관리자만 수정할 수 있어요.",
+      "footAdmins": "관리자만 수정할 수 있어요.",
+      "emptyF": "{{name}}이(가) 아직 나에 대해 저장한 게 없어요.",
+      "emptyM": "{{name}}이(가) 아직 나에 대해 저장한 게 없어요.",
+      "saidDm": "{{when}} 1:1 채팅에서 내가 한 말",
+      "saidChannel": "#{{channel}}에서 내가 한 말 · {{date}}",
+      "saidSomewhere": "대화에서 내가 한 말 · {{date}}",
+      "wrote": "내가 작성함 · {{date}}",
+      "learned": "대화에서 배움 · {{date}}",
+      "when": {
+        "today": "오늘",
+        "yesterday": "어제",
+        "date": "{{date}}"
+      }
+    },
+    "fix": {
+      "titleF": "{{name}}이(가) 아는 것",
+      "titleM": "{{name}}이(가) 아는 것",
+      "from": "내 대화에서 · {{when}}",
+      "see": "보기",
+      "save": "저장",
+      "forget": "잊게 하기",
+      "saved": "메모리를 수정했어요",
+      "forgotten": "잊었어요"
+    },
+    "thinks": "사용하는 AI",
+    "uses": {
+      "title": "사용할 수 있는 것",
+      "title_female": "사용할 수 있는 것",
+      "level": {
+        "read": "읽기",
+        "write": "읽기 및 쓰기",
+        "some": "일부"
+      },
+      "area": {
+        "context": "메모리",
+        "drive": "Drive",
+        "issues": "작업",
+        "calendar": "캘린더",
+        "wiki": "Wiki",
+        "skills": "스킬",
+        "schedule": "루틴",
+        "forum": "포럼",
+        "sandbox": "전용 컴퓨터",
+        "browser": "브라우저",
+        "setup": "워크스페이스 설정",
+        "desktop": "컴퓨터 화면"
+      },
+      "asksYou": "머지와 게시는 어떤 수준에서든 항상 내 승인을 받아요.",
+      "asksOwner": "머지와 게시는 어떤 수준에서든 항상 {{name}}의 승인을 받아요.",
+      "asksAdmins": "머지와 게시는 어떤 수준에서든 항상 관리자의 승인을 받아요.",
+      "empty": "지금은 대화만 할 수 있어요."
+    }
+  },
+  "outage": {
+    "a11y": "컴퓨터 연결 끊김",
+    "title": "{{computer}} 연결 끊김",
+    "back": "{{computer}}이(가) 다시 연결됐어요",
+    "whoOne": "{{name}}이(가) 기다리고 있어요",
+    "whoMany": "{{names}}이(가) 기다리고 있어요",
+    "tasks_other": "작업 {{count}}개",
+    "switch": "컴퓨터 전환",
+    "dismiss": "알림 닫기",
+    "rowWaiting": "{{computer}} 대기 중",
+    "rowWaitingLabel": "{{name}}, {{computer}} 대기 중",
+    "waiting": {
+      "routines_other": "루틴 {{count}}개 대기 중",
+      "conversations_other": "대화 {{count}}개 대기 중",
+      "tasks_other": "작업 {{count}}개 대기 중",
+      "none": "대기 중인 항목 없음"
+    },
+    "sheet": {
+      "title": "컴퓨터 전환",
+      "descOne": "이제부터 {{names}}이(가) 일할 곳을 고르세요.",
+      "descMany": "이제부터 {{names}}이(가) 일할 곳을 고르세요.",
+      "where": "옮길 곳",
+      "who": "옮길 에이전트",
+      "hint": "{{computer}}에서 이미 파일을 바꾼 작업은 그 컴퓨터를 기다려요.",
+      "submit_other": "에이전트 {{count}}명 전환",
+      "later": "나중에",
+      "on": "켜짐",
+      "cloudTag": "항상 켜짐",
+      "managedDesc": "이 워크스페이스 전용 · 에이전트마다 사용자 한 명",
+      "has": "{{brains}} 있음",
+      "none": "지금은 이 에이전트를 맡을 다른 컴퓨터가 없어요. 웹사이트에서 연결해 주세요.",
+      "gone": "{{computer}}이(가) 다시 연결됐어요. 전환할 필요가 없어요.",
+      "reason": {
+        "offline": "연결 끊김",
+        "paused": "일시 중지됨",
+        "missing_brain": "{{brain}} 없음",
+        "exec_off": "명령 실행을 허용하지 않음",
+        "runner_old": "업데이트 필요",
+        "outdated": "업데이트 필요",
+        "tool_off": "{{brain}}이(가) 꺼져 있음",
+        "not_installed": "{{brain}}이(가) 설치되지 않음",
+        "other": "지금은 사용할 수 없음"
+      }
+    },
+    "result": {
+      "done_other": "에이전트 {{count}}명이 컴퓨터를 전환했어요",
+      "none": "아무도 컴퓨터를 전환하지 않았어요",
+      "resumed_other": "작업 {{count}}개가 이미 이어서 진행됐어요",
+      "still_other": "작업 {{count}}개가 {{computer}}을(를) 기다려요",
+      "skipped_other": "에이전트 {{count}}명이 전환하지 못했어요"
+    },
+    "error": {
+      "target_offline": "그 컴퓨터는 연결이 끊겼어요. 다른 컴퓨터를 고르세요.",
+      "target_not_found": "그 컴퓨터는 더 이상 연결되어 있지 않아요. 다른 컴퓨터를 고르세요.",
+      "target_same": "{{computer}}이(가) 아닌 다른 컴퓨터를 고르세요.",
+      "target_paused": "그 컴퓨터는 일시 중지됐어요. 다른 컴퓨터를 고르세요.",
+      "not_found": "{{computer}}이(가) 더 이상 컴퓨터 목록에 없어요."
+    },
+    "card": {
+      "waiting": "{{computer}}이(가) 돌아오기를 기다리는 중",
+      "body": "{{brain}}이(가) 그 컴퓨터에서 실행돼요. 돌아오는 대로 여기서부터 이어 갈게요",
+      "back": "{{computer}}이(가) 다시 연결됐어요",
+      "backSome": "컴퓨터가 다시 연결됐어요",
+      "backBody": "기다리던 작업을 이어 가요.",
+      "moved": "컴퓨터를 전환했어요",
+      "movedBody": "{{computer}}을(를) 기다리던 작업은 새 컴퓨터에서 이어서 진행돼요."
+    },
+    "titleCloud": "{{computer}}이(가) 응답하지 않아요",
+    "a11yCloud": "컴퓨터 응답 없음",
+    "cloudSub": "확인하고 있어요"
+  },
+  "browser": {
+    "card": {
+      "needs": "{{name}}이(가) 도움이 필요해요",
+      "needsFor": "{{name}}이(가) 도움이 필요해요 · {{time}}",
+      "inControlAt": "내가 제어 중 · {{host}}",
+      "doing": "{{name}} · {{doing}}",
+      "startingF": "{{name}}의 브라우저를 여는 중…",
+      "startingM": "{{name}}의 브라우저를 여는 중…",
+      "stopAskF": "{{name}}의 브라우저를 닫을까요?",
+      "stopAskM": "{{name}}의 브라우저를 닫을까요?",
+      "whereF": "{{name}}의 브라우저에서",
+      "whereM": "{{name}}의 브라우저에서",
+      "open": "열기",
+      "expandHint": "탭해서 펼치기",
+      "stop": "중지",
+      "giveUp": "포기",
+      "done": "완료: {{title}}",
+      "failed": "하지 못함: {{title}}",
+      "failedNote": "하지 못함: {{note}}",
+      "expired": "아무도 제때 열지 않았어요: {{title}}",
+      "cancelled": "취소됨: {{title}}",
+      "withdrawn": "{{name}}에게 더 이상 필요하지 않아요: {{title}}"
+    },
+    "live": {
+      "inControl": "내가 제어 중",
+      "helping": "{{name}}이(가) 제어 중",
+      "watchOnly": "{{name}}이(가) 제어 중이에요. 나는 보기만 해요.",
+      "takeOver": "제어하기",
+      "done": "완료",
+      "handBack": "돌려주기",
+      "couldnt": "하지 못했어요",
+      "typeHere": "여기에 입력",
+      "typeMarked": "표시된 칸에 입력",
+      "typeMarkedSecret": "표시된 칸의 비밀번호",
+      "keys": "키",
+      "secureOn": "텍스트 보기",
+      "secureOff": "텍스트 숨기기 (비밀번호)",
+      "send": "보내기",
+      "password": "비밀번호",
+      "page": "브라우저 페이지예요. 탭하면 클릭돼요.",
+      "graceF": "나가면 {{name}}이(가) 2분 동안 기다려요.",
+      "graceM": "나가면 {{name}}이(가) 2분 동안 기다려요.",
+      "closedHelpF": "로그인 정보는 다음을 위해 저장돼요.",
+      "closedHelpM": "로그인 정보는 다음을 위해 저장돼요.",
+      "stuckHelpF": "다시 시도하면 브라우저가 다시 시작돼요. 로그인 정보는 저장돼요.",
+      "stuckHelpM": "다시 시도하면 브라우저가 다시 시작돼요. 로그인 정보는 저장돼요.",
+      "hidden": "{{name}}이(가) 제어 중 · 화면 숨김",
+      "key": {
+        "Tab": "Tab",
+        "Enter": "Enter",
+        "Backspace": "삭제",
+        "Escape": "Esc"
+      },
+      "unavailable": {
+        "reconnectingF": "다시 연결하는 중…",
+        "reconnectingM": "다시 연결하는 중…",
+        "offlineF": "{{name}}의 컴퓨터가 오프라인이에요.",
+        "offlineM": "{{name}}의 컴퓨터가 오프라인이에요.",
+        "no_computerF": "{{name}}에게 컴퓨터가 없어요.",
+        "no_computerM": "{{name}}에게 컴퓨터가 없어요.",
+        "unavailableF": "지금은 {{name}}의 브라우저를 쓸 수 없어요.",
+        "unavailableM": "지금은 {{name}}의 브라우저를 쓸 수 없어요.",
+        "endedF": "{{name}}의 브라우저가 닫혔어요.",
+        "endedM": "{{name}}의 브라우저가 닫혔어요.",
+        "forbiddenF": "이 브라우저는 볼 수 없어요.",
+        "forbiddenM": "이 브라우저는 볼 수 없어요.",
+        "closedF": "{{name}}의 브라우저가 닫혀 있어요.",
+        "closedM": "{{name}}의 브라우저가 닫혀 있어요.",
+        "offlineCloudF": "지금은 {{name}}의 컴퓨터가 응답하지 않아요.",
+        "offlineCloudM": "지금은 {{name}}의 컴퓨터가 응답하지 않아요.",
+        "stuckF": "{{name}}의 브라우저를 열지 못했어요.",
+        "stuckM": "{{name}}의 브라우저를 열지 못했어요.",
+        "tooManyF": "한 번에 열린 브라우저가 너무 많아요. 다른 브라우저가 닫히면 이 브라우저가 나타나요.",
+        "tooManyM": "한 번에 열린 브라우저가 너무 많아요. 다른 브라우저가 닫히면 이 브라우저가 나타나요."
+      }
+    },
+    "done": {
+      "title": "더 남길 말이 있나요?",
+      "introF": "선택 사항이에요. {{name}}이(가) 이어 가기 전에 읽어요.",
+      "introM": "선택 사항이에요. {{name}}이(가) 이어 가기 전에 읽어요.",
+      "placeholder": "예: 테스트 계정으로 로그인했어요"
+    },
+    "failed": {
+      "title": "무슨 일이 있었나요?",
+      "introF": "{{name}}이(가) 읽고 어떻게 할지 정해요.",
+      "introM": "{{name}}이(가) 읽고 어떻게 할지 정해요.",
+      "placeholder": "몇 마디 (선택 사항)",
+      "send": "보내기",
+      "reason": {
+        "code": "없는 코드를 요구했어요",
+        "password": "비밀번호를 몰라요",
+        "blocked": "사이트가 막았어요"
+      }
+    }
+  },
+  "connectors": {
+    "title": "커넥터",
+    "search": "서비스 검색",
+    "connected": "연결됨",
+    "address": "주소",
+    "byAddress": "주소로 연결",
+    "suggested": "{{org}}에 추천",
+    "all": "전체",
+    "empty": "아직 에이전트가 사용하는 서비스가 없어요",
+    "emptySub": "서비스를 연결하면 에이전트가 그 안에서 읽고 일하기 시작해요.",
+    "noResults": "그런 이름의 서비스가 없어요. 주소로 시도해 보세요.",
+    "soon": "곧 지원",
+    "loadFailed": "커넥터를 불러오지 못했어요.",
+    "connectedCheck": "{{name}}, 연결됨",
+    "adminsOnly": "{{org}}의 관리자만 서비스를 연결할 수 있어요. 관리자에게 요청하세요.",
+    "canTitle": "에이전트가 할 수 있는 일",
+    "asks": "{{text}} · 승인을 요청해요",
+    "connect": "연결",
+    "signIn": "{{name}}에 로그인",
+    "useKey": "키 사용",
+    "useSignIn": "브라우저에서 로그인",
+    "keyLabel": "{{name}} 키",
+    "keyHelp": "암호화해서 저장해요. 나도 에이전트도 다시 볼 수 없어요.",
+    "keyShort": "키가 너무 짧은 것 같아요.",
+    "paste": "붙여넣기",
+    "addressTitle": "주소로 연결",
+    "addressHelp": "서비스의 MCP 서버 주소예요(https://로 시작).",
+    "addressLabel": "주소",
+    "addressInvalid": "https:// 주소를 사용하세요.",
+    "needsKey": "이 서버는 키가 필요해요.",
+    "working": "연결하는 중…",
+    "failed": "연결하지 못했어요. 다시 시도해 주세요.",
+    "refused": "{{name}}이(가) 승인하지 않았어요. 아무것도 연결되지 않았어요.",
+    "connectedTitle": "{{name}} 연결됨",
+    "connectedSub": "이제 에이전트가 스스로 할 수 있는 일을 확인하세요.",
+    "connectedDone": "서비스가 연결됐어요.",
+    "levelFailed": "{{name}}의 접근 권한을 바꾸지 못했어요. 다시 시도해 주세요.",
+    "everyoneFailed": "모두의 접근 권한을 바꾸지 못했어요. 다시 시도해 주세요.",
+    "disconnectFailed": "{{name}} 연결을 해제하지 못했어요. 다시 시도해 주세요.",
+    "needsReconnect": "{{name}} 계정이 작동하지 않아요. 누군가 다시 연결할 때까지 에이전트가 쓸 수 없어요.",
+    "accountTitle": "이 계정",
+    "renameFailed": "이름을 바꾸지 못했어요. 다시 시도해 주세요.",
+    "whoTitle": "누가 어디까지 쓰는지",
+    "level": {
+      "none": "사용 안 함",
+      "read": "보기만 함",
+      "write": "변경 가능",
+      "custom": "직접 설정"
+    },
+    "safe": "삭제, 게시, 고객 응대는 항상 내 승인을 받아요.",
+    "done": "완료",
+    "step": "{{total}}단계 중 {{n}}단계: {{label}}",
+    "disconnect": "연결 해제",
+    "disconnected": "{{name}} 연결을 해제했어요.",
+    "usedBy_other": "{{names}}이(가) 사용 중",
+    "fromAgent": "서비스 연결",
+    "review": {
+      "stepAbout": "할 수 있는 일",
+      "saving": "저장하는 중…",
+      "saveFailed": "{{name}}의 도구를 저장하지 못했어요. 다시 시도해 주세요.",
+      "refreshing": "찾는 중…",
+      "refreshFailed": "도구를 다시 찾지 못했어요. 다시 시도해 주세요.",
+      "waiting": "에이전트가 쓰기 전에 관리자가 이 서버의 도구를 검토해야 해요."
+    }
+  },
+  "invite": {
+    "invitedBy": "{{name}}님이 {{org}}에 초대했어요",
+    "invited": "{{org}}에 초대받았어요",
+    "joinAs": "{{role}}(으)로 참여해요.",
+    "apple": "Apple로 계속하기",
+    "signIn": "로그인하고 수락하기",
+    "accept": "{{org}} 참여하기",
+    "wrongAccount": "이 초대는 {{email}}에게 보낸 거예요.",
+    "otherAccount": "다른 계정 사용",
+    "failed": "초대를 수락하지 못했어요. 다시 시도해 주세요.",
+    "join": {
+      "skip": "건너뛰기",
+      "sharedBy": "{{name}}님이 이 링크를 공유했어요",
+      "waitLead": "관리자가 승인하면 바로 참여돼요. 앱을 닫아도 돼요. 이메일로 알려 드릴게요.",
+      "passwordLead": "비밀번호만 입력하면 바로 참여돼요."
+    }
+  },
+  "joinRequests": {
+    "share": "링크 공유",
+    "roles": "역할",
+    "rolesHint": "켜진 역할로 참여해요. 아무것도 없으면 모든 사람이 할 수 있는 일만 할 수 있어요."
+  },
+  "humanCheck": {
+    "title": "간단한 확인",
+    "blocked": "확인 화면이 열리지 않았어요. 다른 네트워크로 시도해 보세요."
+  },
+  "invitePeople": {
+    "emailsHelp": "목록을 붙여넣거나 입력하세요. 한 사람씩 이메일을 받고 바로 참여해요.",
+    "here": "이미 참여 중",
+    "invited": "이미 초대됨",
+    "fix": "확인 필요",
+    "channels": "채널",
+    "optional": "선택 사항",
+    "ok": "확인",
+    "noteHelp": "내 이름과 함께 이메일에 표시돼요. 최대 {{max}}자예요.",
+    "roleHelp": "참여할 때 받는 권한이 달라져요.",
+    "remove": "목록에서 빼기",
+    "sendAgain": "다시 보내기",
+    "cancelTitle": "{{email}}에게 보낸 초대를 취소할까요?",
+    "cancelText": "초대 링크가 더 이상 열리지 않아요.",
+    "send": "보내기"
+  },
+  "members": {
+    "waiting_other": "{{count}}명 대기 중"
+  },
+  "reset": {
+    "title": "새 비밀번호 설정",
+    "save": "저장하고 로그인",
+    "done": "비밀번호를 바꿨어요.",
+    "expired": "만료된 링크예요",
+    "expiredLead": "비밀번호 링크는 1시간 동안만 유효해요.",
+    "toSignIn": "로그인하러 가기"
+  },
+  "entering": {
+    "title": "{{org}}에 들어가는 중…",
+    "titleNew": "들어가는 중…",
+    "lead": "대화를 불러오고 있어요."
+  },
+  "splash": {
+    "slow": "연결하는 중…",
+    "offline": "연결되어 있지 않아요. 다시 시도하는 중이에요."
+  },
+  "onb": {
+    "progress": "{{total}}단계 중 {{n}}단계",
+    "done": "완료",
+    "optional": "선택 사항",
+    "back": "뒤로",
+    "logo": "로고",
+    "logoHelp": "선택 사항이에요.",
+    "logoPick": "선택",
+    "zone": "시간대: {{zone}}",
+    "importSources": "에이전트를 가져올 곳",
+    "importLead": "웹의 설정 › 가져오기 및 내보내기에서 가져오세요.",
+    "importSkip": "없어요, 건너뛰기",
+    "agentsAda": "저는 이미 여기 있어요",
+    "agentsLead": "또 누가 참여하는지 확인하세요.",
+    "share": "초대 링크 공유",
+    "shareMessage": "agentes.chat에서 {{org}}에 참여하세요: {{url}}",
+    "shareNote": "참여를 요청하는 사람은 한 명씩 내가 승인해요.",
+    "emailsPlaceholder": "name@company.com",
+    "membersNote": "멤버로 참여해요.",
+    "invalidEmail": "이 이메일을 확인해 주세요.",
+    "invitesFailed": "이 초대를 보내지 못했어요. 다시 시도해 주세요.",
+    "removeEmail": "{{email}} 삭제",
+    "later": "나중에",
+    "failed": "저장하지 못했어요. 다시 시도해 주세요."
+  },
+  "ai": {
+    "yourPlan": "내 AI 요금제",
+    "coding": "코딩 요금제",
+    "codingSub": "GLM, Kimi, MiniMax 또는 OpenCode",
+    "plansFoot": "에이전트가 내 요금제로 생각해요. API 키는 필요 없어요. 에이전트의 컴퓨터에서 로그인해요.",
+    "whichPlan": "어떤 요금제인가요",
+    "codingFoot": "코딩 요금제는 자체 키로 에이전트의 컴퓨터에서 로그인해요.",
+    "change": "변경",
+    "how": "연결 방법",
+    "whose": "누구의 키인가요",
+    "meanwhile": "그동안에는 에이전트가 API 키로 생각할 수 있어요.",
+    "failed": "이 키를 저장하지 못했어요. 키가 맞는지 확인하고 다시 시도해 주세요.",
+    "save": "키 저장",
+    "saving": "저장하는 중…",
+    "row": "AI 계정",
+    "rowNone": "없음",
+    "rowPlans_other": "요금제 {{count}}개",
+    "rowKeys_other": "키 {{count}}개",
+    "taskNoAi": "{{name}}에게 아직 AI가 없어요. AI가 연결될 때까지 작업이 기다려요.",
+    "connect": "AI 연결",
+    "moveHere": "여기로 옮기기",
+    "audience": "답할 대상",
+    "audience_female": "답할 대상",
+    "another": "다른 AI"
+  },
+  "crash": {
+    "title": "이 화면에서 문제가 생겼어요",
+    "subtitle": "이 화면을 보여 주다가 앱에서 오류가 났어요. 다시 시도해 주세요. 계속 그러면 아래 텍스트를 보내 주세요.",
+    "retry": "다시 시도"
+  },
+  "notFound": {
+    "title": "찾을 수 없어요",
+    "subtitle": "링크가 바뀌었거나 볼 수 없는 항목이에요.",
+    "home": "채팅으로 가기"
+  },
+  "settings": {
+    "edit": "워크스페이스 편집",
+    "access": {
+      "how": "행을 탭해서 수준을 바꾸세요: 접근 불가, 읽기, 읽기 및 쓰기."
+    },
+    "logo": {
+      "failed": "로고를 올리지 못했어요",
+      "tooBig": "이미지가 너무 커요. 다른 이미지를 골라 주세요."
+    },
+    "machine": {
+      "toolsHow": "켜진 도구를 탭하면 꺼져요. 다시 켜는 건 그 컴퓨터에서만 할 수 있어요."
+    },
+    "import": {
+      "preparing": "파일을 준비하는 중…",
+      "failed": "파일을 다운로드하지 못했어요. 다시 시도해 주세요."
+    }
+  },
+  "status": {
+    "title": "상태",
+    "doing": "지금 하는 일",
+    "placeholder": "회의 중, 점심 중…",
+    "noEmoji": "이모지 없음",
+    "cleared": "상태를 지웠어요",
+    "bySelfUntil": "{{name}} 작성 · {{when}}"
+  }
+}
