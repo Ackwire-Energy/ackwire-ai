@@ -1,12 +1,12 @@
-import { and, type Database, eq, gt, inArray, schema, sql } from "@agenteschat/db";
-import { approverIds } from "./approvals";
+import { and, eq, gt, schema, sql } from "@agenteschat/db";
+import { approverIds, namesLabel, namesOf } from "./approvals";
 import { findMember, plainName } from "./chat-tools";
 import { cutText } from "./format";
 import { MISSION_TOOL_RATES } from "./missions";
 import { maySql } from "./permissions";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
-const { agents, approvals, organizationMemberRoles, organizationMembers, orgRoles, users } = schema;
+const { agents, approvals, organizationMemberRoles, organizationMembers, orgRoles } = schema;
 
 export const REQUEST_APPROVAL_TOOL = "request_approval";
 
@@ -17,17 +17,6 @@ const PEOPLE_MAX = 10;
 const REQUESTS_PER_HOUR = MISSION_TOOL_RATES.request_approval ?? 5;
 
 type Resolved = { ok: true; approvers: schema.ApprovalApprovers } | { ok: false; message: string };
-
-/** People's names as a card says who decides: "Ana, Bruno e Caio" is the app's; here "Ana, Bruno, Caio +2". */
-const namesLabel = (names: string[]) =>
-  names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : names.join(", ");
-
-async function namesOf(db: Database, ids: string[]) {
-  if (ids.length === 0) return [];
-  const rows = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids));
-  const byId = new Map(rows.map((r) => [r.id, r.name]));
-  return ids.map((id) => byId.get(id)).filter((n): n is string => !!n);
-}
 
 /**
  * Who decides a `request_approval` (ADR 0126): the role and the people the agent named (the role by its name, a

@@ -64,6 +64,7 @@ export class ModelBrain implements Brain {
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema,
+      ...(t.stable ? { stable: true } : {}),
     }));
     const deltas = eventQueue<BrainEvent>();
     const call = gateway
@@ -78,6 +79,8 @@ export class ModelBrain implements Brain {
         tools: specs.length > 0 ? specs : undefined,
         // Only "Automático" sets an effort for the API; the API takes low, medium and high.
         ...(turn.effort ? { effort: apiEffort(turn.effort) } : {}),
+        // The prompt up to the conversation stays cached for an hour: a message after a pause reads it.
+        cacheTtl: "1h",
         onDelta: (text) => deltas.push({ type: "text_delta", text }),
         signal: io.signal,
       })

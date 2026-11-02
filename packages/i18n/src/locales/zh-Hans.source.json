@@ -7136,6 +7136,9 @@
   "agent.runNoText": {
     "value": "No text"
   },
+  "agent.runPrivate": {
+    "value": "In a conversation you're not in"
+  },
   "agent.runTokens": {
     "value": "{{input}} in · {{cached}} cached · {{output}} out"
   },
@@ -21859,6 +21862,9 @@
   },
   "toolReview.noTools": {
     "value": "The server didn't offer any tools."
+  },
+  "toolReview.unreadable": {
+    "value": "Couldn't read the connector's tools: {{reason}}"
   },
   "toolReview.refresh": {
     "value": "Look for new tools"

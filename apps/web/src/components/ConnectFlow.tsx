@@ -523,7 +523,11 @@ function ToolsStep({
           </Field>
         )}
         <div className="cflow__lead">
-          <p className="muted cflow__text">{t("toolReview.lead", { count: tools.length, name })}</p>
+          {server.toolsError ? (
+            <Alert>{t("toolReview.unreadable", { reason: server.toolsError })}</Alert>
+          ) : (
+            <p className="muted cflow__text">{t("toolReview.lead", { count: tools.length, name })}</p>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -532,11 +536,13 @@ function ToolsStep({
             loading={refresh.isPending}
             onClick={() => refresh.mutate(server.id, { onSuccess: (fresh) => setServer(fresh) })}
           >
-            {t("toolReview.refresh")}
+            {server.toolsError ? t("common.retry") : t("toolReview.refresh")}
           </Button>
         </div>
         {tools.length === 0 ? (
-          <p className="muted">{t("toolReview.noTools")}</p>
+          server.toolsError ? null : (
+            <p className="muted">{t("toolReview.noTools")}</p>
+          )
         ) : (
           <ToolReview name={name} tools={tools} state={state} onChange={setState} onMoved={(m) => toast.show(m)} />
         )}

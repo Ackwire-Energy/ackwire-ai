@@ -393,7 +393,19 @@ export function accountSettingsEnv(
   };
   for (const k of CLOUD_ENV) env[k] = own ? (runner[k] ?? "") : "";
   for (const k of NETWORK_ENV) env[k] = runner[k] ?? "";
-  if (!plan) return env;
+  if (!plan) {
+    // The computer's own API key on Anthropic's API: its conversation stays cached for an hour between messages, as a
+    // subscription's does by default (Claude Code 2.1.242 and later read it), unless its owner chose a TTL.
+    const ownKey =
+      own &&
+      Boolean(runner.ANTHROPIC_API_KEY) &&
+      env.ANTHROPIC_BASE_URL === API_ANTHROPIC &&
+      CLOUD_ENV.every((k) => !runner[k]) &&
+      !runner.CLAUDE_CODE_PROMPT_CACHE_TTL &&
+      !runner.FORCE_PROMPT_CACHING_5M;
+    if (ownKey) env.CLAUDE_CODE_PROMPT_CACHE_TTL = "1h";
+    return env;
+  }
   for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
   // A subagent called with Claude Code's `fable` alias would otherwise ask the plan for a Claude model it doesn't serve.
   env.ANTHROPIC_DEFAULT_FABLE_MODEL = planModel(plan, "opus").id;

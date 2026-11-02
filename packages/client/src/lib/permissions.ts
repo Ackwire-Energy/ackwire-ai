@@ -38,19 +38,22 @@ export const can = (org: { permissions?: readonly string[] } | null | undefined,
 
 type Membership = Parameters<typeof can>[0];
 
-/** Who manages a channel (its name, members and category): its creator, or who may manage every channel. */
+/**
+ * Who manages a channel (its name, members and category): who may manage every channel, or its creator while still in
+ * it. Mirrors the server's `managesChannel` (packages/engine/src/channels.ts).
+ */
 export const managesChannel = (
-  channel: { createdByUserId?: string | null } | null | undefined,
+  channel: { isMember?: boolean; createdByUserId?: string | null } | null | undefined,
   meId: string | null | undefined,
   org: Membership,
-) => can(org, "manage_channels") || (!!meId && channel?.createdByUserId === meId);
+) => can(org, "manage_channels") || (!!meId && channel?.isMember === true && channel.createdByUserId === meId);
 
 /**
  * Who picks how an agent replies in a channel: who manages the channel, or the agent's owner. Mirrors the server's
  * `setChannelAgentAutoReply` (packages/engine/src/channels.ts).
  */
 export const setsAutoReply = (
-  channel: { createdByUserId?: string | null } | null | undefined,
+  channel: { isMember?: boolean; createdByUserId?: string | null } | null | undefined,
   agent: { ownerUserId?: string | null } | null | undefined,
   meId: string | null | undefined,
   org: Membership,
@@ -66,3 +69,28 @@ export const addsAgentsTo = (
   meId: string | null | undefined,
   org: Membership,
 ) => (channel?.isMember === true && can(org, "post")) || managesChannel(channel, meId, org);
+
+/** Mirrors the server's `UNDO_WINDOW_MS` (packages/engine/src/agent-actions.ts). */
+export const UNDO_WINDOW_MS = 5 * 60_000;
+
+/** Who may edit what an agent remembers: who reviews memory, or the agent's owner (the server's `requireEdit`). */
+export const editsMemory = (
+  agent: { ownerUserId?: string | null } | null | undefined,
+  meId: string | null | undefined,
+  org: Membership,
+) => can(org, "review_memory") || (!!meId && agent?.ownerUserId === meId);
+
+/**
+ * Who may undo a memory change from its chat card: who may edit the agent's memory, or the person who asked for the
+ * change while the undo window is open (`sentAt` absent: just now). Mirrors the server's `revertMemoryChange`.
+ */
+export const undoesMemoryChange = (
+  update: { requestedByUserId?: string | null },
+  agent: { ownerUserId?: string | null } | null | undefined,
+  meId: string | null | undefined,
+  org: Membership,
+  sentAt?: string | null,
+  now = Date.now(),
+) =>
+  editsMemory(agent, meId, org) ||
+  (!!meId && update.requestedByUserId === meId && (!sentAt || now - new Date(sentAt).getTime() < UNDO_WINDOW_MS));

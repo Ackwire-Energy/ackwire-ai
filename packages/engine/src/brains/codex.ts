@@ -10,6 +10,7 @@ import {
   parseBrainEvent,
   STEER_PROTOCOL,
 } from "@agenteschat/adapters";
+import type { CodeSetup } from "../git/machine";
 import type { MachineCaller } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
@@ -86,7 +87,7 @@ export interface CodexBrainDeps {
   /** The agent's folder scope on the machine (id + handle). */
   agent?(turn: BrainTurn): Promise<AgentScope | undefined>;
   /** Before a chat turn: the agent's checkouts updated, where it starts and the "# Your code" block (`prepareAgentCode`). */
-  prepare?(turn: BrainTurn, signal: AbortSignal): Promise<{ cwd: string; prompt: string } | null>;
+  prepare?(turn: BrainTurn, signal: AbortSignal): Promise<CodeSetup | null>;
   /** The turn's permission profile (missions: their own; other runs: `work`, ADR 0109). */
   permissions?(turn: BrainTurn): Promise<BrainTurnRequest["permissions"] | undefined>;
   /** False for a background run: the runner keeps no Codex process for it after the turn. */
@@ -264,7 +265,7 @@ export class CodexBrain implements Brain {
     const [mcp, agent, code] = await Promise.all([
       this.deps.mcp(turn),
       this.deps.agent?.(turn),
-      checkouts ? this.deps.prepare?.(turn, io.signal).catch(() => null) : null,
+      checkouts ? (turn.code ?? this.deps.prepare?.(turn, io.signal))?.catch(() => null) : null,
     ]);
     // A kept-alive Codex lists our tools once, as its thread opens: the runner starts it again when a name is new.
     const toolNames = turn.tools.map((t) => t.name).sort();
@@ -275,7 +276,7 @@ export class CodexBrain implements Brain {
       cwd: code?.cwd || session.cwd,
       ...(turn.model ? { model: turn.model } : {}),
       system: code?.prompt ? `${turn.system}\n\n${code.prompt}` : turn.system,
-      prompt: computerPrompt(turn),
+      prompt: computerPrompt(turn, code?.start),
       mcp: { ...mcp, tools: toolNames.join(" ") },
       ...(agent ? { agent } : {}),
       ...accountFields(status.protocol, turn),

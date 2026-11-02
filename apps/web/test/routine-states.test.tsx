@@ -6,6 +6,7 @@ setupDom();
 import type { ApiClient, Routine, RoutineRun } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { clockAt } from "@agenteschat/client/lib/format";
 import { RUN_CODES, runOutcome } from "@agenteschat/client/lib/routine-view";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { TFunction } from "i18next";
@@ -179,7 +180,7 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
 
   test("paused near its plan's limit: until when, quietly; Continuar agora for its people, greyed with the reason for others", async () => {
     const resetsAt = new Date(Date.now() + 2 * 3_600_000).toISOString();
-    const clock = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(resetsAt));
+    const clock = clockAt("pt-BR", resetsAt);
     const paused = (over: Partial<Routine> & Pick<Routine, "id" | "name">) =>
       routine({
         state: "usage_paused",
@@ -234,7 +235,7 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
 
   test("waiting at the plan's own limit: which plan and when it runs, no Continuar agora, and Não rodar cancels it", async () => {
     const resetsAt = new Date(Date.now() + 25 * 60_000).toISOString();
-    const clock = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(resetsAt));
+    const clock = clockAt("pt-BR", resetsAt);
     const { calls } = await open([
       routine({
         id: "rt-limit",

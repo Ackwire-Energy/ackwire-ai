@@ -108,7 +108,7 @@ function Who({ face, name, sub }: { face: ReactNode; name: string; sub: ReactNod
 /** A row's state, as an icon and words ("Expira em 5 dias", "Pediu pelo link há 3 h"). */
 function State({ icon, tone, children }: { icon: IconName; tone?: "soon" | "ok"; children: ReactNode }) {
   return (
-    <span className="members-row__state" data-tone={tone}>
+    <span className="members-row__state ac-iconline" data-tone={tone}>
       <Icon name={icon} size={14} />
       <span>{children}</span>
     </span>
@@ -504,7 +504,11 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
                   <Who face={<Avatar size="md" name={r.name} />} name={r.name} sub={r.email} />
                   <State icon={by ? "person" : "link"}>{how}</State>
                   {/* Nobody proved the address: approving can't let them in at once (ADR 0072). */}
-                  {!r.verified && !by && <Chip icon="mail">{t("members.requests.unverified")}</Chip>}
+                  {!r.verified && !by && (
+                    <span className="members-row__flag">
+                      <Chip icon="mail">{t("members.requests.unverified")}</Chip>
+                    </span>
+                  )}
                   <span className="members-row__acts">
                     <RolesPicker
                       size="sm"
