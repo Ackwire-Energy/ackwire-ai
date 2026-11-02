@@ -535,7 +535,9 @@
     "copied": "Copiado",
     "retry": "Reintentar",
     "openTailscale": "Abrir Tailscale",
-    "otherServer": "Usar otro servidor"
+    "otherServer": "Usar otro servidor",
+    "stuck": "agentes.chat no se abrió. Vuelve a intentarlo o mira la página tal como está.",
+    "showAnyway": "Mostrarla igualmente"
   },
   "menu": {
     "about": "Acerca de agentes.chat",
