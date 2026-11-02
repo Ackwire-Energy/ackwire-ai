@@ -21,12 +21,13 @@ import { cutText } from "../format";
 import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
 import { personWords, runReadOutsideById, UNASKED_DESTINATION, unaskedDestination } from "../outside";
-import { personBehindCall } from "../requester";
+import { personBehindCall, wikiActorOfCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { untrustedBlock } from "../untrusted";
+import { wikiHitsForAgent } from "../wiki";
 import {
   type ConsolidateResult,
   type ContextItem,
@@ -94,13 +95,18 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const channels = await visible(ctx);
         const kinds = Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined;
         const [hits, steps] = await Promise.all([
-          searchVisible(deps, {
-            orgId: ctx.orgId,
-            text: str(input.query),
-            visibleChannelIds: channels,
-            kinds,
-            limit: typeof input.limit === "number" ? input.limit : 8,
-          }),
+          (async () =>
+            wikiHitsForAgent(
+              ctx.db,
+              await wikiActorOfCall(ctx),
+              await searchVisible(deps, {
+                orgId: ctx.orgId,
+                text: str(input.query),
+                visibleChannelIds: channels,
+                kinds,
+                limit: typeof input.limit === "number" ? input.limit : 8,
+              }),
+            ))(),
           kinds ? [] : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, channels, str(input.query)),
         ]);
         if (hits.length === 0 && steps.length === 0) return { content: "No results." };

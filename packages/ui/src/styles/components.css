@@ -8779,3 +8779,65 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
 }
+
+/* Who has access to something (AccessDialog): a search that adds, then one row per person, role or agent. */
+.ac-access {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ac-access__note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--card-well);
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ac-access__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 6px 0;
+}
+.ac-access__row + .ac-access__row {
+  border-top: 1px solid var(--line);
+}
+/* One width for every mark, so the names line up whatever leads them. */
+.ac-access__lead {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 32px;
+  margin-right: 4px;
+}
+.ac-access__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 20px;
+}
+.ac-access__name {
+  font-weight: 600;
+}
+.ac-access__detail {
+  color: var(--ink2);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.ac-access__row .ac-select {
+  flex: none;
+  width: 132px;
+}
+.ac-access__remove {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 32px;
+}
+.ac-access__start {
+  margin-right: auto;
+}

@@ -1,6 +1,6 @@
 {
-  "id": "0ffe1ff3-0963-4c27-8c17-ac7cde5f530f",
-  "prevId": "1f1c6c3d-aa7c-4dd7-b575-89ab134105c0",
+  "id": "83bda38d-9ff9-4f7b-973f-823ba887f873",
+  "prevId": "5aad69e1-53a9-4ef0-bd68-e5d2bef87a5e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -377,13 +377,6 @@
         },
         "consultable": {
           "name": "consultable",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "brain_extra_usage": {
-          "name": "brain_extra_usage",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -14399,39 +14392,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "origin": {
-          "name": "origin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'person'"
-        },
-        "owner_agent_id": {
-          "name": "owner_agent_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "locked": {
-          "name": "locked",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "use_count": {
-          "name": "use_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "last_used_at": {
-          "name": "last_used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -14471,19 +14431,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "skills_owner_agent_id_agents_id_fk": {
-          "name": "skills_owner_agent_id_agents_id_fk",
-          "tableFrom": "skills",
-          "tableTo": "agents",
-          "columnsFrom": [
-            "owner_agent_id"
           ],
           "columnsTo": [
             "id"
@@ -18219,6 +18166,61 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "agents_limited": {
+          "name": "agents_limited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "audience_agent_ids": {
+          "name": "audience_agent_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
+        },
+        "audience_folder": {
+          "name": "audience_folder",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "editors_limited": {
+          "name": "editors_limited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "editor_role_ids": {
+          "name": "editor_role_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
+        },
+        "editor_user_ids": {
+          "name": "editor_user_ids",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "agent_editors_limited": {
+          "name": "agent_editors_limited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "agent_editor_ids": {
+          "name": "agent_editor_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
         }
       },
       "indexes": {
@@ -20905,57 +20907,139 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.agent_learning_days": {
-      "name": "agent_learning_days",
+    "public.wiki_folder_audiences": {
+      "name": "wiki_folder_audiences",
       "schema": "",
       "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
         "org_id": {
           "name": "org_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "agent_id": {
-          "name": "agent_id",
-          "type": "uuid",
+        "folder": {
+          "name": "folder",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "day": {
-          "name": "day",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "jobs": {
-          "name": "jobs",
-          "type": "integer",
+        "restricted": {
+          "name": "restricted",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": 0
+          "default": false
+        },
+        "audience_role_ids": {
+          "name": "audience_role_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
+        },
+        "audience_user_ids": {
+          "name": "audience_user_ids",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "agents_limited": {
+          "name": "agents_limited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "audience_agent_ids": {
+          "name": "audience_agent_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
+        },
+        "updated_by_id": {
+          "name": "updated_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "editors_limited": {
+          "name": "editors_limited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "editor_role_ids": {
+          "name": "editor_role_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
+        },
+        "editor_user_ids": {
+          "name": "editor_user_ids",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "agent_editors_limited": {
+          "name": "agent_editors_limited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "agent_editor_ids": {
+          "name": "agent_editor_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
         }
       },
       "indexes": {
-        "agent_learning_days_org_id_index": {
-          "name": "agent_learning_days_org_id_index",
+        "wiki_folder_audiences_org_id_folder_index": {
+          "name": "wiki_folder_audiences_org_id_folder_index",
           "columns": [
             {
               "expression": "org_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "folder",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
       "foreignKeys": {
-        "agent_learning_days_org_id_organizations_id_fk": {
-          "name": "agent_learning_days_org_id_organizations_id_fk",
-          "tableFrom": "agent_learning_days",
+        "wiki_folder_audiences_org_id_organizations_id_fk": {
+          "name": "wiki_folder_audiences_org_id_organizations_id_fk",
+          "tableFrom": "wiki_folder_audiences",
           "tableTo": "organizations",
           "columnsFrom": [
             "org_id"
@@ -20967,15 +21051,7 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {
-        "agent_learning_days_agent_id_day_pk": {
-          "name": "agent_learning_days_agent_id_day_pk",
-          "columns": [
-            "agent_id",
-            "day"
-          ]
-        }
-      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -21057,8 +21133,7 @@
         "agent_instructions",
         "org_context",
         "agent_role",
-        "agent_access",
-        "skill"
+        "agent_access"
       ]
     },
     "public.context_trust": {
