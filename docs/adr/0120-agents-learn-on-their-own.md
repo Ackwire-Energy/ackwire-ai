@@ -101,3 +101,7 @@ Learning never records a secret's value or where it is kept; the credential chec
 | The team's and a person's learned items on the agent's tab (they show on the workspace memory page) | people look for them there |
 | A separate "stale" state for skills before archiving | something reads it |
 | The new judge question and learn prompt checked on a Claude subscription sign-in (its filter refuses some wordings with a 400 that reads like billing) | before turning learning on for a subscription workspace in production |
+
+## Addendum (2026-11-02): failures are reported
+
+When the judge refuses the `learn` question and the verdict is asked again without it, `continuationVerdict` calls `onLearnFailed`, and the executor reports it (ADR 0104 addendum) with the agent's brain, provider, model, account kind and the judge's name, once per workspace an hour. The learning job's refused model call is reported the same way and the job ends `skipped: "model_failed"` instead of failing; a rate limit or an overload still throws so the outbox tries again. A failure while queueing learning at turn end is reported too. This is how a Claude subscription sign-in refusing the wording shows up before learning is turned on for such a workspace.

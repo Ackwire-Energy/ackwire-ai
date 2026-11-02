@@ -215,8 +215,8 @@ export function usagePauseRefetchMs(
 
 /**
  * Why Continuar agora on a run paused near its limit is greyed for this viewer (`routines.usagePause.<reason>`):
- * only its creator, the agent's owner and admins (`canManage`) may press it, and not while the agent's long work
- * may not use paid extra usage. Null: they may.
+ * only its creator, the agent's owner and admins (`canManage`) may press it, and not once the plan's window is used
+ * up while the agent's long work may not use paid extra usage. Null: they may.
  */
 export const usageContinueBlock = (r: Pick<Routine, "canManage" | "usagePause">) =>
   !r.canManage ? ("forbidden" as const) : r.usagePause?.extraOff ? ("extra_off" as const) : null;

@@ -32,3 +32,7 @@ An error people hit was seen in the server's log at best. A web page that broke 
 - Reporting every warning: noise. An error line is where the code already says something went wrong.
 - Reporting only a job's last failure: one that is not transient would be seen hours later, after up to 8 attempts and their backoff.
 - The phone app with Sentry's SDK on JavaScript alone (`@sentry/core`): no native crashes, and the SDK the platform documents is the one above.
+
+## Addendum (2026-11-02): learning's failures
+
+Learning (ADR 0120) fails where nothing logs an error: the turn-end judgment asks again without its `learn` question, the `context.learn` job's model call is refused, or queueing the job fails. These go to the reporter directly (`reportLearnFailure`, `ContextDeps.errors`), tagged `cause` (`judge_learn_question`, `learn_call`, `learn_queue`), `org_id`, `agent_id`, `run_id`, `brain`, `provider`, `model`, `account` (`plan_sign_in` or `api_key`) and `judge`, never with what the conversation said. At most one report per workspace and cause an hour, held in each process's memory, so a broken provider can't flood the server. A rate limit or an overload on the learning call isn't reported: the outbox tries it again.

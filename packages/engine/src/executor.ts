@@ -230,10 +230,12 @@ import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from 
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import {
   budgetUsedPercent,
+  continuesPastPlan,
   isLongWork,
   ladderDelay,
   nextMonthStart,
   overrideHolds,
+  type PlanReadingRef,
   planName,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
@@ -442,6 +444,8 @@ export interface Transcript {
     source?: "plan" | "budget";
     /** When the limit resets, when known (Rotinas says "Pausada até…"; `until` is later by the stagger). */
     resetsAt?: string;
+    /** A plan pause's: where its plan was read. */
+    reading?: PlanReadingRef;
   };
   /**
    * Long work paused near a limit (ADR 0118): `paused` once it was (it stays long work), `cardId` its card,
@@ -2469,6 +2473,16 @@ async function executeRunInner(
       waitKey: key,
       until: runAt.toISOString(),
       ...(u.pause ? { source: u.pause.source, ...(resetsAt ? { resetsAt } : {}) } : {}),
+      // Continuar agora reads this plan's window again (`pauseContinuesPastPlan`).
+      ...(u.pause?.source === "plan"
+        ? {
+            reading: {
+              machineId,
+              ...(plan.account?.id ? { accountId: plan.account.id } : {}),
+              model: plan.model ?? null,
+            },
+          }
+        : {}),
     };
     await addRunStep(db, run, "error", {
       reason: "usage_wait",
@@ -2566,10 +2580,17 @@ async function executeRunInner(
    * person), not more of the mission's work: read once.
    */
   let missionWork: boolean | null = null;
-  /** Long work at the pause line, unless Continuar agora let it go on or it may use the plan's extra usage. */
+  /**
+   * Long work at the pause line, unless it may use the plan's extra usage or Continuar agora let it go on: then up
+   * to the plan's own allowance, past it only into extra usage (`continuesPastPlan`).
+   */
   const longWorkPause = async () => {
     const t = transcript as Transcript;
-    if (forum || overrideHolds(t.usagePause?.override)) return null;
+    if (forum) return null;
+    if (overrideHolds(t.usagePause?.override)) {
+      const now = await usageReading();
+      return now && continuesPastPlan(now) ? now : null;
+    }
     if (run.background && byHand === null) byHand = await routineRunByHand(db, run.id).catch(() => false);
     if (plan.missionId && missionWork === null)
       missionWork = !(await personOfMessage(db, run.orgId, run.triggerMessageId).catch(() => null));
