@@ -184,6 +184,13 @@ test("the methods it answers are chosen on the routine: GET passes its query str
     method: "GET",
   });
   expect((await (await api(`/routines/${routine.id}/hook`)).json()) as Hook).toMatchObject({ methods: ["GET", "PUT"] });
+  // Signed, a GET's signature covers its query string as sent.
+  const { secret } = (await (await api(`/routines/${routine.id}/hook/secret`, { json: {} })).json()) as {
+    secret: string;
+  };
+  const query = "status=paid&order=43";
+  expect((await call(`${url}?${query}`, "", { "x-agentes-signature": sign(secret, "") }, "GET")).status).toBe(401);
+  expect((await call(`${url}?${query}`, "", { "x-agentes-signature": sign(secret, query) }, "GET")).status).toBe(202);
   const bad = await api(`/routines/${routine.id}`, {
     method: "PATCH",
     json: { trigger: { type: "webhook", methods: [] } },

@@ -4729,7 +4729,7 @@
       "signature": "Signature",
       "signedOff": "Désactivée : l'agent reçoit tout appel à l'adresse.",
       "signedOn": "Activée : seuls les appels signés avec le secret passent.",
-      "signedHelp": "Envoyez le HMAC-SHA256 du corps dans X-Agentes-Signature (sha256=…). Le X-Hub-Signature-256 de GitHub fonctionne aussi.",
+      "signedHelp": "Envoyez le HMAC-SHA256 du corps (pour un appel GET : de sa query string, sans le ?) dans X-Agentes-Signature (sha256=…). Le X-Hub-Signature-256 de GitHub fonctionne aussi.",
       "addSecret": "Exiger une signature",
       "newSecret": "Nouveau secret",
       "newSecretTitle": "Créer un nouveau secret ?",

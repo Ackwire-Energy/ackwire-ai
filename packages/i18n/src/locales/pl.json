@@ -4832,7 +4832,7 @@
       "signature": "Podpis",
       "signedOff": "Wyłączony: agent dostaje każde wywołanie adresu.",
       "signedOn": "Włączony: przechodzą tylko wywołania podpisane sekretem.",
-      "signedHelp": "Wyślij HMAC-SHA256 treści w nagłówku X-Agentes-Signature (sha256=…). X-Hub-Signature-256 z GitHuba też działa.",
+      "signedHelp": "Wyślij HMAC-SHA256 treści (przy wywołaniu GET: jego query stringa, bez ?) w nagłówku X-Agentes-Signature (sha256=…). X-Hub-Signature-256 z GitHuba też działa.",
       "addSecret": "Wymagaj podpisu",
       "newSecret": "Nowy sekret",
       "newSecretTitle": "Utworzyć nowy sekret?",

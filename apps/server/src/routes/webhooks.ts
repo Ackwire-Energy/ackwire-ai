@@ -94,6 +94,7 @@ export function registerRoutineHooks(api: OpenAPIHono, deps: AppDeps) {
       read: (max) => readWebhookBytes(c.req.raw, max),
       method: c.req.method,
       query: c.req.query(),
+      rawQuery: new URL(c.req.url).search.slice(1),
     });
     if (answer.status === 405) {
       c.header("allow", answer.allow.join(", "));

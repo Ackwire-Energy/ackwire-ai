@@ -320,6 +320,8 @@ export async function receiveRoutineHook(
     method?: string;
     /** The query string's fields: a GET call's data. */
     query?: Record<string, string>;
+    /** The query string as sent, without its `?`: what a GET call's signature covers. */
+    rawQuery?: string;
   },
 ): Promise<HookAnswer> {
   const hook = TOKEN.test(input.token) ? await liveHook(deps.db, sha256(input.token)) : null;
@@ -335,7 +337,9 @@ export async function receiveRoutineHook(
     await logCall(deps.db, hook, { outcome: "too_large", status: 413, bytes: declared });
     return { status: 413, code: "too_large" };
   }
-  if (hook.secretCiphertext && !(await signedBy(deps.keyWrappers, hook, body, input.headers))) {
+  // A GET has no body: its signature covers its query string, the data, so a seen signature can't carry other data.
+  const signed = method === "GET" ? new TextEncoder().encode(input.rawQuery ?? "") : body;
+  if (hook.secretCiphertext && !(await signedBy(deps.keyWrappers, hook, signed, input.headers))) {
     await logCall(deps.db, hook, { outcome: "bad_signature", status: 401, bytes: body.byteLength });
     return { status: 401, code: "invalid_signature" };
   }
@@ -377,7 +381,7 @@ async function underLimit(deps: Pick<RoutineHookDeps, "db" | "rateLimiter">, hoo
   return false;
 }
 
-/** The HMAC-SHA256 of the raw body, as `sha256=<hex>` in either header, compared in constant time. */
+/** The HMAC-SHA256 of the raw body (a GET's query string), as `sha256=<hex>` in either header, compared in constant time. */
 async function signedBy(keyWrappers: KeyWrapper[], hook: HookRow, body: Uint8Array, headers: Headers) {
   const secret = await openSecret(
     keyWrappers,

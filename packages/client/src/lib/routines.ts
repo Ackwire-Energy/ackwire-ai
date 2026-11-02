@@ -60,10 +60,10 @@ export function hookCurl(url: string, secret: string | null, methods: readonly s
   const method = methods.includes("POST") ? "POST" : (methods.find((m) => m !== "GET") ?? "GET");
   const sign = (data: string) => `SIG=$(printf '%s' ${data} | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')`;
   const signature = `  -H "X-Agentes-Signature: sha256=$SIG"`;
-  // A GET's data is its query string; a signature then covers its empty body.
+  // A GET's data is its query string, and its signature covers that query string (without the `?`).
   if (method === "GET") {
     const get = `curl '${url}?text=hello'`;
-    return secret === null ? get : [`SECRET='${secret}'`, sign("''"), `${get} \\`, signature].join("\n");
+    return secret === null ? get : [`SECRET='${secret}'`, sign("'text=hello'"), `${get} \\`, signature].join("\n");
   }
   const body = `{"text":"hello"}`;
   const send = (sig: string[], data: string) =>

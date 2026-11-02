@@ -113,7 +113,7 @@ describe("a webhook routine's address", () => {
     expect(hookCurl(url, null, ["GET"])).toBe(`curl '${url}?text=hello'`);
     expect(hookCurl(url, "s3cret", ["GET"]).split("\n")).toEqual([
       "SECRET='s3cret'",
-      `SIG=$(printf '%s' '' | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')`,
+      `SIG=$(printf '%s' 'text=hello' | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')`,
       `curl '${url}?text=hello' \\`,
       `  -H "X-Agentes-Signature: sha256=$SIG"`,
     ]);

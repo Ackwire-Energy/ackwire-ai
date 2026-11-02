@@ -4798,7 +4798,7 @@
       "signature": "Подпись",
       "signedOff": "Выключена: агент получает любой вызов на этот адрес.",
       "signedOn": "Включена: проходят только вызовы, подписанные секретом.",
-      "signedHelp": "Отправляйте HMAC-SHA256 тела запроса в X-Agentes-Signature (sha256=…). X-Hub-Signature-256 от GitHub тоже подойдёт.",
+      "signedHelp": "Отправляйте HMAC-SHA256 тела запроса (для вызова GET: его строки запроса, без ?) в X-Agentes-Signature (sha256=…). X-Hub-Signature-256 от GitHub тоже подойдёт.",
       "addSecret": "Требовать подпись",
       "newSecret": "Новый секрет",
       "newSecretTitle": "Создать новый секрет?",

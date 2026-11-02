@@ -4594,7 +4594,7 @@
       "signature": "Handtekening",
       "signedOff": "Uit: de agent krijgt elke aanroep naar het adres.",
       "signedOn": "Aan: alleen aanroepen die met het geheim zijn ondertekend, komen door.",
-      "signedHelp": "Stuur de HMAC-SHA256 van de body in X-Agentes-Signature (sha256=…). X-Hub-Signature-256 van GitHub werkt ook.",
+      "signedHelp": "Stuur de HMAC-SHA256 van de body (bij een GET-aanroep: van de querystring, zonder het ?) in X-Agentes-Signature (sha256=…). X-Hub-Signature-256 van GitHub werkt ook.",
       "addSecret": "Handtekening vereisen",
       "newSecret": "Nieuw geheim",
       "newSecretTitle": "Een nieuw geheim maken?",

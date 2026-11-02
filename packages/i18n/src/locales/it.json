@@ -4732,7 +4732,7 @@
       "signature": "Firma",
       "signedOff": "Disattivata: l'agente riceve qualsiasi chiamata all'indirizzo.",
       "signedOn": "Attivata: passano solo le chiamate firmate con il segreto.",
-      "signedHelp": "Invia l'HMAC-SHA256 del corpo in X-Agentes-Signature (sha256=…). Funziona anche X-Hub-Signature-256 di GitHub.",
+      "signedHelp": "Invia l'HMAC-SHA256 del corpo (per una chiamata GET: della sua query string, senza il ?) in X-Agentes-Signature (sha256=…). Funziona anche X-Hub-Signature-256 di GitHub.",
       "addSecret": "Richiedi una firma",
       "newSecret": "Nuovo segreto",
       "newSecretTitle": "Creare un nuovo segreto?",

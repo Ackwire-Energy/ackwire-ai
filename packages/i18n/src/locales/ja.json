@@ -4380,7 +4380,7 @@
       "signature": "署名",
       "signedOff": "オフ: アドレスへのすべての呼び出しがエージェントに届きます。",
       "signedOn": "オン: シークレットで署名された呼び出しだけが届きます。",
-      "signedHelp": "本文のHMAC-SHA256をX-Agentes-Signature（sha256=…）で送ってください。GitHubのX-Hub-Signature-256も使えます。",
+      "signedHelp": "本文（GETの呼び出しではクエリ文字列、?を除く）のHMAC-SHA256をX-Agentes-Signature（sha256=…）で送ってください。GitHubのX-Hub-Signature-256も使えます。",
       "addSecret": "署名を必須にする",
       "newSecret": "新しいシークレット",
       "newSecretTitle": "新しいシークレットを作成しますか？",

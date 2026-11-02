@@ -74,6 +74,7 @@ const post = (
   receiveRoutineHook(d, {
     token,
     ...call,
+    ...(call.query ? { rawQuery: new URLSearchParams(call.query).toString() } : {}),
     headers: new Headers({ "content-type": "application/json", ...headers }),
     read: async (max) => {
       const bytes = new TextEncoder().encode(body);
@@ -245,6 +246,21 @@ describe("routine webhooks", () => {
     ]);
     await removeRoutineHookSecret(hookDeps(), f.owner.id, ref);
     expect(await post(d, token, body)).toMatchObject({ status: 202 });
+  });
+
+  test("a signed GET's signature covers its query string: one seen signature can't carry other data", async () => {
+    f = await setup();
+    const routine = await webhookRoutine();
+    await updateRoutine(deps(), f.owner.id, f.org.id, routine.id, { trigger: { type: "webhook", methods: ["GET"] } });
+    const ref = await managedWebhookRoutine(f.db, f.owner.id, f.org.id, routine.id);
+    const { secret } = await newRoutineHookSecret(hookDeps(), f.owner.id, ref);
+    const token = await tokenOf(routine.id);
+    const d = hookDeps();
+    const get = (query: Record<string, string>, signature: string) =>
+      post(d, token, "", { "x-agentes-signature": signature }, { method: "GET", query });
+    expect(await get({ order: "42" }, sign(secret, ""))).toMatchObject({ status: 401 });
+    expect(await get({ order: "42" }, sign(secret, "order=42"))).toMatchObject({ status: 202 });
+    expect(await get({ order: "999" }, sign(secret, "order=42"))).toMatchObject({ status: 401 });
   });
 
   test("the same Idempotency-Key or X-GitHub-Delivery within 24 hours answers with the first run, nothing new", async () => {

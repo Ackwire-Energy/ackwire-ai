@@ -4366,7 +4366,7 @@ export const en = {
       signedOff: "Off: the agent gets any call to the address.",
       signedOn: "On: only calls signed with the secret get through.",
       signedHelp:
-        "Send the HMAC-SHA256 of the body in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too.",
+        "Send the HMAC-SHA256 of the body (of a GET call: its query string, without the ?) in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too.",
       addSecret: "Require a signature",
       newSecret: "New secret",
       newSecretTitle: "Make a new secret?",

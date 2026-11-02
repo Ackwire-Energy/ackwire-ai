@@ -4503,7 +4503,7 @@
       "signature": "İmza",
       "signedOff": "Kapalı: ajan, adrese yapılan her çağrıyı alır.",
       "signedOn": "Açık: yalnızca gizli anahtarla imzalanan çağrılar geçer.",
-      "signedHelp": "Gövdenin HMAC-SHA256 değerini X-Agentes-Signature başlığında (sha256=…) gönderin. GitHub'ın X-Hub-Signature-256 başlığı da çalışır.",
+      "signedHelp": "Gövdenin (GET çağrısında: ? olmadan sorgu dizesinin) HMAC-SHA256 değerini X-Agentes-Signature başlığında (sha256=…) gönderin. GitHub'ın X-Hub-Signature-256 başlığı da çalışır.",
       "addSecret": "İmza iste",
       "newSecret": "Yeni gizli anahtar",
       "newSecretTitle": "Yeni bir gizli anahtar oluşturulsun mu?",

@@ -4675,7 +4675,7 @@
       "signature": "Firma",
       "signedOff": "Desactivada: el agente recibe cualquier llamada a la dirección.",
       "signedOn": "Activada: solo pasan las llamadas firmadas con el secreto.",
-      "signedHelp": "Envía el HMAC-SHA256 del cuerpo en X-Agentes-Signature (sha256=…). El X-Hub-Signature-256 de GitHub también funciona.",
+      "signedHelp": "Envía el HMAC-SHA256 del cuerpo (en una llamada GET: de su query string, sin el ?) en X-Agentes-Signature (sha256=…). El X-Hub-Signature-256 de GitHub también funciona.",
       "addSecret": "Exigir una firma",
       "newSecret": "Nuevo secreto",
       "newSecretTitle": "¿Crear un nuevo secreto?",

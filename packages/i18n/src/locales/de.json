@@ -4540,7 +4540,7 @@
       "signature": "Signatur",
       "signedOff": "Aus: Der Agent bekommt jeden Aufruf an die Adresse.",
       "signedOn": "An: Nur Aufrufe, die mit dem Secret signiert sind, kommen durch.",
-      "signedHelp": "Sende den HMAC-SHA256 des Bodys in X-Agentes-Signature (sha256=…). GitHubs X-Hub-Signature-256 funktioniert auch.",
+      "signedHelp": "Sende den HMAC-SHA256 des Bodys (bei einem GET-Aufruf: seines Query-Strings, ohne das ?) in X-Agentes-Signature (sha256=…). GitHubs X-Hub-Signature-256 funktioniert auch.",
       "addSecret": "Signatur verlangen",
       "newSecret": "Neues Secret",
       "newSecretTitle": "Neues Secret erstellen?",

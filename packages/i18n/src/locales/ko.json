@@ -4376,7 +4376,7 @@
       "signature": "서명",
       "signedOff": "꺼짐: 에이전트가 주소로 오는 모든 호출을 받아요.",
       "signedOn": "켜짐: 시크릿으로 서명된 호출만 통과해요.",
-      "signedHelp": "본문의 HMAC-SHA256을 X-Agentes-Signature(sha256=…)에 담아 보내세요. GitHub의 X-Hub-Signature-256도 쓸 수 있어요.",
+      "signedHelp": "본문(GET 호출이면 ?를 뺀 쿼리 문자열)의 HMAC-SHA256을 X-Agentes-Signature(sha256=…)에 담아 보내세요. GitHub의 X-Hub-Signature-256도 쓸 수 있어요.",
       "addSecret": "서명 필수",
       "newSecret": "새 시크릿",
       "newSecretTitle": "새 시크릿을 만들까요?",

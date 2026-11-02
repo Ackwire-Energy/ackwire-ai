@@ -4499,7 +4499,7 @@ export const ptBR = {
       signedOff: "Desligada: o agente recebe qualquer chamada ao endereço.",
       signedOn: "Ligada: só passam as chamadas assinadas com o segredo.",
       signedHelp:
-        "Mande o HMAC-SHA256 do corpo em X-Agentes-Signature (sha256=…). O X-Hub-Signature-256 do GitHub também vale.",
+        "Mande o HMAC-SHA256 do corpo (numa chamada GET, da query string, sem o ?) em X-Agentes-Signature (sha256=…). O X-Hub-Signature-256 do GitHub também vale.",
       addSecret: "Exigir assinatura",
       newSecret: "Gerar novo segredo",
       newSecretTitle: "Gerar um novo segredo?",
