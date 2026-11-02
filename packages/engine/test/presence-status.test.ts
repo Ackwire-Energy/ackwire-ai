@@ -222,6 +222,16 @@ test("a waiting run says what it waits on, and keeps the agent online, not busy"
   expect(await presenceOf(f)).toMatchObject({ presence: "online", status: { by: "wait", kind: "waiting_approval" } });
 });
 
+test("a run in line for room on its computer says so, not that the computer is gone", async () => {
+  f = await setup();
+  const machineId = crypto.randomUUID();
+  const waiting = (code: string) => ({ waitingForBrain: { kind: "claude_code", machineId, code, waitId: "w" } });
+  await runOf(f, { status: "waiting_input", waitingMachineId: machineId, transcript: waiting("busy") });
+  expect((await presenceOf(f))?.status).toMatchObject({ by: "wait", kind: "queued_computer" });
+  await f.db.update(schema.agentRuns).set({ transcript: waiting("machine_offline") });
+  expect((await presenceOf(f))?.status).toMatchObject({ by: "wait", kind: "waiting_computer" });
+});
+
 test("the run's line: public channels by name, nothing for a private conversation", async () => {
   f = await setup();
   const run = await runOf(f);

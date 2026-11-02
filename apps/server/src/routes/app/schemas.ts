@@ -454,6 +454,10 @@ const MessageBase = z.object({
             .literal(true)
             .optional()
             .openapi({ description: "`waiting_input` because its AI provider is down: it retries by itself." }),
+          computer: z.enum(["queued", "away"]).optional().openapi({
+            description:
+              "`waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`).",
+          }),
         }),
       ),
       blocked: z

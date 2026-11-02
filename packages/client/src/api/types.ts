@@ -888,6 +888,8 @@ export interface MessageReceipts {
     reason?: string;
     /** `waiting_input` because its AI provider is down: it retries by itself. */
     outage?: true;
+    /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+    computer?: "queued" | "away";
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
@@ -1099,6 +1101,8 @@ export type ChannelEvent =
       background?: boolean;
       /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
       outage?: true;
+      /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+      computer?: "queued" | "away";
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -1184,6 +1188,8 @@ export type ChannelEvent =
       status: "done" | "failed" | "waiting_approval" | "waiting_input";
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
+      /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+      computer?: "queued" | "away";
       error?: string;
       /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
       errorCode?: string;
@@ -1272,6 +1278,8 @@ export type ChannelEvent =
       reason?: string;
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
+      /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+      computer?: "queued" | "away";
     }
   /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
   | {
@@ -1739,6 +1747,7 @@ export type AgentStatusKind =
   | "waiting_approval"
   | "waiting_answer"
   | "waiting_computer"
+  | "queued_computer"
   | "waiting_plan"
   | "waiting_budget"
   | "provider_down"

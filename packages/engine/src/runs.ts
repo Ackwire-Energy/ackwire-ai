@@ -12,6 +12,11 @@ export type RunStatus = AgentRun["status"];
 /** For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. */
 export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null)`;
 
+/** For a select over `agent_runs`: waiting for its computer, in line for room (`queued`) or for it to be back (`away`). */
+export const computerWaitSql = sql<"queued" | "away" | null>`(case when ${agentRuns.status} = 'waiting_input'
+  and ${agentRuns.waitingMachineId} is not null then (case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'
+  then 'queued' else 'away' end) end)`;
+
 /**
  * Where a run's replies go: asked in the main timeline (a channel, a DM
  * or a forum post), it answers in the main timeline; asked in a thread, in

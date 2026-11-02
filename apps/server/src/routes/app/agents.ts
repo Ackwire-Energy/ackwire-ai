@@ -510,6 +510,7 @@ export function agentRoutes(deps: AppDeps) {
                         "waiting_approval",
                         "waiting_answer",
                         "waiting_computer",
+                        "queued_computer",
                         "waiting_plan",
                         "waiting_budget",
                         "provider_down",

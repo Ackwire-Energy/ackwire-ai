@@ -48,6 +48,7 @@ export * from "./capabilities";
 export * from "./channel-categories";
 export * from "./channels";
 export * from "./chat-tools";
+export * from "./computer-queue";
 export * from "./connector-usage";
 export * from "./connectors/catalog";
 export * from "./connectors/classify";

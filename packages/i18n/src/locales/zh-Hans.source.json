@@ -3820,6 +3820,18 @@
       "other": "{{names}}: the AI provider is down · retries by itself"
     }
   },
+  "receipts.queued": {
+    "value": {
+      "one": "{{names}} is in line for the computer",
+      "other": "{{names}} are in line for the computer"
+    }
+  },
+  "receipts.away": {
+    "value": {
+      "one": "{{names}} is waiting for the computer",
+      "other": "{{names}} are waiting for the computer"
+    }
+  },
   "receipts.nobody": {
     "value": "No agent will answer"
   },
@@ -3840,6 +3852,12 @@
   },
   "receipts.status.outage": {
     "value": "The AI provider is down · retries by itself"
+  },
+  "receipts.status.queued": {
+    "value": "In line for the computer"
+  },
+  "receipts.status.away": {
+    "value": "Waiting for the computer"
   },
   "receipts.status.handled": {
     "value": "Answered"
@@ -5250,6 +5268,9 @@
   },
   "presence.agent.waiting_computer": {
     "value": "Waiting for the computer"
+  },
+  "presence.agent.queued_computer": {
+    "value": "In line for the computer"
   },
   "presence.agent.waiting_plan": {
     "value": "Waiting for the plan to reset"
@@ -27023,6 +27044,9 @@
   },
   "chat.body.brain_busy": {
     "value": "My computer is busy with other tasks right now. I'll answer as soon as it's free."
+  },
+  "chat.body.brain_queued": {
+    "value": "Still in line for the computer. I'll answer as soon as it has room."
   },
   "chat.body.brain_interrupted": {
     "value": "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}."
