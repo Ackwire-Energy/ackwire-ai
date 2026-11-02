@@ -32,23 +32,31 @@ AGPL and self-hostable) waits for human translators.
 2. **English is the source.** `Strings = Widen<typeof en>` types `t()`. pt-BR keeps its TypeScript file (its comments
    are notes for translators) and every other language is a JSON file; none is typed against English, so a language
    may have `_few`/`_many` or no `_one`. `checkLocale` checks each at test time: keys (missing only fails a ready
-   language), plural categories per `Intl.PluralRules`, the same `{{placeholders}}` and tags, nothing empty, nothing
+   language), plural categories per `Intl.PluralRules`, each form with its English form's `{{placeholders}}` (else
+   `_other`'s; only `_zero`, and `_one` where it means 1 alone, may say the number in words, so ru's `_one`, also 21,
+   keeps `{{count}}`) and tags, nothing empty, nothing
    left in English unless listed in `identical.json`, the glossary's keep-as-is names, no semicolons, the no-break
    spaces of menu paths and closing words (not for ja and zh-Hans). `fillPluralGaps` copies `_other` into `_many`
    (es, fr, it, pt-BR: round millions) and pt-BR's `_zero`.
-3. **Loading.** The web and the desktop's site load one language and English (`loadStrings`, one chunk each). The
-   phone requires the shared strings lazily (Metro runs a module on first `require`); its own and the desktop's small
-   files are in the bundle. i18next: `fallbackLng: "en"`, `supportedLngs: LOCALE_CODES`, `load: "currentOnly"`.
+3. **Loading.** The web and every desktop window load one language and English (`loadStrings`, one chunk each;
+   `loadDesktopI18n`), and the next on a switch. The phone requires the shared strings lazily (Metro runs a module on
+   first `require`); its own and the desktop's small files (about 25 KB a language) are in the bundle. Native lists
+   (expo `locales`, `supportedLocales`, the Mac's `CFBundleLocalizations`) name only ready languages, since the stores
+   show them; a test keeps them equal to the ready set. i18next: `fallbackLng: "en"`, `supportedLngs: LOCALE_CODES`, `load: "currentOnly"`.
 4. **Agent gender is context.** `agentGrammar(name)` returns `{ name, context }` (`female` for names ending in "a");
    every string that agreed with the agent through fragments (`{{The}}`, `{{article}}`, `{{she}}`…) was rewritten
    once into `key` and `key_female`. Sentences about two agents and about providers ("chave do Claude") were rewritten
    without articles; `providerGrammar` is gone.
 5. **One language per person.** `users.locale` (emails, pushes) plus `users.locale_auto` (default true). A device
-   shows: its own pick not yet sent (signed out), else a language picked anywhere (`locale_auto` false), else its own
-   language ("Automático"), telling the server when that differs (`PATCH /api/app/me { locale, auto }`). Before
-   sign-in: this device's pick, the landing's `agentes_locale` cookie, the browser's languages, English. Pickers:
-   "Automático (detected)" then each language by its own name, in Settings, on the sign-in pages, on the phone's
-   Language page and in the desktop's Preferences (a per-computer choice for the desktop shell).
+   shows: its own pick not yet sent (signed out, or a send that failed), else a language kept on the device while the
+   server has none picked (a pick from before the server kept them), sent as picked, else a language picked anywhere
+   (`locale_auto` false), else its own language ("Automático"), telling the server when that differs
+   (`PATCH /api/app/me { locale, auto }`). Before sign-in: this device's pick, the landing's `agentes_locale` cookie,
+   the browser's languages, English. Pickers: "Automático (detected)" then each language by its own name, in Settings,
+   on the sign-in pages and on the phone's Language page. A help page's switch changes that page only (`?lang=`).
+   The desktop's own windows (tray, Preferences, cover) run on the computer's runner token, not a person's session,
+   so they never read `/me`: their language is a per-computer choice in Preferences, else the system's. The workspace
+   window is the web app and follows the person's language like any browser.
 6. **Server text.** Email words per language (`email/words/<code>.ts`, deep-merged over English, counts through
    `plural()`), push words per language over English, pushes in `users.locale` before the device's, the workspace
    computer's default name from the shared strings, dates and money through Intl and the registry, the CJK system
@@ -56,14 +64,22 @@ AGPL and self-hostable) waits for human translators.
    for shows the server's English message in every language. A run's turn names the person's app language (for a file's
    title or a form's labels); replies still follow the language the person writes in.
 7. **Formatting.** `@agenteschat/i18n/format`: `plural`, `formatList`, `formatMoneyUsd`, `formatDate`, `formatTime`,
-   `relativeTime`, `dayMonthOrder`. No case change on translated text (a lowercase form is its own key) and no two
-   `t()` glued with a space (`common.joinSentences`); guards in the web's and the phone's tests.
+   `relativeTime`, `dayMonthOrder`. Lists of names go through `joinNames(names, t)`, i18next's `list` format in
+   `format.list` (Intl.ListFormat: "Ada, Atlas, and Theo", "Ada、Atlas、Theo"); "and N more" is the list's last item.
+   A typed day follows `dayMonthOrder`. No case change on `t()` itself (a lowercase form is its own key); a fragment's
+   first letter changes only through `lowerFirst`/`capitalize` in `client/lib/format` with the language (German keeps
+   it, a name like "GitHub" stays, Turkish dotted i). No two `t()` glued with a space (`common.joinSentences`); guards
+   in the web's tests cover the web, the phone, the desktop and the client.
 8. **Fonts.** No web font download: Japanese, Korean and Chinese use each system's face after the Latin one, no
    `font-size-adjust`, strict line breaks, no italics; the desktop's Russian titles use Onest (Funnel Display has no
-   Cyrillic). Linux packages recommend `fonts-noto-cjk`. PDFs with CJK need embedded fonts (a follow-up).
-9. **Translating.** `bun run i18n:missing <code>` lists what a language lacks with its notes, placeholders, plural
-   forms and feminine variant; `i18n:apply` merges a translated file after `checkLocale`; `i18n:status` shows each
-   language's share per surface. A reviewer sets `ready: true`. Machine translation only with that review.
+   Cyrillic). The phone's large titles use the system face already; its Funnel Display is only the wordmark and a
+   document card's head (the document's own language, not the app's). Linux packages recommend `fonts-noto-cjk`. PDFs with CJK need embedded fonts (a follow-up).
+9. **Translating.** `bun run i18n:missing <code>` lists what a language lacks, and what was translated from English
+   that has changed since (`outdated`, with the English then), with its notes, placeholders, plural forms and feminine
+   variant; `i18n:apply` merges a translated file after `checkLocale` and keeps each key's English in
+   `<code>.source.json` beside the language; `i18n:status` shows each language's share and outdated keys per surface.
+   A reviewer sets `ready: true` (and adds the language's native lists and iOS permission texts). Machine translation
+   only with that review.
 
 ## Consequences
 
