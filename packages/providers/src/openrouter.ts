@@ -5,6 +5,7 @@ import { openAIError } from "./openai";
 import {
   type ContentBlock,
   estimateTokens,
+  laidOut,
   type ModelProvider,
   type ModelRequest,
   type ModelResult,
@@ -490,7 +491,8 @@ export function createOpenRouterProvider(
 ): ModelProvider {
   return {
     id: "openrouter",
-    async stream(request, { apiKey, onDelta }): Promise<ModelResult> {
+    async stream(input, { apiKey, onDelta }): Promise<ModelResult> {
+      const request = laidOut(input);
       const partial: PartialUsage = {
         inputTokens: null,
         cacheReadTokens: 0,

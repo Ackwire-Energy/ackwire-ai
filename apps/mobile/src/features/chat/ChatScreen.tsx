@@ -1769,7 +1769,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                       <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
                     )
                   }
-                  onType={() => sendTyping(threadId)}
+                  onType={(text) => sendTyping(threadId, text)}
                 />
               ) : (
                 <Button

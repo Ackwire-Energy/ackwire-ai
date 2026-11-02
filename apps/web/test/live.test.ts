@@ -10,6 +10,7 @@ import {
   receiptView,
   runsInChannel,
   seedReceipt,
+  startsMessage,
   stopTyping,
   TYPING_TTL_MS,
   typingIn,
@@ -85,7 +86,10 @@ describe("typing", () => {
 
   test("our own typing frames are throttled to one every 3 s", () => {
     const shouldSend = typingThrottle(3000);
-    expect([0, 500, 2999, 3000, 3100, 6000].map(shouldSend)).toEqual([true, false, false, true, false, true]);
+    expect([0, 500, 2999, 3000, 3100, 6000].map((t) => shouldSend(t))).toEqual([true, false, false, true, false, true]);
+    // A new message's first keystroke goes at once, so a second message right after the first shows as typing.
+    expect(shouldSend(6500, startsMessage("p"))).toBe(true);
+    expect(shouldSend(6600, startsMessage("pr"))).toBe(false);
   });
 });
 

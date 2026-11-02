@@ -91,8 +91,11 @@ const size = (r: ModelRequest) =>
     (r.tools ?? []).map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema })),
   ).length;
 
-/** A DM "oi" with every production tool source: the ceiling is the trimmed size plus a little room. */
-export const OI_CEILING_CHARS = 60_000;
+/**
+ * A DM "oi" with every production tool source: 51,124 characters before the token trim (B1–B11), 37,694 after;
+ * the ceiling leaves a little room.
+ */
+const OI_CEILING_CHARS = 40_000;
 
 test("a DM 'oi' stays under the size ceiling", async () => {
   const [request] = await play(TURNS.find((t) => t.id === "greet-dm") as ScriptedTurn);

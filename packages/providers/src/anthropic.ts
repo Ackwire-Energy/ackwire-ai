@@ -9,6 +9,7 @@ import type {
 import { MODEL_CATALOG } from "./catalog";
 import {
   type ContentBlock,
+  laidOut,
   type ModelMessage,
   type ModelProvider,
   type ModelRequest,
@@ -94,7 +95,8 @@ export function createAnthropicProvider(
 
   return {
     id,
-    async stream(request, { apiKey, workspaceId, onDelta }): Promise<ModelResult> {
+    async stream(input, { apiKey, workspaceId, onDelta }): Promise<ModelResult> {
+      const request = laidOut(input);
       const info = MODEL_CATALOG[request.model];
       const fallback = !compat && info?.serverSideFallback === true;
       const format = compat ? undefined : request.outputSchema;
@@ -124,45 +126,73 @@ export function createAnthropicProvider(
         outputTokens: null,
         outputChars: 0,
       };
-      const call = async (withThinking: boolean): Promise<ModelResult> => {
+      const params = (withThinking: boolean) => {
         // `block_binding` is taken only with thinking on; the call made without thinking goes plain.
         const bind = withThinking && !compat && !thinkingOff;
         const betas = [
           ...(fallback ? ["server-side-fallback-2026-07-01"] : []),
           ...(bind ? [THINKING_BINDING_BETA] : []),
         ];
-        const stream = client(apiKey, workspaceId).beta.messages.stream(
-          {
-            model: request.model,
-            max_tokens: request.maxTokens,
-            system: toSystem(request, compat ? undefined : room(request)),
-            messages: toMessageParams(request.messages, id, withThinking),
-            ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
-            ...(tools.length > 0 ? { tools } : {}),
-            ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
-            ...(thinkingOff
-              ? { thinking: { type: "disabled" as const } }
-              : bind
-                ? {
-                    thinking: {
-                      type: "adaptive" as const,
-                      block_binding: { prefix_mismatch_behavior: "drop_block" as const },
-                    },
-                  }
-                : {}),
-            ...(format || effort
+        return {
+          model: request.model,
+          max_tokens: request.maxTokens,
+          system: toSystem(request, compat ? undefined : room(request)),
+          messages: toMessageParams(request.messages, id, withThinking, cacheControl(request)),
+          ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
+          ...(tools.length > 0 ? { tools } : {}),
+          ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
+          ...(thinkingOff
+            ? { thinking: { type: "disabled" as const } }
+            : bind
               ? {
-                  output_config: {
-                    ...(format ? { format: { type: "json_schema" as const, schema: format } } : {}),
-                    ...(effort ? { effort } : {}),
+                  thinking: {
+                    type: "adaptive" as const,
+                    block_binding: { prefix_mismatch_behavior: "drop_block" as const },
                   },
                 }
               : {}),
-            ...(betas.length > 0 ? { betas } : {}),
-            ...(fallback ? { fallbacks: "default" as const } : {}),
-          },
-          { signal: request.signal },
-        );
+          ...(format || effort
+            ? {
+                output_config: {
+                  ...(format ? { format: { type: "json_schema" as const, schema: format } } : {}),
+                  ...(effort ? { effort } : {}),
+                },
+              }
+            : {}),
+          ...(betas.length > 0 ? { betas } : {}),
+          ...(fallback ? { fallbacks: "default" as const } : {}),
+        };
+      };
+      // Pre-warm (`maxTokens` 0): the API writes the prompt to the cache and answers nothing, billing no output.
+      if (request.maxTokens === 0 && !compat) {
+        try {
+          const message = await client(apiKey, workspaceId).beta.messages.create(
+            { ...params(true), max_tokens: 0, stream: false },
+            { signal: request.signal },
+          );
+          return {
+            text: "",
+            content: [],
+            model: message.model,
+            stopReason: "max_tokens",
+            usage: {
+              inputTokens: message.usage.input_tokens,
+              outputTokens: message.usage.output_tokens,
+              cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+              cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
+              ...((message.usage.cache_creation?.ephemeral_1h_input_tokens ?? 0) > 0
+                ? { cacheWriteLongTokens: message.usage.cache_creation?.ephemeral_1h_input_tokens }
+                : {}),
+            },
+          };
+        } catch (error) {
+          throw toProviderError(error);
+        }
+      }
+      const call = async (withThinking: boolean): Promise<ModelResult> => {
+        const stream = client(apiKey, workspaceId).beta.messages.stream(params(withThinking), {
+          signal: request.signal,
+        });
         stream.on("streamEvent", (event) => {
           if (event.type === "message_start") {
             partial.inputTokens = event.message.usage.input_tokens;
@@ -266,10 +296,16 @@ type CacheControl = { type: "ephemeral"; ttl?: "1h" };
 const cacheControl = (request: ModelRequest): CacheControl =>
   request.cacheTtl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
 
-/** The system's breakpoints: what is left after the automatic one and the stable tools' one. */
+/** The system's breakpoints: what is left after the automatic one, the stable tools' one and the history's. */
 const room = (request: ModelRequest) => ({
   control: cacheControl(request),
-  max: MAX_BREAKPOINTS - 1 - (request.tools?.some((t) => t.stable) ? 1 : 0),
+  max:
+    MAX_BREAKPOINTS -
+    1 -
+    (request.tools?.some((t) => t.stable) ? 1 : 0) -
+    (request.messages.some((m) => typeof m.content !== "string" && m.content.some((b) => b.type === "text" && b.cache))
+      ? 1
+      : 0),
 });
 
 /**
@@ -313,25 +349,41 @@ const isThinking = (data: Record<string, unknown>) => data.type === "thinking" |
  * The messages as sent: the thinking before the last `restart` is left out, and all of it without
  * `withThinking`. A message left empty goes too (the API merges the turns around it).
  */
-function toMessageParams(messages: ModelMessage[], provider: string, withThinking = true): BetaMessageParam[] {
+function toMessageParams(
+  messages: ModelMessage[],
+  provider: string,
+  withThinking = true,
+  control: CacheControl = { type: "ephemeral" },
+): BetaMessageParam[] {
   let from = 0;
   messages.forEach((m, i) => {
     if (typeof m.content !== "string" && m.content.some((b) => b.restart === provider)) from = i;
   });
   return messages
-    .map((m, i) => toMessageParam(m, provider, withThinking && i >= from))
+    .map((m, i) => toMessageParam(m, provider, withThinking && i >= from, control))
     .filter((m) => typeof m.content === "string" || m.content.length > 0);
 }
 
-function toMessageParam(message: ModelMessage, provider: string, thinking: boolean): BetaMessageParam {
+function toMessageParam(
+  message: ModelMessage,
+  provider: string,
+  thinking: boolean,
+  control: CacheControl,
+): BetaMessageParam {
   if (typeof message.content === "string") return { role: message.role, content: message.content };
-  return { role: message.role, content: message.content.flatMap((b) => toBlockParam(b, provider, thinking)) };
+  return { role: message.role, content: message.content.flatMap((b) => toBlockParam(b, provider, thinking, control)) };
 }
 
-function toBlockParam(block: ContentBlock, provider: string, thinking: boolean): BetaContentBlockParam[] {
+function toBlockParam(
+  block: ContentBlock,
+  provider: string,
+  thinking: boolean,
+  control: CacheControl,
+): BetaContentBlockParam[] {
   switch (block.type) {
     case "text":
-      return [{ type: "text", text: block.text }];
+      // The history's end keeps the prompt's TTL: a message after a pause still reads the conversation (token-trim B8).
+      return [{ type: "text", text: block.text, ...(block.cache ? { cache_control: control } : {}) }];
     case "tool_use":
       return [{ type: "tool_use", id: block.id, name: block.name, input: block.input }];
     case "tool_result":

@@ -41,6 +41,7 @@ import {
   type StreamsState,
   seedReceipt,
   staleProvisional,
+  startsMessage,
   stopTyping,
   type TypingState,
   typingThrottle,
@@ -322,7 +323,7 @@ export interface ChatLive {
   /** Who is typing now (`typingIn` reads it for the conversation or one of its threads). */
   typing: TypingState;
   /** "I'm typing" here or in a thread, throttled (at most one frame every 3 s). */
-  sendTyping: (threadId: string | null) => void;
+  sendTyping: (threadId: string | null, text?: string) => void;
 }
 
 export function useChatLive(orgId: string, channelId: string, enabled: boolean): ChatLive {
@@ -414,8 +415,8 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   }, [typingEnds]);
   const throttle = useMemo(() => typingThrottle(), []);
   const sendTyping = useCallback(
-    (threadId: string | null) => {
-      if (connection && throttle(Date.now())) connection.sendTyping(channelId, threadId);
+    (threadId: string | null, text?: string) => {
+      if (connection && throttle(Date.now(), startsMessage(text))) connection.sendTyping(channelId, threadId);
     },
     [connection, channelId, throttle],
   );

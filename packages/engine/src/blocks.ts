@@ -274,21 +274,24 @@ export async function replyToBlock(
 export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
   const showBlock: ToolDefinition = {
     name: SHOW_BLOCK_TOOL,
-    description: `Show a live block in your reply. Use it on your own whenever using something beats reading about it; nobody needs to ask for one, and it needs no approval: it runs apart from the app and can't reach anything. To change a block you showed, send its block_id.\n\n${BLOCK_MANUAL}`,
+    // The manual comes on first use (a call without html), not in every request (token-trim B2).
+    description:
+      "Show a live block in your reply: a small interactive thing the person uses now (a what-if simulator, options to see side by side, a filterable view, a short form); what they pick comes back to you. Use it on your own whenever using something beats reading about it; nobody needs to ask for one, and it needs no approval: it runs apart from the app and can't reach anything. Reports and documents are files; a question with plain choices is ask_user. Call it first with only `title` to get the manual (the parts, colors and script a block is built from), then with `html`. To change a block you showed, send its block_id.",
     scope: "",
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", minLength: 1, maxLength: 200, description: "What it is, in the person's language" },
         subtitle: { type: "string", maxLength: 120, description: "A short line: where the data comes from and when" },
-        html: { type: "string", minLength: 1, description: "The block" },
+        html: { type: "string", description: "The block; without it, the manual to write one" },
         block_id: { type: "string", minLength: 36, maxLength: 36, description: "A block of yours to replace" },
       },
-      required: ["title", "html"],
+      required: ["title"],
       additionalProperties: false,
     },
     describe: (input) => ({ title: `Show ${str(input.title)}` }),
     async execute(input, ctx) {
+      if (!str(input.html).trim()) return { content: BLOCK_MANUAL };
       try {
         const actor = actorOf(ctx);
         const html = str(input.html);

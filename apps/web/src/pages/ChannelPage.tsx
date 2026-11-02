@@ -2021,7 +2021,7 @@ function ChannelView({
                         value={draft}
                         onChange={(v) => {
                           setDraft(v);
-                          if (v.trim()) sendTyping();
+                          if (v.trim()) sendTyping(v);
                         }}
                         onSend={onSend}
                         working={chrome?.locked ? null : working}

@@ -332,6 +332,16 @@ export interface EngineDeps {
    * (`waitForBurst`, `ROUTER_QUIET_MS` on a server); absent: no wait.
    */
   quietMs?: number;
+  /**
+   * Token-trim B10: a model brain on Claude's API writes its first turn's prompt to the cache during that wait (a
+   * `maxTokens` 0 call through the gateway). Off: no such call.
+   */
+  prewarm?: boolean;
+  /**
+   * Token-trim B11: the wait ends early when the person isn't typing (`user.typing` on the conversation, through
+   * `pubsub`). Off: the whole window.
+   */
+  quietByTyping?: boolean;
   /** Memory and summaries (ADR 0017). Without it the context is the recent conversation only. */
   context?: ContextDeps;
   /** Latency measurements (`trigger_to_claim_ms`, `claim_to_first_delta_ms`, `run_ms`), for logs. */
@@ -394,6 +404,8 @@ export interface Transcript {
   messages: ModelMessage[];
   /** Tools on demand (ADR 0043): the tool groups this run listed up front; absent = every tool. */
   toolGroups?: string[];
+  /** The trigger's message: the model brain reads the per-turn notes after it (`turnNotes`, token-trim B8). */
+  notesAt?: number;
   /** Hash of what its computer session's system prompt depends on (`RunContext.sessionPrompt`, granted scopes). */
   promptKey?: string;
   /** "Automático": the model tier and effort chosen for this run; a resume thinks with the same. */
@@ -604,10 +616,12 @@ const CONTEXT_TOOLS: readonly string[] = [
   FOLLOW_UP_TOOL,
   WORK_IN_BACKGROUND_TOOL,
   SHOW_BLOCK_TOOL,
-  FIND_AGENT_TOOL,
   "load_skill",
   "read_wiki_page",
 ];
+
+/** How long the first call waits for its pre-warm once the quiet window is over. */
+const PREWARM_WAIT_MS = 4000;
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
@@ -1450,7 +1464,9 @@ async function executeRunInner(
           [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
         ),
         skills: skillList,
-        team: tools.some((t) => t.name === FIND_AGENT_TOOL),
+        // Granted: `find_agent` is on demand (token-trim B3), and "# Your team" stays.
+        team: granted.some((t) => t.name === FIND_AGENT_TOOL),
+        expand: tools.some((t) => t.name === "expand"),
         // Granted is enough: on demand (ADR 0043) it is one `use_tool` away.
         issueTools: granted.some((t) => t.name === UPDATE_ISSUE_TOOL),
         trigger,
@@ -1544,7 +1560,8 @@ async function executeRunInner(
         text: `# Organization wiki (trusted source)\nPages written and reviewed by the team: they are the organization's official knowledge and outweigh memory. Cite the page with [[Title]] when you use what it says.\n${wikiPages.text}`,
       });
     }
-    if (granted.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
+    // Loaded, not only granted: on demand, the wiki tools' own descriptions say it (token-trim B4).
+    if (tools.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
       system.push({
         text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X"). Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
       });
@@ -1575,6 +1592,7 @@ async function executeRunInner(
       // What doesn't change during the run first (prompt cache), the per-turn blocks last.
       system: stableFirst(system),
       messages: context.messages,
+      notesAt: context.messages.length - 1,
       ...(toolChoice ? { toolGroups: toolChoice.groups } : {}),
       ...(tools.some((t) => t.name === PASS_TOOL) ? { passListed: true } : {}),
       promptKey: sha256(
@@ -2007,9 +2025,8 @@ async function executeRunInner(
       const own =
         plan.kind === "model"
           ? []
-          : [
-              `your computer's own tools: shell and files${plan.kind === "claude_code" ? ", WebSearch and WebFetch" : ""}`,
-            ];
+          : // The web is ours on every brain (`web_search`, `web_fetch`, in `turnMeans`).
+            ["your computer's own tools: shell and files"];
       // Whose teammates, from the run in memory: the Tool Gateway read its row already.
       const teammates = reachesTeammates(names)
         ? await runAuthority(db, { ...run, transcript: t as unknown as Record<string, unknown> })
@@ -2960,7 +2977,13 @@ async function executeRunInner(
         })().catch(() => null);
         earlyCode = { plan, code };
       }
-      await waitForBurst(db, triggerMessage, deps.quietMs, signal);
+      const warming =
+        deps.prewarm && brain instanceof ModelBrain
+          ? brain.prewarm(brainTurnOf(run, thinker, transcript, tools, triggerText, plan))
+          : null;
+      await waitForBurst(db, triggerMessage, deps.quietMs, signal, deps.quietByTyping ? deps.pubsub : undefined);
+      // A pre-warm still reading the prompt: the first call waits for it rather than writing the same cache twice.
+      if (warming) await Promise.race([warming, Bun.sleep(PREWARM_WAIT_MS)]);
     }
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
@@ -3922,7 +3945,7 @@ function createBrain(
     maxOutputTokens: deps.maxOutputTokens,
     conversation: () => {
       const t = transcript();
-      return { system: t.system, messages: t.messages };
+      return { system: t.system, messages: t.messages, notesAt: t.notesAt };
     },
   });
 }
@@ -4504,6 +4527,8 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     ...(stopped.repo ? { repo: stopped.repo } : {}),
     // The same tools and model: the thinking blocks it replays stay valid only with the same `tools`.
     ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),
+    // The same layout too: the notes stay where the thinking it replays read them.
+    ...(stopped.notesAt !== undefined ? { notesAt: stopped.notesAt } : {}),
     ...(stopped.passListed ? { passListed: true } : {}),
     ...(stopped.autoModel ? { autoModel: stopped.autoModel } : {}),
     ...(stopped.promptKey ? { promptKey: stopped.promptKey } : {}),

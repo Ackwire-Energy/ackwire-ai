@@ -154,6 +154,8 @@ export interface JobDeps extends RunExecutorDeps {
     plans?: { hub: Pick<MachineCaller, "call" | "status">; publicUrl: string };
     /** How long a person's message waits for their next one (`ROUTER_QUIET_MS` on a server); absent: no wait. */
     quietMs?: number;
+    /** The wait ends early when the person isn't typing (token-trim B11). */
+    quietByTyping?: boolean;
   };
 }
 
@@ -211,6 +213,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
     quietMs: router.quietMs,
+    quietByTyping: router.quietByTyping,
     pubsub: deps.pubsub,
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
     ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),

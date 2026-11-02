@@ -518,6 +518,9 @@ export function buildEngine(o: EngineOptions) {
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     // A run started on a person's message reads what they add in the next seconds with it (ADR 0112).
     quietMs: o.routerQuietMs ?? ROUTER_QUIET_MS,
+    // It ends early when the person isn't typing, and Claude's API reads the prompt into its cache meanwhile.
+    quietByTyping: true,
+    prewarm: true,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
     warmBrowser,
@@ -539,6 +542,7 @@ export function buildEngine(o: EngineOptions) {
       minScore: config.ROUTER_MIN_SCORE,
       mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
       quietMs: o.routerQuietMs ?? ROUTER_QUIET_MS,
+      quietByTyping: true,
       // Jev first whenever the installation has its key, unless ROUTER_STRATEGY=llm.
       ...((config.ROUTER_STRATEGY ?? "jev") === "jev"
         ? { jev: { key: jevKey, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }

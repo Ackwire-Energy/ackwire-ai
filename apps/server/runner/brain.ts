@@ -508,17 +508,23 @@ export interface ClaudeLaunch {
   settingSources?: string;
   /** Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
   builtinTools?: readonly string[];
+  /** Claude Code's own tools taken away (`--disallowedTools`), where `builtinTools` can't be set. */
+  disallowedTools?: readonly string[];
   /** No `--fallback-model` (a plan's aliases may all be one model). */
   noFallback?: boolean;
 }
 
 /**
- * Claude Code's own tools a brain keeps: reading, searching, editing and running code in its folder,
- * and the web. Ours come through MCP. Names Claude Code doesn't know are ignored by it.
+ * Claude Code's own tools a brain keeps: reading, searching, editing and running code in its folder. Ours come
+ * through MCP, the web included: our `web_search` and `web_fetch` mark what they read as outside content (ADR 0117),
+ * so Claude Code's WebFetch and WebSearch are left out (`WEB_BUILTIN_TOOLS`). Names Claude Code doesn't know are
+ * ignored by it.
  */
-export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
-/** A plan turn's own tools (ADR 0053 §3, 0109): reading, the web and a shell our prompt tool keeps read-only; no edits. */
-export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
+export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep"] as const;
+/** A plan turn's own tools (ADR 0053 §3, 0109): reading and a shell our prompt tool keeps read-only; no edits. */
+export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep"] as const;
+/** Claude Code's web tools, which ours replace on a brain turn. */
+export const WEB_BUILTIN_TOOLS = ["WebFetch", "WebSearch"] as const;
 
 /** Most of a checkout's CLAUDE.md and AGENTS.md a turn reads: room for real instructions, not for a dump. */
 export const REPO_INSTRUCTIONS_MAX = 20_000;
@@ -554,7 +560,10 @@ export function repoInstructions(cwd: string): string {
 export function brainProfileLaunch(
   mode: "plan" | "work",
   personalMcp: boolean,
-): Pick<ClaudeLaunch, "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools"> {
+): Pick<
+  ClaudeLaunch,
+  "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools" | "disallowedTools"
+> {
   if (mode === "plan") {
     return {
       strictMcp: true,
@@ -568,8 +577,10 @@ export function brainProfileLaunch(
     strictMcp: !personalMcp,
     promptTool: true,
     permissionMode: "acceptEdits",
-    // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
-    ...(personalMcp ? {} : { settingSources: "", builtinTools: BRAIN_BUILTIN_TOOLS }),
+    // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code but the web.
+    ...(personalMcp
+      ? { disallowedTools: WEB_BUILTIN_TOOLS }
+      : { settingSources: "", builtinTools: BRAIN_BUILTIN_TOOLS }),
   };
 }
 
@@ -602,6 +613,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.addDirs ?? []).flatMap((d) => ["--add-dir", d]),
     ...(l.settingSources !== undefined ? ["--setting-sources", l.settingSources] : []),
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
+    ...(l.disallowedTools?.length ? ["--disallowedTools", l.disallowedTools.join(",")] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -1564,8 +1576,8 @@ export class BrainManager {
             token,
             cwd,
             folders: [...new Set([cwd, ctx.folder])],
-            // Our tools always loaded (no ToolSearch call before each one; the list is short since ADR 0043).
-            alwaysLoad: true,
+            // Our tools behind Claude Code's ToolSearch, but those it reaches for on its own (`ALWAYS_LOADED`).
+            alwaysLoad: false,
             // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
             profile: mode,
             ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),

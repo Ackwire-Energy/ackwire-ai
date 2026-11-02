@@ -5,24 +5,26 @@
  */
 
 /** A piece of a message. Provider-specific blocks (thinking, fallback markers) travel as `opaque`. */
-export type ContentBlock = (
-  | { type: "text"; text: string }
-  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean }
-  /**
-   * A block we don't interpret (e.g. Anthropic `thinking` with its signature).
-   * It must be sent back to the same provider exactly as received when the
-   * conversation continues (tool loops), so we keep the raw object.
-   */
-  | { type: "opaque"; provider: string; data: Record<string, unknown> }
-) & {
-  /**
-   * On the first block of a reply written while the thinking sent back was left out (Anthropic dropped or
-   * refused it), with or without thinking of its own: the provider with this id never sends the thinking before
-   * this message again, or the API would drop or refuse the thinking written after it too.
-   */
-  restart?: string;
-};
+export type ContentBlock =
+  /** `cache`: a prompt-cache breakpoint after this text (Anthropic; the history's end before per-turn notes). */
+  (
+    | { type: "text"; text: string; cache?: boolean }
+    | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+    | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean }
+    /**
+     * A block we don't interpret (e.g. Anthropic `thinking` with its signature).
+     * It must be sent back to the same provider exactly as received when the
+     * conversation continues (tool loops), so we keep the raw object.
+     */
+    | { type: "opaque"; provider: string; data: Record<string, unknown> }
+  ) & {
+    /**
+     * On the first block of a reply written while the thinking sent back was left out (Anthropic dropped or
+     * refused it), with or without thinking of its own: the provider with this id never sends the thinking before
+     * this message again, or the API would drop or refuse the thinking written after it too.
+     */
+    restart?: string;
+  };
 
 export interface ModelMessage {
   role: "user" | "assistant";
@@ -33,6 +35,8 @@ export interface ModelMessage {
 export interface SystemBlock {
   text: string;
   cache?: boolean;
+  /** Read after the conversation (`ModelRequest.notes` carries it there), not in the system. */
+  after?: boolean;
 }
 
 export type SystemPrompt = string | SystemBlock[];
@@ -71,7 +75,31 @@ export interface ModelRequest {
    * 5-minute default. Absent: 5 minutes everywhere.
    */
   cacheTtl?: "1h";
+  /**
+   * What changes from run to run, read after the history (token-trim B8): `text` follows the text of message `at` (the
+   * trigger's), whose own text then carries a cache point when history comes before it; the system blocks marked
+   * `after` are left out of the system. Absent: the system as it is.
+   */
+  notes?: { at: number; text: string };
   signal?: AbortSignal;
+}
+
+/** The request as an adapter sends it: `notes` after the trigger's text, the `after` blocks out of the system. */
+export function laidOut(request: ModelRequest): ModelRequest {
+  const { notes } = request;
+  const trigger = notes ? request.messages[notes.at] : undefined;
+  if (!notes || trigger?.role !== "user" || typeof request.system === "string") return request;
+  const own: ContentBlock[] =
+    typeof trigger.content === "string" ? [{ type: "text", text: trigger.content }] : [...trigger.content];
+  const last = own.at(-1);
+  if (notes.at > 0 && last?.type === "text") own[own.length - 1] = { ...last, cache: true };
+  return {
+    ...request,
+    system: request.system.filter((b) => !b.after),
+    messages: request.messages.map((m, i) =>
+      i === notes.at ? { role: m.role, content: [...own, { type: "text", text: notes.text }] } : m,
+    ),
+  };
 }
 
 export interface ModelUsage {
