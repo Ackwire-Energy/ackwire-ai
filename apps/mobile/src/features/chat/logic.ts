@@ -529,15 +529,17 @@ export function orderPins(pins: MessagePin[]): MessagePin[] {
 }
 
 /**
- * Tapping a pin: scroll to it when it is a row on screen, else open its
- * thread (a top-level message opens as the start of its own thread).
+ * Tapping a pin: go to it here when it lives in this timeline (this thread, or the main one), else open where it
+ * lives (its thread, or the conversation's main timeline from a thread) at it.
  */
 export function pinTarget(
   pin: Pick<MessagePin, "messageId" | "threadId">,
-  onScreen: ReadonlySet<string>,
-): { kind: "scroll"; messageId: string } | { kind: "open"; threadId: string } {
-  if (onScreen.has(pin.messageId)) return { kind: "scroll", messageId: pin.messageId };
-  return { kind: "open", threadId: pin.threadId ?? pin.messageId };
+  threadId: string | null,
+): { kind: "here"; messageId: string } | { kind: "open"; threadId: string | null; messageId: string } {
+  const here = threadId ? pin.threadId === threadId || pin.messageId === threadId : !pin.threadId;
+  return here
+    ? { kind: "here", messageId: pin.messageId }
+    : { kind: "open", threadId: pin.threadId, messageId: pin.messageId };
 }
 
 // ── Composer ─────────────────────────────────────────────────────────────────

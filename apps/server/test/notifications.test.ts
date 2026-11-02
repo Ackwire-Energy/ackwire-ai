@@ -154,7 +154,10 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
     ((await (await api(`/notifications/${id}/done`, { json: { done: true } })).json()) as Item).doneAt,
   ).not.toBeNull();
   expect(((await (await api("/notifications")).json()) as Page).counts.all).toBe(2);
+  // "Concluídas" lists it.
+  expect(((await (await api("/notifications?filter=done")).json()) as Page).items.map((n) => n.id)).toEqual([id]);
   await api(`/notifications/${id}/done`, { json: { done: false } });
+  expect(((await (await api("/notifications?filter=done")).json()) as Page).items).toEqual([]);
   expect(((await (await api("/notifications")).json()) as Page).counts.all).toBe(3);
 
   const until = new Date(Date.now() + 3600_000).toISOString();

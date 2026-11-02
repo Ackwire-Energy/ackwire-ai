@@ -511,6 +511,9 @@ export const featureKeysEn = {
     mark: "Pinned",
     none: "Nothing pinned yet",
     empty: "Nothing pinned here yet. Hold a message and tap Pin.",
+    bar_one: "Pinned messages ({{count}})",
+    bar_other: "Pinned messages ({{count}})",
+    unpinOf: "Unpin the message from {{name}}",
   },
   thread: {
     threadIn: "Thread in #{{channel}}",
@@ -745,6 +748,7 @@ export const featureKeysEn = {
     filter: {
       all: "All",
       waiting: "Waiting for you",
+      done: "Done",
     },
     day: {
       today: "Today",
@@ -824,6 +828,8 @@ export const featureKeysEn = {
     markUnread: "Mark as unread",
     unread: "Unread",
     done: "Done",
+    restore: "Move back",
+    noneDone: "Nothing marked done in the last 30 days.",
     more: "See more",
     empty: "Nothing is waiting for you. Breathe.",
   },

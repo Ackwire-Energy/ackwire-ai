@@ -221,7 +221,7 @@ import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
-import { ChannelPinsButton } from "@/components/ChannelPins";
+import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
@@ -656,7 +656,7 @@ function ChannelView({
     return () => window.removeEventListener("keydown", onKey);
   });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
-  const [panel, setPanel] = useState<{ id: string; reply: boolean } | null>(null);
+  const [panel, setPanel] = useState<{ id: string; reply: boolean; focus?: string } | null>(null);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
   // (its memory); one panel at a time.
   const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
@@ -1675,10 +1675,10 @@ function ChannelView({
           setConsultId(null);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
-    openThread: (id) => {
+    openThread: (id, focus) => {
       setProfile(null);
       setConsultId(null);
-      setPanel({ id, reply: false });
+      setPanel({ id, reply: false, focus });
     },
     openConsultation: (id) => {
       setProfile(null);
@@ -1712,7 +1712,7 @@ function ChannelView({
       channelAgents,
       reply: (message) => now().reply(message),
       // A thread view has no panel: its links go to the thread's page.
-      openThread: inThread ? undefined : (id) => now().openThread(id),
+      openThread: inThread ? undefined : (id, focus) => now().openThread(id, focus),
       // In a thread view the question opens in place, inside the reply's block.
       openConsultation: inThread ? undefined : (id) => now().openConsultation(id),
       requestCorrection: (message, text) => now().requestCorrection(message, text),
@@ -1761,10 +1761,16 @@ function ChannelView({
                     onDetails={() => setDetailsOpen(true)}
                   />
                   {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                  {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
                   <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
                 </div>
               </header>
+            )}
+            {isMember && (
+              <ChannelPinnedBar
+                channelId={channel.id}
+                channelName={chrome ? undefined : channel.name}
+                threadId={thread?.id}
+              />
             )}
             {!chrome && isMember && arriving && (
               <ArrivalCard channel={channel} onSayHi={() => composer.current?.focus()} onClose={arrival.close} />
@@ -2139,7 +2145,13 @@ function ChannelView({
           )}
           {panel && (
             <aside className="thread-panel" aria-label={t("threads.side.label")}>
-              <ThreadPage key={panel.id} threadId={panel.id} reply={panel.reply} onClose={() => setPanel(null)} />
+              <ThreadPage
+                key={`${panel.id}:${panel.focus ?? ""}`}
+                threadId={panel.id}
+                reply={panel.reply}
+                focusMessageId={panel.focus}
+                onClose={() => setPanel(null)}
+              />
             </aside>
           )}
           {profile && (

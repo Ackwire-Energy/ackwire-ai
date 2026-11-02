@@ -14,7 +14,8 @@ import { daysAgo } from "../shared/logic";
  * says who and how many.
  */
 
-export type ActivityFilter = "all" | "waiting";
+/** `done`: "Concluídas", what I marked done (the last 30 days), by when. */
+export type ActivityFilter = "all" | "waiting" | "done";
 
 /**
  * Waiting ones in this order: an agent stuck in its browser or waiting for a secret (both expire in minutes), an
@@ -56,14 +57,27 @@ export function activitySections(
   filter: ActivityFilter,
   now = new Date(),
 ): { waiting: AppNotification[]; days: [DayGroup, AppNotification[]][] } {
+  if (filter === "done") {
+    const done = items.filter((n) => n.doneAt);
+    return { waiting: [], days: byDay(done, (n) => n.doneAt ?? n.updatedAt, now) };
+  }
   const visible = items.filter((n) => isVisible(n, now.getTime()));
   const waiting = sortWaiting(visible.filter((n) => n.waiting));
   if (filter === "waiting") return { waiting, days: [] };
+  return {
+    waiting,
+    days: byDay(
+      visible.filter((x) => !x.waiting),
+      (n) => n.updatedAt,
+      now,
+    ),
+  };
+}
+
+function byDay(list: AppNotification[], at: (n: AppNotification) => string, now: Date) {
   const groups = new Map<DayGroup, AppNotification[]>(DAY_GROUPS.map((g) => [g, []]));
-  for (const n of visible.filter((x) => !x.waiting).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))) {
-    groups.get(dayGroupOf(n.updatedAt, now))?.push(n);
-  }
-  return { waiting, days: [...groups].filter(([, l]) => l.length > 0) };
+  for (const n of [...list].sort((a, b) => at(b).localeCompare(at(a)))) groups.get(dayGroupOf(at(n), now))?.push(n);
+  return [...groups].filter(([, l]) => l.length > 0);
 }
 
 /** Who did it, said short: the first one or two names and how many more. */

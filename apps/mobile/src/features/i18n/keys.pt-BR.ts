@@ -519,6 +519,9 @@ export const featureKeysPtBR = {
     mark: "Fixada",
     none: "Nada fixado ainda",
     empty: "Nada fixado aqui ainda. Segure uma mensagem e toque em Fixar.",
+    bar_one: "Mensagens fixadas ({{count}})",
+    bar_other: "Mensagens fixadas ({{count}})",
+    unpinOf: "Desafixar a mensagem de {{name}}",
   },
   thread: {
     threadIn: "Thread em #{{channel}}",
@@ -753,6 +756,7 @@ export const featureKeysPtBR = {
     filter: {
       all: "Tudo",
       waiting: "Esperando você",
+      done: "Concluídas",
     },
     day: {
       today: "Hoje",
@@ -832,6 +836,8 @@ export const featureKeysPtBR = {
     markUnread: "Marcar como não lida",
     unread: "Não lida",
     done: "Feito",
+    restore: "Mover de volta",
+    noneDone: "Nada concluído nos últimos 30 dias.",
     more: "Ver mais",
     empty: "Nada esperando você. Pode respirar.",
   },
