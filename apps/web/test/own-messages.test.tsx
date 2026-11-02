@@ -188,7 +188,14 @@ describe("own message styles", () => {
     const kit = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
     expect(r.get(".ac-msg--own")).toContain("--own-meta-w: 26px");
     expect(kit).toContain('.ac-msg--own:is([data-run="solo"], [data-run="end"]) {\n  --own-meta-w: 76px;');
+    // A DM's row has room for the check and the "Vista por" face side by side (20px + 6px gap + 20px).
+    expect(kit).toContain(".ac-msg--own:has(.ac-msg__own-meta .ac-receipt__seen) {\n  --own-meta-w: 52px;");
+    expect(kit).toContain(
+      '.ac-msg--own:is([data-run="solo"], [data-run="end"]):has(.ac-msg__own-meta .ac-receipt__seen) {\n  --own-meta-w: 102px;',
+    );
     expect(r.get(".ac-msg--own .ac-msg__text > .md > p:last-child::after")).toContain("width: var(--own-meta-w)");
+    // When the room wraps to a line of its own, that line has the meta's height, not none.
+    expect(r.get(".ac-msg--own .ac-msg__text > .md > p:last-child::after")).toContain("height: 16px");
     expect(kit).toContain(
       ".ac-msg--own .ac-msg__text:not(:has(> .md > :is(p, ul, ol):last-child)) {\n  padding-bottom: 23px;",
     );

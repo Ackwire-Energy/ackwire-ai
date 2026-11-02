@@ -5129,6 +5129,14 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own:is([data-run="solo"], [data-run="end"]) {
   --own-meta-w: 76px;
 }
+/* A DM's own row can show the agents' check and the "Vista por" face together (20px + 6px + 20px): its room is for
+   both from the start, so the face showing up never rewraps the bubble. */
+.ac-msg--own:has(.ac-msg__own-meta .ac-receipt__seen) {
+  --own-meta-w: 52px;
+}
+.ac-msg--own:is([data-run="solo"], [data-run="end"]):has(.ac-msg__own-meta .ac-receipt__seen) {
+  --own-meta-w: 102px;
+}
 .ac-msg--own > .ac-msg__body > .ac-msg__own-meta {
   order: 1;
   align-self: stretch;
@@ -5163,6 +5171,8 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   content: "";
   display: inline-block;
   width: var(--own-meta-w);
+  /* An empty, zero-height box wrapped alone to a new line makes a zero-height line: the meta would sit on the words. */
+  height: 16px;
 }
 .ac-msg--own .ac-msg__text:not(:has(> .md > :is(p, ul, ol):last-child)) {
   padding-bottom: 23px;
