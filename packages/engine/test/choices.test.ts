@@ -79,7 +79,7 @@ test("a pick goes to the agent as the person's own message, once; the card then 
   f = await setup({ blockTools: true, reply: agent });
   const row = await asked();
   const { message, choices } = await answerChoices(deps(), f.owner.id, f.org.id, row.id, { picks: [1] });
-  expect(message.body).toBe("@dev Deixar para amanhã");
+  expect(message.body).toBe("@dev Como sigo com o deploy? Deixar para amanhã");
   expect(message.author).toMatchObject({ type: "person", id: f.owner.id });
   expect(message.meta.choiceReply).toEqual({ id: row.id, title: "Deploy" });
   expect(choices.answer).toMatchObject({ userId: f.owner.id, picks: [1], messageId: message.id });
@@ -90,6 +90,16 @@ test("a pick goes to the agent as the person's own message, once; the card then 
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "oi" });
   await expect(answerChoices(deps(), bia.id, f.org.id, row.id, { picks: [0] })).rejects.toThrow(ConflictError);
   expect((await getChoices(f.artifactDeps, f.owner.id, f.org.id, row.id)).answer?.picks).toEqual([1]);
+});
+
+test("the run a one-question pick starts reads the question it answers", async () => {
+  f = await setup({ blockTools: true, reply: agent });
+  const row = await asked();
+  const { message } = await answerChoices(deps(), f.owner.id, f.org.id, row.id, { picks: [0] });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, message.id));
+  if (!run) throw new Error("no run");
+  const { messages } = await buildRunContext(f.db, run, f.agent, { maxMessages: 10 });
+  expect(JSON.stringify(messages.at(-1)?.content)).toContain("Como sigo com o deploy? Fazer agora");
 });
 
 test("a pick must name one option of each question", async () => {

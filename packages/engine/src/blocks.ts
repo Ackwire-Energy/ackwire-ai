@@ -313,11 +313,12 @@ export async function getChoices(deps: ArtifactDeps, userId: string, orgId: stri
   return loadChoicesView(deps.db, orgId, artifactId);
 }
 
-/** What the agent reads as the person's reply: the option, or each question's option on its own line. */
+/**
+ * What the agent reads as the person's reply: each question with its pick, one per line. The question is always
+ * there: the agent's own history shows its reply text, not the card it sent.
+ */
 export function choiceReplyText(questions: ChoiceQuestion[], picks: number[]): string {
-  const label = (q: ChoiceQuestion, i: number) => q.options[picks[i] as number]?.label ?? "";
-  if (questions.length === 1 && questions[0]) return label(questions[0], 0);
-  return questions.map((q, i) => `${q.question} ${label(q, i)}`).join("\n");
+  return questions.map((q, i) => `${q.question} ${q.options[picks[i] as number]?.label ?? ""}`).join("\n");
 }
 
 /**
