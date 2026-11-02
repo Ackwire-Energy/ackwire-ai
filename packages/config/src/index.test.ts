@@ -144,17 +144,6 @@ describe("loadConfig", () => {
     expect(loadConfig(on).SESSION_SCREENING).toBe(true);
   });
 
-  test("MillionSend inboxes have their own API, apart from the transactional email's, and off hides them", () => {
-    const resend = loadConfig({ ...valid, MILLIONSEND_API_URL: "https://api.resend.com" });
-    expect(resend.MILLIONSEND_INBOXES_API_URL).toBe("https://api.millionsend.com");
-    expect(loadConfig({ ...valid, MILLIONSEND_INBOXES_API_URL: "off" }).MILLIONSEND_INBOXES_API_URL).toBe("off");
-    const own = loadConfig({ ...valid, MILLIONSEND_INBOXES_API_URL: "https://api.mail.example.com" });
-    expect(own.MILLIONSEND_INBOXES_API_URL).toBe("https://api.mail.example.com");
-    expect(() => loadConfig({ ...valid, MILLIONSEND_INBOXES_API_URL: "api.millionsend.com" })).toThrow(
-      /MILLIONSEND_INBOXES_API_URL/,
-    );
-  });
-
   test("the usage report is on unless TELEMETRY says off (on/off, or any yes/no word)", () => {
     expect(loadConfig(valid).TELEMETRY).toBe("on");
     expect(loadConfig(valid).TELEMETRY_URL).toBe("https://telemetry.agentes.chat/v1/report");

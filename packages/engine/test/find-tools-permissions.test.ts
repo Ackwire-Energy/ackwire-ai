@@ -336,7 +336,7 @@ test("an app this installation can't connect says whoever runs it turns it on; o
     "\n- iCloud: iCloud email, custom domains included. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › iCloud (in Portuguese, Configurações › Conectores › Adicionar conector › iCloud).",
   );
   expect(await findTools(ctx, "send an e-mail")).toContain(
-    "\n- Email: A mailbox: a MillionSend inbox, Gmail, Outlook, iCloud or another provider. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Email",
+    "\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Email",
   );
 });
 
@@ -367,7 +367,7 @@ test("a mailbox that needs reconnecting says an admin reconnects it, never to co
   expect(text).toEndWith(`\n- iCloud: iCloud email, custom domains included. ${RECONNECT}`);
   for (const detail of ["ana@icloud.example.com", "Caixa da Ana"]) expect(text).not.toContain(detail);
   expect(await findTools(ctx, "email")).toEndWith(
-    `\n- Email: A mailbox: a MillionSend inbox, Gmail, Outlook, iCloud or another provider. ${RECONNECT}`,
+    `\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. ${RECONNECT}`,
   );
 });
 

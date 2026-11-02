@@ -62,10 +62,6 @@ export function searchConnectors(list: ConnectorDef[], query: string, shown: (d:
 export const shownMailboxes = <T extends { status: string }>(accounts: T[]) =>
   accounts.filter((a) => a.status !== "pending");
 
-/** "Nenhum resultado" only when nothing matches: while searching, the MillionSend card under Email is a match. */
-export const noResults = (tiles: number, searching: boolean, mailCard: boolean) =>
-  tiles === 0 && !(searching && mailCard);
-
 /**
  * The gallery's tiles: the ones that open first, "Em breve" last (as on the web). A connected one opens its
  * connection, even one connected by its address whose vendor hasn't approved agentes.chat yet (`soon`); a `soon`

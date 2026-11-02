@@ -131,6 +131,7 @@ export * from "./mail/accounts";
 export * from "./mail/inbound";
 export * from "./mail/policies";
 export * from "./mail/preview";
+export * from "./mail/retire-millionsend";
 export * from "./mail/text";
 export * from "./mail/tools";
 export * from "./mail/watches";

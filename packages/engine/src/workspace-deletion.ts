@@ -40,7 +40,7 @@ import { forgetInstallationTokens } from "./git/github-app";
 import { announceReleasedAccounts, type ReleasedAccounts, releaseOrgAccounts } from "./machine-accounts";
 import type { MachineHub } from "./machine-hub";
 import { MACHINE_CONTROL_TOPIC, machineOnline, personalMachines } from "./machines";
-import { composioGrantShared, forgetAtComposio, forgetAtMillionSend } from "./mail/accounts";
+import { composioGrantShared, forgetAtComposio } from "./mail/accounts";
 import { recordOperatorEvent } from "./operator-events";
 import {
   can,
@@ -571,7 +571,7 @@ export interface PurgeDeps {
   pubsub?: PubSub;
   /** Revokes its GitHub OAuth grants at GitHub (absent, or without the GitHub app: none can be). */
   connectors?: ConnectorDeps;
-  /** Has Composio forget its mailboxes and MillionSend its inboxes' webhooks (absent, or without them: none can be). */
+  /** Has Composio forget its mailboxes (absent, or without it: none can be). */
   mail?: MailAdapters | null;
   log?: {
     info(message: string, data?: Record<string, unknown>): void;
@@ -714,8 +714,7 @@ async function accountsSignedOut(db: Database, orgId: string, released: Released
  * Revokes the grants a workspace holds outside: Composio forgets the accounts of its connectors and of every Connect
  * Link it made for one (never revoked there: Composio's apps share one grant across toolkits and workspaces) and its
  * mailboxes (their triggers, and the accounts, which revokes them at Google or Microsoft unless another connection
- * still uses the same grant), MillionSend the webhooks of its inboxes (their sealed keys open with the connectors' key
- * wrappers), and GitHub its OAuth tokens. Each is marked as it goes, so a retry skips it. Returns the ids of the
+ * still uses the same grant), and GitHub its OAuth tokens. Each is marked as it goes, so a retry skips it. Returns the ids of the
  * mailboxes, connections and Composio accounts that failed; never a token.
  */
 async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
@@ -794,36 +793,6 @@ async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
           .set({ externalTriggerId: null, updatedAt: now })
           .where(eq(mailWatches.accountId, box.id));
       });
-    }
-  }
-  const millionsend = deps.mail?.millionsend;
-  const keyWrappers = deps.connectors?.keyWrappers;
-  if (millionsend && keyWrappers) {
-    const inboxes = await db
-      .select()
-      .from(mailAccounts)
-      .where(
-        and(
-          eq(mailAccounts.orgId, orgId),
-          eq(mailAccounts.via, "millionsend"),
-          isNotNull(mailAccounts.externalAccountId),
-        ),
-      );
-    for (const box of inboxes) {
-      try {
-        await forgetAtMillionSend(millionsend.client, { keyWrappers }, box);
-      } catch {
-        left.push(box.id);
-        continue;
-      }
-      await db
-        .update(mailAccounts)
-        .set({
-          externalAccountId: null,
-          revokedAt: sql`coalesce(${mailAccounts.revokedAt}, now())`,
-          updatedAt: new Date(),
-        })
-        .where(eq(mailAccounts.id, box.id));
     }
   }
   const connectors = deps.connectors;

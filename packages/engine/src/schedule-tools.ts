@@ -330,19 +330,19 @@ async function readableChannels(ctx: ToolContext, channelIds: string[], person: 
 
 /** Where a person connects a mailbox (agents can't), in the apps' words and the Portuguese they show. */
 const CONNECT_HOW =
-  "a person who manages connectors does it. On the web or the desktop app: Settings › Connectors › Add connector › Email, then the mailbox (MillionSend, Gmail, Outlook, iCloud or another), and its step Who can use it lets you read it (in Portuguese, Configurações › Conectores › Adicionar conector › Email, then Quem pode usar). On the phone app, for a MillionSend inbox: You › Connectors › MillionSend (in Portuguese, Você › Conectores › MillionSend). An inbox created at MillionSend, through its connector or its site, is read here only once it's connected this way. Tell the person exactly this.";
+  "a person who manages connectors does it. On the web or the desktop app: Settings › Connectors › Add connector › Email, then the mailbox (Gmail, Outlook, iCloud or another), and its step Who can use it lets you read it (in Portuguese, Configurações › Conectores › Adicionar conector › Email, then Quem pode usar). Tell the person exactly this.";
 /** Where a person lets an agent read a mailbox that is connected. */
 const GIVE_HOW =
   "a person who manages agents must let you. On the web or the desktop app: Settings › Connectors › Who uses it, on the mailbox's row (in Portuguese, Configurações › Conectores › Quem usa). On the phone app: You › Connectors, then the mailbox (in Portuguese, Você › Conectores). Tell the person exactly this.";
 
-/** No mailbox in the workspace: where a person connects one (an inbox made at MillionSend isn't one until then). */
+/** No mailbox in the workspace: where a person connects one. */
 export const NO_MAILBOX_TEXT = `You can't read any mailbox yet, and you can't connect one yourself: ${CONNECT_HOW}`;
 /** Mailboxes, none of them this agent's to read: where a person lets it. */
 export const MAILBOX_NOT_GIVEN_TEXT = `You can't read any of this workspace's mailboxes: ${GIVE_HOW}`;
 
 /**
  * The mailbox an email trigger watches: one this agent may read, by its address or label; left out, the only one
- * it may read. A named one that isn't connected (an inbox the agent just made at MillionSend, often) is told where a
+ * it may read. A named one that isn't connected is told where a
  * person connects it, one that is but isn't this agent's where a person lets it read it.
  */
 async function mailboxOf(ctx: ToolContext, raw: string) {

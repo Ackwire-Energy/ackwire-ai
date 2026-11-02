@@ -760,9 +760,6 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
     );
 
     // ── Organizing ───────────────────────────────────────────────────────
-    // MillionSend keeps folders, read state and the trash per conversation: organizing a message moves all of it.
-    const whole = account.via === "millionsend";
-    const one = whole ? "a message's whole conversation" : "a message";
     const organize = (
       verb: "move" | "mark" | "archive" | "trash",
       description: string,
@@ -784,7 +781,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
                   const m = recalled(account.id, str(input.message_id));
                   return {
                     title: `Delete email${m ? ` "${oneLine(m.subject, 120)}" from ${m.from?.address ?? "?"}` : ` ${str(input.message_id)}`} in ${account.address}`,
-                    detail: `Moves ${whole ? "the whole conversation" : "the message"} to the trash of ${account.address}.`,
+                    detail: `Moves the message to the trash of ${account.address}.`,
                   };
                 },
               }
@@ -809,7 +806,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
 
     const move = organize(
       "move",
-      `Move ${one} to another folder.`,
+      "Move a message to another folder.",
       { folder: { type: "string", minLength: 1, maxLength: 300, description: "Folder id from the folders tool." } },
       ["folder"],
       (p, input) => p.move(str(input.message_id), str(input.folder)),
@@ -818,7 +815,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
     );
     const mark = organize(
       "mark",
-      whole ? `Mark ${one} read or unread.` : "Mark a message read or unread, flagged or not.",
+      "Mark a message read or unread, flagged or not.",
       { read: { type: "boolean" }, flagged: { type: "boolean" } },
       [],
       (p, input) =>
@@ -830,7 +827,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
     );
     const archive = organize(
       "archive",
-      `Archive ${one} (out of the inbox, kept).`,
+      "Archive a message (out of the inbox, kept).",
       {},
       [],
       (p, input) => p.archive(str(input.message_id)),
@@ -838,7 +835,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
     );
     const trash = organize(
       "trash",
-      `Move ${one} to the trash. A person approves every deletion.`,
+      "Move a message to the trash. A person approves every deletion.",
       {},
       [],
       (p, input) => p.trash(str(input.message_id)),
@@ -876,7 +873,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
   return {
     name: "mail",
     async tools(ctx) {
-      if (!deps.mail?.composio && !deps.mail?.imap && !deps.mail?.millionsend) return [];
+      if (!deps.mail?.composio && !deps.mail?.imap) return [];
       const accounts = await orgMailAccounts(ctx.db, ctx.orgId);
       if (accounts.length === 0) return [];
       const slugs = mailSlugs(accounts.filter((a) => a.address));

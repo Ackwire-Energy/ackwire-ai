@@ -602,17 +602,9 @@ export const envVars = {
     description: "IMAP/SMTP mailboxes for agents (iCloud, hosting providers, any server). `false` hides them.",
     section: "Email for agents",
   },
-  MILLIONSEND_INBOXES_API_URL: {
-    // Its own setting: MILLIONSEND_API_URL may point at Resend, which has no inboxes and mustn't see these keys.
-    schema: z.union([z.literal("off"), z.url()]).default("https://api.millionsend.com"),
-    description:
-      "MillionSend's API, for MillionSend inboxes connected as mailboxes for agents (each with its own key): MillionSend Cloud, or a self-hosted MillionSend. `off` hides them. Their new mail arrives at once when MillionSend can reach `{PUBLIC_URL}/api/webhooks/millionsend` over https, else within `MAIL_POLL_SECONDS`.",
-    section: "Email for agents",
-  },
   MAIL_POLL_SECONDS: {
     schema: z.coerce.number().int().min(60).max(3600).default(300),
-    description:
-      "How often IMAP folders and MillionSend inboxes watched by routines are checked for new mail (MillionSend's webhook brings it sooner).",
+    description: "How often IMAP folders watched by routines are checked for new mail.",
     section: "Email for agents",
   },
   EMAIL_REPLY_TO: {

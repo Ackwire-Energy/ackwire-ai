@@ -5,7 +5,6 @@ import {
   useConnections,
   useCustomServers,
   useMailAccounts,
-  useMailProviders,
 } from "@agenteschat/client";
 import { composioOffText, composioUsageText, nearComposioLimit } from "@agenteschat/client/lib/composio";
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
@@ -32,18 +31,17 @@ import {
   CATEGORIES,
   connectionOf,
   galleryTiles,
-  noResults,
   SUGGESTED,
   searchConnectors,
   shownMailboxes,
   suggestionsOf,
 } from "./logic";
-import { MailboxSheet, MillionSendSheet } from "./MailboxSheet";
+import { MailboxSheet } from "./MailboxSheet";
 
 /**
  * Conectores on the phone: what is connected as a row of icons
  * with a check (and "Endereço" to connect any server by its address), three suggestions with a strip in the
- * brand's tone, a MillionSend inbox under Email, then every service as even tiles in two columns, filtered by
+ * brand's tone, then every service as even tiles in two columns, filtered by
  * category. A service not connected opens a sheet over the gallery with the flow in four steps: what agents could
  * do → connect → its tools → who uses it; a connection opens its own screen (who uses it, its tools,
  * disconnecting). A mailbox, of any kind, opens a sheet of who uses it.
@@ -67,8 +65,7 @@ function Gallery() {
   const connections = useConnections(orgId);
   // Servers connected by address (a vendor's own, like Sentry's) come from their own list, as on the web.
   const servers = useCustomServers(orgId);
-  // Mailboxes (ADR 0038): rows of what is connected; the phone connects a MillionSend inbox (ADR 0102).
-  const mailProviders = useMailProviders(orgId);
+  // Mailboxes (ADR 0038): rows of what is connected; they connect on the web.
   const mailAccounts = useMailAccounts(orgId);
   const mailboxes = shownMailboxes(mailAccounts.data ?? []);
   const pull = usePullRefresh(async () => {
@@ -92,16 +89,6 @@ function Gallery() {
     return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
-  const millionsend = {
-    name: t("mail.choice.millionsend.name"),
-    text: t("mail.choice.millionsend.text"),
-  };
-  const mailShown =
-    Boolean(mailProviders.data?.millionsend) &&
-    (!searching ||
-      `${millionsend.name} ${millionsend.text} ${t("connectors.category.email")} email`
-        .toLowerCase()
-        .includes(q.trim().toLowerCase()));
   // Without Composio here, the services that connect only through it are left out: admins read why.
   const composioOff = admin ? composioOffText(t, list, SUGGESTED) : null;
   const open = (def: ConnectorDef) => {
@@ -222,19 +209,6 @@ function Gallery() {
               </View>
             </>
           ) : null}
-          {mailShown ? (
-            <>
-              <SectionHeader title={t("connectors.category.email")} />
-              <View style={styles.suggestions}>
-                <Suggestion
-                  mark={MAIL_BRANDS.millionsend ?? null}
-                  name={millionsend.name}
-                  text={millionsend.text}
-                  onPress={() => sheet.open(<MillionSendSheet />)}
-                />
-              </View>
-            </>
-          ) : null}
           {cats.length > 1 ? (
             // Under the search it sits close; after the sections above it starts a new one (their spacing).
             <View style={searching ? undefined : styles.filters}>
@@ -248,7 +222,7 @@ function Gallery() {
               />
             </View>
           ) : null}
-          {noResults(rest.length, searching, mailShown) ? (
+          {rest.length === 0 ? (
             <EmptyState icon="search" title={t("mobile.connectors.noResults")} />
           ) : (
             <View style={styles.grid}>
