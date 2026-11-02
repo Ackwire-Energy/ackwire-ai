@@ -1,7 +1,6 @@
 import { type Database, rowsOf, type SQL, sql } from "@agenteschat/db";
 import { nanoUsdToUsd } from "@agenteschat/providers";
 import { ANALYTICS_ROWS_MAX, analyticsRange } from "./connector-usage";
-import { COMPUTER_BUSY_WAIT_MS } from "./executor";
 import { getOrMake } from "./format";
 import { apiNano, tokensOf } from "./plan-usage";
 import { runErrorDetail } from "./runs";
@@ -96,7 +95,7 @@ async function workAnalytics(db: Database, query: { from: string; to: string }, 
   }`;
   const runKey = orgId ? sql`ar.agent_id` : sql`ar.org_id`;
   // Waits for room are steps (`brain_unavailable`, `busy`), written once per wait; it lasts until the run's next step
-  // (`roomFound` when the computer takes the turn), and never past the executor's deadline.
+  // (`roomFound` when the computer takes the turn), its end or now.
   const busyStep = sql`s.kind = 'error' and s.data->>'reason' = 'brain_unavailable' and s.data->>'code' = 'busy'`;
 
   const [turnRows, failureRows, peakRows, tokenRows] = await Promise.all([
@@ -158,8 +157,7 @@ async function workAnalytics(db: Database, query: { from: string; to: string }, 
         select ${runKey} as key, s.created_at as since,
           least(coalesce(
             (select min(n.created_at) from agent_run_steps n where n.run_id = s.run_id and n.seq > s.seq),
-            ar.finished_at, now()), s.created_at + ${`${COMPUTER_BUSY_WAIT_MS} milliseconds`}::interval,
-            ${end}::timestamptz) as until
+            ar.finished_at, now()), ${end}::timestamptz) as until
         from agent_runs ar join agent_run_steps s on s.run_id = ar.id
         where ${runsIn} and ${busyStep}
       ), e as (
