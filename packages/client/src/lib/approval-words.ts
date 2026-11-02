@@ -215,7 +215,9 @@ export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approv
   const target = sqlReadsTarget(approval.approveAlways?.actions[0]);
   const key =
     target !== null
-      ? "approval.always.noteReads"
+      ? target
+        ? "approval.always.noteReads"
+        : "approval.always.noteReadsAll"
       : approval.approveAlways?.tool === BRANCH_PUSH
         ? "approval.always.noteTarget"
         : "approval.always.note";
@@ -225,7 +227,10 @@ export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approv
 /** A rule the agent runs without asking, in words: a push by its branch, its action, else the tool as labelled. */
 export function approvalRuleWords(t: TFunction, rule: Pick<ApprovalRule, "tool" | "action" | "toolLabel">) {
   const target = sqlReadsTarget(rule.action);
-  if (target !== null) return t("approval.always.readsRule", { tool: rule.toolLabel, target });
+  if (target !== null) {
+    const words = t("approval.always.readsRule", { tool: rule.toolLabel });
+    return target ? `${words} · ${target}` : words;
+  }
   if (rule.tool === BRANCH_PUSH && rule.action) return pushWords(t, rule.action);
   return rule.action ? actionName(t, rule.action) : rule.toolLabel;
 }

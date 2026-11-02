@@ -5620,8 +5620,11 @@
   "approval.always.noteReads": {
     "value": "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
   },
+  "approval.always.noteReadsAll": {
+    "value": "Covers only reads by {{actions}} on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
+  },
   "approval.always.readsRule": {
-    "value": "Reads by {{tool}} · {{target}}"
+    "value": "Reads by {{tool}}"
   },
   "approval.always.pushTo": {
     "value": "push to {{branch}} in {{repo}}"

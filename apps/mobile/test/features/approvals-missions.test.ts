@@ -110,13 +110,23 @@ describe("Aprovar sempre on the phone", () => {
     expect(approveAlwaysLabel(pt, reads)).toBe("Aprovar sempre leituras");
     expect(approveAlwaysLabel(en, offered)).toBe("Always approve");
     expect(approveAlwaysHint(pt, reads, "Theo")).toBe(
-      "Cobre só leituras de Execute sql, neste projeto (project_id=p1), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
+      "Cobre só leituras de Executar sql, neste projeto (project_id=p1), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
     );
     expect(approveAlwaysHint(en, reads, "Ada")).toBe(
-      "Covers only reads by Execute sql in this project (project_id=p1) from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
+      "Covers only reads by Run sql in this project (project_id=p1) from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
     );
     const rule = { tool: "execute_sql", action: "sql-read:project_id=p1", toolLabel: "Execute sql" };
     expect(approvalRuleWords(pt, rule)).toBe("Leituras de Execute sql · project_id=p1");
+
+    // A tool that takes only the SQL (the reference Postgres server's query): the connection, no empty project.
+    const whole = { ...reads, approveAlways: { tool: "query", actions: ["sql-read:"] } };
+    expect(approveAlwaysHint(pt, whole, "Theo")).toBe(
+      "Cobre só leituras de Consultar, nesta conexão, de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
+    );
+    expect(approveAlwaysHint(en, whole, "Ada")).toBe(
+      "Covers only reads by Query on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
+    );
+    expect(approvalRuleWords(pt, { tool: "query", action: "sql-read:", toolLabel: "Query" })).toBe("Leituras de Query");
   });
 
   test("its toast: it won't ask again, and where to undo it, in both languages", async () => {

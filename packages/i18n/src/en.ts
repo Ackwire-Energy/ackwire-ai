@@ -2256,8 +2256,10 @@ export const en = {
       /** `target`: the call's other arguments, as `project_id=abc`. */
       noteReads:
         "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
+      noteReadsAll:
+        "Covers only reads by {{actions}} on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
       /** A remembered SQL reads rule in Tools and access. */
-      readsRule: "Reads by {{tool}} · {{target}}",
+      readsRule: "Reads by {{tool}}",
       pushTo: "push to {{branch}} in {{repo}}",
       done: "Approved. {{name}} won't ask for this again.",
       undoHere: "To undo it, go to Tools and access, on {{name}}'s page.",
