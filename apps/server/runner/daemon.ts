@@ -988,7 +988,7 @@ export class RunnerDaemon implements RequestObserver {
       tasks,
       brains,
       // System mode: root runs no turns; its agents' CLIs are their workers'.
-      reclaimBrains: supervisor ? () => supervisor.reclaimBrains() : () => brains.reclaimIdle(),
+      reclaimBrains: supervisor ? (spare) => supervisor.reclaimBrains(spare) : (spare) => brains.reclaimIdle(spare),
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
       // A config written later without the mode never turns a system session back into one that does agents' work.

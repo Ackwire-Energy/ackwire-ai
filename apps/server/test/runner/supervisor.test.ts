@@ -628,7 +628,7 @@ test("a cancel reaches only the worker that runs that request", async () => {
   expect(await errorCode(() => pending)).toBe("internal");
 });
 
-test("room for a turn: root asks every worker to close an idle CLI; one that did is enough, a silent one doesn't hold it", async () => {
+test("room for a turn: root closes one idle CLI, the least recently used across workers, the waiting session's last; a silent worker doesn't hold it", async () => {
   const t = setup({ reclaimMs: 200 });
   t.sup.boot();
   t.sup.attach();
@@ -639,19 +639,38 @@ test("room for a turn: root asks every worker to close an idle CLI; one that did
   for (const w of t.workers) w.hello();
   const ana = t.last(ANA.id);
   const bia = t.last(BIA.id);
-  const asked = t.sup.reclaimBrains();
-  await waitFor(() => ana.of("brain.reclaim").length === 1 && bia.of("brain.reclaim").length === 1);
-  const id = ana.of("brain.reclaim")[0]?.reclaimId;
-  expect(bia.of("brain.reclaim")[0]?.reclaimId).toBe(id);
-  // Another ask's answer, then each worker's own.
+  const asks = (w: FakeWorker) => w.of("brain.reclaim");
+  const answer = (w: FakeWorker, n: number, reply: Record<string, unknown>) =>
+    w.send({ type: "brain.reclaimed", reclaimId: asks(w)[n]?.reclaimId, ...reply });
+
+  // Both have one idle: only Bia's, used longer ago, closes.
+  const oldest = t.sup.reclaimBrains("ana:s1");
+  await waitFor(() => asks(ana).length === 1 && asks(bia).length === 1);
+  expect(asks(ana)[0]).toMatchObject({ peek: true, spare: "ana:s1" });
   ana.send({ type: "brain.reclaimed", reclaimId: "nope", closed: true });
-  ana.send({ type: "brain.reclaimed", reclaimId: id, closed: false });
-  bia.send({ type: "brain.reclaimed", reclaimId: id, closed: true });
-  expect(await asked).toBe(true);
-  // Bia's worker says nothing: Ana's "none" ends it in time.
+  answer(ana, 0, { closed: false, idle: { since: 200, spare: false } });
+  answer(bia, 0, { closed: false, idle: { since: 100, spare: false } });
+  await waitFor(() => asks(bia).length === 2);
+  expect(asks(bia)[1]?.peek).toBeUndefined();
+  answer(bia, 1, { closed: true });
+  expect(await oldest).toBe(true);
+  expect(asks(ana)).toHaveLength(1);
+
+  // The waiting session's own goes last, even if older; Bia's became busy meanwhile, so Ana's closes.
+  const spare = t.sup.reclaimBrains("ana:s1");
+  await waitFor(() => asks(ana).length === 2 && asks(bia).length === 3);
+  answer(ana, 1, { closed: false, idle: { since: 50, spare: true } });
+  answer(bia, 2, { closed: false, idle: { since: 100, spare: false } });
+  await waitFor(() => asks(bia).length === 4);
+  answer(bia, 3, { closed: false });
+  await waitFor(() => asks(ana).length === 3);
+  answer(ana, 2, { closed: true });
+  expect(await spare).toBe(true);
+
+  // Bia's worker says nothing, Ana has none idle: none, in time.
   const silent = t.sup.reclaimBrains();
-  await waitFor(() => ana.of("brain.reclaim").length === 2);
-  ana.send({ type: "brain.reclaimed", reclaimId: ana.of("brain.reclaim")[1]?.reclaimId, closed: false });
+  await waitFor(() => asks(ana).length === 4);
+  answer(ana, 3, { closed: false });
   expect(await silent).toBe(false);
   for (const [w, q] of [
     [ana, await requestOn(ana)],
@@ -660,7 +679,7 @@ test("room for a turn: root asks every worker to close an idle CLI; one that did
     w.send({ type: "result", id: q.id, ok: true, data: execDone });
   await Promise.all(runs);
 
-  // The worker's end: it closes one of its own and says whether it did.
+  // The worker's end: it answers what it would close, or whether it closed one.
   const fromRoot = new PassThrough();
   const toRoot = new PassThrough();
   const link = new WorkerLink(fromRoot, toRoot);
@@ -671,10 +690,19 @@ test("room for a turn: root asks every worker to close an idle CLI; one that did
     (line) => said.push(JSON.parse(line)),
     () => {},
   );
-  link.onReclaim = async () => true;
-  fromRoot.write(`${JSON.stringify({ type: "brain.reclaim", reclaimId: "7" })}\n`);
-  await waitFor(() => said.length === 1);
-  expect(said[0]).toEqual({ type: "brain.reclaimed", reclaimId: "7", closed: true });
+  const heard: unknown[] = [];
+  link.onReclaim = async (ask) => {
+    heard.push(ask);
+    return ask.peek ? { closed: false, idle: { since: 5, spare: true } } : { closed: true };
+  };
+  fromRoot.write(`${JSON.stringify({ type: "brain.reclaim", reclaimId: "7", spare: "a:s", peek: true })}\n`);
+  fromRoot.write(`${JSON.stringify({ type: "brain.reclaim", reclaimId: "8" })}\n`);
+  await waitFor(() => said.length === 2);
+  expect(heard).toEqual([{ spare: "a:s", peek: true }, { peek: false }]);
+  expect(said).toEqual([
+    { type: "brain.reclaimed", reclaimId: "7", closed: false, idle: { since: 5, spare: true } },
+    { type: "brain.reclaimed", reclaimId: "8", closed: true },
+  ]);
 });
 
 test("frames from a worker go up only when they are its agent's", async () => {

@@ -21,7 +21,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { realFoldersFor } from "./access";
 import type { AccountGrant, AccountManager } from "./accounts";
-import type { BrainManager } from "./brain";
+import { type BrainManager, brainKey } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
 import { type CursorBrainTurnRequest, handleCursorBrainTurn } from "./brain-cursor";
@@ -183,10 +183,11 @@ export interface HandlerContext {
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
   /**
-   * A brain turn found no room: closes one idle warm CLI on this computer (each worker's, in system mode),
-   * least recently used first, never one mid-turn or holding the agent's work; false when none could close.
+   * A brain turn found no room: closes one idle warm CLI on this computer (any agent's in system mode), least
+   * recently used first, `spare` (the waiting turn's own session, `brainKey`) last, never one mid-turn or
+   * holding the agent's work; false when none could close.
    */
-  reclaimBrains?: () => Promise<boolean>;
+  reclaimBrains?: (spare: string) => Promise<boolean>;
   /**
    * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
    * scratch), how Codex starts our MCP server, and the live Codex runs the
@@ -1222,11 +1223,11 @@ export class RequestRunner {
    * No room for a turn: idle warm CLIs close, one at a time, until there is, for up to `RECLAIM_MS`. Not where
    * memory isn't known: room there is a count of turns, which closing idle CLIs doesn't change.
    */
-  private async reclaim(close: () => Promise<boolean>): Promise<boolean> {
+  private async reclaim(close: () => Promise<boolean>, signal: AbortSignal): Promise<boolean> {
     const until = Date.now() + (this.admission.reclaimMs ?? RECLAIM_MS);
-    while (Date.now() < until) {
+    while (!signal.aborted && Date.now() < until) {
       if (!(await close())) return false;
-      if (this.admit()) return true;
+      if (!signal.aborted && this.admit()) return true;
     }
     return false;
   }
@@ -1254,12 +1255,15 @@ export class RequestRunner {
         this.full(id);
         return Promise.resolve();
       }
-      // Held meanwhile: a duplicate id is refused, a cancel reaches it (the turn then ends at once as canceled).
+      // Held meanwhile: a duplicate id is refused, and a cancel stops closing other conversations' CLIs for it.
       this.inflight.set(id, controller);
-      return this.reclaim(close).then((room) => {
+      const session = (req as { session?: { id?: unknown } }).session?.id;
+      const spare = brainKey(req.agent?.id ?? "", String(session ?? ""));
+      return this.reclaim(() => close(spare), controller.signal).then((room) => {
         if (room && !this.closed) return this.run(id, req, controller);
         this.inflight.delete(id);
-        this.full(id);
+        if (controller.signal.aborted) this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });
+        else this.full(id);
       });
     }
     return this.run(id, req, controller);

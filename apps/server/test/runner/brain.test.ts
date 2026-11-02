@@ -21,6 +21,7 @@ import {
   BrainManager,
   type BrainManagerOptions,
   type BrainTurnContext,
+  brainKey,
   brainProfileLaunch,
   ClaudeStreamParser,
   carryClaudeSession,
@@ -661,6 +662,37 @@ test.if(posix)("reclaimIdle: the least recently used idle process closes, and re
   expect(await m.reclaimIdle()).toBe(false);
   await busy;
 });
+
+test.if(posix)(
+  "the cap is per agent; reclaimIdle closes the waiting turn's own session only when nothing else can",
+  async () => {
+    const { m, ws, turn } = setup({ maxProcesses: 1 });
+    const RIO = { id: "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0001", handle: "rio" };
+    await turn(1, "nova");
+    await m.turn(
+      {
+        runId: RUN(2),
+        kind: "claude_code",
+        session: { id: SESSION(2), resume: false },
+        cwd: "",
+        system: "",
+        prompt: "rio",
+        mcp: { token: "t" },
+      },
+      { agent: RIO, folder: await agentWorkspace(ws, RIO), emit: () => {} },
+    );
+    // Rio's turn left the other agent's warm process alone.
+    expect(m.size).toBe(2);
+    const own = brainKey(AGENT.id, SESSION(1));
+    // Its own process is the oldest, but the turn waiting for room would start it again: Rio's goes.
+    expect(m.idleCandidate(own)).toMatchObject({ spare: false });
+    expect(await m.reclaimIdle(own)).toBe(true);
+    expect(m.process(RIO.id, SESSION(2))).toBeUndefined();
+    expect(m.idleCandidate(own)).toMatchObject({ spare: true });
+    expect(await m.reclaimIdle(own)).toBe(true);
+    expect(m.size).toBe(0);
+  },
+);
 
 test.if(posix)("a process that dies mid-turn: the same turn runs again one-shot, resuming the session", async () => {
   const { m, spawns, turn } = setup();

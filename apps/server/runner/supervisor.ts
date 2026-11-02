@@ -108,7 +108,7 @@ const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
 /** Clone slots one worker may hold or wait for at once. */
 const MAX_WORKER_SLOTS = 64;
-/** How long `reclaimBrains` waits for the workers (each waits up to `RECLAIM_EXIT_MS` for its CLI to exit). */
+/** How long `reclaimBrains` waits for a worker's answer (a close waits up to `RECLAIM_EXIT_MS` for the CLI to exit). */
 const RECLAIM_REPLY_MS = 3_000;
 
 /** The broker is a child of the root runner home, never of an agent-owned home. */
@@ -173,6 +173,12 @@ function desktopUseOf(req: MachineRequest): WorkerDesktopUse | null {
 }
 
 /** The link's own frames, besides the machine protocol's. */
+/** A worker's answer to `brain.reclaim`. */
+export interface BrainReclaimed {
+  closed: boolean;
+  idle?: { since: number; spare: boolean };
+}
+
 export type WorkerLinkFrame =
   /** To the worker. */
   | ({ type: "worker.state" } & WorkerState)
@@ -195,10 +201,13 @@ export type WorkerLinkFrame =
     }
   /** From the worker: its agent's Chrome is in use on the agent's desktop (`BROWSER_LEASE_MS`). */
   | { type: "browser.desktop" }
-  /** To the worker: close its least recently used idle brain CLI (`BrainManager.reclaimIdle`). */
-  | { type: "brain.reclaim"; reclaimId: string }
-  /** From the worker: whether it closed one. */
-  | { type: "brain.reclaimed"; reclaimId: string; closed: boolean }
+  /**
+   * To the worker: close its least recently used idle brain CLI (`BrainManager.reclaimIdle`), `spare` last; with
+   * `peek`, only say which it would (`idleCandidate`).
+   */
+  | { type: "brain.reclaim"; reclaimId: string; spare?: string; peek?: boolean }
+  /** From the worker: whether it closed one, or (`peek`) when the one it would close was last used. */
+  | ({ type: "brain.reclaimed"; reclaimId: string } & BrainReclaimed)
   /** To the worker: Browser was clicked on its agent's desktop (`BrowserManager.show`). */
   | { type: "browser.show"; showId: string; agent: AgentScope }
   /** From the worker: Chrome for Testing installs first. */
@@ -337,8 +346,8 @@ interface Worker {
   enters: number[];
   /** Its clone slots, by its id (`release` once it has one): a worker that stops gives them back. */
   slots: Map<string, { release?: () => void }>;
-  /** `brain.reclaim`s it hasn't answered, by this side's id: whether it closed a CLI. */
-  reclaims: Map<string, (closed: boolean) => void>;
+  /** `brain.reclaim`s it hasn't answered, by this side's id. */
+  reclaims: Map<string, (reply: BrainReclaimed) => void>;
 }
 
 interface Show {
@@ -563,30 +572,41 @@ export class Supervisor {
   }
 
   /**
-   * A brain turn found no room on the computer: each worker closes its least recently used idle CLI (never one
-   * mid-turn or holding its agent's work). True once any did; a worker that doesn't answer in time counts as none.
+   * A brain turn found no room on the computer: one idle CLI closes, the least recently used across the workers
+   * (never one mid-turn or holding its agent's work; `spare`, the waiting turn's own session, last). Every worker
+   * says which it would close, then they are asked in that order until one did. A worker that doesn't answer in
+   * time counts as none.
    */
-  reclaimBrains(): Promise<boolean> {
-    const asked = [...this.workers.values()].filter((w) => w.ready);
-    if (asked.length === 0) return Promise.resolve(false);
+  async reclaimBrains(spare?: string): Promise<boolean> {
+    const workers = [...this.workers.values()].filter((w) => w.ready);
+    const peeks = await Promise.all(
+      workers.map(async (w) => ({ w, idle: (await this.askBrains(w, { spare, peek: true }))?.idle })),
+    );
+    const order = peeks
+      .flatMap(({ w, idle }) => (idle ? [{ w, idle }] : []))
+      .sort((a, b) => Number(a.idle.spare) - Number(b.idle.spare) || a.idle.since - b.idle.since);
+    for (const { w } of order) if ((await this.askBrains(w, { spare }))?.closed) return true;
+    return false;
+  }
+
+  private askBrains(w: Worker, ask: { spare?: string; peek?: boolean }): Promise<BrainReclaimed | null> {
     const reclaimId = String(++this.seq);
     return new Promise((resolve) => {
-      let left = asked.length;
-      let closed = false;
-      const done = () => {
+      const late = setTimeout(() => {
+        w.reclaims.delete(reclaimId);
+        resolve(null);
+      }, this.opts.reclaimMs ?? RECLAIM_REPLY_MS);
+      w.reclaims.set(reclaimId, (reply) => {
         clearTimeout(late);
-        for (const w of asked) w.reclaims.delete(reclaimId);
-        resolve(closed);
-      };
-      const late = setTimeout(done, this.opts.reclaimMs ?? RECLAIM_REPLY_MS);
-      for (const w of asked) {
-        w.reclaims.set(reclaimId, (c) => {
-          if (!w.reclaims.delete(reclaimId)) return;
-          closed ||= c;
-          if (--left === 0) done();
-        });
-        this.send(w, { type: "brain.reclaim", reclaimId });
-      }
+        w.reclaims.delete(reclaimId);
+        resolve(reply);
+      });
+      this.send(w, {
+        type: "brain.reclaim",
+        reclaimId,
+        ...(ask.spare ? { spare: ask.spare } : {}),
+        ...(ask.peek ? { peek: true } : {}),
+      });
     });
   }
 
@@ -1041,7 +1061,12 @@ export class Supervisor {
       return;
     }
     if (f?.type === "brain.reclaimed") {
-      w.reclaims.get(typeof f.reclaimId === "string" ? f.reclaimId : "")?.(f.closed === true);
+      const idle = f.idle as Partial<NonNullable<BrainReclaimed["idle"]>> | undefined;
+      const valid = typeof idle?.since === "number" && Number.isFinite(idle.since) && typeof idle.spare === "boolean";
+      w.reclaims.get(typeof f.reclaimId === "string" ? f.reclaimId : "")?.({
+        closed: f.closed === true,
+        ...(valid ? { idle: { since: idle.since as number, spare: idle.spare as boolean } } : {}),
+      });
       return;
     }
     if (f?.type === "secret.installed") {

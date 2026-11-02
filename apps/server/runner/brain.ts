@@ -73,13 +73,15 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   `done` or `error`.
  * - Block 5: one process per (agent, session) stays alive between turns
  *   (stdin open), closed after `idleMs` without a turn, at most
- *   `maxProcesses` kept (the least recently used idle one is closed for a new
- *   one). With all busy, a turn still gets its own process (live messages
- *   reach it too), and the cap is restored as turns end, least recently used
- *   idle first. A process that holds the agent's work (a task in the
+ *   `maxProcesses` kept per agent (the least recently used idle one of that
+ *   agent's is closed for a new one). With all busy, a turn still gets its
+ *   own process (live messages reach it too), and the cap is restored as
+ *   turns end, least recently used idle first. A process that holds the agent's work (a task in the
  *   background such as a dev server, or a turn of its own) is never closed as
  *   idle, to make room, or for the cap: closing it would kill that work.
- *   `reclaimIdle` closes one when the computer is short of memory for a turn.
+ *   `reclaimIdle` closes one when the computer is short of memory for a turn
+ *   (any agent's, the least recently used; the waiting turn's own session
+ *   last).
  *   A process that dies while idle is started again (resumed) on the next
  *   turn; one that dies mid-turn is replaced by a one-shot resume of the same
  *   turn. Turns of one session run one at a time (queued).
@@ -114,6 +116,9 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   other background jobs (a dev server, a watcher) live on. Only a turn stuck
  *   past that wait has its process killed (the next one resumes the session).
  */
+
+/** A session's process, by agent and session id: the key `reclaimIdle` spares last. */
+export const brainKey = (agentId: string, session: string) => `${agentId}:${session}`;
 
 export const BRAIN_IDLE_MS = 3 * 60_000;
 export const BRAIN_MAX_PROCESSES = 1;
@@ -1121,6 +1126,7 @@ export interface BrainManagerOptions {
 
 interface Live {
   key: string;
+  agentId: string;
   id: string;
   proc: ClaudeProcess;
   /** The account folder it signs in with; null: the computer's own sign-in. */
@@ -1246,12 +1252,19 @@ export class BrainManager {
 
   /** Persistent processes alive now (tests, status). */
   get size() {
-    return [...this.live.values()].filter((l) => l.persistent && !l.proc.exited).length;
+    return this.alive();
+  }
+
+  /** The cap is per agent: on a person's computer one agent's turns never close another's warm process. */
+  private alive(agentId?: string) {
+    return [...this.live.values()].filter(
+      (l) => l.persistent && !l.proc.exited && (agentId === undefined || l.agentId === agentId),
+    ).length;
   }
 
   /** The live process of a session, if any (tests). */
   process(agentId: string, session: string): ClaudeProcess | undefined {
-    return this.live.get(`${agentId}:${session}`)?.proc;
+    return this.live.get(brainKey(agentId, session))?.proc;
   }
 
   /** Whether a process of that sign-in is open: a turn, or the one kept after it (`null`: the computer's own). */
@@ -1288,7 +1301,7 @@ export class BrainManager {
    */
   steer(agentId: string, req: BrainSteerRequest): BrainSteerReply {
     const live = this.running.get(req.runId);
-    if (!live || live.key !== `${agentId}:${req.session}` || live.proc.exited) return { status: "no_turn" };
+    if (!live || live.key !== brainKey(agentId, req.session) || live.proc.exited) return { status: "no_turn" };
     return live.proc.turn?.steer(req.messages) ?? { status: "no_turn" };
   }
 
@@ -1336,7 +1349,7 @@ export class BrainManager {
         secrets: withSignIn(ctx.secrets, signIn),
       };
     }
-    const key = `${ctx.agent.id}:${session}`;
+    const key = brainKey(ctx.agent.id, session);
     const prev = this.chains.get(key) ?? Promise.resolve();
     const run = prev.catch(() => undefined).then(() => this.runTurn(key, session, cwd, req, ctx));
     this.chains.set(key, run);
@@ -1387,7 +1400,7 @@ export class BrainManager {
     }
     const keepAlive = req.keepAlive !== false;
     if (!live && keepAlive) {
-      if (this.size >= this.max) this.closeIdle(this.lruIdle());
+      if (this.alive(ctx.agent.id) >= this.max) this.closeIdle(this.lruIdle(ctx.agent.id));
       // Over the cap when every process is busy or holds work: the turn still gets its own (the agent works on
       // several conversations at once); `trim` closes the extra as turns end.
       live = this.spawn(key, session, cwd, req, ctx, sig, true, this.resumeFor(cwd, session, req, ctx));
@@ -1517,7 +1530,7 @@ export class BrainManager {
         if (this.left(live)) this.drop(live);
         else this.armIdle(live);
       }
-      this.trim();
+      this.trim(live.agentId);
     }
   }
 
@@ -1663,6 +1676,7 @@ export class BrainManager {
     );
     const live: Live = {
       key,
+      agentId: ctx.agent.id,
       id,
       proc,
       account: ctx.accountHome && typeof req.account === "string" ? req.account : null,
@@ -1700,14 +1714,24 @@ export class BrainManager {
     return this.opts.maxProcesses ?? BRAIN_MAX_PROCESSES;
   }
 
-  /** The least recently used process between turns that holds no work of the agent's. */
-  private lruIdle(): Live | undefined {
+  /**
+   * The least recently used process between turns that holds no work of the agent's (of `agentId`'s when given).
+   * `spare` (a `brainKey`) comes last: the turn waiting for room would start that session again at once.
+   */
+  private lruIdle(agentId?: string, spare?: string): Live | undefined {
     let lru: Live | undefined;
+    const rank = (l: Live) => (l.key === spare ? Number.MAX_SAFE_INTEGER : l.lastUsed);
     for (const l of this.live.values()) {
-      if (l.busy || !l.persistent || l.proc.holdsWork) continue;
-      if (!lru || l.lastUsed < lru.lastUsed) lru = l;
+      if (l.busy || !l.persistent || l.proc.holdsWork || (agentId !== undefined && l.agentId !== agentId)) continue;
+      if (!lru || rank(l) < rank(lru)) lru = l;
     }
     return lru;
+  }
+
+  /** What `reclaimIdle(spare)` would close: when it was last used, and whether it is `spare`'s (system mode's root picks). */
+  idleCandidate(spare?: string): { since: number; spare: boolean } | null {
+    const l = this.lruIdle(undefined, spare);
+    return l ? { since: l.lastUsed, spare: l.key === spare } : null;
   }
 
   private closeIdle(l: Live | undefined, why = "for another conversation") {
@@ -1716,10 +1740,10 @@ export class BrainManager {
     this.drop(l);
   }
 
-  /** Back within the cap once turns end: the least recently used idle processes close first. */
-  private trim() {
-    while (this.size > this.max) {
-      const l = this.lruIdle();
+  /** Back within the agent's cap once its turns end: the least recently used idle processes close first. */
+  private trim(agentId: string) {
+    while (this.alive(agentId) > this.max) {
+      const l = this.lruIdle(agentId);
       if (!l) return;
       this.closeIdle(l, "(over the cap)");
     }
@@ -1728,10 +1752,10 @@ export class BrainManager {
   /**
    * The computer is short of memory for a turn: closes the least recently used idle process that holds no
    * work (its session resumes on its next turn) and resolves once it exited (at most `RECLAIM_EXIT_MS`);
-   * false when there is none.
+   * false when there is none. The waiting turn's own session (`spare`) closes only when nothing else can.
    */
-  async reclaimIdle(): Promise<boolean> {
-    const l = this.lruIdle();
+  async reclaimIdle(spare?: string): Promise<boolean> {
+    const l = this.lruIdle(undefined, spare);
     if (!l) return false;
     this.closeIdle(l, "to make room for a turn");
     await new Promise<void>((resolve) => {

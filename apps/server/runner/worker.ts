@@ -34,6 +34,7 @@ import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from ".
 import { AGENTS_CGROUP, agentCgroup, systemdBooted } from "./service";
 import {
   BROWSER_LEASE_MS,
+  type BrainReclaimed,
   UPLOAD_CHUNK_BYTES,
   type WorkerDesktop,
   type WorkerDesktopUse,
@@ -120,8 +121,11 @@ export class WorkerLink {
   onSecretInstall: (id: string, agent: AgentScope, secret: ActivatedSecret) => void = () => {};
   /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
   onShow: (showId: string, agent: AgentScope) => void = () => {};
-  /** Root needs room for a brain turn: whether an idle CLI of this agent's closed. */
-  onReclaim: () => Promise<boolean> = async () => false;
+  /**
+   * Root needs room for a brain turn: with `peek`, what this agent would close (`BrainManager.idleCandidate`),
+   * else whether an idle CLI of this agent's closed.
+   */
+  onReclaim: (ask: { spare?: string; peek: boolean }) => Promise<BrainReclaimed> = async () => ({ closed: false });
   /** The supervisor is gone (stdin closed). */
   onEnd: () => void = () => {};
 
@@ -219,10 +223,11 @@ export class WorkerLink {
       case "brain.reclaim":
         if (typeof f.reclaimId === "string") {
           const reclaimId = f.reclaimId.slice(0, 64);
-          void this.onReclaim()
-            .catch(() => false)
-            .then((closed) =>
-              this.write(JSON.stringify({ type: "brain.reclaimed", reclaimId, closed } satisfies WorkerLinkFrame)),
+          const ask = { ...(typeof f.spare === "string" ? { spare: f.spare } : {}), peek: f.peek === true };
+          void this.onReclaim(ask)
+            .catch(() => ({ closed: false }))
+            .then((out) =>
+              this.write(JSON.stringify({ type: "brain.reclaimed", reclaimId, ...out } satisfies WorkerLinkFrame)),
             );
         }
         return;
@@ -498,7 +503,11 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const counted = setInterval(() => link.traffic(browser.takeTraffic()), LOAD_SAMPLE_MS);
   counted.unref?.();
   void browser.closeAll();
-  link.onReclaim = () => brains.reclaimIdle();
+  link.onReclaim = async ({ spare, peek }) => {
+    if (!peek) return { closed: await brains.reclaimIdle(spare) };
+    const idle = brains.idleCandidate(spare);
+    return idle ? { closed: false, idle } : { closed: false };
+  };
   link.onShow = (showId, agent) => {
     const shown =
       agent.id === o.agentId
@@ -536,7 +545,6 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     cacheFill: link.cacheFill,
     tasks,
     brains,
-    reclaimBrains: () => brains.reclaimIdle(),
     codex: {
       runnerHome: home,
       mcp: mcpCommand,
