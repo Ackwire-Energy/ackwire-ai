@@ -550,7 +550,8 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
     const options = screen().getAllByRole("option");
     expect(options.map((o) => [o.textContent, o.getAttribute("aria-disabled") === "true"])).toEqual([
-      ["A conta que os seus agentes dividem", false],
+      // The computer's own sign-in says its plan under its name, as "Seus planos" titles it.
+      ["A conta que os seus agentes dividemClaude · Max", false],
       ["Trabalho · Teamwalt@acme.com", false],
       ["Pessoal · MaxTambém usada por Theo", false],
       ["Claude Team 2De Ana", true],
@@ -802,7 +803,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       screen()
         .getAllByRole("option")
         .map((o) => o.textContent),
-    ).toEqual(["A conta que os seus agentes dividem", "Trabalho · Teamwalt@acme.com", "Adicionar conta"]);
+    ).toEqual(["A conta que os seus agentes dividemClaude · Max", "Trabalho · Teamwalt@acme.com", "Adicionar conta"]);
   });
 
   test("ChatGPT on the workspace's computer, which nobody connected: straight to its sign-in, never that computer's account", async () => {
