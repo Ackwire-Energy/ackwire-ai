@@ -266,11 +266,12 @@ jobs:
           test -s apps/desktop/src-tauri/native/web/index.html
           test -d apps/desktop/src-tauri/native/licenses/npm
 
-      - name: Icons
+      - name: Icons and the .dmg's background
         working-directory: apps/desktop
         run: |
           bun scripts/icons.ts
           bun run tauri icon app-icon.png
+          bun scripts/dmg-art.ts
 
       # The cached target may keep an older build's .app, .dmg and updater bundle (another name, another
       # version): the steps below pick the first one they find, so only this build's may be there.
