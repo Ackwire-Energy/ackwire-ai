@@ -130,6 +130,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       describe: (input) => ({ title: `Save how to: ${str(input.title)}` }),
       async execute(input, ctx) {
         try {
+          // Read from a page, an email or a routine's input, a how-to is only data until a person stands behind the run.
+          const requester = await personRequester(ctx);
           const title = str(input.title).trim();
           const res = await consolidateItem(
             ctx.db,
@@ -143,13 +145,14 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               subject: `how to ${title}`,
               content: str(input.how).trim(),
               sourceIds: [ctx.triggerMessageId],
-              // The method holds in every conversation, like a rule saved with `everywhere`.
-              channelIds: [],
+              // Where it was worked out: a public channel's reaches every run, a private one's stays there.
+              channelIds: [ctx.channelId],
+              trust: requester ? "high" : "low",
               evidence: [
                 { type: "self", ref: ctx.triggerMessageId, agentId: ctx.agentId, at: new Date().toISOString() },
               ],
               confidence: 0.8,
-              createdByKind: "agent",
+              createdByKind: HOW_TO_CREATOR,
               createdById: ctx.agentId,
             },
             memoryJudging(deps),
@@ -722,7 +725,14 @@ export async function retrieveForRun(
     db
       .select()
       .from(contextItems)
-      .where(and(base, eq(contextItems.agentId, input.agentId)))
+      // How-tos come in only when the request matches them (`searched`), so they never crowd out rules people gave.
+      .where(
+        and(
+          base,
+          eq(contextItems.agentId, input.agentId),
+          sql`not (${contextItems.kind} = 'note' and ${contextItems.createdByKind} = ${HOW_TO_CREATOR})`,
+        ),
+      )
       .orderBy(desc(contextItems.verified), desc(contextItems.relevance), desc(contextItems.updatedAt))
       .limit(15),
     db
@@ -819,8 +829,17 @@ export function pickDistinct(candidates: ContextItem[], known: string): ContextI
   return out;
 }
 
+/** Who a how-to note (`save_how_to`) is created by: the only notes an agent writes itself. */
+const HOW_TO_CREATOR = "agent";
+
 /** Tools whose calls say nothing about how a task was done. */
 const STEP_NOISE = ["search_context", "get_summary", "expand", "react", "ask_user", "save_how_to"];
+/** Words too common to tell one step from another (English and Portuguese). */
+const STEP_STOP_WORDS = new Set(
+  "the and for from with that this you your what how com que para por uma dos das nos nas como sobre isso esse essa".split(
+    " ",
+  ),
+);
 const STEP_DAYS = 90;
 const STEPS_SHOWN = 5;
 
@@ -838,10 +857,16 @@ async function ownPastSteps(
   channelIds: string[],
   query: string,
 ): Promise<string[]> {
-  const words = [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u))].filter((w) => w.length >= 3).slice(0, 8);
+  const words = [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u))]
+    .filter((w) => w.length >= 3 && !STEP_STOP_WORDS.has(w))
+    .slice(0, 8);
   if (words.length === 0 || channelIds.length === 0) return [];
   const patterns = words.map((w) => sql`${`%${w.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}`);
   const input = sql`(s.data->'input')::text`;
+  const score = sql`(${sql.join(
+    patterns.map((p) => sql`(${input} ilike ${p})::int`),
+    sql` + `,
+  )})`;
   const rows = rowsOf<{ data: { name?: string; input?: unknown }; created_at: string | Date; failed: boolean | null }>(
     await db.execute(sql`select s.data, s.created_at, (select (x.data->>'isError')::boolean from agent_run_steps x
           where x.run_id = s.run_id and x.kind = 'tool_result' and x.data->>'toolUseId' = s.data->>'toolUseId'
@@ -859,12 +884,9 @@ async function ownPastSteps(
           STEP_NOISE.map((n) => sql`${n}`),
           sql`, `,
         )})
-        and ${input} ilike any (array[${sql.join(patterns, sql`, `)}])
+        and ${score} >= ${Math.min(2, words.length)}
       -- More of the query's words first, then the newest.
-      order by (${sql.join(
-        patterns.map((p) => sql`(${input} ilike ${p})::int`),
-        sql` + `,
-      )}) desc, s.created_at desc
+      order by ${score} desc, s.created_at desc
       limit ${STEPS_SHOWN}`),
   );
   return rows

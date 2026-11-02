@@ -351,8 +351,13 @@ export async function buildRunContext(
   const machineAccess = agent.machineId
     ? machineAccessOf(db, run.orgId, agent.id, agent.machineId).catch(() => null)
     : null;
-  // The secrets people already gave it (names only), so it uses them instead of asking again.
-  const heldSecrets = heldSecretsOf(db, run.orgId, agent.id, agent.machineId).catch(() => []);
+  // The secrets people already gave it (names only), so it uses them instead of asking again. In a mission's
+  // thread its tools act on the mission's computer (ADR 0029): that one's secrets, none when it has no computer.
+  const heldSecrets = threadInfo?.missionId
+    ? threadInfo.missionMachineId
+      ? heldSecretsOf(db, run.orgId, agent.id, threadInfo.missionMachineId).catch(() => [])
+      : Promise.resolve([])
+    : heldSecretsOf(db, run.orgId, agent.id, agent.machineId).catch(() => []);
   // A routine's run keeps to its own task, as with "Your recent work" below.
   const openTasks =
     options.routine || run.background

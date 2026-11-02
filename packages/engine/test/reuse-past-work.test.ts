@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
-import { addChannelMember, createChannel, drainOutbox, postPersonMessage, type ToolSource } from "../src";
+import {
+  addChannelMember,
+  buildRunContext,
+  createChannel,
+  drainOutbox,
+  insertMessage,
+  postPersonMessage,
+  retrieveForRun,
+  type ToolContext,
+  type ToolSource,
+} from "../src";
 import { setup as baseSetup, type Fixture } from "./fixtures";
 
 let f: Fixture;
@@ -85,7 +95,7 @@ describe("agents reuse past work", () => {
     expect([howTo?.kind, howTo?.scopeType, howTo?.channelIds, howTo?.createdByKind, howTo?.title]).toEqual([
       "note",
       "agent",
-      [],
+      [f.general.id],
       "agent",
       "List the Northwind models",
     ]);
@@ -144,5 +154,100 @@ describe("agents reuse past work", () => {
     expect(lines[0]).toContain(`fetch_url {"url":"${MODELS_URL}"`);
     expect(lines[0]).toEndWith("(ok)");
     expect(lines[1]).toEndWith("(error)");
+
+    // One shared word is not a match: a search about something else carries no earlier steps.
+    const invoke = toolCaller(f, ops.id, (await post("something unrelated", ops.id)).id);
+    const searchFor = async (query: string) =>
+      (await invoke("search_context", { query })).split("\n").filter((l) => l.startsWith("[your earlier step]"));
+    expect(await searchFor("the northwind invoices from last week")).toEqual([]);
+    expect(await searchFor("the models from northwind")).toHaveLength(2);
+
+    // In a mission's thread its tools act on the mission's computer (ADR 0029), not the one holding the key.
+    const root = await post("mission root");
+    await f.db.insert(schema.threads).values({ orgId: f.org.id, channelId: f.general.id, rootMessageId: root.id });
+    await f.db.insert(schema.missions).values({
+      orgId: f.org.id,
+      threadRootId: root.id,
+      channelId: f.general.id,
+      agentId: f.agent.id,
+      title: "Mobile app",
+      goal: "Ship it",
+      mainSessionId: "session-1",
+    });
+    const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    if (!agent) throw new Error("no agent");
+    const inMission = await buildRunContext(f.db, { ...run, threadRootId: root.id }, agent, { maxMessages: 10 });
+    expect(inMission.system.map((b) => b.text).join("\n")).not.toContain("# Secrets on your computer");
+  });
+
+  test("a how-to: untrusted when no person is behind the run, kept to a private channel, and out of the prompt unless the request matches it", async () => {
+    f = await baseSetup({ contextTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const saveHowTo = async (channelId: string, background: boolean, title: string) => {
+      const msg = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId,
+        author: { type: "person", userId: f.owner.id },
+        body: "@dev do it",
+      });
+      const invoke = toolCaller(f, channelId, msg.id, background);
+      return invoke("save_how_to", { title, how: `GET https://api.northwind.example/${title} with NORTHWIND_API_KEY` });
+    };
+    const itemNamed = async (title: string) =>
+      (await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.title, title)))[0];
+
+    // A routine's run (or a webhook's) read it somewhere: kept, but labeled as data.
+    await saveHowTo(f.general.id, true, "export the invoices");
+    expect((await itemNamed("export the invoices"))?.trust).toBe("low");
+    await saveHowTo(f.general.id, false, "list the warehouses");
+    expect((await itemNamed("list the warehouses"))?.trust).toBe("high");
+
+    const finance = await createChannel(f.db, f.owner.id, f.org.id, { name: "finance", visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, finance.id, { agentId: f.agent.id });
+    await saveHowTo(finance.id, false, "pull the payroll totals");
+    expect((await itemNamed("pull the payroll totals"))?.channelIds).toEqual([finance.id]);
+
+    const memory = (text: string) =>
+      retrieveForRun(f.context, { orgId: f.org.id, agentId: f.agent.id, channelId: f.general.id, text });
+    // Private stays private, even when the request matches it.
+    expect((await memory("pull the payroll totals")).text).not.toContain("payroll");
+    // A how-to reaches the prompt when the request is about it, not in every run.
+    expect((await memory("list the warehouses please")).text).toContain("list the warehouses");
+    expect((await memory("good morning")).text).not.toContain("warehouses");
   });
 });
+
+/** Calls the agent's tools as a run in `channelId` triggered by `triggerMessageId` would (a routine's when `background`). */
+function toolCaller(fx: typeof f, channelId: string, triggerMessageId: string, background = false) {
+  let run: Promise<string> | null = null;
+  const runId = () =>
+    (run ??= fx.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: fx.org.id,
+        agentId: fx.agent.id,
+        channelId,
+        threadRootId: triggerMessageId,
+        triggerMessageId,
+        trigger: "mention",
+        hop: 1,
+        background,
+      })
+      .returning()
+      .then(([r]) => r?.id ?? ""));
+  return async (name: string, input: Record<string, unknown>) => {
+    const ctx: ToolContext = {
+      db: fx.db,
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      runId: await runId(),
+      channelId,
+      threadRootId: triggerMessageId,
+      triggerMessageId,
+    };
+    const tools = fx.tools;
+    if (!tools) throw new Error("no tools");
+    const r = await tools.invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name, input });
+    if (r.type !== "result") throw new Error(`expected a result, got ${r.type}`);
+    return r.output.content;
+  };
+}
