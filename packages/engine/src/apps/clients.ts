@@ -288,7 +288,10 @@ export interface AppIdentity {
 
 /**
  * How the consent page, the list in Settings and the "via" tag show an app: from this request's return address
- * (never the one the app registered first), and from its metadata document's host when it has one.
+ * (never the one the app registered first), and from its metadata document's host when it has one. Only a known
+ * app's own host is shown as verified with its name as the title. A return address on this computer is always a
+ * program there, whatever document it names: any local program can start a sign-in with a known app's `client_id`
+ * and its own port (the CIMD spec's localhost impersonation).
  */
 export function appIdentity(
   client: Pick<ResolvedApp, "id" | "kind" | "name">,
@@ -304,23 +307,20 @@ export function appIdentity(
   const cursor =
     redirectUri === CURSOR_CALLBACK || redirect?.hostname === "cursor.com" || redirect?.hostname === "www.cursor.com";
   const fallbackName = client.name ?? "";
-  if (client.kind === "cimd") {
-    const host = parseUrl(client.id)?.hostname ?? null;
-    return {
-      displayKind: "verified",
-      name: client.name ?? host ?? "",
-      host,
-      brand: brandOf(host),
-      returnsTo,
-      reservedNameWarning: false,
-      cursor,
-    };
-  }
   let identity: Omit<AppIdentity, "reservedNameWarning" | "returnsTo" | "cursor">;
   if (redirectUri === CURSOR_CALLBACK) {
     identity = { displayKind: "app_scheme", name: "Cursor", host: null, brand: "cursor" };
   } else if (redirect && isLoopbackUrl(redirect)) {
     identity = { displayKind: "loopback", name: fallbackName, host: null, brand: null };
+  } else if (client.kind === "cimd") {
+    const host = parseUrl(client.id)?.hostname.toLowerCase() ?? null;
+    const brand = brandOf(host);
+    identity = {
+      displayKind: brand ? "verified" : "https",
+      name: fallbackName || (host ?? ""),
+      host,
+      brand,
+    };
   } else {
     const host = redirect?.hostname ?? null;
     identity = { displayKind: "https", name: fallbackName || (host ?? ""), host, brand: brandOf(host) };

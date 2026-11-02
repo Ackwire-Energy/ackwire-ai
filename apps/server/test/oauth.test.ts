@@ -186,6 +186,53 @@ describe("metadata documents (CIMD)", () => {
     expect(view.workspaces.map((w) => w.id)).toEqual([orgId]);
   });
 
+  const clientOf = async (b: ReturnType<typeof browser>, id: string, redirect: string) => {
+    const { location } = await authorize(t, baseParams(id, redirect));
+    const view = (await (await b(`/api/app/authorize/${requestIdOf(location)}`)).json()) as {
+      request: { client: Record<string, unknown> };
+    };
+    return view.request.client;
+  };
+
+  test("a known app's document with a return address on this computer is shown as a program there", async () => {
+    const { b } = await owner();
+    const CODE = "https://claude.ai/oauth/claude-code-client-metadata";
+    docs.set(CODE, {
+      body: JSON.stringify({
+        client_id: CODE,
+        client_name: "Claude Code",
+        redirect_uris: ["http://localhost/callback"],
+      }),
+    });
+    expect(await clientOf(b, CODE, "http://localhost:51234/callback")).toMatchObject({
+      displayKind: "loopback",
+      name: "Claude Code",
+      host: null,
+      brand: null,
+      returnsTo: "localhost:51234",
+      reservedNameWarning: true,
+    });
+  });
+
+  test("a document on any other host is shown by its host, its name unverified and checked", async () => {
+    const { b } = await owner();
+    const FAKE = "https://claude-connect.example/client.json";
+    docs.set(FAKE, {
+      body: JSON.stringify({
+        client_id: FAKE,
+        client_name: "Claude",
+        redirect_uris: ["https://claude-connect.example/cb"],
+      }),
+    });
+    expect(await clientOf(b, FAKE, "https://claude-connect.example/cb")).toMatchObject({
+      displayKind: "https",
+      name: "Claude",
+      host: "claude-connect.example",
+      brand: null,
+      reservedNameWarning: true,
+    });
+  });
+
   test("private_key_jwt documents connect as public clients with PKCE", async () => {
     docs.set(ID, { body: doc({ token_endpoint_auth_method: "private_key_jwt", jwks_uri: "https://claude.ai/jwks" }) });
     const { location } = await authorize(t, baseParams(ID, "https://claude.ai/api/mcp/auth_callback"));
