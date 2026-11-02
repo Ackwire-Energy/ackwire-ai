@@ -242,6 +242,34 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0113)", () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  test("the only workspace paused: says so and links to it; Permitir stays off", async () => {
+    await open((apps) =>
+      apps.addConsent(REQ, {}, { workspaces: [{ id: ORG_ID, name: "Acme", logo: null, paused: true, current: true }] }),
+    );
+    expect(page().textContent).toContain("Acme (pausado)");
+    expect(within(page()).getByRole("alert").textContent).toContain(
+      "Este workspace está pausado. Ative-o para conectar apps.",
+    );
+    expect(within(page()).getByRole("link", { name: "Abrir o workspace" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
+    expect(within(page()).getByRole("button", { name: "Permitir" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  test("every workspace paused: says so above the picker", async () => {
+    await open((apps) =>
+      apps.addConsent(
+        REQ,
+        {},
+        {
+          workspaces: [
+            { id: ORG_ID, name: "Acme", logo: null, paused: true, current: true },
+            { id: "00000000-0000-4000-8000-0000000000f2", name: "Estúdio", logo: null, paused: true, current: false },
+          ],
+        },
+      ),
+    );
+    expect(within(page()).getByRole("alert").textContent).toContain("Todos os seus workspaces estão pausados.");
+  });
+
   test("no workspace yet: says so, with Criar workspace", async () => {
     await open((apps) => apps.addConsent(REQ, {}, { workspaces: [] }));
     expect(page().textContent).toContain("Você ainda não está em um workspace");

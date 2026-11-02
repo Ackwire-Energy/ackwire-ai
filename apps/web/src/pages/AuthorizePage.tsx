@@ -212,6 +212,8 @@ function ConsentForm({
           : "Cursor";
   const canWrite = consent.request.access.requested.includes("write");
   const only = consent.workspaces.length === 1 ? consent.workspaces[0] : null;
+  // Every workspace paused (on hold until billing is paid, say): Permitir can't be pressed, so the page says why.
+  const nonePickable = !defaultWorkspace(consent);
   return (
     <Card padded as="div" className="consent">
       <form
@@ -261,7 +263,7 @@ function ConsentForm({
         {only ? (
           <div className="apps-field" style={{ gap: 2 }}>
             <span className="newag__label">{t("apps.consent.workspace")}</span>
-            <span>{only.name}</span>
+            <span>{only.paused ? t("apps.consent.paused", { name: only.name }) : only.name}</span>
           </div>
         ) : (
           <Field label={t("apps.consent.workspace")} id="consent-org">
@@ -280,6 +282,14 @@ function ConsentForm({
           </Field>
         )}
         {inlineError && <Alert>{t(`apps.consent.error.${inlineError}`)}</Alert>}
+        {!inlineError && nonePickable && (
+          <Alert>
+            {t(only ? "apps.consent.error.onlyPaused" : "apps.consent.error.allPaused")}{" "}
+            <Link to="/org/$orgId" params={{ orgId: only?.id ?? consent.workspaces[0]?.id ?? "" }} className="ac-link">
+              {t("apps.consent.error.openWorkspace")}
+            </Link>
+          </Alert>
+        )}
         <div className="apps-field" style={{ gap: 6 }}>
           <span className="newag__label" id="consent-access">
             {t("apps.consent.access")}
