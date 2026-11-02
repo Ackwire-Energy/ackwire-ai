@@ -297,8 +297,8 @@ export function agentBrowserTarget(
   return null;
 }
 
-/** The counters in the agents' `memory.events` that rise when they run out of memory (`max`: they reached their limit). */
-const OUT_OF_MEMORY = ["max", "oom", "oom_kill"];
+/** The counters that rise when a page dies for memory (`memoryCounters`). */
+const OUT_OF_MEMORY = ["oom", "oom_kill"];
 
 /** How a tab's page died (`pageCrashed`): `again` before the agent heard of the first time, so it wasn't reloaded. */
 export interface PageCrash {
@@ -1022,8 +1022,13 @@ export interface BrowserManagerOptions {
   connectStream?: (url: string) => StreamSocket;
   /** Tests: opens a Chrome's browser endpoint (its traffic and its pages that die). */
   connectDevtools?: (url: string) => StreamSocket;
-  /** The agents' slice's `memory.events` (system mode): whether a page that died ran out of memory. */
-  memoryEvents?: string;
+  /**
+   * The agent's slice's `memory.events` and the agents' (system mode): a page that died ran out of memory when one of
+   * the agent's own processes was stopped for memory (its `oom_kill`, which counts its sub-slices' too) or an
+   * allocation failed at the limit all agents share (theirs `oom`). Never their `max`: with their cache at that limit,
+   * as it stays once they have filled it, it rises at every allocation.
+   */
+  memoryEvents?: { agent: string; agents: string };
   /** Tests: how long a new stream waits for Chrome's first frame (`FIRST_FRAME_MS`). */
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
@@ -2035,8 +2040,11 @@ export class BrowserManager {
     this.opts.log(`the browser of ${session.name}: a page ${memory ? "ran out of memory" : "crashed"}, ${left}`);
   }
 
-  private memoryCounters() {
-    return this.opts.memoryEvents ? cgroupCounters(this.opts.memoryEvents) : null;
+  private memoryCounters(): Record<string, number> | null {
+    const files = this.opts.memoryEvents;
+    if (!files) return null;
+    const [agent, agents] = [cgroupCounters(files.agent), cgroupCounters(files.agents)];
+    return agent || agents ? { oom_kill: agent?.oom_kill ?? 0, oom: agents?.oom ?? 0 } : null;
   }
 
   /**

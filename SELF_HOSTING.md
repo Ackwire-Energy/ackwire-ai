@@ -1108,7 +1108,9 @@ so one agent's build may use every CPU and all the memory the agents have; when 
 each gets an equal share. All of them together stop at 75% of the RAM (50% on this server's own
 computer), plus swap for a third of that, which keeps the rest for the system, the runner and, here,
 the server. At that limit the kernel stops one process, usually the biggest (Chrome's pages first), and
-only that process: the command it belonged to fails, and the agent is told it was most likely memory.
+only that process: the command it belonged to fails, and the agent is told it was most likely memory
+(with systemd 253 or newer; a desktop or a task already running when you update gets this when it next
+starts).
 `agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what is free
 for new work and which agents use the most; agents are told to run it before something heavy, to tell
 the person when another agent's work leaves no room, and to stop what a finished build left running.
