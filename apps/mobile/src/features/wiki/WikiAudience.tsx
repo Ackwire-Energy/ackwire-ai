@@ -132,6 +132,20 @@ function Form({
     hint?: string,
   ): AccessListRow<WikiLevel> => {
     const level = draft[group][key] ?? "none";
+    const baseKey = group === "agentRows" ? "agents" : "people";
+    // With everyone editing, a tap adds them, and adding someone means limiting it: "everyone" drops until Salvar.
+    if (base === "edit") {
+      return {
+        key,
+        icon,
+        label,
+        ...(hint ? { hint } : {}),
+        level: "none",
+        levels: ["none", rowCap === "edit" ? "edit" : "view"],
+        action: t("wiki.audienceAddRow"),
+        onChange: (next) => setDraft((d) => ({ ...d, [baseKey]: "none", [group]: { ...d[group], [key]: next } })),
+      };
+    }
     return {
       key,
       icon,
@@ -179,33 +193,29 @@ function Form({
             base("agents", t("wiki.audienceAgentsAll"), t("wiki.audienceAgentsAllText"), "person"),
           ]}
         />
-        {draft.people !== "edit" ? (
-          <>
-            <AccessList
-              title={t("wiki.audienceRoles")}
-              levelName={levelName}
-              rows={roleList.map((r) =>
-                row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
-              )}
-            />
-            <AccessList
-              title={t("wiki.audiencePeople")}
-              levelName={levelName}
-              rows={[...dir.memberById.values()].map((m) =>
-                row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
-              )}
-            />
-          </>
-        ) : null}
-        {draft.agents !== "edit" ? (
+        <>
           <AccessList
-            title={t("wiki.audienceAgents")}
+            title={t("wiki.audienceRoles")}
             levelName={levelName}
-            rows={agents.map((a) =>
-              row("agentRows", draft.agents, wikiRowCap(cap.agents, cap.agentRows[a.id]), a.id, "person", a.name),
+            rows={roleList.map((r) =>
+              row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
             )}
           />
-        ) : null}
+          <AccessList
+            title={t("wiki.audiencePeople")}
+            levelName={levelName}
+            rows={[...dir.memberById.values()].map((m) =>
+              row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
+            )}
+          />
+        </>
+        <AccessList
+          title={t("wiki.audienceAgents")}
+          levelName={levelName}
+          rows={agents.map((a) =>
+            row("agentRows", draft.agents, wikiRowCap(cap.agents, cap.agentRows[a.id]), a.id, "person", a.name),
+          )}
+        />
         <Text variant="footnote" tone="faint" style={styles.lead}>
           {t("wiki.audienceEditNote")}
         </Text>

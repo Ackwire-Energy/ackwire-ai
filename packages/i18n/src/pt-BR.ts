@@ -6800,6 +6800,7 @@ export const ptBR = {
     readOnly: "Só leitura",
     readOnlyHint: "Você pode ler esta página, mas não editar.",
     audienceAdd: "Adicionar pessoa, papel ou agente",
+    audienceAddRow: "Adicionar",
     audienceAddSearch: "Buscar pessoas, papéis e agentes",
     audienceRoles: "Papéis",
     audienceRemove: "Remover",

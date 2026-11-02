@@ -11,6 +11,8 @@ export interface AccessListRow<L extends string = string> {
   /** The levels this row walks through, in order; a tap goes to the next. */
   levels: L[];
   onChange: (level: L) => void;
+  /** Words on the right instead of the level's name ("Adicionar"). */
+  action?: string;
 }
 
 /**
@@ -39,7 +41,7 @@ export function AccessList<L extends string>({
             ...(r.hint ? { hint: r.hint } : {}),
             trailing: (
               <Text variant="subhead" tone="faint">
-                {levelName(r.level)}
+                {r.action ?? levelName(r.level)}
               </Text>
             ),
             onPress: () => r.onChange(r.levels[(r.levels.indexOf(r.level) + 1) % r.levels.length] ?? r.level),

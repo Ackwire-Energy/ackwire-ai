@@ -281,6 +281,30 @@ describe("the wiki", () => {
     ]);
   });
 
+  test("Acesso: with everyone editing, adding a role is what limits the page", async () => {
+    const { state } = await go("wiki/deploy");
+    const more = screen().getByRole("button", { name: "Mais ações" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Acesso" }));
+    const dialog = screen().getByRole("dialog", { name: "Acesso a Deploy" });
+    await pickLevel(dialog, "Adicionar pessoa, papel ou agente", "Admin");
+    expect(within(dialog).getByRole("combobox", { name: "O que Todos do workspace pode fazer" }).textContent).toContain(
+      "Sem acesso",
+    );
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    const call = state.calls.find((c) => c.method === "wiki.audience");
+    expect(call?.args.slice(1)).toEqual([
+      "deploy",
+      { audience: { roleIds: [ADMIN_ROLE_ID], userIds: [] }, agentIds: null, editors: null, agentEditorIds: null },
+    ]);
+  });
+
   test("a page outside your audience: a plain no access", async () => {
     const api = createFakeApi(seedState(), { seed: true });
     api.wiki.get = async () => {

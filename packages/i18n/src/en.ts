@@ -6741,6 +6741,7 @@ export const en: Translations = {
     readOnly: "Read only",
     readOnlyHint: "You can read this page but not edit it.",
     audienceAdd: "Add a person, role or agent",
+    audienceAddRow: "Add",
     audienceAddSearch: "Search people, roles and agents",
     audienceRoles: "Roles",
     audienceRemove: "Remove",

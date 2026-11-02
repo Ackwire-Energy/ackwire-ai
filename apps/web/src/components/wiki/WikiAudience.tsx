@@ -203,14 +203,17 @@ function AudienceForm({
   const levelsFor = (s: AccessSubject) => {
     const { group, id } = parts(s);
     const most = capOf(group, id);
-    if (most === "none" || baseOf(group) === "edit") return [];
+    if (most === "none") return [];
     if (baseOf(group) === "view") return most === "edit" ? [level("edit")] : [];
     return most === "edit" ? [level("view"), level("edit")] : [level("view")];
   };
   const levelOf = (s: AccessSubject) => {
     const { group, id } = parts(s);
     const value = draft[group][id] ?? "none";
-    if (value === "none" || (baseOf(group) === "view" && value !== "edit")) return undefined;
+    // With everyone editing, a row says nothing: it comes back when "everyone" is lowered.
+    if (value === "none" || baseOf(group) === "edit" || (baseOf(group) === "view" && value !== "edit")) {
+      return undefined;
+    }
     return value;
   };
   return (
@@ -243,7 +246,13 @@ function AudienceForm({
       levelsFor={levelsFor}
       onLevelChange={(s, value) => {
         const { group, id } = parts(s);
-        setDraft((d) => ({ ...d, [group]: { ...d[group], [id]: value ?? "none" } }));
+        // Adding someone while everyone edits means limiting it: "everyone" drops, in plain sight, until Salvar.
+        const base = group === "agentRows" ? "agents" : "people";
+        setDraft((d) => ({
+          ...d,
+          [group]: { ...d[group], [id]: value ?? "none" },
+          ...(value && d[base] === "edit" ? { [base]: "none" } : {}),
+        }));
       }}
       labels={{
         add: t("wiki.audienceAdd"),
