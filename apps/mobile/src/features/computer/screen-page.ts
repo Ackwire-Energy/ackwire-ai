@@ -96,14 +96,18 @@ export const screenCall = <K extends keyof PageCalls>(method: K, ...args: PageCa
 /** RFB's buttons: the left one, and the wheel's two directions (pressed and let go per notch). */
 export const BUTTON = { none: 0, left: 1, wheelUp: 8, wheelDown: 16 } as const;
 
-/** How often a moving pointer reaches the page: a touch moves far more often than a stream needs to hear. */
-export const POINTER_MS = 33;
+/**
+ * How often a moving pointer reaches the page: a touch moves far more often than a stream needs to hear. The same pace
+ * noVNC keeps for a mouse (`MOUSE_MOVE_DELAY`), so the agent's screen answers a finger as it answers a mouse on the web.
+ */
+export const POINTER_MS = 16;
 
 type Send = (x: number, y: number, buttons: number) => void;
 
 /**
- * The pointer on its way to the page. Moves wait for the next tick and only the newest goes; a change of buttons goes
- * at once, and after the move before it, so a click lands where the cursor was seen.
+ * The pointer on its way to the page. The first move goes at once, so a touch never starts late; while it keeps moving,
+ * only the newest goes at each tick. A change of buttons goes at once, and after the move before it, so a click lands
+ * where the cursor was seen.
  */
 export class PointerLine {
   private buttons: number = BUTTON.none;
@@ -118,10 +122,9 @@ export class PointerLine {
 
   move(x: number, y: number) {
     this.waiting = { x, y };
-    this.tick ??= this.schedule(() => {
-      this.tick = null;
-      this.flush();
-    }, POINTER_MS);
+    if (this.tick !== null) return;
+    this.flush();
+    this.wait();
   }
 
   /** Presses or lets go of these buttons where the pointer is. */
@@ -143,6 +146,15 @@ export class PointerLine {
     if (this.tick !== null) this.unschedule(this.tick);
     this.tick = null;
     this.waiting = null;
+  }
+
+  private wait() {
+    this.tick = this.schedule(() => {
+      this.tick = null;
+      if (!this.waiting) return;
+      this.flush();
+      this.wait();
+    }, POINTER_MS);
   }
 
   private flush() {

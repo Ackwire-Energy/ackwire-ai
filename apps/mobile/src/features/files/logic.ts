@@ -123,18 +123,6 @@ function fileType(name: string, mime: string, view: FileView): FileTypeKey {
   return view === "text" ? "text" : "file";
 }
 
-/**
- * How a message's pictures sit: one alone at its own shape, or rows of two (an odd last one alone in
- * its row, half width). Returns the indexes per row.
- */
-export function imageRows(count: number): number[][] {
-  if (count <= 0) return [];
-  if (count === 1) return [[0]];
-  const rows: number[][] = [];
-  for (let i = 0; i < count; i += 2) rows.push(i + 1 < count ? [i, i + 1] : [i]);
-  return rows;
-}
-
 /** A lone picture's height for `width`: its own aspect ratio, kept between tall (3:4… 9:16) and wide (2:1). */
 export function singleImageHeight(width: number, size: { width: number; height: number } | null): number {
   if (!size || size.width <= 0 || size.height <= 0) return Math.round(width * 0.75);

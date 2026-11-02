@@ -54,6 +54,8 @@ On the screen, pinch zooms and a drag moves the view, and a tap brings the curso
 
 The app draws the cursor over the screen, since a remote pointer doesn't show under a finger, or at all where a desktop draws none. It is ours rather than a circle or the system's: a pixel arrow in the brand's dither, with a light rim and a soft shadow so it reads on any window, whose tip is where a click lands. It shrinks a little on a click and grows while dragging.
 
+Sideways, in control, the trade changes, so the phone gets the other answer. Lying down, the picture fills the phone's width at 0.73, a 20 px target is 15 pt, and there is no room for a pad beside it that doesn't shrink the picture back. So the finger is the mouse: a tap clicks where it lands, a drag rolls the view and then the page under it (`dragView`), a hold presses and drags, two fingers move and zoom the view. The cursor stays out of the way; a ring and a spot under the finger say what happened. A dock over the picture keeps the notice's ⓘ, the keyboard and handing back, and rests faint between touches. Only this view turns, and only in control (`useSideways`): the rest of the app stays upright, and a button on the trackpad lies it down when the phone's own rotation lock is on.
+
 ### 4. Typing
 
 The app's `TypeBar`, not key by key: a whole text goes to the field in focus, the same words and password mode as the browser, so the system's autofill and passwords work and a password never lands in the conversation. A key row has Esc, Tab, Enter and Delete, and the field takes the phone's own paste. Text goes as on the web (ADR 0058 §16): typed as characters where noVNC can, pasted otherwise.

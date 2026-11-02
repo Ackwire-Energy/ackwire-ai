@@ -27,7 +27,7 @@ import {
   trackField,
   webToneIndex,
 } from "../src/sky/math";
-import { shaderSource } from "../src/sky/shaders";
+import { EFFORT_SHADER, shaderSource } from "../src/sky/shaders";
 
 describe("Bayer thresholds", () => {
   test("the shader's formula equals the web's table for every cell", () => {
@@ -105,7 +105,6 @@ test("every shader declares the uniforms the component passes", () => {
     "track",
     "sweep",
     "pill",
-    "pillwork",
     "horizon",
     "workspace",
   ] as const) {
@@ -115,6 +114,9 @@ test("every shader declares the uniforms the component passes", () => {
     expect(src).toContain("half4 main(float2 pos)");
     expect(src).toContain("float field(");
   }
+  expect(shaderSource("pill")).toContain("uniform float work;");
+  for (const u of ["size", "px", "pos", "steps", "t", "fillTone", "tipTone", "inkTone", "offTone"])
+    expect(EFFORT_SHADER).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
   expect(shaderSource("fuse")).toContain("uniform float remaining;");
   expect(shaderSource("bar")).toContain("uniform float value;");
   expect(shaderSource("track")).toContain("uniform float states[48];");

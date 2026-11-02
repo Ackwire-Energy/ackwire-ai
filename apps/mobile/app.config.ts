@@ -41,7 +41,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "agentes",
   scheme: "agenteschat",
   version: "0.1.0",
-  orientation: "portrait",
+  // Upright everywhere (the plugin below); only the agent's screen, in control, lies down (`useSideways`).
+  orientation: "default",
   icon: "./assets/images/icon.png",
   userInterfaceStyle: "automatic",
   ios: {
@@ -84,6 +85,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     ["expo-router", { redirects: LEGACY_REDIRECTS }],
+    ["expo-screen-orientation", { initialOrientation: "PORTRAIT_UP" }],
     "expo-secure-store",
     "expo-localization",
     "expo-web-browser",
