@@ -10,6 +10,7 @@ import {
   grantKey,
   grantScopes,
   importSkillZip,
+  KILLED_NOTE,
   NO_COMPUTER_MESSAGE,
   NotFoundError,
   notAllowedMessage,
@@ -145,6 +146,22 @@ describe("access", () => {
 });
 
 describe("limits", () => {
+  test("a command the system killed (137) most likely ran out of memory; one a person stopped didn't", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await connectedComputer(f, {
+      exec: (req) =>
+        req.command.includes("python3")
+          ? { exitCode: 137, stdout: "", stderr: "", canceled: { killed: true } }
+          : { exitCode: 137, stdout: "", stderr: "Killed\n" },
+    });
+    const ctx = await runCtx();
+    const killed = await call(ctx, "run_code", { language: "bash", code: "./gradlew assembleDebug" });
+    expect(killed.content).toStartWith("run_code bash: exit code 137");
+    expect(killed.content).toEndWith(`\n${KILLED_NOTE}`);
+    const stopped = await call(ctx, "run_code", { language: "python", code: "import time; time.sleep(60)" });
+    expect(stopped.content).not.toContain(KILLED_NOTE);
+  });
+
   test("timeouts and long output are cut; approval and the org's switch", async () => {
     f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
     const { runner } = await connectedComputer(f, {
