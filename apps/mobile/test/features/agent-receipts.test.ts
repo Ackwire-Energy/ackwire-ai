@@ -119,6 +119,27 @@ describe("the agents' receipt line under a person's message", () => {
     expect(en("receipts.outage", { count: 1, names: "Ada" })).toBe("Ada: the AI provider is down · retries by itself");
   });
 
+  test("a run waiting for its computer: in line, or until it is back, on its own line", async () => {
+    const waiting = (computer: "queued" | "away") =>
+      receiptLine(
+        applyReceiptEvent(routed({}), {
+          type: "message.handled",
+          channelId: "c1",
+          messageId: "m1",
+          agentId: "ada",
+          status: "waiting_input",
+          computer,
+        }).m1,
+      );
+    expect(waiting("queued")?.words).toEqual({ key: "receipts.queued", agents: ["ada"] });
+    expect(waiting("away")?.words).toEqual({ key: "receipts.away", agents: ["ada"] });
+    expect(waiting("queued")?.alert).toBe(false);
+    const pt = await translator("pt-BR");
+    expect(pt("receipts.queued", { count: 1, names: "Ada" })).toBe("Ada está na fila do computador");
+    const en = await translator("en");
+    expect(en("receipts.away", { count: 2, names: "Ada and Theo" })).toBe("Ada and Theo are waiting for the computer");
+  });
+
   test("a failure is the danger tone with Retry", () => {
     const line = receiptLine(handled(routed({}), "ada", "failed").m1);
     expect(line?.words).toEqual({ key: "receipts.failed", agents: ["ada"] });
