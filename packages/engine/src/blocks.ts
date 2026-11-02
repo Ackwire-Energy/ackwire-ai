@@ -177,7 +177,9 @@ async function resultText(
   poll: PollView,
 ): Promise<string> {
   const ids = [...new Set(poll.votes.map((v) => v.userId))];
-  const people = ids.length ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids)) : [];
+  const people = ids.length
+    ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids))
+    : [];
   const nameOf = (id: string) => people.find((p) => p.id === id)?.name ?? "someone";
   const lines = content.options.map((label, i) => {
     const who = poll.votes.filter((v) => v.option === i).map((v) => nameOf(v.userId));

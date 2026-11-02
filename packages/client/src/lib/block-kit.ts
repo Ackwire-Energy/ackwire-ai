@@ -5,7 +5,10 @@
  * the app. Parts and how to use them: `BLOCK_MANUAL` in `packages/engine/src/blocks.ts`.
  */
 
-export const BLOCK_KIT_CSS = String.raw`:root{--ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;--line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);--raised:#fff;--sunken:#f3f3f0;--well:#fbfbf9;--plate:rgba(127,127,127,.1);--plate2:rgba(127,127,127,.06);--ok:#1f7a45;--warn:#9a5b00;--danger:#c4321c;--focus:rgba(75,140,245,.35);color-scheme:light}
+/** What the app tells the page before the kit starts. `json` is already safe inside a script. */
+export const blockBoot = (json: string) => `window.__block=${json}`;
+
+export const BLOCK_KIT_CSS = `:root{--ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;--line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);--raised:#fff;--sunken:#f3f3f0;--well:#fbfbf9;--plate:rgba(127,127,127,.1);--plate2:rgba(127,127,127,.06);--ok:#1f7a45;--warn:#9a5b00;--danger:#c4321c;--focus:rgba(75,140,245,.35);color-scheme:light}
 html[data-theme=dark]{--ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;--line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.15);--raised:#1c1c1b;--sunken:#0a0a09;--well:#141413;--plate:rgba(127,127,127,.14);--plate2:rgba(127,127,127,.08);--ok:#5fc48a;--warn:#e0a84a;--danger:#f08a80;--focus:rgba(75,140,245,.45);color-scheme:dark}
 *{box-sizing:border-box}
 html{overflow:hidden auto}

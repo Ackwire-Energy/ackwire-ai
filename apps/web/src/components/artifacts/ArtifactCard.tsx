@@ -4,12 +4,12 @@ import { documentPreview, KIND_ICON, patchCounts } from "@agenteschat/client/lib
 import { Icon } from "@agenteschat/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { LiveBlockCard } from "@/components/blocks/LiveBlock";
+import { PollCard } from "@/components/blocks/PollCard";
 import { useOrg } from "@/components/org-context";
 import { contextMenuHandler, copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
-import { LiveBlockCard } from "@/components/blocks/LiveBlock";
-import { PollCard } from "@/components/blocks/PollCard";
 import { artifactLink, useArtifactViewer, useAuthorName } from "./ArtifactViewer";
 import { FileCardPreview } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";

@@ -433,7 +433,8 @@ export function artifactRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, artifactId } = c.req.valid("param");
-      return c.json(await keepBlock(artifacts(), c.get("user").id, orgId, artifactId), 200);
+      const userId = c.get("user").id;
+      return c.json(await withFacts(userId, orgId, await keepBlock(artifacts(), userId, orgId, artifactId)), 200);
     },
   );
 
@@ -448,10 +449,17 @@ export function artifactRoutes(deps: AppDeps) {
       request: {
         params: ArtifactParams,
         body: body(
-          z.object({ text: z.string().min(1).max(BLOCK_REPLY_CHARS), clientId: z.string().max(64).nullable().optional() }),
+          z.object({
+            text: z.string().min(1).max(BLOCK_REPLY_CHARS),
+            clientId: z.string().max(64).nullable().optional(),
+          }),
         ),
       },
-      responses: { 201: json(z.object({ id: z.string() })), ...errors },
+      responses: {
+        201: json(z.object({ id: z.string() })),
+        ...errors,
+        429: errorResponse("Too many messages (`rate_limited`)"),
+      },
     }),
     async (c) => {
       const { orgId, artifactId } = c.req.valid("param");
@@ -459,7 +467,12 @@ export function artifactRoutes(deps: AppDeps) {
       const limit = await deps.adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
       const message = await replyToBlock(
-        { ...artifacts(), pubsub: deps.adapters.pubsub, judge: deps.extras?.context?.judge, talker: deps.extras?.talker },
+        {
+          ...artifacts(),
+          pubsub: deps.adapters.pubsub,
+          judge: deps.extras?.context?.judge,
+          talker: deps.extras?.talker,
+        },
         user.id,
         orgId,
         artifactId,

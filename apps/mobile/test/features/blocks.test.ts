@@ -4,7 +4,14 @@ import { blockMayLoad, MAX_LIVE_BLOCKS, themeScript, withLiveBlock } from "../..
 describe("live blocks on the phone", () => {
   test("a block never leaves its page", () => {
     expect(blockMayLoad("about:blank")).toBe(true);
-    for (const url of ["https://example.com/?d=1", "http://x.test", "tel:123", "intent://x", "file:///etc", "data:text/html,a"]) {
+    for (const url of [
+      "https://example.com/?d=1",
+      "http://x.test",
+      "tel:123",
+      "intent://x",
+      "file:///etc",
+      "data:text/html,a",
+    ]) {
       expect(blockMayLoad(url)).toBe(false);
     }
   });

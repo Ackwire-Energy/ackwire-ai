@@ -25,7 +25,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   const vote = useVote(orgId, id);
   const a = artifact.data;
   const poll = query.data;
-  if (!a || a.content.kind !== "poll" || !poll) {
+  if (a?.content.kind !== "poll" || !poll) {
     return (
       <View style={[styles.card, styles.loading, { backgroundColor: c.raised, borderColor: c.line2 }]}>
         <ActivityIndicator color={c.faint} />
@@ -81,7 +81,9 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
               style={[styles.option, { borderColor: c.line2 }]}
             >
               <View style={[styles.fill, { width: `${o.share * 100}%`, backgroundColor: c.line }]} />
-              <View style={[styles.box, { borderColor: c.faint }, mine && { backgroundColor: c.ink, borderColor: c.ink }]}>
+              <View
+                style={[styles.box, { borderColor: c.faint }, mine && { backgroundColor: c.ink, borderColor: c.ink }]}
+              >
                 {mine ? <Icon name="check" size={13} color={c.raised} /> : null}
               </View>
               <Text variant="body" style={[styles.label, styles.bold]}>

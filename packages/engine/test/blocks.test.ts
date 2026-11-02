@@ -25,7 +25,9 @@ import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
-  await f?.close();
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
 });
 
 const last = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content);
@@ -96,7 +98,7 @@ describe("live blocks", () => {
     expect(reply?.meta.artifacts).toEqual([{ id: row.id, version: 1 }]);
     const shown = await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, row.id);
     expect(shown.content).toEqual({ kind: "block", html: BLOCK, subtitle: "Dados de hoje" });
-    expect(await listArtifacts(f.artifactDeps, person(f.owner.id), f.org.id)).toEqual([]);
+    expect(await listArtifacts(f.db, person(f.owner.id), f.org.id)).toEqual([]);
   });
 
   test("a person keeps one, and it joins the Drive", async () => {
@@ -104,7 +106,7 @@ describe("live blocks", () => {
     const row = await ask("@dev simula o desconto");
     const kept = await keepBlock(f.artifactDeps, f.owner.id, f.org.id, row.id);
     expect(kept.inDrive).toBe(true);
-    expect((await listArtifacts(f.artifactDeps, person(f.owner.id), f.org.id)).map((a) => a.id)).toEqual([row.id]);
+    expect((await listArtifacts(f.db, person(f.owner.id), f.org.id)).map((a) => a.id)).toEqual([row.id]);
   });
 
   test("what comes back is the person's own message, to the agent that made the block", async () => {

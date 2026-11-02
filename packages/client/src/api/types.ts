@@ -2434,6 +2434,8 @@ export interface Artifact {
   untrusted: boolean;
   /** The creator, who asked the agent, the agent's owner and admins may delete it. */
   canDelete?: boolean;
+  /** False for a block or a poll, which live in their conversation until someone keeps a block (ADR 0113). */
+  inDrive?: boolean;
   /** Who can see it, from the conversation it came from (ADR 0111). */
   audience: ArtifactAudience;
 }

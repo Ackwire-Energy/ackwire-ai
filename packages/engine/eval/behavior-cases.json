@@ -2493,17 +2493,9 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustCall": [
-        "show_block"
-      ],
-      "mustNotCall": [
-        "create_artifact",
-        "start_poll"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustCall": ["show_block"],
+      "mustNotCall": ["create_artifact", "start_poll"],
       "behavior": "Lia shows a simulator with show_block, in her reply, with the Acme numbers as its starting values and a sentence saying what it is. No file."
     }
   },
@@ -2529,17 +2521,9 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustCall": [
-        "show_block"
-      ],
-      "mustNotCall": [
-        "create_artifact",
-        "start_poll"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustCall": ["show_block"],
+      "mustNotCall": ["create_artifact", "start_poll"],
       "behavior": "Lia shows the three plans in a block the person can filter and pick from, and the pick comes back to her through the block."
     }
   },
@@ -2565,16 +2549,9 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustCall": [
-        "show_block"
-      ],
-      "mustNotCall": [
-        "create_artifact"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustCall": ["show_block"],
+      "mustNotCall": ["create_artifact"],
       "behavior": "Lia shows a short form with show_block whose answer comes back to her, instead of listing questions in text."
     }
   },
@@ -2600,18 +2577,9 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustNotCall": [
-        "show_block",
-        "start_poll",
-        "create_artifact"
-      ],
-      "evidence": [
-        "412"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustNotCall": ["show_block", "start_poll", "create_artifact"],
+      "evidence": ["412"],
       "behavior": "Lia answers with the number in one line."
     }
   },
@@ -2637,14 +2605,8 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustNotCall": [
-        "show_block",
-        "start_poll"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustNotCall": ["show_block", "start_poll"],
       "behavior": "Lia answers with a chart or a small table of the six months, in the reply itself, and says what stands out."
     }
   },
@@ -2670,17 +2632,9 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustCall": [
-        "create_artifact"
-      ],
-      "mustNotCall": [
-        "show_block",
-        "start_poll"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustCall": ["create_artifact"],
+      "mustNotCall": ["show_block", "start_poll"],
       "behavior": "Lia writes a file in the Drive, a report to keep and send on, and not a block."
     }
   },
@@ -2717,17 +2671,9 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustCall": [
-        "start_poll"
-      ],
-      "mustNotCall": [
-        "show_block",
-        "create_artifact"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustCall": ["start_poll"],
+      "mustNotCall": ["show_block", "create_artifact"],
       "behavior": "Lia opens one vote with the three dates, and adds at most a short line."
     }
   },
@@ -2753,14 +2699,8 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustNotCall": [
-        "start_poll",
-        "create_artifact"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustNotCall": ["start_poll", "create_artifact"],
       "behavior": "Lia recommends one plan and says why, in the reply."
     }
   },
@@ -2786,14 +2726,8 @@
     },
     "blocks": true,
     "expect": {
-      "skipJudge": [
-        "looked_first",
-        "next_step"
-      ],
-      "mustNotCall": [
-        "show_block",
-        "create_artifact"
-      ],
+      "skipJudge": ["looked_first", "next_step"],
+      "mustNotCall": ["show_block", "create_artifact"],
       "behavior": "Lia does not build a form for a password. She says briefly that a password can't go through a block or the chat."
     }
   },
@@ -2824,19 +2758,9 @@
     },
     "blocks": true,
     "expect": {
-      "mustCall": [
-        "hand_off"
-      ],
-      "mustNotCall": [
-        "show_block",
-        "start_poll"
-      ],
-      "skipJudge": [
-        "looked_first",
-        "next_step",
-        "talks_like_a_colleague",
-        "grounded"
-      ],
+      "mustCall": ["hand_off"],
+      "mustNotCall": ["show_block", "start_poll"],
+      "skipJudge": ["looked_first", "next_step", "talks_like_a_colleague", "grounded"],
       "behavior": "The routine reports the six months through hand_off, with no block and no vote."
     }
   }

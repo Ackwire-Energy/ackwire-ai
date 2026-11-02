@@ -69,12 +69,13 @@ function BlockWebView({
 }) {
   const { t, i18n } = useTranslation();
   const { scheme } = useTheme();
-  const web = useRef<WebView>(null);
+  const web = useRef<WebView<object>>(null);
   const [life, setLife] = useState(0);
   const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
   const theme = scheme === "dark" ? "dark" : "light";
 
   // Built once per block: a new theme is sent to it, and a rebuild would lose what the person set.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above; `life`: a page the system ended comes back
   const page = useMemo(
     () =>
       blockPage(html, {
@@ -89,7 +90,6 @@ function BlockWebView({
         state: keptOf(blockKey).state,
         font: SYSTEM_FONT,
       }),
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above; `life`: a page the system ended comes back
     [html, blockKey, life],
   );
 
@@ -267,7 +267,7 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
   const dir = useDirectory();
   const query = useArtifact(orgId, id, version);
   const a = query.data;
-  if (!a || a.content.kind !== "block") {
+  if (a?.content.kind !== "block") {
     return (
       <View style={[styles.card, styles.loading, { backgroundColor: c.raised, borderColor: c.line2 }]}>
         <ActivityIndicator color={c.faint} />
@@ -284,7 +284,13 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
   };
   return (
     <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
-      <Sky color={agentLook(dir.agentById.get(agentId)).color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
+      <Sky
+        color={agentLook(dir.agentById.get(agentId)).color}
+        surface="raised"
+        depth={0.95}
+        fade={0}
+        style={styles.sky}
+      />
       <View style={styles.head}>
         <View style={styles.titles}>
           <Text variant="subhead" style={styles.bold} numberOfLines={2}>
@@ -312,7 +318,7 @@ export function BlockScreen({ id, version }: { id: string; version?: number }) {
   const query = useArtifact(orgId, id, version);
   const keep = useKeepBlock(orgId, id);
   const a = query.data;
-  if (!a || a.content.kind !== "block") {
+  if (a?.content.kind !== "block") {
     return (
       <View style={[styles.fill, styles.center, { backgroundColor: c.bg }]}>
         {query.isError ? (

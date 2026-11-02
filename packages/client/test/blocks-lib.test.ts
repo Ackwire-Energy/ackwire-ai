@@ -43,13 +43,21 @@ describe("what a frame may say", () => {
   });
 
   test("a draft is plain text, cut to size, and empty can't be sent", () => {
-    const e = blockEvent({ agentes: 1, type: "draft", label: "L".repeat(99), text: `a\n\n${"b".repeat(3000)}`, ready: true });
+    const e = blockEvent({
+      agentes: 1,
+      type: "draft",
+      label: "L".repeat(99),
+      text: `a\n\n${"b".repeat(3000)}`,
+      ready: true,
+    });
     expect(e).toMatchObject({ type: "draft", ready: true });
     if (e?.type !== "draft") throw new Error("no draft");
     expect(e.label).toHaveLength(40);
     expect(e.text).toHaveLength(2000);
     expect(e.text.startsWith("a b")).toBe(true);
-    expect(blockEvent({ agentes: 1, type: "draft", label: "Go", text: "  ", ready: true })).toMatchObject({ ready: false });
+    expect(blockEvent({ agentes: 1, type: "draft", label: "Go", text: "  ", ready: true })).toMatchObject({
+      ready: false,
+    });
     expect(blockEvent({ agentes: 1, type: "draft", text: "x", ready: true })).toBeNull();
   });
 });

@@ -3,10 +3,10 @@ import { parsePatch, patchCounts, sideBySide, sortRows } from "@agenteschat/clie
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Markdown } from "@/lib/markdown";
-import { FileSummary, FileView } from "./FileView";
 import { LiveBlock } from "@/components/blocks/LiveBlock";
 import { PollCard } from "@/components/blocks/PollCard";
+import { Markdown } from "@/lib/markdown";
+import { FileSummary, FileView } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
 import { MermaidOrCode } from "./Mermaid";
 

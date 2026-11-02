@@ -993,12 +993,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       keep: (orgId, id) => request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}/keep`, { method: "POST" }),
       reply: (orgId, id, text, clientId) =>
         request<{ id: string }>(`${org(orgId)}/artifacts/${enc(id)}/reply`, {
-          method: "POST",
-          body: { text, clientId },
+          json: { text, clientId },
         }),
       poll: (orgId, id) => request<Poll>(`${org(orgId)}/polls/${enc(id)}`),
       vote: (orgId, id, options) =>
-        request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", body: { options } }),
+        request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),
       versions: async (orgId, id) =>
         (await request<{ versions: ArtifactVersion[] }>(`${org(orgId)}/artifacts/${enc(id)}/versions`)).versions,
       download: (orgId, id, version) =>

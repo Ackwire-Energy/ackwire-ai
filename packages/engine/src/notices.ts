@@ -35,7 +35,12 @@ export type NoticeKind =
  * count, no notification, no preview): what matters to them, the agent says in its reply. Mirrored by the apps'
  * `AGENT_ONLY_NOTICES` (packages/client/src/lib/notices.ts).
  */
-export const AGENT_ONLY_NOTICES: readonly NoticeKind[] = ["agent_note", "wait_result", "proposal_result", "poll_result"];
+export const AGENT_ONLY_NOTICES: readonly NoticeKind[] = [
+  "agent_note",
+  "wait_result",
+  "proposal_result",
+  "poll_result",
+];
 
 /** Whether a message is a notice only its agent reads (`AGENT_ONLY_NOTICES`). */
 export const isAgentOnlyNotice = (meta: Record<string, unknown> | null | undefined) =>

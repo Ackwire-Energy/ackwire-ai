@@ -11,8 +11,8 @@ import { Button, Menu, MenuItem, Spinner } from "@agenteschat/ui";
 import { chartRamp } from "@agenteschat/ui/sky/chart";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { usePageUrl } from "@/components/artifacts/HtmlFrame";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
+import { usePageUrl } from "@/components/artifacts/HtmlFrame";
 import { useOrg } from "@/components/org-context";
 import { CardSky, colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -24,7 +24,10 @@ import "./blocks.css";
 const INLINE_MAX_HEIGHT = 640;
 
 /** What stays when a frame goes away (scrolled out, opened big): the same block comes back as it was. */
-const kept = new Map<string, { state?: Record<string, unknown>; height?: number; sent?: { text: string; at: string } }>();
+const kept = new Map<
+  string,
+  { state?: Record<string, unknown>; height?: number; sent?: { text: string; at: string } }
+>();
 const keptOf = (key: string) => {
   const found = kept.get(key);
   if (found) return found;
@@ -97,6 +100,7 @@ function BlockFrame({
   }, []);
 
   // The page is built once per block: a new theme is sent to it, and a rebuild would lose what the person set.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   const page = useMemo(() => {
     if (face === null) return null;
     const host: BlockHost = {
@@ -108,7 +112,6 @@ function BlockFrame({
       fontFace: face,
     };
     return blockPage(html, host);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   }, [face, html, blockKey]);
 
   const { url, failed } = usePageUrl(page ?? "", ready);
@@ -217,7 +220,7 @@ export function LiveBlock({
           <b>{t("blocks.brokenTitle")}</b>
           <small>{t("blocks.brokenBody")}</small>
         </span>
-        <Button variant="secondary" size="sm" disabled={reply.isPending} onClick={() => say(t("blocks.retryText"))}>
+        <Button size="sm" disabled={reply.isPending} onClick={() => say(t("blocks.retryText"))}>
           {t("blocks.retry")}
         </Button>
       </div>
@@ -280,7 +283,7 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
   const keep = useKeepBlock(org.id, id);
   const toast = useToast();
   const a = query.data;
-  if (!a || a.content.kind !== "block") {
+  if (a?.content.kind !== "block") {
     return (
       <div className="live-block live-block--loading" aria-busy="true">
         <Spinner />

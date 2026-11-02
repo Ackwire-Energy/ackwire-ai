@@ -202,7 +202,11 @@ export function ArtifactViewer({
                 }}
               />
             ) : (
-              <ArtifactContentView content={a.content} title={a.title} source={{ id: a.id, version: a.shownVersion, agentId: a.createdBy.id }} />
+              <ArtifactContentView
+                content={a.content}
+                title={a.title}
+                source={{ id: a.id, version: a.shownVersion, agentId: a.createdBy.id }}
+              />
             )}
           </div>
           <Versions artifact={a} onVersion={onVersion} />

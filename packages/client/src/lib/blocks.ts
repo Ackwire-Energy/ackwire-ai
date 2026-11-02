@@ -1,5 +1,5 @@
 import type { Poll } from "../api/types";
-import { BLOCK_KIT_CSS, BLOCK_KIT_JS } from "./block-kit";
+import { BLOCK_KIT_CSS, BLOCK_KIT_JS, blockBoot } from "./block-kit";
 import { isolatedPage } from "./isolated-page";
 
 /**
@@ -27,7 +27,10 @@ export function blockPage(html: string, host: BlockHost): string {
   const { fontFace, font, ...boot } = host;
   const json = JSON.stringify(boot).replace(/</g, "\\u003c");
   const style = `${fontFace ?? ""}${BLOCK_KIT_CSS}${font ? `:root{--font:${font}}` : ""}`;
-  return isolatedPage(html, `<style>${style}</style><script>window.__block=${json}</script><script>${BLOCK_KIT_JS}</script>`);
+  return isolatedPage(
+    html,
+    `<style>${style}</style><script>${blockBoot(json)}</script><script>${BLOCK_KIT_JS}</script>`,
+  );
 }
 
 export type BlockEvent =
@@ -73,7 +76,13 @@ export function blockEvent(raw: unknown): BlockEvent | null {
       const label = text(e.label, LABEL_CHARS);
       const said = text(e.text, TEXT_CHARS);
       if (!label) return null;
-      return { type: "draft", text: said, label, ready: e.ready === true && said !== "", hint: text(e.hint, HINT_CHARS) };
+      return {
+        type: "draft",
+        text: said,
+        label,
+        ready: e.ready === true && said !== "",
+        hint: text(e.hint, HINT_CHARS),
+      };
     }
     case "error":
       return { type: "error", message: text(e.message, HINT_CHARS) };

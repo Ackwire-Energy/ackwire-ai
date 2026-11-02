@@ -25,7 +25,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   const vote = useVote(org.id, id);
   const a = artifact.data;
   const poll: Poll | undefined = query.data;
-  if (!a || a.content.kind !== "poll" || !poll) {
+  if (a?.content.kind !== "poll" || !poll) {
     return (
       <div className="live-block live-block--loading" aria-busy="true">
         <Spinner />
@@ -70,7 +70,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
               <span className="poll__fill" style={{ width: `${o.share * 100}%` }} />
               <span className="poll__box">{mine && <Icon name="check" size={14} />}</span>
               <span className="poll__label">{o.label}</span>
-              <span className="poll__faces" aria-label={o.voters.map(nameOf).join(", ")}>
+              <span className="poll__faces" role="img" aria-label={o.voters.map(nameOf).join(", ")}>
                 {o.voters.slice(0, FACES).map((v) => (
                   <span key={v} className="poll__face" title={nameOf(v)} aria-hidden="true">
                     {nameOf(v).slice(0, 1).toUpperCase()}

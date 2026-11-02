@@ -114,17 +114,17 @@ export function HtmlFrame({
   }, []);
 
   const iframe = url ? (
-      <iframe
-        ref={frame}
-        className={className ?? "artifact-html"}
-        src={url}
-        title={title}
-        sandbox={HTML_SANDBOX}
-        referrerPolicy="no-referrer"
-        tabIndex={thumbnail ? -1 : undefined}
-        aria-hidden={thumbnail || undefined}
-        scrolling={thumbnail ? "no" : undefined}
-      />
+    <iframe
+      ref={frame}
+      className={className ?? "artifact-html"}
+      src={url}
+      title={title}
+      sandbox={HTML_SANDBOX}
+      referrerPolicy="no-referrer"
+      tabIndex={thumbnail ? -1 : undefined}
+      aria-hidden={thumbnail || undefined}
+      scrolling={thumbnail ? "no" : undefined}
+    />
   ) : null;
   if (thumbnail) return iframe;
   return (

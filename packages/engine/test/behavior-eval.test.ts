@@ -38,6 +38,9 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "propose_mission",
     "add_agent_to_channel",
     "update_thread",
+    "create_artifact",
+    "show_block",
+    "start_poll",
     "hand_off",
     "pass",
   ]);
