@@ -59,6 +59,14 @@ export {
 } from "./brain/portrait.js";
 export { channelQuery, insertChannelRef } from "./channel-refs";
 export {
+  type AccessBase,
+  AccessDialog,
+  type AccessDialogLabels,
+  type AccessDialogProps,
+  type AccessLevel,
+  type AccessSubject,
+} from "./components/AccessDialog";
+export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
   AGENT_EYES,

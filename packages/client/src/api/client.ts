@@ -1,4 +1,5 @@
 import type { OnboardingStepId } from "../lib/onboarding";
+import type { WikiAccess } from "../lib/wiki";
 import type {
   AccessInput,
   AccountDeletionPlan,
@@ -246,7 +247,7 @@ import type {
   TrashedArtifact,
   UndoAllResult,
   UsageReport,
-  WikiAudience,
+  WikiFolderAudience,
   WikiGraph,
   WikiImportInput,
   WikiImportResult,
@@ -1122,7 +1123,14 @@ export interface ApiClient {
     /** "Fixadas": at the top of the wiki for everyone. */
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
     /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
-    audience(orgId: string, slug: string, audience: WikiAudience | null): Promise<WikiPage>;
+    audience(orgId: string, slug: string, access: WikiAccess): Promise<WikiPage>;
+    /** A folder's audience, and the closest limited folder above it. */
+    folderAudience(
+      orgId: string,
+      folder: string,
+    ): Promise<{ own: WikiFolderAudience | null; above: WikiFolderAudience | null }>;
+    /** Reaches the pages in it and its subfolders, and the pages that land in it later. */
+    setFolderAudience(orgId: string, folder: string, access: WikiAccess): Promise<{ folder: string; pages: number }>;
     /** To the trash (the server can restore it). */
     remove(orgId: string, slug: string): Promise<void>;
     /** What the agents read most in the last 7 days. */
