@@ -199,7 +199,7 @@ export async function decideConsent(
       .returning({ id: oauthAppRequests.id });
     if (!used) throw new ConflictError("This request was already used", "request_used");
     const [before] = await tx
-      .select({ id: appGrants.id, revokedAt: appGrants.revokedAt })
+      .select({ id: appGrants.id, revokedAt: appGrants.revokedAt, scopes: appGrants.scopes })
       .from(appGrants)
       .where(
         and(
@@ -214,7 +214,8 @@ export async function decideConsent(
       displayName: identity.name,
       displayHost: identity.host,
       brand: identity.brand,
-      scopes,
+      // What the app's connections may do at most, for the list: each connection keeps the access it was given.
+      scopes: before && !before.revokedAt ? [...new Set([...before.scopes, ...scopes])] : scopes,
       consentedAt: new Date(),
       revokedAt: null,
       revokedBy: null,
@@ -297,16 +298,26 @@ const tokenError = (error: string, description?: string, status: 400 | 401 = 400
   description,
 });
 
-/** A new access + refresh pair in a family (a new family when none is given). */
+/**
+ * A new access + refresh pair in a family (a new family when none is given), with the family's own access and
+ * access-token lifetime: the grant is shared by every connection of one app, these are each connection's.
+ */
 async function mintPair(
   tx: Executor,
-  grant: { id: string; orgId: string; scopes: string[] },
-  options: { familyId?: string; parentId?: string | null; requestId?: string | null; accessMs: number },
+  grant: { id: string; orgId: string },
+  options: {
+    familyId?: string;
+    parentId?: string | null;
+    requestId?: string | null;
+    accessMs: number;
+    scopes: string[];
+  },
 ) {
   const access = `${ACCESS_TOKEN_PREFIX}${randomBase62(43)}`;
   const refresh = `${REFRESH_TOKEN_PREFIX}${randomBase62(43)}`;
   const familyId = options.familyId ?? Bun.randomUUIDv7();
   const now = Date.now();
+  const family = { scopes: options.scopes, accessSeconds: Math.round(options.accessMs / 1000) };
   await tx.insert(appTokens).values([
     {
       orgId: grant.orgId,
@@ -316,6 +327,7 @@ async function mintPair(
       familyId,
       parentId: options.parentId ?? null,
       requestId: options.requestId ?? null,
+      ...family,
       expiresAt: new Date(now + options.accessMs),
     },
     {
@@ -326,6 +338,7 @@ async function mintPair(
       familyId,
       parentId: options.parentId ?? null,
       requestId: options.requestId ?? null,
+      ...family,
       expiresAt: new Date(now + APP_LIMITS.refreshMs),
     },
   ]);
@@ -334,7 +347,7 @@ async function mintPair(
     token_type: "Bearer" as const,
     expires_in: Math.round(options.accessMs / 1000),
     refresh_token: refresh,
-    scope: grant.scopes.join(" "),
+    scope: options.scopes.join(" "),
   };
 }
 
@@ -420,7 +433,11 @@ export async function exchangeCode(deps: OauthDeps, form: Record<string, string 
   const [client] = await db.select().from(oauthAppClients).where(eq(oauthAppClients.id, request.clientId));
   const cursor = client ? appIdentity(client, request.redirectUri).cursor : false;
   const body = await db.transaction((tx) =>
-    mintPair(tx, grant, { requestId: request.id, accessMs: cursor ? APP_LIMITS.cursorAccessMs : APP_LIMITS.accessMs }),
+    mintPair(tx, grant, {
+      requestId: request.id,
+      accessMs: cursor ? APP_LIMITS.cursorAccessMs : APP_LIMITS.accessMs,
+      scopes: request.scopes,
+    }),
   );
   await touchApp(db, request.clientId);
   return { ok: true, body };
@@ -457,13 +474,10 @@ export async function refreshTokens(deps: OauthDeps, form: Record<string, string
       error: "temporarily_unavailable",
       description: "Too many refreshes. Try again later.",
     };
-  const accessMs =
-    grant.clientId &&
-    (await db.select().from(oauthAppClients).where(eq(oauthAppClients.id, grant.clientId)))[0]?.redirectUris.some(
-      (u) => u.startsWith("cursor://") || u.includes("cursor.com/"),
-    )
-      ? APP_LIMITS.cursorAccessMs
-      : APP_LIMITS.accessMs;
+  const family = {
+    accessMs: token.accessSeconds ? token.accessSeconds * 1000 : APP_LIMITS.accessMs,
+    scopes: token.scopes ?? grant.scopes,
+  };
   const outcome = await db.transaction(async (tx) => {
     if (token.usedAt) {
       // Rotated already. Inside the grace and while its child refresh token is unused, a retry gets a fresh pair
@@ -487,7 +501,7 @@ export async function refreshTokens(deps: OauthDeps, form: Record<string, string
             children.map((c) => c.id),
           ),
         );
-      return mintPair(tx, grant, { familyId: token.familyId, parentId: token.id, accessMs });
+      return mintPair(tx, grant, { familyId: token.familyId, parentId: token.id, ...family });
     }
     const [marked] = await tx
       .update(appTokens)
@@ -495,7 +509,7 @@ export async function refreshTokens(deps: OauthDeps, form: Record<string, string
       .where(and(eq(appTokens.id, token.id), isNull(appTokens.usedAt)))
       .returning({ id: appTokens.id });
     if (!marked) return "race" as const;
-    return mintPair(tx, grant, { familyId: token.familyId, parentId: token.id, accessMs });
+    return mintPair(tx, grant, { familyId: token.familyId, parentId: token.id, ...family });
   });
   if (outcome === "race") return refreshTokens(deps, form);
   if (!outcome) return tokenError("invalid_grant", "The token was already used");

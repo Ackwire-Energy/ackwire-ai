@@ -292,7 +292,7 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     );
     expect(dialog().getByRole("heading", { name: "Desconectar Claude Code?" })).toBeTruthy();
     expect(screen().getByRole("dialog").textContent).toContain(
-      "Ele perde o acesso agora. Você pode conectar de novo quando quiser.",
+      "Ele perde o acesso agora, em todos os computadores onde está conectado.",
     );
     await click(dialog().getByRole("button", { name: "Desconectar" }));
     expect(calls(state, "apps.disconnect")).toHaveLength(1);

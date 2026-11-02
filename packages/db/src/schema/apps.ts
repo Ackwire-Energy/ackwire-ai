@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -126,6 +126,13 @@ export const appTokens = pgTable(
     familyId: uuid().notNull(),
     parentId: uuid(),
     requestId: uuid(),
+    /**
+     * The access its family was consented with (`read`, `write`): one app connected on two computers keeps each
+     * connection's own. Null: the grant's (a personal token).
+     */
+    scopes: text().array(),
+    /** How long its family's access tokens live, fixed at the code exchange (Cursor's are longer). */
+    accessSeconds: integer(),
     /** Null: a personal token with no expiry. */
     expiresAt: timestamp({ withTimezone: true }),
     /** A refresh token's rotation. */

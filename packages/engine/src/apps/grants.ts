@@ -37,6 +37,7 @@ export async function authenticateAppBearer(db: Database, header: string | undef
     .select({
       grant: appGrants,
       tokenKind: appTokens.kind,
+      tokenScopes: appTokens.scopes,
       personName: users.name,
       blockedAt: users.blockedAt,
     })
@@ -83,7 +84,8 @@ export async function appPrincipal(
     orgName: org?.name ?? "",
     userId: grant.userId,
     personName: row.personName,
-    scopes: grant.scopes as AppScope[],
+    // The connection's own access, within the grant's.
+    scopes: (row.tokenScopes ?? grant.scopes).filter((s) => grant.scopes.includes(s)) as AppScope[],
     app: { name: grant.displayName, brand: grant.brand, host: grant.displayHost, kind: grant.displayKind },
     refusal,
   };

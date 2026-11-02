@@ -559,6 +559,22 @@ describe("token", () => {
     expect(ok.json.expires_in).toBe(8 * 3600);
   });
 
+  test("a refresh keeps the lifetime fixed at the code exchange, whatever else the app registered", async () => {
+    const { b, orgId } = await owner();
+    const refreshOnce = async (redirectUris: string[], redirectUri: string) => {
+      const reg = await registerClient(t, { client_name: "App", redirect_uris: redirectUris });
+      const clientId = ((await reg.json()) as { client_id: string }).client_id;
+      const app = await connectApp(t, b, orgId, { clientId, redirectUri });
+      const next = await token(t, { grant_type: "refresh_token", refresh_token: app.refresh, client_id: clientId });
+      return [app.expiresIn, next.json.expires_in];
+    };
+    expect(await refreshOnce(["https://evil.example/cursor.com/cb"], "https://evil.example/cursor.com/cb")).toEqual([
+      3600, 3600,
+    ]);
+    expect(await refreshOnce(["https://a.example/cb", CURSOR_CALLBACK], "https://a.example/cb")).toEqual([3600, 3600]);
+    expect(await refreshOnce([CURSOR_CALLBACK], CURSOR_CALLBACK)).toEqual([28800, 28800]);
+  });
+
   test("refresh: rotation, a retry within the grace, reuse after it, expiry, client binding", async () => {
     const { b, orgId } = await owner();
     const app = await connectApp(t, b, orgId);

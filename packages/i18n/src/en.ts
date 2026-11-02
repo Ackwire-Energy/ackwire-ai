@@ -8904,7 +8904,7 @@ export const en: Translations = {
     actions: "Options for {{name}}",
     disconnect: "Disconnect",
     disconnectTitle: "Disconnect {{name}}?",
-    disconnectText: "It loses access now. You can connect again any time.",
+    disconnectText: "It loses access now, on every computer it's connected on. You can connect again any time.",
     disconnected: "{{name}} disconnected",
     notNotified: "The person isn't notified.",
     footer: "Each connection covers one workspace. For another workspace, connect again from it.",

@@ -3,7 +3,7 @@ import { and, eq, schema } from "@agenteschat/db";
 import { APP_TOOL_NAMES, openWaits, sha256 } from "@agenteschat/engine";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { callTool, connectApp, mcp } from "./ai-apps";
+import { callTool, connectApp, mcp, token } from "./ai-apps";
 import {
   type Browser,
   browser,
@@ -162,6 +162,24 @@ describe("protocol", () => {
     expect((await listTools(app.access)).map((x) => x.name)).toEqual(
       APP_TOOL_NAMES.filter((n) => n !== "send_to_agent"),
     );
+  });
+
+  test("one app on two computers: each connection keeps the access it was given, refreshes included", async () => {
+    const { b, orgId } = await setup();
+    const laptopA = await connectApp(t, b, orgId, { access: "write" });
+    const laptopB = await connectApp(t, b, orgId, { access: "read", clientId: laptopA.clientId });
+    expect((await listTools(laptopA.access)).map((x) => x.name)).toContain("send_to_agent");
+    expect((await listTools(laptopB.access)).map((x) => x.name)).not.toContain("send_to_agent");
+    const refreshed = await token(t, {
+      grant_type: "refresh_token",
+      refresh_token: laptopB.refresh,
+      client_id: laptopB.clientId,
+    });
+    expect(refreshed.json.scope).toBe("read");
+    expect((await listTools(String(refreshed.json.access_token))).map((x) => x.name)).not.toContain("send_to_agent");
+    // The list shows what the app's connections may do at most.
+    const list = (await (await b(`/api/app/organizations/${orgId}/apps`)).json()) as { apps: { access: string }[] };
+    expect(list.apps.map((a) => a.access)).toEqual(["write"]);
   });
 
   test("GET is 405, an unknown method 200 with -32601, a body over 128 KiB 413", async () => {

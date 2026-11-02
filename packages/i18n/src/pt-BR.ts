@@ -8970,7 +8970,8 @@ export const ptBR = {
     actions: "Opções de {{name}}",
     disconnect: "Desconectar",
     disconnectTitle: "Desconectar {{name}}?",
-    disconnectText: "Ele perde o acesso agora. Você pode conectar de novo quando quiser.",
+    disconnectText:
+      "Ele perde o acesso agora, em todos os computadores onde está conectado. Você pode conectar de novo quando quiser.",
     disconnected: "{{name}} desconectado",
     notNotified: "A pessoa não é avisada.",
     footer: "Cada conexão vale para um workspace. Para outro workspace, conecte de novo a partir dele.",
