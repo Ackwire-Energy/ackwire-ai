@@ -308,7 +308,8 @@ async function boot(
   // Off the boot path: it calls MillionSend once per mailbox left from the withdrawn path (ADR 0102).
   void retireMillionSendMailboxes({ db: database.db, keyWrappers: engine.mail.keyWrappers })
     .then((r) => {
-      if (r.checked > 0) log.info("MillionSend mailboxes disconnected", r);
+      if (r.checked > 0)
+        log.info("MillionSend mailboxes disconnected", { checked: r.checked, webhooksLeft: r.webhooksLeft });
     })
     .catch((error: unknown) => log.warn("MillionSend mailboxes cleanup failed", { error: String(error) }));
   const workers = startWorkers({

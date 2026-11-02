@@ -41,6 +41,7 @@ import { announceReleasedAccounts, type ReleasedAccounts, releaseOrgAccounts } f
 import type { MachineHub } from "./machine-hub";
 import { MACHINE_CONTROL_TOPIC, machineOnline, personalMachines } from "./machines";
 import { composioGrantShared, forgetAtComposio } from "./mail/accounts";
+import { retireMillionSendMailboxes } from "./mail/retire-millionsend";
 import { recordOperatorEvent } from "./operator-events";
 import {
   can,
@@ -714,8 +715,9 @@ async function accountsSignedOut(db: Database, orgId: string, released: Released
  * Revokes the grants a workspace holds outside: Composio forgets the accounts of its connectors and of every Connect
  * Link it made for one (never revoked there: Composio's apps share one grant across toolkits and workspaces) and its
  * mailboxes (their triggers, and the accounts, which revokes them at Google or Microsoft unless another connection
- * still uses the same grant), and GitHub its OAuth tokens. Each is marked as it goes, so a retry skips it. Returns the ids of the
- * mailboxes, connections and Composio accounts that failed; never a token.
+ * still uses the same grant), MillionSend the webhooks of inboxes left from the withdrawn path whose boot cleanup
+ * failed (their sealed keys go with the workspace), and GitHub its OAuth tokens. Each is marked as it goes, so a
+ * retry skips it. Returns the ids of the mailboxes, connections and Composio accounts that failed; never a token.
  */
 async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
   const { db } = deps;
@@ -795,6 +797,8 @@ async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
       });
     }
   }
+  const keyWrappers = deps.connectors?.keyWrappers;
+  if (keyWrappers) left.push(...(await retireMillionSendMailboxes({ db, keyWrappers, orgId })).webhooksLeft);
   const connectors = deps.connectors;
   if (connectors?.oauthApps?.github) {
     const grants = await db
