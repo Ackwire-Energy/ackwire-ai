@@ -165,20 +165,35 @@ describe("own message styles", () => {
     return out;
   };
 
-  test("the bar and the check stand left of the bubble, never over my words", async () => {
+  test("the bar and the check stand left of the bubble, never over my words, the check always on screen", async () => {
     const r = await rules();
     const bar = r.get(
       ".ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions",
     );
+    // The bar's middle on the bubble's top edge, as on everyone's rows.
     expect(bar).toContain("right: calc(100% + 8px)");
-    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__actions")).toContain("right: calc(100% + 8px)");
-    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating")).toContain("right: calc(100% + 8px)");
-    // The check gives way to the bar (`:is(:hover, :focus-within, [data-menu-open]) …`, split at its commas).
-    expect(r.get('[data-menu-open="true"]) > .ac-msg__body > .ac-msg__aside--floating')).toContain("opacity: 0");
-    // Except under the keys' focus on the check itself (a DM's face is a button): it stays, the bar gives way.
+    expect(bar).toContain("top: 0");
+    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__actions")).toContain("top: 0");
+    // The check at the bubble's bottom edge: a zero-height item right after the bubble, its contents hanging up from it.
+    const check = r.get(".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating") ?? "";
+    expect(check).toContain("right: calc(100% + 8px)");
+    expect(check).toContain("height: 0");
+    expect(check).toContain("align-items: flex-end");
+    expect(check).toContain("order: 1");
+    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__text ~ *")).toContain("order: 2");
+    // No hover, focus or open menu hides it: a mouse can open a DM's "Vista por" face.
+    const kit = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const own = [...kit.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+      ([, list = ""]) => list.includes(".ac-msg--own") && /\.ac-msg__aside--floating\s*$/.test(list),
+    );
+    expect(own.length).toBeGreaterThan(0);
+    for (const [, , body = ""] of own) expect(body).not.toMatch(/opacity|visibility|display:\s*none/);
+    // The keys on the check itself (a DM's face is a button): the bar gives way.
     const keys =
       "html:not([data-pointer]) .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible) > .ac-msg__body >";
-    expect(r.get(`${keys} .ac-msg__aside--floating`)).toContain("opacity: 1");
     expect(r.get(`${keys} .ac-msg__actions`)).toContain("opacity: 0");
   });
 

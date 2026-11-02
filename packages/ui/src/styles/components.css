@@ -5103,29 +5103,28 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   right: 0;
 }
 /*
- * Left of the bubble, centred on its first line: the check (agents saw it, answered it) at rest, the action bar on
- * hover, which hides the check. Neither ever covers the words.
+ * Left of the bubble: the check (agents saw it, answered it; a DM's "Vista por" face) at its bottom edge, the action
+ * bar on hover with its middle on its top edge, as on everyone's rows. On a one-line bubble (40px) the bar (30px)
+ * ends 4px above the face, so the check stays on screen and a mouse can open it. Neither ever covers the words.
+ *
+ * The check is a zero-height item put right after the bubble (`order`), whatever hangs under it (time, reactions, a
+ * file, receipt words) after the check: its bottom sits on the bubble's, and it never adds height to the row.
  */
 .ac-msg--own > .ac-msg__body > .ac-msg__aside--floating {
-  position: absolute;
-  top: 20px;
+  order: 1;
+  position: relative;
   right: calc(100% + 8px);
+  height: 0;
+  align-items: flex-end;
   float: none;
   margin: 0;
   line-height: 16px;
-  translate: 0 -50%;
-  transition: opacity 0.12s;
+  translate: none;
 }
-.ac-msg--own:is(:hover, :focus-within, [data-menu-open="true"]) > .ac-msg__body > .ac-msg__aside--floating {
-  opacity: 0;
+.ac-msg--own > .ac-msg__body > .ac-msg__text ~ * {
+  order: 2;
 }
-/* The keys on the check (a DM's "Vista por" face) keep it on screen with its ring; the bar gives way instead. */
-html:not([data-pointer])
-  .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible)
-  > .ac-msg__body
-  > .ac-msg__aside--floating {
-  opacity: 1;
-}
+/* The keys on the check (a DM's "Vista por" face): the bar gives way, so nothing comes near its ring. */
 html:not([data-pointer])
   .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible)
   > .ac-msg__body
@@ -5135,7 +5134,7 @@ html:not([data-pointer])
 }
 .ac-msg--own > .ac-msg__body > .ac-msg__actions,
 .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-  top: 20px;
+  top: 0;
   right: calc(100% + 8px);
   left: auto;
 }

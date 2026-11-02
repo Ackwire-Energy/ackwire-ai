@@ -66,7 +66,7 @@ describe("a receipt never changes a message's height", () => {
     });
     await settle(4);
     expect(row("s2").className).toContain("ac-msg--grouped");
-    // My own rows: the mark stands left of the bubble, out of the text's flow. Waiting for the next pause: the spinner.
+    // My own rows: the mark stands left of the bubble's bottom edge, out of the text's flow. Waiting for the next pause: the spinner.
     const waiting = row("s1").querySelector(".ac-msg__aside--floating .ac-receipt__check");
     expect(waiting?.getAttribute("data-steer")).toBe("waiting");
     expect(waiting?.querySelector("canvas.ac-pixspin")).not.toBeNull();
@@ -183,8 +183,13 @@ describe("a receipt never changes a message's height", () => {
     // The mark ends the first line: in the name's line, or floated on a grouped message's text.
     expect(value(kit, ".ac-msg__head > .ac-msg__aside", "align-self")).toBe("center");
     expect(value(kit, ".ac-msg__aside--floating", "float")).toBe("right");
-    // On my own rows it stands left of the bubble, out of the flow, so it never adds a line either.
-    expect(value(kit, ".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating", "position")).toBe("absolute");
+    // On my own rows it stands left of the bubble at its bottom edge, a zero-height item right after the bubble, so it
+    // never adds a line either.
+    const own = ".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating";
+    expect(value(kit, own, "height")).toBe("0");
+    expect(value(kit, own, "align-items")).toBe("flex-end");
+    expect(value(kit, own, "order")).toBe("1");
+    expect(value(kit, ".ac-msg--own > .ac-msg__body > .ac-msg__text ~ *", "order")).toBe("2");
     // No line of words under a message, nor a row after it, for a receipt.
     const src = join(import.meta.dir, "../src");
     const sheets = (dir: string): string[] =>
