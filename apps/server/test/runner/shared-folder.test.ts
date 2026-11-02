@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { RunnerAccess } from "@agenteschat/adapters/machine-protocol";
+import { ACCESS_LIMITS, parseAccess, type RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { allowedFor, foldersFor } from "../../runner/access";
 import { lookFiles } from "../../runner/desktop-look";
 import type { RunCommand } from "../../runner/service";
@@ -85,14 +85,20 @@ test("the shared folder is granted to every agent, once; file access follows the
     shared,
   );
   expect(access.folders).toEqual([
-    { path: "/data", agents: ["agent-1"] },
     { path: shared, agents: ["*"] },
+    { path: "/data", agents: ["agent-1"] },
   ]);
   expect(withShared(access, shared)).toBe(access);
   expect(withShared(NOTHING, null)).toBe(NOTHING);
 
   expect(foldersFor(access, "agent-2")).toEqual([shared]);
-  expect(foldersFor(access, "agent-1")).toEqual(["/data", shared]);
+  expect(foldersFor(access, "agent-1")).toEqual([shared, "/data"]);
+  // First: the server keeps only the first ACCESS_LIMITS.folders of a report, so 100 folders never hide it.
+  const full = withShared(
+    { ...NOTHING, folders: Array.from({ length: ACCESS_LIMITS.folders }, (_, i) => ({ path: `/d${i}`, agents: [] })) },
+    shared,
+  );
+  expect(parseAccess(full)?.folders[0]).toEqual({ path: shared, agents: ["*"] });
   expect(foldersFor(access, undefined)).toEqual([]);
   expect(allowedFor(access, "agent-2", path.join(shared, "repo", "README.md"))).toBe(true);
   expect(allowedFor(access, "agent-2", "/data/x")).toBe(false);

@@ -83,12 +83,15 @@ export function joinShared(user: string, home: string, spec: Required<SharedSpec
   return problems;
 }
 
-/** `access` with the shared folder granted to every agent (ADR 0115), unless it already is. */
+/**
+ * `access` with the shared folder granted to every agent (ADR 0115), unless it already is. First, since the server
+ * keeps only the first `ACCESS_LIMITS.folders` of a report.
+ */
 export function withShared(access: RunnerAccess, shared: string | null): RunnerAccess {
-  if (!shared || access.folders.some((f) => f.path === shared && f.agents.includes(ALL_AGENTS))) return access;
+  if (!shared || (access.folders[0]?.path === shared && access.folders[0].agents.includes(ALL_AGENTS))) return access;
   return {
     ...access,
-    folders: [...access.folders.filter((f) => f.path !== shared), { path: shared, agents: [ALL_AGENTS] }],
+    folders: [{ path: shared, agents: [ALL_AGENTS] }, ...access.folders.filter((f) => f.path !== shared)],
   };
 }
 

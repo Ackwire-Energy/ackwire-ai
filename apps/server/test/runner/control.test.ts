@@ -364,10 +364,10 @@ test("access requests: pending until the person answers on the machine; the answ
     decision: "granted",
     scope: "agent",
   });
-  expect(answered.access.folders).toEqual([{ path: folder, agents: [AGENT.id] }, sharedGrant()]);
+  expect(answered.access.folders).toEqual([sharedGrant(), { path: folder, agents: [AGENT.id] }]);
   expect((stored(home).access as { folders: unknown[] }).folders).toEqual([{ path: folder, agents: [AGENT.id] }]);
   expect(s.of("access.changed").at(-1)).toMatchObject({
-    access: { folders: [{ path: folder, agents: [AGENT.id] }, sharedGrant()] },
+    access: { folders: [sharedGrant(), { path: folder, agents: [AGENT.id] }] },
   });
   expect(s.of("access.decided")).toEqual([
     { type: "access.decided", requestId: "req-00000001", decision: "granted", scope: "agent" },
@@ -419,7 +419,7 @@ test("access requests: pending until the person answers on the machine; the answ
   await waitFor(() => s.sent.some((f) => f.id === "r1"));
   expect(s.sent.find((f) => f.id === "r1")).toMatchObject({ ok: true });
   expect((stored(home).access as { folders: { path: string }[] }).folders.map((f) => f.path)).toEqual([other]);
-  expect(s.of("access.changed").at(-1)).toMatchObject({ access: { folders: [{ path: other }, sharedGrant()] } });
+  expect(s.of("access.changed").at(-1)).toMatchObject({ access: { folders: [sharedGrant(), { path: other }] } });
   // Terminal mode would print the command; the app gets the event instead (both kept in sync).
   expect(lines.some((l) => l.includes(`agentes-runner folders allow ${other} --agent dev`))).toBe(true);
 });
@@ -438,10 +438,10 @@ test("folders, tools and settings from the app: system folders refused, everythi
     error: { code: "invalid_path" },
   });
   expect(await c.data({ type: "folders.add", path: folder, agents: [AGENT.id] })).toMatchObject({
-    folders: [{ path: folder, agents: [AGENT.id] }, sharedGrant()],
+    folders: [sharedGrant(), { path: folder, agents: [AGENT.id] }],
   });
   expect(await c.data({ type: "folders.setAgents", path: folder, agents: [] })).toMatchObject({
-    folders: [{ path: folder, agents: [] }, sharedGrant()],
+    folders: [sharedGrant(), { path: folder, agents: [] }],
   });
   const left = await c.data<{ folders: { path: string }[] }>({ type: "folders.remove", path: folder });
   const sharedPath = left.folders[0]?.path ?? "";
