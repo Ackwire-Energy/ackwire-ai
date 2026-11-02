@@ -5,7 +5,6 @@ import {
   type Advanced,
   advancedDefaults,
   advancedSummary,
-  EFFORT_LEVELS,
   effortLevel,
   isAdvancedDefault,
 } from "@agenteschat/client/lib/brain-advanced";
@@ -22,14 +21,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
 import { useColors, useDirectory } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
+import { EffortRamp, useEffortChoice } from "./EffortRamp";
 import { accountKindOf, agentAccounts } from "./logic";
 import { Note, PlanReplies, PlanRepliesOf } from "./parts";
 
 /*
  * An agent's "Configuração avançada" on the phone (ADR 0086), the web's dialog over "Quem pensa" as a screen of its
- * own, opened from "Pensa com" by its owner or an admin: how it thinks (effort, with a fixed model on its computer;
- * the context window, any brain) and who it answers ("Atende outras pessoas", answering through the API while its
+ * own, opened from "Pensa com" by its owner or an admin: how it thinks (effort on its computer, a ramp with a fixed
+ * model and a row that says "Automático" picks it otherwise; the context window, any brain) and who it answers
+ * ("Atende outras pessoas", answering through the API while its
  * computer is away). Each choice saves at once, like the rest of "Pensa com"; "Voltar ao padrão" puts them all back.
  */
 
@@ -84,6 +86,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
         );
   const now = view ? advancedOf(view, options) : null;
   const may = !busy && view?.canEdit === true;
+  const effort = useEffortChoice(agentId, now?.effort);
 
   /** Saves at once and says what the row on "Pensa com" will say now (or `done`). */
   const save = async (input: AgentBrainInput, done?: string) => {
@@ -134,23 +137,29 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
           <Note icon="x">{t("common.loadFailed")}</Note>
         ) : (
           <>
-            {kind && !autoModel ? (
-              <>
-                <GroupedHeader>{t("agentPage.work.brain.effort")}</GroupedHeader>
+            {kind ? (
+              <View style={styles.gap}>
                 <GroupedList>
-                  {EFFORT_LEVELS.map((e) => (
+                  {autoModel ? (
+                    // "Automático" picks the effort too: the row says so and leads to a model, which brings the ramp.
                     <GroupedRow
-                      key={e}
-                      label={t(`agentPage.work.brain.efforts.${e}`)}
-                      sub={t(`agentPage.work.brain.effortText.${e}`)}
-                      subLines={2}
-                      checked={now.effort === e}
-                      disabled={!may}
-                      onPress={() => e !== now.effort && void save({ effort: e })}
+                      label={t("agentPage.work.brain.effort")}
+                      sub={t("agentPage.work.brain.effortText.auto")}
+                      chevron
+                      onPress={() => router.push(`/agent-model/${agentId}` as never)}
                     />
-                  ))}
+                  ) : (
+                    <View style={styles.ramp}>
+                      <EffortRamp
+                        value={effort.value}
+                        onChange={effort.change}
+                        color={agentLook(agent).color}
+                        disabled={!view.canEdit}
+                      />
+                    </View>
+                  )}
                 </GroupedList>
-              </>
+              </View>
             ) : null}
             <GroupedHeader>{t("agentPage.work.brain.context")}</GroupedHeader>
             <GroupedList>
@@ -235,4 +244,5 @@ const styles = StyleSheet.create({
   loading: { marginTop: 16 },
   // A list without a header keeps a header's room above it.
   gap: { marginTop: 18 },
+  ramp: { paddingHorizontal: 15, paddingTop: 13, paddingBottom: 12 },
 });

@@ -998,6 +998,7 @@ export const featureKeysEn: FeatureTranslations = {
     loadFailed: "Couldn't open the file.",
     openImage: "Open picture",
     imageOf: "Picture {{index}} of {{count}}",
+    place: "{{index}} of {{count}}",
     noPreview: "This file doesn't open in the app. Share it to open it in another app.",
   },
   issues: {

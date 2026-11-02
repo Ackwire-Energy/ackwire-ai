@@ -10,14 +10,15 @@ import { LiveBlockCard } from "../blocks/LiveBlock";
 import { PollCard } from "../blocks/PollCard";
 import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
-import { encodeFileList, extensionOf, type FileInfo, fileInfo, imageRows, singleImageHeight } from "./logic";
+import { ImageStack } from "./ImageStack";
+import { encodeFileList, extensionOf, type FileInfo, fileInfo, singleImageHeight } from "./logic";
 import { useArtifacts, useRemoteFile } from "./source";
 
 /**
- * A message's files: pictures inline (one at its own shape, or two
- * side by side), tapping opens the viewer at that picture; other files as a card with the type's tile,
- * the real name and "Documento · 4 KB", tapping opens the document screen. `align="end"`: the viewer's own
- * message, its files sit on the right.
+ * A message's files: a picture inline at its own shape, or several as a deck to swipe through (`ImageStack`),
+ * tapping opens the viewer at that picture; other files as a card with the type's tile, the real name and
+ * "Documento · 4 KB", tapping opens the document screen. `align="end"`: the viewer's own message, its files sit
+ * on the right.
  */
 
 export interface MessageFile {
@@ -29,11 +30,9 @@ export interface MessageFile {
 
 /** Widest a picture block gets in a message. */
 const MAX_WIDTH = 300;
-const GAP = 6;
 const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"]);
 
 export function MessageFiles({ files, align = "start" }: { files: MessageFile[]; align?: "start" | "end" }) {
-  const { t } = useTranslation();
   const orgId = useOrgId();
   const live = files.filter((f) => !f.deleted);
   const queries = useArtifacts(
@@ -61,47 +60,31 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
   const removed = files.filter((f) => f.deleted);
   const blockWidth = Math.min(width || MAX_WIDTH, MAX_WIDTH);
 
-  const openImage = (at: number) => {
+  const [only] = images;
+  const openOnly = () => {
+    if (!only) return;
     tapHaptic();
     router.push({
       pathname: "/images",
       params: {
-        files: encodeFileList(
-          images.map(({ file, detail }) => ({ id: file.id, version: detail?.shownVersion ?? file.version })),
-        ),
-        at: String(at),
+        files: encodeFileList([{ id: only.file.id, version: only.detail?.shownVersion ?? only.file.version }]),
+        at: "0",
       },
     });
   };
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[styles.wrap, align === "end" && styles.end]}>
-      {images.length > 0 ? (
+      {images.length > 1 ? <ImageStack images={images} width={blockWidth} /> : null}
+      {only && images.length === 1 ? (
         <View style={[styles.images, { width: blockWidth }]}>
-          {imageRows(images.length).map((row) => (
-            <View key={row.join("-")} style={styles.row}>
-              {row.map((i) => {
-                const item = images[i];
-                if (!item) return null;
-                const cell = images.length === 1 ? blockWidth : (blockWidth - GAP) / 2;
-                return (
-                  <InlineImage
-                    key={item.file.id}
-                    file={item.file}
-                    detail={item.detail}
-                    width={cell}
-                    single={images.length === 1}
-                    label={
-                      images.length > 1
-                        ? t("mobile.files.imageOf", { index: i + 1, count: images.length })
-                        : item.detail?.title || item.file.title
-                    }
-                    onPress={() => openImage(i)}
-                  />
-                );
-              })}
-            </View>
-          ))}
+          <InlineImage
+            file={only.file}
+            detail={only.detail}
+            width={blockWidth}
+            label={only.detail?.title || only.file.title}
+            onPress={openOnly}
+          />
         </View>
       ) : null}
       {blocks.map((b) =>
@@ -125,14 +108,12 @@ function InlineImage({
   file,
   detail,
   width,
-  single,
   label,
   onPress,
 }: {
   file: MessageFile;
   detail: ArtifactDetail | undefined;
   width: number;
-  single: boolean;
   label: string;
   onPress: () => void;
 }) {
@@ -143,7 +124,7 @@ function InlineImage({
   const link = useRemoteFile(orgId, file.id, version);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [failed, setFailed] = useState(false);
-  const height = single ? singleImageHeight(width, size) : Math.round((width * 4) / 3);
+  const height = singleImageHeight(width, size);
   return (
     <Pressable
       onPress={onPress}
@@ -272,8 +253,7 @@ function RemovedCard() {
 const styles = StyleSheet.create({
   wrap: { alignSelf: "stretch" },
   end: { alignItems: "flex-end" },
-  images: { marginTop: 8, gap: GAP },
-  row: { flexDirection: "row", gap: GAP },
+  images: { marginTop: 8 },
   shot: { borderRadius: 14, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
   center: {
     position: "absolute",

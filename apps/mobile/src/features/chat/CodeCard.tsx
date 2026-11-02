@@ -50,6 +50,7 @@ export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; t
           accessibilityLabel={t("mobile.code.fullScreen")}
           hitSlop={6}
           style={styles.tool}
+          contentStyle={styles.toolIn}
         >
           <Icon name="expand" size={17} color={c.muted} />
         </PressScale>
@@ -62,6 +63,7 @@ export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; t
           onPress={() => openFull(lang, text)}
           accessibilityRole="button"
           style={[styles.more, { borderTopColor: c.line }]}
+          contentStyle={styles.center}
         >
           <Text variant="footnote" tone="muted">
             {t("mobile.code.more", { count: lines.length })}
@@ -143,6 +145,7 @@ function CopyButton({ text, plate = false }: { text: string; plate?: boolean }) 
       accessibilityLabel={done ? t("mobile.code.copied") : t("mobile.code.copy")}
       hitSlop={6}
       style={[styles.tool, done ? styles.toolDone : null, plate ? { backgroundColor: c.plate } : null]}
+      contentStyle={styles.toolIn}
     >
       <Icon name={done ? "check" : "copy"} size={17} color={done ? c.ok : c.muted} />
       {done ? (
@@ -186,6 +189,7 @@ export function CodeSheet() {
           accessibilityRole="switch"
           accessibilityState={{ checked: wrap }}
           style={[styles.pill, { backgroundColor: wrap ? c.ink : c.plate }]}
+          contentStyle={styles.center}
         >
           <Text variant="label" style={{ color: wrap ? c.bg : c.ink2 }}>
             {t("mobile.code.wrap")}
@@ -216,14 +220,12 @@ const styles = StyleSheet.create({
     minWidth: 32,
     paddingHorizontal: 7,
     borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
   },
+  toolIn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  center: { alignItems: "center", justifyContent: "center" },
   toolDone: { paddingHorizontal: 10 },
   body: { paddingHorizontal: 14, paddingBottom: 12 },
-  more: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 10, alignItems: "center" },
+  more: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
   mono: { fontFamily: MONO, fontSize: 13, lineHeight: 20 },
   wrap: { flexShrink: 1 },
   italic: { fontStyle: "italic" },
@@ -232,7 +234,7 @@ const styles = StyleSheet.create({
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
   sheetTitle: { flex: 1, textAlign: "center" },
   sheetTools: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  pill: { height: 32, paddingHorizontal: 13, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  pill: { height: 32, paddingHorizontal: 13, borderRadius: 16 },
   fill: { flex: 1 },
   sheetBody: { paddingHorizontal: 16, paddingTop: 4 },
 });

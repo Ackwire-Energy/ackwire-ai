@@ -17,6 +17,11 @@ export interface PressScaleProps extends Omit<PressableProps, "style" | "childre
    * to fit, so a button stood as tall as the screen.
    */
   fill?: boolean;
+  /**
+   * How the content sits in the press area. `style` is the button from the outside (size, color, shadow): alignment
+   * set there moves the press area, not what is inside it, so a sized circle's icon stayed in its top corner.
+   */
+  contentStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }
@@ -30,6 +35,7 @@ export function PressScale({
   sink = false,
   haptic = true,
   fill = true,
+  contentStyle,
   style,
   children,
   onPressIn,
@@ -47,7 +53,7 @@ export function PressScale({
       <Pressable
         {...rest}
         disabled={disabled}
-        style={fill ? styles.fill : undefined}
+        style={[fill ? styles.fill : undefined, contentStyle]}
         onPressIn={(e) => {
           k.value = reducedMotion ? withTiming(1, { duration: 0 }) : withSpring(1, motion.press);
           if (haptic && !disabled) haptics.light();
