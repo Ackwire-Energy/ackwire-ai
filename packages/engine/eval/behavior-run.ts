@@ -26,9 +26,11 @@ import {
   type ContextDeps,
   createAgent,
   createAgentRuns,
+  createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
+  createBlockToolSource,
   createChannel,
   createChatToolSource,
   createContextToolSource,
@@ -185,6 +187,8 @@ export interface BehaviorCase {
   workspace?: boolean;
   /** The real chat tools (`post_message`, `send_dm`): speaking elsewhere or for someone. */
   chat?: boolean;
+  /** The real `show_block` and `start_poll` (ADR 0113), next to the Drive's tools an agent could reach for instead. */
+  blocks?: boolean;
   /** A `propose_mission` with the real description and findings schema (no computer; recorded only). */
   missions?: boolean;
   /** Issues already in the workspace. */
@@ -392,6 +396,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       [
         ...(c.connectors ?? []).flatMap((id) => [...new Set(CONNECTORS[id].map((t) => t.scope))]),
         ...(c.issues ? ["issues:read", "issues:write"] : []),
+        ...(c.blocks ? ["drive:read", "drive:write"] : []),
         ...(c.secretRequest ? ["sandbox:run"] : []),
       ].map((scope) => ({ connectionId: null, scope })),
     );
@@ -453,6 +458,17 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
               },
             }),
           ]
+        : []),
+      ...(c.blocks
+        ? (() => {
+            const blobs = createBlobStoreResolver({
+              db,
+              keyWrappers: [keyWrapper],
+              platform: createMemoryBlobStore(),
+            });
+            const deps = { db, blobs, pubsub };
+            return [createArtifactToolSource(deps), createBlockToolSource(deps)];
+          })()
         : []),
       ...(c.missions ? [fakeMissionSource().source] : []),
       ...(c.secretRequest ? [fakeSecretRequestSource()] : []),

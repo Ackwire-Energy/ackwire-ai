@@ -110,7 +110,8 @@ export interface AppOptions {
  * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
  */
-const APP_CSP = "frame-ancestors 'none'; base-uri 'self'; frame-src 'self' blob: data: https://challenges.cloudflare.com";
+const APP_CSP =
+  "frame-ancestors 'none'; base-uri 'self'; frame-src 'self' blob: data: https://challenges.cloudflare.com";
 
 export function createApp(options: AppOptions) {
   const log = options.log ?? createLogger("warn");

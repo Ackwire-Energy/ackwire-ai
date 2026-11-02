@@ -178,6 +178,7 @@ import type {
   OrgSettings,
   Person,
   PhoneSignIn,
+  Poll,
   PostMedia,
   Proposal,
   PushDeviceInput,
@@ -1188,6 +1189,13 @@ export interface ApiClient {
     list(orgId: string, filters?: ArtifactFilters): Promise<Artifact[]>;
     /** One artifact at `version` (default: latest), with content. */
     get(orgId: string, id: string, version?: number): Promise<ArtifactDetail>;
+    /** Keeps a block in the Drive (ADR 0113). */
+    keep(orgId: string, id: string): Promise<Artifact>;
+    /** Sends what a person picked in a block to the agent that made it, as their own message. */
+    reply(orgId: string, id: string, text: string, clientId: string): Promise<{ id: string }>;
+    poll(orgId: string, id: string): Promise<Poll>;
+    /** Replaces the viewer's marks in a vote; empty takes them back. */
+    vote(orgId: string, id: string, options: number[]): Promise<Poll>;
     versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
     /** Short-lived signed URL for the stored file. */
     download(orgId: string, id: string, version?: number): Promise<{ url: string; expiresAt: string }>;

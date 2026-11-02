@@ -48,6 +48,8 @@ const KIND_EXT: Record<Exclude<ArtifactKind, "file">, string> = {
   diff: "patch",
   diagram: "mmd",
   html: "html",
+  block: "html",
+  poll: "json",
 };
 
 const KIND_TYPE: Record<Exclude<ArtifactKind, "file">, FileTypeKey> = {
@@ -56,6 +58,8 @@ const KIND_TYPE: Record<Exclude<ArtifactKind, "file">, FileTypeKey> = {
   diff: "diff",
   diagram: "diagram",
   html: "page",
+  block: "page",
+  poll: "file",
 };
 
 /** "relatorio.final.PDF" → "pdf" ("" without one). */
@@ -192,7 +196,10 @@ export function shareSource(a: Pick<ArtifactDetail, "kind" | "title" | "content"
     case "diagram":
       return { from: "text", text: c.mermaid, name, mime: "text/plain" };
     case "html":
+    case "block":
       return { from: "text", text: c.html, name, mime: "text/html" };
+    case "poll":
+      return { from: "text", text: [c.question, ...c.options].join("\n"), name, mime: "text/plain" };
     case "table":
       return { from: "export", format: "csv", name, mime: "text/csv" };
     case "diff":

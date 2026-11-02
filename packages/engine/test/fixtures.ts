@@ -24,6 +24,7 @@ import {
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
+  createBlockToolSource,
   createCalendarToolSource,
   createChatToolSource,
   createContextToolSource,
@@ -183,6 +184,8 @@ export async function setup(
     handOff?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
     artifactTools?: boolean;
+    /** Add `show_block` and `start_poll` (ADR 0113). */
+    blockTools?: boolean;
     chatTools?: boolean;
     /** Add the issue tools (create_issue, comment_issue…). */
     issueTools?: boolean;
@@ -332,6 +335,7 @@ export async function setup(
       ? [createHandOffToolSource({ pubsub, judge: context.judge, tools: (): ToolGateway | undefined => tools })]
       : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
+    ...(options.blockTools ? [createBlockToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),

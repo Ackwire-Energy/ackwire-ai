@@ -13,7 +13,7 @@ const ForYouItem = z
       at: z.string(),
       file: z.object({
         id: z.uuid(),
-        kind: z.enum(["document", "table", "diff", "html", "diagram", "file"]),
+        kind: z.enum(["document", "table", "diff", "html", "diagram", "file", "block", "poll"]),
         title: z.string(),
         channelId: z.string().nullable(),
         threadId: z.string().nullable(),

@@ -1,5 +1,5 @@
 import { isolatedPage, PAGE_SANDBOX } from "@agenteschat/client/lib/isolated-page";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -46,6 +46,37 @@ export function withShim(html: string): string {
 
 type Load = "blob" | "data" | "failed";
 
+/** How a page gets into its frame: a blob URL, a data URL where that is refused, and `failed` if neither started. */
+export function usePageUrl(page: string, ready: boolean) {
+  const [load, setLoad] = useState<Load>("blob");
+  const [url, setUrl] = useState<string | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new page starts over from a blob URL
+  useEffect(() => {
+    setLoad("blob");
+  }, [page]);
+
+  useEffect(() => {
+    if (load === "failed" || !page) return;
+    if (load === "data" || typeof URL.createObjectURL !== "function") {
+      setUrl(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
+      return;
+    }
+    const next = URL.createObjectURL(new Blob([page], { type: "text/html" }));
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [page, load]);
+
+  // Some browsers refuse a blob page in a sandboxed frame: try a data URL, then say so.
+  useEffect(() => {
+    if (ready || load === "failed" || !url) return;
+    const timer = setTimeout(() => setLoad(load === "blob" ? "data" : "failed"), READY_MS);
+    return () => clearTimeout(timer);
+  }, [ready, load, url]);
+
+  return { url: load === "failed" ? null : url, failed: load === "failed" };
+}
+
 export function HtmlFrame({
   html,
   title,
@@ -60,29 +91,16 @@ export function HtmlFrame({
 }) {
   const { t } = useTranslation();
   const frame = useRef<HTMLIFrameElement>(null);
-  const [load, setLoad] = useState<Load>("blob");
-  const [url, setUrl] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const page = useMemo(() => withShim(html), [html]);
+  const { url, failed } = usePageUrl(page, ready);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new page starts over from a blob URL
-  useEffect(() => {
-    setLoad("blob");
-  }, [html]);
-
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new page starts over
   useEffect(() => {
     setReady(false);
     setError(null);
-    const page = withShim(html);
-    if (load === "failed") return;
-    if (load === "data" || typeof URL.createObjectURL !== "function") {
-      setUrl(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
-      return;
-    }
-    const next = URL.createObjectURL(new Blob([page], { type: "text/html" }));
-    setUrl(next);
-    return () => URL.revokeObjectURL(next);
-  }, [html, load]);
+  }, [page]);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -95,33 +113,25 @@ export function HtmlFrame({
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  // Some browsers refuse a blob page in a sandboxed frame: try a data URL, then say so.
-  useEffect(() => {
-    if (ready || load === "failed" || !url) return;
-    const timer = setTimeout(() => setLoad(load === "blob" ? "data" : "failed"), READY_MS);
-    return () => clearTimeout(timer);
-  }, [ready, load, url]);
-
-  const iframe =
-    url && load !== "failed" ? (
-      <iframe
-        ref={frame}
-        className={className ?? "artifact-html"}
-        src={url}
-        title={title}
-        sandbox={HTML_SANDBOX}
-        referrerPolicy="no-referrer"
-        tabIndex={thumbnail ? -1 : undefined}
-        aria-hidden={thumbnail || undefined}
-        scrolling={thumbnail ? "no" : undefined}
-      />
-    ) : null;
+  const iframe = url ? (
+    <iframe
+      ref={frame}
+      className={className ?? "artifact-html"}
+      src={url}
+      title={title}
+      sandbox={HTML_SANDBOX}
+      referrerPolicy="no-referrer"
+      tabIndex={thumbnail ? -1 : undefined}
+      aria-hidden={thumbnail || undefined}
+      scrolling={thumbnail ? "no" : undefined}
+    />
+  ) : null;
   if (thumbnail) return iframe;
   return (
     <>
       {iframe}
-      {load === "failed" && <p className="small muted">{t("artifacts.htmlFailed")}</p>}
-      {error && load !== "failed" && <p className="small muted">{t("artifacts.htmlError", { message: error })}</p>}
+      {failed && <p className="small muted">{t("artifacts.htmlFailed")}</p>}
+      {error && !failed && <p className="small muted">{t("artifacts.htmlError", { message: error })}</p>}
     </>
   );
 }
