@@ -102,7 +102,7 @@ function Consent({ t, requestId }: { t: TFunction; requestId: string }) {
   if (outcome?.kind === "allowed") {
     return (
       <Card padded as="div" className="consent">
-        <EmptyState sky title={t("apps.consent.doneTitle")}>
+        <EmptyState icon="check" title={t("apps.consent.doneTitle")}>
           <span role="status">{t("apps.consent.done", { app: outcome.app })}</span>
         </EmptyState>
       </Card>
@@ -259,7 +259,7 @@ function ConsentForm({
           </button>
         </p>
         {only ? (
-          <div className="list-col" style={{ gap: 2 }}>
+          <div className="apps-field" style={{ gap: 2 }}>
             <span className="newag__label">{t("apps.consent.workspace")}</span>
             <span>{only.name}</span>
           </div>
@@ -280,7 +280,7 @@ function ConsentForm({
           </Field>
         )}
         {inlineError && <Alert>{t(`apps.consent.error.${inlineError}`)}</Alert>}
-        <div className="list-col" style={{ gap: 6 }}>
+        <div className="apps-field" style={{ gap: 6 }}>
           <span className="newag__label" id="consent-access">
             {t("apps.consent.access")}
           </span>
@@ -303,7 +303,7 @@ function ConsentForm({
           />
         </div>
         <div className="consent__lists">
-          <div className="list-col" style={{ gap: 8 }}>
+          <div className="apps-field" style={{ gap: 8 }}>
             <span className="newag__label">{t("apps.consent.can")}</span>
             <ul className="consent__list consent__list--can small">
               <li>
@@ -322,7 +322,7 @@ function ConsentForm({
               </li>
             </ul>
           </div>
-          <div className="list-col" style={{ gap: 8 }}>
+          <div className="apps-field" style={{ gap: 8 }}>
             <span className="newag__label">{t("apps.consent.never")}</span>
             <ul className="consent__list consent__list--never small">
               {(["neverApprove", "neverSettings", "neverHidden"] as const).map((key) => (
@@ -335,7 +335,7 @@ function ConsentForm({
           </div>
         </div>
         {client.displayKind === "loopback" && <Alert tone="neutral">{t("apps.consent.loopbackWarning")}</Alert>}
-        <div className="list-col" style={{ gap: 4 }}>
+        <div className="apps-field" style={{ gap: 4 }}>
           <span className="small">{t("apps.consent.startedNow")}</span>
           <span className="consent__returns small muted">
             {t("apps.consent.returnsTo", { place: visibleText(client.returnsTo) })}

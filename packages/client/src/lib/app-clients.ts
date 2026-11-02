@@ -28,14 +28,15 @@ export const cursorInstallLink = (url: string) =>
   `cursor://anysphere.cursor-deeplink/mcp/install?name=${MCP_SERVER_NAME}&config=${btoa(JSON.stringify({ url }))}`;
 
 /** `~/.cursor/mcp.json`. */
-export const cursorConfig = (url: string) => JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { url } } });
+export const cursorConfig = (url: string) => JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { url } } }, null, 2);
 
 /** VS Code's install link: the server as URL-encoded JSON. */
 export const vscodeInstallLink = (url: string) =>
   `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: MCP_SERVER_NAME, type: "http", url }))}`;
 
 /** `.vscode/mcp.json`. */
-export const vscodeConfig = (url: string) => JSON.stringify({ servers: { [MCP_SERVER_NAME]: { type: "http", url } } });
+export const vscodeConfig = (url: string) =>
+  JSON.stringify({ servers: { [MCP_SERVER_NAME]: { type: "http", url } } }, null, 2);
 
 export const codexCommands = (url: string) =>
   `codex mcp add ${MCP_SERVER_NAME} --url ${url}\ncodex mcp login ${MCP_SERVER_NAME}`;

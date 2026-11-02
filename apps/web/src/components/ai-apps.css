@@ -12,6 +12,13 @@
   gap: 2px;
 }
 
+/* A label and what it names, stacked (a list-col grows in a column, this one doesn't). */
+.apps-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .app-row {
   flex-wrap: nowrap;
   align-items: flex-start;
@@ -141,6 +148,11 @@ html:not([data-pointer]) .apps-client:focus-visible {
 }
 
 /* The consent page. */
+.consent-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 .consent {
   display: flex;
   flex-direction: column;
@@ -162,8 +174,12 @@ html:not([data-pointer]) .apps-client:focus-visible {
   font-weight: 500;
   overflow-wrap: anywhere;
 }
+/* The name or address moves to the next line whole (never split at its hyphen), and breaks only when it can't fit. */
 .consent__title b {
+  display: inline-block;
+  max-width: 100%;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 .consent__account {
   display: flex;

@@ -93,7 +93,6 @@ export function AiAppsSection() {
       error={list.isError && !list.data ? list.error : null}
       onRetry={() => void list.refetch()}
       whole={view === "all"}
-      onConnect={() => setConnecting(true)}
       onCreate={() => setCreating(true)}
       onConfirm={setConfirm}
     />
@@ -156,7 +155,6 @@ function AppsBody({
   error,
   onRetry,
   whole,
-  onConnect,
   onCreate,
   onConfirm,
 }: {
@@ -165,7 +163,6 @@ function AppsBody({
   error: unknown;
   onRetry: () => void;
   whole: boolean;
-  onConnect: () => void;
   onCreate: () => void;
   onConfirm: (c: Confirm) => void;
 }) {
@@ -175,18 +172,7 @@ function AppsBody({
   return (
     <>
       {isAppsEmpty(list) && !whole ? (
-        <Card as="div">
-          <EmptyState
-            icon="link"
-            actions={
-              <Button variant="primary" icon="plus" onClick={onConnect}>
-                {t("apps.connect")}
-              </Button>
-            }
-          >
-            {t("apps.empty")}
-          </EmptyState>
-        </Card>
+        <EmptyState icon="link">{t("apps.empty")}</EmptyState>
       ) : (
         list.apps.length > 0 && (
           <Card aria-labelledby="apps-connected">
@@ -571,10 +557,7 @@ function ClientSteps({
       <>
         <div className="row">
           <Button asChild variant="primary">
-            <a href={cursorInstallLink(url)}>
-              <ProviderLogo id="cursor" size="xs" />
-              {t("apps.dialog.cursor.add")}
-            </a>
+            <a href={cursorInstallLink(url)}>{t("apps.dialog.cursor.add")}</a>
           </Button>
         </div>
         <span className="apps-step small muted">
@@ -597,10 +580,7 @@ function ClientSteps({
       <TabPanel value="vscode">
         <div className="row">
           <Button asChild variant="primary">
-            <a href={vscodeInstallLink(url)}>
-              <ProviderLogo id="vscode" size="xs" />
-              {t("apps.dialog.other.vscodeAdd")}
-            </a>
+            <a href={vscodeInstallLink(url)}>{t("apps.dialog.other.vscodeAdd")}</a>
           </Button>
         </div>
         <span className="apps-step small muted">
@@ -713,7 +693,7 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
-          <div className="list-col" style={{ gap: 6 }}>
+          <div className="apps-field" style={{ gap: 6 }}>
             <span className="newag__label" id="apps-token-access">
               {t("apps.tokens.access")}
             </span>
