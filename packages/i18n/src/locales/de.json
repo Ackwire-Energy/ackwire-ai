@@ -1416,8 +1416,8 @@
       "button_other": "Angeheftete Nachrichten ({{count}})",
       "label": "Angeheftete Nachrichten in #{{channel}}",
       "in": "Angeheftet in #{{channel}}",
-      "empty": "Hier ist noch nichts angeheftet. Hefte eine Nachricht über ihr Menü an.",
-      "unpin": "Nachricht von {{name}} lösen"
+      "unpin": "Nachricht von {{name}} lösen",
+      "empty": "Hier ist noch nichts angeheftet. Hefte eine Nachricht über ihr Menü an."
     },
     "membersButton_one": "Mitglieder des Kanals ({{count}})",
     "membersButton_other": "Mitglieder des Kanals ({{count}})",
@@ -1548,7 +1548,8 @@
       "outage": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
       "handled": "Beantwortet",
       "failed": "Fehlgeschlagen",
-      "referenced": "Nur erwähnt"
+      "referenced": "Nur erwähnt",
+      "reacted": "Hat reagiert"
     },
     "failedShort": "Konnte nicht antworten",
     "popoverTitle": "Agenten",
@@ -1766,6 +1767,10 @@
     "forbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann jetzt weitermachen",
     "resumed": "{{agent}} hat die Arbeit wieder aufgenommen",
     "ended": "Diese Arbeit endete, bevor sie weiterging",
+    "canceled": "Abgebrochen. Es läuft nicht, wenn das Limit zurückgesetzt ist.",
+    "dontRun": "Nicht ausführen",
+    "dontRunHint": "Abbrechen: Nichts läuft, wenn das Limit zurückgesetzt ist",
+    "dontRunForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann es abbrechen",
     "extraTitle": "Längere Arbeit darf bezahlte Zusatznutzung verwenden",
     "extraHint": "Mit eingeschalteter Zusatznutzung im Abo läuft längere Arbeit über 95 % hinaus weiter. Ausgeschaltet pausiert sie bei 95 % und geht weiter, wenn sich das Abo zurücksetzt."
   },
@@ -2470,7 +2475,8 @@
       "mentions": "Erwähnungen",
       "waiting": "Wartet auf dich",
       "unread": "Ungelesen",
-      "reactions": "Reaktionen"
+      "reactions": "Reaktionen",
+      "done": "Erledigt"
     },
     "keys": {
       "title": "Tastenkürzel",
@@ -2611,6 +2617,8 @@
     "replyTip": "Antworten · R",
     "done": "Erledigt",
     "doneTip": "Erledigt · E",
+    "restore": "Zurückverschieben",
+    "restoreTip": "Zurückverschieben · E",
     "snooze": "Später erinnern",
     "snoozeShort": "Erinnern",
     "open": "Öffnen",
@@ -2643,6 +2651,7 @@
       "done": "Als erledigt markiert",
       "doneQuestion": "{{name}} wartet noch. Die Frage bleibt in der Unterhaltung.",
       "doneApproval": "Die Anfrage bleibt in Freigaben.",
+      "restored": "Wieder in deinem Posteingang",
       "undo": "Rückgängig",
       "readAll_one": "{{count}} als gelesen markiert",
       "readAll_other": "{{count}} als gelesen markiert",
@@ -2659,6 +2668,7 @@
     "noneWaiting": "Niemand wartet auf dich.",
     "noneUnread": "Alles gelesen.",
     "noneHere": "Vorerst nichts hier.",
+    "noneDone": "In den letzten 30 Tagen nichts als erledigt markiert.",
     "more": "Mehr anzeigen"
   },
   "approvals": {
@@ -4767,7 +4777,9 @@
       "usagePaused": "Pausiert bis {{until}} (Abo-Limit)",
       "usagePausedUnknown": "Pausiert, bis sich das Abo zurücksetzt (Abo-Limit)",
       "usagePausedBudget": "Pausiert bis {{until}} (Budgetlimit)",
-      "usagePausedBudgetUnknown": "Pausiert, bis sich das Budget erneuert (Budgetlimit)"
+      "usagePausedBudgetUnknown": "Pausiert, bis sich das Budget erneuert (Budgetlimit)",
+      "waitingPlan": "Wartet auf das {{plan}}-Abo · läuft um {{until}}",
+      "waitingPlanUnknown": "Wartet, bis sich das {{plan}}-Abo zurücksetzt"
     },
     "pausedReason": {
       "creator_left": "Pausiert: Wer sie erstellt hat, hat den Workspace verlassen",
@@ -4817,6 +4829,8 @@
       "waiting": "Wartet auf eine Antwort",
       "waitingApproval": "Wartet auf deine Freigabe",
       "waitingComputer": "Wartet auf den Computer",
+      "waitingPlan": "Wartet, bis sich das Abo zurücksetzt",
+      "waitingBudget": "Wartet, bis sich das Budget erneuert",
       "reported": "Hat berichtet, was er gefunden hat",
       "silent": "Nichts Neues, still geblieben",
       "failed": "Hat nicht funktioniert",
@@ -4874,6 +4888,10 @@
     "stoppedToast": "Ausführung gestoppt.",
     "usagePause": {
       "line": "Sie macht von selbst weiter, wenn sich das Limit zurücksetzt. In der Unterhaltung wird nichts gepostet.",
+      "lineLimit": "Sie läuft von selbst, wenn das Limit zurückgesetzt ist. In der Unterhaltung wird nichts gepostet.",
+      "dontRun": "Nicht ausführen",
+      "dontRunName": "{{name}} nicht ausführen, wenn das Limit zurückgesetzt ist",
+      "canceledToast": "Abgebrochen. Es läuft nicht, wenn das Limit zurückgesetzt ist.",
       "continuedToast": "Ausführung geht weiter.",
       "forbidden": "Nur wer die Routine erstellt hat, der Inhaber des Agenten oder ein Admin kann sie jetzt fortsetzen",
       "extra_off": "Das Zeitfenster dieses Abos ist aufgebraucht und die längere Arbeit dieses Agenten nutzt keine bezahlte Zusatznutzung. Schalte sie in seinen KI-Einstellungen ein, um jetzt weiterzumachen, sonst geht es nach dem Zurücksetzen weiter",
@@ -7752,7 +7770,8 @@
       "html": "HTML-Seite",
       "file": "Datei",
       "block": "Block",
-      "poll": "Umfrage"
+      "poll": "Umfrage",
+      "choices": "Auswahl"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · erstellt von {{name}}",
@@ -7833,6 +7852,16 @@
     "pollAnswered_other": "{{count}} von {{total}} haben geantwortet",
     "voteFailed": "Deine Stimme wurde nicht gezählt."
   },
+  "choices": {
+    "step": "{{step}} von {{total}}",
+    "back": "Zurück",
+    "next": "Weiter",
+    "close": "Schließen",
+    "closed": "{{title}} · geschlossen",
+    "reopen": "Wieder anzeigen",
+    "answeredBy": "{{name}} hat gewählt",
+    "failed": "Deine Auswahl wurde nicht gesendet. Versuch es noch einmal."
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "Alles, was Personen und Agenten erstellt oder hochgeladen haben.",
@@ -7870,7 +7899,8 @@
       "html": "HTML-Seiten",
       "file": "Dateien",
       "block": "Blöcke",
-      "poll": "Umfragen"
+      "poll": "Umfragen",
+      "choices": "Auswahlen"
     },
     "kindCount": "{{kind}}: {{count}}",
     "view": "Ansicht",
@@ -9331,7 +9361,72 @@
     "hint": "Durchsucht die Kanäle, in denen du bist.",
     "inChannel": "in #{{channel}}",
     "count_one": "{{count}} Ergebnis",
-    "count_other": "{{count}} Ergebnisse"
+    "count_other": "{{count}} Ergebnisse",
+    "countMore": "{{count}}+ Ergebnisse",
+    "words": {
+      "ops": {
+        "from": "von",
+        "in": "in",
+        "has": "hat",
+        "mentions": "erwähnt",
+        "before": "vor",
+        "after": "nach",
+        "during": "während",
+        "author": "autor",
+        "pinned": "angeheftet"
+      },
+      "has": {
+        "link": "link",
+        "file": "datei",
+        "image": "bild",
+        "card": "karte"
+      },
+      "author": {
+        "person": "person",
+        "agent": "agent"
+      }
+    },
+    "options": "Suchoptionen",
+    "option": {
+      "from": "Von einer bestimmten Person oder einem Agenten",
+      "in": "In einem bestimmten Kanal oder einer Direktnachricht gesendet",
+      "has": "Enthält einen Link, eine Datei, ein Bild oder eine Karte",
+      "mentions": "Erwähnt eine bestimmte Person oder einen Agenten",
+      "before": "Vor einem Datum",
+      "after": "Nach einem Datum",
+      "during": "An einem Tag, in einem Monat oder Jahr",
+      "author": "Von Personen oder von Agenten geschrieben",
+      "pinned": "Angeheftete Nachrichten"
+    },
+    "moreFilters": "Weitere Filter",
+    "hasLabel": {
+      "link": "Link",
+      "file": "Datei",
+      "image": "Bild",
+      "card": "Karte"
+    },
+    "authorLabel": {
+      "person": "Personen",
+      "agent": "Agenten"
+    },
+    "pinnedChip": "Angeheftet",
+    "removeFilter": "{{filter}} entfernen",
+    "filtersApplied_one": "{{count}} Filter",
+    "filtersApplied_other": "{{count}} Filter",
+    "recent": "Letzte Suchen",
+    "clearRecent": "Löschen",
+    "pickDate": "Datum",
+    "dateHint": "Gib ein Datum ein: 2026-10-05, 2026-10 oder 2026",
+    "noMatch": "Hier heißt niemand so.",
+    "noPlace": "Kein Kanal und keine Direktnachricht mit diesem Namen.",
+    "sort": {
+      "label": "Sortieren",
+      "newest": "Neueste",
+      "oldest": "Älteste",
+      "relevance": "Relevanteste"
+    },
+    "searchHere": "In dieser Unterhaltung suchen",
+    "dm": "Direktnachricht mit {{name}}"
   },
   "files": {
     "upload": "Datei hochladen",
@@ -10548,7 +10643,7 @@
       "waitingComputer": "Wartet auf den Computer",
       "paused": "Am Abo-Limit pausiert",
       "pausedUntil": "Am Abo-Limit pausiert · zurück um {{time}}",
-      "done": "Fertig in {{duration}}",
+      "done": "Beendet nach {{duration}}",
       "failed": "Nicht fertig geworden",
       "canceled": "Von {{name}} nach {{duration}} gestoppt",
       "canceledAnon": "Nach {{duration}} gestoppt"
@@ -10959,9 +11054,11 @@
       "plan_limit_wait": "Das {{plan}}-Abo hat sein Limit erreicht. Ich antworte {{when}}, wenn es sich zurücksetzt.",
       "plan_limit_wait_unknown": "Das {{plan}}-Abo hat sein Limit erreicht. Ich antworte, sobald es sich zurücksetzt.",
       "budget_wait": "Mein Monatsbudget ist aufgebraucht. Ich mache {{when}} weiter, oder früher, wenn ein Admin es erhöht.",
+      "usage_wait_canceled": "Abgebrochen. Es läuft nicht, wenn das Limit zurückgesetzt ist.",
       "usage_paused": "{{agent}} hat diese Arbeit pausiert · {{plan}}-Abo bei {{percent}} % {{window}}",
       "usage_paused_budget": "{{agent}} hat diese Arbeit pausiert · Monatsbudget bei {{percent}} %",
       "work_auto_moved": "Das dauert eine Weile, also mache ich im Hintergrund weiter. Ich poste hier Updates, das nächste in etwa {{minutes}} Min.",
+      "work_auto_movedOver": "Das dauert eine Weile, also mache ich im Hintergrund weiter. Ich poste hier Updates.",
       "work_end_done": "Fertig ({{minutes}} Min.).",
       "work_end_failed": "Diese Arbeit im Hintergrund wurde nicht abgeschlossen ({{minutes}} Min.).",
       "work_end_failedWhy": "Diese Arbeit im Hintergrund wurde nicht abgeschlossen ({{minutes}} Min.): {{why}}.",

@@ -1464,8 +1464,8 @@
       "button_other": "Messages épinglés ({{count}})",
       "label": "Messages épinglés dans #{{channel}}",
       "in": "Épinglé dans #{{channel}}",
-      "empty": "Rien d'épinglé ici pour l'instant. Épinglez un message depuis son menu.",
-      "unpin": "Désépingler le message de {{name}}"
+      "unpin": "Désépingler le message de {{name}}",
+      "empty": "Rien d'épinglé ici pour l'instant. Épinglez un message depuis son menu."
     },
     "membersButton_one": "Membres du canal ({{count}})",
     "membersButton_many": "Membres du canal ({{count}})",
@@ -1610,7 +1610,8 @@
       "outage": "Le fournisseur d'IA est en panne · nouvel essai automatique",
       "handled": "A répondu",
       "failed": "Échec",
-      "referenced": "Seulement mentionné"
+      "referenced": "Seulement mentionné",
+      "reacted": "A réagi"
     },
     "failedShort": "N'a pas pu répondre",
     "popoverTitle": "Agents",
@@ -1831,6 +1832,10 @@
     "forbidden": "Seuls la personne qui a demandé, le propriétaire de l'agent ou un admin peuvent continuer maintenant",
     "resumed": "{{agent}} a repris le travail",
     "ended": "Ce travail s'est terminé avant de reprendre",
+    "canceled": "Annulé. Ça ne s'exécutera pas quand la limite se renouvellera.",
+    "dontRun": "Ne pas exécuter",
+    "dontRunHint": "Annuler, rien ne s'exécutera quand la limite se renouvellera",
+    "dontRunForbidden": "Seuls la personne qui a demandé, le propriétaire de l'agent ou un admin peuvent l'annuler",
     "extraTitle": "Le long travail peut utiliser l'usage supplémentaire payant",
     "extraHint": "Avec l'usage supplémentaire activé dans l'abonnement, le long travail continue au-delà de 95 %. Désactivé, il se met en pause à 95 % et reprend au renouvellement de l'abonnement."
   },
@@ -2554,7 +2559,8 @@
       "mentions": "Mentions",
       "waiting": "Vous attend",
       "unread": "Non lues",
-      "reactions": "Réactions"
+      "reactions": "Réactions",
+      "done": "Terminées"
     },
     "keys": {
       "title": "Raccourcis",
@@ -2703,6 +2709,8 @@
     "replyTip": "Répondre · R",
     "done": "Fait",
     "doneTip": "Fait · E",
+    "restore": "Restaurer",
+    "restoreTip": "Restaurer · E",
     "snooze": "Me le rappeler plus tard",
     "snoozeShort": "Rappeler",
     "open": "Ouvrir",
@@ -2734,6 +2742,7 @@
       "done": "Marqué comme fait",
       "doneQuestion": "{{name}} attend toujours. La question reste dans la conversation.",
       "doneApproval": "La demande reste dans Approbations.",
+      "restored": "De retour dans votre boîte de réception",
       "undo": "Annuler",
       "readAll_one": "{{count}} marquée comme lue",
       "readAll_many": "{{count}} marquées comme lues",
@@ -2751,6 +2760,7 @@
     "noneWaiting": "Personne ne vous attend.",
     "noneUnread": "Tout est lu.",
     "noneHere": "Rien ici pour l'instant.",
+    "noneDone": "Rien marqué comme terminé ces 30 derniers jours.",
     "more": "Afficher plus"
   },
   "approvals": {
@@ -4959,7 +4969,9 @@
       "usagePaused": "En pause jusqu'à {{until}} (limite de l'abonnement)",
       "usagePausedUnknown": "En pause jusqu'au renouvellement de l'abonnement (limite de l'abonnement)",
       "usagePausedBudget": "En pause jusqu'à {{until}} (limite du budget)",
-      "usagePausedBudgetUnknown": "En pause jusqu'au renouvellement du budget (limite du budget)"
+      "usagePausedBudgetUnknown": "En pause jusqu'au renouvellement du budget (limite du budget)",
+      "waitingPlan": "En attente de l'abonnement {{plan}} · s'exécute à {{until}}",
+      "waitingPlanUnknown": "En attente du renouvellement de l'abonnement {{plan}}"
     },
     "pausedReason": {
       "creator_left": "En pause : la personne qui l'a créée a quitté l'espace de travail",
@@ -5014,6 +5026,8 @@
       "waiting": "En attente d'une réponse",
       "waitingApproval": "En attente de votre approbation",
       "waitingComputer": "En attente de l'ordinateur",
+      "waitingPlan": "En attente du renouvellement de l'abonnement",
+      "waitingBudget": "En attente du renouvellement du budget",
       "reported": "A rapporté ce qu'elle a trouvé",
       "silent": "Rien de nouveau, silence",
       "failed": "A échoué",
@@ -5071,6 +5085,10 @@
     "stoppedToast": "Exécution arrêtée.",
     "usagePause": {
       "line": "Elle reprend seule quand la limite se renouvelle. Rien n'est publié dans la conversation.",
+      "lineLimit": "Elle s'exécute seule quand la limite se renouvelle. Rien n'est publié dans la conversation.",
+      "dontRun": "Ne pas exécuter",
+      "dontRunName": "Ne pas exécuter {{name}} quand la limite se renouvellera",
+      "canceledToast": "Annulé. Ça ne s'exécutera pas quand la limite se renouvellera.",
       "continuedToast": "L'exécution continue.",
       "forbidden": "Seuls la personne qui a créé la routine, le propriétaire de l'agent ou un admin peuvent la poursuivre maintenant",
       "extra_off": "La fenêtre de cet abonnement est épuisée et le long travail de cet agent n'utilise pas l'usage supplémentaire payant. Activez-le dans ses paramètres d'IA pour continuer maintenant, sinon il reprendra après le renouvellement",
@@ -8110,7 +8128,8 @@
       "html": "Page HTML",
       "file": "Fichier",
       "block": "Bloc",
-      "poll": "Sondage"
+      "poll": "Sondage",
+      "choices": "Choix"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · créé par {{name}}",
@@ -8194,6 +8213,16 @@
     "pollAnswered_other": "{{count}} sur {{total}} ont répondu",
     "voteFailed": "Votre vote n'est pas passé."
   },
+  "choices": {
+    "step": "{{step}} sur {{total}}",
+    "back": "Retour",
+    "next": "Suivant",
+    "close": "Fermer",
+    "closed": "{{title}} · fermé",
+    "reopen": "Afficher à nouveau",
+    "answeredBy": "{{name}} a choisi",
+    "failed": "Votre choix n'a pas été envoyé. Réessayez."
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "Tout ce que les personnes et les agents ont créé ou importé.",
@@ -8232,7 +8261,8 @@
       "html": "Pages HTML",
       "file": "Fichiers",
       "block": "Blocs",
-      "poll": "Sondages"
+      "poll": "Sondages",
+      "choices": "Choix"
     },
     "kindCount": "{{kind}} : {{count}}",
     "view": "Affichage",
@@ -9730,7 +9760,73 @@
     "inChannel": "dans #{{channel}}",
     "count_one": "{{count}} résultat",
     "count_many": "{{count}} résultats",
-    "count_other": "{{count}} résultats"
+    "count_other": "{{count}} résultats",
+    "countMore": "{{count}}+ résultats",
+    "words": {
+      "ops": {
+        "from": "de",
+        "in": "dans",
+        "has": "contient",
+        "mentions": "mentionne",
+        "before": "avant",
+        "after": "après",
+        "during": "pendant",
+        "author": "auteur",
+        "pinned": "épinglé"
+      },
+      "has": {
+        "link": "lien",
+        "file": "fichier",
+        "image": "image",
+        "card": "carte"
+      },
+      "author": {
+        "person": "personne",
+        "agent": "agent"
+      }
+    },
+    "options": "Options de recherche",
+    "option": {
+      "from": "D'une personne ou d'un agent précis",
+      "in": "Envoyé dans un canal ou un message direct précis",
+      "has": "Contient un lien, un fichier, une image ou une carte",
+      "mentions": "Mentionne une personne ou un agent précis",
+      "before": "Avant une date",
+      "after": "Après une date",
+      "during": "Un jour, un mois ou une année",
+      "author": "Écrit par des personnes ou par des agents",
+      "pinned": "Messages épinglés"
+    },
+    "moreFilters": "Plus de filtres",
+    "hasLabel": {
+      "link": "Lien",
+      "file": "Fichier",
+      "image": "Image",
+      "card": "Carte"
+    },
+    "authorLabel": {
+      "person": "Personnes",
+      "agent": "Agents"
+    },
+    "pinnedChip": "Épinglés",
+    "removeFilter": "Retirer {{filter}}",
+    "filtersApplied_one": "{{count}} filtre",
+    "filtersApplied_many": "{{count}} filtres",
+    "filtersApplied_other": "{{count}} filtres",
+    "recent": "Recherches récentes",
+    "clearRecent": "Effacer",
+    "pickDate": "Date",
+    "dateHint": "Saisissez une date, par exemple 2026-10-05, 2026-10 ou 2026",
+    "noMatch": "Personne de ce nom ici.",
+    "noPlace": "Aucun canal ni message direct de ce nom.",
+    "sort": {
+      "label": "Trier",
+      "newest": "Plus récents",
+      "oldest": "Plus anciens",
+      "relevance": "Plus pertinents"
+    },
+    "searchHere": "Rechercher dans cette conversation",
+    "dm": "Message direct avec {{name}}"
   },
   "files": {
     "upload": "Importer un fichier",
@@ -11410,9 +11506,11 @@
       "plan_limit_wait": "L'abonnement {{plan}} a atteint sa limite. Je répondrai {{when}}, quand elle se réinitialisera.",
       "plan_limit_wait_unknown": "L'abonnement {{plan}} a atteint sa limite. Je répondrai dès qu'elle se réinitialisera.",
       "budget_wait": "Mon budget du mois est épuisé. Je reprendrai {{when}}, ou plus tôt si un admin l'augmente.",
+      "usage_wait_canceled": "Annulé. Ça ne s'exécutera pas quand la limite se renouvellera.",
       "usage_paused": "{{agent}} a mis ce travail en pause · abonnement {{plan}} à {{percent}} % {{window}}",
       "usage_paused_budget": "{{agent}} a mis ce travail en pause · budget mensuel à {{percent}} %",
       "work_auto_moved": "Cela va prendre un moment, je continue donc en arrière-plan. Je publierai des nouvelles ici, la prochaine dans environ {{minutes}} min.",
+      "work_auto_movedOver": "Cela va prendre un moment, je continue donc en arrière-plan. Je publierai des nouvelles ici.",
       "work_end_done": "Terminé ({{minutes}} min).",
       "work_end_failed": "Ce travail en arrière-plan n'a pas abouti ({{minutes}} min).",
       "work_end_failedWhy": "Ce travail en arrière-plan n'a pas abouti ({{minutes}} min) : {{why}}.",

@@ -45,6 +45,16 @@
     "pollAnswered_other": "{{count}} di {{total}} hanno risposto",
     "voteFailed": "Il tuo voto non è andato a buon fine."
   },
+  "choices": {
+    "step": "{{step}} di {{total}}",
+    "back": "Indietro",
+    "next": "Avanti",
+    "close": "Chiudi",
+    "closed": "{{title}} · chiuso",
+    "reopen": "Mostra di nuovo",
+    "answeredBy": "{{name}} ha scelto",
+    "failed": "La tua scelta non è stata inviata. Riprova."
+  },
   "chart": {
     "pending": "Creazione del grafico…",
     "table": "Tabella",
@@ -519,7 +529,11 @@
     "full": "Questa chat ha già 100 messaggi fissati. Rimuovine prima uno.",
     "mark": "Fissato",
     "none": "Ancora niente di fissato",
-    "empty": "Ancora niente di fissato qui. Tieni premuto un messaggio e tocca Fissa."
+    "empty": "Ancora niente di fissato qui. Tieni premuto un messaggio e tocca Fissa.",
+    "bar_one": "Messaggi fissati ({{count}})",
+    "bar_many": "Messaggi fissati ({{count}})",
+    "bar_other": "Messaggi fissati ({{count}})",
+    "unpinOf": "Togli dai fissati il messaggio di {{name}}"
   },
   "thread": {
     "threadIn": "Thread in #{{channel}}",
@@ -755,7 +769,8 @@
     "title": "Attività recenti",
     "filter": {
       "all": "Tutto",
-      "waiting": "Ti aspetta"
+      "waiting": "Ti aspetta",
+      "done": "Completate"
     },
     "day": {
       "today": "Oggi",
@@ -868,6 +883,8 @@
     "markUnread": "Segna come non letto",
     "unread": "Non letti",
     "done": "Fatto",
+    "restore": "Ripristina",
+    "noneDone": "Niente segnato come completato negli ultimi 30 giorni.",
     "more": "Vedi altro",
     "empty": "Niente ti aspetta. Respira."
   },

@@ -1368,8 +1368,8 @@
       "button_other": "置顶消息（{{count}}）",
       "label": "#{{channel}} 中的置顶消息",
       "in": "置顶于 #{{channel}}",
-      "empty": "这里还没有置顶内容。可以从消息菜单中置顶。",
-      "unpin": "取消置顶 {{name}} 的消息"
+      "unpin": "取消置顶 {{name}} 的消息",
+      "empty": "这里还没有置顶内容。可以从消息菜单中置顶。"
     },
     "membersButton_other": "频道成员（{{count}}）",
     "membersPeople": "成员",
@@ -1492,7 +1492,8 @@
       "outage": "AI 服务商出现故障 · 会自动重试",
       "handled": "已回答",
       "failed": "失败",
-      "referenced": "仅被提及"
+      "referenced": "仅被提及",
+      "reacted": "已回应"
     },
     "failedShort": "无法回答",
     "popoverTitle": "智能体",
@@ -1708,6 +1709,10 @@
     "forbidden": "现在只有提出请求的人、智能体的负责人或管理员可以让它继续",
     "resumed": "{{agent}} 已重新开始工作",
     "ended": "这项工作在继续之前就已结束",
+    "canceled": "已取消。限额重置后不会运行。",
+    "dontRun": "不运行",
+    "dontRunHint": "取消后，限额重置时不会运行任何内容",
+    "dontRunForbidden": "只有提出请求的人、智能体的负责人或管理员可以取消",
     "extraTitle": "长时间工作可以使用付费的额外用量",
     "extraHint": "如果套餐开启了额外用量，长时间工作在超过 95% 后仍会继续。关闭时，会在 95% 时暂停，并在套餐重置后继续。"
   },
@@ -2398,7 +2403,8 @@
       "mentions": "提及",
       "waiting": "等你处理",
       "unread": "未读",
-      "reactions": "表情回应"
+      "reactions": "表情回应",
+      "done": "已完成"
     },
     "keys": {
       "title": "快捷键",
@@ -2529,6 +2535,8 @@
     "replyTip": "回复 · R",
     "done": "已处理",
     "doneTip": "已处理 · E",
+    "restore": "移回",
+    "restoreTip": "移回 · E",
     "snooze": "稍后提醒我",
     "snoozeShort": "提醒",
     "open": "打开",
@@ -2560,6 +2568,7 @@
       "done": "已标为已处理",
       "doneQuestion": "{{name}} 仍在等待。问题会保留在对话中。",
       "doneApproval": "请求会保留在“审批”中。",
+      "restored": "已移回收件箱",
       "undo": "撤销",
       "readAll_other": "已将 {{count}} 条标为已读",
       "sent": "回复已发送",
@@ -2575,6 +2584,7 @@
     "noneWaiting": "没有人在等你。",
     "noneUnread": "全部已读。",
     "noneHere": "这里暂时没有内容。",
+    "noneDone": "过去 30 天内没有标记为完成的内容。",
     "more": "显示更多"
   },
   "approvals": {
@@ -4654,7 +4664,9 @@
       "usagePaused": "暂停至 {{until}}（套餐限额）",
       "usagePausedUnknown": "暂停至套餐重置（套餐限额）",
       "usagePausedBudget": "暂停至 {{until}}（预算限额）",
-      "usagePausedBudgetUnknown": "暂停至预算更新（预算限额）"
+      "usagePausedBudgetUnknown": "暂停至预算更新（预算限额）",
+      "waitingPlan": "等待 {{plan}} 套餐 · {{until}} 运行",
+      "waitingPlanUnknown": "等待 {{plan}} 套餐重置"
     },
     "pausedReason": {
       "creator_left": "已暂停：创建者已离开工作区",
@@ -4699,6 +4711,8 @@
       "waiting": "等待有人回答",
       "waitingApproval": "等待你审批",
       "waitingComputer": "等待电脑",
+      "waitingPlan": "等待套餐重置",
+      "waitingBudget": "等待预算更新",
       "reported": "已告知发现的内容",
       "silent": "没有新内容，保持安静",
       "failed": "失败",
@@ -4756,6 +4770,10 @@
     "stoppedToast": "运行已停止。",
     "usagePause": {
       "line": "限额重置后会自动继续。不会在对话中发布任何内容。",
+      "lineLimit": "限额重置后会自动运行。不会在对话中发布任何内容。",
+      "dontRun": "不运行",
+      "dontRunName": "限额重置后不运行 {{name}}",
+      "canceledToast": "已取消。限额重置后不会运行。",
       "continuedToast": "运行继续中。",
       "forbidden": "现在只有例行工作的创建者、智能体的负责人或管理员可以让它继续",
       "extra_off": "这个套餐的时段额度已用完，而这个智能体的长时间工作不使用付费的额外用量。在它的 AI 设置中开启后即可立即继续，否则会在重置后继续",
@@ -7515,7 +7533,8 @@
       "html": "HTML 页面",
       "file": "文件",
       "block": "区块",
-      "poll": "投票"
+      "poll": "投票",
+      "choices": "选项"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · 由 {{name}} 创建",
@@ -7593,6 +7612,16 @@
     "pollAnswered_other": "{{count}} / {{total}} 人已回答",
     "voteFailed": "你的投票没有成功提交。"
   },
+  "choices": {
+    "step": "{{step}} / {{total}}",
+    "back": "上一步",
+    "next": "下一步",
+    "close": "关闭",
+    "closed": "{{title}} · 已关闭",
+    "reopen": "再次显示",
+    "answeredBy": "{{name}} 已选择",
+    "failed": "你的选择没有发送成功。请重试。"
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "成员和智能体创建或上传的所有内容。",
@@ -7629,7 +7658,8 @@
       "html": "HTML 页面",
       "file": "文件",
       "block": "区块",
-      "poll": "投票"
+      "poll": "投票",
+      "choices": "选项"
     },
     "kindCount": "{{kind}}：{{count}}",
     "view": "视图",
@@ -9049,7 +9079,71 @@
     "empty": "没有找到“{{q}}”相关内容。",
     "hint": "搜索你所在的频道。",
     "inChannel": "在 #{{channel}}",
-    "count_other": "{{count}} 个结果"
+    "count_other": "{{count}} 个结果",
+    "countMore": "{{count}}+ 个结果",
+    "words": {
+      "ops": {
+        "from": "来自",
+        "in": "位于",
+        "has": "包含",
+        "mentions": "提及",
+        "before": "之前",
+        "after": "之后",
+        "during": "期间",
+        "author": "作者",
+        "pinned": "置顶"
+      },
+      "has": {
+        "link": "链接",
+        "file": "文件",
+        "image": "图片",
+        "card": "卡片"
+      },
+      "author": {
+        "person": "成员",
+        "agent": "智能体"
+      }
+    },
+    "options": "搜索选项",
+    "option": {
+      "from": "来自特定成员或智能体",
+      "in": "发送在特定频道或私信中",
+      "has": "包含链接、文件、图片或卡片",
+      "mentions": "提及特定成员或智能体",
+      "before": "某日期之前",
+      "after": "某日期之后",
+      "during": "某天、某月或某年",
+      "author": "由成员或智能体撰写",
+      "pinned": "置顶消息"
+    },
+    "moreFilters": "更多筛选",
+    "hasLabel": {
+      "link": "链接",
+      "file": "文件",
+      "image": "图片",
+      "card": "卡片"
+    },
+    "authorLabel": {
+      "person": "成员",
+      "agent": "智能体"
+    },
+    "pinnedChip": "已置顶",
+    "removeFilter": "移除 {{filter}}",
+    "filtersApplied_other": "{{count}} 个筛选条件",
+    "recent": "最近搜索",
+    "clearRecent": "清除",
+    "pickDate": "日期",
+    "dateHint": "输入日期，例如 2026-10-05、2026-10 或 2026",
+    "noMatch": "这里没有叫这个名字的人。",
+    "noPlace": "没有这个名字的频道或私信。",
+    "sort": {
+      "label": "排序",
+      "newest": "最新",
+      "oldest": "最早",
+      "relevance": "最相关"
+    },
+    "searchHere": "在此对话中搜索",
+    "dm": "与 {{name}} 的私信"
   },
   "files": {
     "upload": "上传文件",
@@ -10232,7 +10326,7 @@
       "waitingComputer": "等待电脑",
       "paused": "已达套餐限额，已暂停",
       "pausedUntil": "已达套餐限额，已暂停 · {{time}} 恢复",
-      "done": "用时 {{duration}} 完成",
+      "done": "用时 {{duration}} 结束",
       "failed": "未完成",
       "canceled": "{{duration}}后被 {{name}} 停止",
       "canceledAnon": "{{duration}}后停止"
@@ -10651,9 +10745,11 @@
       "plan_limit_wait": "{{plan}} 套餐已达限额。{{when}}重置后我会回复。",
       "plan_limit_wait_unknown": "{{plan}} 套餐已达限额。重置后我会立即回复。",
       "budget_wait": "我本月的预算用完了。我会在{{when}}继续，如果管理员提高预算会更早。",
+      "usage_wait_canceled": "已取消。限额重置后不会运行。",
       "usage_paused": "{{agent}} 暂停了这项工作 · {{plan}} 套餐已用 {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} 暂停了这项工作 · 每月预算已用 {{percent}}%",
       "work_auto_moved": "这需要一些时间，所以我会在后台继续。我会在这里发布进展，下一次大约在 {{minutes}} 分钟后。",
+      "work_auto_movedOver": "这需要一些时间，所以我会在后台继续。我会在这里发布进展。",
       "work_end_done": "完成（{{minutes}} 分钟）。",
       "work_end_failed": "这项后台工作没有完成（{{minutes}} 分钟）。",
       "work_end_failedWhy": "这项后台工作没有完成（{{minutes}} 分钟）：{{why}}。",
