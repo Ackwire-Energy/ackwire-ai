@@ -43,7 +43,9 @@ test("an agent's role sits under its name, up to two lines, beside a face as tal
     "0",
   ]);
   // The face spans the name's line and a one-line role's, and sits centred on them (no rule tops it any more).
-  const face = ".sidebar__item > .ac-avatar--sm";
+  const face = '.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm';
+  // The rail's 40px tile keeps its smaller face, with room for the presence badge and the unread count.
+  expect(value(".sidebar__item > .ac-avatar--sm", "height")).toBe("28px");
   const px = (v: string | undefined) => Number.parseFloat(v ?? "");
   expect(px(value(face, "height"))).toBe(
     px(value('.sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label', "line-height")) +

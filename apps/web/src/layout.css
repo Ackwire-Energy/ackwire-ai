@@ -10414,11 +10414,17 @@ html[data-menu-overlay] .shell {
   margin: 0 2px;
   color: var(--faint);
 }
-/*
- * Faces in the lists: as tall as a name and a one-line role together (20px + 16px), here and on the rail, centred on
- * the text beside them (a name alone, or a name over a role of one or two lines), with 3px over and under (42px rows).
- */
+/* Faces on the rail: a step up from the kit's small (24px), inside the rail's 40px tile with room for its badges. */
 .sidebar__item > .ac-avatar--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+/*
+ * Faces in the full list: as tall as a name and a one-line role together (20px + 16px), centred on the text beside
+ * them (a name alone, or a name over a role of one or two lines), with 3px over and under (42px rows).
+ */
+.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm {
   width: 36px;
   height: 36px;
   font-size: 14px;
