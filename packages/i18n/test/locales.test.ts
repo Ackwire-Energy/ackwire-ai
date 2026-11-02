@@ -15,6 +15,37 @@ describe("every language against English", () => {
   }
 });
 
+describe("the check itself", () => {
+  const source = { files_one: "One file from {{name}}", files_other: "{{count}} files from {{name}}" };
+  test("every plural form keeps its English form's placeholders", () => {
+    const target = {
+      files_one: "{{count}} файл от {{name}}",
+      files_few: "файла",
+      files_many: "{{count}} файлов от {{name}}",
+      files_other: "{{count}} файла от {{name}}",
+    };
+    expect(checkLocale({ source, target, code: "ru", ready: true })).toEqual([
+      "files_few: placeholders none ≠ English {{name}} {{count}}",
+    ]);
+  });
+  test("the number may be a word only where `_one` means 1 alone", () => {
+    const target = (one: string) => ({ files_one: one, files_other: "{{count}} Dateien von {{name}}" });
+    expect(checkLocale({ source, target: target("Eine Datei von {{name}}"), code: "de", ready: true })).toEqual([]);
+    expect(
+      checkLocale({
+        source,
+        target: {
+          ...target("один файл от {{name}}"),
+          files_few: "{{count}} файла от {{name}}",
+          files_many: "{{count}} файлов от {{name}}",
+        },
+        code: "ru",
+        ready: true,
+      }),
+    ).toEqual(["files_one: placeholders {{name}} ≠ English {{name}} {{count}}"]);
+  });
+});
+
 describe("English, the source", () => {
   test("no empty values (the custom role starts with no instructions)", () => {
     expect(flatten(en).filter(([k, v]) => !v.trim() && k !== "newAgent.roles.custom.instructions")).toEqual([]);

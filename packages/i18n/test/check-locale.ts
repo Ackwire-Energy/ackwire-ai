@@ -37,6 +37,7 @@ const sameSet = (a: string[], b: string[]) => {
   const y = [...new Set(b)].sort();
   return x.length === y.length && x.every((v, i) => v === y[i]);
 };
+const shown = (list: string[]) => [...new Set(list)].map((v) => `{{${v}}}`).join(" ") || "none";
 const sameBag = (a: string[], b: string[]) => [...a].sort().join("\n") === [...b].sort().join("\n");
 
 /** Values that may stay empty in every language: the custom role starts with no instructions. */
@@ -87,7 +88,10 @@ export function checkLocale({ source, target, code, ready, identical = [] }: Che
     const group = context ? `${base}_${context}` : base;
     tgtByBase.set(group, [...(tgtByBase.get(group) ?? []), entry]);
   }
-  const categories = new Intl.PluralRules(localeInfo(code).intl).resolvedOptions().pluralCategories as string[];
+  const rules = new Intl.PluralRules(localeInfo(code).intl);
+  const categories = rules.resolvedOptions().pluralCategories as string[];
+  // ru's `_one` is also 21, 31…: there the number must show. (pt's and fr's are also 0, which the app says apart.)
+  const oneIsOnlyOne = !Array.from({ length: 199 }, (_, n) => n + 2).some((n) => rules.select(n) === "one");
   const isCjk = code === "ja" || code === "zh-Hans";
   const sameAsEn = new Set(identical);
   const enValue = new Map(src);
@@ -110,12 +114,6 @@ export function checkLocale({ source, target, code, ready, identical = [] }: Che
         else if (f !== "zero" && !categories.includes(f)) problems.push(`${group}_${f}: ${code} has no ${f} form`);
     } else if (forms.some(Boolean)) problems.push(`${group}: not plural in English`);
 
-    const srcVars = srcEntries.flatMap(([, v]) => vars(v)).filter((v) => v !== "count");
-    const tgtVars = entries.flatMap(([, v]) => vars(v)).filter((v) => v !== "count");
-    if (!sameSet(srcVars, tgtVars))
-      problems.push(
-        `${group}: placeholders {{${[...new Set(tgtVars)].join("}} {{")}}} ≠ English {{${[...new Set(srcVars)].join("}} {{")}}}`,
-      );
     for (const [key, value] of entries) {
       if (!written.has(key)) continue;
       const { plural } = splitKey(key);
@@ -125,6 +123,17 @@ export function checkLocale({ source, target, code, ready, identical = [] }: Che
         [`${base}${ctx}${pl}`, `${base}${pl}`, `${base}${ctx}_other`, `${base}_other`, base]
           .map((k) => enValue.get(k))
           .find((v) => v !== undefined) ?? "";
+      // Each form its English one's placeholders, the number included: only `_zero`, and `_one` where it means 1
+      // alone, may say it in words ("one file"). Where `_one` also means 21 (ru), it says the number when
+      // English's `_other` does.
+      const countOptional = plural === "zero" || (plural === "one" && oneIsOnlyOne);
+      const enOther = enValue.get(`${base}${ctx}_other`) ?? enValue.get(`${base}_other`) ?? "";
+      const needCount =
+        vars(en).includes("count") || (plural === "one" && !oneIsOnlyOne && vars(enOther).includes("count"));
+      const want = [...vars(en).filter((v) => v !== "count"), ...(needCount ? ["count"] : [])];
+      const drop = (list: string[]) => (countOptional ? list.filter((v) => v !== "count") : list);
+      if (!sameSet(drop(vars(value)), drop(want)))
+        problems.push(`${key}: placeholders ${shown(vars(value))} ≠ English ${shown(want)}`);
       if (!sameBag(tags(value), tags(en))) problems.push(`${key}: tags differ from English`);
       if (!value.trim() && !EMPTY_OK.has(base)) problems.push(`${key}: empty`);
       if (code !== "en" && value === en && !nothingToTranslate(value) && !sameAsEn.has(base))
