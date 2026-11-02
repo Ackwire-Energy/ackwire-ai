@@ -139,7 +139,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   );
 
   return (
-    <div className={embedded ? "settings__section" : "page"} style={{ gap: 28 }}>
+    <div className={`${embedded ? "settings__section" : "page"} members-page`} style={{ gap: 28 }}>
       <header className="page__header page__header--row">
         <div className="page__header-text">
           {embedded ? (
@@ -204,7 +204,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             return (
               <div key={m.userId} className="ac-list__row">
                 <Avatar
-                  size="sm"
+                  size="md"
                   name={m.name}
                   imageUrl={m.image}
                   presence={m.presence}
@@ -289,7 +289,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                 params={{ orgId: org.id, agentId: a.id }}
                 className="ac-list__row"
               >
-                <AgentAvatar agentId={a.id} size="sm" name={a.name} />
+                <AgentAvatar agentId={a.id} size="md" name={a.name} />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>
                     {a.name}
@@ -456,7 +456,7 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
                       : t("members.requests.label", { name: r.name })
                   }
                 >
-                  <Who face={<Avatar size="sm" name={r.name} />} name={r.name} sub={r.email} />
+                  <Who face={<Avatar size="md" name={r.name} />} name={r.name} sub={r.email} />
                   <State icon={by ? "person" : "link"}>{how}</State>
                   {/* Nobody proved the address: approving can't let them in at once (ADR 0072). */}
                   {!r.verified && !by && <Chip icon="mail">{t("members.requests.unverified")}</Chip>}
@@ -679,7 +679,7 @@ function SentInvitations() {
               aria-label={t("members.invitations.label", { email: inv.email })}
             >
               <Who
-                face={<Avatar size="sm" name={inv.email} initials={inv.email.slice(0, 2).toUpperCase()} />}
+                face={<Avatar size="md" name={inv.email} initials={inv.email.slice(0, 2).toUpperCase()} />}
                 name={inv.email}
                 sub={sub}
               />
@@ -904,7 +904,7 @@ function Suggestions() {
                 aria-label={t("members.suggest.label", { email: s.email })}
               >
                 <Who
-                  face={<Avatar size="sm" name={s.email} initials={s.email.slice(0, 2).toUpperCase()} />}
+                  face={<Avatar size="md" name={s.email} initials={s.email.slice(0, 2).toUpperCase()} />}
                   name={s.email}
                   sub={s.note ?? ""}
                 />

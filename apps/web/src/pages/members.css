@@ -13,6 +13,18 @@
   gap: 10px;
 }
 
+/* Here the faces are a step bigger and sit in the middle of their two lines, not on the name's line (layout.css). */
+.members-page .ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) {
+  align-items: center;
+}
+.members-page .ac-list__row > .ac-avatar:first-child:has(+ .list-col > :nth-child(2)) {
+  translate: none;
+}
+/* The 12px the bigger face takes come off the words' basis, so a row breaks onto two lines at the width it did. */
+.members-page .ac-list__row > .ac-avatar:first-child + .list-col {
+  flex-basis: 188px;
+}
+
 /* A request or an invitation: face, two lines, its state, its actions; a note in a well under the words. */
 .members-row__name {
   overflow: hidden;
@@ -64,7 +76,7 @@
 /* What the person wrote: under the words, as quoted, in a well. Its edge on the words' edge (the face and the gap). */
 .members-row__note {
   flex-basis: 100%;
-  margin: 0 0 2px calc(24px + var(--space-3));
+  margin: 0 0 2px calc(36px + var(--space-3));
   padding: 8px 12px;
   border-radius: 12px 12px 12px 3px;
   background: var(--card-well);
