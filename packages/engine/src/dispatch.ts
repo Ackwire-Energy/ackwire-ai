@@ -123,6 +123,13 @@ export async function startOrJoinRun(
               options.joinChannelRun && !message.threadId
                 ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`
                 : sql`false`
+            }
+            or ${
+              // Its run in the channel waiting for its computer takes the message: one turn per agent there, not
+              // one per mention, each waiting for the same computer.
+              message.threadId
+                ? sql`false`
+                : sql`(${agentRuns.status} = 'waiting_input' and ${agentRuns.waitingMachineId} is not null and ${inChannelRun(sql`${agentRuns}`)})`
             })`,
         ),
       )

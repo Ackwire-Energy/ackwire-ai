@@ -15,6 +15,7 @@ import {
   type ChannelEvent,
   COMPUTER_BUSY_RETRY_MS,
   COMPUTER_BUSY_WAIT_MS,
+  COMPUTER_QUEUE_NOTE_MS,
   COMPUTER_REACT_NOTE,
   COMPUTER_TOOLS_NOTE,
   cancelRun,
@@ -30,6 +31,7 @@ import {
   decideApproval,
   drainLocalRuns,
   drainOutbox,
+  enqueue,
   executeToolForRun,
   grantScopes,
   insertMessage,
@@ -48,6 +50,7 @@ import {
   recoverStaleRuns,
   resolveBrain,
   resumeRunsWaitingForMachine,
+  roomHead,
   runWhere,
   SESSION_IDLE_MS,
   SESSION_MAX_INPUT_TOKENS,
@@ -127,6 +130,30 @@ const timeline = (fx: Fixture) => listMessages(fx.db, fx.owner.id, fx.org.id, fx
 /** The run knows its brain (`resolveBrain` looked at its computer once): a look now is it waiting there. */
 const waitingLook = async (fx: Fixture) =>
   Boolean((await fx.db.select({ brain: schema.agentRuns.brain }).from(schema.agentRuns))[0]?.brain);
+
+/** Another run of the agent in the channel's main timeline (one a new message there would have joined). */
+async function secondRun(fx: Fixture, triggerMessageId: string, hop = 1) {
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId: triggerMessageId,
+      triggerMessageId,
+      trigger: "router",
+      hop,
+    })
+    .returning();
+  if (!run) throw new Error("no run");
+  await enqueue(fx.db, {
+    orgId: fx.org.id,
+    kind: "agent_run.execute",
+    payload: { runId: run.id },
+    dedupeKey: `agent_run.execute:${run.id}`,
+  });
+  return run;
+}
 
 /** Its computer went a few seconds ago (a runner dialing again), the row as the hub leaves it. */
 async function justGone(fx: Fixture, machineId: string) {
@@ -991,39 +1018,57 @@ test("a computer gone a few seconds ago: the run waits for it as one still worki
   expect(steps.some((s) => s.data.reason === "brain_unavailable")).toBe(false);
 });
 
-test("a computer still gone after that moment: the note and the wait as before; the outage shows only then", async () => {
+test("a computer still gone after that moment: it waits without a word until the outage grace is over, then says so once", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
   await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
-  const lastSeenAt = await justGone(f, machineId);
+  let lastSeenAt = await justGone(f, machineId);
   const outages = async () =>
     (await listMachineOutages({ db: f.db }, f.owner.id, f.org.id)).outages.map((o) => o.machineId);
-  const whileWaiting: string[][] = [];
   const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Voltei." }]);
   const handlers = createJobHandlers({
     ...f.jobDeps,
-    computerBlipWaitMs: 1_200,
+    computerBlipWaitMs: 300,
     brains: { claude_code: () => brain },
-    machines: {
-      status: async (id) => {
-        if (whileWaiting.length === 0 && (await waitingLook(f))) whileWaiting.push(await outages());
-        return statusOf(id, { online: false, lastSeenAt });
-      },
-    },
+    machines: { status: async (id) => statusOf(id, { online: false, lastSeenAt }) },
   });
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
 
-  // While the run waited for it, nobody waited yet: "Computador desconectado" kept its grace.
-  expect(whileWaiting).toEqual([[]]);
-  const [run] = await f.db.select().from(schema.agentRuns);
+  let [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_input");
   expect(run?.waitingMachineId).toBe(machineId);
   expect(seen.length).toBe(0);
-  const main = await timeline(f);
-  expect(main.filter((m) => m.meta.bodyCode === "brain_unavailable")).toHaveLength(1);
-  expect(main.at(-1)?.meta).toMatchObject({ brainUnavailable: { code: "machine_offline", machineId } });
+  const notes = async () => (await timeline(f)).filter((m) => m.meta.bodyCode === "brain_unavailable");
+  expect(await notes()).toEqual([]);
+  // A blip (a deploy, a runner dialing again) is no outage yet: no card, no note.
+  expect(await outages()).toEqual([]);
+  const look = (await f.db.select().from(schema.outbox)).find((j) => j.dedupeKey?.includes(":offline_note:"));
+  expect(look?.nextAttemptAt.getTime()).toBe(Date.parse(lastSeenAt) + 2 * 60_000);
+
+  // Still gone past the grace: the note, once, and the outage shows.
+  lastSeenAt = new Date(Date.now() - 3 * 60_000).toISOString();
+  await f.db
+    .update(schema.machines)
+    .set({ lastSeenAt: new Date(lastSeenAt) })
+    .where(eq(schema.machines.id, machineId));
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 3 * 60_000) });
+  [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  expect((await notes()).map((m) => m.meta.brainUnavailable)).toMatchObject([{ code: "machine_offline", machineId }]);
   expect(await outages()).toEqual([machineId]);
+
+  // Another run of the agent waiting there for the same computer adds nothing.
+  const again = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "person", userId: f.owner.id },
+    body: "e aí?",
+  });
+  await secondRun(f, again.id);
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 3 * 60_000) });
+  expect((await f.db.select().from(schema.agentRuns)).map((r) => r.status)).toEqual(["waiting_input", "waiting_input"]);
+  expect(await notes()).toHaveLength(1);
 });
 
 test("a computer gone for minutes is an outage: the agent says so at once, without waiting", async () => {
@@ -1046,7 +1091,8 @@ test("a computer gone for minutes is an outage: the agent says so at once, witho
   });
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
-  expect(looks).toBe(1);
+  // One look to wait for it, one to tell an outage from a blip: never a wait.
+  expect(looks).toBe(2);
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
   expect((await timeline(f)).at(-1)?.meta).toMatchObject({ bodyCode: "brain_unavailable" });
 });
@@ -2084,7 +2130,7 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   expect(gh.executed).toEqual([]);
 });
 
-test("one 'computer away' note per outage and place: a second run waits quietly; another channel gets its own", async () => {
+test("one 'computer away' note per outage and place: later messages there join the waiting run; another channel gets its own", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
   await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
@@ -2116,11 +2162,12 @@ test("one 'computer away' note per outage and place: a second run waits quietly;
   expect(runs.map((r) => r.status)).toEqual(["waiting_input"]);
   expect(await notices()).toHaveLength(0);
 
+  // People write there: their messages join that run (one turn when the computer is back), and they hear it once.
   await call(f.general.id);
   await call(f.general.id);
   runs = await f.db.select().from(schema.agentRuns);
-  expect(runs.map((r) => r.status)).toEqual(["waiting_input", "waiting_input", "waiting_input"]);
-  expect(runs.every((r) => r.waitingMachineId === machineId)).toBe(true);
+  expect(runs.map((r) => r.status)).toEqual(["waiting_input"]);
+  expect(runs[0]?.waitingMachineId).toBe(machineId);
   expect(await notices()).toHaveLength(1);
 
   // Another channel: its people didn't see the note, so it is said there once.
@@ -2140,8 +2187,8 @@ test("one 'computer away' note per outage and place: a second run waits quietly;
 
   // All of them still wait and come back together.
   runs = await f.db.select().from(schema.agentRuns);
-  expect(runs.filter((r) => r.status === "waiting_input")).toHaveLength(5);
-  expect((await resumeRunsWaitingForMachine(f.db, machineId)).length).toBe(5);
+  expect(runs.filter((r) => r.status === "waiting_input")).toHaveLength(2);
+  expect((await resumeRunsWaitingForMachine(f.db, machineId)).length).toBe(2);
 });
 
 test("waiting for its computer isn't working: left out of 'working now' and a thread's working flag", async () => {
@@ -2173,7 +2220,7 @@ test("waiting for its computer isn't working: left out of 'working now' and a th
   });
 });
 
-test("no room on the computer: the agent says so once, asks again quietly without spending the job's tries, and answers once there is room", async () => {
+test("no room on the computer: nothing in the chat, the person's message says it is in line, it asks again quietly without spending the job's tries, and answers once there is room", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
   // No key the API could answer with: nothing can stand in.
@@ -2185,9 +2232,9 @@ test("no room on the computer: the agent says so once, asks again quietly withou
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const events: { type: string; status?: string }[] = [];
+  const events: { type: string; status?: string; computer?: string }[] = [];
   f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(e as { type: string; status?: string }));
-  await post(f, "@dev oi");
+  const asked = await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
 
   let [run] = await f.db.select().from(schema.agentRuns);
@@ -2195,8 +2242,13 @@ test("no room on the computer: the agent says so once, asks again quietly withou
   expect(run?.waitingMachineId).toBe(machineId);
   const notes = async () =>
     (await f.db.select().from(schema.messages)).filter((m) => m.meta.bodyCode === "brain_unavailable");
-  expect((await notes()).map((m) => m.meta.brainUnavailable)).toEqual([
-    { brain: "claude_code", code: "busy", machineId, agentId: f.agent.id },
+  // Waiting for room is a live state on the person's message, never a line in the chat.
+  expect(await notes()).toEqual([]);
+  expect(events.find((e) => e.type === "agent.run" && e.status === "waiting_input")?.computer).toBe("queued");
+  expect(events.find((e) => e.type === "message.handled")?.computer).toBe("queued");
+  const [listed] = (await timeline(f)).filter((m) => m.id === asked.id);
+  expect(listed?.receipts?.handled).toMatchObject([
+    { agentId: f.agent.id, status: "waiting_input", computer: "queued" },
   ]);
   // The run's own job ended with its first try; the next look is a job of its own, a few seconds later.
   const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
@@ -2215,7 +2267,7 @@ test("no room on the computer: the agent says so once, asks again quietly withou
   [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_input");
   expect(seen.length).toBe(2);
-  expect(await notes()).toHaveLength(1);
+  expect(await notes()).toEqual([]);
   expect(events.filter((e) => e.type === "agent.thinking" || e.status === "running")).toEqual([]);
   const steps = await f.db
     .select()
@@ -2292,6 +2344,194 @@ test("no room on the computer and a model key: the model brain answers, as for a
   const last = (await timeline(f)).at(-1);
   expect(last?.body).toBe("Respondi pela API.");
   expect(last?.meta).toMatchObject({ brainFallback: { from: "claude_code", code: "busy" } });
+});
+
+/** Sets when a run started waiting for room (ms). */
+async function roomSince(fx: Fixture, runId: string, since: number) {
+  const [row] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, runId));
+  await fx.db
+    .update(schema.agentRuns)
+    .set({ transcript: { ...row?.transcript, roomWaitSince: since } })
+    .where(eq(schema.agentRuns.id, runId));
+}
+
+/** Another agent's turn went to this computer a moment ago (still running). */
+async function askedJustNow(fx: Fixture, machineId: string) {
+  const id = Bun.randomUUIDv7();
+  await fx.db.insert(schema.agentRuns).values({
+    orgId: fx.org.id,
+    agentId: fx.agent.id,
+    channelId: fx.general.id,
+    threadRootId: id,
+    triggerMessageId: id,
+    trigger: "mention",
+    hop: 2,
+    status: "running",
+    heartbeatAt: new Date(),
+    transcript: { roomAsk: { machineId, at: Date.now() } },
+  });
+}
+
+const personMessage = (fx: Fixture, body: string, threadId?: string) =>
+  insertMessage(fx.db, {
+    orgId: fx.org.id,
+    channelId: fx.general.id,
+    ...(threadId ? { threadId } : {}),
+    author: { type: "person", userId: fx.owner.id },
+    body,
+  });
+
+const runById = async (fx: Fixture, id: string) =>
+  (await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, id)))[0];
+
+test("still in line after ten minutes: one note in the agent's words, and no other from it there", async () => {
+  f = await setup();
+  await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const { brain } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [first] = await f.db.select().from(schema.agentRuns);
+  if (!first) throw new Error("no run");
+  const longAgo = Date.now() - COMPUTER_QUEUE_NOTE_MS - 1_000;
+  await roomSince(f, first.id, longAgo);
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000) });
+  const notes = async () =>
+    (await f.db.select().from(schema.messages)).filter((m) => m.meta.bodyCode === "brain_unavailable");
+  expect((await notes()).map((m) => [m.body, m.meta.brainUnavailable])).toMatchObject([
+    ["Still in line for the computer. I'll answer as soon as it has room.", { code: "busy", long: true }],
+  ]);
+
+  // A second run of the agent there, first in line by now: it asks, finds no room, and says nothing more.
+  const second = await secondRun(f, (await personMessage(f, "e aí?")).id);
+  await drainOutbox(f.db, handlers);
+  await roomSince(f, second.id, longAgo - 1_000);
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000) });
+  expect((await runById(f, second.id))?.status).toBe("waiting_input");
+  expect(await notes()).toHaveLength(1);
+});
+
+test("a deploy drops the computer for seconds: runs in line keep their place, and nobody hears about it", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let online = true;
+  let lastSeenAt: string | null = null;
+  const { brain } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online, lastSeenAt }) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  const since = (run.transcript as { roomWaitSince?: number }).roomWaitSince;
+  expect(typeof since).toBe("number");
+
+  online = false;
+  lastSeenAt = new Date(Date.now() - 5_000).toISOString();
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000) });
+  let t = (await runById(f, run.id))?.transcript as {
+    roomWaitSince?: number;
+    waitingForBrain?: { code: string; quiet?: boolean };
+  };
+  expect(t.waitingForBrain).toMatchObject({ code: "machine_offline", quiet: true });
+  expect(t.roomWaitSince).toBe(since);
+
+  online = true;
+  await resumeRunsWaitingForMachine(f.db, machineId);
+  await drainOutbox(f.db, handlers);
+  t = (await runById(f, run.id))?.transcript as typeof t;
+  expect(t.waitingForBrain?.code).toBe("busy");
+  expect(t.roomWaitSince).toBe(since);
+  expect((await timeline(f)).filter((m) => m.meta.bodyCode === "brain_unavailable")).toEqual([]);
+});
+
+test("agents' turns on one computer start apart, parked in line (never handed to the API); a person's goes at once", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Pela API."] }) });
+  const machineId = await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Pronto." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await askedJustNow(f, machineId);
+  const fromAgents = await secondRun(f, (await personMessage(f, "@dev revisa")).id, 2);
+  await drainOutbox(f.db, handlers);
+  const parked = await runById(f, fromAgents.id);
+  expect(parked?.status).toBe("waiting_input");
+  expect(parked?.transcript).toMatchObject({ waitingForBrain: { code: "busy" } });
+  expect(parked?.transcript).not.toHaveProperty("fallback");
+  expect(seen).toHaveLength(0);
+  expect((await timeline(f)).filter((m) => m.meta.bodyCode === "brain_unavailable")).toEqual([]);
+
+  // A person asks in a thread: no spacing for them, and when that turn ends the next in line is asked.
+  const root = await personMessage(f, "sobre o deploy");
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev responde",
+    threadId: root.id,
+  });
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(1);
+  expect((await runById(f, fromAgents.id))?.status).toBe("waiting_input");
+  const kick = (await f.db.select().from(schema.outbox)).find(
+    (j) => j.dedupeKey?.startsWith(`agent_run.execute:${fromAgents.id}:room-kick:`) && j.status === "pending",
+  );
+  expect(kick).toBeDefined();
+});
+
+test("only the head of the computer's line asks it: an agent's run waits behind a person's", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const { brain, seen } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await askedJustNow(f, machineId);
+  const fromAgents = await secondRun(f, (await personMessage(f, "@dev revisa")).id, 3);
+  await drainOutbox(f.db, handlers);
+  const root = await personMessage(f, "sobre o deploy");
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev responde",
+    threadId: root.id,
+  });
+  await drainOutbox(f.db, handlers);
+  const personRun = (await f.db.select().from(schema.agentRuns)).find((r) => r.threadRootId === root.id);
+  expect(personRun?.status).toBe("waiting_input");
+  expect(personRun?.transcript).toMatchObject({ roomPeople: true });
+  expect((await roomHead(f.db, machineId))?.id).toBe(personRun?.id ?? "");
+  const asked = seen.length;
+
+  // The agent's run looks again first: it isn't the head, so it doesn't ask.
+  const waitOf = async () =>
+    ((await runById(f, fromAgents.id))?.transcript as { waitingForBrain?: { waitId?: string } } | null)?.waitingForBrain
+      ?.waitId;
+  const waitId = await waitOf();
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 11_000) });
+  expect(seen.length).toBe(asked);
+  expect((await runById(f, fromAgents.id))?.status).toBe("waiting_input");
+  expect(await waitOf()).toBe(waitId);
+  const next = (await f.db.select().from(schema.outbox)).filter(
+    (j) => j.dedupeKey?.startsWith(`agent_run.execute:${fromAgents.id}:room:`) && j.status === "pending",
+  );
+  expect(next).toHaveLength(1);
 });
 
 test("a session whose folder is gone from the computer goes on fresh in the agent's own folder, told so", async () => {

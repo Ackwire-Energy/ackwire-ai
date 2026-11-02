@@ -39,7 +39,7 @@ import { agentOnlyNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun, workKeepsThread } from "./run-scope";
-import { NO_AI, outageParkedSql } from "./runs";
+import { computerWaitSql, NO_AI, outageParkedSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
@@ -186,6 +186,8 @@ export interface Receipts {
     reason?: typeof NO_AI;
     /** `waiting_input` parked on a provider outage: it retries by itself. */
     outage?: true;
+    /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+    computer?: "queued" | "away";
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
   blocked: string[];
@@ -229,6 +231,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     status: schema.agentRuns.status,
     error: schema.agentRuns.error,
     outage: outageParkedSql,
+    computer: computerWaitSql,
   };
   const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
     db
@@ -294,6 +297,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         status: r.status,
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
         ...(r.outage ? { outage: true as const } : {}),
+        ...(r.computer ? { computer: r.computer } : {}),
       })),
       // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
       // or the message only references it.
@@ -707,7 +711,8 @@ export async function insertMessageWithRuns(
                     ? sql`false`
                     : sql`(${inChannelRun(sql`r`)} and exists (
                 select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm'))
-                or (r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`
+                or (r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})
+                or (r.status = 'waiting_input' and r.waiting_machine_id is not null and ${inChannelRun(sql`r`)})`
                 }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})

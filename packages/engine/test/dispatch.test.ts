@@ -93,6 +93,39 @@ describe("dispatchMentions", () => {
     expect(execute).toHaveLength(1);
   });
 
+  test("mentions in the channel join the agent's run there waiting for its computer: one turn, not one per mention", async () => {
+    const other = await qa();
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: other.id });
+    await post("@dev oi");
+    const machineId = crypto.randomUUID();
+    await f.db.update(schema.agentRuns).set({
+      status: "waiting_input",
+      waitingMachineId: machineId,
+      transcript: { waitingForBrain: { kind: "claude_code", machineId, code: "busy", waitId: "w1" } },
+    });
+    const mention = () =>
+      f.db.transaction((tx) =>
+        insertMessage(tx, {
+          orgId: f.org.id,
+          channelId: f.general.id,
+          author: { type: "agent", agentId: other.id, runId: crypto.randomUUID(), hop: 1 },
+          body: "@dev olha isso",
+        }),
+      );
+    const first = await mention();
+    const second = await mention();
+    for (const m of [first, second]) await dispatchMentions(f.db, { orgId: f.org.id, messageId: m.id }, { maxHops: 5 });
+    // A person writing there again joins it too.
+    const again = await post("@dev responde");
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.pendingMessageIds).toEqual([first.id, second.id, again.id]);
+    // A person waits on it now: it goes to the front of its computer's line, and looks again at once.
+    expect(runs[0]?.transcript).toMatchObject({ roomPeople: true });
+    const look = (await f.db.select().from(schema.outbox)).find((j) => j.dedupeKey?.includes(":steer:"));
+    expect(look?.payload).toEqual({ runId: runs[0]?.id, wait: "w1" });
+  });
+
   test("hop limit: an agent message at the limit triggers nobody", async () => {
     const root = await post("start");
     const other = await createAgent(

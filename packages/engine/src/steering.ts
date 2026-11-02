@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { type Database, inArray, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { runBrainOf } from "./brains/select";
 import { cancelRun, interruptRun } from "./cancel";
@@ -110,6 +110,14 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     // run resumes and reads this message with the rest; still away: it parks again quietly (one answer later).
     else if (active.status === "waiting_input" && (active.waitingMachineId || brainWait)) {
       const wait = brainWait?.waitId;
+      // A person waits on it now: it goes to the front of its computer's line (`computer-queue.ts`).
+      if (brainWait?.code === "busy") {
+        await deps.db
+          .update(agentRuns)
+          .set({ transcript: sql`jsonb_set(${agentRuns.transcript}, '{roomPeople}', 'true'::jsonb)` })
+          .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "waiting_input")))
+          .catch(() => undefined);
+      }
       await enqueue(deps.db, {
         orgId,
         kind: "agent_run.execute",
