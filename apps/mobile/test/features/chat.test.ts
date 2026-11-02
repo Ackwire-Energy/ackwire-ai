@@ -711,6 +711,10 @@ describe("an agent's question (ask_user)", () => {
       status: "answered",
       answer: "Agora",
     });
+    // Taken back by the agent: the card says it no longer needs an answer.
+    expect(
+      questionOf({ question: { ...question, status: "answered", answer: null, withdrawn: true } })?.withdrawn,
+    ).toBe(true);
     expect(questionOf({ question: { id: "q", text: "" } })).toBeNull();
     expect(questionOf({})).toBeNull();
     expect(questionOf(undefined)).toBeNull();

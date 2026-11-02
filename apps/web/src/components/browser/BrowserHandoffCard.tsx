@@ -179,7 +179,9 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
                     ? "browser.card.settledFailed"
                     : status === "cancelled"
                       ? "browser.card.settledCancelled"
-                      : "browser.card.settledExpired",
+                      : status === "withdrawn"
+                        ? "browser.card.settledWithdrawn"
+                        : "browser.card.settledExpired",
               )}
             </span>
           ) : (
@@ -242,6 +244,12 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
             <div className="brw-rq__res">
               <Icon name="close" size={16} />
               {t("browser.card.cancelled")}
+            </div>
+          )}
+          {status === "withdrawn" && settled && (
+            <div className="brw-rq__res">
+              <Icon name="check" size={16} />
+              {t("browser.card.withdrawn", g)}
             </div>
           )}
           {active && !showBrowser && (

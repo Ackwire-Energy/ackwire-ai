@@ -40,9 +40,12 @@ export const browserHandoffs = pgTable(
     kind: text().$type<"ask" | "takeover">().notNull(),
     /** What the agent asked for, in its words ("Sign in to Stripe with the shop's test account"). */
     instructions: text().notNull().default(""),
-    /** `pending` (nobody opened it), `active` (a person in control), then `done | failed | expired | cancelled`. */
+    /**
+     * `pending` (nobody opened it), `active` (a person in control), then `done | failed | expired | cancelled`, or
+     * `withdrawn` (the agent no longer needs it, `withdraw_request`).
+     */
     status: text()
-      .$type<"pending" | "active" | "done" | "failed" | "expired" | "cancelled">()
+      .$type<"pending" | "active" | "done" | "failed" | "expired" | "cancelled" | "withdrawn">()
       .notNull()
       .default("pending"),
     /** Who it was asked of (whoever asked for the work, else the agent's owner). */

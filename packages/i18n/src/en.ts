@@ -2065,6 +2065,7 @@ export const en: Translations = {
     waitingFor: "Only {{person}} can answer.",
     outcomeBy: "Delivered by {{person}}",
     outcomeByYou: "Delivered by you",
+    outcomeWithdrawn: "No longer needed",
     alreadyAnswered: "This request was already answered or expired.",
     failed: "Couldn't deliver it. Is the agent's computer on?",
     empty: "Type the value.",
@@ -2092,6 +2093,7 @@ export const en: Translations = {
     alreadyAnswered: "This question was already answered or closed.",
     closed: "Closed without an answer.",
     failed: "Couldn't send the answer. Try again.",
+    withdrawn: "{{name}} no longer needs an answer.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
   ask: {
@@ -10276,10 +10278,12 @@ export const en: Translations = {
       failed: "Didn't work.",
       expired: "Nobody opened it in time. {{name}} stopped and said so.",
       cancelled: "Request cancelled.",
+      withdrawn: "{{name}} no longer needs this.",
       settledDone: "asked for help · resolved",
       settledFailed: "asked for help · didn't work",
       settledExpired: "asked for help · expired",
       settledCancelled: "asked for help · cancelled",
+      settledWithdrawn: "asked for help · no longer needed",
       busy: "Someone else is already helping.",
       openFailed: "Couldn't open it now. Try again.",
     },

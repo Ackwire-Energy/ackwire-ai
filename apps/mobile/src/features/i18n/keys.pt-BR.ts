@@ -1384,6 +1384,7 @@ export const featureKeysPtBR = {
       failedNote: "Não deu: {{note}}",
       expired: "Ninguém abriu a tempo: {{title}}",
       cancelled: "Cancelado: {{title}}",
+      withdrawn: "{{name}} não precisa mais disso: {{title}}",
     },
     live: {
       inControl: "Você está no controle",

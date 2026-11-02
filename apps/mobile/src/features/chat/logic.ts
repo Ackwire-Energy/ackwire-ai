@@ -299,6 +299,7 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
     status: q.status === "answered" ? "answered" : "open",
     answer: str(q.answer) || null,
     answeredByUserId: str(q.answeredByUserId) || null,
+    ...(q.withdrawn === true ? { withdrawn: true as const } : {}),
   };
 }
 

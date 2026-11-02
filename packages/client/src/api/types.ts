@@ -2265,6 +2265,8 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+  /** The agent took it back: it no longer needs an answer. */
+  withdrawn?: true;
 }
 
 /**
@@ -2299,6 +2301,8 @@ export interface SecretRequest {
   expiresAt: string;
   deliveredAt: string | null;
   removed: boolean;
+  /** The agent took it back: it no longer needs it. */
+  withdrawn?: true;
 }
 
 /** A secret on an agent's computer, by name (the agent page). */
@@ -5477,7 +5481,7 @@ export interface AgentDatabaseInput {
 
 // ── Agent browser (ADR 0040) ─────────────────────────────────────────────────
 
-export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled";
+export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled" | "withdrawn";
 
 /** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
 export type ScreenKind = "browser" | "desktop";
