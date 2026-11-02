@@ -626,12 +626,17 @@ describe("email invitations (ADR 0090)", () => {
     const adm = await addMember(db, org.id, "admin", "adm");
     const rita = await createInvitation(db, adm.id, org.id, { email: "rita@example.com", roleIds: [devs.id] }, NOW);
     await removeMember(db, owner.id, org.id, adm.id);
+    expect((await previewInvitation(db, rita.token, NOW))?.invitedBy).toBeNull();
     expect(await accept("u_rita", "rita@example.com", rita.token)).toEqual({ role: "member", roleIds: [] });
 
     // An owner who invited an owner and was then made a member: the person comes in as a member.
     const bob = await addMember(db, org.id, "owner", "bob");
     const ze = await createInvitation(db, bob.id, org.id, { email: "ze@example.com", role: "owner" }, NOW);
+    expect((await previewInvitation(db, ze.token, NOW))?.role).toBe("owner");
     await changeMemberRole(db, owner.id, org.id, bob.id, "member");
+    expect(await previewInvitation(db, ze.token, NOW)).toEqual(
+      expect.objectContaining({ role: "member", invitedBy: "bob" }),
+    );
     expect(await accept("u_ze", "ze@example.com", ze.token)).toEqual({ role: "member", roleIds: [] });
 
     // Someone who joined another way meanwhile gets no roles from an old invitation.

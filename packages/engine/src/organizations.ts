@@ -22,10 +22,10 @@ import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
+import { restoreDms } from "./dms";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { restoreDms } from "./dms";
 import { deleteGifKey } from "./gif-key";
 import { deleteJevKey } from "./jev-key";
 import { assertMemberRoom } from "./limits";
@@ -1698,6 +1698,21 @@ async function seatsFull(db: Executor, orgId: string) {
  * address signs in (`account`) and whether the workspace is full (`full`), before anyone makes an account
  * (ADR 0090).
  */
+/**
+ * The role an invitation gives now: owner only while whoever sent it can still make owners, so removing or demoting
+ * them takes back what they handed out.
+ */
+async function invitedAs(
+  db: Executor,
+  invitation: { orgId: string; invitedByUserId: string | null; role: MemberRole },
+) {
+  const inviter = invitation.invitedByUserId
+    ? await getMembership(db, invitation.invitedByUserId, invitation.orgId)
+    : null;
+  const role: MemberRole = invitation.role === "owner" && can(inviter, "manage_owners") ? "owner" : "member";
+  return { inviter, role };
+}
+
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
     .select({
@@ -1711,6 +1726,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       expiresAt: organizationInvitations.expiresAt,
       acceptedAt: organizationInvitations.acceptedAt,
       invitedBy: users.name,
+      invitedByUserId: organizationInvitations.invitedByUserId,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
@@ -1756,12 +1772,14 @@ export async function previewInvitation(db: Database, token: string, now = new D
       closed: true as const,
     };
   }
+  // What accepting would give now, and who sent it only while they're still here.
+  const { inviter, role } = await invitedAs(db, row);
   return {
     orgName: row.orgName,
     email: row.email,
-    role: row.role,
+    role,
     kind: "email" as const,
-    invitedBy: row.invitedBy ?? null,
+    invitedBy: inviter ? (row.invitedBy ?? null) : null,
     expiresAt: row.expiresAt.toISOString(),
     account: await invitedAccount(db, row.email),
     ...((await seatsFull(db, row.orgId)) ? { full: true as const } : {}),
@@ -1878,11 +1896,8 @@ export async function acceptInvitation(
     await assertCanWork(tx, invitation.orgId);
     // What it gives is what whoever sent it could still give now: removing or demoting them takes back the roles they
     // handed out, as with private channels below. Someone already in gets no roles from an old invitation.
-    const inviter = invitation.invitedByUserId
-      ? await getMembership(tx, invitation.invitedByUserId, invitation.orgId)
-      : null;
+    const { inviter, role } = await invitedAs(tx, invitation);
     const already = await getMembership(tx, user.id, invitation.orgId, { includeBlocked: true });
-    const role = invitation.role === "owner" && can(inviter, "manage_owners") ? "owner" : "member";
     const roleIds = already ? [] : await stillGivableRoleIds(tx, inviter, invitation.orgId, invitation.roleIds);
     await joinOrganization(tx, invitation.orgId, user.id, role, roleIds);
     // The channels it named, besides `general` (ADR 0090): those still there. A private one only while whoever sent
