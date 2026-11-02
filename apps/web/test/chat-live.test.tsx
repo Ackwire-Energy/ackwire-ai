@@ -668,6 +668,26 @@ describe("receipts: an agent's reaction is its answer", () => {
   });
 });
 
+describe("receipts: the clock from the moment it is sent", () => {
+  test("no mention in a channel with agents: the clock at once, before the server says anything, then the router's word", async () => {
+    const { socket, state } = await open();
+    await sendText("alguém por aí?");
+    await settle(4);
+    const clock = rowsWith("alguém por aí?")[0]?.querySelector(".ac-receipt__check") as HTMLElement;
+    expect(clock.getAttribute("aria-label")).toBe("Escolhendo quem responde");
+    expect(clock.querySelector("path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
+    await push(socket, {
+      type: "message.routed",
+      messageId: lastPerson(state)?.id,
+      seenBy: [ADA_ID],
+      pickedBy: [],
+      strategy: "router",
+    });
+    const checks = rowsWith("alguém por aí?")[0]?.querySelector(".ac-receipt__check") as HTMLElement;
+    expect(checks.querySelector("path")?.getAttribute("d")).toBe("m2 10.5 3 3 6-7M10 12.5l1 1 7-8");
+  });
+});
+
 describe("receipts: who picked the agents for a message nobody mentioned", () => {
   const receiptOf = (text: string) => rowsWith(text)[0]?.querySelector(".ac-receipt") as HTMLElement;
   const popoverOf = async (text: string) => {
@@ -851,7 +871,10 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     await settle(4);
     const second = lastPerson(state);
     expect(second?.body).toBe("oi");
-    expect(rowsWith("oi")[0] && rowsWith("oi").at(-1)?.querySelector(".ac-receipt")).toBeNull();
+    // Only the clock until then: sent, nobody picked it up yet.
+    expect(rowsWith("oi").at(-1)?.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
+      "Escolhendo quem responde",
+    );
     await pushG({ type: "message.routed", messageId: second?.id, seenBy: [ADA_ID], pickedBy: [], strategy: "router" });
     await settle();
     expect(bar().textContent).toBe("");

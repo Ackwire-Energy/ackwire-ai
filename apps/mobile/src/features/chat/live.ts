@@ -317,6 +317,8 @@ export interface ChatLive {
   expect: (threadId: string, agentIds: string[], messageId?: string) => void;
   /** Messages loaded over HTTP: their receipts (`message.receipts`) start or catch up. */
   seed: (messages: readonly Message[]) => void;
+  /** My message just sent where agents may pick it up: the clock until the router decides. */
+  picking: (messageId: string) => void;
   /** "Parar" (as on the web): "Parando…" until the run's event; a run that already ended just leaves. */
   stop: (runId: string, byUserId: string) => void;
   /** Who is typing now (`typingIn` reads it for the conversation or one of its threads). */
@@ -427,6 +429,16 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     [channelId],
   );
   const seed = useCallback((messages: readonly Message[]) => dispatch({ type: "seed", messages }), []);
+  // My message just sent where agents may pick it up: the clock at once, as the router's own `message.routing` says.
+  const picking = useCallback(
+    (messageId: string) =>
+      dispatch({
+        type: "event",
+        event: { type: "message.routing", channelId, messageId, step: "plan" },
+        at: Date.now(),
+      }),
+    [channelId],
+  );
 
   const stop = useCallback(
     (runId: string, byUserId: string) => {
@@ -447,7 +459,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const runs = useMemo(() => runsInChannel(state.streams, channelId), [state.streams, channelId]);
   const consults = useMemo(() => consultsIn(state.consults, channelId), [state.consults, channelId]);
   return useMemo(
-    () => ({ runs, consults, receipts: state.receipts, expect, seed, stop, typing: state.typing, sendTyping }),
-    [runs, consults, state.receipts, state.typing, expect, seed, stop, sendTyping],
+    () => ({ runs, consults, receipts: state.receipts, expect, seed, picking, stop, typing: state.typing, sendTyping }),
+    [runs, consults, state.receipts, state.typing, expect, seed, picking, stop, sendTyping],
   );
 }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { applyReceiptEvent, receiptTicks } from "@agenteschat/client";
 import { dayInView } from "../../src/features/chat/logic";
 import { appColors, toastGlow, toastToneOf, toneColor, withAlpha } from "../../src/ui/palette";
 import { message } from "./fixtures";
@@ -88,5 +89,28 @@ describe("nobody will answer: the receipt's sheet, never a line", () => {
     expect(receipts).toMatch(/requestComposerText\(m\.channelId, `@\$\{c\.handle\} `\)/);
     // The marks are the clock, one tick and two.
     expect(receipts).toMatch(/if \(mark === "none"\) return null;\s*return <Icon name=\{mark\}/);
+  });
+});
+
+describe("my message's clock from the moment it is sent", () => {
+  test("sent into a channel with agents, it wears the clock before the server says anything, as the web's", () => {
+    const screen = src("features/chat/ChatScreen.tsx");
+    expect(screen).toContain(
+      "if (channel && channelAgents.length > 0 && !isMediaAlone(message)) live.picking(message.id);",
+    );
+    expect(src("features/chat/live.ts")).toContain(
+      'dispatch({ type: "event", event: { type: "message.routing", channelId, messageId, step: "plan" }, at: Date.now() })',
+    );
+    const picking = applyReceiptEvent({}, { type: "message.routing", channelId: "c", messageId: "m", step: "plan" });
+    expect(receiptTicks(picking.m)).toBe("clock");
+    const routed = applyReceiptEvent(picking, {
+      type: "message.routed",
+      channelId: "c",
+      messageId: "m",
+      seenBy: ["a"],
+      pickedBy: [],
+      strategy: "router",
+    });
+    expect(receiptTicks(routed.m)).toBe("checks");
   });
 });

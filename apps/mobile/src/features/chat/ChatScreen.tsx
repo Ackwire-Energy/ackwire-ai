@@ -735,6 +735,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       if (dmAgentId && !steered && !isMediaAlone(message)) {
         live.expect(message.threadId ?? message.id, [dmAgentId], message.id);
       }
+      // A channel with agents: the router (or a mention) decides who answers, and `message.routed` always follows.
+      // A GIF or a sticker alone routes to nobody, so it gets no clock to keep.
+      if (channel && channelAgents.length > 0 && !isMediaAlone(message)) live.picking(message.id);
     },
     onFailed: (_error, { waits }) => {
       if (!waits) toast({ title: t("mobile.chat.notSent"), icon: "x" });

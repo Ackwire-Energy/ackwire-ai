@@ -104,7 +104,7 @@ import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@ag
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
-import { isMediaAfterReply, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
+import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
   isOpenMission,
@@ -774,6 +774,10 @@ function ChannelView({
         );
       const fresh = agents.filter((id) => !atWork(id));
       if (fresh.length > 0) live.expect(channel.id, local.id, fresh);
+      // No one guessed in a channel with agents: the router picks, and its `message.routed` always follows. The
+      // clock at once, as its own `message.routing` says; a GIF or a sticker alone routes to nobody, so no clock.
+      else if (agents.length === 0 && !chrome?.dmAgentId && channelAgents.length > 0 && !isMediaAlone(local))
+        live.apply({ type: "message.routing", channelId: channel.id, messageId: local.id, step: "plan" });
     },
     onSent: (message, local) => live.retarget(local.id, message.id),
     // A thread archived meanwhile (`thread.archived`), GIFs or stickers turned off or a GIF gone (`message.media_*`):
