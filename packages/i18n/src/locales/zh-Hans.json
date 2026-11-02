@@ -2290,6 +2290,7 @@
     "refusedBy": "由 {{name}} 拒绝 · {{when}}",
     "approvedByYou": "由你批准 · {{when}}",
     "outcomeApprovedBy": "由 {{name}} 批准",
+    "requesterDecides": "由按角色审批的人提出，因此其本人也可以决定",
     "outcomeApprovedByYou": "由你批准",
     "outcomeRefusedBy": "由 {{name}} 拒绝",
     "outcomeRefusedByYou": "由你拒绝",

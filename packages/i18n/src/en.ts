@@ -2307,6 +2307,8 @@ export const en = {
     refusedBy: "Refused by {{name}} · {{when}}",
     approvedByYou: "Approved by you · {{when}}",
     outcomeApprovedBy: "Approved by {{name}}",
+    /** A request the person made themselves, which they may decide as an approver by role (ADR 0126). */
+    requesterDecides: "Asked by someone who approves it by role, so they may decide it too",
     outcomeApprovedByYou: "Approved by you",
     outcomeRefusedBy: "Refused by {{name}}",
     outcomeRefusedByYou: "Refused by you",

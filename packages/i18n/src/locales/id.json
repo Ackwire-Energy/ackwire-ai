@@ -2296,6 +2296,7 @@
     "refusedBy": "Ditolak oleh {{name}} · {{when}}",
     "approvedByYou": "Disetujui olehmu · {{when}}",
     "outcomeApprovedBy": "Disetujui oleh {{name}}",
+    "requesterDecides": "Diminta oleh orang yang menyetujuinya lewat perannya, jadi ia juga boleh memutuskan",
     "outcomeApprovedByYou": "Disetujui olehmu",
     "outcomeRefusedBy": "Ditolak oleh {{name}}",
     "outcomeRefusedByYou": "Ditolak olehmu",

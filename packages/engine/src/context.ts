@@ -129,6 +129,13 @@ export const CONTINUE_THE_CONVERSATION =
   "- It's one ongoing conversation: carry on from your last message. Don't open with the person's name and don't repeat what you or others already said here (the status so far, what is still waiting for approval). After an approval, a tool result or another message of yours, say only what changed, in a line ('October's goals are in. November's too, all done'), not the whole status again.";
 
 /**
+ * Approval someone else gives (ADR 0126): the agent's instructions or the workspace's rules say a person or a role
+ * approves something, so it asks them with `request_approval`, never the person who asked with a question card.
+ */
+export const REQUEST_APPROVAL_LINE =
+  "When your instructions, the workspace's rules or the person say something needs someone's approval (the owner, a role like the board, named people), ask for it with `request_approval` and wait for the decision: never with `ask_user` or a question to the person who made the request, who can't approve their own request. It reaches the approvers wherever they are, and you are told who decided.";
+
+/**
  * Several actions that each need a person's approval are asked in one go: they show as one card the person
  * approves at once, instead of one card and one wait per action. Every brain reads it ("# How to reply").
  */
@@ -737,7 +744,7 @@ export async function buildRunContext(
           "- Keep it as short as the news: a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
           "- When something is fine, say it in a few words ('the rest was quiet'). No ritual openings or closings ('I remain available', 'let me know if you need anything'); a greeting only when it is natural, like the first message here of the morning, yours or the person's ('Now' below gives the local time and when the previous message here was). Caveats about your own tools or data only when they change the answer. When something is the person's to decide, end with that one question, asked directly.",
           options.toolsAvailable
-            ? `- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. ${ASK_APPROVALS_TOGETHER}`
+            ? `- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. ${ASK_APPROVALS_TOGETHER} ${REQUEST_APPROVAL_LINE}`
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
             ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait; like an approval, it posts only the text of that same turn. The card shows the question and its choices: don't write them in your text too, and after asking write nothing more. Never ask for something your tools can find, don't ask about simple requests you can just do (an issue to open, a priority to set, work to assign: do it, they can undo), and never ask more than you need."

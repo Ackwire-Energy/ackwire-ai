@@ -1392,6 +1392,11 @@ export interface Approval {
   routineId?: string | null;
   /** Approved ahead and not run yet, and you may withdraw it (`approvals.cancel`). */
   canCancel?: boolean;
+  /**
+   * Asked with `request_approval` (ADR 0126): who decides, in words ("Diretoria"), and whose request it was, who
+   * decides it only as an approver by role (`requesterDecides`). Null or absent: any other approval.
+   */
+  approvers?: { label: string; requestedByUserId: string | null; requesterDecides: boolean } | null;
 }
 
 /** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */

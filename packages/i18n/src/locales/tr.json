@@ -2348,6 +2348,7 @@
     "refusedBy": "{{name}} reddetti · {{when}}",
     "approvedByYou": "Siz onayladınız · {{when}}",
     "outcomeApprovedBy": "{{name}} onayladı",
+    "requesterDecides": "Rolü gereği onaylayan biri istedi, bu yüzden o da karar verebilir",
     "outcomeApprovedByYou": "Siz onayladınız",
     "outcomeRefusedBy": "{{name}} reddetti",
     "outcomeRefusedByYou": "Siz reddettiniz",

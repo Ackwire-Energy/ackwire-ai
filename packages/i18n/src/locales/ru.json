@@ -2494,6 +2494,7 @@
     "refusedBy": "Отклонено: {{name}} · {{when}}",
     "approvedByYou": "Одобрено вами · {{when}}",
     "outcomeApprovedBy": "Одобрено: {{name}}",
+    "requesterDecides": "Запрос от того, кто утверждает это по своей роли, поэтому он тоже может решить",
     "outcomeApprovedByYou": "Одобрено вами",
     "outcomeRefusedBy": "Отклонено: {{name}}",
     "outcomeRefusedByYou": "Отклонено вами",

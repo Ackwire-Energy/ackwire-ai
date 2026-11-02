@@ -2286,6 +2286,7 @@
     "refusedBy": "{{name}}が却下 · {{when}}",
     "approvedByYou": "あなたが承認 · {{when}}",
     "outcomeApprovedBy": "{{name}}が承認",
+    "requesterDecides": "役割で承認できる人が依頼したため、その人も決定できます",
     "outcomeApprovedByYou": "あなたが承認",
     "outcomeRefusedBy": "{{name}}が却下",
     "outcomeRefusedByYou": "あなたが却下",

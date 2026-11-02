@@ -244,3 +244,18 @@ export function decisionOutcome(
   if (name) return t(approved ? "approval.outcomeApprovedBy" : "approval.outcomeRefusedBy", { name });
   return t(approved ? "approvals.status.approved" : "approvals.status.refused");
 }
+
+/** Who an approval waits for, by name: the people `request_approval` asked (ADR 0126), else the agent's owner. */
+export const approvalWaitsFor = (approval: Pick<Approval, "approvers">, ownerName: string | undefined) =>
+  approval.approvers?.label || ownerName;
+
+/**
+ * The line saying the person whose request it is decides it too, as an approver by role (ADR 0126): while it waits
+ * and once they decided it. Null for any other approval.
+ */
+export function requesterDecidesLine(t: TFunction, a: Pick<Approval, "approvers" | "status" | "decidedByUserId">) {
+  const asked = a.approvers;
+  if (!asked?.requesterDecides || !asked.requestedByUserId) return null;
+  if (a.status !== "pending" && a.decidedByUserId !== asked.requestedByUserId) return null;
+  return t("approval.requesterDecides");
+}
