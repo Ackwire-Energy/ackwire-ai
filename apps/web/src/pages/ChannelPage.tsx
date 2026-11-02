@@ -100,7 +100,7 @@ import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
@@ -1706,7 +1706,7 @@ function ChannelView({
   const Tag = chrome?.panel ? "section" : "main";
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
-    t("newAgent.and"),
+    t,
   );
   const subtitle = [
     channel.topic,
@@ -2583,8 +2583,6 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
   );
 }
 
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
-
 /**
  * The block's header: the time it started, as any message. What it is doing and for how long is the
  * bar's above the composer (saying it twice was noise).
@@ -2603,7 +2601,7 @@ function LiveRunStatus({
   run: LiveRun /** The waiting row's step line says what it does. */;
   quietOnly?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -2653,7 +2651,7 @@ function LiveRunStatus({
       ) : (
         doing && (
           <p className="ac-msg__activity" aria-live="polite">
-            {capitalize(activityVerb(t, doing))}…
+            {capitalize(activityVerb(t, doing), i18n.language)}…
           </p>
         )
       )}

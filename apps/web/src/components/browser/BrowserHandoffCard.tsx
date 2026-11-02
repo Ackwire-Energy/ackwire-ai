@@ -9,7 +9,7 @@ import {
   useApi,
   useBrowserHandoffMutations,
 } from "@agenteschat/client";
-import { formatTime } from "@agenteschat/client/lib/format";
+import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Icon } from "@agenteschat/ui";
@@ -187,7 +187,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
           ) : (
             <span>
               {people.length > 0
-                ? t("browser.card.asked", { people: people.join(t("notifications.and")) })
+                ? t("browser.card.asked", { people: joinNames(people, t) })
                 : t("browser.card.askedShort")}
             </span>
           )}

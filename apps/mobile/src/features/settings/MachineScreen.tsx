@@ -195,7 +195,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
                   ? folders.length > 0
                     ? t("machines.page.agentFolders", {
                         ...agentGrammar(a.name),
-                        folders: joinNames(folders, t("newAgent.and")),
+                        folders: joinNames(folders, t),
                       })
                     : t("machines.page.agentOwnFolder", agentGrammar(a.name))
                   : null;
@@ -370,9 +370,7 @@ function FoldersSection({ machine: m }: { machine: Machine }) {
                 subLines={2}
                 below={
                   <Text variant="caption" tone="faint" numberOfLines={2}>
-                    {f.agents.length > 0
-                      ? joinNames(f.agents.map(nameOf), t("newAgent.and"))
-                      : t("machines.access.nobody")}
+                    {f.agents.length > 0 ? joinNames(f.agents.map(nameOf), t) : t("machines.access.nobody")}
                   </Text>
                 }
                 chevron={reduces}

@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ComputerBrain, MachineOutage, MachineOutages, OutageAgent, OutageTarget } from "../api/types";
+import { joinNames } from "./format";
 
 /**
  * "Computador desconectado": who waits for an offline computer, where
@@ -88,7 +89,7 @@ export function waitingText(t: TFunction, waiting: OutageAgent["waiting"]): stri
     waiting.conversations > 0 ? t("outage.count.conversations", { count: waiting.conversations }) : null,
   ].filter((x): x is string => Boolean(x));
   if (parts.length === 0) return null;
-  return t("outage.count.waiting", { what: parts.join(t("outage.count.and")) });
+  return t("outage.count.waiting", { what: joinNames(parts, t) });
 }
 
 /** "há 12 min" since it went offline; "agora" under a minute. */

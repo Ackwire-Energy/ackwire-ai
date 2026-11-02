@@ -239,7 +239,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     const ids = [...new Set([...(owner === NO_OWNER ? [] : [owner]), ...a.userIds])];
     const roles = (a.roleIds ?? []).flatMap((id) => dir.roleName(id) ?? []);
     const names = [...roles, ...ids.map(first)];
-    return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
+    return names.length ? joinNames(names, t) : t("audience.summary.nobody");
   };
   const budgetText = (amount: number | null) =>
     amount === null

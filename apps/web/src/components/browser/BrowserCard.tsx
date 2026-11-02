@@ -38,7 +38,7 @@ import {
   useMachines,
   wheelEvent,
 } from "@agenteschat/client";
-import { formatTime } from "@agenteschat/client/lib/format";
+import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
@@ -262,8 +262,6 @@ export function useHeldTakeover(agentId: string, runId: string, enabled = true):
   const liveHere = useStreams((s) => Boolean(s.runs[runId]));
   return !liveHere && open.data && isHeldTakeover(open.data, runId) ? open.data : null;
 }
-
-const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
 
 /**
  * What covers the page (or the agent's desktop) instead of it: a state said plainly, with a spinner only
@@ -1471,18 +1469,22 @@ export function BrowserCard({
 
 /** Names with their faces, joined as people say them ("Ada, Bia e Atlas"). */
 function FacesList({ agentIds }: { agentIds: string[] }) {
-  const { t } = useTranslation();
+  const { i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const names = agentIds.map((id) => ({ id, name: dir.agentById.get(id)?.name ?? "" })).filter((a) => a.name);
+  let next = 0;
   return (
     <>
-      {names.map((a, i) => (
-        <Fragment key={a.id}>
-          {i > 0 && (i === names.length - 1 ? ` ${t("newAgent.and")} ` : ", ")}
-          <AgentWho agentId={a.id} name={a.name} />
-        </Fragment>
-      ))}
+      {new Intl.ListFormat(i18n.language).formatToParts(names.map((a) => a.name)).map((p, k) => {
+        const a = p.type === "element" ? names[next++] : undefined;
+        return a ? (
+          <AgentWho key={a.id} agentId={a.id} name={a.name} />
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: separators have no identity of their own
+          <Fragment key={k}>{p.value}</Fragment>
+        );
+      })}
     </>
   );
 }

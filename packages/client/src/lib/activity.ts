@@ -518,7 +518,7 @@ export function markedPieces(text: string): MarkedPiece[] {
 
 /** "Theo", "Theo e Iris", "Theo e mais 2". */
 export function listNames(t: TFunction, names: string[], mark: MarkName = plain) {
-  if (names.length <= 2) return joinNames(names.map(mark), t("newAgent.and"));
+  if (names.length <= 2) return joinNames(names.map(mark), t);
   return t("chat.namesMore", { first: mark(names[0] ?? ""), count: names.length - 1 });
 }
 

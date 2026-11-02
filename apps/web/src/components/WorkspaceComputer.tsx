@@ -324,7 +324,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
             {t("machines.usedBy", {
               names: joinNames(
                 machine.agents.map((a) => a.name),
-                t("newAgent.and"),
+                t,
               ),
             })}
           </span>

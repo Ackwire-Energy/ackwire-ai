@@ -1,4 +1,5 @@
 import type { AgentStatus, Availability, MemberPresence, MemberStatus, StatusInput } from "@agenteschat/client";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { clearsText, type UntilChoice, untilFor } from "@agenteschat/client/lib/presence";
 import type { TFunction } from "i18next";
 
@@ -54,15 +55,12 @@ export const isSuggestion = (draft: StatusDraft, text: string, emoji: string) =>
 /** The emojis offered for a line (the field's key): the suggestions' first, then common ones. */
 export const STATUS_EMOJIS: readonly string[] = "💬 📅 🎧 🍽️ 🤒 🏖️ ☕ 🚗 ✈️ 🏠 💻 🛠️ 📚 🧘 🏃 🎉 👶 💤".split(" ");
 
-/** A sentence's first letter in lower case, to follow a " · " ("Some às 15:00" → "some às 15:00"). */
-export const lowerFirst = (s: string) => (s ? s.charAt(0).toLocaleLowerCase() + s.slice(1) : s);
-
 /** A person's line in one string: "📅 Em reunião" (the emoji first, when there is one). */
 export const lineText = (s: { emoji: string | null; text: string }) => (s.emoji ? `${s.emoji} ${s.text}` : s.text);
 
 /** A person's line with when it clears: "📅 Em reunião · some às 15:00" (nothing said without an end). */
 export function personLine(t: TFunction, language: string, s: MemberStatus, now = new Date()): string {
-  return s.until ? `${lineText(s)} · ${lowerFirst(clearsText(t, language, s.until, now))}` : lineText(s);
+  return s.until ? `${lineText(s)} · ${lowerFirst(clearsText(t, language, s.until, now), language)}` : lineText(s);
 }
 
 /** What an agent's presence is from (`presence.agentWhy.*`): active, on heavy work, idle since, held, no AI. */

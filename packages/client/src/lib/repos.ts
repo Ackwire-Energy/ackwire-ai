@@ -39,7 +39,7 @@ export function reposText(t: TFunction, c: RepoChoice) {
   if (c.list.length === 0) return t("repos.none");
   return joinNames(
     c.list.map((e) => repoName(t, e)),
-    t("newAgent.and"),
+    t,
   );
 }
 

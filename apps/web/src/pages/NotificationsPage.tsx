@@ -1003,7 +1003,7 @@ function ApprovalSay({
   mine: string | null;
   fallback: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const approval = useApproval(org.id, approvalId);
   const approvals = useApprovals(org.id);
@@ -1021,7 +1021,7 @@ function ApprovalSay({
       <p className="nt-say">
         <Trans
           i18nKey="notifications.wait.wants"
-          values={{ name, action: approvalDoing(t, a) }}
+          values={{ name, action: approvalDoing(t, a, i18n.language) }}
           components={{ b: <b /> }}
         />
       </p>

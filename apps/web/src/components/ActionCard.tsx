@@ -69,7 +69,7 @@ export function ActionCard({ message }: { message: Message }) {
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
     card.agentIds.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),
-    t("newAgent.and"),
+    t,
   );
   const title = agents
     ? t("actionCard.connect_ai.title", { context: card.what, agents })

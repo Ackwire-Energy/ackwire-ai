@@ -125,7 +125,7 @@ function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tone
               tokens: formatTokensShort(t, i18n.language, data.tokens),
               parts: joinNames(
                 used.map((s) => usageSourcePart(t, i18n.language, s)),
-                t("usageViews.and"),
+                t,
               ),
             })}
             {typeof data.equivalentUsd === "number" && data.equivalentUsd > 0
@@ -171,9 +171,7 @@ function Now({ data, agentId, name }: { data: AgentPlanUsage; agentId: string; n
     >
       <AccountHead
         account={current}
-        extra={
-          others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t("usageViews.and")) }) : null
-        }
+        extra={others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t) }) : null}
       />
       {current.usage ? (
         <PlanMeter

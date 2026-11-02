@@ -849,7 +849,7 @@ function PlanSteps({
               key={a.id}
               label={t("connectAi.use", { label: accountTitle(a) })}
               {...(a.usedBy.length > 0
-                ? { sub: t("agentPage.work.brain.accountAlso", { agents: joinNames(a.usedBy, t("newAgent.and")) }) }
+                ? { sub: t("agentPage.work.brain.accountAlso", { agents: joinNames(a.usedBy, t) }) }
                 : {})}
               onPress={() => void assign(a)}
             />

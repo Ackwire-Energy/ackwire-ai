@@ -48,7 +48,15 @@ describe("no hardcoded UI text", () => {
 });
 
 describe("translated text stays as each language writes it (ADR 0121)", () => {
-  const ROOTS_ALL = [...ROOTS, join(REPO, "packages", "client", "src")];
+  const ROOTS_ALL = [
+    ...ROOTS,
+    join(REPO, "packages", "client", "src"),
+    join(REPO, "apps", "mobile", "src"),
+    join(REPO, "apps", "mobile", "app"),
+    join(REPO, "apps", "desktop", "src"),
+  ];
+  /** The one place a translated line's first letter changes case (German keeps it; a name stays). */
+  const CASE_HELPERS = join(REPO, "packages", "client", "src", "lib", "format.ts");
   test("no case change on t(…), and no two t(…) glued with a space", () => {
     const offenders: string[] = [];
     for (const root of ROOTS_ALL)
@@ -59,6 +67,13 @@ describe("translated text stays as each language writes it (ADR 0121)", () => {
           // A lowercase or capitalized form is its own key ("roles.ownerLower"): only translators know it.
           /\bt\((?:[^()]|\([^()]*\))*\)\.(?:toLowerCase|toUpperCase|toLocaleLowerCase|toLocaleUpperCase)\(/g,
           /\b(?:capitalize|lowerFirst)\(t\(/g,
+          // A first letter changed elsewhere: `lowerFirst`/`capitalize` from client/lib/format, with the language.
+          ...(f === CASE_HELPERS
+            ? []
+            : [
+                /\b(?:const|function)\s+(?:lower|lowerFirst|capitalize)\b[^\n]*charAt\(0\)/g,
+                /\.charAt\(0\)\.to(?:Locale)?LowerCase\([^)]*\)\s*\+\s*[\w.]+\.slice\(1\)/g,
+              ]),
           // Two sentences side by side: `common.joinSentences` ("{{a}} {{b}}", no space in Japanese and Chinese).
           /`\$\{t\([^`]*\)\} \$\{t\(/g,
         ];

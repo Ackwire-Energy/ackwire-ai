@@ -57,7 +57,7 @@ export function usedByText(t: TFunction, agents: readonly { name: string }[]) {
     ? t("machines.usedBy", {
         names: joinNames(
           agents.map((a) => a.name),
-          t("newAgent.and"),
+          t,
         ),
       })
     : t("machines.noAgents");

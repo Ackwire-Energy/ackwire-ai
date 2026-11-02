@@ -1844,7 +1844,6 @@ export const en = {
       report: "when it posts",
     },
     someFields: "some fields",
-    and: " and ",
     someone: "someone",
     you: "you",
     undo: "Undo",
@@ -2389,8 +2388,7 @@ export const en = {
     dayUnread_one: "{{count}} unread",
     dayUnread_other: "{{count}} unread",
     unreadItem: "{{name}}, unread",
-    and: " and ",
-    namesMore: "{{names}} and {{count}} more",
+    namesMore: "{{count}} more",
     lead: "{{text}}.",
     speaker: "{{name}}:",
     wait: {
@@ -2583,7 +2581,6 @@ export const en = {
     },
     waiters_one: "<b>{{names}}</b> is waiting for your decision.",
     waiters_other: "<b>{{names}}</b> are waiting for your decision.",
-    and: " and ",
     verb: {
       merge: "wants to merge",
       deploy: "wants to deploy",
@@ -4203,8 +4200,8 @@ export const en = {
       assignee: "Assignee",
       priority: "Priority",
       due: "Due date (optional)",
-      dueHelp: "dd/mm or dd/mm/yyyy.",
-      dueInvalid: "Use dd/mm or dd/mm/yyyy.",
+      dueHelp: "{{example}} or {{exampleYear}}.",
+      dueInvalid: "Use {{example}} or {{exampleYear}}.",
       cancel: "Cancel",
       create: "Create task",
       created: "Task #{{number}} created.",
@@ -7041,7 +7038,6 @@ export const en = {
       pages_other: "{{count}} pages in the wiki",
       agentsRead_one: "{{names}} can read it now. New pages are marked “new”.",
       agentsRead_other: "{{names}} can read them now. New pages are marked “new”.",
-      and: " and ",
       newMarked: "New pages are marked “new”.",
       uploaded_one: "{{count}} attachment is in the Drive.",
       uploaded_other: "{{count}} attachments are in the Drive.",
@@ -9097,7 +9093,6 @@ export const en = {
       routines_other: "{{count}} routines",
       conversations_one: "{{count}} conversation",
       conversations_other: "{{count}} conversations",
-      and: " and ",
       waiting: "{{what}} waiting",
     },
     dialog: {
@@ -9773,7 +9768,6 @@ export const en = {
     },
   },
   usageViews: {
-    and: " and ",
     signedOut: "Signed out",
     whose: "{{name}}'s",
     part: "{{name}} ≈ {{percent}}",
@@ -9834,6 +9828,8 @@ export const en = {
     subtitle: "Development only. The @agenteschat/ui components with the states of the approved screens.",
   },
   format: {
+    // i18next's `list` format: Intl.ListFormat in the language ("Ada, Atlas, and Theo", "Ada、Atlas、Theo"). Keep as is.
+    list: "{{names, list}}",
     usd: "US$ {{value}}",
     tokensMillions: "{{value}}M",
     tokensThousands: "{{value}}k",

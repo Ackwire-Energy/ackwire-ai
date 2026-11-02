@@ -1875,7 +1875,6 @@ export const ptBR = {
       report: "quando posta",
     },
     someFields: "alguns campos",
-    and: " e ",
     someone: "alguém",
     you: "você",
     undo: "Desfazer",
@@ -2423,8 +2422,7 @@ export const ptBR = {
     dayUnread_one: "{{count}} não lida",
     dayUnread_other: "{{count}} não lidas",
     unreadItem: "{{name}}, não lida",
-    and: " e ",
-    namesMore: "{{names}} e mais {{count}}",
+    namesMore: "mais {{count}}",
     lead: "{{text}}.",
     speaker: "{{name}}:",
     wait: {
@@ -2619,7 +2617,6 @@ export const ptBR = {
     },
     waiters_one: "<b>{{names}}</b> está esperando sua decisão.",
     waiters_other: "<b>{{names}}</b> estão esperando sua decisão.",
-    and: " e ",
     verb: {
       merge: "quer fazer um merge",
       deploy: "quer fazer um deploy",
@@ -4332,8 +4329,8 @@ export const ptBR = {
       assignee: "Responsável",
       priority: "Prioridade",
       due: "Prazo (opcional)",
-      dueHelp: "dd/mm ou dd/mm/aaaa.",
-      dueInvalid: "Use dd/mm ou dd/mm/aaaa.",
+      dueHelp: "{{example}} ou {{exampleYear}}.",
+      dueInvalid: "Use {{example}} ou {{exampleYear}}.",
       cancel: "Cancelar",
       create: "Criar tarefa",
       created: "Tarefa #{{number}} criada.",
@@ -7240,7 +7237,6 @@ export const ptBR = {
       pages_other: "{{count}} páginas na wiki",
       agentsRead_one: "{{names}} já pode consultar. As novas aparecem marcadas como “novo”.",
       agentsRead_other: "{{names}} já podem consultar. As novas aparecem marcadas como “novo”.",
-      and: " e ",
       newMarked: "As novas aparecem marcadas como “novo”.",
       uploaded_one: "{{count}} anexo está no Drive.",
       uploaded_other: "{{count}} anexos estão no Drive.",
@@ -9309,7 +9305,6 @@ export const ptBR = {
       routines_other: "{{count}} rotinas",
       conversations_one: "{{count}} conversa",
       conversations_other: "{{count}} conversas",
-      and: " e ",
       waiting: "{{what}} esperando",
     },
     dialog: {
@@ -9993,7 +9988,6 @@ export const ptBR = {
     },
   },
   usageViews: {
-    and: " e ",
     signedOut: "Saiu da conta",
     whose: "de {{name}}",
     part: "{{name}} ≈ {{percent}}",
@@ -10062,6 +10056,7 @@ export const ptBR = {
     subtitle: "Só em desenvolvimento. Os componentes de @agenteschat/ui com os estados das telas aprovadas.",
   },
   format: {
+    list: "{{names, list}}",
     usd: "US$ {{value}}",
     tokensMillions: "{{value}} mi",
     tokensThousands: "{{value}} mil",

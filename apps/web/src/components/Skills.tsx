@@ -765,7 +765,7 @@ export function SkillSheet({
                   count: users.length,
                   names: joinNames(
                     users.map((a) => a.name),
-                    t("newAgent.and"),
+                    t,
                   ),
                 })
               : t("skills.removeNone")

@@ -172,8 +172,8 @@ function byDay(rows: AuditRow[], day: (iso: string) => string): [string, AuditRo
 
 /** One row: the face, "Ada criou uma tarefa", the line under it, and how it ended with the time. */
 function AuditRowView({ row, time }: { row: AuditRow; time: string }) {
-  const { t } = useTranslation();
-  const { name, text } = auditSentence(t, row);
+  const { t, i18n } = useTranslation();
+  const { name, text } = auditSentence(t, row, i18n.language);
   const sub = auditSubLine(t, row);
   const look = auditOutcome(t, row);
   return (
@@ -243,7 +243,7 @@ export function AuditRowScreen({ id }: { id: string }) {
     );
   }
   const name = auditActorName(t, row) ?? t("audit.system");
-  const { name: who, text } = auditSentence(t, row);
+  const { name: who, text } = auditSentence(t, row, i18n.language);
   const look = auditOutcome(t, row);
   const reason = auditReason(t, row);
   const reasonKey = auditReasonKey(row);

@@ -797,9 +797,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       .filter((m) => m.userId === ownerId || audience.userIds.includes(m.userId))
       .map((m) => m.name.split(/\s+/)[0] ?? m.name);
     const roles = (roleList.data?.roles ?? []).filter((r) => audience.roleIds?.includes(r.id)).map((r) => r.name);
-    return names.length + roles.length
-      ? joinNames([...roles, ...names], t("newAgent.and"))
-      : t("audience.summary.nobody");
+    return names.length + roles.length ? joinNames([...roles, ...names], t) : t("audience.summary.nobody");
   };
   const ownerTitle = (
     <h2>
@@ -1812,7 +1810,7 @@ function CreatedMoment({
   const first = channels[0];
   const names = joinNames(
     channels.map((c) => `#${c.name}`),
-    t("newAgent.and"),
+    t,
   );
   return (
     <section className="newag__born" aria-labelledby="ag-born">

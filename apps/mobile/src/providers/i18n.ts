@@ -86,6 +86,8 @@ export function setupI18n(): typeof i18n {
     interpolation: { escapeValue: false },
     initAsync: false,
   });
+  // ponytail: a Hermes without Intl.ListFormat gets plain commas in `format.list`; drop once every supported Hermes has it.
+  if (typeof Intl.ListFormat === "undefined") i18n.services.formatter?.add("list", (v: string[]) => v.join(", "));
   return i18n;
 }
 

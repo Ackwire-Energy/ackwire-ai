@@ -7,7 +7,6 @@ import {
   inputOf,
   isSuggestion,
   lineText,
-  lowerFirst,
   personLine,
   STATUS_EMOJIS,
   untilOf,
@@ -77,8 +76,6 @@ describe("how a status reads in a row, a pill and a profile", () => {
     const at3 = new Date(2026, 9, 30, 15, 0).toISOString();
     const line = personLine(t, "pt-BR", { text: "Em reunião", emoji: "📅", until: at3 }, NOW);
     expect(line.startsWith("📅 Em reunião · some às ")).toBe(true);
-    expect(lowerFirst("Some às 15:00")).toBe("some às 15:00");
-    expect(lowerFirst("")).toBe("");
   });
 
   test("why an agent appears as it does", () => {

@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { AGENT_ACTION_KINDS, type AgentAction, type ApiRule } from "../api/types";
+import { joinNames } from "./format";
 
 /** A receipt's `params.rule` when it is a rule (`freq`, `timezone`); anything else is none. */
 function ruleOf(value: unknown): ApiRule | null {
@@ -61,11 +62,6 @@ export const actionErrorKey = (code: string) => `agentActions.errors.${code.repl
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 
-function joinList(items: string[], and: string) {
-  if (items.length <= 1) return items[0] ?? "";
-  return `${items.slice(0, -1).join(", ")}${and}${items[items.length - 1]}`;
-}
-
 /**
  * The values (and i18next `context`) for `t(actionTextKey(a), …)`: issue
  * number and title, the changed fields in words, the assignee ("você" when it
@@ -83,9 +79,9 @@ export function actionTextValues(
   const fields = Array.isArray(p.fields) ? p.fields : [];
   const fieldWords = (group: "issueFields" | "routineFields") =>
     fields.length
-      ? joinList(
+      ? joinNames(
           fields.map((f) => t(`agentActions.${group}.${f}`, { defaultValue: f })),
-          t("agentActions.and"),
+          t,
         )
       : t("agentActions.someFields");
   const title = str(p.title) || a.target.title || "";

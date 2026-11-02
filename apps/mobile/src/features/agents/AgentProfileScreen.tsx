@@ -14,7 +14,7 @@ import {
 } from "@agenteschat/client";
 import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { formatPercent } from "@agenteschat/client/lib/format";
+import { formatPercent, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -223,10 +223,7 @@ function Profile({ id }: { id: string }) {
     : owner
       ? t("mobile.intentAgents.owner", { name: owner })
       : null;
-  const roleLine = [
-    roleName || null,
-    plain ? (roleName ? plain.charAt(0).toLowerCase() + plain.slice(1) : plain) : null,
-  ]
+  const roleLine = [roleName || null, plain ? (roleName ? lowerFirst(plain, i18n.language) : plain) : null]
     .filter(Boolean)
     .join(" · ");
   const shownDid = allDid ? did : did.slice(0, DID_SHOWN);

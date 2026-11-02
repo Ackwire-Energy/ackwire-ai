@@ -94,7 +94,7 @@ export function ChannelWelcome({
   const activity = agentActivitySince(messages, since);
   const names = joinNames(
     activity.agentIds.slice(0, 3).map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),
-    t("newAgent.and"),
+    t,
   );
   const waiting = overview.data?.approvalsWaitingForMe ?? 0;
   const firstName = me.user.name.split(/\s+/)[0] ?? me.user.name;

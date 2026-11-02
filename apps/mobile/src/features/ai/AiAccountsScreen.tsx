@@ -124,7 +124,7 @@ export function AiAccountsScreen() {
       a.label,
     );
   };
-  const names = (list: string[]) => joinNames(list, t("newAgent.and"));
+  const names = (list: string[]) => joinNames(list, t);
   const machineOf = (a: Account) => machines.data?.find((m) => m.id === a.machineId);
   // One more of the person's agents thinks with an account made for all of them there: no sign-in.
   const give = (a: Account, agent: { id: string; name: string }) =>

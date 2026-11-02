@@ -1344,7 +1344,6 @@ export const featureKeysPtBR = {
       cloudTag: "Sempre ligado",
       managedDesc: "Só deste workspace · um usuário para cada agente",
       has: "Tem o {{brains}}",
-      and: " e o ",
       none: "Nenhum outro computador pode receber esses agentes agora. Conecte um pelo site.",
       gone: "O {{computer}} voltou. Ninguém precisa trocar.",
       reason: {

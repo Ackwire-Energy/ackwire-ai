@@ -1,5 +1,6 @@
 import type { AgentLookInput, AiStatus, Edition, OrgOnboarding, OrgSummary } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import {
   crewOf,
@@ -13,7 +14,6 @@ import { platformZoneName } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
-import { joinNames } from "../shared/logic";
 
 /**
  * The phone's first run: one question per full screen, hosted by an
@@ -199,7 +199,7 @@ export function stepText(
         names.length === 0
           ? t("onboarding.done.textNone")
           : t(names.length === 1 ? "onboarding.done.inGeneralOne" : "onboarding.done.inGeneralMany", {
-              names: joinNames(names, t("newAgent.and")),
+              names: joinNames(names, t),
             });
       // The invitations emailed on the team step, as the web's welcome says.
       const lead = invited > 0 ? `${inGeneral} ${t("onboarding.done.invited", { count: invited })}` : inGeneral;

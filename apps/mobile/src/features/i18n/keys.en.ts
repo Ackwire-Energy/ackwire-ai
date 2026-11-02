@@ -1339,7 +1339,6 @@ export const featureKeysEn = {
       cloudTag: "Always on",
       managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
-      and: " and ",
       none: "No other computer can take these agents right now. Connect one on the website.",
       gone: "{{computer}} is back. Nobody needs to switch.",
       reason: {

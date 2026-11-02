@@ -688,7 +688,7 @@ function NewIssueDialog({
   columns: IssueColumn[];
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const title_ = useColumnTitle();
@@ -708,7 +708,11 @@ function NewIssueDialog({
   const [assignee, setAssignee] = useState(NO_ACTOR);
   const [priority, setPriority] = useState<IssuePriority>("normal");
   const [due, setDue] = useState("");
-  const dueDate = due.trim() ? parseDayInput(due) : null;
+  const dueDate = due.trim() ? parseDayInput(due, new Date(), i18n.language) : null;
+  // A day in the language's own order ("24/10", "10/24", "24.10."), for the field's hint.
+  const dayLike = (year?: "numeric") =>
+    new Intl.DateTimeFormat(i18n.language, { day: "2-digit", month: "2-digit", year }).format(new Date(2026, 9, 24));
+  const dueExamples = { example: dayLike(), exampleYear: dayLike("numeric") };
   const dueError = due.trim() !== "" && !dueDate;
   const { criteria } = splitCriteria(text);
   const chosen = actorFromKey(assignee);
@@ -821,10 +825,15 @@ function NewIssueDialog({
             <Field
               label={t("issues.form.due")}
               id="ni-due"
-              help={t("issues.form.dueHelp")}
-              error={dueError ? t("issues.form.dueInvalid") : undefined}
+              help={t("issues.form.dueHelp", dueExamples)}
+              error={dueError ? t("issues.form.dueInvalid", dueExamples) : undefined}
             >
-              <Input value={due} onChange={(e) => setDue(e.target.value)} inputMode="numeric" placeholder="24/10" />
+              <Input
+                value={due}
+                onChange={(e) => setDue(e.target.value)}
+                inputMode="numeric"
+                placeholder={dueExamples.example}
+              />
             </Field>
           </div>
           {agent && (

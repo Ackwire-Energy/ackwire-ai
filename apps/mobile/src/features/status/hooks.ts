@@ -8,12 +8,13 @@ import {
   useAiStatus,
   usePeople,
 } from "@agenteschat/client";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { agentPresenceShown, agentStatusText, clearsText } from "@agenteschat/client/lib/presence";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { agentWhyKey, lineText, lowerFirst, personLine } from "./logic";
+import { agentWhyKey, lineText, personLine } from "./logic";
 
 /**
  * Who is how (ADR 0084): people's presence and line (`GET …/people`) and agents' (`GET …/agent-status`, an agent
@@ -124,7 +125,7 @@ export function useAgentProfileStatus(agentId: string, name: string): AgentProfi
       : until
         ? t("mobile.status.bySelfUntil", {
             name,
-            when: lowerFirst(clearsText(t, i18n.language || "en", until)),
+            when: lowerFirst(clearsText(t, i18n.language || "en", until), i18n.language),
           })
         : t("presence.bySelf", { name });
   return {

@@ -304,7 +304,7 @@ function ExcludedLine({ run, onOpen, onInclude }: { run: Message[]; onOpen: () =
   const label =
     run.length === 1
       ? t("threads.adjust.leftOne", { name: names[0] ?? "" })
-      : t("threads.adjust.leftMany", { count: run.length, names: joinNames(names, t("newAgent.and")) });
+      : t("threads.adjust.leftMany", { count: run.length, names: joinNames(names, t) });
   return (
     <div className="thsel-left">
       <Checkbox
@@ -341,7 +341,7 @@ export function RangeBar({ adjust }: { adjust: RangeAdjust }) {
             <p>
               {t("threads.adjust.blockedText", {
                 count: blind.length,
-                names: joinNames(blind, t("newAgent.and")),
+                names: joinNames(blind, t),
                 channel: channelName,
               })}
             </p>

@@ -59,8 +59,8 @@ describe("receipts", () => {
 
 describe("receipt sentence values", () => {
   const t = ((key: string, o?: Record<string, unknown>) =>
-    key === "agentActions.and"
-      ? " e "
+    key === "format.list"
+      ? new Intl.ListFormat("pt-BR").format(o?.names as string[])
       : key.startsWith("agentActions.")
         ? (key.split(".").pop() ?? key)
         : String(o?.defaultValue ?? key)) as unknown as TFunction;

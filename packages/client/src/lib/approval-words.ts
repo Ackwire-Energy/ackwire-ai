@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { Approval, ApprovalRule } from "../api/types";
 import { aheadPhase, approvalAction, emailTitleWords } from "./approval-kind";
 import { humanize } from "./custom-tools";
+import { lowerFirst } from "./format";
 import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
@@ -98,6 +99,7 @@ function innerTool(approval: Pick<Approval, "params"> & Partial<Pick<Approval, "
 export function approvalDoing(
   t: TFunction,
   approval: Pick<Approval, "tool" | "title" | "params" | "connector" | "scope" | "email">,
+  locale: string,
 ) {
   const inner = innerTool(approval);
   const action = approvalAction(approval);
@@ -109,7 +111,7 @@ export function approvalDoing(
         ? t(`notifications.wait.doing.${action}`)
         : toolName(t, partsOf(approval.tool), approval.tool);
   // "Ver …" → "ver …"; an acronym ("PR #42") stays.
-  return /^[A-Z][^A-Z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
+  return lowerFirst(text, locale);
 }
 
 /** It only looks: asked under a read scope, or its tool's name starts with a reading verb. */

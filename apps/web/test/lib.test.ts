@@ -8,6 +8,8 @@ import {
   formatTokensShort,
   formatUsd,
   joinNames,
+  namesText,
+  parseDayInput,
   relativeTime,
   shortModel,
   timeLeft,
@@ -111,10 +113,30 @@ describe("format (pt-BR, machine numbers precise)", () => {
       "45 min left",
     );
   });
+  test("a typed day in the language's order", () => {
+    const now = new Date(2026, 0, 5);
+    expect(parseDayInput("24/10", now, "pt-BR")).toBe("2026-10-24");
+    expect(parseDayInput("10/24", now, "en")).toBe("2026-10-24");
+    expect(parseDayInput("24/10", now, "en")).toBeNull();
+    expect(parseDayInput("24.10.", now, "de")).toBe("2026-10-24");
+    expect(parseDayInput("31/02/2027", now, "pt-BR")).toBeNull();
+  });
+
   test("names and models", () => {
-    expect(joinNames(["Ada"], " e ")).toBe("Ada");
-    expect(joinNames(["Ada", "Atlas"], " e ")).toBe("Ada e Atlas");
-    expect(joinNames(["Ada", "Atlas", "Theo"], " e ")).toBe("Ada, Atlas e Theo");
+    expect(joinNames(["Ada"], t)).toBe("Ada");
+    expect(joinNames(["Ada", "Atlas"], t)).toBe("Ada e Atlas");
+    expect(joinNames(["Ada", "Atlas", "Theo"], t)).toBe("Ada, Atlas e Theo");
+    expect(namesText(t, ["Ada", "Atlas", "Theo", "Lia"])).toBe("Ada, Atlas e mais 2");
+    // Each language's own separators: the instance's language, or a page's fixed one.
+    for (const [lng, list, more] of [
+      ["en", "Ada, Atlas, and Theo", "Ada, Atlas, and 2 more"],
+      ["ja", "Ada、Atlas、Theo", null],
+      ["zh-Hans", "Ada、Atlas和Theo", null],
+    ] as const) {
+      const tl = i18n.getFixedT(lng) as TFunction;
+      expect(joinNames(["Ada", "Atlas", "Theo"], tl)).toBe(list);
+      if (more) expect(namesText(tl, ["Ada", "Atlas", "Theo", "Lia"])).toBe(more);
+    }
     expect(shortModel("Claude Sonnet 5.5")).toBe("sonnet 5.5");
   });
 });

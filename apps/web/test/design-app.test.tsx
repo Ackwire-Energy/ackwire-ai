@@ -74,7 +74,7 @@ describe("work summary", () => {
     expect(w.connectors).toEqual(["himetrica", "Drive"]);
     expect(workHeader(t, { steps: w.steps.length, connectors: w.connectors, durationMs: w.durationMs })).toEqual({
       steps: "2 passos",
-      connectors: "himetrica, Drive",
+      connectors: "himetrica e Drive",
       duration: "12 s",
     });
   });

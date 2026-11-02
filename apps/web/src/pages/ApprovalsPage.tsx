@@ -325,7 +325,7 @@ export function ApprovalsPage() {
                 values={{
                   names: joinNames(
                     waiters.map((id) => dir.agentById.get(id)?.name ?? ""),
-                    t("approvals.and"),
+                    t,
                   ),
                 }}
                 components={{ b: <b /> }}

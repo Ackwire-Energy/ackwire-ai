@@ -158,8 +158,8 @@ export function AuditSection() {
 // ── Pieces ─────────────────────────────────────────────────────────────────
 
 function Sentence({ row }: { row: AuditRow }) {
-  const { t } = useTranslation();
-  const { name, text } = auditSentence(t, row);
+  const { t, i18n } = useTranslation();
+  const { name, text } = auditSentence(t, row, i18n.language);
   if (!name) return <>{text}</>;
   return (
     <>

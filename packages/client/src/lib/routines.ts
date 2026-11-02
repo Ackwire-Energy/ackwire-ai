@@ -127,9 +127,9 @@ const NAMES_EN: Record<keyof typeof NAMES, string> = {
   "Australia/Sydney": "Sydney",
   "Pacific/Auckland": "Auckland",
 };
-/** Our own names in Portuguese (the default) and English; every other language gets the platform's (Intl). */
+/** Our own names in Portuguese and English (the default); every other language gets the platform's (Intl). */
 const namesFor = (locale?: string): Partial<Record<string, string>> =>
-  !locale || locale.startsWith("pt") ? NAMES : locale.startsWith("en") ? NAMES_EN : {};
+  locale?.startsWith("pt") ? NAMES : !locale || locale.startsWith("en") ? NAMES_EN : {};
 
 const NAMES = {
   "America/Sao_Paulo": "horário de Brasília",
@@ -170,27 +170,6 @@ const NAMES = {
   "Australia/Sydney": "Sydney",
   "Pacific/Auckland": "Auckland",
 } satisfies Record<string, string>;
-
-/** "UTC−3", "UTC+5:30", "UTC" for a zone at `at`. */
-export function utcOffset(timeZone: string, at = new Date()): string {
-  try {
-    const part = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
-      .formatToParts(at)
-      .find((p) => p.type === "timeZoneName")?.value;
-    const m = /GMT([+-])(\d{2}):(\d{2})/.exec(part ?? "");
-    if (!m) return "UTC";
-    const hours = String(Number(m[2]));
-    return `UTC${m[1] === "-" ? "−" : "+"}${hours}${m[3] === "00" ? "" : `:${m[3]}`}`;
-  } catch {
-    return "UTC";
-  }
-}
-
-/** "horário de Brasília (UTC−3)"; "UTC"; unknown zones by their IANA name with the offset. */
-export function timezoneLabel(timeZone: string, at = new Date(), locale?: string): string {
-  if (timeZone === "UTC" || timeZone === "Etc/UTC") return "UTC";
-  return `${namesFor(locale)[timeZone] ?? timeZone} (${utcOffset(timeZone, at)})`;
-}
 
 /** The browser's zone, if it has one. */
 export function browserTimezone(): string | null {

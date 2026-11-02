@@ -116,7 +116,7 @@ export function MessageReceipts({
   if (!marked && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
 
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  const names = (ids: string[]) => joinNames(ids.map(name), t("newAgent.and"));
+  const names = (ids: string[]) => joinNames(ids.map(name), t);
   const mentionNeeded = status?.kind === "nobody" && status.mentionNeeded === true;
   const statusText =
     status === null

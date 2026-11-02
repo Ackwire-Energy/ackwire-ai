@@ -1252,7 +1252,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
               title: hostsTeam.length
                 ? t("onboarding.computer.payment.title", {
                     names:
-                      hostsTeam.length > besideHost ? namesText(t, hostsTeam, besideHost) : joinNames(hostsTeam, ", "),
+                      hostsTeam.length > besideHost ? namesText(t, hostsTeam, besideHost) : hostsTeam.join(", "),
                   })
                 : t("onboarding.computer.payment.titleAlone"),
               lead: t("onboarding.computer.payment.lead"),

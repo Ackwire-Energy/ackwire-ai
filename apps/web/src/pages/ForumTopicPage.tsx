@@ -325,7 +325,7 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
                 {silent.length > 0 && said > 0 && (
                   <p className="forum-quiet ac-iconline">
                     <Icon name="dash" size={14} />
-                    {t("forum.posts.didntSpeak", { count: silent.length, names: joinNames(silent, t("newAgent.and")) })}
+                    {t("forum.posts.didntSpeak", { count: silent.length, names: joinNames(silent, t) })}
                   </p>
                 )}
                 {liveHere && <LiveTurn topic={topic} active={active} />}
@@ -1301,8 +1301,7 @@ function Standing({
           <b>{t("forum.side.agree", { count: conv.agree.length, total: conv.total })}</b>
           <small>
             {t(ended ? "forum.side.withDecision" : "forum.side.withProposal")}
-            {askers.length > 0 &&
-              ` · ${t("forum.side.askers", { count: askers.length, names: joinNames(askers, t("newAgent.and")) })}`}
+            {askers.length > 0 && ` · ${t("forum.side.askers", { count: askers.length, names: joinNames(askers, t) })}`}
           </small>
         </div>
       </div>

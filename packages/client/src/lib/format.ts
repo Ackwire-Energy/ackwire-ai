@@ -68,10 +68,17 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 export const daysBetween = (iso: string, now: Date) =>
   Math.round((startOfDay(now) - startOfDay(new Date(iso))) / 86_400_000);
 
+/** A line's first letter in upper case, by the language's rules (Turkish "i" → "İ"). */
 export const capitalize = (s: string, locale?: string) => s.charAt(0).toLocaleUpperCase(locale) + s.slice(1);
 
-/** A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). */
-export const lowerFirst = (s: string, locale?: string) => (s ? s.charAt(0).toLocaleLowerCase(locale) + s.slice(1) : s);
+/**
+ * A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). German keeps it: its
+ * nouns are capitalized, so only a translator knows a lowercase form there. A name ("GitHub", "PDF") stays as it is.
+ */
+export const lowerFirst = (s: string, locale?: string) =>
+  !s || locale?.startsWith("de") || /^\p{Lu}\p{L}*\p{Lu}/u.test(s)
+    ? s
+    : s.charAt(0).toLocaleLowerCase(locale) + s.slice(1);
 
 /** "Segunda-feira" */
 export const formatWeekday = (locale: string, iso: string) =>
@@ -149,11 +156,8 @@ export function timeLeft(t: TFunction, iso: string, now = new Date()) {
 /** "Ana" for "Ana Souza". */
 export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-/** "Ada e Atlas", "Ada, Atlas e Theo". */
-export function joinNames(names: string[], and: string) {
-  if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")}${and}${names[names.length - 1]}`;
-}
+/** "Ada, Atlas, and Theo", "Ada, Atlas e Theo", "Ada、Atlas、Theo": the language's own list (Intl.ListFormat), in `t`'s language. */
+export const joinNames = (names: readonly string[], t: TFunction): string => t("format.list", { names });
 
 /** How many names a list of a team says before "and N more" (`namesText`): a ready-made team's four, whole. */
 export const NAMES_SHOWN = 4;
@@ -161,8 +165,8 @@ export const NAMES_SHOWN = 4;
 /** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total`. */
 export function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
   const shown = names.slice(0, max);
-  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
-  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
+  if (total <= shown.length) return joinNames(shown, t);
+  return joinNames([...shown, t("notifications.namesMore", { count: total - shown.length })], t);
 }
 
 /** Short model label for message meta: "Claude Sonnet 5.5" → "sonnet 5.5". */
@@ -186,8 +190,8 @@ export function dueLabel(_t: TFunction, locale: string, ymd: string, now = new D
  * "24/10" or "24/10/2026" (10/24 where the language puts the month first) → `YYYY-MM-DD`, this year when omitted;
  * null when invalid. Dots and dashes work as the slash does ("24.10.2026").
  */
-export function parseDayInput(value: string, now = new Date(), locale = "pt-BR"): string | null {
-  const m = value.trim().match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{4}))?$/);
+export function parseDayInput(value: string, now: Date, locale: string): string | null {
+  const m = value.trim().match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{4}))?\.?$/);
   if (!m) return null;
   const [day, month] = dayMonthOrder(locale) === "dm" ? [Number(m[1]), Number(m[2])] : [Number(m[2]), Number(m[1])];
   const d = new Date(Number(m[3] ?? now.getFullYear()), month - 1, day);
