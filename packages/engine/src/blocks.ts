@@ -313,9 +313,10 @@ async function loadChoicesView(db: Database, orgId: string, artifactId: string):
   const lost = row && !row.messageId && row.createdAt.getTime() < Date.now() - UNPOSTED_CLAIM_MS;
   return {
     id: artifactId,
-    answer: row && !lost
-      ? { userId: row.userId, picks: row.picks, messageId: row.messageId, at: row.createdAt.toISOString() }
-      : null,
+    answer:
+      row && !lost
+        ? { userId: row.userId, picks: row.picks, messageId: row.messageId, at: row.createdAt.toISOString() }
+        : null,
   };
 }
 

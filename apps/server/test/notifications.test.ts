@@ -141,7 +141,7 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
   expect(rest.items).toHaveLength(1);
   expect((await api("/notifications?filter=everything")).status).toBe(400);
 
-  const id = page.items[0]?.id;
+  const id = page.items[0]?.id ?? "";
   const read = await api(`/notifications/${id}/read`, { json: { read: true } });
   expect(read.status).toBe(200);
   expect(((await read.json()) as Item).readAt).not.toBeNull();
