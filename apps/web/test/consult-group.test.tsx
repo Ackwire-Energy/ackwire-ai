@@ -331,21 +331,38 @@ describe("the questions inside the reply that asked: one pill per agent (Consult
     expect(document.querySelector(".ac-consult-group")).toBeNull();
   });
 
-  test("the notice's card opens the two agents' conversation in the panel, never in place", async () => {
+  test("the notice's pill opens the two agents' conversation in the panel, never in place", async () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     const state = withTalk(withAsk([c], true), c);
     state.messages = state.messages.filter((m) => m.id !== "msg-asked");
     await open(state);
-    const card = document.querySelector(".ac-consult") as HTMLElement;
-    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
+    const head = document.querySelector(".ac-talk") as HTMLElement;
+    expect(head.textContent).toBe("Ada ⇄ Atlas · respondeu em 35 s");
     expect(head.getAttribute("aria-expanded")).toBeNull();
     await act(async () => fireEvent.click(head));
     await settle(3);
-    // A long answer reads beside the chat: the card stays one line.
-    expect(card.querySelector(".ac-consult__body")).toBeNull();
+    // A long answer reads beside the chat: the pill opens nothing in place.
+    expect(document.querySelector(".ac-talk-detail")).toBeNull();
     expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
     expect(panel()?.textContent).toContain("subiu 6 pb");
     expect(head.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("an agent @named outside the conversation got it by direct message: their pill, no 'Entregue ao' row", async () => {
+    const c = consultation({ kind: "note" });
+    const state = withTalk(withAsk([c]), c);
+    const asked = state.messages.find((m) => m.id === "msg-asked");
+    if (asked)
+      asked.meta = { reach: [{ agentId: ATLAS_ID, handle: "atlas", reason: "not_in_channel", consultationId: "q1" }] };
+    await open(state);
+    expect(document.body.textContent).not.toContain("Entregue ao");
+    const reach = screen().getByRole("group", { name: "Quem a mensagem não chamou direto" });
+    const talks = [...reach.querySelectorAll(".ac-talk")] as HTMLElement[];
+    expect(talks).toHaveLength(1);
+    expect(talks[0]?.textContent).toMatch(/^Ada ⇄ Atlas · conversando há/);
+    await act(async () => fireEvent.click(talks[0] as HTMLElement));
+    await settle(3);
+    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
   });
 
   test("an event reloads the list: an answer that came shows in place", async () => {
