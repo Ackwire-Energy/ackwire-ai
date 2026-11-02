@@ -230,7 +230,8 @@ export const envVars = {
   },
   APPLE_TEAM_ID: {
     schema: z.string().optional(),
-    description: "Apple Developer team id (10 characters) for Sign in with Apple.",
+    description:
+      "Apple Developer team id (10 characters) for Sign in with Apple and, with `APPLE_APP_BUNDLE_ID`, for links that open the iOS app.",
     section: "Sign-in",
   },
   APPLE_KEY_ID: {
@@ -259,19 +260,19 @@ export const envVars = {
   APPLE_APP_BUNDLE_ID: {
     schema: z.string().optional(),
     description:
-      "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively. With `APPLE_TEAM_ID`, invitation and password reset links open the app (`/.well-known/apple-app-site-association`).",
+      "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively. With `APPLE_TEAM_ID`, links to this server's pages the app has a screen for (conversations, messages, threads, agents, tasks, routines, approvals, the inbox, settings; invitations and password resets) open the app: `/.well-known/apple-app-site-association`, also at `/apple-app-site-association`. Comma-separated for several builds (e.g. `chat.agentes.app,chat.agentes.app.preview`): all get the links, the first signs in with Apple. The app must be built with this server's host in its Associated Domains (`EXPO_PUBLIC_API_URL`).",
     section: "Sign-in",
   },
   ANDROID_APP_PACKAGE: {
     schema: z.string().optional(),
     description:
-      "Package of the Android app (e.g. `chat.agentes.app`). With `ANDROID_APP_CERT_SHA256`, invitation and password reset links open the app (`/.well-known/assetlinks.json`).",
+      "Package of the Android app (e.g. `chat.agentes.app`). With `ANDROID_APP_CERT_SHA256`, links to this server's pages the app has a screen for open the app, as on iOS (`/.well-known/assetlinks.json`). Comma-separated for several builds (e.g. `chat.agentes.app,chat.agentes.app.preview`). The app must be built with this server's host (`EXPO_PUBLIC_API_URL`).",
     section: "Sign-in",
   },
   ANDROID_APP_CERT_SHA256: {
     schema: z.string().optional(),
     description:
-      "SHA-256 fingerprints of the Android app's signing certificates (`AA:BB:…`), comma-separated (e.g. the upload key and Play's app signing key).",
+      "SHA-256 fingerprints of the Android app's signing certificates (`AA:BB:…`), comma-separated: Google Play's app signing key (Play Console › Test and release › App integrity › App signing), and the upload key's for builds installed outside Play.",
     section: "Sign-in",
   },
   AGENT_DEFAULT_MODEL: {

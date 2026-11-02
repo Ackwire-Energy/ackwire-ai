@@ -16,6 +16,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { serverUrl } from "@/lib/server";
 import {
   Button,
   Filters,
@@ -33,8 +34,9 @@ import {
   Text,
   weights,
 } from "@/ui";
+import { openPage } from "../ai/parts";
 import { ApprovalWhy } from "../approvals/parts";
-import { notificationHref, routineHref } from "../links/logic";
+import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining } from "../shared/logic";
@@ -163,6 +165,8 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
+  // No screen of its own in the app (a forum topic): its page on the web, so a tap is never a dead end.
+  const web = href ? null : notificationWebPath(n, orgId);
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
@@ -176,13 +180,14 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const open = () => {
     if (n.readAt === null) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
+    else if (web) openPage(`${serverUrl()}${web}`);
   };
   return (
     <Pressable
-      onPress={href ? open : undefined}
-      disabled={!href}
+      onPress={href || web ? open : undefined}
+      disabled={!href && !web}
       style={({ pressed }) => [styles.wcard, surface, pressed && styles.wpressed]}
-      accessibilityRole={href ? "button" : undefined}
+      accessibilityRole={href || web ? "button" : undefined}
       accessibilityLabel={[name, kind, title].filter(Boolean).join(", ")}
     >
       <View style={styles.hd}>
@@ -233,7 +238,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
           </Text>
         )}
         <View style={styles.grow} />
-        {href ? <Button variant="primary" size="sm" label={button} onPress={open} /> : null}
+        {href || web ? <Button variant="primary" size="sm" label={button} onPress={open} /> : null}
       </View>
     </Pressable>
   );
@@ -351,6 +356,8 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
+  // No screen of its own in the app (a forum topic): its page on the web, so a tap is never a dead end.
+  const web = href ? null : notificationWebPath(n, orgId);
   const unread = n.readAt === null;
 
   // A restriction on agentes.chat Cloud: its whole line under the headline, and a held agent's name heads it.
@@ -399,6 +406,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const open = () => {
     if (unread) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
+    else if (web) openPage(`${serverUrl()}${web}`);
   };
   const faces = n.actors.slice(0, n.count > 1 ? 2 : 1);
   const leading =

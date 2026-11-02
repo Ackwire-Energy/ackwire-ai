@@ -170,15 +170,18 @@ describe("push delivery", () => {
   test("a mention pushes once to the person's phone with the deep link data", async () => {
     f = await setup();
     const { bia, push, drain } = await withPhone();
-    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia pode revisar?" });
+    const sent = await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia pode revisar?" });
     await drain();
     expect(push.sent).toHaveLength(1);
     const [n] = await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, bia.id));
-    expect(push.sent[0]).toMatchObject({
-      to: TOKEN_BIA,
-      title: "ana mencionou você",
-      body: "@bia pode revisar?",
-      data: { orgId: f.org.id, kind: "mention", notificationId: n?.id, channelId: f.general.id },
+    expect(push.sent[0]).toMatchObject({ to: TOKEN_BIA, title: "ana mencionou você", body: "@bia pode revisar?" });
+    // The message itself, so the tap opens at it.
+    expect(push.sent[0]?.data).toEqual({
+      orgId: f.org.id,
+      kind: "mention",
+      notificationId: n?.id,
+      channelId: f.general.id,
+      messageId: sent.id,
     });
     // A retried job sends nothing new (one job per notification).
     await drain();
@@ -196,7 +199,7 @@ describe("push delivery", () => {
       [TOKEN_BIA, "ana", "Te mandei o contrato"],
       [TOKEN_BIA_EN, "ana", "Te mandei o contrato"],
     ]);
-    expect(push.sent[0]?.data).toMatchObject({ kind: "dm", channelId: dm.id });
+    expect(push.sent[0]?.data).toMatchObject({ kind: "dm", channelId: dm.id, dmId: dm.id });
   });
 
   test("thread replies and other non-pushing kinds don't push", async () => {

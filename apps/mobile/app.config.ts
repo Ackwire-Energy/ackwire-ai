@@ -16,10 +16,40 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 const variant = process.env.APP_VARIANT ?? "production";
 const suffix = variant === "production" ? "" : `.${variant}`;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://app.agentes.chat";
-// Invitation and password reset links on this host open the app (universal links / App Links); the server
-// publishes the matching /.well-known files (apps/server/src/app-links.ts). An early-access sign-up (`/signup`) opens
-// the app on Android only, until the server lists it for iOS (app-links.ts says when).
+// Links to this host open the app (universal links / App Links); the server publishes the matching /.well-known
+// files (apps/server/src/app-links.ts).
 const linkHost = new URL(apiUrl).host;
+
+/**
+ * The website's pages that open the app on Android (its intent filters; `*` is any text), the same list the server
+ * gives iOS (`APP_LINK_PATHS` in apps/server/src/app-links.ts, a test keeps them equal): what the app has a screen for
+ * (`appLinkFromUrl`, src/features/links/app-links.ts). Android can't leave a page out of a filter, so a settings
+ * section the app lacks (billing) opens in the browser from the app. A change here reaches phones only with a new
+ * build.
+ */
+export const APP_LINK_PATTERNS = [
+  "/invite/*",
+  "/reset-password",
+  "/signup",
+  "/org/*/home",
+  "/org/*/c/*",
+  "/org/*/dm/*",
+  "/org/*/threads",
+  "/org/*/threads/*",
+  "/org/*/agents/*",
+  "/org/*/approvals",
+  "/org/*/notifications",
+  "/org/*/issues",
+  "/org/*/issues/*",
+  "/org/*/routines",
+  "/org/*/search",
+  "/org/*/drive",
+  "/org/*/wiki",
+  "/org/*/wiki/*",
+  "/org/*/members",
+  "/org/*/settings",
+  "/org/*/settings/*",
+];
 // Our EAS project on expo.dev (not a secret: it only names the project).
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
 // expo-image-picker and expo-camera both set iOS's camera text: one text for both uses.
@@ -69,11 +99,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         action: "VIEW",
         autoVerify: true,
-        data: [
-          { scheme: "https", host: linkHost, pathPrefix: "/invite/" },
-          { scheme: "https", host: linkHost, path: "/reset-password" },
-          { scheme: "https", host: linkHost, path: "/signup" },
-        ],
+        data: APP_LINK_PATTERNS.map((pattern) => ({
+          scheme: "https",
+          host: linkHost,
+          pathPattern: pattern.replace(/\*/g, ".*"),
+        })),
         category: ["BROWSABLE", "DEFAULT"],
       },
     ],

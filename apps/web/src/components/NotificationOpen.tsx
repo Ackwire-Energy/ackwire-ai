@@ -2,7 +2,7 @@ import type { AiStatus, AppNotification } from "@agenteschat/client";
 import { cacheNotification, keys, useApi } from "@agenteschat/client";
 import { type OpenTarget, opensConnectAi, opensOnComputer, openTarget } from "@agenteschat/client/lib/notifications";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useContext, useEffect, useRef } from "react";
 import { requestBrowserCard } from "@/components/browser/open";
 import { useConnectAi } from "@/components/ConnectAi";
@@ -19,40 +19,18 @@ import { fallbackTarget, type PushOpenData, setPushOpenHandler } from "@/lib/pus
 
 type Navigate = ReturnType<typeof useNavigate>;
 
+/** The router's options for a target, in its workspace (`replace`: instead of the page this tab is on). */
+export const targetOptions = (orgId: string, target: OpenTarget, replace = false) =>
+  ({
+    to: target.to,
+    params: { orgId, ...("params" in target ? target.params : {}) },
+    search: ("search" in target && target.search) || {},
+    replace,
+  }) as never;
+
 /** Moves to where a notification opens, in its workspace (`replace`: instead of the page this tab is on). */
 export function goToTarget(navigate: Navigate, orgId: string, target: OpenTarget, replace = false) {
-  switch (target.to) {
-    case "/org/$orgId/threads/$threadId":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
-    case "/org/$orgId/c/$channelId":
-      return void navigate({
-        to: target.to,
-        params: { orgId, ...target.params },
-        search: target.search ?? {},
-        replace,
-      });
-    case "/org/$orgId/dm/agent/$agentId":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
-    case "/org/$orgId/agents/$agentId":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
-    case "/org/$orgId/dm/person/$userId":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
-    case "/org/$orgId/issues/$number":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
-    case "/org/$orgId/forum/$topicId":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
-    case "/org/$orgId/threads":
-      return void navigate({ to: target.to, params: { orgId }, search: target.search, replace });
-    case "/org/$orgId/settings/computers/$machineId":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
-    case "/org/$orgId/settings/$section":
-      return void navigate({ to: target.to, params: { orgId, ...target.params }, search: {}, replace });
-    case "/org/$orgId/routines":
-      // A routine's trouble opens it in Rotinas, its state and fix in view.
-      return void navigate({ to: target.to, params: { orgId }, search: target.search ?? {}, replace });
-    default:
-      return void navigate({ to: target.to, params: { orgId }, replace });
-  }
+  void navigate(targetOptions(orgId, target, replace));
 }
 
 /** The inbox itself, with nothing to open. */
@@ -104,6 +82,24 @@ export function useNotificationOpener() {
       return "page";
     },
     [navigate, connect, openDetails, openComputer],
+  );
+}
+
+/**
+ * The address a notification opens at, for a new tab (Cmd/Ctrl-click, a middle click): its page, or, when it opens
+ * a dialog or nothing of its own, the inbox with `?open=`, which opens it there (`OpeningNotification`).
+ */
+export function useNotificationHref() {
+  const router = useRouter();
+  return useCallback(
+    (n: AppNotification, orgId: string): string => {
+      const target = opensOnComputer(n) || n.kind === "computer_ready" ? null : openTarget(n);
+      const options = target
+        ? targetOptions(orgId, target)
+        : ({ to: "/org/$orgId/notifications", params: { orgId }, search: { open: n.id } } as never);
+      return router.buildLocation(options).href;
+    },
+    [router],
   );
 }
 
