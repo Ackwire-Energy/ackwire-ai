@@ -39,6 +39,7 @@ export const ICONS = {
   back: [p("m15 5-7 7 7 7")],
   more: [c(6, 12, 1.3, true), c(12, 12, 1.3, true), c(18, 12, 1.3, true)],
   check: [p("m5 12.5 4.5 4.5L19 7.5")],
+  checks: [p("m2.5 12.5 3.5 3.5 7-8.5M12 15l1 1 8.5-9.5")],
   x: [p("M6 6l12 12M18 6 6 18")],
   clock: [c(12, 12, 8.5), p("M12 7.5V12l3 2")],
   /** Waits on you: three pixels burning out, the request's fuse in small (no shield). */

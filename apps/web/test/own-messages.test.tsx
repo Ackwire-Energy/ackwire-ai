@@ -115,9 +115,9 @@ describe("my own messages sit on the right", () => {
       .replace(/\( /g, "(")
       .replace(/ \)/g, ")");
     const hanging =
-      ".ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty))";
+      ".ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))";
     expect(css).toContain(`${hanging} { padding-bottom: 6px; }`);
-    expect(css).toContain(`${hanging} .ac-msg__text { border-bottom-right-radius: 18px; }`);
+    expect(css).toContain(`${hanging} .ac-msg__text { border-bottom-right-radius: var(--own-cut); }`);
     expect(css).toContain(`${hanging} + .ac-msg--own { padding-top: 6px; }`);
     expect(css).toContain(`${hanging} + .ac-msg--own .ac-msg__text { border-top-right-radius: 18px; }`);
   });
@@ -165,7 +165,7 @@ describe("own message styles", () => {
     return out;
   };
 
-  test("the bar and the check stand left of the bubble, never over my words, the check always on screen", async () => {
+  test("the bar stands left of the bubble, never over my words; the check ends the time's line, always on screen", async () => {
     const r = await rules();
     const bar = r.get(
       ".ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions",
@@ -174,27 +174,27 @@ describe("own message styles", () => {
     expect(bar).toContain("right: calc(100% + 8px)");
     expect(bar).toContain("top: 0");
     expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__actions")).toContain("top: 0");
-    // The check at the bubble's bottom edge: a zero-height item right after the bubble, its contents hanging up from it.
-    const check = r.get(".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating") ?? "";
-    expect(check).toContain("right: calc(100% + 8px)");
-    expect(check).toContain("height: 0");
-    expect(check).toContain("align-items: flex-end");
-    expect(check).toContain("order: 1");
-    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__text ~ *")).toContain("order: 2");
-    // No hover, focus or open menu hides it: a mouse can open a DM's "Vista por" face.
+    // The check in the time's line, on the bubble's right edge: no line of its own, and no room while it's empty.
+    expect(r.get(".ac-msg__own-foot")).toContain("justify-content: flex-end");
+    expect(r.get(".ac-msg__own-foot > .ac-msg__aside")).toContain("height: 16px");
+    expect(r.get(".ac-msg__own-foot .ac-receipt__check")).toContain("padding: 0");
+    // No hover, focus or open menu hides it.
     const kit = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
-    const own = [...kit.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
-      ([, list = ""]) => list.includes(".ac-msg--own") && /\.ac-msg__aside--floating\s*$/.test(list),
+    const own = [...kit.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, list = ""]) =>
+      list.includes(".ac-msg__own-foot"),
     );
     expect(own.length).toBeGreaterThan(0);
     for (const [, , body = ""] of own) expect(body).not.toMatch(/opacity|visibility|display:\s*none/);
-    // The keys on the check itself (a DM's face is a button): the bar gives way.
-    const keys =
-      "html:not([data-pointer]) .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible) > .ac-msg__body >";
-    expect(r.get(`${keys} .ac-msg__actions`)).toContain("opacity: 0");
+  });
+
+  test("a turn's bubble ends on the cut corner, on the side it stands", async () => {
+    const r = await rules();
+    const last = r.get('.ac-msg--own:is([data-run="solo"], [data-run="end"]) .ac-msg__text');
+    expect(last).toContain("border-bottom-right-radius: var(--own-cut)");
+    expect(r.get('.ac-msg--own[data-run="start"] .ac-msg__text')).toContain("border-bottom-right-radius: 6px");
   });
 
   test("a narrow window keeps room for the bar left of the bubble; a touch screen's bar sits over its top edge", async () => {

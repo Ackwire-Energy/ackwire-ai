@@ -4967,11 +4967,12 @@ html:not([data-pointer]) .ac-hint:focus-visible {
  * The viewer's own messages: on the right in a neutral bubble a step off the page, no face or name (the hidden head
  * still reads them). What hangs under the bubble (a file, reactions, the thread line, an error, the time) shares its
  * right edge. A run of rows grouped under the first reads as one turn: the corners they share square off, and the
- * time goes under the last.
+ * time goes under the last. The turn's last corner is cut, as a card's is, on the side the bubble stands.
  */
 :root,
 [data-theme="light"] {
   --own-bubble: color-mix(in srgb, var(--ink) 6%, var(--bg));
+  --own-cut: 5px;
 }
 [data-theme="dark"] {
   --own-bubble: color-mix(in srgb, var(--ink) 11%, var(--bg));
@@ -5048,6 +5049,9 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own[data-run="end"] .ac-msg__text {
   border-top-right-radius: 6px;
 }
+.ac-msg--own:is([data-run="solo"], [data-run="end"]) .ac-msg__text {
+  border-bottom-right-radius: var(--own-cut);
+}
 /* Hovered, or its menu open: the bubble itself lights a step, in place of the row's plate. */
 .ac-msg--own:is(:hover, [data-menu-open="true"]) .ac-msg__text {
   filter: brightness(0.97);
@@ -5103,35 +5107,39 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   right: 0;
 }
 /*
- * Left of the bubble: the check (agents saw it, answered it; a DM's "Vista por" face) at its bottom edge, the action
- * bar on hover with its middle on its top edge, as on everyone's rows. On a one-line bubble (40px) the bar (30px)
- * ends 4px above the face, so the check stays on screen and a mouse can open it. Neither ever covers the words.
- *
- * The check is a zero-height item put right after the bubble (`order`), whatever hangs under it (time, reactions, a
- * file, receipt words) after the check: its bottom sits on the bubble's, and it never adds height to the row.
+ * The receipt's mark (agents saw it, answered it; a DM's "Vista por" face) ends the time's line, its right on the
+ * bubble's edge, so a turn says when and how it went in one place and a mark that comes never adds a line. An empty
+ * mark takes no room, so the time keeps that edge. A taller face hangs over the line's 16px.
  */
-.ac-msg--own > .ac-msg__body > .ac-msg__aside--floating {
-  order: 1;
-  position: relative;
-  right: calc(100% + 8px);
-  height: 0;
+.ac-msg__own-foot {
+  display: flex;
   align-items: flex-end;
-  float: none;
-  margin: 0;
-  line-height: 16px;
-  translate: none;
+  justify-content: flex-end;
 }
-.ac-msg--own > .ac-msg__body > .ac-msg__text ~ * {
-  order: 2;
+.ac-msg__own-foot > .ac-msg__aside {
+  gap: 0;
+  height: 16px;
+  margin-left: 0;
 }
-/* The keys on the check (a DM's "Vista por" face): the bar gives way, so nothing comes near its ring. */
-html:not([data-pointer])
-  .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible)
-  > .ac-msg__body
-  > .ac-msg__actions {
-  opacity: 0;
-  pointer-events: none;
+.ac-msg__own-foot .ac-receipt__check,
+.ac-msg__own-foot .ac-receipt__check:has(> .ac-avatar) {
+  position: relative;
+  margin-left: 4px;
+  padding: 0;
 }
+.ac-msg__own-foot .ac-receipt__check .ac-icon {
+  width: 14px;
+  height: 14px;
+}
+/* A small mark, a finger: the button reaches past it, over nothing else it could press. */
+@media (hover: none), (pointer: coarse) {
+  .ac-msg__own-foot .ac-receipt__check::after {
+    content: "";
+    position: absolute;
+    inset: -14px -10px;
+  }
+}
+/* Left of the bubble, on hover: the action bar, its middle on the bubble's top edge, as on everyone's rows. */
 .ac-msg--own > .ac-msg__body > .ac-msg__actions,
 .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   top: 0;
@@ -5181,24 +5189,24 @@ html:not([data-pointer])
  * the usual gap under it, its corner round, and the next bubble's top corner round too.
  */
 .ac-msg--own:has(
-  > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+  > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
 ) {
   padding-bottom: 6px;
 }
 .ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
   )
   .ac-msg__text {
-  border-bottom-right-radius: 18px;
+  border-bottom-right-radius: var(--own-cut);
 }
 .ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
   )
   + .ac-msg--own {
   padding-top: 6px;
 }
 .ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
   )
   + .ac-msg--own
   .ac-msg__text {

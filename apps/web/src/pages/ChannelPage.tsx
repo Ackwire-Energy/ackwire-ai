@@ -2217,7 +2217,7 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
-  /** A DM with this person: my rows keep the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turns' time lines keep the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** The agents' questions to other agents: inside the replies that asked, and how their answers draw. */
   consultGroups: ConsultGroups;
@@ -3123,7 +3123,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   seenLive?: LiveRun;
   /** The last message of its run here: it carries the run's browser card while a take over holds it. */
   lastOfRun?: boolean;
-  /** A DM with this person: my row keeps the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turn's time line keeps the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** My latest message, which they read: their face in that slot. */
   seen?: boolean;

@@ -11572,11 +11572,12 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .ac-receipt__check:has(> .ac-avatar) {
   padding: 0 1px;
 }
-/* The face's slot on each of my messages in a DM between people, held with or without the face. */
+/* The face's slot at the end of a turn's time line in a DM between people: there before the face, so the face coming
+   in is said, and with no room until then, so the time keeps the bubble's edge. */
 .ac-receipt__seen {
   display: inline-flex;
-  width: 20px;
-  height: 18px;
+  align-items: center;
+  height: 16px;
 }
 /* Each new mark of a message sent into a task at work, and the face of who read it, fades in where it stands. */
 @media (prefers-reduced-motion: no-preference) {
