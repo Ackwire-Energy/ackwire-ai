@@ -79,6 +79,50 @@ describe("providers", () => {
     }
   });
 
+  test("a server of one's own is told the workspace and its key; a provider is never told the workspace", async () => {
+    const local = fake(Response.json({ text: "oi" }));
+    await createSpeechEngine("local", { baseUrl: "http://speech/v1", apiKey: "own-key" }, options(local))?.file({
+      ...input,
+      orgId: "org-1",
+    });
+    expect(local.calls[0]?.init?.headers).toEqual({ authorization: "Bearer own-key", "x-agentes-org": "org-1" });
+    for (const provider of ["groq", "openai"] as const) {
+      const f = fake(Response.json({ text: "oi" }));
+      await createSpeechEngine(provider, { apiKey: "key" }, options(f))?.file({ ...input, orgId: "org-1" });
+      expect(f.calls[0]?.init?.headers).toEqual({ authorization: "Bearer key" });
+    }
+  });
+
+  test("a server that gives no answer in time is busy, so the next engine tries", async () => {
+    const hanging = (async (_url: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      })) as unknown as SpeechFetch;
+    const error = await createSpeechEngine("local", { baseUrl: "http://speech/v1" }, { fetch: hanging, timeoutMs: 20 })
+      ?.file(input)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SpeechError);
+    expect((error as SpeechError).reason).toBe("busy");
+  });
+
+  test("a warm-up goes to a server of one's own only where asked for, and never throws", async () => {
+    const warm = fake(new Response(null, { status: 202 }));
+    const engine = createSpeechEngine("local", { baseUrl: "http://speech/v1/", warm: true }, options(warm));
+    engine?.warm?.("org-1");
+    await Bun.sleep(1);
+    expect(warm.calls.map((call) => [call.url, call.init?.method, call.init?.headers])).toEqual([
+      ["http://speech/v1/warm", "POST", { "x-agentes-org": "org-1" }],
+    ]);
+    expect(createSpeechEngine("local", { baseUrl: "http://speech/v1" })?.warm).toBeUndefined();
+    expect(createSpeechEngine("groq", { apiKey: "key" })?.warm).toBeUndefined();
+    const failing = (async () => {
+      throw new Error("down");
+    }) as unknown as SpeechFetch;
+    expect(() =>
+      createSpeechEngine("local", { baseUrl: "http://speech/v1", warm: true }, { fetch: failing })?.warm?.("org-1"),
+    ).not.toThrow();
+  });
+
   test("what a provider needs is required", () => {
     expect(createSpeechEngine("groq", {})).toBeNull();
     expect(createSpeechEngine("local", {})).toBeNull();

@@ -479,6 +479,21 @@ export const envVars = {
     description: "The model that speech server loads (default `whisper-1`).",
     section: "Chat",
   },
+  LOCAL_SPEECH_API_KEY: {
+    schema: z.string().optional(),
+    description: "The key that speech server asks for, if it asks for one (sent as `Authorization: Bearer`).",
+    section: "Chat",
+    secret: true,
+  },
+  LOCAL_SPEECH_WARM: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("off"),
+    description:
+      "`on`: tell that speech server when someone starts recording (`POST <LOCAL_SPEECH_URL>/warm`, with the workspace in `X-Agentes-Org`, as every request to it has), so a model it loads on demand is ready when the recording arrives.",
+    section: "Chat",
+  },
   VOICE_RETENTION_DAYS: {
     schema: z.coerce.number().int().min(0).default(90),
     description:

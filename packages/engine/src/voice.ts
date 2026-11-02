@@ -244,7 +244,14 @@ async function wordsOf(deps: VoiceDeps, clip: Clip, audio: Uint8Array) {
   let last: unknown = null;
   for (const engine of deps.engines()) {
     try {
-      const { text } = await engine.file({ audio, contentType: clip.contentType, language: clip.language, terms });
+      const { text } = await engine.file({
+        audio,
+        contentType: clip.contentType,
+        language: clip.language,
+        terms,
+        orgId: clip.orgId,
+        durationMs: clip.durationMs,
+      });
       return { engine, text: text.trim() };
     } catch (error) {
       last = error;

@@ -13,10 +13,10 @@ afterEach(async () => {
 /** A fake Groq: the words of any recording. */
 const groq = (async () => Response.json({ text: "Ada, oi" })) as unknown as typeof fetch;
 
-async function start(env: Record<string, string> = { GROQ_API_KEY: "groq-key-1234" }) {
+async function start(env: Record<string, string> = { GROQ_API_KEY: "groq-key-1234" }, speechFetch = groq) {
   const server = await createTestServer({
     env: { ALLOW_SIGNUP: "true", ...env },
-    speechFetch: groq,
+    speechFetch,
     signedBlobs: false,
   });
   t = server;
@@ -105,6 +105,33 @@ test("the workspace's switch and the server's engine decide the microphone", asy
   expect(await errorCode(refused)).toBe("voice.unavailable");
   const allowed = await owner(`/api/app/organizations/${orgId}/voice/allowed`);
   expect(await allowed.json()).toEqual({ allowed: false });
+});
+
+test("a server of one's own that asked for it hears when someone is about to record, with the workspace", async () => {
+  const calls: { url: string; method?: string; headers?: RequestInit["headers"] }[] = [];
+  const own = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), method: init?.method, headers: init?.headers });
+    return new Response(null, { status: 202 });
+  }) as unknown as typeof fetch;
+  const { owner, orgId } = await start(
+    {
+      SPEECH_ENGINES: "local",
+      LOCAL_SPEECH_URL: "http://speech.test/v1",
+      LOCAL_SPEECH_API_KEY: "own-server-key",
+      LOCAL_SPEECH_WARM: "on",
+    },
+    own,
+  );
+  const allowed = await owner(`/api/app/organizations/${orgId}/voice/allowed`);
+  expect(await allowed.json()).toEqual({ allowed: true });
+  await Bun.sleep(5);
+  expect(calls.filter((call) => call.url.endsWith("/warm"))).toEqual([
+    {
+      url: "http://speech.test/v1/warm",
+      method: "POST",
+      headers: { authorization: "Bearer own-server-key", "x-agentes-org": orgId },
+    },
+  ]);
 });
 
 test("with no engine there is no voice", async () => {

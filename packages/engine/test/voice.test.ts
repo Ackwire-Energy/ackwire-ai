@@ -34,16 +34,21 @@ afterEach(async () => {
 const DAY = 24 * 3600_000;
 
 /** A fake engine: each call takes the next answer; an Error is thrown. */
-function engine(...answers: (string | Error)[]): SpeechEngine & { terms: string[][] } {
+function engine(
+  ...answers: (string | Error)[]
+): SpeechEngine & { terms: string[][]; sent: { orgId?: string; durationMs?: number }[] } {
   const terms: string[][] = [];
+  const sent: { orgId?: string; durationMs?: number }[] = [];
   return {
     id: "groq" as SpeechProviderId,
     model: "fake",
     nanoUsdPerHour: 3_600_000_000,
     minBilledSeconds: 0,
     terms,
+    sent,
     async file(input) {
       terms.push(input.terms);
+      sent.push({ orgId: input.orgId, durationMs: input.durationMs });
       const next = answers.shift() ?? "";
       if (next instanceof Error) throw next;
       return { text: next };
@@ -108,6 +113,8 @@ describe("sending", () => {
     expect(voice).toMatchObject({ clipId, durationMs: 3000, peaks: [0.1, 1, 0, 0] });
     expect(voice?.noWords).toBeUndefined();
     expect(fake.terms[0]).toContain(f.agent.name);
+    // The engine knows whose recording it is and how long: a server of one's own routes and times by them.
+    expect(fake.sent[0]).toEqual({ orgId: f.org.id, durationMs: 3000 });
     expect((await clipOf(clipId)).status).toBe("sent");
     expect((await clipOf(clipId)).costNanoUsd).toBe(3_000_000);
   });

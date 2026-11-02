@@ -22,6 +22,8 @@ On the message itself, one line of the words sits under the wave, in the player'
 
 `SpeechEngine` is a small adapter per provider: AssemblyAI, ElevenLabs, Soniox, and the OpenAI format for OpenAI, Groq and a server of one's own. Engines are tried in order (`SPEECH_ENGINES`), the next one taking over when one fails. The workspace's names (agents, people, channels) go with every call, so nobody keeps a vocabulary list. With no engine, the microphone stays hidden and the server still needs only Postgres.
 
+A server of one's own is told more than a provider ever is: the workspace each recording comes from (`X-Agentes-Org`), so one server can route or count by workspace, and, with `LOCAL_SPEECH_WARM=on`, that someone is about to record (`POST /warm` when the app asks whether it may), so a model loaded on demand is ready when the recording arrives. Every server of the OpenAI format gets half a minute plus twice the recording's length to answer; past that it counts as busy and the next engine tries.
+
 The key is the server's, not the workspace's. On agentes.chat's servers it comes from the environment and nobody chooses. Elsewhere the installation's owner may also pick a provider and paste its key in Settings, kept like the Jev key (ADR 0073): sealed, tried with a second of silence before it is stored, never returned.
 
 ### 4. The finished recording first

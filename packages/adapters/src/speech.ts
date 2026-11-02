@@ -10,6 +10,10 @@ export interface SpeechFileInput {
   language: string | null;
   /** Names that must come out right: agents, people, channels. */
   terms: string[];
+  /** The workspace it comes from: only a server of one's own is told, to route or count by it. */
+  orgId?: string;
+  /** How long the recording is: a server of the OpenAI format gets a time limit from it. */
+  durationMs?: number;
 }
 
 export interface SpeechEngine {
@@ -21,6 +25,11 @@ export interface SpeechEngine {
   /** Seconds a provider bills at least, per request. */
   readonly minBilledSeconds: number;
   file(input: SpeechFileInput): Promise<{ text: string }>;
+  /**
+   * Tells a server of one's own that someone started recording in `orgId`, so its model loads while they speak. Only
+   * where asked for (`warm`); never throws.
+   */
+  warm?(orgId: string): void;
 }
 
 /** `auth`: the key was refused, and retrying can't help. `busy`: try again or use the next engine. */
@@ -46,6 +55,8 @@ export interface SpeechCredentials {
   baseUrl?: string;
   /** `local`: the model that server loads. */
   model?: string;
+  /** `local`: whether the server is told when someone starts recording (`POST <baseUrl>/warm`). */
+  warm?: boolean;
 }
 
 interface SpeechOptions {
@@ -253,11 +264,18 @@ function openAiFormat(
     model: string;
     nanoUsdPerHour: number;
     minBilledSeconds: number;
+    /** A server of one's own: told the workspace (`X-Agentes-Org`), never a provider. */
+    ownServer?: boolean;
+    warm?: boolean;
   },
   options: SpeechOptions,
 ): SpeechEngine {
   const http = options.fetch ?? fetch;
   const base = config.baseUrl.replace(/\/+$/, "");
+  const headers = (orgId: string | undefined): Record<string, string> => ({
+    ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
+    ...(config.ownServer && orgId ? { "x-agentes-org": orgId } : {}),
+  });
   return {
     id: config.id,
     model: config.model,
@@ -271,15 +289,37 @@ function openAiFormat(
       if (input.language) form.set("language", input.language);
       const terms = cleanTerms(input.terms, MAX_PROMPT_TERMS, 6);
       if (terms.length > 0) form.set("prompt", terms.join(", "));
-      const res = await http(`${base}/audio/transcriptions`, {
-        method: "POST",
-        headers: config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {},
-        body: form,
-      });
+      // Twice the recording on top of half a minute: a server that takes longer is stuck, and the next engine tries.
+      const limitMs = options.timeoutMs ?? 30_000 + 2 * (input.durationMs ?? TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await http(`${base}/audio/transcriptions`, {
+          method: "POST",
+          headers: headers(input.orgId),
+          body: form,
+          signal: AbortSignal.timeout(limitMs),
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "TimeoutError") {
+          throw new SpeechError("busy", `${config.label} gave no answer within ${Math.round(limitMs / 1000)} s`);
+        }
+        throw error;
+      }
       if (!res.ok) throw await refuse(res, config.label);
       const { text } = (await res.json()) as { text?: string };
       return { text: text ?? "" };
     },
+    ...(config.warm
+      ? {
+          warm(orgId: string) {
+            void http(`${base}/warm`, {
+              method: "POST",
+              headers: headers(orgId),
+              signal: AbortSignal.timeout(3000),
+            }).catch(() => {});
+          },
+        }
+      : {}),
   };
 }
 
@@ -301,6 +341,8 @@ export function createSpeechEngine(
         model: model || "whisper-1",
         nanoUsdPerHour: 0,
         minBilledSeconds: 0,
+        ownServer: true,
+        warm: credentials.warm === true,
       },
       options,
     );

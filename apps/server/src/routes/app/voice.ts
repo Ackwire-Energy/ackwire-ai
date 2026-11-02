@@ -180,6 +180,8 @@ export function voiceRoutes(deps: AppDeps) {
       await requirePermission(deps.db, userId, orgId, "read");
       const v = deps.extras?.voice;
       const allowed = Boolean(v) && (await voiceOn(voice(), orgId)) && (await voiceAllowed(voice(), userId, orgId));
+      // The app asks just before recording: a server of one's own that loads its model on demand starts now.
+      if (allowed) for (const engine of voice().engines()) engine.warm?.(orgId);
       return c.json({ allowed }, 200);
     },
   );
