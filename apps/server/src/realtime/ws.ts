@@ -481,7 +481,7 @@ export function createRealtime(deps: RealtimeDeps) {
             for (const channelId of [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()])
               drop(channelId, "revoked");
             if (ws.readyState === 1) {
-              send(ws, { type: "error", code: "membership_revoked" });
+              send(ws, { type: "error", code: event.quiet ? "membership_ended" : "membership_revoked" });
               // Closed outside the publisher's call stack (in-memory pub/sub delivers synchronously).
               ws.close(4403, "membership revoked");
             }

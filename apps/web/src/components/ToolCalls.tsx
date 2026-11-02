@@ -10,6 +10,7 @@ import {
   quietLine,
   quietWork,
   savedOneLine,
+  showsActivity,
   type ToolItem,
   type ToolLine,
   toolApps,
@@ -212,11 +213,15 @@ export function LiveTools({
   stopped?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const items = toolItemsLive(work, stopped);
   const blockItems = useBlockItems(items);
   const logo = useLogo();
   const calls = toolCalls(items);
   const steers = items.flatMap((i) => (i.kind === "steer" ? [i] : []));
+  // Done, its tools are the summary the person chose not to see (`showActivity`): what it read stays.
+  if (done && !showsActivity(org))
+    return steers.map((s) => <SteerWell key={s.key} now={s.now} note={steerNote?.(s.messageId)} />);
   // A lone quick read that only fed the answer: no card, as if it called nothing (once done, what it said on the way
   // is in its reply).
   const quiet = quietWork(items);
@@ -311,7 +316,7 @@ export function SavedTools({
   // its own cards show (where it browsed).
   // No `meta.work` (a reply saved before it): a block that loads the run's steps when opened, gone if it called none.
   const shown = compact ? workSteps(compact, onCard) : null;
-  if (shown === 0) return null;
+  if (shown === 0 || !showsActivity(org)) return null;
   const calls = work ? toolCalls(items) : (shown ?? 0);
   const lone = savedOneLine(meta, onCard);
   // Its one call (beside the screens' on their cards) only fed the answer (`quietLine`): the reply says it. Time

@@ -1,11 +1,17 @@
 import type { TFunction } from "i18next";
-import type { ConnectorDef, Run, RunStep } from "../api/types";
+import type { ConnectorDef, OrgSummary, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
 import { joinNames, shortTarget } from "./format";
 import { MAIL_BRANDS } from "./mail";
+
+/**
+ * Whether a finished reply shows what the agent did ("Usou 4 ferramentas"): only for a person who turned it on in this
+ * workspace; off by default, and off with a server that doesn't send it. The live step line shows either way.
+ */
+export const showsActivity = (org: Pick<OrgSummary, "showActivity"> | null | undefined) => org?.showActivity === true;
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
@@ -404,7 +410,7 @@ export function toolHint(tool: string, activity: Activity, detail?: string | nul
   if (detail?.trim()) return detail.trim() === activity.app ? null : detail.trim();
   if (activity.kind !== "consulting") return null;
   const name = tool.trim().replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
-  // The MillionSend connector shares its service name with MillionSend mailboxes: only `mail_` tools are a mailbox's.
+  // A connector may share its service name with a mailbox (Gmail): only `mail_` tools are a mailbox's.
   if (
     activity.service === "mail" ||
     activity.service === "postgres" ||

@@ -4,7 +4,7 @@ import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type Test
 let t: TestServer;
 afterEach(() => t.close());
 
-type Created = { id: string; audience: { mode: string; userIds: string[] } };
+type Created = { id: string; audience: { mode: string; userIds: string[]; roleIds: string[]; consultable: boolean } };
 
 test("Criar agente restricted to nobody yet: only its creator, never the whole workspace", async () => {
   t = await createTestServer();
@@ -19,11 +19,18 @@ test("Criar agente restricted to nobody yet: only its creator, never the whole w
   });
   expect(res.status).toBe(201);
   const rex = (await res.json()) as Created;
-  expect(rex.audience).toEqual({ mode: "people", userIds: [] });
+  expect(rex.audience).toEqual({ mode: "people", userIds: [], roleIds: [], consultable: true });
 
-  // Its people refused (not members): the agent exists, answering only its owner.
+  // Someone not in the workspace drops out of the list: restricted to nobody yet, as Rex.
+  const dropped = await owner(`${org}/agents`, {
+    json: { name: "Leo", handle: "leo", audience: { mode: "people", userIds: ["not-a-member"] } },
+  });
+  expect(dropped.status).toBe(201);
+  expect(((await dropped.json()) as Created).audience).toEqual(rex.audience);
+
+  // Its roles refused (not the workspace's): the agent exists, answering only its owner.
   const refused = await owner(`${org}/agents`, {
-    json: { name: "Max", handle: "max", audience: { mode: "people", userIds: ["not-a-member"] } },
+    json: { name: "Max", handle: "max", audience: { mode: "people", userIds: [], roleIds: [crypto.randomUUID()] } },
   });
   expect(refused.status).toBe(400);
   const { agents } = (await (await owner(`${org}/agents`)).json()) as {

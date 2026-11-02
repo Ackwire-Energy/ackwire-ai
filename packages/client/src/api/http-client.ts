@@ -110,7 +110,6 @@ import type {
   Memory,
   Message,
   MessagePin,
-  MillionSendInbox,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -145,6 +144,7 @@ import type {
   Proposal,
   ReactionCount,
   Reminder,
+  RemovalPreview,
   RosterMember,
   Routine,
   RoutineHook,
@@ -176,6 +176,7 @@ import type {
   ThreadFollow,
   ThreadInfo,
   ThreadPage,
+  ToolChange,
   TrashedArtifact,
   UndoAllResult,
   UsageReport,
@@ -263,11 +264,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       accounts: async (orgId) => (await request<{ accounts: MailAccount[] }>(`${org(orgId)}/mail/accounts`)).accounts,
       connectImap: async (orgId, input) =>
         (await request<{ account: MailAccount }>(`${org(orgId)}/mail/accounts/imap`, { json: input })).account,
-      millionsendInboxes: async (orgId, input) =>
-        (await request<{ inboxes: MillionSendInbox[] }>(`${org(orgId)}/mail/millionsend/inboxes`, { json: input }))
-          .inboxes,
-      connectMillionSend: (orgId, input) =>
-        request<{ account: MailAccount; instant: boolean }>(`${org(orgId)}/mail/accounts/millionsend`, { json: input }),
       connectComposio: (orgId, input) =>
         request<{ accountId: string; redirectUrl: string }>(`${org(orgId)}/mail/accounts/composio`, { json: input }),
       update: async (orgId, accountId, input) =>
@@ -460,6 +456,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
       setStart: (orgId, input) => request<StartChoice>(`${org(orgId)}/me/start`, { method: "PUT", json: input }),
+      setShowActivity: async (orgId, show) =>
+        (await request<{ show: boolean }>(`${org(orgId)}/me/activity`, { method: "PUT", json: { show } })).show,
       sidebarItems: async (orgId) => (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`)).items,
       setSidebarItem: async (orgId, item, place) =>
         (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PATCH", json: { item, place } }))
@@ -479,6 +477,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
         request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "PATCH", json: { role } }),
+      removal: (orgId, userId) => request<RemovalPreview>(`${org(orgId)}/members/${enc(userId)}/removal`),
       removeMember: (orgId, userId) => request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE" }),
       invitations: async (orgId) =>
         (await request<{ invitations: Invitation[] }>(`${org(orgId)}/invitations`)).invitations,
@@ -1364,6 +1363,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       disconnect: (orgId, serverId) =>
         request<void>(`${org(orgId)}/connectors/custom/${enc(serverId)}`, { method: "DELETE" }),
+      toolChanges: async (orgId) =>
+        (await request<{ changes: ToolChange[] }>(`${org(orgId)}/connectors/tool-changes`)).changes,
+      acceptToolChange: (orgId, connectionId, toolName) =>
+        request<void>(`${org(orgId)}/connectors/${enc(connectionId)}/tools/${enc(toolName)}/accept-change`, {
+          json: {},
+        }),
     },
     questions: {
       answer: (orgId, questionId, input) =>

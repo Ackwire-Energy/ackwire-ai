@@ -213,7 +213,13 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
                 const git = deps.sandbox.git;
                 if (!machines || !git) return { content: "Connected computers are not available here.", isError: true };
                 const r = await cloneOnMachine(
-                  { db: c.db, hub: machines.hub, git, ...(deps.sandbox.now ? { now: deps.sandbox.now } : {}) },
+                  {
+                    db: c.db,
+                    hub: machines.hub,
+                    git,
+                    github: deps.app ? { app: deps.app, http: github } : null,
+                    ...(deps.sandbox.now ? { now: deps.sandbox.now } : {}),
+                  },
                   { orgId: c.orgId, agentId: c.agentId, machineId: agent.machineId },
                   {
                     repo: `${repo.owner}/${repo.repo}`,
@@ -223,6 +229,12 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
                   },
                 );
                 const where = r.path ?? r.dir;
+                if (r.status === "cloning") {
+                  return {
+                    content: `${r.repo} is still downloading into ${where} on your computer (${r.message ?? "in progress"}). It goes on by itself; call git_clone again for it when you need the code, to wait for it.`,
+                    data: { repo: r.repo, dir: r.dir, machineId: agent.machineId, status: r.status },
+                  };
+                }
                 if (r.status === "failed" && !r.head) {
                   return { content: `git clone failed: ${r.message ?? "unknown error"}`, isError: true };
                 }

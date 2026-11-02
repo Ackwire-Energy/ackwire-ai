@@ -12,6 +12,7 @@ import type {
 } from "../api/types";
 import { accountTitle, groupPlans, ownSignInName, ownSignIns, ownSignInTitle } from "./ai-accounts";
 import { daysBetween, formatPercent, formatShortDate, formatTime, relativeTime } from "./format";
+import { brainName } from "./outages";
 import { planOf } from "./plans";
 
 /**
@@ -229,7 +230,7 @@ export const accountName = (t: TFunction, a: Pick<PlanAccountInfo, "label" | "ma
 
 /** Who makes what an account thinks with: a coding plan's maker, else Claude Code or Codex. */
 export const brandOf = (a: Pick<PlanAccountInfo, "kind" | "provider">) =>
-  planOf(a.provider)?.maker ?? (a.kind === "codex" ? "Codex" : "Claude Code");
+  planOf(a.provider)?.maker ?? brainName(a.kind);
 
 /** Why an account shows no windows: its maker doesn't tell them here, nobody used it yet, or nobody uses it. */
 export function noWindowsText(t: TFunction, account: Pick<PlanAccountUsage, "provider" | "agents">) {

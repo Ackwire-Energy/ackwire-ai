@@ -8,6 +8,7 @@ import {
   type BrainTurn,
   CodexBrain,
   type ContextDeps,
+  CursorBrain,
   composioConnectorsOf,
   connectOverHttp,
   createArtifactToolSource,
@@ -58,6 +59,7 @@ import {
   createUsageToolSource,
   createWebToolSource,
   createWikiToolSource,
+  createWithdrawRequestToolSource,
   createWorkspaceToolSource,
   type EmailArt,
   emailArtAt,
@@ -289,6 +291,8 @@ export function buildEngine(o: EngineOptions) {
       createPermissionToolSource(),
       // The agent browser asks a person for help (ADR 0040 §6).
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
+      // The agent takes back a request for a person it no longer needs (listed while it has one open).
+      createWithdrawRequestToolSource({ pubsub: adapters.pubsub }),
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
@@ -323,7 +327,7 @@ export function buildEngine(o: EngineOptions) {
       createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
-      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log }),
+      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log, pubsub: adapters.pubsub }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
       createMailToolSource({
         keyWrappers,
@@ -426,7 +430,12 @@ export function buildEngine(o: EngineOptions) {
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
     prepareAgentCode(
-      { db, hub: machineHub, git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET } },
+      {
+        db,
+        hub: machineHub,
+        git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
+        github: githubApp ? { app: githubApp, http: o.github ?? { apiUrl: "https://api.github.com", fetch } } : null,
+      },
       turn,
       {
         signal,
@@ -451,6 +460,15 @@ export function buildEngine(o: EngineOptions) {
         agent: agentScope,
         permissions: turnPermissions,
         keepAlive: !run.background,
+        prepare: prepareCode,
+      }),
+    // ADR 0114: Cursor's CLI, one process per turn (nothing kept alive between turns).
+    cursor: (_agent, _run, setup) =>
+      new CursorBrain({
+        link: brainLink,
+        mcp: async () => ({ token: setup.mcpToken() }),
+        agent: agentScope,
+        permissions: turnPermissions,
         prepare: prepareCode,
       }),
   };

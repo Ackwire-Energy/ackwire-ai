@@ -446,16 +446,17 @@ describe("with nobody behind it, a run works as the agent itself", () => {
   test("what the run a report woke writes holds no credential: what the routine read may be a stranger's", async () => {
     const key = "AKIAIOSFODNN7EXAMPLE";
     f = await setup({ reply: () => ({ chunks: [`Achei a chave ${key} no repo.`] }) });
+    // An agent's own work writes as the agent, with its own grants. It goes first: once the routine's reply sits in
+    // the channel, a run there has read outside (ADR 0117) and masks a credential no person wrote too.
+    const own = await runOn((await agentLine("Lembrete: revisar o PR #12.")).id);
+    await drainOutbox(f.db, f.handlers);
+    const [ownReply] = await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, own.id));
+    expect(ownReply?.body).toContain(key);
     const { run } = await routineRun("read");
     const woken = await reportWakes(run);
     await drainOutbox(f.db, f.handlers);
     const [reply] = await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, woken.id));
     expect(reply?.body).toBe("Achei a chave •••• no repo.");
-    // An agent's own work writes as the agent, with its own grants.
-    const own = await runOn((await agentLine("Lembrete: revisar o PR #12.")).id);
-    await drainOutbox(f.db, f.handlers);
-    const [ownReply] = await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, own.id));
-    expect(ownReply?.body).toContain(key);
   });
 
   test("an agent's own message wakes a run that works as the agent", async () => {

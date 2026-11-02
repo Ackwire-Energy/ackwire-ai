@@ -1,5 +1,6 @@
 import path from "node:path";
 import { commandParts, ruleMatches } from "./machine-protocol";
+import { type OutboundCode, outboundUrlProblem } from "./outbound-url";
 
 /**
  * Deterministic command policy for computer turns (ADR 0029, ADR 0053 §3). No
@@ -1593,6 +1594,39 @@ export const DELETE_BRANCHES_POINTER = `agents don't delete branches with git. A
 export const otherBranchPointer = (branches: readonly string[], handle: string) =>
   `${branches.join(", ")} ${branches.length === 1 ? "isn't your branch" : "aren't your branches"} (yours: agentes/${handle}/…). To push there, ask with request_branch_push (repo, branch, why); once a person approves, push again. Or push to agentes/${handle}/<topic> and open a pull request. ${NO_TERMINAL_COMMANDS}`;
 
+/** The addresses a call opens: WebFetch's `url`, every http(s) argument of a curl or wget. */
+function outboundUrls(toolName: string, input: Record<string, unknown> | null | undefined): string[] {
+  if (toolName === "WebFetch") return typeof input?.url === "string" ? [input.url] : [];
+  if (toolName !== "Bash" || typeof input?.command !== "string") return [];
+  const urls: string[] = [];
+  for (const s of simpleCommands(input.command) ?? []) {
+    const base = (s.argv[0] ?? "").split("/").pop();
+    if (base !== "curl" && base !== "wget") continue;
+    for (const a of s.argv.slice(1)) {
+      const v = a.replace(/^--url=/, "");
+      if (/^https?:\/\//i.test(v)) urls.push(v);
+    }
+  }
+  return urls;
+}
+
+/**
+ * An address a call would open that carries a key (`outboundUrlProblem` without the run's reads, which only the
+ * server knows): refused before anything allows the call. Length alone refuses nothing here: presigned download
+ * links (S3 session tokens, GCS signatures) run past a thousand characters, and with no reads known nothing could
+ * tell a person's link from a smuggling one.
+ */
+export function outboundCallProblem(
+  toolName: string,
+  input: Record<string, unknown> | null | undefined,
+): { code: OutboundCode; message: string } | null {
+  for (const url of outboundUrls(toolName, input)) {
+    const problem = outboundUrlProblem(url);
+    if (problem && problem.code !== "outbound.long") return problem;
+  }
+  return null;
+}
+
 /**
  * What the computer decides by itself, before anyone is asked: the deny list
  * and secrets are refused (`how`: what the refusal says to do to ask a
@@ -1608,9 +1642,11 @@ export function localVerdict(
   scope: CommandScope | undefined,
   profile: CommandProfile,
   how: string = ASK_IN_CHAT,
-): { behavior: "allow" } | { behavior: "deny"; message: string } | null {
+): { behavior: "allow" } | { behavior: "deny"; message: string; code?: string } | null {
   const denied = deniedMessage(toolName, input, how);
   if (denied) return { behavior: "deny", message: denied };
+  const outbound = outboundCallProblem(toolName, input);
+  if (outbound) return { behavior: "deny", message: outbound.message, code: outbound.code };
   if (secretRead(toolName, input, scope)) return { behavior: "deny", message: SECRET_MESSAGE };
   if (scope && readOnlyCall(toolName, input, scope, profile)) return { behavior: "allow" };
   if (profile === "plan") return { behavior: "deny", message: PLAN_MESSAGE };

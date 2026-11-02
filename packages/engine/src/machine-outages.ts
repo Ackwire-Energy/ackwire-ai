@@ -3,6 +3,7 @@ import { and, type Database, eq, inArray, isNull, schema, sql } from "@agentesch
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { brainOf, brainOptions } from "./brain-settings";
+import type { ComputerBrainKind } from "./brains/types";
 import { isComputerBrain } from "./brains/types";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -23,8 +24,6 @@ const { machines, agents, agentRuns, routineRuns } = schema;
  * runs that waited for the old one go on there, except a turn that already
  * ran tools on the old computer (only it may finish that turn).
  */
-
-export type ComputerBrainKind = "claude_code" | "codex";
 
 export interface OutageAgent {
   agentId: string;

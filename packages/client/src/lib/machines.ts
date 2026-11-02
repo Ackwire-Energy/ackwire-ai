@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type {
   AccountLoginStatus,
   DeviceLocation,
@@ -9,6 +10,7 @@ import type {
   MachineToolName,
 } from "../api/types";
 import { errorCode, sendWaits } from "./errors";
+import { formatBytes } from "./files";
 
 /**
  * Connected computers (ADR 0025, ADR 0036): the device code, the commands the
@@ -70,11 +72,14 @@ export const allowsInApp = (os: string | null | undefined) => os === "darwin" ||
  * `brain.reasons.tool_off`'s line for a brain whose tool is off on `m`: the app's Preferences on a Mac or a PC, and on
  * any other computer the command too.
  */
-export function toolOffReason(m: Pick<Machine, "os" | "mode"> | null | undefined, kind: "claude_code" | "codex") {
+export function toolOffReason(
+  m: Pick<Machine, "os" | "mode"> | null | undefined,
+  kind: "claude_code" | "codex" | "cursor",
+) {
   if (!m || allowsInApp(m.os)) return { key: "brain.reasons.tool_off" as const, command: "" };
   return {
     key: "brain.reasons.tool_offLinux" as const,
-    command: toolOnCommand(m, kind === "codex" ? "codex" : "claude"),
+    command: toolOnCommand(m, kind === "codex" || kind === "cursor" ? kind : "claude"),
   };
 }
 
@@ -84,11 +89,31 @@ export function folderName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-export const MACHINE_TOOLS: MachineToolName[] = ["claude", "codex", "commands"];
+export const MACHINE_TOOLS: MachineToolName[] = ["claude", "codex", "cursor", "commands"];
 
 /** The folders of a machine an agent may use (beyond its own folder). */
 export const foldersOfAgent = (access: MachineAccess | null | undefined, agentId: string): MachineFolderGrant[] =>
   (access?.folders ?? []).filter((f) => f.agents.includes(agentId));
+
+/** Agents of the grant every agent on the computer has (`ALL_AGENTS` in the machine protocol). */
+const ALL_AGENTS = "*";
+
+/** The computer's shared folder (ADR 0115): its folder granted to every agent; null when its runner has none. */
+export const sharedFolderOf = (access: MachineAccess | null | undefined): string | null =>
+  access?.folders.find((f) => f.agents.includes(ALL_AGENTS))?.path ?? null;
+
+/** The folders people allowed, without the shared folder (a row of its own that nobody removes). */
+export const allowedFolders = (access: MachineAccess | null | undefined): MachineFolderGrant[] =>
+  (access?.folders ?? []).filter((f) => !f.agents.includes(ALL_AGENTS));
+
+/** The shared folder row's facts: its size (or not measured yet) and what is free on the disk. */
+export function sharedFolderFacts(t: TFunction, locale: string, disk: Machine["disk"]): string {
+  const gb = (n: number) => formatBytes(locale, n * 2 ** 30);
+  return [
+    disk?.sharedGb != null ? t("machines.shared.size", { size: gb(disk.sharedGb) }) : t("machines.shared.measuring"),
+    ...(disk ? [t("machines.shared.free", { free: gb(disk.freeGb) })] : []),
+  ].join(" · ");
+}
 
 /** Paused now: `until` absent or still ahead. */
 export function isPaused(m: Pick<Machine, "paused">, now = Date.now()): boolean {

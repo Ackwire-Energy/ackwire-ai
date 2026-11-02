@@ -44,7 +44,11 @@ test("a greeting routine posts exactly one message: the greeting, tagged with th
   const [rr] = await f.db.select().from(schema.routineRuns);
   const posted = await messagesIn(f, dm.id);
   expect(posted.map((m) => [m.authorType, m.authorAgentId, m.body])).toEqual([["agent", f.agent.id, GREETING]]);
-  expect(posted[0]?.meta).toEqual({ routine: { id: routine.id, name: "Bom dia diário", runId: rr?.id } });
+  expect(posted[0]?.meta).toEqual({
+    routine: { id: routine.id, name: "Bom dia diário", runId: rr?.id },
+    // A routine run may read outside, so its report relays it (ADR 0117).
+    readOutside: true,
+  });
   // Only the routine's own run: nothing woke the agent in the DM.
   expect((await f.db.select().from(schema.agentRuns)).map((r) => r.background)).toEqual([true]);
   expect(rr).toMatchObject({ status: "reported", messageId: posted[0]?.id, summary: "Bom dia enviado." });
@@ -184,7 +188,7 @@ test("a routine set to act hands its mention to an agent outside as a note, and 
   const bob = await addMember(f.db, f.org.id, "member", "bob");
   await f.db
     .update(schema.agents)
-    .set({ ownerUserId: bob.id, audienceMode: "owner" })
+    .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
     .where(eq(schema.agents.id, gil.id));
   const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);

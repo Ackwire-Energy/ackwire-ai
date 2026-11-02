@@ -16,7 +16,6 @@ import {
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
-  createMillionSendMail,
   createMillionSendSender,
   createPostgresBlobStore,
   createPostgresDatabaseDriver,
@@ -60,6 +59,7 @@ import {
   meterComposio,
   resolveHostDns,
   retireHostTokens,
+  retireMillionSendMailboxes,
   setRestrictionNotices,
   vapidKeys,
   vapidSubject,
@@ -231,7 +231,6 @@ async function boot(
   log.info("mail for agents", {
     composio: Boolean(defaults.mail?.composio),
     imap: Boolean(defaults.mail?.imap),
-    millionsend: Boolean(defaults.mail?.millionsend),
   });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
   const base = { config, db: database.db, edition, version: release };
@@ -306,6 +305,13 @@ async function boot(
   });
   // The saved Jev key, before anything calls Jev (vision reads it synchronously).
   await engine.jevKey.ready();
+  // Off the boot path: it calls MillionSend once per mailbox left from the withdrawn path (ADR 0102).
+  void retireMillionSendMailboxes({ db: database.db, keyWrappers: engine.mail.keyWrappers })
+    .then((r) => {
+      if (r.checked > 0)
+        log.info("MillionSend mailboxes disconnected", { checked: r.checked, webhooksLeft: r.webhooksLeft });
+    })
+    .catch((error: unknown) => log.warn("MillionSend mailboxes cleanup failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -594,8 +600,7 @@ function gifProvider(config: Config, key: () => string | null): GifProvider | nu
 }
 
 /**
- * People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off, and
- * MillionSend inboxes (ADR 0102) at `MILLIONSEND_INBOXES_API_URL` unless turned off, each with its own key. The same
+ * People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. The same
  * Composio client serves the connectors that go through it (ADR 0107).
  */
 function mailAdapters(
@@ -631,9 +636,5 @@ function mailAdapters(
           presets: MAIL_PRESETS,
         }
       : null,
-    millionsend:
-      config.MILLIONSEND_INBOXES_API_URL === "off"
-        ? null
-        : createMillionSendMail({ baseURL: config.MILLIONSEND_INBOXES_API_URL }),
   };
 }

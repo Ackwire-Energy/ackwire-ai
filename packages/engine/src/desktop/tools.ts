@@ -417,6 +417,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     inputSchema,
     scope: DESKTOP_SCOPE,
     needs: RUN_CODE,
+    readsOutside: true,
     execute: async (input, ctx) =>
       (await waitIfPersonInControl(ctx.db, ctx, deps.pubsub, "desktop")) ?? execute(input, ctx),
   });

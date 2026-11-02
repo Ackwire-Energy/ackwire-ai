@@ -89,7 +89,6 @@ import type {
   Me,
   Message,
   MessageMemory,
-  MillionSendKeyInput,
   MoveAgentsInput,
   NoticeCategory,
   NoticePrefs,
@@ -460,6 +459,43 @@ export function useSetMemberRoles(orgId: string) {
       if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
     },
     onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** What removing this person (or leaving) does, while the confirmation is open. */
+export const useRemovalPreview = (orgId: string, userId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["org", orgId, "removal", userId],
+    queryFn: () => api.orgs.removal(orgId, userId ?? ""),
+    enabled: userId !== null,
+    staleTime: 0,
+  });
+};
+
+/** Removes a member, or leaves: the row goes at once; their agents' new owner and the counts follow. */
+export function useRemoveMember(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId),
+    onMutate: async (userId) => {
+      await qc.cancelQueries({ queryKey: keys.people(orgId) });
+      const before = qc.getQueryData<Person[]>(keys.people(orgId));
+      if (before)
+        qc.setQueryData<Person[]>(
+          keys.people(orgId),
+          before.filter((p) => p.userId !== userId),
+        );
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
+    },
+    onSettled: () => {
+      for (const key of [keys.people(orgId), keys.members(orgId), keys.overview(orgId), keys.agents(orgId), keys.me])
+        void qc.invalidateQueries({ queryKey: key });
+    },
   });
 }
 
@@ -1597,17 +1633,6 @@ export function useMailAction(orgId: string) {
       mutationFn: (input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean }) =>
         api.mail.connectComposio(orgId, input),
     }),
-    millionsendInboxes: useMutation({
-      mutationFn: (input: MillionSendKeyInput) => api.mail.millionsendInboxes(orgId, input),
-      // The form says why (a key MillionSend refused).
-      meta: { silent: true },
-    }),
-    connectMillionSend: useMutation({
-      mutationFn: (input: MillionSendKeyInput & { inboxId: string; label?: string }) =>
-        api.mail.connectMillionSend(orgId, input),
-      onSuccess: done,
-      meta: { silent: true },
-    }),
     update: useMutation({
       mutationFn: ({ accountId, ...input }: MailAccountUpdate & { accountId: string }) =>
         api.mail.update(orgId, accountId, input),
@@ -1725,6 +1750,29 @@ export function useSetStart(orgId: string) {
       return { before };
     },
     onError: (_e, _input, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: put,
+  });
+}
+
+/** Shows or hides what agents did under each reply, for me in this workspace: the switch moves at once. */
+export function useSetShowActivity(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const put = (showActivity: boolean) =>
+    qc.setQueryData<Me | null>(keys.me, (me) =>
+      me ? { ...me, organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, showActivity } : o)) } : me,
+    );
+  return useMutation({
+    mutationFn: (show: boolean) => api.orgs.setShowActivity(orgId, show),
+    onMutate: async (show) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      put(show);
+      return { before };
+    },
+    onError: (_e, _show, ctx) => {
       if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
     },
     onSuccess: put,
@@ -2317,6 +2365,30 @@ export const useCustomServers = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId), enabled });
 };
+
+/** Approved MCP tools whose server changed them (ADR 0117): connector admins only (`enabled`). */
+export const useToolChanges = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.toolChanges(orgId),
+    queryFn: () => api.customConnectors.toolChanges(orgId),
+    enabled,
+  });
+};
+
+export function useAcceptToolChange(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (c: { connectionId: string; toolName: string }) =>
+      api.customConnectors.acceptToolChange(orgId, c.connectionId, c.toolName),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+      ]),
+  });
+}
 
 export function useCustomServerAction(orgId: string) {
   const api = useApi();

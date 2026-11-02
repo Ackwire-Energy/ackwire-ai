@@ -4,6 +4,7 @@ import { type ContextDeps, isTrustedMessage, resolveSummaryModel } from "./conte
 import { publishChannelEvent } from "./events";
 import { mediaOf } from "./media";
 import { replyExcerpt } from "./messages";
+import { neutralizeUntrusted } from "./untrusted";
 
 const { messages, threads, users, agents } = schema;
 
@@ -129,7 +130,9 @@ export async function assessThread(
     const kind = mediaOf(m.meta)?.kind;
     return replyExcerpt(m.body, ASSESS_EXCERPT) || (kind ? MEDIA_WORDS[kind] : "");
   };
-  const lines = all.map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${author(m)}]: ${said(m)}`);
+  const lines = all.map(
+    (m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${author(m)}]: ${neutralizeUntrusted(said(m))}`,
+  );
 
   let answer: Record<string, unknown> | null;
   try {

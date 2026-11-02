@@ -22,6 +22,7 @@ import {
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { isChannelMember } from "../channels";
+import { answersAgentsOnly } from "../consultations";
 import { openPersonAgentDm } from "../dms";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
@@ -240,6 +241,7 @@ function outcomeText(result: BrowserHandoffResult, kind: "ask" | "takeover", scr
   if (result.result === "failed") {
     return `The person couldn't do it. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
+  if (result.result === "withdrawn") return "You withdrew this request: nobody will do it.";
   if (result.result === "cancelled") {
     return `A person canceled the request. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
@@ -387,7 +389,10 @@ export async function requireBrowserAccess(
           .limit(5)
       ).map((r) => r.id);
   for (const runId of runs) {
-    if ((await humanBehindRun({ db }, orgId, runId)) === userId) return access;
+    // A run consulted for someone outside the agent's audience has nobody behind it for its screen.
+    if ((await humanBehindRun({ db }, orgId, runId)) === userId && !(await answersAgentsOnly(db, orgId, runId))) {
+      return access;
+    }
   }
   if (screen === "desktop" && agent.machineId) {
     const machine = await getMachine(db, orgId, agent.machineId);
@@ -747,11 +752,18 @@ export function createBrowserHandoffToolSource(
         isError: true,
       };
     }
+    const agentsOnly = await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId);
     const recipient = drivers
       ? drivers.length === 1
         ? (drivers[0] ?? null)
         : null
-      : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      : await browserHandoffRecipient(
+          { db: ctx.db },
+          ctx.orgId,
+          // Consulted for someone outside its audience: its owner helps, never that person.
+          agentsOnly ? null : ctx.runId,
+          ctx.agentId,
+        );
     // The card goes where the person asked can act on it: the run's conversation when they're in it, else their DM
     // with the agent (a run in a room between agents, or one they aren't in, would leave the request unreachable).
     // Several drivers: one in the conversation keeps it there, else whoever asked for the work's DM; else it stays
@@ -770,9 +782,10 @@ export function createBrowserHandoffToolSource(
           ),
         )
         .limit(1);
-      const requester = member?.userId
-        ? null
-        : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      const requester =
+        member?.userId || agentsOnly
+          ? null
+          : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
       asked = member?.userId ?? (requester && drivers.includes(requester) ? requester : null);
     }
     const where =
@@ -910,6 +923,7 @@ async function resumeWaitingRun(
   row: BrowserHandoffRow,
   result: BrowserHandoffResult,
   answeredBy?: string,
+  waitingOnly?: boolean,
 ) {
   if (!row.runId) return;
   await resumeRunWithResult(deps.db, {
@@ -919,6 +933,7 @@ async function resumeWaitingRun(
       content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row, answeredBy), row.screen),
     },
     pubsub: deps.pubsub,
+    waitingOnly,
   });
 }
 
@@ -927,6 +942,7 @@ function endedResult(row: BrowserHandoffRow): BrowserHandoffResult {
   const note = row.note ? { note: row.note } : {};
   if (row.status === "done") return { result: "done", ...note };
   if (row.status === "cancelled") return { result: "cancelled" };
+  if (row.status === "withdrawn") return { result: "withdrawn" };
   if (row.status === "failed") return { result: "failed", ...note };
   return { result: "expired" };
 }
@@ -1051,6 +1067,33 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
   if (!row) throw new ConflictError("This is already over");
   await settle(deps, row);
   return handoffView(row);
+}
+
+/**
+ * The agent withdraws its own asked help (`withdraw_request`) while nobody took control: the card says it no
+ * longer needs it, the people asked stop waiting. A run still waiting on it resumes; the run withdrawing it
+ * (`byRunId`), or one that stopped waiting on it and ended, is told nothing more (no late notice, no new run). Null: not open anymore, or a person is in control.
+ */
+export async function withdrawHandoff(deps: HandoffDeps, handoffId: string, byRunId: string, reason: string | null) {
+  const [row] = await deps.db.transaction(async (tx) => {
+    const rows = await tx
+      .update(browserHandoffs)
+      .set({ status: "withdrawn", note: reason, resolvedAt: new Date() })
+      .where(
+        and(
+          eq(browserHandoffs.id, handoffId),
+          eq(browserHandoffs.kind, "ask"),
+          sql`(${browserHandoffs.status} = 'pending' or (${browserHandoffs.status} = 'active' and ${browserHandoffs.controllerUserId} is null))`,
+        ),
+      )
+      .returning();
+    if (rows[0]) await syncCard(tx, rows[0]);
+    return rows;
+  });
+  if (!row) return null;
+  if (row.runId !== byRunId) await resumeWaitingRun(deps, row, endedResult(row), undefined, true).catch(() => {});
+  await afterChange(deps, row).catch(() => {});
+  return row;
 }
 
 /**

@@ -63,13 +63,6 @@ export function useUserEvents() {
       // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
       // tasks refresh too (the columns live under the same key).
       if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
-      // Someone joined or left, or roles changed (ADR 0085): the people, the roles and what you may do (`me`).
-      if (event.type === "org.members") {
-        void qc.invalidateQueries({ queryKey: keys.people(orgId) });
-        void qc.invalidateQueries({ queryKey: keys.members(orgId) });
-        void qc.invalidateQueries({ queryKey: keys.roles(orgId) });
-        void qc.invalidateQueries({ queryKey: keys.me });
-      }
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")
         refreshMission(qc, orgId, event.missionId);
     });

@@ -63,7 +63,17 @@ import {
   storedPlanUsage,
   UNAVAILABLE_CODES,
 } from "./brains/select";
-import type { Brain, BrainEvent, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
+import {
+  BRAIN_NAMES,
+  type Brain,
+  type BrainEvent,
+  type BrainIO,
+  type BrainKind,
+  type BrainTool,
+  type BrainTurn,
+  isComputerBrain,
+  type ToolResult,
+} from "./brains/types";
 import { agentBrowserProfiles } from "./browser/profiles";
 import { browsersPrompt } from "./browser/tools";
 import { BROWSER_SCOPE } from "./browser/types";
@@ -133,7 +143,9 @@ import { getMessage, insertMessage, type Message, messageView, unreachedAgents, 
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
 import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-producers";
+import { openRequestNudge, openRequestsOf, WITHDRAW_REQUEST_TOOL } from "./open-requests";
 import { enqueue, PermanentJobError } from "./outbox";
+import { type OutsideMemo, personWords, runReadOutside } from "./outside";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
 import { reachWillHand } from "./reach";
@@ -200,7 +212,7 @@ import {
 } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
-import { carriesCredential, maskCredentials } from "./tool-detail";
+import { carriesCredential, maskCredentials, maskCredentialsExcept } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
   ON_DEMAND_FIND,
@@ -1068,6 +1080,9 @@ async function executeRunInner(
     followUp: await routedAsFollowUp(db, run).catch(() => false),
     answerOwed: Boolean((run.transcript as unknown as Transcript | null)?.answerOwed),
   });
+  /** Whether this run read outside content (`runReadOutside`): sticky once true. */
+  let readOutside = false;
+  const outsideMemo: OutsideMemo = {};
   /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
   const post = async (
     tx: Executor,
@@ -1082,8 +1097,18 @@ async function executeRunInner(
     // wrote into since (`steeredBy`, in the transcript as it is now) answers that person. Any other run writes as
     // the agent, with its own grants, as a person's does.
     const current = { ...run, transcript: transcript as unknown as Record<string, unknown> | null };
+    // A run that read outside content (ADR 0117) marks what it posts, so the next agent reads it as relayed and memory
+    // from it stays low trust; once it has read outside, every later post is marked too. A credential in its reply is
+    // masked unless a person wrote it here.
+    if (!note && !readOutside) readOutside = await runReadOutside(tx, current, undefined, outsideMemo);
     const said =
-      !note && carriesCredential(body) && fedByRoutine(await runAuthority(tx, current)) ? maskCredentials(body) : body;
+      note || !carriesCredential(body)
+        ? body
+        : fedByRoutine(await runAuthority(tx, current))
+          ? maskCredentials(body)
+          : readOutside
+            ? maskCredentialsExcept(body, await personWords(tx, run.orgId, run.channelId, threadId))
+            : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
@@ -1152,6 +1177,7 @@ async function executeRunInner(
         ...meta,
         ...runMeta,
         ...tagged,
+        ...(readOutside && !note ? { readOutside: true } : {}),
         work,
         ...(teamChecks.length > 0 ? { teamChecks } : {}),
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
@@ -1977,7 +2003,7 @@ async function executeRunInner(
     } else delete t.roomWaitSince;
     // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
-    const name = from === "codex" ? "Codex" : "Claude Code";
+    const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
     // One note per outage and place: another run of this agent already waits for the same computer and
     // said so here (an hourly routine, a second message): this one waits quietly with it.
     // A routine's run waits quietly: it runs when the computer is back (the next slot supersedes it), and
@@ -2143,7 +2169,7 @@ async function executeRunInner(
   ) => {
     await deferred;
     const t = transcript as Transcript;
-    const name = from === "codex" ? "Codex" : "Claude Code";
+    const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
     const said = stripSentinel(partial);
     const note = `_${name} stopped before finishing (${failure.message}). Already done, not repeated: ${executed.join(", ")}._`;
     await addRunStep(db, run, "error", {
@@ -3123,9 +3149,23 @@ async function executeRunInner(
           )
         : "";
       const judging = evidenceFor(t);
+      // Help it asked for in this run and stopped waiting on (a person wrote meanwhile): only then a lookup.
+      const detachedIds = ((t as { detachedWaits?: { waitId: string }[] }).detachedWaits ?? []).map((d) => d.waitId);
+      const openRequest =
+        detachedIds.length > 0 &&
+        !state.requestNudged &&
+        !betweenAgents &&
+        granted.some((g) => g.name === WITHDRAW_REQUEST_TOOL)
+          ? openRequestNudge(
+              (await openRequestsOf(db, run.orgId, run.agentId, run.channelId).catch(() => [])).filter((r) =>
+                detachedIds.includes(r.id),
+              ),
+            )
+          : "";
       const decision = await decideTurnEnd({
         state,
         kind: betweenAgents ? "agents_dm" : "conversation",
+        openRequest,
         executed: transcript.executedCalls ?? 0,
         bound: t.stuck?.endAt !== undefined ? "stuck" : t.wrapUpNoted ? "step_limit" : null,
         quiet: silent && !judged,
@@ -3163,6 +3203,7 @@ async function executeRunInner(
         unreached: "unreached",
         untried: "untried",
         secret: "secret",
+        open_request: "open_request",
       }[decision.rule];
       const { nudge: _, ...recorded } = { ...decision, count: t.continuation.count };
       later(() =>

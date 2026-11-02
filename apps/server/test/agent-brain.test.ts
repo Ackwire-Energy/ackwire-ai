@@ -113,6 +113,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     ["model", true, null],
     ["claude_code", false, "no_computer"],
     ["codex", false, "no_computer"],
+    ["cursor", false, "no_computer"],
   ]);
   expect(fresh.options.find((o) => o.kind === "codex")?.experimental).toBe(true);
   expect(fresh.options.find((o) => o.kind === "claude_code")?.models.map((m) => m.value)).toEqual([
@@ -225,6 +226,51 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
   // Back to the API: no confirmation, the model is cleared.
   const back = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "model" } });
   expect(await back.json()).toMatchObject({ brain: "model", model: null, fallback: false });
+});
+
+test("Outros agentes podem consultar: the audience carries the switch, on by default, kept when absent", async () => {
+  const { api, agentId } = await workspace();
+  const patch = async (audience: Record<string, unknown>) =>
+    (
+      (await (await api(`/agents/${agentId}`, { method: "PATCH", json: { audience } })).json()) as {
+        audience: { consultable?: boolean };
+      }
+    ).audience.consultable;
+  expect(await patch({ mode: "owner", userIds: [], consultable: false })).toBe(false);
+  expect(await patch({ mode: "owner", userIds: [] })).toBe(false);
+  expect(await patch({ mode: "owner", userIds: [], consultable: true })).toBe(true);
+});
+
+test("Quem pode falar by role: whoever holds it talks to the agent, from the moment they get it until they lose it", async () => {
+  const { api, asBia, member, agentId } = await workspace();
+  const biaId = ((await (await member("/api/app/me")).json()) as { user: { id: string } }).user.id;
+  const role = (await (await api("/roles", { json: { name: "Suporte" } })).json()) as { id: string };
+  const canTalk = async () =>
+    ((await (await asBia("/agents")).json()) as { agents: { id: string; canTalk: boolean }[] }).agents.find(
+      (a) => a.id === agentId,
+    )?.canTalk;
+  const patched = await api(`/agents/${agentId}`, {
+    method: "PATCH",
+    json: { audience: { mode: "people", userIds: [], roleIds: [role.id] } },
+  });
+  expect(patched.status).toBe(200);
+  expect(((await patched.json()) as { audience: unknown }).audience).toEqual({
+    mode: "people",
+    userIds: [],
+    roleIds: [role.id],
+    consultable: true,
+  });
+  expect(await canTalk()).toBe(false);
+  await api(`/members/${biaId}/roles`, { method: "PUT", json: { roleIds: [role.id] } });
+  expect(await canTalk()).toBe(true);
+  await api(`/members/${biaId}/roles`, { method: "PUT", json: { roleIds: [] } });
+  expect(await canTalk()).toBe(false);
+  // Not a role id: refused before it reaches the database.
+  const bad = await api(`/agents/${agentId}`, {
+    method: "PATCH",
+    json: { audience: { mode: "people", userIds: [], roleIds: ["suporte"] } },
+  });
+  expect(bad.status).toBe(400);
 });
 
 test("where the server provisions the computers (the Cloud), an agent on a plan replies to everyone once its owner says so", async () => {
@@ -534,4 +580,27 @@ test("mission brain: from the executor by default; the brain before Start, the m
   expect(row).toMatchObject({ brain: null, brainModel: "sonnet" });
   const events = await t.db.select().from(schema.missionEvents).where(eq(schema.missionEvents.missionId, mission.id));
   expect(events.filter((e) => e.kind === "brain_changed").length).toBe(2);
+});
+
+test("a new agent's canTalk reads the creator's roles: a role it answers that the creator holds lets them in", async () => {
+  const { api, owner, member } = await workspace();
+  const me = async (who: typeof owner) =>
+    ((await (await who("/api/app/me")).json()) as { user: { id: string } }).user.id;
+  const [ownerId, biaId] = [await me(owner), await me(member)];
+  const roleId = async (name: string) =>
+    ((await (await api("/roles", { json: { name } })).json()) as { id: string }).id;
+  const [board, support] = [await roleId("Diretoria"), await roleId("Suporte")];
+  const held = (await (await api("/members")).json()) as { members: { userId: string; roleIds: string[] }[] };
+  const mine = held.members.find((m) => m.userId === ownerId)?.roleIds ?? [];
+  expect((await api(`/members/${ownerId}/roles`, { method: "PUT", json: { roleIds: [...mine, board] } })).status).toBe(
+    200,
+  );
+  const create = async (handle: string, roleIds: string[]) =>
+    (await (
+      await api("/agents", {
+        json: { name: handle, handle, ownerUserId: biaId, audience: { mode: "people", userIds: [], roleIds } },
+      })
+    ).json()) as { canTalk: boolean };
+  expect((await create("eva", [board])).canTalk).toBe(true);
+  expect((await create("ivo", [support])).canTalk).toBe(false);
 });

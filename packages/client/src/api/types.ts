@@ -195,6 +195,8 @@ export interface OrgSummary {
   deletion?: OrgDeletion;
   /** From `GET /me`: what opens when the app starts here (ADR 0108). Absent from older servers: the home. */
   start?: StartChoice;
+  /** From `GET /me`: whether I see what agents did under each reply. Absent (an older server): off. */
+  showActivity?: boolean;
 }
 
 /** What opens when the app starts in a workspace (ADR 0108): the app's home, where the person was, or a channel. */
@@ -255,6 +257,20 @@ export interface Me {
 
 export interface Organization extends OrgSummary {
   context?: string;
+}
+
+/** What removing a member (or leaving) does (`GET …/members/{userId}/removal`). */
+export interface RemovalPreview {
+  /** Who answers for their agents from then on: whoever removes them, or the longest-standing other owner. */
+  heir: { userId: string; name: string } | null;
+  /** The agents they answer for. */
+  agents: { id: string; name: string }[];
+  /** Agents that think with a plan they signed in (or on their computer): they lose it. */
+  losePlan: { id: string; name: string }[];
+  /** The computers they connected here: removed. */
+  computers: { id: string; name: string }[];
+  /** Their routines still on: paused. */
+  routines: number;
 }
 
 export interface Member {
@@ -467,6 +483,10 @@ export interface AgentAudience {
   mode: AudienceMode;
   /** For `people` (the owner can always talk to it). */
   userIds: string[];
+  /** For `people`: whoever holds one of these roles at the time (not `everyone`). Older servers leave it out. */
+  roleIds?: string[];
+  /** Other agents may consult it for people outside the audience (it answers them only). Absent = on. */
+  consultable?: boolean;
 }
 
 export interface Agent {
@@ -603,7 +623,7 @@ export interface AgentInput {
  * no agent, else the workspace's model (it has a key), else none (connected after it is created).
  */
 export type SuggestedAi =
-  | { kind: "account"; brain: "claude_code" | "codex"; machineId: string; accountId: string; label: string }
+  | { kind: "account"; brain: "claude_code" | "codex" | "cursor"; machineId: string; accountId: string; label: string }
   | { kind: "model" }
   | { kind: "none" };
 
@@ -1875,6 +1895,19 @@ export interface CustomTool {
   firstSeenAt: string;
 }
 
+/**
+ * ADR 0117: an approved MCP tool whose server changed its description or input. Agents keep `before` until a
+ * connector admin accepts the change.
+ */
+export interface ToolChange {
+  connectionId: string;
+  connectionLabel: string;
+  toolName: string;
+  before: { description: string; inputSchema: Record<string, unknown> };
+  after: { description: string; inputSchema: Record<string, unknown> };
+  changedAt: string;
+}
+
 export interface CustomServer {
   id: string;
   serverUrl: string;
@@ -2247,6 +2280,8 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+  /** The agent took it back: it no longer needs an answer. */
+  withdrawn?: true;
 }
 
 /**
@@ -2281,6 +2316,10 @@ export interface SecretRequest {
   expiresAt: string;
   deliveredAt: string | null;
   removed: boolean;
+  /** The agent took it back: it no longer needs it. */
+  withdrawn?: true;
+  /** The agent already held this name on this computer: a delivery replaces that value. */
+  replaces?: boolean;
 }
 
 /** A secret on an agent's computer, by name (the agent page). */
@@ -3170,6 +3209,11 @@ export interface Machine {
    * user); `reason`, in the runner's words, says what is missing. Null or absent when its runner doesn't say.
    */
   desktopUse?: { available: boolean; reason: string | null } | null;
+  /**
+   * ADR 0115: its workspace disk (free GB, share in use) and the shared folder's size (GB, measured hourly), as its
+   * runner last said; null or absent for people who don't manage it, or when its runner doesn't say.
+   */
+  disk?: { freeGb: number; use: number | null; sharedGb: number | null } | null;
 }
 
 /** Whether the organization uses the server's own computer (`GET …/machines/host`). */
@@ -3235,7 +3279,7 @@ export interface MachinePause {
 }
 
 /** A tool the person turns on or off on the machine. */
-export type MachineToolName = "claude" | "codex" | "commands";
+export type MachineToolName = "claude" | "codex" | "cursor" | "commands";
 
 /** A folder allowed on the machine and the agents (ids) that may use it; empty: allowed, no agent yet. */
 export interface MachineFolderGrant {
@@ -3250,7 +3294,13 @@ export interface MachineAccess {
    * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
    * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
    */
-  tools: Record<MachineToolName, boolean> & { browser?: boolean; desktop?: boolean; terminal?: boolean };
+  tools: Record<Exclude<MachineToolName, "cursor">, boolean> & {
+    /** Protocol 36 (ADR 0114): Cursor's CLI; absent on older runners, where it follows Codex's. */
+    cursor?: boolean;
+    browser?: boolean;
+    desktop?: boolean;
+    terminal?: boolean;
+  };
 }
 
 /** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
@@ -3291,7 +3341,7 @@ export interface DesktopRelease {
 }
 
 /** A computer brain that runs on a connected machine. */
-export type ComputerBrain = "claude_code" | "codex";
+export type ComputerBrain = "claude_code" | "codex" | "cursor";
 
 /** An agent waiting for an offline computer, and what it has waiting. */
 export interface OutageAgent {
@@ -4347,7 +4397,7 @@ export interface MissionSettings {
 }
 
 /** "Quem pensa" (ADR 0032): the API, or Claude Code / Codex on the agent's computer with a person's plan. */
-export type BrainKind = "model" | "claude_code" | "codex";
+export type BrainKind = "model" | "claude_code" | "codex" | "cursor";
 
 /** Why a computer brain can't be chosen now. */
 export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
@@ -4360,6 +4410,8 @@ export interface BrainModelOption {
   recommended?: boolean;
   /** Its context window in tokens. */
   contextWindow?: number;
+  /** Cursor (ADR 0114): its CLI said the person's plan includes it; absent: it didn't say. */
+  inPlan?: boolean;
 }
 
 export interface BrainOption {
@@ -4426,7 +4478,7 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
 
-export type MachineAccountKind = "claude_code" | "codex";
+export type MachineAccountKind = "claude_code" | "codex" | "cursor";
 
 /** ADR 0041 §3, ADR 0059: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
@@ -4474,9 +4526,9 @@ export interface AiComputer {
   /** Its runner takes coding plans' keys. */
   keys: boolean;
   /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
-  shares?: { claude_code: boolean; codex: boolean; key: boolean };
+  shares?: { claude_code: boolean; codex: boolean; cursor?: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
-  brains: { claude_code: boolean; codex: boolean };
+  brains: { claude_code: boolean; codex: boolean; cursor?: boolean };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the viewer connected (absent: a server
    * too old to say). Its plan and usage when the computer reported them.
@@ -4975,7 +5027,14 @@ export type NotificationKind =
    * ADR 0110: an agent's owner asks for one more browser profile for it (the people who grant profiles). Waiting;
    * `source.agentId` and its name in `source.label`. Opens the agent's page.
    */
-  | "browser_profile_request";
+  | "browser_profile_request"
+  /**
+   * ADR 0117: a connected MCP server changed tools an admin approved (connector admins). Waiting; `source.label` the
+   * connection's name, `latest.title` the tools. Opens Conectores, where it is accepted.
+   */
+  | "connector_tool_changed"
+  /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
+  | "computer_disk_full";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5049,6 +5108,9 @@ export interface NotificationLatest {
   names?: string[];
   /** `join_request` from a member's suggestion (ADR 0090): who suggested. */
   suggestedBy?: string;
+  /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
+  diskUse?: number;
+  diskFreeGb?: number;
 }
 
 export interface AppNotification {
@@ -5268,28 +5330,6 @@ export interface MailProviders {
   /** iCloud and any other mailbox (IMAP/SMTP). */
   imap: boolean;
   presets: MailPreset[];
-  /**
-   * MillionSend inboxes, null when off. `connectorKey`: the workspace's MillionSend connector holds a key a person
-   * may choose to reuse; `keysUrl`: where MillionSend Cloud makes keys (null: a self-hosted MillionSend).
-   */
-  millionsend: { connectorKey: boolean; keysUrl: string | null } | null;
-}
-
-/** An inbox a MillionSend key reaches. */
-export interface MillionSendInbox {
-  id: string;
-  address: string;
-  name: string | null;
-  kind: "agent" | "human";
-  shared: boolean;
-  /** Already a mailbox of this workspace. */
-  connected: boolean;
-}
-
-/** A MillionSend key: pasted, or the MillionSend connector's (the person chose it). */
-export interface MillionSendKeyInput {
-  apiKey?: string;
-  useConnector?: boolean;
 }
 
 export type MailLevel = "read" | "read_write";
@@ -5297,8 +5337,8 @@ export type MailLevel = "read" | "read_write";
 /** A mailbox the organization connected (never its password). */
 export interface MailAccount {
   id: string;
-  provider: "gmail" | "outlook" | "imap" | "millionsend";
-  via: "composio" | "imap" | "millionsend";
+  provider: "gmail" | "outlook" | "imap";
+  via: "composio" | "imap";
   address: string;
   label: string;
   status: "pending" | "active" | "needs_reconnect";
@@ -5340,8 +5380,6 @@ export interface MailAccountUpdate {
   label?: string;
   /** A new app password (IMAP): tested first, a `422` carries `MailConnectError`. */
   password?: string;
-  /** A new API key (MillionSend): it must still reach the inbox, a `422` carries `auth`. */
-  apiKey?: string;
   offActions?: MailActionName[];
   askActions?: MailActionName[];
   /** The mailbox's other addresses (replaces the list). */
@@ -5479,7 +5517,7 @@ export interface AgentDatabaseInput {
 
 // ── Agent browser (ADR 0040) ─────────────────────────────────────────────────
 
-export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled";
+export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled" | "withdrawn";
 
 /** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
 export type ScreenKind = "browser" | "desktop";

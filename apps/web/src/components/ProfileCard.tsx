@@ -274,7 +274,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         {modeOf(agent) !== "everyone" && (
           <>
             <dt>{t("profile.audience")}</dt>
-            <dd>{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</dd>
+            <dd>{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</dd>
           </>
         )}
         <dt>{t("profile.model")}</dt>
@@ -291,7 +291,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       </dl>
       {seesSpend && <Spend agent={agent} locale={i18n.language} />}
       {!canTalk(agent) && (
-        <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name)}</p>
+        <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</p>
       )}
       <div className="profile-card__actions">
         <Button asChild size="sm" variant="primary">

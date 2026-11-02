@@ -32,6 +32,8 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+  /** The agent took it back (`withdraw_request`): it no longer needs an answer. Kept on the card by later syncs. */
+  withdrawn?: true;
 }
 
 export function questionView(q: AgentQuestionRow): AgentQuestion {
@@ -118,18 +120,21 @@ export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource 
 /** What the model hears back once the question is closed. */
 export function questionResult(q: AgentQuestionRow | undefined): { content: string; isError?: boolean } {
   if (q?.status === "answered" && q.answer !== null) return { content: `The person answered: ${q.answer}` };
+  if (q?.status === "canceled") return { content: "You withdrew this question: nobody will answer it." };
   return {
     content:
       "No one answered within 24 hours. Go on with your best judgement if it is safe, or say what you still need.",
   };
 }
 
-/** Writes the current state of the question into its chat message (`meta.question`). */
-export async function syncQuestionMessage(db: Executor, q: AgentQuestionRow) {
+/** Writes the current state of the question into its chat message (`meta.question`), keeping `withdrawn`. */
+export async function syncQuestionMessage(db: Executor, q: AgentQuestionRow, view: AgentQuestion = questionView(q)) {
   if (!q.messageId) return;
   await db
     .update(messages)
-    .set({ meta: sql`jsonb_set(${messages.meta}, '{question}', ${JSON.stringify(questionView(q))}::jsonb)` })
+    .set({
+      meta: sql`jsonb_set(${messages.meta}, '{question}', coalesce(${messages.meta}->'question', '{}'::jsonb) || ${JSON.stringify(view)}::jsonb)`,
+    })
     .where(and(eq(messages.id, q.messageId), eq(messages.orgId, q.orgId)));
 }
 
@@ -145,8 +150,9 @@ export async function publishQuestion(
   pubsub: PubSub | undefined,
   q: AgentQuestionRow,
   type: "question.asked" | "question.answered",
+  view: AgentQuestion = questionView(q),
 ) {
-  await publishChannelEvent(pubsub, { type, channelId: q.channelId, threadId: q.threadId, question: questionView(q) });
+  await publishChannelEvent(pubsub, { type, channelId: q.channelId, threadId: q.threadId, question: view });
 }
 
 /**
@@ -209,6 +215,28 @@ export async function afterReplyAnswered(deps: { db: Database; pubsub?: PubSub }
   await syncQuestionMessage(deps.db, row);
   await publishQuestion(deps.pubsub, row, "question.answered");
   await resolveQuestionNotifications(deps, orgId, row.id).catch(() => {});
+}
+
+/** The agent withdraws its own open question (`withdraw_request`): the card closes and a run waiting on it goes on. */
+export async function withdrawQuestion(deps: { db: Database; pubsub?: PubSub }, agentId: string, questionId: string) {
+  const withdrawn = await deps.db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(agentQuestions)
+      .set({ status: "canceled" })
+      .where(
+        and(eq(agentQuestions.id, questionId), eq(agentQuestions.agentId, agentId), eq(agentQuestions.status, "open")),
+      )
+      .returning();
+    if (!row) return null;
+    await syncQuestionMessage(tx, row, { ...questionView(row), withdrawn: true });
+    await enqueue(tx, resumeJob(row));
+    return row;
+  });
+  if (withdrawn) {
+    await publishQuestion(deps.pubsub, withdrawn, "question.answered", { ...questionView(withdrawn), withdrawn: true });
+    await resolveQuestionNotifications(deps, withdrawn.orgId, withdrawn.id).catch(() => {});
+  }
+  return withdrawn;
 }
 
 /** Closes questions past their deadline and resumes their runs (worker, every minute). */

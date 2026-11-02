@@ -713,6 +713,8 @@ export const secretRequests = pgTable(
     deliveredSize: integer(),
     /** Removed from the computer (the row stays for the record). */
     removedAt: timestamp({ withTimezone: true }),
+    /** When asked, the agent already held this name on this computer: a delivery replaces that value. */
+    replaces: boolean().notNull().default(false),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

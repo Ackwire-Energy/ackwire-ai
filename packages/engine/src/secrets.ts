@@ -50,6 +50,10 @@ export interface SecretRequestView {
   expiresAt: string;
   deliveredAt: string | null;
   removed: boolean;
+  /** The agent took it back (`withdraw_request`): it no longer needs it. Kept on the card by later syncs. */
+  withdrawn?: true;
+  /** The agent already held this name on this computer: a delivery replaces that value. */
+  replaces: boolean;
 }
 
 const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath" | "site">): SecretTarget =>
@@ -84,6 +88,7 @@ export function secretRequestView(row: SecretRequestRow): SecretRequestView {
     expiresAt: row.expiresAt.toISOString(),
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
     removed: row.removedAt !== null,
+    replaces: row.replaces,
   };
 }
 
@@ -100,11 +105,11 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
     case "delivered":
       if (target.kind === "site") {
         return {
-          content: `${row.name} was delivered to your computer for ${new URL(target.site).host}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.`,
+          content: `${row.name} was delivered to your computer for ${new URL(target.site).host}${row.replaces ? ", replacing the one you had" : ""}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.`,
         };
       }
       return {
-        content: `${row.name} was delivered to your computer: ${
+        content: `${row.name} was delivered to your computer${row.replaces ? ", replacing the one you had" : ""}: ${
           target.kind === "file"
             ? `written to ${target.path} (mode 600)`
             : `available as the environment variable ${row.name} in your commands`
@@ -115,7 +120,7 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
         content: `The person declined to give ${row.name}. Don't ask again in this conversation; say what you can do without it.`,
       };
     case "canceled":
-      return { content: `The request for ${row.name} was canceled.`, isError: true };
+      return { content: `The request for ${row.name} was withdrawn: it won't come.`, isError: true };
     default:
       return {
         content: `No one gave ${row.name} within 15 minutes. Say what you still need; you may ask again if the person wants.`,
@@ -123,12 +128,16 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
   }
 }
 
-export async function syncSecretMessage(db: Executor, row: SecretRequestRow) {
+export async function syncSecretMessage(
+  db: Executor,
+  row: SecretRequestRow,
+  view: SecretRequestView = secretRequestView(row),
+) {
   if (!row.messageId) return;
   await db
     .update(schema.messages)
     .set({
-      meta: sql`jsonb_set(${schema.messages.meta}, '{secretRequest}', ${JSON.stringify(secretRequestView(row))}::jsonb)`,
+      meta: sql`jsonb_set(${schema.messages.meta}, '{secretRequest}', coalesce(${schema.messages.meta}->'secretRequest', '{}'::jsonb) || ${JSON.stringify(view)}::jsonb)`,
     })
     .where(and(eq(schema.messages.id, row.messageId), eq(schema.messages.orgId, row.orgId)));
 }
@@ -141,12 +150,13 @@ export async function publishSecret(
   deps: { db: Database; pubsub?: PubSub },
   row: SecretRequestRow,
   type: "secret.requested" | "secret.updated",
+  view: SecretRequestView = secretRequestView(row),
 ) {
   await publishChannelEvent(deps.pubsub, {
     type,
     channelId: row.channelId,
     threadId: row.threadId,
-    secretRequest: secretRequestView(row),
+    secretRequest: view,
   });
   if (type === "secret.requested") await notifySecretRequest(deps, row).catch(() => undefined);
   else if (statusOf(row) !== "pending")
@@ -581,6 +591,42 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
   });
   for (const row of expired) await publishSecret(deps, row, "secret.updated");
   return expired.length;
+}
+
+/** The agent withdraws its own pending request (`withdraw_request`): its card closes and a run waiting on it goes on. */
+export async function withdrawSecretRequest(
+  deps: { db: Database; pubsub?: PubSub },
+  agentId: string,
+  requestId: string,
+) {
+  const withdrawn = await deps.db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(secretRequests)
+      .set({ status: "canceled" })
+      .where(
+        and(
+          eq(secretRequests.id, requestId),
+          eq(secretRequests.agentId, agentId),
+          eq(secretRequests.status, "pending"),
+        ),
+      )
+      .returning();
+    if (!row) return null;
+    await syncSecretMessage(tx, row, { ...secretRequestView(row), withdrawn: true });
+    await enqueue(tx, resumeJob(row));
+    await enqueueSecretDiscard(tx, row);
+    await recordAudit(tx, {
+      orgId: row.orgId,
+      actor: { type: "agent", id: agentId },
+      action: "secret.canceled",
+      target: { type: "agent", id: agentId },
+      details: { requestId: row.id, name: row.name },
+    });
+    return row;
+  });
+  if (withdrawn)
+    await publishSecret(deps, withdrawn, "secret.updated", { ...secretRequestView(withdrawn), withdrawn: true });
+  return withdrawn;
 }
 
 /** A run canceled while waiting: its requests close too. */

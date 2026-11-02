@@ -9,7 +9,7 @@ import {
   loginReadPasses,
   otherThanHint,
 } from "@agenteschat/client/lib/machines";
-import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
+import { type PlanId, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,7 +28,8 @@ import { openPopup, sendPopup } from "@/lib/popup";
  * computer's key. ChatGPT: device code sign-in allowed in its settings first,
  * then the device page and the one-time code to type there. A coding plan:
  * its own key page, then the key, sealed the same way; it never reaches our
- * server. "Colar" shows only while the field is empty. Every start is a click,
+ * server. Cursor (ADR 0114): its sign-in page, and the computer finishes by
+ * itself; or, chosen under it, a Cursor API key, sent like a plan's key. "Colar" shows only while the field is empty. Every start is a click,
  * never the block showing. The page asks every 2 s; Voltar or closing stops
  * the sign-in on the computer. Reads that fail while the server restarts or
  * the computer reconnects say Reconnecting, and the same sign-in goes on
@@ -204,7 +205,9 @@ function AddAccountFlow({
   const api = useApi();
   const qc = useQueryClient();
   const codeId = useId();
-  const plan = planOf(provider);
+  // Cursor: its sign-in, or (chosen under it) its API key, which goes like a coding plan's key.
+  const [cursorKey, setCursorKey] = useState(false);
+  const { plan, provider: keyProvider } = signInKey(provider, kind, cursorKey);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
@@ -247,7 +250,7 @@ function AddAccountFlow({
     try {
       const l = await beginLogin((input) => api.machines.beginAccountLogin(org.id, machineId, kind, input), kind, {
         again,
-        provider,
+        provider: keyProvider,
         hint,
       });
       if (gone.current) {
@@ -353,7 +356,7 @@ function AddAccountFlow({
       if (plan && fanOut) {
         for (const target of fanOut.filter((x) => !fanned.current.some((f) => f.id === x.id))) {
           const l = await api.machines.beginAccountLogin(org.id, machineId, kind, {
-            provider,
+            provider: keyProvider,
             ...(target.again ? { accountId: target.again } : {}),
           });
           if (gone.current) {
@@ -564,6 +567,38 @@ function AddAccountFlow({
             <SettingNote icon="alert">{t("aiAccounts.add.keyShape", { plan: plan.label })}</SettingNote>
           )}
         </Step>
+      </>
+    );
+  } else if (kind === "cursor") {
+    steps = (
+      <>
+        <Step
+          side={
+            login ? (
+              openAgain(login.url)
+            ) : (
+              <Button
+                size="sm"
+                variant="primary"
+                icon="external"
+                loading={starting || loading}
+                disabled={!ready}
+                onClick={start}
+              >
+                {signInLabel ?? t("agentPage.work.brain.add.open.cursor")}
+              </Button>
+            )
+          }
+        >
+          <StepTitle title={t("agentPage.work.brain.add.stepOne.cursor")} hint={signInHint} />
+          {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
+        </Step>
+        {login && opened && <Step side={waiting}>{t("agentPage.work.brain.add.cursorFinish", { computer })}</Step>}
+        {!login && !again && (
+          <Button size="sm" variant="ghost" icon="key" onClick={() => setCursorKey(true)}>
+            {t("agentPage.work.brain.add.cursorKey")}
+          </Button>
+        )}
       </>
     );
   } else if (kind === "codex") {

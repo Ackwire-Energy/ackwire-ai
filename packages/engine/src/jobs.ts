@@ -519,13 +519,19 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
             : { runs: [] };
           const dropped = "dropped" in res ? (res.dropped ?? []) : [];
           // Never silent: who its mention didn't reach hears it as a note, or the people here read why not.
-          await settleReach(deps, message, {
+          const reach = await settleReach(deps, message, {
             outside: handed.allowed.filter((id) => outside.includes(id)),
             blocked: [
               ...new Set([...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused]),
             ],
           });
-          await reportDroppedMentions({ db: deps.db, pubsub: deps.pubsub }, message, dropped);
+          // A member consulted by note instead (it takes consultations) was reached: no "wasn't woken" notice.
+          const consulted = new Set(reach.filter((e) => e.consultationId).map((e) => e.agentId));
+          await reportDroppedMentions(
+            { db: deps.db, pubsub: deps.pubsub },
+            message,
+            dropped.filter((d) => !consulted.has(d.agentId)),
+          );
           await publishRouted(deps.pubsub, message, {
             strategy: "mention",
             seenBy: message.mentionedAgentIds,

@@ -2,17 +2,9 @@
  * Test fake — mailboxes (ADR 0038), same shapes as the server's `…/mail/*` and
  * `…/agents/{id}/mail` routes. Off by default (no way in, like a server without
  * email): tests turn it on with `fake.providers = MAIL_PROVIDERS` and add
- * mailboxes through the API. An IMAP connect fails with the code in `fake.nextError`,
- * and so does the next MillionSend key read; MillionSend keys reach `fake.inboxes`.
+ * mailboxes through the API. An IMAP connect fails with the code in `fake.nextError`.
  */
-import type {
-  AgentMailbox,
-  ApiClient,
-  MailAccount,
-  MailConnectError,
-  MailProviders,
-  MillionSendInbox,
-} from "@agenteschat/client";
+import type { AgentMailbox, ApiClient, MailAccount, MailConnectError, MailProviders } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { defaultPolicy } from "@agenteschat/client/lib/mail";
 import { clone, MockNotFoundError, mockId } from "./context";
@@ -21,22 +13,17 @@ export interface FakeMail {
   client: ApiClient["mail"];
   accounts: MailAccount[];
   providers: MailProviders;
-  /** The next IMAP connect, password or key change, or MillionSend key read fails with this code (once). */
-  nextError: MailConnectError | "mail.millionsend_inbox_not_found" | "mail.millionsend_no_connector_key" | null;
+  /** The next IMAP connect or password change fails with this code (once). */
+  nextError: MailConnectError | null;
   /** Per agent, per mailbox. */
   agentMail: Map<string, Map<string, AgentMailbox>>;
   /** What `suggestedAddresses` answers (the mailbox's sent folder). */
   suggested: string[];
-  /** The inboxes any MillionSend key reaches. */
-  inboxes: Omit<MillionSendInbox, "connected">[];
-  /** Whether the next MillionSend connect makes a webhook (new email at once). */
-  instant: boolean;
 }
 
 export const MAIL_PROVIDERS: MailProviders = {
   composio: true,
   imap: true,
-  millionsend: null,
   presets: [
     {
       id: "icloud",
@@ -78,27 +65,10 @@ export function createFakeMail(
 ): FakeMail {
   const fake: FakeMail = {
     accounts: [],
-    providers: { composio: false, imap: false, presets: [], millionsend: null },
+    providers: { composio: false, imap: false, presets: [] },
     nextError: null,
     agentMail: new Map(),
     suggested: [],
-    inboxes: [
-      {
-        id: "7eeb9517-aed7-40d7-ad65-500be42ed147",
-        address: "suporte@acme.agents.millionsend.com",
-        name: "Suporte",
-        kind: "agent",
-        shared: true,
-      },
-      {
-        id: "2c6d1e0a-5b4f-4a3e-9c2d-1b0a9f8e7d6c",
-        address: "vendas@acme.com.br",
-        name: "Vendas",
-        kind: "human",
-        shared: false,
-      },
-    ],
-    instant: true,
     client: undefined as unknown as ApiClient["mail"],
   };
   const find = (id: string) => {
@@ -148,36 +118,6 @@ export function createFakeMail(
       fake.accounts.push(account);
       return clone(account);
     },
-    millionsendInboxes: async (orgId, input) => {
-      log("mail.millionsendInboxes", orgId, input.apiKey ? { apiKey: "[redacted]" } : input);
-      failOnce();
-      const taken = new Set(fake.accounts.map((a) => a.address));
-      return fake.inboxes.map((i) => ({ ...i, connected: taken.has(i.address) }));
-    },
-    connectMillionSend: async (orgId, { apiKey, ...input }) => {
-      log("mail.connectMillionSend", orgId, apiKey ? { ...input, apiKey: "[redacted]" } : input);
-      failOnce();
-      const inbox = fake.inboxes.find((i) => i.id === input.inboxId);
-      if (!inbox) throw new MockNotFoundError("This key doesn't reach that inbox");
-      const account: MailAccount = {
-        id: mockId("mail"),
-        provider: "millionsend",
-        via: "millionsend",
-        address: inbox.address,
-        label: inbox.name ?? inbox.address,
-        status: "active",
-        offActions: [],
-        askActions: [],
-        aliases: [],
-        defaultFrom: null,
-        lastError: null,
-        preset: null,
-        createdAt: now().toISOString(),
-        agents: [],
-      };
-      fake.accounts.push(account);
-      return { account: clone(account), instant: fake.instant };
-    },
     connectComposio: async (orgId, input) => {
       log("mail.connectComposio", orgId, input);
       return { accountId: mockId("mail"), redirectUrl: `https://composio.example/connect/${input.provider}` };
@@ -186,16 +126,15 @@ export function createFakeMail(
       log("mail.update", orgId, accountId, {
         ...input,
         ...(input.password ? { password: "[redacted]" } : {}),
-        ...(input.apiKey ? { apiKey: "[redacted]" } : {}),
       });
-      if (input.password || input.apiKey) failOnce();
+      if (input.password) failOnce();
       const a = find(accountId);
       if (input.label) a.label = input.label;
       if (input.offActions) a.offActions = [...input.offActions];
       if (input.askActions) a.askActions = [...input.askActions];
       if (input.aliases) a.aliases = input.aliases.map((x) => x.toLowerCase()).filter((x) => x !== a.address);
       if (input.defaultFrom !== undefined) a.defaultFrom = input.defaultFrom === a.address ? null : input.defaultFrom;
-      if (input.password || input.apiKey) {
+      if (input.password) {
         a.status = "active";
         a.lastError = null;
       }

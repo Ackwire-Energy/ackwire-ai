@@ -246,10 +246,13 @@ export function codePrompt(input: {
   checkouts: readonly CodeCheckout[];
   /** Granted repositories (`owner/name`) with no checkout yet. */
   notCloned: readonly string[];
+  /** Repositories still downloading on the computer (ADR 0116). */
+  downloading?: readonly string[];
   /** Where this turn starts (a checkout's path), when it is one. */
   cwd?: string | null;
 }): string {
-  if (input.checkouts.length === 0 && input.notCloned.length === 0) return "";
+  const downloading = input.downloading ?? [];
+  if (input.checkouts.length === 0 && input.notCloned.length === 0 && downloading.length === 0) return "";
   const lines = ["# Your code"];
   for (const c of input.checkouts) {
     const branch = c.defaultBranch ? `default branch ${c.defaultBranch}` : "default branch";
@@ -268,6 +271,11 @@ export function codePrompt(input: {
   if (input.notCloned.length > 0) {
     lines.push(
       `Not cloned yet: ${input.notCloned.join(", ")}. To work on one, call git_clone first; it needs no approval.`,
+    );
+  }
+  if (downloading.length > 0) {
+    lines.push(
+      `Still downloading on your computer: ${downloading.join(", ")}. It goes on by itself; call git_clone for one when you need it, to wait for it.`,
     );
   }
   return lines.join("\n");

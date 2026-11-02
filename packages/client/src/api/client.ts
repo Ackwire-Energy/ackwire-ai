@@ -138,8 +138,6 @@ import type {
   Memory,
   Message,
   MessagePin,
-  MillionSendInbox,
-  MillionSendKeyInput,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -186,6 +184,7 @@ import type {
   ReadOnlyOrgSettings,
   Reminder,
   ReminderInput,
+  RemovalPreview,
   Role,
   RoleInput,
   RosterMember,
@@ -236,6 +235,7 @@ import type {
   ThreadInfo,
   ThreadPage,
   ThreadPatch,
+  ToolChange,
   ToolDecision,
   TrashedArtifact,
   UndoAllResult,
@@ -357,6 +357,8 @@ export interface ApiClient {
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** What opens when the app starts here, on every device (ADR 0108; `start.channel_unknown`). */
     setStart(orgId: string, input: { page: StartPage; channelId?: string | null }): Promise<StartChoice>;
+    /** Whether I see what agents did under each reply here, on every device. */
+    setShowActivity(orgId: string, show: boolean): Promise<boolean>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
@@ -384,6 +386,8 @@ export interface ApiClient {
     members(orgId: string): Promise<Member[]>;
     /** Makes a member an owner or not (owners only). What anyone may do is their roles (`roles.setFor`). */
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
+    /** What removing them (or leaving) does; refused as the removal would be. */
+    removal(orgId: string, userId: string): Promise<RemovalPreview>;
     removeMember(orgId: string, userId: string): Promise<void>;
     invitations(orgId: string): Promise<Invitation[]>;
     invite(
@@ -848,6 +852,10 @@ export interface ApiClient {
       input: { label: string; tools: { name: string; access: ToolDecision; label: string; confirmed?: boolean }[] },
     ): Promise<CustomServer>;
     disconnect(orgId: string, serverId: string): Promise<void>;
+    /** Approved tools whose server changed them (ADR 0117), for connector admins. */
+    toolChanges(orgId: string): Promise<ToolChange[]>;
+    /** Accepts a tool's new description and input: agents get them now. */
+    acceptToolChange(orgId: string, connectionId: string, toolName: string): Promise<void>;
   };
   dms: {
     /** My direct conversations, with unread counts. */
@@ -1335,13 +1343,6 @@ export interface ApiClient {
     accounts(orgId: string): Promise<MailAccount[]>;
     /** Tests the login and both servers first; a `422` carries `MailConnectError` as its code. */
     connectImap(orgId: string, input: MailImapInput): Promise<MailAccount>;
-    /** The inboxes a MillionSend key reaches (the key isn't kept); a `422 auth` when MillionSend refuses it. */
-    millionsendInboxes(orgId: string, input: MillionSendKeyInput): Promise<MillionSendInbox[]>;
-    /** Connects one; `instant`: a webhook brings its new mail at once (else it's checked every few minutes). */
-    connectMillionSend(
-      orgId: string,
-      input: MillionSendKeyInput & { inboxId: string; label?: string },
-    ): Promise<{ account: MailAccount; instant: boolean }>;
     /**
      * Gmail/Outlook: the page to open; the server sends the person back with `?mail=connected|failed`.
      * `desktop`: started in the desktop app's window, which opens the page in the browser and gets the return back.

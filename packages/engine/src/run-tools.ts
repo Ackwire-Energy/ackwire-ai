@@ -32,7 +32,7 @@ import { withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
+const { agentRuns, agents, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
 
 /**
  * Tool access for runs, shared by the engine loop and the runner's `agentes`
@@ -736,6 +736,11 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
     return message;
   };
 
+  const [asker] =
+    requests.secretRequestIds.length > 0
+      ? await tx.select({ name: agents.name }).from(agents).where(eq(agents.id, run.agentId))
+      : [];
+  const agentName = asker?.name ?? "An agent";
   for (const requestId of requests.secretRequestIds) {
     const [request] = await tx
       .update(secretRequests)
@@ -743,8 +748,9 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .where(eq(secretRequests.id, requestId))
       .returning();
     if (!request) continue;
-    const message = await card(asked, `Secret request: ${request.name}`, {
-      ...bodyCode("secret_request", { name: request.name }),
+    // The card names the key itself: this text is for previews and notifications, a sentence of its own.
+    const message = await card(asked, `${agentName} asked for a key: ${request.name}`, {
+      ...bodyCode("secret_request", { agent: agentName, name: request.name }),
       secretRequestId: request.id,
       secretRequest: secretRequestView(request),
     });

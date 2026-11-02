@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
-import { planOf, planReplies } from "@agenteschat/client/lib/plans";
+import { CURSOR_KEY_PLAN, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
 import { markOf } from "@agenteschat/ui/brand/marks";
 import type { TFunction } from "i18next";
 import {
@@ -788,4 +788,16 @@ describe("the agent's AI", () => {
     expect(newAgentAi(null).autonomy).toBeUndefined();
     expect(screen).toContain("...(thinks.autonomy ? { autonomy: thinks.autonomy } : {})");
   });
+});
+
+test("a Cursor sign-in on the phone: its own steps, or its API key when chosen, never Claude's code", async () => {
+  // The flow is a component the tests can't render: what it wires in, as text.
+  const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
+  expect(flow).toContain('} else if (kind === "cursor") {');
+  expect(flow).toContain("agentPage.work.brain.add.cursorFinish");
+  expect(flow).toContain("signInKey(planId, kind, cursorKey)");
+  expect(signInKey(undefined, "cursor", false)).toEqual({ plan: undefined, provider: undefined });
+  expect(signInKey(undefined, "cursor", true)).toEqual({ plan: CURSOR_KEY_PLAN, provider: "cursor" });
+  expect(signInKey(undefined, "claude_code", true).plan).toBeUndefined();
+  expect(signInKey("zai", "claude_code", false)).toEqual({ plan: planOf("zai") as never, provider: "zai" });
 });

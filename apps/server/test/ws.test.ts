@@ -360,11 +360,38 @@ test("membership changes drop live subscriptions at once (channel, then organiza
   expect(stillHere).toMatchObject({ event: { type: "message.created" } });
   expect(a.frames.some((f) => f.type === "event" && f.channelId === channelId)).toBe(false);
 
-  // Removed from the organization: every subscription ends and the socket closes.
+  // Removed from the organization: the owner reads what it does first (their agents would pass to them), then every
+  // subscription ends, the socket closes, and her app's requests are refused.
+  const preview = await owner(`/api/app/organizations/${orgId}/members/${anaId}/removal`);
+  expect(((await preview.json()) as { heir: { userId: string } }).heir.userId).toBe((await meId(owner)) ?? "");
   expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
   expect(await closed).toBe(4403);
   expect(a.frames).toContainEqual({ type: "unsubscribed", channelId: other.id, reason: "revoked" });
   expect(a.frames).toContainEqual({ type: "error", code: "membership_revoked" });
+  expect((await ana(`/api/app/organizations/${orgId}/channels`)).status).toBe(403);
+  expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}/removal`)).status).toBe(404);
+  const me = (await (await ana("/api/app/me")).json()) as { organizations: { id: string }[] };
+  expect(me.organizations.map((o) => o.id)).not.toContain(orgId);
+});
+
+test("leaving on one's own closes the socket without saying they were taken out", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const { url } = (await (
+    await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+  ).json()) as { url: string };
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  const anaId = (await meId(ana)) ?? "";
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  const closed = new Promise<number>((resolve) => a.ws.addEventListener("close", (e) => resolve(e.code)));
+  expect((await ana(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
+  expect(await closed).toBe(4403);
+  expect(a.frames).toContainEqual({ type: "error", code: "membership_ended" });
+  expect(a.frames).not.toContainEqual({ type: "error", code: "membership_revoked" });
 });
 
 test("a missed revocation event is reconciled from durable membership", async () => {

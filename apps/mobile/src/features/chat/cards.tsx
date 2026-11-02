@@ -634,11 +634,13 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       <AskDone
         done
         words={
-          q.answer === null
-            ? t("mobile.chat.question.closed")
-            : who
-              ? t("mobile.chat.question.answered", { name: who, answer: said })
-              : t("mobile.chat.question.answeredByYou", { answer: said })
+          q.withdrawn
+            ? t("question.withdrawn", agentGrammar(t, dir.anyAgent(q.agentId)?.name ?? t("channel.unknownAgent")))
+            : q.answer === null
+              ? t("mobile.chat.question.closed")
+              : who
+                ? t("mobile.chat.question.answered", { name: who, answer: said })
+                : t("mobile.chat.question.answeredByYou", { answer: said })
         }
       />
     );

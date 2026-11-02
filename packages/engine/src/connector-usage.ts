@@ -91,7 +91,7 @@ export type ConnectorKeySource =
 /**
  * The key a connector's usage is counted under, the same for its tools and its accounts (ADR 0103 §1): a catalog
  * connector's id, a custom server's preset id or else its hostname, a mailbox's provider through Composio (`gmail`,
- * `outlook`) or MillionSend's (`millionsend`), else its IMAP preset's id or `imap`, and a Composio toolkit's id where we have one already or else
+ * `outlook`), else its IMAP preset's id or `imap`, and a Composio toolkit's id where we have one already or else
  * its slug. Postgres databases are `postgres`, and GitHub's own tools `github`.
  */
 export function connectorKeyOf(source: ConnectorKeySource): string {

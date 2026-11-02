@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secretAad } from "@agenteschat/adapters";
 import { and, eq, isNull, schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
 import {
   authenticateMachine,
   cancelRun,
@@ -18,6 +19,7 @@ import {
   grantScopes,
   listAgentSecrets,
   listMachines,
+  listNotifications,
   MACHINE_CONTROL_TOPIC,
   MachineDroppedError,
   type MachineHub,
@@ -411,6 +413,43 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     // A pong without either keeps what the last one said; one out of bounds says nothing.
     await runner.frame({ type: "pong", at: 3, browserTraffic: { ...more, up: -5 } });
     expect((await row())?.browserTraffic).toMatchObject(more);
+  });
+
+  test("a disk past 85% tells the admins once each time it crosses; the page shows the disk and the shared folder", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const base = { loadAvg: 0.1, loadPeak: 0.5, memoryAvg: 0.3, memoryPeak: 0.4, hours: 0.2 };
+    const warnings = async () =>
+      (await listNotifications({ db: f.db }, f.owner.id, f.org.id, { limit: 50 })).items.filter(
+        (n) => n.kind === "computer_disk_full",
+      );
+    await runner.frame({ type: "pong", at: 1, load: { ...base, diskFreeGb: 40, diskUse: 0.6, sharedGb: 2.5 } });
+    expect(await warnings()).toEqual([]);
+    expect((await listMachines(f.db, f.owner.id, f.org.id))[0]?.disk).toEqual({ freeGb: 40, use: 0.6, sharedGb: 2.5 });
+
+    await runner.frame({ type: "pong", at: 2, load: { ...base, diskFreeGb: 9, diskUse: 0.91, sharedGb: 30 } });
+    await runner.frame({ type: "pong", at: 3, load: { ...base, diskFreeGb: 8, diskUse: 0.92, sharedGb: 31 } });
+    const [warned] = await warnings();
+    expect(await warnings()).toHaveLength(1);
+    expect(warned?.source).toMatchObject({ machineId: paired.machineId, label: "Build box" });
+    expect(warned?.latest).toMatchObject({ diskUse: 0.91, diskFreeGb: 9 });
+
+    // A runner that restarts reports once without the disk: the page keeps it and nobody hears it again.
+    await runner.frame({ type: "pong", at: 4, load: base });
+    expect((await listMachines(f.db, f.owner.id, f.org.id))[0]?.disk).toEqual({ freeGb: 8, use: 0.92, sharedGb: 31 });
+    await runner.frame({ type: "pong", at: 5, load: { ...base, diskFreeGb: 8, diskUse: 0.92 } });
+    // Hovering at the line: under 85% but not under 80% doesn't arm it again.
+    await runner.frame({ type: "pong", at: 6, load: { ...base, diskFreeGb: 14, diskUse: 0.83 } });
+    await runner.frame({ type: "pong", at: 7, load: { ...base, diskFreeGb: 9, diskUse: 0.86 } });
+    expect(await warnings()).toHaveLength(1);
+
+    // Back under 80%, then over the line again: a new notice.
+    await runner.frame({ type: "pong", at: 8, load: { ...base, diskFreeGb: 30, diskUse: 0.7 } });
+    await runner.frame({ type: "pong", at: 9, load: { ...base, diskFreeGb: 5, diskUse: 0.95 } });
+    expect(await warnings()).toHaveLength(2);
   });
 
   test("a tool switched on the machine holds now (exec on the row) and wakes what waited for it", async () => {
@@ -1038,6 +1077,12 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       purpose: "publicar o pacote no npm",
       publicKey: row.publicKey,
     });
+    // Its text is for previews and notifications, a sentence that names who asked (the card names the key).
+    expect(card?.body).toBe(`${f.agent.name} asked for a key: NPM_TOKEN`);
+    expect((card?.meta as { bodyParams?: unknown } | undefined)?.bodyParams).toEqual({
+      agent: f.agent.name,
+      name: "NPM_TOKEN",
+    });
 
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
@@ -1091,6 +1136,152 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     );
     expect(runner.secrets.has("NPM_TOKEN")).toBe(false);
     expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
+  });
+
+  test("a refused key is asked for again under the same name, by its giver or the owner, once: the card says it replaces the held one, and none of it reaches the model", async () => {
+    const OLD = "tsk_old_key_value_000000000";
+    const NEW = "tsk_new_key_value_111111111";
+    const asks: Record<string, unknown>[] = [];
+    let api: "401" | "200" = "401";
+    f = await setup({
+      machines: true,
+      reply: (req) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        const ask = (purpose: string) => {
+          const input = { name: "TYPESAFE_API_KEY", purpose, target: "env" };
+          asks.push(input);
+          return { chunks: [""], toolUses: [{ name: "request_secret", input }] };
+        };
+        const list = () => ({
+          chunks: [""],
+          toolUses: [
+            {
+              name: "run_code",
+              input: {
+                language: "bash",
+                code: 'curl -s -H "Authorization: Bearer $TYPESAFE_API_KEY" https://api.typesafe.example/v1/items',
+              },
+            },
+          ],
+        });
+        if (last.includes("401 Unauthorized"))
+          return ask("A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?");
+        // The replacement arrived: try the call again.
+        if (last.includes("replacing the one you had")) return list();
+        if (last.includes("tool_result")) return { chunks: ["Pronto."] };
+        if (last.includes("conecta")) return ask("acessar a API do Typesafe");
+        if (last.includes("lista")) return list();
+        return { chunks: ["ok"] };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const paired = await pair();
+    const runner = fakeRunner(f.machineHub as MachineHub, {
+      // Like the real runner: the value is in the command's env, its output comes back redacted.
+      exec: () =>
+        api === "401"
+          ? { exitCode: 22, stdout: "", stderr: "401 Unauthorized: invalid api key [secret:TYPESAFE_API_KEY]" }
+          : { exitCode: 0, stdout: '{"items":[]}', stderr: "" },
+    });
+    await runner.hello(paired.token);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const say = async (body: string, by = f.owner.id) => {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, by, f.org.id, f.general.id, { body });
+      await drainOutbox(f.db, f.handlers);
+    };
+    const give = async (value: string) => {
+      const [row] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"));
+      if (!row) throw new Error("no pending secret request");
+      const box = await sealSecret(
+        row.publicKey,
+        value,
+        secretAad({ requestId: row.id, orgId: f.org.id, name: row.name, target: { kind: "env" } }),
+      );
+      await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, box);
+      await drainOutbox(f.db, f.handlers);
+      return row;
+    };
+
+    await say("@dev conecta no Typesafe");
+    const first = await give(OLD);
+    expect(first.replaces).toBe(false);
+    // The model is told how a refused key gets replaced, in its rules and in the tool.
+    const request = f.provider.calls.at(-1)?.request;
+    expect(systemText(request?.system ?? "")).toContain("When a key you were given is refused");
+    expect(request?.tools?.find((t) => t.name === "request_secret")?.description).toContain(
+      "ask once for a new one under the same `name`",
+    );
+    const toolResults = async () =>
+      (await f.db.select().from(schema.agentRunSteps))
+        .filter((x) => x.kind === "tool_result")
+        .map((x) => (x.data as { content: string }).content);
+
+    // The key works: nothing is asked. The agent knows the key by name from then on (never its value).
+    api = "200";
+    await say("@dev lista os itens");
+    expect(asks).toHaveLength(1);
+    expect(systemText(f.provider.calls.at(-1)?.request.system ?? "")).toContain(
+      "# Your keys on your computer\nGiven to you through request_secret; use them by name, never print them: TYPESAFE_API_KEY (a variable).",
+    );
+
+    // Refused while a member who didn't give it asked: the owner's key isn't swapped for the member's.
+    api = "401";
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    await say("@dev lista os itens de novo", bia.id);
+    expect(asks).toHaveLength(2);
+    expect(await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"))).toEqual(
+      [],
+    );
+    expect(await toolResults()).toContainEqual(
+      expect.stringContaining(
+        `TYPESAFE_API_KEY was given by ${f.owner.name}; only ${f.owner.name}, your owner or an admin can replace it.`,
+      ),
+    );
+
+    // Refused while its giver asked: the agent asks once, under the same name, saying what failed.
+    await say("@dev lista os itens de novo");
+    expect(asks).toHaveLength(3);
+    const [again] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"));
+    expect(again).toMatchObject({ name: "TYPESAFE_API_KEY", replaces: true });
+    const [card] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, again?.messageId as string));
+    expect((card?.meta as { secretRequest?: SecretRequestView } | undefined)?.secretRequest).toMatchObject({
+      name: "TYPESAFE_API_KEY",
+      purpose: "A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?",
+      replaces: true,
+    });
+
+    // The new one replaces the old on the computer; the agent hears it did and calls again.
+    await give(NEW);
+    expect(runner.secrets.get("TYPESAFE_API_KEY")).toBe(NEW);
+    const [old] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, first.id));
+    expect(old?.removedAt).not.toBeNull();
+    const results = await toolResults();
+    expect(
+      results.some((r) => r.includes("TYPESAFE_API_KEY was delivered to your computer, replacing the one you had")),
+    ).toBe(true);
+    // The new one is refused too: a third ask in that run is refused, so the agent stops instead of looping.
+    expect(asks).toHaveLength(4);
+    expect(await f.db.select().from(schema.secretRequests)).toHaveLength(2);
+    expect(results).toContainEqual(
+      expect.stringContaining("The TYPESAFE_API_KEY you were just given was refused too. Don't ask for it again"),
+    );
+
+    // Neither value ever reached the model or our database.
+    const everything = JSON.stringify([
+      f.provider.calls.map((c) => c.request),
+      await f.db.select().from(schema.messages),
+      await f.db.select().from(schema.agentRunSteps),
+      await f.db.select().from(schema.auditLog),
+      await f.db.select().from(schema.outbox),
+      await f.db.select().from(schema.secretRequests),
+    ]);
+    expect(everything).not.toContain(OLD);
+    expect(everything).not.toContain(NEW);
   });
 
   test("a decline during staging prevents activation and leaves no live secret", async () => {

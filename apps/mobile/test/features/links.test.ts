@@ -129,6 +129,17 @@ describe("inbox items", () => {
     });
     expect(notificationHref(n)).toBe("/agent/a1");
   });
+
+  test("a computer's disk almost full opens that computer, where the shared folder's size shows (ADR 0115)", () => {
+    const n = notification({
+      id: "n",
+      kind: "computer_disk_full",
+      actors: [],
+      source: { machineId: "m1", label: "Build box" },
+    });
+    expect(notificationHref(n)).toBe("/settings/computers/m1");
+    expect(notificationHref({ ...n, source: { label: "Build box" } })).toBeNull();
+  });
 });
 
 describe("the workspace's computer is ready", () => {

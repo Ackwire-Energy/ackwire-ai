@@ -12,6 +12,7 @@ import { publishMessageCreated } from "./events";
 import { cutText, cutTextEnd } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { isWithdrawnHandoff } from "./open-requests";
 import { enqueue } from "./outbox";
 import { personCanPost } from "./routine-state";
 import { deliverNoticeToRun, lateNoticeSent } from "./run-resume";
@@ -207,7 +208,8 @@ export async function wakesLater(
       .limit(1),
   ]);
   if (followUp.length > 0 || handedOff || reminder.length > 0) return true;
-  for (const d of detachedWaits) if (!(await lateNoticeSent(db, run, d.waitId))) return true;
+  for (const d of detachedWaits)
+    if (!(await lateNoticeSent(db, run, d.waitId)) && !(await isWithdrawnHandoff(db, run.orgId, d.waitId))) return true;
   return false;
 }
 
