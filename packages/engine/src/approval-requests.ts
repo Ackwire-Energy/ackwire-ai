@@ -1,15 +1,20 @@
-import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
+import { and, type Database, eq, gt, inArray, schema, sql } from "@agenteschat/db";
 import { approverIds } from "./approvals";
 import { findMember, plainName } from "./chat-tools";
 import { cutText } from "./format";
+import { MISSION_TOOL_RATES } from "./missions";
+import { maySql } from "./permissions";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
-const { agents, approvals, organizationMemberRoles, orgRoles, users } = schema;
+const { agents, approvals, organizationMemberRoles, organizationMembers, orgRoles, users } = schema;
 
 export const REQUEST_APPROVAL_TOOL = "request_approval";
 
 /** At most this many people named on one request. */
 const PEOPLE_MAX = 10;
+
+/** Requests per agent per hour, as a mission's `request_approval`: each one notifies and pushes every approver. */
+const REQUESTS_PER_HOUR = MISSION_TOOL_RATES.request_approval ?? 5;
 
 type Resolved = { ok: true; approvers: schema.ApprovalApprovers } | { ok: false; message: string };
 
@@ -35,9 +40,39 @@ export async function resolveApprovers(
   requestedBy: string | null,
 ): Promise<Resolved> {
   const { db, orgId } = ctx;
+  const [recent] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.orgId, orgId),
+        eq(approvals.agentId, ctx.agentId),
+        eq(approvals.tool, REQUEST_APPROVAL_TOOL),
+        gt(approvals.createdAt, sql`now() - interval '1 hour'`),
+      ),
+    );
+  if ((recent?.n ?? 0) >= REQUESTS_PER_HOUR) {
+    return {
+      ok: false,
+      message: `Too many approval requests in the last hour (at most ${REQUESTS_PER_HOUR}). Tell the person to wait for the ones already asked, or to ask again later.`,
+    };
+  }
   const ids = new Set<string>();
   const labels: string[] = [];
-  let requesterDecides = false;
+  // An admin decides any approval, their own request too: the card says so (ADR 0126).
+  const [requesterAdmin] = requestedBy
+    ? await db
+        .select({ userId: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.orgId, orgId),
+            eq(organizationMembers.userId, requestedBy),
+            maySql(orgId, organizationMembers.userId, "approve_actions"),
+          ),
+        )
+    : [];
+  let requesterDecides = !!requesterAdmin;
   const roleName = input.role?.trim();
   if (roleName) {
     const roles = await db
@@ -64,7 +99,7 @@ export async function resolveApprovers(
       };
     }
     for (const h of holders) ids.add(h.userId);
-    requesterDecides = !!requestedBy && ids.has(requestedBy);
+    requesterDecides ||= !!requestedBy && ids.has(requestedBy);
     labels.push(role.name);
   }
   const named: string[] = [];

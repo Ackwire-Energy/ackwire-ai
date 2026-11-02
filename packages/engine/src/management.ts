@@ -1,6 +1,7 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
 import { MODEL_TIERS, type ModelTier } from "@agenteschat/providers";
 import { getAgent } from "./agents";
+import { decidableBySql } from "./approvals";
 import type { AutoModels } from "./auto-model";
 import { caches } from "./cache";
 import { CHANNEL_NAME_PATTERN, placesAgentsIn } from "./channels";
@@ -263,11 +264,7 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
     .where(
-      and(
-        eq(approvals.orgId, orgId),
-        eq(approvals.status, "pending"),
-        admin ? undefined : eq(approvals.ownerUserId, actorId),
-      ),
+      and(eq(approvals.orgId, orgId), eq(approvals.status, "pending"), admin ? undefined : decidableBySql(actorId)),
     );
   return {
     name: membership.orgName,

@@ -11,6 +11,7 @@ import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
 import { recordRead } from "../outbound";
+import { routineCreatorOf } from "../requester";
 import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
 import { describeWhen } from "../schedule";
@@ -929,7 +930,11 @@ export function createToolGateway(deps: {
             : null;
         const asked =
           tool.approvers && !tool.connectionId
-            ? await tool.approvers(call.input, ctx, authority?.personId ?? null)
+            ? await tool.approvers(
+                call.input,
+                ctx,
+                authority ? (authority.personId ?? routineCreatorOf(authority)) : null,
+              )
             : null;
         if (asked && !asked.ok) return finish({ content: asked.message, isError: true }, "refused");
         const described = tool.describe?.(call.input) ?? { title: `${tool.name}`, detail: canonicalJson(call.input) };

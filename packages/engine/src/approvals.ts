@@ -436,6 +436,15 @@ export function decides(
   return named?.userIds.length ? named.userIds.includes(actorId) : approval.ownerUserId === actorId;
 }
 
+/** `decides` for someone who doesn't approve every action, as SQL over `approvals` (the sidebar's count). */
+export const decidableBySql = (actorId: string) => sql`(
+  ${approvals.tool} <> ${REQUEST_PERMISSION_TOOL}
+  and not (coalesce(${approvals.approvers} ->> 'requestedBy', '') = ${actorId}
+    and not coalesce((${approvals.approvers} ->> 'requesterDecides')::boolean, false))
+  and case when jsonb_array_length(coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb)) > 0
+    then ${approvals.approvers} -> 'userIds' @> to_jsonb(${actorId}::text)
+    else ${approvals.ownerUserId} is not distinct from ${actorId} end)`;
+
 /**
  * The people asked to decide (the card's badge, the inbox, push, email): whoever may approve actions (ADR 0085) and
  * the agent's owner (`adminsDecide` aside); for one asked with `request_approval`, the people it names instead,

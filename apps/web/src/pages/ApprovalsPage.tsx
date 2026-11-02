@@ -14,7 +14,7 @@ import {
 import { approvalCards, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { aheadEndLine } from "@agenteschat/client/lib/approval-words";
+import { aheadEndLine, approvalWaitsFor, requesterDecidesLine } from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { daysBetween, joinNames, nextLabel, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -377,7 +377,7 @@ export function ApprovalsPage() {
               const partial = approveAllPartial(
                 t,
                 items,
-                dir.memberById.get(first.ownerUserId ?? agent?.ownerUserId ?? ""),
+                approvalWaitsFor(first, dir.memberById.get(first.ownerUserId ?? agent?.ownerUserId ?? "")?.name),
               );
               return (
                 <section key={first.messageId ?? first.id} className="ap-group" aria-label={agent?.name}>
@@ -779,13 +779,13 @@ export function ApproveAll({ items }: { items: Approval[] }) {
 }
 
 /** Said when this person may decide only some of a card's requests: "Aprovar tudo" covers only those. */
-export function approveAllPartial(t: TFunction, items: Approval[], owner: Member | undefined) {
+export function approveAllPartial(t: TFunction, items: Approval[], who: string | undefined) {
   const { ids, waiting, blocked } = approveAllScope(items);
   if (blocked === 0 || ids.length === 0) return null;
   return t("approval.all.partial", {
     mine: ids.length,
     count: waiting,
-    who: owner?.name ?? t("approval.all.partialAdmin"),
+    who: who ?? t("approval.all.partialAdmin"),
   });
 }
 
@@ -878,7 +878,7 @@ function RequestCard({
   const phase = approvalPhase(a);
   const running = phase === "running";
   const leftMs = new Date(a.expiresAt).getTime() - Date.now();
-  const owner = a.ownerUserId ?? agent?.ownerUserId;
+  const waits = approvalWaitsFor(a, members.get(a.ownerUserId ?? agent?.ownerUserId ?? "")?.name);
   const title = approvalTitle(t, a);
   const origin = approvalOriginShort(a);
   const why = approvalWhy(a);
@@ -918,8 +918,8 @@ function RequestCard({
           <Chip icon="clock" tone={leftMs <= URGENT_MS ? "waiting" : "neutral"}>
             {a.canDecide
               ? expiryText(t, a)
-              : members.get(owner ?? "")
-                ? t("approval.waitingFor", { name: members.get(owner ?? "")?.name })
+              : waits
+                ? t("approval.waitingFor", { name: waits })
                 : t("approval.waitingAdmin")}
           </Chip>
         )}
@@ -1318,27 +1318,40 @@ function ApprovalDetails({
 
       {p === "waiting" && (
         <DetailsSection title={t("approvals.panel.deciders")}>
-          <ul className="ap-deciders">
-            {deciders.map((m) => (
-              <li key={m.userId}>
+          {a.approvers ? (
+            // Asked of named people or a role (ADR 0126): they decide, never the requester unless by role.
+            <ul className="ap-deciders">
+              <li>
                 <span className="ap-person" aria-hidden="true">
-                  {(m.name.trim()[0] ?? "?").toUpperCase()}
+                  {(a.approvers.label.trim()[0] ?? "?").toUpperCase()}
                 </span>
-                <span>
-                  {m.userId === me.user.id ? t("approvals.panel.you") : m.name}
-                  <small>
-                    {" · "}
-                    {[
-                      m.userId === ownerId ? t("approvals.panel.owner") : "",
-                      isAdmin(m) ? t("approvals.panel.admin") : "",
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </small>
-                </span>
+                <span>{a.approvers.label}</span>
               </li>
-            ))}
-          </ul>
+            </ul>
+          ) : (
+            <ul className="ap-deciders">
+              {deciders.map((m) => (
+                <li key={m.userId}>
+                  <span className="ap-person" aria-hidden="true">
+                    {(m.name.trim()[0] ?? "?").toUpperCase()}
+                  </span>
+                  <span>
+                    {m.userId === me.user.id ? t("approvals.panel.you") : m.name}
+                    <small>
+                      {" · "}
+                      {[
+                        m.userId === ownerId ? t("approvals.panel.owner") : "",
+                        isAdmin(m) ? t("approvals.panel.admin") : "",
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </small>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {requesterDecidesLine(t, a) && <p className="ap-muted">{requesterDecidesLine(t, a)}</p>}
           {channel && <p className="ap-muted">{t("approvals.panel.firstWins", { channel })}</p>}
         </DetailsSection>
       )}

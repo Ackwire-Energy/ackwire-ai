@@ -7,7 +7,7 @@
   `approverIds`, `seenBy`), `tools/gateway.ts` (`ToolDefinition.approvers`), `tools/run-policy.ts`, `executor.ts`
   (who refused), `context.ts` (`REQUEST_APPROVAL_LINE`); `apps/server/src/routes/app/approvals.ts` (`approvers`);
   `packages/client/src/lib/approval-words.ts` (`approvalWaitsFor`, `requesterDecidesLine`); web `ApprovalAsk.tsx`,
-  `ApprovalItem.tsx`; phone `chat/cards.tsx`, `approvals/ApprovalSheet.tsx`; migration `0180_approval_requests.sql`
+  `ApprovalItem.tsx`, `ApprovalsPage.tsx`; `management.ts` (`orgOverview`); phone `chat/cards.tsx`, `approvals/ApprovalSheet.tsx`; migration `0180_approval_requests.sql`
 
 ## Context
 
@@ -42,7 +42,14 @@ a question card to the person who made the request, who answered "Aprovo" to the
    approval, it asks with `request_approval` and waits, never with `ask_user` to the person who asked.
 6. **Policy**: any run may ask (a routine's request goes where the routine reports, like its other approvals). In a
    mission's thread the mission's own `request_approval` (scope `sandbox:run`, ADR 0029) wins: its source comes first.
-7. **Rules that ask a person**: a database connection's rules (ADR 0039) never ask for approval (they allow or
+7. **The requester of a routine's run** is the routine's creator (`routineCreatorOf`), so a routine never gets its
+   creator to approve its own request. An admin's own request is marked `requesterDecides`: admins may decide any
+   approval, and the card says it is their own. The sidebar's count (`approvalsWaitingForMe`) and Aprovações (the
+   chip, "Aprovar tudo", who decides) use the same people as `decides`.
+8. **At most 5 requests an hour per agent** (the mission's `request_approval` limit): each one notifies and pushes
+   every approver, so a loop or text the agent read can't flood them. Past it, the call is refused with a line the
+   agent tells the person.
+9. **Rules that ask a person**: a database connection's rules (ADR 0039) never ask for approval (they allow or
    refuse); connector tools set to `approval` are sensitive calls that already go to the agent's owner and admins,
    the same default approvers. Nothing else changes for them.
 

@@ -133,7 +133,7 @@ export function ApprovalGroupAsk({
   const always = approveAlwaysOn(items);
   const deadline = cardDeadline(items);
   const left = deadline ? Math.max(0, new Date(deadline).getTime() - Date.now()) / DAY_MS : 0;
-  const partial = approveAllPartial(t, items, owner);
+  const partial = approveAllPartial(t, items, waits);
   return (
     <RequestCard
       id={first.id}

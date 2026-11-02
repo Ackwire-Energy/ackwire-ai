@@ -9,10 +9,13 @@ import {
   drainOutbox,
   ForbiddenError,
   listApprovals,
+  orgOverview,
   postPersonMessage,
+  runRoutineNow,
   toolPolicy,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { channelRoutine, routineDeps } from "./routine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -154,4 +157,40 @@ test("a role that isn't there is refused with the workspace's roles, and nothing
   expect(await f.db.select().from(schema.approvals)).toEqual([]);
   expect(results.at(-1)).toContain('No role named \\"Conselho\\"');
   expect(results.at(-1)).toContain("Diretoria");
+});
+
+test("the sidebar counts what each person may decide: not their own request, yes the role's", async () => {
+  const { bia, carla } = await memberAsks({ role: "Diretoria" });
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  await ask(bia.id);
+  expect((await orgOverview(f.db, bia.id, f.org.id)).approvalsWaitingForMe).toBe(0);
+  expect((await orgOverview(f.db, carla.id, f.org.id)).approvalsWaitingForMe).toBe(1);
+  expect((await orgOverview(f.db, f.owner.id, f.org.id)).approvalsWaitingForMe).toBe(1);
+});
+
+test("an admin's own request says they may decide it too", async () => {
+  await memberAsks({ role: "Diretoria" });
+  await ask(f.owner.id);
+  const [view] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  expect(view?.canDecide).toBe(true);
+  expect(view?.approvers?.requesterDecides).toBe(true);
+});
+
+test("a routine's request is its creator's: they never approve it", async () => {
+  const { bia } = await memberAsks();
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  const routine = await channelRoutine(f, { prompt: "run the query" }, bia.id);
+  await runRoutineNow(routineDeps(f), bia.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+  const [row] = await f.db.select().from(schema.approvals);
+  if (!row) throw new Error("no approval");
+  expect(row.approvers?.requestedBy).toBe(bia.id);
+  expect(await approverIds(f.db, row)).toEqual([f.owner.id]);
+});
+
+test("at most 5 requests an hour per agent: the next one is refused and asks nobody", async () => {
+  const { bia, results } = await memberAsks();
+  for (let i = 0; i < 6; i++) await ask(bia.id);
+  expect(await f.db.select().from(schema.approvals)).toHaveLength(5);
+  expect(results.at(-1)).toContain("Too many approval requests in the last hour");
 });
