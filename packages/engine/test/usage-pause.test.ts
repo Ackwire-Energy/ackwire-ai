@@ -562,7 +562,7 @@ test("a refusal known only from its words holds until the first window resets, n
 async function routineSlot(fx: Fixture) {
   const deps = { db: fx.db, pubsub: fx.pubsub, context: fx.context };
   const routine = await createRoutine(deps, fx.owner.id, fx.org.id, {
-    name: "Bom dia",
+    name: "Resumo da manhã",
     agentId: fx.agent.id,
     prompt: "Summarize the night.",
     target: { type: "channel", channelId: fx.general.id },
@@ -582,7 +582,7 @@ test("a turn that goes through on the plan wakes the runs parked on its limit no
     source: "turn",
     at: new Date().toISOString(),
   });
-  const { brain, seen } = scripted(() => [{ type: "done", text: "Bom dia." }]);
+  const { brain, seen } = scripted(() => [{ type: "done", text: "Resumo pronto." }]);
   const handlers = handlersWith(f, brain);
   await routineSlot(f);
   await drainOutbox(f.db, handlers);
@@ -607,7 +607,7 @@ test("a wait on the plan whose wake job was lost is woken by the sweep once its 
           { type: "limit", resetsAt: later(150).toISOString() },
           { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
         ]
-      : [{ type: "done", text: "Bom dia." }],
+      : [{ type: "done", text: "Resumo pronto." }],
   );
   const handlers = handlersWith(f, brain);
   await routineSlot(f);

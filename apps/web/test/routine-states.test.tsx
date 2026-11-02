@@ -238,16 +238,16 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     const { calls } = await open([
       routine({
         id: "rt-limit",
-        name: "Bom dia diário",
+        name: "Resumo da manhã",
         state: "usage_paused",
         usagePause: { source: "plan", resetsAt, limit: true, plan: "Claude", extraOff: false },
         brain: { kind: "claude_code", machineName: null },
       }),
     ]);
-    const row = card("Bom dia diário");
+    const row = card("Resumo da manhã");
     expect(row.textContent).toContain(`Esperando o plano do Claude · roda às ${clock}`);
     expect(row.textContent).not.toContain("Rodando");
-    const panel = await details("Bom dia diário");
+    const panel = await details("Resumo da manhã");
     expect(panel.textContent).toContain("Roda sozinha quando o limite voltar");
     expect(within(panel).queryByRole("button", { name: "Continuar agora" })).toBeNull();
     await click(within(panel).getByRole("button", { name: "Não rodar" }));
@@ -671,7 +671,7 @@ describe("Chat: what a routine found", () => {
       body: "Bom dia, time!",
       mentionedAgentIds: [],
       agentRunId: null,
-      meta: { routine: { id: "rt-bd", name: "Bom dia diário", runId: "rr-1" } },
+      meta: { routine: { id: "rt-bd", name: "Resumo da manhã", runId: "rr-1" } },
       createdAt: ago(2),
     });
     const runs = {
@@ -679,21 +679,21 @@ describe("Chat: what a routine found", () => {
         routineRun({
           at: ago(2),
           status: "reported",
-          summary: "Bom dia",
+          summary: "Resumo da manhã",
           link: { channelId: ENG_ID, threadId: null, messageId: "m-told" },
         }),
       ],
     };
-    const { api } = withRoutines([routine({ id: "rt-bd", name: "Bom dia diário" })], runs, state);
+    const { api } = withRoutines([routine({ id: "rt-bd", name: "Resumo da manhã" })], runs, state);
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
-    await click(screen().getByRole("link", { name: "Rotina «Bom dia diário»" }));
+    await click(screen().getByRole("link", { name: "Rotina «Resumo da manhã»" }));
     await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Bom dia diário" });
+    const dialog = screen().getByRole("dialog", { name: "Resumo da manhã" });
     await click(within(dialog).getByRole("link", { name: "Abrir na conversa" }));
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     expect(router.state.location.search).toEqual({ m: "m-told" });
-    expect(screen().queryByRole("dialog", { name: "Bom dia diário" })).toBeNull();
+    expect(screen().queryByRole("dialog", { name: "Resumo da manhã" })).toBeNull();
   });
 });
