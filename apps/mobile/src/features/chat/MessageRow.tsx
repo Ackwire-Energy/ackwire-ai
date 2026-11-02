@@ -96,8 +96,6 @@ import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
-/** The room beside my bubble for its receipt's mark: my row's 64px left padding past the screen's 16px edge. */
-const MARK_ROOM = 48;
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
@@ -105,9 +103,9 @@ const MARK_ROOM = 48;
  * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
  * line under its words and what it changed ("Usou N ferramentas"), the same place live, kept and saved, and a
  * stopped one says so with "Continuar". A person's message's
- * receipt is a mark in room the row already has (`ReceiptMark`), so it never changes the row's height: beside my
- * bubble, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of someone
- * else's name line, the agents' receipt of their latest message.
+ * receipt is a mark in a line the row already has (`ReceiptMark`), so it never changes the row's height: after the
+ * time under my turn, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of
+ * someone else's name line, the agents' receipt of their latest message.
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
@@ -308,10 +306,9 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // The bubble, or the GIF or sticker or the files of a message with no words, leads; the receipt's mark stands
-    // beside it.
+    // The bubble, or the GIF or sticker or the files of a message with no words, leads.
     const lead = body ? (
-      <View style={[styles.bubble, BUBBLE_RUN[run], styles.lead, { backgroundColor: c.bubble }]}>
+      <View style={[styles.bubble, BUBBLE_RUN[run], { backgroundColor: c.bubble }]}>
         <MessageText
           body={body}
           muted={m.local === "pending"}
@@ -321,11 +318,11 @@ export const MessageRow = memo(function MessageRow({
         />
       </View>
     ) : media ? (
-      <View style={styles.grow}>
+      <View style={styles.meFiles}>
         <ChatMedia media={media} align="end" liveId={m.id} />
       </View>
     ) : files.length > 0 ? (
-      <View style={styles.grow}>
+      <View style={styles.meFiles}>
         <MessageFiles files={files} align="end" />
       </View>
     ) : null;
@@ -349,14 +346,7 @@ export const MessageRow = memo(function MessageRow({
             </Text>
           </View>
         ) : null}
-        {lead ? (
-          <View style={styles.meLine}>
-            <View style={styles.meMark}>
-              {m.local ? null : <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />}
-            </View>
-            {lead}
-          </View>
-        ) : null}
+        {lead}
         {body && media ? (
           <View style={styles.meFiles}>
             <ChatMedia media={media} align="end" liveId={m.id} />
@@ -372,11 +362,15 @@ export const MessageRow = memo(function MessageRow({
           {missionDecision}
           {foot}
         </View>
-        {/* One time per run of my rows (they group a few minutes apart), under its last; a send in flight says so. */}
+        {/* One time per run of my rows (they group a few minutes apart), under its last, the receipt's mark ending
+            its line; a send in flight says so. */}
         {!m.local && (run === "end" || run === "solo") ? (
-          <Text variant="caption" tone="faint" style={styles.meTime}>
-            {when.time(m.createdAt)}
-          </Text>
+          <View style={styles.meTime}>
+            <Text variant="caption" tone="faint">
+              {when.time(m.createdAt)}
+            </Text>
+            <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />
+          </View>
         ) : null}
       </Pressable>
     );
@@ -824,12 +818,15 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   );
 }
 
+/** The turn's last corner, cut as a card's is, on the side my bubble stands. */
+const BUBBLE_CUT = 5;
+
 /** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
 const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
-  solo: {},
+  solo: { borderBottomRightRadius: BUBBLE_CUT },
   start: { borderBottomRightRadius: 6 },
   mid: { borderTopRightRadius: 6, borderBottomRightRadius: 6 },
-  end: { borderTopRightRadius: 6 },
+  end: { borderTopRightRadius: 6, borderBottomRightRadius: BUBBLE_CUT },
 };
 
 const styles = StyleSheet.create({
@@ -849,7 +846,7 @@ const styles = StyleSheet.create({
   meCont: { paddingTop: 1, marginTop: 0 },
   // A run of my rows sits 2px apart (1 under this one, 1 over the next).
   meRunOn: { paddingBottom: 1 },
-  meTime: { marginTop: 4, textAlign: "right" },
+  meTime: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 4, height: 16 },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
@@ -858,18 +855,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 18,
   },
-  // My row keeps 64px free on the left, 48 of them past the screen's 16px edge: the receipt's mark stands there, on
-  // the bubble's last line (10px under the text, 24px lines), so it never adds a line.
-  meLine: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "flex-end",
-    marginLeft: -MARK_ROOM,
-  },
-  meMark: { width: MARK_ROOM, alignItems: "flex-end", paddingRight: 6, paddingBottom: 14 },
-  lead: { flexShrink: 1 },
-  grow: { flex: 1 },
   meFiles: { alignSelf: "stretch" },
   meCards: { alignSelf: "stretch" },
   meStatus: { marginTop: 4, textAlign: "right" },
