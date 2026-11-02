@@ -9,6 +9,7 @@ import { publishMessageCreated } from "./events";
 import { type Message, messageView } from "./messages";
 import type { Membership } from "./organizations";
 import { enqueue } from "./outbox";
+import { isTerminal } from "./runs";
 import { effectiveAgentBudget, monthStartUtc } from "./usage";
 
 /**
@@ -204,7 +205,8 @@ export async function routineRunByHand(db: Executor, runId: string) {
 /** `meta.actionCard` of a long-work pause's card (ADR 0118). Only the executor and Continuar agora write it. */
 export interface UsagePauseCard {
   kind: "usage_paused";
-  state: "paused" | "continued" | "resumed";
+  /** `ended`: the run ended paused (canceled, superseded, failed): nothing left to continue. */
+  state: "paused" | "continued" | "resumed" | "ended";
   runId: string;
   waitId: string;
   agentId: string;
@@ -227,11 +229,20 @@ export const usagePauseCardOf = (meta: Record<string, unknown> | null | undefine
 };
 
 /** The paused run picked up by itself (the window reset, or room again): its card says so, once. */
-export async function usageCardResumed(deps: { db: Database; pubsub?: PubSub }, orgId: string, messageId: string) {
+export const usageCardResumed = (deps: { db: Database; pubsub?: PubSub }, orgId: string, messageId: string) =>
+  setUsageCardState(deps, orgId, messageId, "resumed");
+
+/** Moves a card still `paused` to `state`, once. */
+async function setUsageCardState(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  messageId: string,
+  state: "resumed" | "ended",
+) {
   const { messages } = schema;
   const [row] = await deps.db
     .update(messages)
-    .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard,state}', '"resumed"')` })
+    .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard,state}', ${JSON.stringify(state)}::jsonb)` })
     .where(
       and(
         eq(messages.orgId, orgId),
@@ -313,7 +324,11 @@ export async function continueUsagePause(
     });
     return updated ?? null;
   });
-  if (!done) return { runs: [] };
+  if (!done) {
+    // The run ended while paused: the card says so instead of offering a button that does nothing.
+    if (isTerminal(row.run.status)) await setUsageCardState(deps, message.orgId, message.id, "ended");
+    return { runs: [] };
+  }
   if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(done));
   return { runs: [{ agentId: card.agentId, runId: card.runId }] };
 }

@@ -8,7 +8,7 @@ import { usageWhen } from "./plan-usage";
  */
 export interface UsagePauseCard {
   kind: "usage_paused";
-  state: "paused" | "continued" | "resumed";
+  state: "paused" | "continued" | "resumed" | "ended";
   agentId: string;
   /** The person behind the work: with the agent's owner and admins, who may press Continuar agora. */
   forUserId: string | null;
@@ -28,7 +28,7 @@ export function usagePauseCardOf(meta: Record<string, unknown> | null | undefine
   if (raw?.kind !== "usage_paused" || typeof raw.agentId !== "string" || typeof raw.percent !== "number") return null;
   return {
     kind: "usage_paused",
-    state: raw.state === "continued" || raw.state === "resumed" ? raw.state : "paused",
+    state: raw.state === "continued" || raw.state === "resumed" || raw.state === "ended" ? raw.state : "paused",
     agentId: raw.agentId,
     forUserId: str(raw.forUserId),
     source: raw.source === "budget" ? "budget" : "plan",

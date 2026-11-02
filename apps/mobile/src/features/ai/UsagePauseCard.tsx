@@ -57,9 +57,9 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
             ? t("stretchCard.continuedByYou", { time })
             : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })}
         </Text>
-      ) : card.state === "resumed" ? (
+      ) : card.state === "resumed" || card.state === "ended" ? (
         <Text variant="footnote" tone="faint">
-          {t("usageCard.resumed", { agent: name })}
+          {t(`usageCard.${card.state}`, { agent: name })}
         </Text>
       ) : (
         <>

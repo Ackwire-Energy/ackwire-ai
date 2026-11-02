@@ -1681,6 +1681,7 @@ export const en: Translations = {
     hintBudget: "Uses what's left of the budget",
     forbidden: "Only who asked, the agent's owner or an admin can continue now",
     resumed: "{{agent}} picked the work back up",
+    ended: "This work ended before it picked up",
     extraTitle: "Long work may use paid extra usage",
     extraHint:
       "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets.",

@@ -8,6 +8,7 @@ import {
   type Brain,
   type BrainEvent,
   type BrainTurn,
+  cancelRun,
   clearPlanLimits,
   createJobHandlers,
   createRoutine,
@@ -476,4 +477,19 @@ test("a routine's paused slot: its people hear it, and Rodar agora runs it now",
   expect(seen).toHaveLength(1);
   const [paused] = await runs(f);
   expect(paused?.status).not.toBe("waiting_input");
+});
+
+test("Continuar agora on the card of a run canceled while paused: the card says the work ended", async () => {
+  f = await setup({ contextTools: true, budgetNanoUsd: BUDGET, reply: stepper(12) });
+  await spend(f, 96);
+  await post(f, "@dev analisa os pedidos");
+  await drainOutbox(f.db, f.handlers);
+  const [paused] = await runs(f);
+  const [card] = await cards(f);
+  if (!card || !paused) throw new Error("no card");
+  await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, paused.id);
+  const deps = { db: f.db, pubsub: f.pubsub, gateway: f.gateway };
+  expect(await answerNow(deps, f.owner.id, f.org.id, card.id)).toEqual({ runs: [] });
+  const [after] = await cards(f);
+  expect((after?.meta.actionCard as { state?: string } | undefined)?.state).toBe("ended");
 });

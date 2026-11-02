@@ -32,6 +32,7 @@ const meta = (over: Record<string, unknown> = {}) => ({
 test("a long-work pause's card: read from its message, its words, who may press Continuar agora", () => {
   const card = usagePauseCardOf(meta());
   expect(card?.state).toBe("paused");
+  expect(usagePauseCardOf(meta({ state: "ended" }))?.state).toBe("ended");
   expect(actionCardOf(meta())?.kind).toBe("usage_paused");
   expect(usagePauseCardOf({ actionCard: { kind: "stretch_paused" } })).toBeNull();
   if (!card) throw new Error("no card");

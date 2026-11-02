@@ -1699,6 +1699,7 @@ export const ptBR = {
     hintBudget: "Usa o que resta do orçamento",
     forbidden: "Só quem pediu, o dono do agente ou um admin pode continuar agora",
     resumed: "{{agent}} retomou o trabalho",
+    ended: "Este trabalho terminou antes de retomar",
     extraTitle: "Trabalho longo pode usar o uso extra pago",
     extraHint:
       "Com o uso extra ligado no plano, o trabalho longo segue depois de 95%. Desligado, ele pausa em 95% e retoma quando o plano renovar.",
