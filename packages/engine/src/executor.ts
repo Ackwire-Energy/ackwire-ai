@@ -209,7 +209,7 @@ import { truncateOutput } from "./sandbox";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
-import { rerootRun } from "./stretch";
+import { personAskedLately, rerootRun, runStretchOf } from "./stretch";
 import {
   isStuck,
   noteStep,
@@ -510,8 +510,12 @@ export interface Transcript {
    * A blip (a deploy dropping the computer for seconds, within the outage grace) keeps its place; a real outage doesn't.
    */
   roomWaitSince?: number;
+  /** A wake that waited outside any run first (`StartRunOptions.park`): its place in the line counts from then. */
+  roomOrderSince?: number;
   /** A person waits on this run: it goes first in the computer's line (`computer-queue.ts`). */
   roomPeople?: boolean;
+  /** Its stretch is work a person asked for lately (`personAskedLately`): next in the line after people's runs. */
+  roomAsked?: boolean;
   /** When this run last sent a turn to its computer: agents' turns there are spaced (`roomGate`). */
   roomAsk?: { machineId: string; at: number };
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
@@ -731,6 +735,8 @@ export const OUTAGE_PARK = { ladderMinutes: [2, 15, 30, 60], maxMs: 24 * 60 * 60
 type RunJobOptions = {
   finalAttempt: boolean;
   wait?: string;
+  /** A parked wake's run: when the wake started waiting (`transcript.roomOrderSince`). */
+  lineSince?: number;
   jobId?: string;
   owned?: () => Promise<boolean>;
   failed?: (error: unknown) => void;
@@ -2286,7 +2292,10 @@ async function executeRunInner(
     }
     // Only a blip keeps its place in the line: after a real outage the wait for room starts over, or its clock
     // (the 10-minute note, its place in line) would count the time the computer was gone as time it was busy.
-    if (!busy && quietUntil === null) delete t.roomWaitSince;
+    if (!busy && quietUntil === null) {
+      delete t.roomWaitSince;
+      delete t.roomOrderSince;
+    }
     // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
     const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
@@ -2711,6 +2720,7 @@ async function executeRunInner(
     t.postedUpTo = t.messages.length;
     if (!u.soon) t.brainNotice = u.code;
     delete t.roomWaitSince;
+    delete t.roomOrderSince;
     if (paused) {
       // An override that let it go on has run out (it parked again): this pause is a new one.
       const { override: _, ...kept } = t.usagePause ?? {};
@@ -3072,7 +3082,14 @@ async function executeRunInner(
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
         const people = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
-        const behind = await roomGate(db, run, roomMachine, { people, since: transcript.roomWaitSince ?? Date.now() });
+        // A routine's run: a person scheduled it.
+        transcript.roomAsked ??=
+          !people && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
+        if (options.lineSince) transcript.roomOrderSince ??= options.lineSince;
+        const behind = await roomGate(db, run, roomMachine, {
+          rank: people ? 0 : transcript.roomAsked ? 1 : 2,
+          since: transcript.roomOrderSince ?? transcript.roomWaitSince ?? Date.now(),
+        });
         if (behind) {
           const handled = await brainUnavailable({
             code: "busy",
@@ -3227,6 +3244,7 @@ async function executeRunInner(
           // A turn cut off by its computer is finished now, and one that found room ends that wait.
           delete transcript.interruptedTurn;
           delete transcript.roomWaitSince;
+          delete transcript.roomOrderSince;
           // The plan had room for this turn: the runs parked on its limit go on now, not at their own timers.
           const planMachine = turnPlan.session?.machineId;
           if (planMachine && !turnLimited) {
@@ -3258,7 +3276,10 @@ async function executeRunInner(
           error.code === "machine_offline" &&
           !deltas.text() &&
           executedNow.length === 0;
-        if (!refused && !unsent) delete transcript.roomWaitSince;
+        if (!refused && !unsent) {
+          delete transcript.roomWaitSince;
+          delete transcript.roomOrderSince;
+        }
         if (turnAbort?.signal.aborted) {
           await interruptedTurn(turn, deltas.text());
           continue;

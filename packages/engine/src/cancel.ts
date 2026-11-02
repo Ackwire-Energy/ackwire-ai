@@ -4,6 +4,7 @@ import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
 import { personOfMessage } from "./authority";
 import { lineMachineOf, publishQueueChanged } from "./computer-queue";
+import { INBOX_JOB } from "./dispatch";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
@@ -405,6 +406,17 @@ export async function stopOrgWork(
         eq(agentRuns.orgId, orgId),
         inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
         agentId ? eq(agentRuns.agentId, agentId) : undefined,
+      ),
+    );
+  // Wakes still waiting outside any run (ADR 0032 "Calm wakes") never start.
+  await deps.db
+    .delete(outbox)
+    .where(
+      and(
+        eq(outbox.orgId, orgId),
+        eq(outbox.kind, INBOX_JOB),
+        eq(outbox.status, "pending"),
+        agentId ? sql`${outbox.payload}->>'agentId' = ${agentId}` : undefined,
       ),
     );
   for (const { run, channelKind } of live) {
