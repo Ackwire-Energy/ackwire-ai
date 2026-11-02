@@ -73,6 +73,16 @@ test("the window that binds long work: live, of this model, never extra usage", 
   expect(extraUsageLeft(u)).toBe(false);
   expect(extraUsageLeft(reading([{ kind: "other", label: "Extra usage", usedPercent: 140 }]))).toBe(false);
   expect(extraUsageLeft(reading([{ kind: "other", label: "Extra usage", usedPercent: 10 }]))).toBe(true);
+  // A model's own week (`model_scoped`) binds that model only.
+  const scoped = reading([
+    { kind: "five_hour", usedPercent: 60, resetsAt: iso(3600_000) },
+    { kind: "other", label: "Fable", usedPercent: 98, resetsAt: iso(86_400_000) },
+    { kind: "other", label: "OAuth apps", usedPercent: 99 },
+  ]);
+  expect(planBinding(scoped, { model: "claude-fable-5", now })).toEqual(
+    expect.objectContaining({ kind: "other", used: 98 }),
+  );
+  expect(planBinding(scoped, { model: "sonnet", now })?.used).toBe(60);
 });
 
 test("long work: a routine or a mission by kind, else by size in this claim", () => {

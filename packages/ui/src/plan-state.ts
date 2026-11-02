@@ -180,6 +180,8 @@ const WINDOW_MS: Partial<Record<string, number>> = {
   seven_day_opus: 7 * 86_400_000,
   seven_day_sonnet: 7 * 86_400_000,
   monthly: 31 * 86_400_000,
+  // A model's own week.
+  other: 7 * 86_400_000,
 };
 
 /** The paid extra usage the account has turned on with the provider (only Claude's plans report it). */
@@ -191,9 +193,12 @@ export const extraUsageLeft = (usage: { windows: readonly PlanMeterWindow[] } | 
   usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL && w.usedPercent < PLAN_PAUSE) ??
   false;
 
+/** `other` windows that are no model's own week. */
+const NOT_A_MODEL = new Set([EXTRA_USAGE_LABEL, "OAuth apps"]);
+
 /**
  * The window that binds long work on a run with `model`: the most used of the windows that apply to it and still
- * count now. A model's own week counts only for that model; `other` windows (extra usage, OAuth apps) never count.
+ * count now. A model's own week counts only for that model; extra usage and OAuth apps never count.
  * A window whose reset passed reads 0, and one with no reset stops counting once its length passed since the
  * reading. Null: nothing known, which never pauses anything.
  */
@@ -207,7 +212,9 @@ export function planBinding(
   const read = Date.parse(usage.at);
   let top: { kind: string; used: number; resetsAt?: string } | null = null;
   for (const w of usage.windows) {
-    if (w.kind === "other") continue;
+    // A model's own week (Claude's `model_scoped`, stored as `other` with the model's name) counts for that model.
+    if (w.kind === "other" && (!w.label || NOT_A_MODEL.has(w.label) || !model.includes(w.label.toLowerCase())))
+      continue;
     if (w.kind === "seven_day_opus" && !model.includes("opus")) continue;
     if (w.kind === "seven_day_sonnet" && !model.includes("sonnet")) continue;
     const length = WINDOW_MS[w.kind] ?? 0;
