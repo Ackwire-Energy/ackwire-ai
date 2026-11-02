@@ -38,6 +38,7 @@ import {
   installSystemService,
   SYSTEM_UNIT_PATH,
   systemdSystemUnit,
+  systemdVersion,
 } from "../../runner/service";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
@@ -55,6 +56,12 @@ function home() {
 
 const BUN = "/opt/agentes-runner/bin/bun";
 const BUNDLE = "/opt/agentes-runner/agentes-runner.mjs";
+
+test("systemd's version, which says whether a scope takes OOMPolicy (253 and later)", () => {
+  expect(systemdVersion("systemd 257 (257.13-1~deb13u1)\n+PAM +AUDIT +BPF_FRAMEWORK")).toBe(257);
+  expect(systemdVersion("systemd 252 (252.39-1~deb12u1)")).toBe(252);
+  expect(systemdVersion("bash: systemctl: command not found")).toBe(0);
+});
 
 test("the system unit: root, from boot, a PATH root owns, and tasks outlive a restart", () => {
   expect(SYSTEM_UNIT_PATH).toBe("/etc/systemd/system/agentes-runner.service");
@@ -150,8 +157,8 @@ test.if(posix)("service install --system: a system home, and it starts only when
     });
   };
 
-  // A computer an earlier runner set up: its installer's run writes the new limits over the old, and the reload
-  // applies them to the agents running there (systemd sets a running slice's limits again as it reloads).
+  // A computer an earlier runner set up: its installer's run writes the new limits over the old, and the reload gives
+  // them to slices that start from now (running ones get them as the runner starts: `prepareAgents`).
   mkdirSync(path.dirname(agentSliceLimitsPath(unitPath)), { recursive: true });
   writeFileSync(agentSliceLimitsPath(unitPath), "[Slice]\nMemoryMax=1536M\nTasksMax=1024\nCPUQuota=200%\n");
   // install.sh's first step: before pairing, nothing starts.

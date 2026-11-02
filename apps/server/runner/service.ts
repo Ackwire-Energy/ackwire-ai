@@ -508,8 +508,9 @@ export function installSystemService(io: SystemServiceIo): number {
   } catch {
     // incomplete: same as not paired
   }
-  // The reload also applies the slices' new limits to the agents running now: nothing of theirs restarts (and
-  // `KillMode=process` keeps it through the runner's restart).
+  // The reload gives the new limits to slices that start from now; an agent's running slice gets them as the runner
+  // starts and sets its bind policy (`prepareAgents`). Nothing of the agents' restarts (`KillMode=process` keeps it
+  // through the runner's restart too).
   const steps = [["daemon-reload"]];
   if (start && paired) steps.push(["enable", SERVICE_NAME], ["restart", SERVICE_NAME]);
   for (const args of steps) {
