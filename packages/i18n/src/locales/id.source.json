@@ -20615,20 +20615,62 @@
   "connectors.toolChanges.intro": {
     "value": "These servers changed what a tool says or asks for. Agents keep the version you approved until you accept the new one."
   },
-  "connectors.toolChanges.before": {
-    "value": "Approved"
+  "connectors.toolChanges.count": {
+    "value": {
+      "one": "{{count}} tool changed",
+      "other": "{{count}} tools changed"
+    }
   },
-  "connectors.toolChanges.after": {
-    "value": "Now"
+  "connectors.toolChanges.acceptAll": {
+    "value": "Accept all"
+  },
+  "connectors.toolChanges.acceptedAll": {
+    "value": "{{name}}'s tools updated."
+  },
+  "connectors.toolChanges.show": {
+    "value": "See the change"
+  },
+  "connectors.toolChanges.hide": {
+    "value": "Hide"
+  },
+  "connectors.toolChanges.showAll": {
+    "value": "Show all ({{total}})"
+  },
+  "connectors.toolChanges.textChanged": {
+    "value": "The text changed"
+  },
+  "connectors.toolChanges.fieldsChanged": {
+    "value": {
+      "one": "{{count}} field changed",
+      "other": "{{count}} fields changed"
+    }
+  },
+  "connectors.toolChanges.inputChanged": {
+    "value": "The input changed"
+  },
+  "connectors.toolChanges.description": {
+    "value": "Text"
+  },
+  "connectors.toolChanges.field.added": {
+    "value": "new"
+  },
+  "connectors.toolChanges.field.removed": {
+    "value": "removed"
+  },
+  "connectors.toolChanges.field.changed": {
+    "value": "changed"
+  },
+  "connectors.toolChanges.added": {
+    "value": "Added"
+  },
+  "connectors.toolChanges.removed": {
+    "value": "Removed"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.input": {
     "value": "Input"
-  },
-  "connectors.toolChanges.fieldChanged": {
-    "value": "changed"
-  },
-  "connectors.toolChanges.noInput": {
-    "value": "No input"
   },
   "connectors.toolChanges.accept": {
     "value": "Accept"

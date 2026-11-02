@@ -11810,7 +11810,10 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   }
 }
 
-/* Settings → Conectores: approved tools a server changed, old and new side by side (ADR 0117). */
+/*
+ * Settings → Conectores: approved tools a server changed (ADR 0117). One block per connection, one line per tool
+ * saying what changed; only the changed sentences and fields open under it, so many changed tools stay short.
+ */
 .tool-changes {
   display: grid;
   gap: var(--space-2);
@@ -11819,50 +11822,72 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   margin: 0;
   font-size: 1rem;
 }
-.tool-change {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
+.tool-changes__group {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
-.tool-change__head {
+.tool-changes__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
 }
-.tool-change__name {
-  font-weight: 600;
+.tool-changes__who {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
   min-width: 0;
-  overflow-wrap: anywhere;
 }
-.tool-change__sides {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: var(--space-3);
+.tool-changes__name {
+  font-weight: 600;
 }
-.tool-change__text {
-  margin: 4px 0;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-.tool-change__fields {
-  display: grid;
-  gap: 4px;
-  margin: 4px 0 0;
+.tool-changes__tools {
+  margin: 0;
   padding: 0;
   list-style: none;
 }
-.tool-change__field {
-  padding: 4px var(--space-2);
-  border-radius: 8px;
+.tool-changes__more {
+  margin: var(--space-1) var(--space-3) var(--space-2);
 }
-.tool-change__field--changed {
-  background: var(--warn-soft);
+.tool-change {
+  border-top: 1px solid var(--line);
 }
-.tool-change__tag {
-  margin-left: var(--space-2);
-  font-size: 0.75rem;
-  font-weight: 600;
+.tool-change__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+.tool-change__what {
+  display: grid;
+  min-width: 0;
+}
+.tool-change__name {
+  overflow-wrap: anywhere;
+}
+.tool-change__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+.tool-change__details {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3);
+}
+.tool-change__part {
+  display: grid;
+  gap: var(--space-1);
+}
+.tool-change__part .ac-diff__text {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .tool-change__row {
+    flex-wrap: wrap;
+  }
 }

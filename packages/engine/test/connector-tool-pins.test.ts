@@ -4,6 +4,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
+  acceptConnectionToolChanges,
   acceptCustomSuggestion,
   acceptToolChange,
   type CustomDeps,
@@ -106,6 +107,29 @@ test("a changed description keeps the approved one, one notice; accepted, agents
   expect((await w.seen()).description).toContain("other_tool");
   expect(await listToolChanges(f.db, f.owner.id, f.org.id)).toEqual([]);
   expect((await w.notices())[0]?.doneAt).not.toBeNull();
+});
+
+test("Aceitar todas: every change waiting on a connection accepted at once, the notice resolved", async () => {
+  const w = await connected();
+  await w.seen();
+  w.mcp.state.description = V2;
+  w.mcp.state.withLimit = true;
+  await w.seen();
+  expect(await listToolChanges(f.db, f.owner.id, f.org.id)).toHaveLength(1);
+  const accepted = await acceptConnectionToolChanges(
+    { db: f.db, resync: (id) => refreshCustomServer(w.deps, f.owner.id, f.org.id, id) },
+    f.owner.id,
+    f.org.id,
+    w.id,
+  );
+  expect(accepted).toBe(1);
+  const tool = await w.seen();
+  expect(tool.description).toContain("other_tool");
+  expect(Object.keys(tool.inputSchema.properties as object)).toEqual(["q", "limit"]);
+  expect(await listToolChanges(f.db, f.owner.id, f.org.id)).toEqual([]);
+  expect((await w.notices())[0]?.doneAt).not.toBeNull();
+  // Nothing left to accept.
+  await expect(acceptConnectionToolChanges({ db: f.db }, f.owner.id, f.org.id, w.id)).rejects.toThrow();
 });
 
 test("an input-only change is caught too, and the tool stays callable with the approved input", async () => {

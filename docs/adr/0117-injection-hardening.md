@@ -82,10 +82,14 @@ Four ways out stayed open after ADR 0109:
    there) the first time an agent lists it (inside the 60 s listing cache). Connections that exist at deploy are
    pinned to whatever their server lists then. A later listing that differs serves the pinned
    version, keeps the new one as pending (`changed_at` from its first sighting), and tells who manages connectors
-   once (`connector_tool_changed`, waiting). The tool stays callable. Settings › Conectores lists the changes side
-   by side (`GET …/connectors/tool-changes`); Aceitar (`POST …/connectors/{id}/tools/{name}/accept-change`, admins)
-   makes the new version the pin, lists the connection again so agents get it now, re-runs a custom server's
-   classification, and resolves the notice once nothing of the connection waits. A change back to the pinned
+   once (`connector_tool_changed`, waiting). The tool stays callable. Settings › Conectores lists the changes
+   (`GET …/connectors/tool-changes`) one block per connection and one line per tool saying what changed; "Ver a
+   mudança" opens only the changed sentences and fields, with a sentence of context (a server like an ads API
+   rewrites dozens of long descriptions at once, and the whole texts side by side buried the page). Aceitar
+   (`POST …/connectors/{id}/tools/{name}/accept-change`, admins), or Aceitar todas for a connection
+   (`POST …/connectors/{id}/tool-changes/accept`, one listing again for all of them), makes the new version the pin,
+   lists the connection again so agents get it now, re-runs a custom server's classification, and resolves the
+   notice once nothing of the connection waits. A change back to the pinned
    version clears the pending one, and resolves the notice once nothing of the connection waits. Composio's tools (pinned by toolkit version) and the tools we serve ourselves
    are never pinned. A custom server's admin classification gate is unchanged.
 3. **A chat card's preview loads nothing from the network** (`HtmlFrame.tsx`). Every page an agent writes, the

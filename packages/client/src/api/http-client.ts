@@ -1391,6 +1391,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}/tools/${enc(toolName)}/accept-change`, {
           json: {},
         }),
+      acceptConnectionToolChanges: (orgId, connectionId) =>
+        request<{ accepted: number }>(`${org(orgId)}/connectors/${enc(connectionId)}/tool-changes/accept`, {
+          json: {},
+        }),
     },
     questions: {
       answer: (orgId, questionId, input) =>
