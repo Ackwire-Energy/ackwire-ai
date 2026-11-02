@@ -1,4 +1,5 @@
-import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, like, schema, sql } from "@agenteschat/db";
+import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
@@ -28,6 +29,51 @@ export async function mailConnectionIds(db: Executor, orgId: string, ids: (strin
     .from(dbConnections)
     .where(and(eq(dbConnections.orgId, orgId), inArray(dbConnections.id, wanted)));
   return new Set([...rows, ...dbs].map((r) => r.id));
+}
+
+/**
+ * Someone new can talk to the agent (its audience widened, or it has a new owner): it loses the mailboxes of everyone
+ * but `keeperId`. Only a mailbox's owner gives an agent access to it, for the people the agent answered then (ADR 0038
+ * addendum); they give it again if they still want to. Returns the mailboxes taken, each audited.
+ */
+export async function dropForeignMailGrants(
+  db: Executor,
+  orgId: string,
+  agentId: string,
+  keeperId: string | null,
+  actorId: string,
+) {
+  const dropped = await db
+    .delete(agentScopes)
+    .where(
+      and(
+        eq(agentScopes.orgId, orgId),
+        eq(agentScopes.agentId, agentId),
+        like(agentScopes.scope, "mail:%"),
+        inArray(
+          agentScopes.connectionId,
+          db
+            .select({ id: mailAccounts.id })
+            .from(mailAccounts)
+            .where(
+              and(eq(mailAccounts.orgId, orgId), sql`${mailAccounts.createdByUserId} is distinct from ${keeperId}`),
+            ),
+        ),
+      ),
+    )
+    .returning({ accountId: agentScopes.connectionId });
+  const accountIds = [...new Set(dropped.map((d) => d.accountId).filter((id): id is string => !!id))];
+  if (accountIds.length > 0) caches.scopes.delete(`${orgId}:${agentId}`);
+  for (const accountId of accountIds) {
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.mail_access_changed",
+      target: { type: "agent", id: agentId },
+      details: { accountId, level: "none", reason: "audience_widened" },
+    });
+  }
+  return accountIds;
 }
 
 /**
@@ -312,11 +358,17 @@ export async function setAgentScopes(
 }
 
 /** Adds grants without permission checks: for internal setup (new agents, tests). */
-export async function grantScopes(db: Executor, orgId: string, agentId: string, grants: ScopeGrant[]) {
+export async function grantScopes(
+  db: Executor,
+  orgId: string,
+  agentId: string,
+  grants: ScopeGrant[],
+  grantedByUserId: string | null = null,
+) {
   if (grants.length === 0) return;
   caches.scopes.delete(`${orgId}:${agentId}`);
   await db
     .insert(agentScopes)
-    .values(grants.map((g) => ({ orgId, agentId, connectionId: g.connectionId, scope: g.scope })))
+    .values(grants.map((g) => ({ orgId, agentId, connectionId: g.connectionId, scope: g.scope, grantedByUserId })))
     .onConflictDoNothing();
 }

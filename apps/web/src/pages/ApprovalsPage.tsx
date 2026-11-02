@@ -14,7 +14,12 @@ import {
 import { approvalCards, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { aheadEndLine, approvalWaitsFor, requesterDecidesLine } from "@agenteschat/client/lib/approval-words";
+import {
+  aheadEndLine,
+  approvalDecidingKeys,
+  approvalWaitsFor,
+  requesterDecidesLine,
+} from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { daysBetween, joinNames, nextLabel, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -1158,9 +1163,13 @@ function ApprovalDetails({
       ...roles.filter((r) => m.roleIds?.includes(r.id)).flatMap((r) => r.permissions),
     ]);
   const isAdmin = (m: Member) => m.role === "owner" || keysOf(m).has("administrator");
+  const deciding = approvalDecidingKeys(a);
+  const holds = (m: Member) => m.role === "owner" || deciding.every((k) => keysOf(m).has(k));
+  // A request to turn on access is decided only by those who give it, its agent's owner too.
+  const ownerDecides = (m: Member) => a.tool !== "request_permission" || holds(m);
   const deciders = [
-    ...dir.members.filter((m) => m.userId === ownerId),
-    ...dir.members.filter((m) => m.userId !== ownerId && (m.role === "owner" || keysOf(m).has("approve_actions"))),
+    ...dir.members.filter((m) => m.userId === ownerId && ownerDecides(m)),
+    ...dir.members.filter((m) => m.userId !== ownerId && holds(m)),
   ].slice(0, 6);
   const pr = prLink(a);
   const decides = p === "waiting" && a.canDecide;

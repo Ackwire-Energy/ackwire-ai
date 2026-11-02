@@ -11,8 +11,10 @@ import {
   listApprovals,
   orgOverview,
   postPersonMessage,
+  removeMember,
   runRoutineNow,
   toolPolicy,
+  updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { channelRoutine, routineDeps } from "./routine-fixtures";
@@ -193,4 +195,45 @@ test("at most 5 requests an hour per agent: the next one is refused and asks nob
   for (let i = 0; i < 6; i++) await ask(bia.id);
   expect(await f.db.select().from(schema.approvals)).toHaveLength(5);
   expect(results.at(-1)).toContain("Too many approval requests in the last hour");
+});
+
+test("an agent handed to a new owner: they decide its waiting approvals and get the inbox item; the old owner no longer", async () => {
+  const { bia, carla } = await memberAsks();
+  const dani = await addMember(f.db, f.org.id, "member", "dani");
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  await ask(carla.id);
+  const [row] = await f.db.select().from(schema.approvals);
+  if (!row) throw new Error("no approval");
+  expect(row.approvers?.label).toContain("bia");
+  const open = async (userId: string) =>
+    (await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, userId))).filter(
+      (n) => n.kind === "approval" && !n.doneAt,
+    );
+  expect(await open(bia.id)).toHaveLength(1);
+
+  await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { ownerUserId: dani.id }, { pubsub: f.pubsub });
+  const [moved] = await f.db.select().from(schema.approvals);
+  expect(moved?.ownerUserId).toBe(dani.id);
+  expect(moved?.approvers?.label).toContain("dani");
+  expect(moved?.approvers?.label).not.toContain("bia");
+  expect(await open(bia.id)).toHaveLength(0);
+  expect(await open(dani.id)).toHaveLength(1);
+  const [biaView] = await listApprovals(f.db, bia.id, f.org.id, { status: "pending" });
+  expect(biaView?.canDecide ?? false).toBe(false);
+  await expect(
+    decideApproval({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, row.id, { decision: "approve" }),
+  ).rejects.toBeInstanceOf(ForbiddenError);
+  expect((await orgOverview(f.db, dani.id, f.org.id)).approvalsWaitingForMe).toBe(1);
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, dani.id, f.org.id, row.id, { decision: "approve" });
+});
+
+test("a member removed: whoever inherits their agents decides its waiting approvals", async () => {
+  const { bia, carla } = await memberAsks();
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  await ask(carla.id);
+  const [row] = await f.db.select().from(schema.approvals);
+  if (!row) throw new Error("no approval");
+  await removeMember(f.db, f.owner.id, f.org.id, bia.id, { pubsub: f.pubsub });
+  const [moved] = await f.db.select().from(schema.approvals);
+  expect(moved?.ownerUserId).toBe(f.owner.id);
 });

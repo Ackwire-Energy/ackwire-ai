@@ -8,6 +8,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
+import { dropForeignMailGrants } from "./tools/scopes";
 
 const { agents, users, organizationMembers, orgRoles } = schema;
 
@@ -297,6 +298,11 @@ export async function setAgentAudience(
       })
       .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
       .returning();
+    // Consultations never reach someone else's mailbox (the mail tools check the person), so only people count here.
+    const reach = (a: AgentAudience) => ({ ...a, consultable: true });
+    if (updated && widensAudience(reach(audienceOf(agent)), reach(audienceOf(updated)), agent.ownerUserId)) {
+      await dropForeignMailGrants(tx, orgId, agentId, actorId, actorId);
+    }
     return updated;
   });
   if (!updated) throw new NotFoundError("Agent not found");
