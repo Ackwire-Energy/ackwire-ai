@@ -333,8 +333,9 @@ async function promoteCluster(deps: ContextDeps, orgId: string, agentId: string,
 
 /**
  * The same lesson or how-to learned by two or more agents becomes one the whole team reads (ADR 0120): high trust
- * only, the newest wording, evidence united, and the originals superseded by it (history kept). Its channels are all
- * of theirs, so it reaches no run any original couldn't.
+ * only, the newest wording, evidence united, and the originals superseded by it (history kept). Only items with the
+ * same channels are joined: retrieval needs every channel of an item to be one the run may see, so a union of two
+ * agents' DMs or private channels would reach no run at all.
  */
 export async function shareAcrossAgents(deps: ContextDeps, orgId: string) {
   const { db } = deps;
@@ -354,7 +355,7 @@ export async function shareAcrossAgents(deps: ContextDeps, orgId: string) {
     );
   const groups = new Map<string, ContextItem[]>();
   for (const r of rows) {
-    const key = `${r.kind}|${r.subjectKey}`;
+    const key = `${r.kind}|${r.subjectKey}|${[...r.channelIds].sort().join(",")}`;
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   let shared = 0;
@@ -372,7 +373,7 @@ export async function shareAcrossAgents(deps: ContextDeps, orgId: string) {
         title: newest.title ?? undefined,
         content: newest.content,
         sourceIds: [...new Set(group.flatMap((g) => g.sourceIds))],
-        channelIds: [...new Set(group.flatMap((g) => g.channelIds))],
+        channelIds: newest.channelIds,
         trust: "high",
         evidence: group.reduce<ContextItem["evidence"]>((ev, g) => mergeEvidence(ev, g.evidence), []),
         confidence: Math.max(...group.map((g) => g.confidence)),

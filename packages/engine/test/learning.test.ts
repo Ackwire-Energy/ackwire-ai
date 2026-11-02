@@ -14,6 +14,7 @@ import {
   postPersonMessage,
   recordContextUse,
   retrieveForRun,
+  shareAcrossAgents,
   type ToolContext,
   type ToolSource,
 } from "../src";
@@ -590,5 +591,44 @@ describe("learning guards", () => {
     expect([skill?.body, skill?.version]).toEqual(["# northwind-api", 1]);
     expect((await f.db.select().from(schema.contextProposals)).map((p) => p.target)).toEqual(["skill", "skill"]);
     expect((await receipts()).filter((r) => r.kind === "skill.updated")).toEqual([]);
+  });
+
+  test("the same how-to of two agents is shared only when it was learned in the same channels", async () => {
+    f = await setup();
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Ops", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const [dmA, dmB] = [crypto.randomUUID(), crypto.randomUUID()];
+    const howTo = (agentId: string, channelIds: string[], subject: string) =>
+      f.db.insert(schema.contextItems).values({
+        orgId: f.org.id,
+        kind: "lesson",
+        scopeType: "agent",
+        scopeId: agentId,
+        agentId,
+        subjectKey: subject,
+        content: `${subject}: run the script`,
+        channelIds,
+        createdByKind: "agent",
+      });
+    await howTo(f.agent.id, [dmA], "deploy staging");
+    await howTo(ops?.id ?? "", [dmB], "deploy staging");
+    await howTo(f.agent.id, [f.general.id], "logs rotate");
+    await howTo(ops?.id ?? "", [f.general.id], "logs rotate");
+    expect(await shareAcrossAgents(f.context, f.org.id)).toBe(1);
+    const active = (await items()).filter((i) => i.status === "active");
+    const row = (i: { subjectKey: string; agentId: string | null; channelIds: string[] }) =>
+      JSON.stringify([i.subjectKey, i.agentId, i.channelIds]);
+    expect(active.map(row).sort()).toEqual(
+      [
+        row({ subjectKey: "deploy staging", agentId: f.agent.id, channelIds: [dmA] }),
+        row({ subjectKey: "deploy staging", agentId: ops?.id ?? "", channelIds: [dmB] }),
+        row({ subjectKey: "logs rotate", agentId: null, channelIds: [f.general.id] }),
+      ].sort(),
+    );
   });
 });
