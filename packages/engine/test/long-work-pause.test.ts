@@ -453,3 +453,27 @@ test("over the budget's line only by other calls' reservations: it looks again s
   await drainOutbox(f.db, f.handlers, { now: later(3600_000) });
   expect((await runs(f))[0]?.status).toBe("done");
 });
+
+test("a routine's paused slot: its people hear it, and Rodar agora runs it now", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await storeOwnUsage(f, machineId, reading([{ kind: "seven_day", usedPercent: 96, resetsAt: iso(3 * 86_400_000) }]));
+  const { brain, seen } = scripted(() => [{ type: "done", text: "Deploys ok." }]);
+  const handlers = handlersWith(f, brain);
+  await scheduledSlot(f);
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(0);
+  const heard = await f.db
+    .select()
+    .from(schema.notifications)
+    .where(eq(schema.notifications.kind, "routine_waiting_plan"));
+  expect(heard.map((n) => n.userId)).toContain(f.owner.id);
+
+  // Rodar agora: a person asks for it now, so it isn't long by kind; the paused slot gives way to it.
+  const [routine] = await f.db.select().from(schema.routines);
+  await runRoutineNow({ db: f.db, pubsub: f.pubsub, context: f.context }, f.owner.id, f.org.id, routine?.id ?? "");
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(1);
+  const [paused] = await runs(f);
+  expect(paused?.status).not.toBe("waiting_input");
+});
