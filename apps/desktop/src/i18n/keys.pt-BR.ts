@@ -563,6 +563,8 @@ export const desktopPtBR = {
     retry: "Tentar de novo",
     openTailscale: "Abrir o Tailscale",
     otherServer: "Usar outro servidor",
+    stuck: "O agentes.chat não abriu. Tente de novo ou veja a página como está.",
+    showAnyway: "Mostrar assim mesmo",
   },
   /** The menu bar (menus.rs) and the tray's own menu on Windows and Linux (tray.rs): one label per item id. */
   menu: {
