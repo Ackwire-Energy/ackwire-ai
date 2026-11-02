@@ -14,7 +14,7 @@ import {
   runSync,
   systemdBooted,
 } from "./service";
-import { joinShared, SHARED_LINK, type SharedSpec } from "./shared-folder";
+import { joinShared, SHARED_BIN_ENV, SHARED_LINK, type SharedSpec } from "./shared-folder";
 
 /**
  * System mode: every agent works as its own OS user, `ag-<first 8 of its id>`,
@@ -295,6 +295,7 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
     SHELL: AGENT_SHELL,
     // Last, so a tool an agent put in the shared `bin/` never stands in for the computer's own.
     PATH: `${AGENT_PATH}:${home}/${SHARED_LINK}/bin`,
+    [SHARED_BIN_ENV]: `${home}/${SHARED_LINK}/bin`,
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: String(adbServerPort(u.uid)),
   };

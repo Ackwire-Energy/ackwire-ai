@@ -1042,7 +1042,9 @@ them downloads, clones or installs, the others use instead of fetching it again.
 `/srv/agentes/shared`, owned by root and the group `agentes-shared`, which the runner makes and adds
 every agent's user to; each agent also finds it at `~/shared`, in its desktop's file manager, and its
 `bin/` folder at the end of its `PATH`, so a command-line tool one agent installs there (without root)
-works for all of them. Install the `acl` package (`apt install acl`): with it, what an agent makes there
+works for all of them. A tool there runs as whichever agent calls it, with that agent's files, so only
+agents you trust with each other's work should share a computer; the runner itself never starts Claude
+Code or Codex from there. Install the `acl` package (`apt install acl`): with it, what an agent makes there
 stays writable by the others whatever its umask; without it, it stays readable only, until the agent runs
 `chmod g+w`. The runner never changes anything inside the folder. On this server's own computer each
 organization gets a folder and a group of its own (`/srv/agentes/shared-<id>`), so nothing crosses between

@@ -256,6 +256,7 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     SHELL: "/bin/bash",
     // The shared folder's bin/ (ADR 0115) last: a tool an agent put there never stands in for the computer's own.
     PATH: "/usr/local/bin:/usr/bin:/bin:/home/ag-a1b2c3d4/shared/bin",
+    AGENTES_SHARED_BIN: "/home/ag-a1b2c3d4/shared/bin",
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: "31627",
   };
