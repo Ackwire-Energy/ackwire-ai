@@ -225,6 +225,44 @@ export function namedRepo(repos: readonly string[], texts: readonly string[]): s
   return null;
 }
 
+/** What `prepareAgentCode` gives a turn: where it starts, "# Your code" for the system text, and the start line. */
+export interface CodeSetup {
+  cwd: string;
+  prompt: string;
+  /** "You start in …" for the turn's prompt; absent or "" when it starts in no checkout. */
+  start?: string;
+  /** What the start was picked from, to pick it again for other words (`codeStart`) without syncing again. */
+  pick?: { present: CodeStartRepo[]; primary?: string };
+}
+
+type CodeStartRepo = { repo: string; dir: string; path?: string };
+
+/**
+ * Where a turn starts among the synced checkouts: the repository the conversation names (its trigger first, then
+ * its last messages, newest first), else the agent's first repository, else the first checkout.
+ */
+export function codeStart(
+  pick: NonNullable<CodeSetup["pick"]>,
+  turn: Pick<CodeTurn, "trigger" | "messages">,
+): Pick<CodeSetup, "cwd" | "start"> {
+  const texts = [
+    turn.trigger,
+    ...turn.messages
+      .slice(-8)
+      .map((m) => m.content)
+      .reverse(),
+  ];
+  const named = namedRepo(
+    pick.present.map((r) => r.repo),
+    texts,
+  );
+  const start =
+    pick.present.find((r) => r.repo === named) ??
+    pick.present.find((r) => r.repo.toLowerCase() === pick.primary?.toLowerCase()) ??
+    pick.present[0];
+  return { cwd: start?.dir ?? "", start: start ? `You start in ${start.path ?? start.dir}.` : "" };
+}
+
 /** What a chat turn needs from `prepareAgentCode`. */
 export interface CodeTurn {
   orgId: string;
@@ -240,7 +278,8 @@ export interface CodeTurn {
  * machine: updates the agent's checkouts (fetch + fast-forward of the default
  * branch, bounded, never failing the turn), picks where the turn starts (the
  * repository the conversation names, else the agent's first repository, else
- * its first checkout) and writes the "# Your code" block. Null when there is
+ * its first checkout) and writes the "# Your code" block for the system text, and where it starts ("You start in …")
+ * for the turn's own prompt: the system text stays the same from turn to turn. Null when there is
  * nothing to do: a mission turn (it has its own folder), an older runner, no
  * GitHub or no git access, or nothing granted or checked out.
  */
@@ -248,7 +287,7 @@ export async function prepareAgentCode(
   deps: MachineGitDeps,
   turn: CodeTurn,
   options: { signal?: AbortSignal } = {},
-): Promise<{ cwd: string; prompt: string } | null> {
+): Promise<CodeSetup | null> {
   // A chat turn starts in the agent's folder (""); a mission's turn has its own folder; a session started afresh
   // there because its folder was gone stays there.
   const session = turn.session?.cwd === "" && !turn.session.ownFolder ? turn.session : null;
@@ -311,36 +350,19 @@ export async function prepareAgentCode(
     const coming = new Set(downloading.map((r) => r.toLowerCase()));
     const notCloned = explicit.filter((r) => !lower.has(r.toLowerCase()) && !coming.has(r.toLowerCase()));
     if (present.length === 0 && notCloned.length === 0 && downloading.length === 0) return null;
-    const texts = [
-      turn.trigger,
-      ...turn.messages
-        .slice(-8)
-        .map((m) => m.content)
-        .reverse(),
-    ];
-    const named = namedRepo(
-      present.map((r) => r.repo),
-      texts,
-    );
     const primary = explicit.find((r) => lower.has(r.toLowerCase()));
-    const start =
-      present.find((r) => r.repo === named) ??
-      present.find((r) => r.repo.toLowerCase() === primary?.toLowerCase()) ??
-      present[0];
+    const pick = {
+      present: present.map((r) => ({ repo: r.repo, dir: r.dir, ...(r.path ? { path: r.path } : {}) })),
+      ...(primary ? { primary } : {}),
+    };
     const checkouts: CodeCheckout[] = present.map((r) => ({
       repo: r.repo,
       path: r.path ?? r.dir,
       ...(r.defaultBranch ? { defaultBranch: r.defaultBranch } : {}),
       ...(r.status === "failed" ? { stale: r.message || "the update failed" } : {}),
     }));
-    const prompt = codePrompt({
-      handle: agent.handle,
-      checkouts,
-      notCloned,
-      downloading,
-      cwd: start ? (start.path ?? start.dir) : null,
-    });
-    return { cwd: start?.dir ?? "", prompt };
+    const prompt = codePrompt({ handle: agent.handle, checkouts, notCloned, downloading });
+    return { ...codeStart(pick, turn), prompt, pick };
   } catch {
     // Offline, slow, refused: the turn goes on in the agent's folder, as before.
     return null;

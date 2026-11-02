@@ -284,6 +284,66 @@ describe("# This turn", () => {
     expect(computerPrompt(without)).toStartWith("The conversation so far:");
   });
 
+  test("computerPrompt: where it starts sits with the turn's facts, before what was found for the trigger", () => {
+    const found = "## What you know (memory)\nNotes, hints only.\n- the deploy runs on Fridays";
+    const turn = {
+      runId: "r",
+      orgId: "o",
+      agentId: "a",
+      channelId: "c",
+      threadRootId: null,
+      system: "",
+      tools: [],
+      trigger: "oi",
+      thisTurn: `# This turn\n\n## Where you are\n#general\n\n${found}`,
+      thisTurnFound: found,
+      messages: [{ role: "user" as const, content: "oi" }],
+    };
+    expect(computerPrompt(turn, "You start in repos/acme/web.")).toBe(
+      `# This turn\n\n## Where you are\n#general\n\nYou start in repos/acme/web.\n\n${found}\n\noi`,
+    );
+    // Nothing found: as before.
+    expect(computerPrompt({ ...turn, thisTurn: "# This turn", thisTurnFound: undefined }, "You start in x.")).toBe(
+      "# This turn\n\nYou start in x.\n\noi",
+    );
+  });
+
+  test("computerPrompt gives the trigger once whatever its part carries: a quote, files, an app, earlier parts", () => {
+    const base = {
+      runId: "r",
+      orgId: "o",
+      agentId: "a",
+      channelId: "c",
+      threadRootId: null,
+      system: "",
+      tools: [],
+      trigger: "@dev olha isso\n\nlong paste",
+    };
+    const parts = [
+      `[ana]: (replying to bia: "o deploy")\n@dev olha isso\n\nlong paste`,
+      `[ana]: @dev olha isso\n\nlong paste\n(attached files: "log.txt" (artifact 1))`,
+      `[ana]: @dev olha isso\n\nlong paste\n(sent by ana through Phone, an app connected to agentes.chat; the reply is read there)`,
+    ];
+    for (const part of parts) {
+      const content = `[bia]: bom dia\n\n(current message) ${part}`;
+      const prompt = computerPrompt({
+        ...base,
+        messages: [
+          { role: "user" as const, content: "[ana]: oi" },
+          { role: "assistant" as const, content: "olá" },
+          { role: "user" as const, content },
+        ],
+      });
+      expect(prompt.match(/long paste/g)).toHaveLength(1);
+      expect(prompt).toBe(
+        `The conversation so far:\n\nUser: [ana]: oi\n\nYou: olá\n\nUser: [bia]: bom dia\n\nNow answer this:\n\n${part}`,
+      );
+    }
+    // The trigger's part alone: nothing before it.
+    const alone = computerPrompt({ ...base, messages: [{ role: "user" as const, content: parts[1] ?? "" }] });
+    expect(alone).toBe(parts[1] ?? "");
+  });
+
   test("a computer brain gets it on every turn, resumed too; its system prompt keeps the stable part", async () => {
     f = await setup();
     const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {

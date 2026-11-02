@@ -10,11 +10,13 @@ import {
   isNull,
   like,
   lte,
+  ne,
   or,
   type SQL,
   schema,
   sql,
 } from "@agenteschat/db";
+import { decidableBySql } from "./approvals";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { cutText } from "./format";
@@ -516,6 +518,32 @@ export async function resolveNotifications(
 }
 
 /**
+ * Access lost: a person's notifications from a channel they left go for good, snippets included. Approvals stay:
+ * who decides them is `approverIds`, not the channel (`stillDecides`).
+ */
+export async function clearChannelNotifications(
+  deps: NotificationDeps,
+  orgId: string,
+  userId: string,
+  channelId: string,
+): Promise<number> {
+  const rows = await deps.db
+    .delete(notifications)
+    .where(
+      and(
+        eq(notifications.orgId, orgId),
+        eq(notifications.userId, userId),
+        sql`${notifications.source}->>'channelId' = ${channelId}`,
+        ne(notifications.kind, "approval"),
+      ),
+    )
+    .returning({ id: notifications.id });
+  for (const r of rows) await publishUserEvent(deps.pubsub, orgId, userId, { type: "notification.removed", id: r.id });
+  if (rows.length) await publishCounts(deps, orgId, userId);
+  return rows.length;
+}
+
+/**
  * A group's open notifications describe something else now (an approval card whose first waiting request was
  * decided): each person's row gets what `pick` says for them, in place (no new count, no push, same order), or
  * is resolved when `pick` has nothing left for them.
@@ -595,6 +623,13 @@ export async function wakeSnoozedNotifications(deps: NotificationDeps): Promise<
   const users = new Map<string, string>();
   for (const r of rows) {
     users.set(`${r.orgId}:${r.userId}`, r.orgId);
+    if (r.kind === "approval") {
+      const [still] = await deps.db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(and(eq(notifications.id, r.id), stillDecides(r.orgId, r.userId)));
+      if (!still) continue;
+    }
     await publishUserEvent(deps.pubsub, r.orgId, r.userId, {
       type: "notification.upserted",
       notification: notificationView(r),
@@ -606,13 +641,26 @@ export async function wakeSnoozedNotifications(deps: NotificationDeps): Promise<
 
 // ── Reading ───────────────────────────────────────────────────────────────────
 
-/** Not done, and not snoozed into the future. */
+/**
+ * An approval stays only while the person may still decide it (`decidableBySql`, the rule `decideApproval` applies).
+ * Checked on read, so a role or a key taken away by any path takes the row with it.
+ */
+function stillDecides(orgId: string, userId: string): SQL {
+  return or(
+    ne(notifications.kind, "approval"),
+    sql`exists (select 1 from ${schema.approvals} where ${schema.approvals.orgId} = ${orgId}
+      and ${schema.approvals.id} = (${notifications.source}->>'approvalId')::uuid and ${decidableBySql(userId)})`,
+  ) as SQL;
+}
+
+/** Not done, not snoozed into the future, and still the person's to see. */
 function visible(orgId: string, userId: string, now: Date): SQL {
   return and(
     eq(notifications.orgId, orgId),
     eq(notifications.userId, userId),
     isNull(notifications.doneAt),
     or(isNull(notifications.snoozedUntil), lte(notifications.snoozedUntil, now)),
+    stillDecides(orgId, userId),
   ) as SQL;
 }
 
@@ -764,7 +812,14 @@ async function mine(deps: NotificationDeps, userId: string, orgId: string, id: s
   const [row] = await deps.db
     .select()
     .from(notifications)
-    .where(and(eq(notifications.id, id), eq(notifications.orgId, orgId), eq(notifications.userId, userId)));
+    .where(
+      and(
+        eq(notifications.id, id),
+        eq(notifications.orgId, orgId),
+        eq(notifications.userId, userId),
+        stillDecides(orgId, userId),
+      ),
+    );
   if (!row) throw new NotFoundError("Notification not found");
   return row;
 }

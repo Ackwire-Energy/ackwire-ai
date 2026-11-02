@@ -248,8 +248,6 @@ export function codePrompt(input: {
   notCloned: readonly string[];
   /** Repositories still downloading on the computer (ADR 0116). */
   downloading?: readonly string[];
-  /** Where this turn starts (a checkout's path), when it is one. */
-  cwd?: string | null;
 }): string {
   const downloading = input.downloading ?? [];
   if (input.checkouts.length === 0 && input.notCloned.length === 0 && downloading.length === 0) return "";
@@ -262,7 +260,6 @@ export function codePrompt(input: {
         : `${c.repo} is checked out at ${c.path} (${branch}, updated before this turn).`,
     );
   }
-  if (input.cwd && input.checkouts.some((c) => c.path === input.cwd)) lines.push(`You start in ${input.cwd}.`);
   if (input.checkouts.length > 0) {
     lines.push(
       `Read it freely; to change code, create a branch agentes/${input.handle}/<topic> there, push it (git push -u origin agentes/${input.handle}/<topic>) and open a PR with open_pull_request. Delete branches with delete_branches; to push to someone else's branch, ask with request_branch_push first.`,

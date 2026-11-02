@@ -1921,8 +1921,12 @@ export interface Run {
   /** The error as a code (`run.budget_exceeded`…) and its values, to say it in the person's language. */
   errorCode?: string;
   errorParams?: Record<string, string>;
-  /** Start of the message that started the run. */
+  /** Start of the message that started the run; empty when `private`. */
   what: string;
+  /** The viewer isn't in the run's conversation: no `what` and no steps, only its numbers (older servers: absent). */
+  private?: boolean;
+  /** Started by one of the agent's routines, also when `private` (older servers: absent). */
+  routine?: boolean;
   turns: number;
   /** Every input token, cache included. */
   inputTokens: number;
@@ -2053,6 +2057,8 @@ export interface CustomServer {
   via?: "composio";
   /** `needs_reconnect`: its Composio account stopped working; no tools until Reconectar. Older servers leave it out. */
   status?: "active" | "needs_reconnect";
+  /** Why its tools couldn't be read the last time they were listed (short); null or absent when they were. */
+  toolsError?: string | null;
   tools: CustomTool[];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;
