@@ -1021,6 +1021,7 @@ function TouchDock({
             accessibilityLabel={doneLabel}
             hitSlop={4}
             style={[styles.dockDone, { backgroundColor: colors.ink }]}
+            contentStyle={styles.dockDoneIn}
           >
             <Icon name="check" size={20} color={colors.bg} />
           </PressScale>
@@ -1205,7 +1206,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   dockInfo: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  dockDone: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  dockDone: { width: 40, height: 40, borderRadius: 20 },
+  dockDoneIn: { alignItems: "center", justifyContent: "center" },
   dockNotice: { position: "absolute", top: 70 },
   dockNoticeOpen: { width: 300, paddingHorizontal: 14, paddingBottom: 12, paddingTop: 8, borderRadius: 16 },
   typing: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingTop: 8 },
