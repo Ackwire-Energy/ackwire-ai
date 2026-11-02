@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsPtBR: LegalDocument = {
   title: "Termos de uso",
   summary: "O acordo para usar o agentes.chat: o seu workspace, os seus agentes e pelo que cada lado responde.",
-  updated: "2026-10-30",
+  updated: "2026-11-02",
   sections: [
     {
       id: "agreement",
@@ -153,7 +153,7 @@ export const termsPtBR: LegalDocument = {
       id: "changes",
       heading: "17. Mudanças nestes Termos",
       blocks: [
-        "Podemos atualizar estes Termos. Mudanças relevantes serão anunciadas por e-mail ou no app pelo menos 14 dias antes de entrarem em vigor; continuar usando depois dessa data significa aceitá-las. A versão atual fica sempre nesta página. Se as versões em português e em inglês divergirem, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
+        "Podemos atualizar estes Termos. Mudanças relevantes serão anunciadas por e-mail ou no app pelo menos 14 dias antes de entrarem em vigor; continuar usando depois dessa data significa aceitá-las. A versão atual fica sempre nesta página. Se uma tradução divergir da versão em inglês, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
       ],
     },
     {

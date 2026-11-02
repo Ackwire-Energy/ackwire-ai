@@ -1,1 +1,1626 @@
-{}
+{
+  "app": {
+    "failed": "うまくいきませんでした。もう一度お試しください。",
+    "send": "送信"
+  },
+  "categories": {
+    "title": "カテゴリ",
+    "where": "#{{channel}}を表示する場所",
+    "whereHelp": "全員に反映されます。チャンネルの参加者は変わりません。",
+    "create": "作成",
+    "endOfList": "全員のリストの最後に移動します。",
+    "channelCount_other": "{{count}}個のチャンネル",
+    "none": "カテゴリはまだありません。",
+    "manageHelp": "カテゴリをタップすると、名前の変更、移動、削除ができます。",
+    "manageHint": "並び順、名前、削除",
+    "deleteTitle": "{{name}}を削除しますか？",
+    "order": "リスト内の位置",
+    "up": "上へ移動",
+    "down": "下へ移動",
+    "position": "{{count}}中{{at}}番目。",
+    "channelPosition": "{{count}}中{{at}}番目。",
+    "itsChannels": "チャンネル",
+    "seeAll": "すべて表示"
+  },
+  "blocks": {
+    "send": "送信",
+    "more": "その他",
+    "thousand": "千",
+    "building": "まとめています…",
+    "openBig": "全画面で開く",
+    "keep": "Driveに保存",
+    "kept": "Driveに保存済み",
+    "wake": "タップして開く",
+    "goesTo": "{{name}}宛て:",
+    "sentAt": "{{time}}に送信しました",
+    "sendFailed": "うまくいきませんでした。もう一度お試しください。",
+    "someone": "誰か",
+    "pollCloses": "{{time}}に締め切り",
+    "pollClosed": "投票は締め切られました",
+    "pollMultiple": "複数選択できます。",
+    "pollAnswered_other": "{{total}}人中{{count}}人が回答",
+    "voteFailed": "投票できませんでした。"
+  },
+  "chart": {
+    "pending": "グラフを作成中…",
+    "table": "表",
+    "item": "項目",
+    "share": "共有",
+    "gone": "このグラフはもう開いていません。"
+  },
+  "code": {
+    "label": "コード",
+    "copy": "コードをコピー",
+    "copied": "コピーしました",
+    "fullScreen": "全画面",
+    "wrap": "行を折り返す",
+    "more": "全{{count}}行を表示",
+    "gone": "このコードはもう開いていません。"
+  },
+  "time": {
+    "today": "今日",
+    "yesterday": "昨日",
+    "justNow": "たった今",
+    "minutesAgo_other": "{{count}}分前",
+    "hoursAgo_other": "{{count}}時間前",
+    "daysAgo_other": "{{count}}日前"
+  },
+  "names": {
+    "two": "{{first}}と{{second}}",
+    "more": "{{first}}、{{second}}、ほか{{count}}人"
+  },
+  "tabs": {
+    "chats": "チャット",
+    "threads": "スレッド",
+    "agents": "エージェント",
+    "activity": "アクティビティ",
+    "search": "検索",
+    "withCount": "{{label}}、{{count}}"
+  },
+  "home": {
+    "greeting": {
+      "morning": "おはようございます、{{name}}さん",
+      "afternoon": "こんにちは、{{name}}さん",
+      "evening": "こんばんは、{{name}}さん"
+    },
+    "hello": {
+      "morning": "おはようございます",
+      "afternoon": "こんにちは",
+      "evening": "こんばんは"
+    },
+    "waiting": "あなたの対応待ち",
+    "workingNow": "作業中",
+    "missionTitle": "ミッション: {{title}}",
+    "directChat": "ダイレクトチャット",
+    "stepAsk": "エージェントとの会話を始めましょう。"
+  },
+  "approval": {
+    "asksIn": "があなたの承認を求めています · #{{channel}}",
+    "asksYou": "があなたの承認を求めています",
+    "expiresIn_other": "あと{{count}}分で期限切れ",
+    "refuse": "却下",
+    "approve": "承認",
+    "hold": "長押しして承認",
+    "holding": "そのまま押し続けて…",
+    "holdNote": "高リスク: ボタンを1秒間押し続けてください。",
+    "tapNote": "承認するとすぐに実行されます。",
+    "tapNoteAhead": "今承認すると、{{when}}の分も対象になります。",
+    "refuseTitle": "リクエストを却下",
+    "whyPlaceholderF": "理由は？ 任意ですが、{{name}}が学びます",
+    "whyPlaceholderM": "理由は？ 任意ですが、{{name}}が学びます",
+    "approved": "承認しました",
+    "approvedSubF": "{{name}}が取りかかっています。",
+    "approvedSubM": "{{name}}が取りかかっています。",
+    "approvedAhead": "{{when}}、もう確認せずに自動で実行されます。",
+    "refused": "却下しました",
+    "refusedSubF": "{{name}}は次回のために覚えておきます。",
+    "refusedSubM": "{{name}}は次回のために覚えておきます。",
+    "alwaysUndoF": "取り消すには、プロフィールの「常に承認」を開いてください。",
+    "alwaysUndoM": "取り消すには、プロフィールの「常に承認」を開いてください。",
+    "via": "経由",
+    "why": "{{name}}が以前言ったこと: 「{{text}}」",
+    "saidText": "「{{text}}」",
+    "answers": "「{{subject}}」に返信",
+    "answersFrom": "「{{subject}}」に返信（{{from}}から）",
+    "forwards": "「{{subject}}」を転送",
+    "forwardsFrom": "「{{subject}}」を転送（{{from}}から）",
+    "onlyOwner": "決定できるのは{{name}}か管理者だけです。",
+    "onlyAdmins": "決定できるのは管理者だけです。",
+    "notFound": "このリクエストは存在しないか、表示する権限がありません。",
+    "trait": {
+      "production": "全員向け、本番環境",
+      "irreversible": "元に戻せません",
+      "reversible": "元に戻せます",
+      "external": "社外に出ます",
+      "unsent": "何も送信されません",
+      "deletable": "削除できます"
+    },
+    "status": {
+      "approved": "すでに承認済みです。",
+      "refused": "すでに却下済みです。",
+      "expired": "回答がないまま期限切れになりました。",
+      "canceled": "エージェントがリクエストを取り消しました。",
+      "scheduled": "承認済み。{{when}}に自動で実行されます。"
+    }
+  },
+  "chats": {
+    "title": "チャット",
+    "serverError": {
+      "offline": "スマートフォンがインターネットに接続されていません。",
+      "text": "停止しているか、ネットワークの外にある可能性があります。復旧するとチャットが自動で表示されます。",
+      "kept": "アプリにすでにあった内容を表示しています。"
+    },
+    "section": {
+      "agents": "エージェント",
+      "channels": "チャンネル",
+      "people": "人"
+    },
+    "seeAll": {
+      "agents": "すべてのエージェントを表示",
+      "channels": "すべてのチャンネルを表示",
+      "people": "すべての人を表示"
+    },
+    "wait": {
+      "verb": {
+        "approval": "があなたのOKを待っています",
+        "question": "から質問があります",
+        "mission": "があなたのレビューを待っています"
+      },
+      "line": "{{name}}{{verb}}",
+      "chip": {
+        "approval": "承認",
+        "question": "質問",
+        "mission": "ミッション"
+      },
+      "review": "レビュー",
+      "more_other": "ほか{{count}}件があなたの対応待ち",
+      "open": "あなたの対応待ちを見る"
+    },
+    "thread": "スレッド",
+    "missionState": {
+      "working": "作業中…",
+      "waiting": "あなたの対応待ち",
+      "paused": "一時停止中",
+      "done": "完了",
+      "canceled": "キャンセル済み",
+      "active": "進行中",
+      "proposed": "提案中"
+    },
+    "empty": "チャットはまだありません。",
+    "sayHi": "{{name}}さんに挨拶しましょう。",
+    "channelEmpty": "まだメッセージはありません。会話を始めましょう。",
+    "closed": "終了",
+    "working": "作業中…",
+    "missionProgress": "{{total}}項目中{{done}}項目",
+    "missionIn": "{{where}}のミッション",
+    "missionWith": "{{who}}とのミッション",
+    "mission": "ミッション",
+    "unreadLabel_other": "未読{{count}}件",
+    "newChannel": "新しいチャンネル",
+    "newChannelHint": "チームやトピック用",
+    "channelPlaceholder": "チャンネル名（例: マーケティング）",
+    "createChannel": "チャンネルを作成",
+    "waitIn": "{{where}}で",
+    "workingNowLine_other": "{{count}}体のエージェントが作業中",
+    "nobodyWorking": "作業中のエージェントはいません",
+    "first": {
+      "title": "最初のエージェントから始めましょう",
+      "subtitle": "名前を付けて、何をするかを伝えてください。ここにチャットとして表示されます。",
+      "examples": "できることの例",
+      "example": {
+        "support": {
+          "title": "顧客に回答",
+          "hint": "質問に答え、急ぎのときはあなたを呼びます",
+          "what": "顧客の質問に答えて、急ぎのときは私を呼んで"
+        },
+        "reports": {
+          "title": "レポートを書く",
+          "hint": "数字を集めて、ドキュメントにまとめます",
+          "what": "今週の数字を集めて、レポートにまとめて"
+        },
+        "weekly": {
+          "title": "毎週何かをする",
+          "hint": "チャットで頼みます:「毎週月曜日に、…を送って」",
+          "what": "毎週月曜日の朝に、その週の出来事のまとめを送って"
+        }
+      }
+    }
+  },
+  "new": {
+    "title": "新規",
+    "chat": "チャットする相手…",
+    "name": "名前",
+    "channelFine": "チームやトピック用。",
+    "chatSearch": "人またはエージェントを検索",
+    "people": "人",
+    "nobody": "まだ誰もいません。",
+    "ask": {
+      "question": "何が必要ですか？",
+      "placeholder": "例: 金曜日までに料金ページの文章をレビュー",
+      "to": "宛先",
+      "sendF": "{{name}}に頼む",
+      "sendM": "{{name}}に頼む",
+      "more": "または新しく始める",
+      "person": "人とチャット",
+      "noAgents": "エージェントに何かを頼むには、まず自分のエージェントを作成しましょう。"
+    },
+    "agent": {
+      "question": "何をしますか？"
+    }
+  },
+  "chat": {
+    "someone": "誰か",
+    "messageTo": "{{name}}にメッセージ",
+    "messageIn": "{{channel}}にメッセージ",
+    "reply": "返信",
+    "people_other": "{{count}}人",
+    "agentsHere_other": "{{count}}体のエージェント",
+    "threadIn": "#{{channel}}のスレッド",
+    "closedThreadIn": "#{{channel}}の終了したスレッド",
+    "missionIn": "#{{channel}}のミッション",
+    "threadWith": "{{name}}とのスレッド",
+    "closedThreadWith": "{{name}}との終了したスレッド",
+    "missionWith": "{{name}}とのミッション",
+    "startedIn": "#{{channel}}で開始",
+    "startedWith": "{{name}}との会話で開始",
+    "replies_other": "{{count}}件の返信",
+    "repliesWord_other": "返信",
+    "thread": "スレッド",
+    "closed": "終了",
+    "options": "オプション",
+    "profile": "プロフィール",
+    "here_other": "{{count}}人が参加中",
+    "headerAgent": "{{who}}。プロフィールを開く",
+    "headerChannel": "{{who}}。オプション",
+    "switchHint": "長押しで会話を切り替え",
+    "switchTitle": "会話を切り替え",
+    "switchSearch": "会話を検索",
+    "switchAgents": "エージェント",
+    "switchChannels": "チャンネル",
+    "switchPeople": "人",
+    "switchNone": "その名前の会話はありません。",
+    "switchWorking": "作業中",
+    "join": "チャンネルに参加",
+    "empty": "まだ誰も書き込んでいません。",
+    "sending": "送信中…",
+    "failed": "未送信 · もう一度試す",
+    "notSent": "メッセージは送信されませんでした。",
+    "toLatest": "最新のメッセージへ",
+    "stopAgent": "{{name}}を止める",
+    "offlineWait": "接続が戻ると送信されます",
+    "turn": {
+      "thinking": "考え中",
+      "working": "作業中",
+      "writing": "入力中",
+      "stopped": "停止"
+    },
+    "steer": {
+      "waiting": "{{name}}は次の区切りで読みます",
+      "now": "{{name}}は手を止めて読みました",
+      "delivered": "{{name}}に届きました",
+      "held": "{{name}}はあなたの決定後に読みます",
+      "read": "{{name}}が読みました",
+      "resolved": "{{name}}がヘルプのリクエストを閉じました",
+      "well": "メモを読みました",
+      "wellNow": "手を止めてメモを読みました"
+    },
+    "stopped": {
+      "byYou": "あなたが停止",
+      "by": "{{name}}が停止",
+      "plain": "停止",
+      "limit": "ステップの上限に達しました",
+      "stuck": "行き詰まったため停止しました",
+      "continue": "続ける",
+      "failed": "続けられませんでした。もう一度お試しください。"
+    },
+    "unseen": {
+      "count_other": "{{count}}件の新着",
+      "working": "{{names}}が入力中",
+      "divider": "新着"
+    },
+    "connection": {
+      "down": "接続がありません。送信した内容は、接続が戻ると自動で送られます。",
+      "back": "再接続しました"
+    },
+    "longPressHint": "長押しでリアクションやその他の操作",
+    "consult": {
+      "answered": "{{name}}が回答しました",
+      "expiredF": "{{name}}は時間内に回答しませんでした",
+      "expiredM": "{{name}}は時間内に回答しませんでした",
+      "failedF": "{{name}}は回答できませんでした",
+      "failedM": "{{name}}は回答できませんでした",
+      "answerOfF": "{{name}}の回答",
+      "answerOfM": "{{name}}の回答",
+      "noAnswer": "回答はありません。",
+      "privateFF": "{{from}}と{{to}}の非公開チャット",
+      "privateFM": "{{from}}と{{to}}の非公開チャット",
+      "privateMF": "{{from}}と{{to}}の非公開チャット",
+      "privateMM": "{{from}}と{{to}}の非公開チャット"
+    },
+    "file": "ファイル",
+    "fileOpen": "タップして開く",
+    "fileDeleted": "ファイルは削除されました",
+    "fileFailed": "ファイルを開けませんでした。",
+    "question": {
+      "fromF": "{{name}}からの質問",
+      "fromM": "{{name}}からの質問",
+      "own": "自分の言葉で回答する",
+      "placeholder": "あなたの回答",
+      "answered": "{{name}}の回答: {{answer}}",
+      "answeredByYou": "あなたの回答: {{answer}}",
+      "taken": "この質問はすでに回答済みか、終了しています。",
+      "closed": "回答がないまま終了しました。"
+    },
+    "approvalPreview": "承認のリクエスト",
+    "reactionLabel": "{{emoji}} {{count}}",
+    "agentReacted": "エージェントが{{emoji}}でリアクションしました",
+    "reactWith": "{{emoji}}でリアクション",
+    "replyInThread": "スレッドで返信",
+    "openThread": "スレッドを開く",
+    "toMission": "ミッションにする",
+    "copy": "テキストをコピー",
+    "copied": "コピーしました",
+    "seeAgent": "{{name}}を見る",
+    "summaryMessage": "チャットをまとめて。私がいない間に何がありましたか？",
+    "noMission": "このチャットにミッションはありません。",
+    "missionDone": {
+      "pause": "ミッションを一時停止しました",
+      "resume": "ミッションを再開しました",
+      "stop": "ミッションを停止しました"
+    },
+    "uploading": "ファイルを送信中…",
+    "uploadFailed": "ファイルを送信できませんでした。",
+    "intent": {
+      "suggest": {
+        "merge": "そのままマージして",
+        "review": "先に{{name}}にレビューを頼んで",
+        "seeChange": "何が変わったか見せて",
+        "summarize": "3つのポイントでまとめて",
+        "nextStep": "次のステップは？"
+      },
+      "arrived": "{{name}}がチームに加わりました",
+      "meet": "{{name}}との最初の会話",
+      "roleIntro": "チームの{{role}}です。普段の言葉で頼んでください。",
+      "noIntro": "必要なことを、普段の言葉で頼んでください。",
+      "firstTitle": "はじめに",
+      "sendHint": "タップして送信",
+      "first": {
+        "support": {
+          "how": "急ぎかどうかはどう判断しますか？",
+          "task": "締め切りについて問い合わせてきた人への返信を書いて",
+          "routine": "毎朝、届いた急ぎの案件を送って"
+        },
+        "ops": {
+          "how": "何かが落ちたとき、どうやって気づきますか？",
+          "task": "今すべてが動いているか確認して",
+          "routine": "毎朝、夜の間の状況を教えて"
+        },
+        "qa": {
+          "how": "何から先にテストするかはどう決めますか？",
+          "task": "ログインのテストケースを書いて",
+          "routine": "毎週、壊れたものを送って"
+        },
+        "dev": {
+          "how": "私たちのコードで何ができますか？",
+          "task": "最新のオープンなプルリクエストをレビューして",
+          "routine": "毎週金曜日に、コードの変更点を送って"
+        },
+        "research": {
+          "how": "どんなリサーチが得意ですか？",
+          "task": "競合3社を調べて、価格を比較して",
+          "routine": "毎週月曜日に、市場の新しい動きを送って"
+        },
+        "writing": {
+          "how": "どんな文章が得意ですか？",
+          "task": "私の文章をレビューして、改善点を教えて",
+          "routine": "毎週金曜日に、今週書いたものを教えて"
+        },
+        "product": {
+          "how": "優先順位はどう決めますか？",
+          "task": "タスクの中で遅れているものを一覧にして",
+          "routine": "毎週月曜日に、その週の計画を送って"
+        },
+        "sales": {
+          "how": "良いリードはどうやって見つけますか？",
+          "task": "製品を紹介するメールを書いて",
+          "routine": "毎週月曜日に、新しいリードを送って"
+        },
+        "general": {
+          "how": "私のために何ができますか？",
+          "task": "あなたの仕事の例を見せて",
+          "routine": "毎週月曜日に、今週やったことを教えて"
+        }
+      }
+    }
+  },
+  "plus": {
+    "camera": "カメラ",
+    "photos": "写真",
+    "file": "ファイル",
+    "audio": "音声",
+    "audioSoon": "音声はまもなく使えるようになります。",
+    "noCamera": "カメラへのアクセスがありません。スマートフォンの設定で許可してください。",
+    "mission": "ミッションを開始",
+    "missionHint": "計画を立てて、最初から最後までやり遂げる長い仕事",
+    "summary": "チャットをまとめる",
+    "summaryHint": "あなたがいない間の出来事",
+    "remind": "あとでリマインド",
+    "remindHint": "エージェントがここでリマインドします"
+  },
+  "remind": {
+    "title": "リマインド",
+    "sub": "ここにいるエージェントがこのチャットでリマインドします",
+    "what": "何をリマインドしますか？",
+    "placeholder": "何をリマインドしますか？ 例: 料金ページをレビュー",
+    "aboutThis": "これについてリマインド",
+    "preset": {
+      "inHour": "1時間後",
+      "tonight": "今夜",
+      "tomorrowMorning": "明日の朝"
+    },
+    "custom": "時間を選ぶ…",
+    "tomorrow": "明日",
+    "todayAt": "今日 {{time}}",
+    "tomorrowAt": "明日 {{time}}",
+    "dayAt": "{{day}} {{time}}",
+    "hour": "時",
+    "hourLess": "1時間早く",
+    "hourMore": "1時間遅く",
+    "minute": "分",
+    "minuteLess": "{{n}}分早く",
+    "minuteMore": "{{n}}分後",
+    "submit": "この時間にリマインド",
+    "quick": "すぐ選べる時間を見る",
+    "done": "リマインダーを設定しました",
+    "error": {
+      "noAgent": "ここにはリマインドできるエージェントがいません",
+      "past": "その時間はもう過ぎています",
+      "tooFar": "リマインダーは1年先まで設定できます",
+      "noText": "リマインドする内容を入力してください",
+      "failed": "リマインダーを設定できませんでした。もう一度お試しください。"
+    }
+  },
+  "pins": {
+    "title": "ピン留め",
+    "pin": "ピン留め",
+    "unpin": "ピン留めを外す",
+    "pinned": "メッセージをピン留めしました",
+    "unpinned": "メッセージのピン留めを外しました",
+    "full": "このチャットにはすでに100件のピン留めがあります。先にどれかを外してください。",
+    "mark": "ピン留め済み",
+    "none": "ピン留めはまだありません",
+    "empty": "ここにはまだピン留めがありません。メッセージを長押しして「ピン留め」をタップしてください。"
+  },
+  "thread": {
+    "threadIn": "#{{channel}}のスレッド",
+    "missionIn": "#{{channel}}のミッション",
+    "seePlan": "計画と進捗を見る",
+    "pause": "ミッションを一時停止",
+    "pauseHintF": "{{name}}は今の項目を終えてから止まります",
+    "pauseHintM": "{{name}}は今の項目を終えてから止まります",
+    "resume": "ミッションを再開",
+    "conclude": "ミッションを完了",
+    "concludeHint": "決定事項をWikiに残します",
+    "toMissionHint": "計画のある仕事になります",
+    "follow": "フォロー",
+    "followHint": "誰かが返信したら知らせて",
+    "close": "閉じる",
+    "closeHint": "解決済み。誰かが返信すると再び開きます",
+    "reopen": "再び開く",
+    "archive": "アーカイブ",
+    "archiveHint": "リストと検索から外れます",
+    "done": {
+      "close": "スレッドを閉じました",
+      "closeSub": "誰かが返信すると再び開きます。",
+      "reopen": "スレッドを再び開きました",
+      "archive": "アーカイブしました",
+      "paused": "ミッションを一時停止しました",
+      "resumed": "ミッションを再開しました",
+      "concluded": "ミッションが完了しました"
+    }
+  },
+  "newMission": {
+    "title": "新しいミッション",
+    "intro": "エージェントが計画を立て、あなたの指示があってから始めます。",
+    "placeholder": "何をやり遂げる必要がありますか？",
+    "submit": "計画を頼む",
+    "created": "{{name}}が計画を立てています",
+    "noAgents": "ミッションを実行できるエージェントはまだいません。ウェブサイトでコンピューターを接続してください。",
+    "reason": {
+      "no_computer": "接続されたコンピューターが必要です",
+      "exec_off": "このコンピューターはコマンドの実行を許可していません",
+      "runner_outdated": "コンピューターの更新が必要です",
+      "not_in_audience": "あなたとは一緒に作業しません"
+    }
+  },
+  "mission": {
+    "kind": "ミッション",
+    "in": "#{{channel}}のミッション",
+    "working": "{{name}}が作業中",
+    "ofTotal": "/{{total}}",
+    "waitingYou_other": "{{count}}件があなたの対応待ち",
+    "cardLabel": "ミッション: {{title}}、{{total}}項目中{{done}}項目完了",
+    "owner": "担当: {{name}}",
+    "since": "{{when}}から",
+    "hours_other": "{{count}}時間の作業",
+    "itemsDone": "/{{total}}項目完了",
+    "computerOn": "{{name}} · オン",
+    "computerOff": "{{name}} · オフ",
+    "computerNotAnswering": "{{name}} · 応答なし",
+    "computerOffPlain": "コンピューターはオフ",
+    "computerNotAnsweringPlain": "コンピューターが応答しません",
+    "running_other": "{{count}}項目が進行中",
+    "conversation": "ミッションのチャット",
+    "onComputer": "現在コンピューターで作業中",
+    "queued": "待機中",
+    "base": "{{base}}から",
+    "setupTitle": "プロジェクトを準備",
+    "readOnly": "読み取り専用",
+    "setup": {
+      "cap": "プロジェクト",
+      "preparing": "プロジェクトを準備中…",
+      "failedShort": "プロジェクトを準備できませんでした",
+      "failedTitle": "プロジェクトを準備できませんでした",
+      "retry": "もう一度試す",
+      "retrying": "プロジェクトを再度準備中",
+      "ready": "プロジェクトの準備完了: ミッションを続けます",
+      "waiting": "ミッションの担当者がもう一度試せます。",
+      "lostTitle": "ミッションの作業内容がこのコンピューターから消えました",
+      "lostText": "ブランチ{{branch}}はもう存在しません。やり直すと、ベースから新しいコピーを作成します。",
+      "restart": "やり直す"
+    },
+    "minutes_other": "{{count}}分",
+    "decisions": "決定事項",
+    "notFound": "このミッションは存在しないか、表示する権限がありません。",
+    "status": {
+      "proposed": "承認待ちの計画",
+      "active": "進行中",
+      "paused": "一時停止中",
+      "awaiting_close": "完了待ち",
+      "done": "完了",
+      "canceled": "キャンセル済み"
+    },
+    "plan": {
+      "section": "計画",
+      "title": "ミッションの計画",
+      "titleCount_other": "計画 · {{count}}項目",
+      "more_other": "ほか{{count}}件",
+      "planningF": "{{name}}が計画を立てています…",
+      "planningM": "{{name}}が計画を立てています…",
+      "change": "変更を依頼",
+      "changeTitle": "計画の何を変えますか？",
+      "changePlaceholder": "例: ログイン画面から始めて",
+      "changeSent": "メモを届けました",
+      "changeQueued": "メモを保存しました: コンピューターがオンになると届きます",
+      "start": "開始",
+      "started": "ミッションを開始しました: {{title}}",
+      "startedToast": "ミッションを開始しました",
+      "startedSubF": "見せられるものができたら、{{name}}がお知らせします。",
+      "startedSubM": "見せられるものができたら、{{name}}がお知らせします。",
+      "doing": "進行中",
+      "waiting": "あなたの対応待ち"
+    },
+    "review": {
+      "ready": "確認の準備ができました",
+      "approve": "承認",
+      "askChanges": "変更を依頼",
+      "whatChange": "何を変えますか？",
+      "changesPlaceholder": "例: Androidで送信ボタンが小さい",
+      "sendChanges": "変更を送信",
+      "changesSent": "変更を送信しました",
+      "changesSentSubF": "{{name}}が調整して、もう一度見せます。",
+      "changesSentSubM": "{{name}}が調整して、もう一度見せます。",
+      "approvedSubF": "{{name}}は次の項目に進みます。",
+      "approvedSubM": "{{name}}は次の項目に進みます。",
+      "approved": "承認しました: {{title}}",
+      "changes": "変更を依頼しました: {{title}}"
+    },
+    "decision": {
+      "title": "決定",
+      "decided": "決定済み",
+      "recommended": "おすすめ",
+      "noted": "決定を記録しました",
+      "notedSub": "ミッションの決定事項に残ります。"
+    }
+  },
+  "threads": {
+    "title": "スレッドとミッション",
+    "section": {
+      "missions": "ミッション",
+      "threads": "スレッド"
+    },
+    "empty": "スレッドやミッションはまだありません",
+    "emptyHint": "メッセージを長押しすると、スレッドで返信したりミッションにしたりできます。"
+  },
+  "agents": {
+    "title": "エージェント",
+    "subtitle_other": "チームに{{count}}人 · {{working}}人が作業中",
+    "free": "空き",
+    "workingLabel": "{{name}}、作業中",
+    "new": "新しいエージェント",
+    "namePlaceholder": "名前（例: Nina）",
+    "whatPlaceholder": "例: 顧客にメールで回答して、急ぎのときは知らせて",
+    "create": "エージェントを作成",
+    "created": "{{name}}がチームに加わりました",
+    "createFailed": "エージェントを作成できませんでした。その名前はすでに使われているかもしれません。",
+    "empty": "エージェントはまだいません。",
+    "noneForYou": "あなたと一緒に作業するエージェントはまだいません。",
+    "noneForYouHint": "管理者にアクセスを依頼してください。",
+    "freeSection": "空き",
+    "noGroupSection": "グループなし"
+  },
+  "agentEdit": {
+    "missing": "このエージェントはもう存在しません。",
+    "saved": "変更を保存しました",
+    "adminsOnly": "名前、役割、指示を変更できるのは管理者だけです。",
+    "discardTitle": "変更を破棄しますか？",
+    "discardText": "変更内容はまだ保存されていません。",
+    "discard": "破棄",
+    "keepEditing": "編集を続ける"
+  },
+  "newAgent": {
+    "leaveTitle": "作成せずに終了しますか？",
+    "leaveText": "作成途中のエージェントは作成されません。",
+    "keepGoing": "作成を続ける",
+    "partly": "エージェントは作成されましたが、役割に含まれる一部の設定が反映されませんでした。プロフィールで調整してください。",
+    "import": {
+      "where": {
+        "openbotrun": "openbot-import.json（OpenBotのMigratorから）またはopenbot-transfer.json（インスタンスの移行から）を選んでください。.zipはまず「ファイル」アプリで開きます。タップすると解凍されます。",
+        "openmausbot": "OpenMausBotで: チームを右クリック › チームを共有… › ファイルを保存。そのファイルをここで選んでください。",
+        "hermes": "Hermesはターミナルから書き出します（hermes profile export）。形式は.tar.gzで、スマートフォンでは開けません。コンピューターで取り込むか、プロフィールの.mdと.yamlファイルをここで選んでください。",
+        "openclaw": "OpenClawはエージェントをコンピューターの~/.openclawフォルダに保存します。ワークスペースの.mdファイルをここで選ぶか、コンピューターでフォルダごと取り込んでください。",
+        "paperclip": "パッケージのGitHubリンクを下に貼り付けるか、COMPANY.mdとほかの.mdファイルを選んでください。",
+        "agenteschat": "もう一方のワークスペースで: 設定 › インポートとエクスポート › ファイルをダウンロード。その.jsonをここで選んでください。"
+      },
+      "pick": "ファイルを選ぶ",
+      "pasteTitle": "または、ほかのアプリの返答かGitHubリンクを貼り付け",
+      "paste": "貼り付け",
+      "read": "読み込む",
+      "copyFailed": "コピーできませんでした。もう一度お試しください。",
+      "archive": "スマートフォンでは.zipや.tar.gzファイルを開けません。「ファイル」アプリで.zipをタップして解凍し、中のファイルを選ぶか、コンピューターで取り込んでください。",
+      "privacy": "このスマートフォン上で読み込みます。キーやログイン情報のファイルは開きません。",
+      "also": "一緒に移行されるもの",
+      "change": "変更",
+      "arrived_other": "{{count}}体のエージェントが到着しました",
+      "partial": "{{total}}人中{{done}}人が到着しました。もう一度取り込むと残りも移行されます。"
+    }
+  },
+  "agent": {
+    "talk": "チャット",
+    "task": "タスク",
+    "owner": "オーナー: {{name}}",
+    "cantTalk": "このエージェントはあなたと一緒に作業しません。",
+    "now": "現在",
+    "freeHint": "必要なときに呼んでください",
+    "does": "できること",
+    "canUse": "使えるもの",
+    "month": "今月",
+    "ofBudget": "/月{{budget}}",
+    "ofMonthBudget": "今月の予算のうち",
+    "exhaustedF": "{{name}}は今月の予算をすべて使い切りました。",
+    "exhaustedM": "{{name}}は今月の予算をすべて使い切りました。",
+    "taskForF": "{{name}}へのタスク",
+    "taskForM": "{{name}}へのタスク",
+    "taskPlaceholder": "何をやり遂げる必要がありますか？",
+    "sendTask": "タスクを送信",
+    "taskSent": "タスクを送信しました"
+  },
+  "activity": {
+    "title": "アクティビティ",
+    "filter": {
+      "all": "すべて",
+      "waiting": "あなたの対応待ち"
+    },
+    "day": {
+      "today": "今日",
+      "yesterday": "昨日",
+      "week": "今週",
+      "older": "それ以前"
+    },
+    "kind": {
+      "mention_other": "{{names}}があなたをメンションしました",
+      "thread_reply_other": "{{names}}がスレッドで返信しました",
+      "agent_reply_other": "{{names}}が返信しました",
+      "dm_other": "{{names}}からメッセージが届きました",
+      "agent_question_other": "{{names}}から質問があります",
+      "issue_assigned_other": "あなたへのタスク",
+      "issue_comment_other": "{{names}}がタスクにコメントしました",
+      "issue_status_other": "{{names}}がタスクを変更しました",
+      "forum_turn_other": "フォーラムであなたの番です",
+      "forum_synthesis_other": "フォーラムのまとめができました",
+      "approval_other": "{{names}}が承認を求めています",
+      "mission_finished_other": "ミッションが完了しました",
+      "mission_stopped_other": "ミッションが停止しました",
+      "routine_finished_other": "ルーティンが完了しました",
+      "routine_failed_other": "ルーティンが失敗しました",
+      "run_failed_other": "完了できませんでした",
+      "routine_paused_other": "ルーティンが一時停止しました",
+      "routine_stalled_other": "ルーティンがコンピューターを待っています",
+      "agent_unreached_other": "ルーティンがエージェントを呼び出せませんでした",
+      "routine_waiting_plan_other": "ルーティンがプランのリセットを待っています",
+      "plan_reset_unknown_other": "{{plan}}から上限のリセット時期の連絡がありませんでした",
+      "reaction_other": "{{names}}がリアクションしました",
+      "browser_handoff_other": "{{names}}がブラウザであなたを必要としています",
+      "secret_request_other": "{{names}}があなたからのシークレットを必要としています",
+      "desktop_handoff_other": "{{names}}がコンピューターであなたを必要としています",
+      "org_standing_other": "ワークスペースのステータスが変わりました",
+      "computer_ready_other": "ワークスペースのコンピューターの準備ができました",
+      "invitation_accepted_other": "{{names}}が招待を承諾しました",
+      "composio_limit_other": "このワークスペースは今月のComposio呼び出し回数を使い切りました",
+      "browser_profile_request_other": "{{names}}がブラウザプロフィールの追加を求めています",
+      "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
+      "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
+      "app_created_other": "AIアプリがあなたのために作成しました"
+    },
+    "markRead": "既読にする",
+    "markUnread": "未読にする",
+    "unread": "未読",
+    "done": "完了",
+    "more": "もっと見る",
+    "empty": "あなたの対応待ちはありません。ひと息つきましょう。"
+  },
+  "find": {
+    "title": "検索",
+    "short": "検索",
+    "recent": "最近",
+    "placeholder": "チャット、エージェント、メッセージを検索",
+    "actions": "アクション",
+    "agents": "エージェント",
+    "conversations": "チャット",
+    "messages": "メッセージ",
+    "files": "ファイル",
+    "filter": {
+      "all": "すべて"
+    },
+    "nothing": "「{{q}}」に一致するものはありません。",
+    "action": {
+      "newConversation": "新しいチャット",
+      "newTask": "タスクを頼む",
+      "newAgent": "エージェントを作成"
+    }
+  },
+  "channelRef": {
+    "list": "チャンネル",
+    "a11y": "チャンネル #{{name}}",
+    "archivedA11y": "チャンネル #{{name}}、アーカイブ済み",
+    "archived": "#{{name}}はアーカイブされました",
+    "notMember": "参加していません"
+  },
+  "mention": {
+    "list": "人とエージェント",
+    "inChannel": "このチャンネル内",
+    "outside": "チャンネル外",
+    "agent": "エージェント",
+    "person": "人",
+    "add": "追加",
+    "addA11y": "{{name}}をチャンネルに追加",
+    "added": "{{name}}がチャンネルに参加しました"
+  },
+  "me": {
+    "title": "あなた",
+    "role": {
+      "owner": "オーナー",
+      "member": "メンバー"
+    },
+    "appearance": "外観",
+    "notifications": "通知",
+    "pushOff": "通知はオフです",
+    "pushOffSub": "アラートを受け取るには、スマートフォンの設定でオンにしてください。",
+    "language": "言語",
+    "start": "アプリを開いたとき",
+    "startHome": "会話",
+    "startLast": "前回の続き",
+    "startChannels": "チャンネル",
+    "startHint": "このワークスペース用です。こことコンピューターの両方に適用され、ホームはホームページです。",
+    "startFailed": "保存できませんでした。もう一度お試しください。",
+    "activity": "エージェントの返信",
+    "activityShow": "各返信の下にエージェントの作業内容を表示",
+    "activityHint": "使ったツールとかかった時間です。このワークスペースで、ここでもコンピューターでも適用されます。作業中の様子は引き続き表示されます。",
+    "activityFailed": "保存できませんでした。もう一度お試しください。",
+    "sounds": "サウンド",
+    "soundsOn": "アプリ内のサウンド",
+    "soundsOff": "オフ",
+    "soundsHint": "アプリを開いている間、控えめに鳴ります。マナーモード中は鳴りません。",
+    "soundStyle": "スタイル",
+    "soundTactile": "タクタイル",
+    "soundSky": "空",
+    "soundPixel": "ピクセル",
+    "signOut": "ログアウト",
+    "signOutConfirm": "このアカウントからログアウトしますか？",
+    "signOutConfirmText": "戻るときは、メールアドレスでもう一度ログインしてください。",
+    "deleteAccount": "アカウントを削除",
+    "deleteAccountHint": "完全に削除され、あなただけのデータもすべて消えます",
+    "accountSub": "@{{handle}} · 写真、名前、アカウント",
+    "workspaceSub_other": "あなたは{{role}} · {{count}}個のワークスペース",
+    "switchOrg": "切り替え",
+    "fromWorkspace": "ワークスペースから",
+    "issues": "タスク",
+    "issuesWithMe_other": "あなた担当: {{count}}件",
+    "drive": "Drive",
+    "connectors": "コネクタ",
+    "usage": "使用量",
+    "preferences": "環境設定",
+    "editProfile": "プロフィールを編集",
+    "switchWorkspace": "ワークスペースを切り替え",
+    "yourAgents": "あなたのエージェント",
+    "newAgent": "新規",
+    "thinksWith": "使用しているAI",
+    "ownOn": "{{computer}}でログイン中",
+    "on": "オン",
+    "off": "オフ",
+    "notificationsPhone": "このスマートフォンの通知",
+    "notificationsOnHint": "ブラウザやデスクトップアプリでもオンにしていれば、そちらにも届きます。",
+    "notificationsOffHint": "ここで通知を受け取るにはオンにしてください。下の種類はすべてのデバイスに適用されます。",
+    "notificationsKindsHint": "アクティビティにはすべてが残ります。この設定はこのワークスペースの、すべてのデバイスに適用されます。",
+    "version": "agentes.chat · バージョン {{version}}",
+    "workspaces": "ワークスペース",
+    "workspacesIn": "参加中",
+    "account": {
+      "title": "アカウント",
+      "save": "OK",
+      "changePhoto": "写真を変更",
+      "fromLibrary": "ライブラリから選ぶ",
+      "fromCamera": "写真を撮る",
+      "removePhoto": "写真を削除",
+      "noCamera": "カメラへのアクセスがありません",
+      "photoSaved": "写真を保存しました",
+      "photoRemoved": "写真を削除しました",
+      "photoFailed": "写真をアップロードできませんでした",
+      "photoTooBig": "写真が大きすぎます。別の写真をお試しください。",
+      "name": "名前",
+      "namePlaceholder": "あなたの名前",
+      "email": "メールアドレス",
+      "inWorkspace": "このワークスペース内 · {{org}}",
+      "handle": "あなたの@",
+      "timezone": "タイムゾーン",
+      "timezoneHint": "プロフィールカードに表示され、ルーティンやリマインダーの実行時刻に使われます。",
+      "orgZone": "ワークスペースのタイムゾーン",
+      "nameEmpty": "名前を入力してください。",
+      "handleInvalid": "@は小文字、数字、-、_ を使って2〜32文字にしてください。",
+      "handleTaken": "その@はほかの人が使っています。",
+      "handleAgent": "その@はエージェントが使っています。",
+      "saved": "アカウントを保存しました"
+    },
+    "zone": {
+      "title": "タイムゾーン",
+      "search": "都市またはタイムゾーンを検索",
+      "useOrg": "ワークスペースのタイムゾーンを使う",
+      "suggested": "おすすめ",
+      "all": "すべて",
+      "none": "その名前のタイムゾーンはありません"
+    }
+  },
+  "delete": {
+    "title": "アカウントを削除",
+    "intro": "元に戻すことはできません。",
+    "goes": {
+      "account": "あなたのアカウント、アクセス権、セッションが削除されます。",
+      "orgs": "あなたが唯一のメンバーのワークスペースは削除されます。",
+      "phones": "このスマートフォンとほかのデバイスにアラートが届かなくなります。"
+    },
+    "stays": "あなたが書いたメッセージは、名前なしでチャットに残ります。",
+    "blocked": "あなたは{{names}}の唯一のオーナーです。ウェブサイトの「人」で別の人をオーナーにしてから、戻ってきてください。",
+    "addPasswordFirst": "まずウェブサイトでアカウントにパスワードを追加してから、ここに入力してください。",
+    "addPasswordWeb": "ウェブサイトでパスワードを追加",
+    "otherAccount": "別のアカウントでログインしました。何も削除されていません。",
+    "hold": "長押しして削除",
+    "holding": "そのまま押し続けて…"
+  },
+  "files": {
+    "type": {
+      "image": "画像",
+      "pdf": "PDF",
+      "document": "ドキュメント",
+      "table": "表",
+      "code": "コード",
+      "archive": "アーカイブ",
+      "diff": "コードの変更",
+      "diagram": "図",
+      "page": "ページ",
+      "text": "テキスト",
+      "file": "ファイル"
+    },
+    "more": "その他のオプション",
+    "share": "共有",
+    "savePhotos": "写真に保存",
+    "drive": "Driveで表示",
+    "saved": "写真に保存しました",
+    "photosDenied": "写真へのアクセスがありません",
+    "photosDeniedSub": "画像を保存するには、設定で許可してください。",
+    "shareFailed": "ファイルを共有できませんでした。",
+    "saveFailed": "画像を保存できませんでした。",
+    "loadFailed": "ファイルを開けませんでした。",
+    "openImage": "画像を開く",
+    "imageOf": "画像 {{index}}/{{count}}",
+    "place": "{{index}}/{{count}}",
+    "noPreview": "このファイルはアプリでは開けません。共有して別のアプリで開いてください。"
+  },
+  "issues": {
+    "title": "タスク",
+    "new": "新しいタスク",
+    "filters": "タスクを絞り込む",
+    "section": {
+      "todo": "未着手",
+      "in_progress": "進行中",
+      "in_review": "レビュー中",
+      "done": "完了",
+      "canceled": "キャンセル済み"
+    },
+    "columnEmpty": "今は何もありません。",
+    "commentHere": "コメント…",
+    "state": {
+      "running": "作業中",
+      "waiting": "あなたの対応待ち",
+      "stalled": "停滞中",
+      "review": "レビュー中",
+      "reviewPr": "レビュー中 · PR #{{number}}",
+      "progress": "進行中",
+      "todo": "未着手",
+      "done": "完了",
+      "canceled": "キャンセル済み"
+    },
+    "until": "期限 {{date}}",
+    "empty": "ここにタスクはありません",
+    "emptyOpen": "チャットで頼むこともできます。",
+    "loadFailed": "タスクを読み込めませんでした。",
+    "createdBy": "作成者: {{name}}",
+    "fromMessage": "メッセージから",
+    "fromForum": "フォーラムから",
+    "fromAgent": "エージェントへの依頼から",
+    "fromWebhook": "{{provider}}から",
+    "workingFor_other": "{{count}}分間作業中",
+    "justStarted": "開始したばかり",
+    "waitsYou": "があなたを待っています",
+    "stalledSince": "{{when}}に停止",
+    "criteriaOf": "{{done}}/{{total}}",
+    "linkMessage": "#{{channel}}のメッセージ",
+    "linkMessagePlain": "元のメッセージ",
+    "subIssues": "サブタスク",
+    "talk": "チャット",
+    "finish": "完了にする",
+    "reopen": "再開する",
+    "finished": "#{{number}}を完了しました",
+    "reopened": "#{{number}}を再開しました",
+    "changed": "タスクを更新しました",
+    "moved": "#{{number}}を{{column}}に移動しました",
+    "more": "その他のオプション",
+    "actions": {
+      "status": "列",
+      "priority": "優先度",
+      "assignee": "担当者",
+      "cancel": "タスクをキャンセル",
+      "canceled": "#{{number}}をキャンセルしました"
+    },
+    "nobody": "なし",
+    "you": "あなた",
+    "form": {
+      "title": "新しいタスク",
+      "create": "作成",
+      "titlePlaceholder": "やること",
+      "description": "説明（任意）",
+      "who": "担当者",
+      "agentStarts": "タスクを作成するとすぐに、エージェントが作業を始めます。",
+      "details": "詳細",
+      "due": "期限",
+      "dueChoice": {
+        "none": "なし",
+        "today": "今日",
+        "tomorrow": "明日",
+        "friday": "金曜日",
+        "nextWeek": "1週間後"
+      },
+      "created": "タスク#{{number}}を作成しました",
+      "createFailed": "タスクを作成できませんでした。"
+    }
+  },
+  "drive": {
+    "title": "Drive",
+    "search": "Driveを検索",
+    "types": "ファイルの種類",
+    "type": {
+      "all": "すべて",
+      "documents": "ドキュメント",
+      "images": "画像",
+      "tables": "表",
+      "diffs": "差分"
+    },
+    "section": {
+      "today": "今日",
+      "week": "今週"
+    },
+    "kind": {
+      "document": "ドキュメント",
+      "table": "表",
+      "diff": "差分",
+      "image": "画像",
+      "file": "ファイル"
+    },
+    "by": "{{name}} · {{when}}",
+    "empty": "Driveにはまだ何もありません",
+    "emptySub": "エージェントや人がチャットで作成・送信したものがここに表示されます。",
+    "noResults": "この条件に一致するものはありません。",
+    "loadFailed": "Driveを読み込めませんでした。",
+    "more": "もっと見る"
+  },
+  "constellation": {
+    "openHint": "空でタップしたものを開きます"
+  },
+  "memory": {
+    "title": "メモリ",
+    "subtitle": "エージェントがチームから学んだこと。",
+    "search": "メモリを検索",
+    "all": "すべて",
+    "sky": "星座",
+    "recent": "最近覚えたこと",
+    "mostUsed": "よく使われる",
+    "noMatch": "一致するメモリはありません。",
+    "emptyTitle": "まだ何も覚えていません",
+    "empty": "エージェントは一緒に作業しながら、覚えたことをここに残します。",
+    "gone": "このメモリはもう存在しません。",
+    "of": "{{name}}のメモリ",
+    "line_other": "{{name}} · {{count}}回使用",
+    "agentLine_other": "{{count}}件のメモリ",
+    "uses_other": "{{count}}回使用",
+    "confirmed": "人が確認済み",
+    "unconfirmed": "未確認",
+    "before": "以前の内容: {{text}}",
+    "fix": "修正",
+    "forgetTitle": "このメモリを忘れますか？",
+    "forgetText": "{{name}}は今後の会話でこれを使わなくなります。"
+  },
+  "wiki": {
+    "map": "ページマップ",
+    "mapAgent": "今週ページを読んだエージェント",
+    "usedBy": "使っているエージェント",
+    "readsWeek_other": "今週{{count}}回読まれました",
+    "empty": "「新しいページ」をタップして、最初のページを書きましょう。",
+    "missing": "このページは存在しないか、名前が変更されました。",
+    "blank": "空白のページです。",
+    "folderGone": "このフォルダにはもうページがありません。",
+    "reads_other": "{{count}}回",
+    "taskConflict": "ページが変更されたため、最新の状態にしました。もう一度確認してください。",
+    "view": "表示",
+    "notSaved": "プレビュー · まだ保存されていません",
+    "placeholder": "ここに書いてください。[[ でほかのページにリンクできます。",
+    "hideKeyboard": "キーボードを隠す",
+    "createLink": "「{{title}}」を作成",
+    "discardTitle": "保存せずに終了しますか？",
+    "discardText": "ここに書いた内容は失われます。",
+    "discard": "破棄",
+    "keepWriting": "書き続ける",
+    "conflictText": "保存されたバージョンはv{{version}}になりました。差分を見て、残すほうを選んでください。",
+    "conflictDiff": "差分: 保存済み → あなたの版",
+    "createAndWrite": "作成して書く",
+    "exists": "このタイトルのページはすでに存在します。",
+    "openExisting": "ページを開く"
+  },
+  "routines": {
+    "loadFailed": "ルーティンを読み込めませんでした。",
+    "anyAgent": "すべてのエージェント",
+    "create": "作成"
+  },
+  "homeNow": {
+    "working_other": "{{count}}人が作業中",
+    "finished": {
+      "run": "「{{what}}」を完了しました",
+      "mission": "ミッション「{{what}}」を完了しました",
+      "routine": "ルーティン「{{what}}」を完了しました",
+      "plain": "タスクを完了しました"
+    },
+    "rowWait": {
+      "approval": "があなたのOKを待っています",
+      "question": "があなたの回答を待っています",
+      "mission": "があなたのレビューを待っています"
+    },
+    "doingLabel": "作業中: {{what}}",
+    "first": {
+      "subtitle": "ここにチャットとして表示されます。",
+      "create": "最初のエージェントを作成",
+      "examples": "または、これらから始めましょう"
+    }
+  },
+  "activityNow": {
+    "kind": {
+      "approval": "承認",
+      "question": "質問",
+      "forum": "あなたの番",
+      "browser": "ブラウザ",
+      "secret": "シークレット",
+      "join": "メンバー"
+    },
+    "review": "レビュー",
+    "answer": "返信",
+    "open": "開く",
+    "clear": {
+      "title": "あなたの対応待ちはありません",
+      "text": "エージェントがあなたを必要とすると、まずここに表示されます。"
+    },
+    "next": {
+      "title": "次: {{name}}",
+      "routineOf": "{{agent}}のルーティン · {{when}}",
+      "routine": "ルーティン · {{when}}",
+      "today": "今日 {{time}}",
+      "tomorrow": "明日 {{time}}",
+      "later": "{{day}} {{time}}"
+    }
+  },
+  "intentAgents": {
+    "waitingSection": "あなたの対応待ち",
+    "waitingLine": "{{title}} · あなたのOK待ち",
+    "waitingMore_other": "{{title}} · ほか{{count}}件があなたの対応待ち",
+    "waitingLabel": "{{name}}、あなたのOK待ち",
+    "owner": "オーナー: {{name}}",
+    "ownerYou": "オーナー: あなた",
+    "nowWaiting": "あなたのOK待ち: {{title}}",
+    "did": {
+      "title": "あなたのためにしたこと",
+      "title_female": "あなたのためにしたこと",
+      "month_other": "今月{{count}}件",
+      "seeAll": "すべて表示",
+      "seeLess": "表示を減らす",
+      "emptyF": "まだ何もありません。",
+      "emptyM": "まだ何もありません。",
+      "file": "{{title}}",
+      "approval": "{{title}}",
+      "fileKind": {
+        "document": "ドキュメント",
+        "table": "表",
+        "diff": "コードの変更",
+        "image": "画像",
+        "file": "ファイル"
+      },
+      "waitingOnYou": "あなたのOK待ち",
+      "youApproved": "あなたが承認",
+      "youRefused": "あなたが却下",
+      "action": {
+        "issueCreated": "タスク#{{number}}を作成",
+        "issueUpdated": "タスク#{{number}}を変更",
+        "issueAssigned": "タスク#{{number}}を引き継ぎ",
+        "routineCreated": "ルーティン{{name}}を作成",
+        "routineUpdated": "ルーティン{{name}}を変更",
+        "agentAdded": "{{name}}を#{{channel}}に追加",
+        "pageCreated": "ページ{{title}}を作成",
+        "pageEdited": "ページ{{title}}を編集",
+        "pageEditedRestricted": "制限付きページを編集",
+        "threadRenamed": "スレッド名を{{to}}に変更",
+        "threadClosed": "スレッド{{title}}を閉じました"
+      }
+    },
+    "knows": {
+      "title": "あなたについて知っていること",
+      "title_female": "あなたについて知っていること",
+      "footF": "タップして修正または削除できます。",
+      "footM": "タップして修正または削除できます。",
+      "footOwner": "修正できるのは{{name}}か管理者だけです。",
+      "footAdmins": "修正できるのは管理者だけです。",
+      "emptyF": "{{name}}はまだあなたについて何も保存していません。",
+      "emptyM": "{{name}}はまだあなたについて何も保存していません。",
+      "saidDm": "{{when}}、ダイレクトチャットであなたが言ったこと",
+      "saidChannel": "#{{channel}}であなたが言ったこと · {{date}}",
+      "saidSomewhere": "会話の中であなたが言ったこと · {{date}}",
+      "wrote": "あなたが書いたこと · {{date}}",
+      "learned": "会話の中で覚えたこと · {{date}}",
+      "when": {
+        "today": "今日",
+        "yesterday": "昨日",
+        "date": "{{date}}"
+      }
+    },
+    "fix": {
+      "titleF": "{{name}}が知っていること",
+      "titleM": "{{name}}が知っていること",
+      "from": "あなたとの会話から · {{when}}",
+      "see": "見る",
+      "save": "保存",
+      "forget": "これを忘れる",
+      "saved": "メモリを修正しました",
+      "forgotten": "忘れました"
+    },
+    "thinks": "使用しているAI",
+    "uses": {
+      "title": "使えるもの",
+      "title_female": "使えるもの",
+      "level": {
+        "read": "読み取り",
+        "write": "読み取りと書き込み",
+        "some": "一部"
+      },
+      "area": {
+        "context": "メモリ",
+        "drive": "Drive",
+        "issues": "タスク",
+        "calendar": "カレンダー",
+        "wiki": "Wiki",
+        "skills": "スキル",
+        "schedule": "ルーティン",
+        "forum": "フォーラム",
+        "sandbox": "専用コンピューター",
+        "browser": "ブラウザ",
+        "setup": "ワークスペースの設定",
+        "desktop": "コンピューターの画面"
+      },
+      "asksYou": "マージと公開は、どのレベルでも必ずあなたの承認を求めます。",
+      "asksOwner": "マージと公開は、どのレベルでも必ず{{name}}の承認を求めます。",
+      "asksAdmins": "マージと公開は、どのレベルでも必ず管理者の承認を求めます。",
+      "empty": "今は会話だけです。"
+    }
+  },
+  "outage": {
+    "a11y": "コンピューターの接続が切れました",
+    "title": "{{computer}}の接続が切れました",
+    "back": "{{computer}}が復帰しました",
+    "whoOne": "{{name}}が復帰を待っています",
+    "whoMany": "{{names}}が復帰を待っています",
+    "tasks_other": "{{count}}件のタスク",
+    "switch": "コンピューターを切り替え",
+    "dismiss": "お知らせを閉じる",
+    "rowWaiting": "{{computer}}を待っています",
+    "rowWaitingLabel": "{{name}}、{{computer}}を待っています",
+    "waiting": {
+      "routines_other": "{{count}}件のルーティンが待機中",
+      "conversations_other": "{{count}}件の会話が待機中",
+      "tasks_other": "{{count}}件のタスクが待機中",
+      "none": "待機中のものはありません"
+    },
+    "sheet": {
+      "title": "コンピューターを切り替え",
+      "descOne": "今後{{names}}が作業する場所を選んでください。",
+      "descMany": "今後{{names}}が作業する場所を選んでください。",
+      "where": "切り替え先",
+      "who": "切り替えるエージェント",
+      "hint": "{{computer}}上ですでにファイルを変更したタスクは、そのコンピューターを待ちます。",
+      "submit_other": "{{count}}体のエージェントを切り替え",
+      "later": "あとで",
+      "on": "オン",
+      "cloudTag": "常時オン",
+      "managedDesc": "このワークスペース専用 · エージェントごとに1ユーザー",
+      "has": "{{brains}}あり",
+      "none": "今これらのエージェントを引き受けられるコンピューターはほかにありません。ウェブサイトで接続してください。",
+      "gone": "{{computer}}が復帰しました。切り替えは不要です。",
+      "reason": {
+        "offline": "接続切れ",
+        "paused": "一時停止中",
+        "missing_brain": "{{brain}}がありません",
+        "exec_off": "コマンドの実行を許可していません",
+        "runner_old": "更新が必要です",
+        "outdated": "更新が必要です",
+        "tool_off": "{{brain}}がオフになっています",
+        "not_installed": "{{brain}}がインストールされていません",
+        "other": "今は使えません"
+      }
+    },
+    "result": {
+      "done_other": "{{count}}体のエージェントがコンピューターを切り替えました",
+      "none": "コンピューターを切り替えたエージェントはいません",
+      "resumed_other": "{{count}}件のタスクがすでに再開しました",
+      "still_other": "{{count}}件のタスクが{{computer}}を待っています",
+      "skipped_other": "{{count}}体のエージェントを切り替えられませんでした"
+    },
+    "error": {
+      "target_offline": "そのコンピューターの接続が切れました。別のコンピューターを選んでください。",
+      "target_not_found": "そのコンピューターはもう接続されていません。別のコンピューターを選んでください。",
+      "target_same": "{{computer}}以外のコンピューターを選んでください。",
+      "target_paused": "そのコンピューターは一時停止中です。別のコンピューターを選んでください。",
+      "not_found": "{{computer}}はコンピューターの一覧にもうありません。"
+    },
+    "card": {
+      "waiting": "{{computer}}の復帰を待っています",
+      "body": "{{brain}}はそのコンピューターで動いています。復帰したらすぐにここから続けます",
+      "back": "{{computer}}が復帰しました",
+      "backSome": "コンピューターが復帰しました",
+      "backBody": "待っていた作業を続けます。",
+      "moved": "コンピューターを切り替えました",
+      "movedBody": "{{computer}}を待っていた作業は、新しいコンピューターで続きます。"
+    },
+    "titleCloud": "{{computer}}が応答しません",
+    "a11yCloud": "コンピューターが応答しません",
+    "cloudSub": "対応中です"
+  },
+  "browser": {
+    "card": {
+      "needs": "{{name}}が助けを求めています",
+      "needsFor": "{{name}}が助けを求めています · {{time}}",
+      "inControlAt": "あなたが操作中 · {{host}}",
+      "doing": "{{name}} · {{doing}}",
+      "startingF": "{{name}}のブラウザを開いています…",
+      "startingM": "{{name}}のブラウザを開いています…",
+      "stopAskF": "{{name}}のブラウザを閉じますか？",
+      "stopAskM": "{{name}}のブラウザを閉じますか？",
+      "whereF": "{{name}}のブラウザ内",
+      "whereM": "{{name}}のブラウザ内",
+      "open": "開く",
+      "expandHint": "タップして展開",
+      "stop": "停止",
+      "giveUp": "あきらめる",
+      "done": "完了: {{title}}",
+      "failed": "できませんでした: {{title}}",
+      "failedNote": "できませんでした: {{note}}",
+      "expired": "時間内に誰も開きませんでした: {{title}}",
+      "cancelled": "キャンセル済み: {{title}}",
+      "withdrawn": "{{name}}にはもう不要です: {{title}}"
+    },
+    "live": {
+      "inControl": "あなたが操作中",
+      "helping": "{{name}}が操作中",
+      "watchOnly": "{{name}}が操作中です。あなたは見ているだけです。",
+      "takeOver": "操作を代わる",
+      "done": "完了",
+      "handBack": "操作を戻す",
+      "couldnt": "できなかった",
+      "typeHere": "ここに入力",
+      "typeMarked": "マークされた欄に入力",
+      "typeMarkedSecret": "マークされた欄のパスワード",
+      "keys": "キー",
+      "secureOn": "テキストを表示",
+      "secureOff": "テキストを隠す（パスワード）",
+      "send": "送信",
+      "password": "パスワード",
+      "page": "ブラウザのページです。タップするとクリックします。",
+      "graceF": "離れると、{{name}}は2分間待ちます。",
+      "graceM": "離れると、{{name}}は2分間待ちます。",
+      "closedHelpF": "ログイン情報は次回のために保存されます。",
+      "closedHelpM": "ログイン情報は次回のために保存されます。",
+      "stuckHelpF": "もう一度試すとブラウザが再起動します。ログイン情報は保存されたままです。",
+      "stuckHelpM": "もう一度試すとブラウザが再起動します。ログイン情報は保存されたままです。",
+      "hidden": "{{name}}が操作中 · 画面は非表示",
+      "key": {
+        "Tab": "Tab",
+        "Enter": "Enter",
+        "Backspace": "削除",
+        "Escape": "Esc"
+      },
+      "unavailable": {
+        "reconnectingF": "再接続中…",
+        "reconnectingM": "再接続中…",
+        "offlineF": "{{name}}のコンピューターはオフラインです。",
+        "offlineM": "{{name}}のコンピューターはオフラインです。",
+        "no_computerF": "{{name}}にはコンピューターがありません。",
+        "no_computerM": "{{name}}にはコンピューターがありません。",
+        "unavailableF": "{{name}}のブラウザは今は使えません。",
+        "unavailableM": "{{name}}のブラウザは今は使えません。",
+        "endedF": "{{name}}のブラウザが閉じました。",
+        "endedM": "{{name}}のブラウザが閉じました。",
+        "forbiddenF": "このブラウザを見る権限がありません。",
+        "forbiddenM": "このブラウザを見る権限がありません。",
+        "closedF": "{{name}}のブラウザは閉じています。",
+        "closedM": "{{name}}のブラウザは閉じています。",
+        "offlineCloudF": "{{name}}のコンピューターは今応答しません。",
+        "offlineCloudM": "{{name}}のコンピューターは今応答しません。",
+        "stuckF": "{{name}}のブラウザを開けませんでした。",
+        "stuckM": "{{name}}のブラウザを開けませんでした。",
+        "tooManyF": "同時に開いているブラウザが多すぎます。ほかのブラウザが閉じると、これが表示されます。",
+        "tooManyM": "同時に開いているブラウザが多すぎます。ほかのブラウザが閉じると、これが表示されます。"
+      }
+    },
+    "done": {
+      "title": "何か付け加えることはありますか？",
+      "introF": "任意です。{{name}}は続ける前にこれを読みます。",
+      "introM": "任意です。{{name}}は続ける前にこれを読みます。",
+      "placeholder": "例: テスト用アカウントでログインしました"
+    },
+    "failed": {
+      "title": "何がありましたか？",
+      "introF": "{{name}}がこれを読んで、どうするか決めます。",
+      "introM": "{{name}}がこれを読んで、どうするか決めます。",
+      "placeholder": "ひとこと（任意）",
+      "send": "送信",
+      "reason": {
+        "code": "持っていないコードを求められた",
+        "password": "パスワードがわからない",
+        "blocked": "サイトにブロックされた"
+      }
+    }
+  },
+  "connectors": {
+    "title": "コネクタ",
+    "search": "サービスを検索",
+    "connected": "接続済み",
+    "address": "アドレス",
+    "byAddress": "アドレスで接続",
+    "suggested": "{{org}}へのおすすめ",
+    "all": "すべて",
+    "empty": "エージェントはまだ何も使っていません",
+    "emptySub": "サービスを接続すると、エージェントがそこで情報を読んだり作業したりできるようになります。",
+    "noResults": "その名前のサービスはありません。アドレスで試してください。",
+    "soon": "近日公開",
+    "loadFailed": "コネクタを読み込めませんでした。",
+    "connectedCheck": "{{name}}、接続済み",
+    "adminsOnly": "サービスを接続できるのは{{org}}の管理者だけです。管理者に頼んでください。",
+    "canTitle": "エージェントができるようになること",
+    "asks": "{{text}} · あなたの承認が必要",
+    "connect": "接続",
+    "signIn": "{{name}}にログイン",
+    "useKey": "キーを使う",
+    "useSignIn": "ブラウザでログイン",
+    "keyLabel": "{{name}}のキー",
+    "keyHelp": "暗号化して保存されます。あなたもエージェントも、二度と見ることはできません。",
+    "keyShort": "キーが短すぎるようです。",
+    "paste": "貼り付け",
+    "addressTitle": "アドレスで接続",
+    "addressHelp": "サービスのMCPサーバーのアドレス（https://で始まります）。",
+    "addressLabel": "アドレス",
+    "addressInvalid": "https://のアドレスを使ってください。",
+    "needsKey": "このサーバーはキーを求めています。",
+    "working": "接続中…",
+    "failed": "接続できませんでした。もう一度お試しください。",
+    "refused": "{{name}}が許可しませんでした。何も接続されていません。",
+    "connectedTitle": "{{name}}を接続しました",
+    "connectedSub": "次に、エージェントが自分でできることを確認しましょう。",
+    "connectedDone": "サービスを接続しました。",
+    "levelFailed": "{{name}}のアクセスを変更できませんでした。もう一度お試しください。",
+    "everyoneFailed": "全員のアクセスを変更できませんでした。もう一度お試しください。",
+    "disconnectFailed": "{{name}}の接続を解除できませんでした。もう一度お試しください。",
+    "needsReconnect": "{{name}}のアカウントが使えなくなりました。誰かが再接続するまで、エージェントは使えません。",
+    "accountTitle": "このアカウント",
+    "renameFailed": "名前を変更できませんでした。もう一度お試しください。",
+    "whoTitle": "誰がどこまで使うか",
+    "level": {
+      "none": "使わない",
+      "read": "見るだけ",
+      "write": "変更できる",
+      "custom": "カスタム"
+    },
+    "safe": "削除、公開、顧客への回答は、必ずあなたの承認を求めます。",
+    "done": "完了",
+    "step": "ステップ {{n}}/{{total}}: {{label}}",
+    "disconnect": "接続を解除",
+    "disconnected": "{{name}}の接続を解除しました。",
+    "usedBy_other": "{{names}}が使用中",
+    "fromAgent": "サービスを接続",
+    "review": {
+      "stepAbout": "できること",
+      "saving": "保存中…",
+      "saveFailed": "{{name}}のツールを保存できませんでした。もう一度お試しください。",
+      "refreshing": "確認中…",
+      "refreshFailed": "ツールをもう一度確認できませんでした。もう一度お試しください。",
+      "waiting": "エージェントが使う前に、管理者がこのサーバーのツールを確認する必要があります。"
+    }
+  },
+  "invite": {
+    "invitedBy": "{{name}}さんから{{org}}に招待されました",
+    "invited": "{{org}}に招待されました",
+    "joinAs": "{{role}}として参加します。",
+    "apple": "Appleで続ける",
+    "signIn": "ログインして承諾",
+    "accept": "{{org}}に参加",
+    "wrongAccount": "この招待は{{email}}宛てです。",
+    "otherAccount": "別のアカウントを使う",
+    "failed": "招待を承諾できませんでした。もう一度お試しください。",
+    "join": {
+      "skip": "スキップ",
+      "sharedBy": "{{name}}さんがこのリンクを共有しました",
+      "waitLead": "管理者が承認するとすぐに参加できます。アプリは閉じてかまいません。メールでお知らせします。",
+      "passwordLead": "パスワードを入力すれば参加できます。"
+    }
+  },
+  "joinRequests": {
+    "share": "リンクを共有",
+    "roles": "ロール",
+    "rolesHint": "オンにしたロールで参加します。ロールがない場合は、「全員」に許可されたことができます。"
+  },
+  "humanCheck": {
+    "title": "簡単な確認",
+    "blocked": "確認を読み込めませんでした。別のネットワークでお試しください。"
+  },
+  "invitePeople": {
+    "emailsHelp": "リストを貼り付けるか、入力してください。各メンバーにメールが届き、すぐに参加できます。",
+    "here": "参加済み",
+    "invited": "招待済み",
+    "fix": "確認してください",
+    "channels": "チャンネル",
+    "optional": "任意",
+    "ok": "OK",
+    "noteHelp": "あなたの名前と一緒にメールに表示されます。最大{{max}}文字。",
+    "roleHelp": "参加時に付与されるものが変わります。",
+    "remove": "リストから外す",
+    "sendAgain": "再送信",
+    "cancelTitle": "{{email}}への招待を取り消しますか？",
+    "cancelText": "招待リンクが開けなくなります。",
+    "send": "送信"
+  },
+  "members": {
+    "waiting_other": "{{count}}人が待機中"
+  },
+  "reset": {
+    "title": "新しいパスワードを設定",
+    "save": "保存してログイン",
+    "done": "パスワードを変更しました。",
+    "expired": "このリンクは期限切れです",
+    "expiredLead": "パスワードのリンクの有効期限は1時間です。",
+    "toSignIn": "ログインへ"
+  },
+  "entering": {
+    "title": "{{org}}に入っています…",
+    "titleNew": "入っています…",
+    "lead": "会話を読み込んでいます。"
+  },
+  "splash": {
+    "slow": "接続中…",
+    "offline": "接続がありません。再試行しています。"
+  },
+  "onb": {
+    "progress": "ステップ {{n}}/{{total}}",
+    "done": "完了",
+    "optional": "任意",
+    "back": "戻る",
+    "logo": "ロゴ",
+    "logoHelp": "任意です。",
+    "logoPick": "選ぶ",
+    "zone": "タイムゾーン: {{zone}}",
+    "importSources": "エージェントの移行元",
+    "importLead": "ウェブの 設定 › インポートとエクスポート から移行できます。",
+    "importSkip": "使っていないのでスキップ",
+    "agentsAda": "私はもうここにいます",
+    "agentsLead": "ほかに誰が参加するか確認しましょう。",
+    "share": "招待リンクを共有",
+    "shareMessage": "agentes.chatで{{org}}に参加しましょう: {{url}}",
+    "shareNote": "参加を求めた人は、あなたが一人ずつ承認します。",
+    "emailsPlaceholder": "name@company.com",
+    "membersNote": "メンバーとして参加します。",
+    "invalidEmail": "このメールアドレスを確認してください。",
+    "invitesFailed": "これらの招待を送信できませんでした。もう一度お試しください。",
+    "removeEmail": "{{email}}を削除",
+    "later": "あとで",
+    "failed": "保存できませんでした。もう一度お試しください。"
+  },
+  "ai": {
+    "yourPlan": "あなたのAIプラン",
+    "coding": "コーディングプラン",
+    "codingSub": "GLM、Kimi、MiniMax、OpenCode",
+    "plansFoot": "エージェントはあなたのプランで考えます。APIキーは不要です。エージェントのコンピューターでログインします。",
+    "whichPlan": "プランの種類",
+    "codingFoot": "コーディングプランは、エージェントのコンピューターで専用のキーを使ってログインします。",
+    "change": "変更",
+    "how": "接続方法",
+    "whose": "誰のキーか",
+    "meanwhile": "それまでの間、エージェントはAPIキーで考えることができます。",
+    "failed": "このキーを保存できませんでした。正しいか確認して、もう一度お試しください。",
+    "save": "キーを保存",
+    "saving": "保存中…",
+    "row": "AIアカウント",
+    "rowNone": "なし",
+    "rowPlans_other": "{{count}}個のプラン",
+    "rowKeys_other": "{{count}}個のキー",
+    "taskNoAi": "{{name}}にはまだAIがありません。AIが接続されるまでタスクは待機します。",
+    "connect": "AIを接続",
+    "moveHere": "ここに移動",
+    "audience": "応答する相手",
+    "audience_female": "応答する相手",
+    "another": "別のAI"
+  },
+  "crash": {
+    "title": "この画面で問題が発生しました",
+    "subtitle": "表示中にアプリでエラーが発生しました。もう一度お試しください。繰り返し起きる場合は、下のテキストを送ってください。",
+    "retry": "もう一度試す"
+  },
+  "notFound": {
+    "title": "見つかりませんでした",
+    "subtitle": "リンクが変わったか、表示する権限がない可能性があります。",
+    "home": "チャットへ"
+  },
+  "settings": {
+    "edit": "ワークスペースを編集",
+    "access": {
+      "how": "行をタップしてレベルを変更します: アクセスなし、読み取り、読み取りと書き込み。"
+    },
+    "logo": {
+      "failed": "ロゴをアップロードできませんでした",
+      "tooBig": "画像が大きすぎます。別の画像をお試しください。"
+    },
+    "machine": {
+      "toolsHow": "オンのツールをタップするとオフになります。再びオンにするには、そのコンピューター上で操作する必要があります。"
+    },
+    "import": {
+      "preparing": "ファイルを準備中…",
+      "failed": "ファイルをダウンロードできませんでした。もう一度お試しください。"
+    }
+  },
+  "status": {
+    "title": "ステータス",
+    "doing": "今していること",
+    "placeholder": "会議中、昼食中…",
+    "noEmoji": "絵文字なし",
+    "cleared": "ステータスをクリアしました",
+    "bySelfUntil": "{{name}}が設定 · {{when}}"
+  }
+}

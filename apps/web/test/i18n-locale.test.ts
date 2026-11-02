@@ -10,8 +10,10 @@ beforeEach(() => localStorage.clear());
 describe("the language to start in (ADR 0122)", () => {
   test("this browser's pick, else the landing's cookie, else the browser's own, else English", () => {
     expect(savedLocale(["pt-PT"], "agentes_locale=en")).toBe("en");
-    expect(savedLocale(["fr-FR"], "")).toBe("en");
-    expect(savedLocale(["fr-FR", "pt-BR"], "")).toBe("pt-BR");
+    expect(savedLocale(["sv-SE"], "")).toBe("en");
+    expect(savedLocale(["sv-SE", "pt-BR"], "")).toBe("pt-BR");
+    expect(savedLocale(["fr-CA", "pt-BR"], "")).toBe("fr");
+    expect(savedLocale(["en-US"], "agentes_locale=zh-Hans")).toBe("zh-Hans");
     expect(savedLocale(["en-US"], "a=1; agentes_locale=pt")).toBe("pt-BR");
     localStorage.setItem("agentes.locale", "pt-BR");
     expect(savedLocale(["en-US"], "agentes_locale=en")).toBe("pt-BR");
@@ -26,6 +28,7 @@ describe("the language to start in (ADR 0122)", () => {
     expect(readLocaleState()).toEqual({ stored: "pt-BR", pending: true });
     chooseLocale("auto", i18n, true);
     expect(readLocaleState()).toEqual({ stored: "auto", pending: false });
-    expect(detectedLocale(["zh-TW", "en"])).toBe("en");
+    expect(detectedLocale(["sv-SE", "en"])).toBe("en");
+    expect(detectedLocale(["zh-TW", "en"])).toBe("zh-Hans");
   });
 });

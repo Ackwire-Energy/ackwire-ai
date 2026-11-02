@@ -41,6 +41,9 @@ test("ids in code, data and product names are not decision ids", () => {
   const lines = [
     "Workers, KV, R2 and D1 of the account.",
     "R2 e D1 da conta.",
+    "Workers, KV, R2 und D1 des Kontos.",
+    "Workers, KV, R2, D1 보기",
+    "Workers, KV, R2 и D1 аккаунта.",
     "color: #D1D5DB;",
     "sha512-ab/D45+x==",
     "sha512-ab/D45/x==",

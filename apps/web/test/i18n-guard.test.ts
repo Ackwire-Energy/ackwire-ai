@@ -102,7 +102,22 @@ describe("a failed request in the person's words", () => {
 
 describe("Claude and ChatGPT, not their makers, in what a person reads", () => {
   /** A legal text names the company, once, beside the product people know. */
-  const MAKER = { en: "Anthropic, which makes Claude", "pt-BR": "a Anthropic, que faz o Claude" } as const;
+  const MAKER = {
+    en: "Anthropic, which makes Claude",
+    "pt-BR": "a Anthropic, que faz o Claude",
+    es: "Anthropic, que crea Claude",
+    fr: "Anthropic, qui développe Claude",
+    de: "Anthropic, dem Hersteller von Claude",
+    it: "Anthropic, che sviluppa Claude",
+    nl: "Anthropic, de maker van Claude",
+    ja: "Claude を開発する Anthropic",
+    ko: "Claude를 만드는 Anthropic",
+    "zh-Hans": "开发 Claude 的 Anthropic",
+    id: "Anthropic, yang membuat Claude",
+    tr: "Claude'u geliştiren Anthropic",
+    pl: "Anthropic, twórca Claude",
+    ru: "Anthropic, создатель Claude",
+  } as const;
   const inCopy = new RegExp(MAKER_WORDS.source, "i");
 
   // The phone's and the Mac app's own code: in their own tests, which run when only those apps change.

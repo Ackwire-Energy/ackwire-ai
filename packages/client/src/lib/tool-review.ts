@@ -174,12 +174,12 @@ export function toolName(t: TFunction, parts: { verb: string | null; words: stri
     const order = t("toolNames.order");
     const headWord = many ? head[1] : head[0];
     const mods = known.slice(0, -1) as [string, string, string][];
-    // pt-BR: the head first, then "do anúncio"…; en: modifiers before the head.
+    // pt-BR: the head first, then "do anúncio"…; en: modifiers before the head; ja, ko: those, then the verb.
     const phrase =
       order === "head-first"
         ? [headWord, ...mods.reverse().map((m) => m[2])].join(" ")
         : [...mods.map((m) => m[2]), headWord].join(" ");
-    return `${verb} ${phrase}`;
+    return order === "verb-last" ? `${phrase} ${verb}` : `${verb} ${phrase}`;
   }
   return `${verb} ${ws.join(" ")}`;
 }
