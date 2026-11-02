@@ -47,6 +47,7 @@ import {
   orgAutoModels,
   withAuto,
 } from "./auto-model";
+import { SHOW_BLOCK_TOOL } from "./blocks";
 import { brainOf } from "./brain-settings";
 import { missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
@@ -1185,6 +1186,7 @@ async function executeRunInner(
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         react: tools.some((t) => t.name === REACT_TOOL),
         followUp: tools.some((t) => t.name === FOLLOW_UP_TOOL),
+        blocks: tools.some((t) => t.name === SHOW_BLOCK_TOOL),
         capabilities: [describeCapabilities(tools, pending), repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import type { ModelRequest } from "@agenteschat/providers";
+import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  buildRunContext,
   closePoll,
   createArtifact,
   drainOutbox,
@@ -56,6 +57,23 @@ const ask = async (body: string) => {
   if (!row) throw new Error("nothing shown");
   return row;
 };
+
+describe("the prompt", () => {
+  test("says when to show a block only where the tools are, and never in a routine's run", async () => {
+    f = await setup();
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+    const system = async (r: typeof run, options: { blocks?: boolean; routine?: boolean }) => {
+      const ctx = await buildRunContext(f.db, r, f.agent, { maxMessages: 30, toolsAvailable: true, ...options });
+      return systemText(ctx.system);
+    };
+    expect(await system(run, { blocks: true })).toContain("show_block");
+    expect(await system(run, {})).not.toContain("show_block");
+    expect(await system(run, { blocks: true, routine: true })).not.toContain("show_block");
+    expect(await system({ ...run, background: true }, { blocks: true })).not.toContain("show_block");
+  });
+});
 
 describe("live blocks", () => {
   test("an agent shows one with no scope of its own, in its reply and out of the Drive", async () => {
