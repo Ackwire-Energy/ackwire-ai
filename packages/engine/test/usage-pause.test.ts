@@ -1,21 +1,24 @@
 import { afterEach, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, type PlanUsage } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   type Brain,
   type BrainEvent,
   type BrainTurn,
+  cancelRun,
   clearPlanLimits,
   createJobHandlers,
   createRoutine,
   drainOutbox,
   listMessages,
   listRoutines,
+  loadAgentStatuses,
   type MachineStatus,
   nextMonthStart,
   postPersonMessage,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
+  recoverStaleRuns,
   runRoutineNow,
   storedPlanLimit,
   updateAgent,
@@ -157,7 +160,7 @@ test("a turn cut by the plan after a tool waits in its session and picks up afte
   // Never handed to the API, which couldn't see what it did.
   expect(f.provider.calls).toHaveLength(0);
   const [note] = await notes(f, "plan_limit_cut");
-  expect(note?.meta.usageWait).toEqual({ code: "plan_limit", resetsAt });
+  expect(note?.meta.usageWait).toEqual({ code: "plan_limit", runId: run?.id, forUserId: f.owner.id, resetsAt });
   expect(note?.meta.bodyParams).toEqual({ plan: "Claude" });
 
   await Bun.sleep(200);
@@ -382,6 +385,8 @@ test("the budget's wall: the run waits for the next month or a raise, and goes o
   const [note] = await notes(f, "budget_wait");
   expect(note?.meta.usageWait).toEqual({
     code: "budget",
+    runId: run?.id,
+    forUserId: f.owner.id,
     resetsAt: new Date(nextMonthStart(Date.now())).toISOString(),
   });
   expect((await resumeJob(f, run?.id ?? ""))?.nextAttemptAt.getTime()).toBe(
@@ -422,6 +427,8 @@ test("fallen back to the API and out of budget: it looks again when its own plan
   const [note] = await notes(f, "budget_wait");
   expect(note?.meta.usageWait).toEqual({
     code: "budget",
+    runId: run?.id,
+    forUserId: f.owner.id,
     resetsAt: new Date(nextMonthStart(Date.now())).toISOString(),
   });
 });
@@ -449,7 +456,7 @@ test("other runs' reservations filling the budget: the run looks again in minute
   expect(await notes(f, "budget_wait", first.id)).toHaveLength(0);
 });
 
-test("a routine waiting on the plan reads as running in Rotinas, and its people hear it once", async () => {
+test("a routine waiting on the plan says so in Rotinas, not running, and its people hear it once", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   await computerAgent(f);
   const { brain } = scripted(() => [
@@ -471,7 +478,12 @@ test("a routine waiting on the plan reads as running in Rotinas, and its people 
   expect(run?.status).toBe("waiting_input");
   expect(f.provider.calls).toHaveLength(0);
   const [view] = await listRoutines(f.db, f.owner.id, f.org.id);
-  expect(view?.state).toBe("running");
+  // Stopped at the plan's own limit: it waits for the Claude plan, with nothing to continue.
+  expect(view?.state).toBe("usage_paused");
+  expect(view?.usagePause?.limit).toBe(true);
+  expect(view?.usagePause?.plan).toBe("Claude");
+  expect(view?.usagePause?.resetsAt).toBeString();
+  expect([view?.recentRuns[0]?.status, view?.recentRuns[0]?.code]).toEqual(["waiting", "waiting_plan"]);
   const heard = () =>
     f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "routine_waiting_plan"));
   expect((await heard()).map((n) => n.userId)).toEqual([f.owner.id]);
@@ -544,4 +556,128 @@ test("a refusal known only from its words holds until the first window resets, n
   const bare: PlanUsage = { windows: [], limited: true, source: "turn", at: new Date(at).toISOString() };
   expect(storedPlanLimit(bare, at + 60_000)).toEqual({ until: null });
   expect(storedPlanLimit(bare, at + 3600_000)).toBeNull();
+});
+
+/** A scheduled slot of a routine of the agent's, started now. */
+async function routineSlot(fx: Fixture) {
+  const deps = { db: fx.db, pubsub: fx.pubsub, context: fx.context };
+  const routine = await createRoutine(deps, fx.owner.id, fx.org.id, {
+    name: "Bom dia",
+    agentId: fx.agent.id,
+    prompt: "Summarize the night.",
+    target: { type: "channel", channelId: fx.general.id },
+    trigger: { type: "schedule", phrase: "todo dia às 8h" },
+  });
+  await runRoutineNow(deps, fx.owner.id, fx.org.id, routine.id);
+  await fx.db.update(schema.routineRuns).set({ trigger: "schedule" });
+  return routine.id;
+}
+
+test("a turn that goes through on the plan wakes the runs parked on its limit now, a routine's slot too", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const machineId = await computerAgent(f, { brainFallback: false });
+  // The reading a slot parked on said the reset is hours away (stale, or an unknown reset's re-checks).
+  await storeOwnUsage(f, machineId, {
+    windows: [{ kind: "five_hour", usedPercent: 100, resetsAt: later(3 * 3600_000).toISOString() }],
+    source: "turn",
+    at: new Date().toISOString(),
+  });
+  const { brain, seen } = scripted(() => [{ type: "done", text: "Bom dia." }]);
+  const handlers = handlersWith(f, brain);
+  await routineSlot(f);
+  await drainOutbox(f.db, handlers);
+  const [slot] = await runs(f);
+  expect(slot?.status).toBe("waiting_input");
+
+  // The plan has room again and a person's message goes through on it.
+  await storeOwnUsage(f, machineId, { windows: [], source: "turn", at: new Date().toISOString() });
+  clearPlanLimits();
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(2);
+  expect((await runs(f)).map((r) => r.status)).toEqual(["done", "done"]);
+});
+
+test("a wait on the plan whose wake job was lost is woken by the sweep once its time passed", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted((n) =>
+    n === 0
+      ? [
+          { type: "limit", resetsAt: later(150).toISOString() },
+          { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+        ]
+      : [{ type: "done", text: "Bom dia." }],
+  );
+  const handlers = handlersWith(f, brain);
+  await routineSlot(f);
+  await drainOutbox(f.db, handlers);
+  const [slot] = await runs(f);
+  expect(slot?.status).toBe("waiting_input");
+  const job = await resumeJob(f, slot?.id ?? "");
+  // Its job died (it failed its attempts, or was lost): nothing else would ever wake it.
+  await f.db
+    .update(schema.outbox)
+    .set({ status: "failed" })
+    .where(eq(schema.outbox.id, job?.id ?? ""));
+  await Bun.sleep(200);
+  const swept = await recoverStaleRuns({ db: f.db, pubsub: f.pubsub }, { now: later(RESUME_AFTER_MS + 3 * 60_000) });
+  expect(swept.requeued).toEqual([slot?.id ?? ""]);
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(2);
+  expect((await runs(f))[0]?.status).toBe("done");
+});
+
+test("back from a wait on the plan, the agent's status moves at once: the apps don't keep saying it waits", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const statusEvents: unknown[] = [];
+  f.pubsub.subscribe(orgTopic(f.org.id), (e) => {
+    if ((e as { event?: { type?: string } }).event?.type === "agent.status") statusEvents.push(e);
+  });
+  let atResume = -1;
+  const { brain } = scripted((n) => {
+    if (n === 1) atResume = statusEvents.length;
+    return n === 0
+      ? [
+          { type: "limit", resetsAt: later(150).toISOString() },
+          { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+        ]
+      : [{ type: "done", text: "oi" }];
+  });
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [status] = await loadAgentStatuses(f.db, f.org.id);
+  expect(status?.status?.kind).toBe("waiting_plan");
+  const parked = statusEvents.length;
+  await Bun.sleep(200);
+  await drainOutbox(f.db, handlers, { now: later(RESUME_AFTER_MS + RESUME_GAP_MS) });
+  // Told before its first turn back, not only when it ends.
+  expect(atResume).toBeGreaterThan(parked);
+});
+
+test("Don't run it: who asked cancels a reply waiting on the plan; its note says so and nothing runs at the reset", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await runs(f);
+  const [note] = await notes(f, "plan_limit_wait");
+  expect(note?.meta.usageWait).toMatchObject({ code: "plan_limit", runId: run?.id, forUserId: f.owner.id });
+
+  await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, run?.id ?? "");
+  expect((await runs(f))[0]?.status).toBe("canceled");
+  const [after] = await notes(f, "plan_limit_wait");
+  expect((after?.meta.usageWait as { canceled?: boolean } | undefined)?.canceled).toBe(true);
+  expect(await resumeJob(f, run?.id ?? "")).toBeUndefined();
+  const [status] = await loadAgentStatuses(f.db, f.org.id);
+  expect(status?.status).toBeNull();
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + RESUME_GAP_MS) });
+  expect(seen).toHaveLength(1);
 });

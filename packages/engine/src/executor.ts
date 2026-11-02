@@ -56,6 +56,7 @@ import type { ComputerTurn } from "./brains/prompt";
 import {
   type BrainPlan,
   bindingReset,
+  forgetPlanLimit,
   mayFallBack,
   NO_AI_CODES,
   notePlanLimit,
@@ -249,6 +250,7 @@ import {
   usageNoticeText,
   usageWaitKey,
   usageWaitPlace,
+  wakePlanWaits,
 } from "./usage-pause";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { RESTRICTED_HERE, sendHeldToDm } from "./wiki-dm";
@@ -473,6 +475,8 @@ export interface Transcript {
     source?: "plan" | "budget";
     /** When the limit resets, when known (Rotinas says "Pausada até…"; `until` is later by the stagger). */
     resetsAt?: string;
+    /** A usage wait's plan in words ("Claude", "ChatGPT"): Rotinas says what it waits for. */
+    plan?: string;
     /** A plan pause's: where its plan was read. */
     reading?: PlanReadingRef;
   };
@@ -868,7 +872,9 @@ async function executeRunInner(
     });
   }
   // Every way a held run comes back (an approval decided, a question answered, a secret given, its computer
-  // back) passes here: the conversations that asked a consulted one (ADR 0034) stop showing it held.
+  // back, its plan reset) passes here: the agent's status stops saying it waits now, not at the apps' next refetch,
+  // and the conversations that asked a consulted one (ADR 0034) stop showing it held.
+  if (backFromWait) await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   if (backFromWait && channelRow && isAgentOnlyDm(channelRow)) {
     await announceConsultationChange({ db, pubsub: deps.pubsub }, run).catch(() => {});
   }
@@ -1965,6 +1971,8 @@ async function executeRunInner(
   // Read once: a later pause of this run resumes with its own text.
   delete transcript.continued;
   let computerTurns = 0;
+  /** The plan said "limit" during the current computer turn (`onLimit`): a turn that went on anyway proves no room. */
+  let turnLimited = false;
   // Brought in without being named: another agent may have answered the same message since (the context
   // stops at the trigger). It reads that before its first call, so it can pass instead of answering twice.
   if (needsContext && policy.mayPass && triggerMessage) {
@@ -2567,12 +2575,16 @@ async function executeRunInner(
                   known ? "plan_limit_wait" : "plan_limit_wait_unknown",
                   `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
                 ];
+          const forUserId = await personOfMessage(tx, run.orgId, run.triggerMessageId).catch(() => null);
           const m = await post(
             tx,
             replyThreadId,
             text,
-            // `usageWait.resetsAt`: the apps say when in the reader's zone.
-            { ...bodyCode(code, { plan: name }), usageWait: { code: u.code, ...(resetsAt ? { resetsAt } : {}) } },
+            // `usageWait.resetsAt`: the apps say when in the reader's zone; `runId`: "Don't run it" cancels it.
+            {
+              ...bodyCode(code, { plan: name }),
+              usageWait: { code: u.code, runId: run.id, forUserId, ...(resetsAt ? { resetsAt } : {}) },
+            },
             undefined,
             true,
           );
@@ -2597,7 +2609,9 @@ async function executeRunInner(
       waitId,
       waitKey: key,
       until: runAt.toISOString(),
-      ...(u.pause ? { source: u.pause.source, ...(resetsAt ? { resetsAt } : {}) } : {}),
+      ...(resetsAt ? { resetsAt } : {}),
+      ...(budget ? {} : { plan: name }),
+      ...(u.pause ? { source: u.pause.source } : {}),
       // Continuar agora reads this plan's window again (`pauseContinuesPastPlan`).
       ...(u.pause?.source === "plan"
         ? {
@@ -3037,6 +3051,7 @@ async function executeRunInner(
                 }),
               ),
             onLimit: (resetsAt) => {
+              turnLimited = true;
               const machineId = turnPlan.session?.machineId;
               if (machineId && turnPlan.kind !== "model") {
                 notePlanLimit(machineId, turnPlan.kind, resetsAt, Date.now(), turnPlan.account?.id);
@@ -3064,6 +3079,19 @@ async function executeRunInner(
           // A turn cut off by its computer is finished now, and one that found room ends that wait.
           delete transcript.interruptedTurn;
           delete transcript.roomWaitSince;
+          // The plan had room for this turn: the runs parked on its limit go on now, not at their own timers.
+          const planMachine = turnPlan.session?.machineId;
+          if (planMachine && !turnLimited) {
+            forgetPlanLimit(planMachine, turnPlan.kind, account?.id);
+            const key = usageWaitKey({
+              code: "plan_limit",
+              machineId: planMachine,
+              kind: turnPlan.kind,
+              accountId: account?.id,
+            });
+            later(() => wakePlanWaits(db, run.orgId, key));
+          }
+          turnLimited = false;
           // Later turns of this run continue the same session.
           if (plan.session) plan = { ...plan, session: { ...plan.session, resume: true } };
         }

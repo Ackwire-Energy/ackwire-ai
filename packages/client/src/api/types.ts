@@ -2834,7 +2834,7 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `usage_paused` (its run paused near its plan's or budget's limit: `usagePause`), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * or an answer), `usage_paused` (its run waits on its plan or budget: `usagePause`), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
  * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
 export type RoutineState =
@@ -2877,12 +2877,19 @@ export interface Routine {
   /** Its run waits for this computer since `since` (state `waiting_computer`). */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /**
-   * Its run paused near its plan's or budget's limit (state `usage_paused`, ADR 0118): it picks up at `resetsAt`
-   * (null: not known yet). `extraOff`: the plan's window is used up and the agent's long work may not use paid
+   * Its run waits on its plan or budget (state `usage_paused`, ADR 0118): paused near the limit, or stopped at it
+   * (`limit`: nothing to continue). It picks up at `resetsAt` (null: not known yet); `plan` is the plan's name. `extraOff`: the plan's window is used up and the agent's long work may not use paid
    * extra usage, so Continuar agora is refused; `extraUsedUp`: the same with the switch on but no extra usage left.
    * Who may press it: `canManage`.
    */
-  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp?: boolean } | null;
+  usagePause?: {
+    source: "plan" | "budget";
+    resetsAt: string | null;
+    limit?: boolean;
+    plan?: string | null;
+    extraOff: boolean;
+    extraUsedUp?: boolean;
+  } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
   /**
