@@ -121,6 +121,7 @@ import {
   verdictRecord,
 } from "./continuation";
 import { modelInfoFor } from "./credentials";
+import { sha256 } from "./crypto";
 import { publishDelivery } from "./delivery";
 import { isAgentOnlyDm } from "./dms";
 import {
@@ -230,6 +231,7 @@ import {
   turnMeans,
 } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
+import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import {
   budgetUsedPercent,
@@ -387,6 +389,8 @@ export interface Transcript {
   messages: ModelMessage[];
   /** Tools on demand (ADR 0043): the tool groups this run listed up front; absent = every tool. */
   toolGroups?: string[];
+  /** Hash of what its computer session's system prompt depends on (`RunContext.sessionPrompt`, granted scopes). */
+  promptKey?: string;
   /** "Automático": the model tier and effort chosen for this run; a resume thinks with the same. */
   autoModel?: AutoModelRecord;
   /** Assistant text before this index was already posted to the chat (or was history). */
@@ -583,6 +587,14 @@ export class BrainFailure extends Error {
 /** What a computer brain reads when its session's folder was gone and a fresh session took the turn. */
 export const sessionLostNote = (folder: string) =>
   `# Your session\nYour previous session on the computer was lost: the folder it worked in (${folder}) isn't there anymore. This is a fresh session in your own folder: it knows this conversation, not what you ran before. Look at what is on disk before you go on, and tell the person if work was lost.`;
+
+/** What a mission's main session reads when its agent's settings changed since it started (`BrainPlan.settingsChanged`). */
+const settingsChangedNote = (system: readonly SystemBlock[]) =>
+  [
+    "# Your settings changed",
+    "People edited your settings (your instructions, the organization's context, your team or what you may use) after this session started. This is how they are now; where it differs from your system prompt, this wins:",
+    ...system.filter((b) => !isTurnBlock(b)).map((b) => b.text),
+  ].join("\n\n");
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
@@ -1403,7 +1415,8 @@ async function executeRunInner(
       ? repositoriesPrompt(await agentRepositoryList(db, run.orgId, agent.id).catch(() => []))
       : "";
     // Its shared browser profiles (ADR 0110), by name.
-    const browsers = tools.some((t) => t.name === "browser_profile")
+    // Granted, not listed: on demand (ADR 0043) the tool is one `use_tool` away, and `promptKey` must not follow tool groups.
+    const browsers = granted.some((t) => t.name === "browser_profile")
       ? browsersPrompt(await agentBrowserProfiles(db, run.orgId, agent.id), agent.browserProfileId)
       : "";
     const [context, memory, wikiPages] = await Promise.all([
@@ -1544,6 +1557,21 @@ async function executeRunInner(
       messages: context.messages,
       ...(toolChoice ? { toolGroups: toolChoice.groups } : {}),
       ...(tools.some((t) => t.name === PASS_TOOL) ? { passListed: true } : {}),
+      promptKey: sha256(
+        JSON.stringify([
+          ...context.sessionPrompt,
+          repositories,
+          browsers,
+          // Per connection (a second database shares `database:read`); the agent's grant rows too, so a tool the
+          // requester's policy held back doesn't change the key from one person to the next.
+          [
+            ...new Set([
+              ...granted.map((t) => grantKey(t.connectionId, t.scope)),
+              ...(deps.tools ? await grantedScopeKeys(db, run.orgId, agent.id) : []),
+            ]),
+          ].sort(),
+        ]),
+      ),
       postedUpTo: context.messages.length,
       postedCount: 0,
       deltaSeq: 0,
@@ -1875,7 +1903,15 @@ async function executeRunInner(
   brainPlan = await resolveBrain(deps, agent, run, replyThreadId ?? run.channelId, {
     // A routine's or any background run's work never continues a conversation's session, nor the other way.
     fresh: Boolean(viaRoutine) || run.background,
+    promptKey: transcript.promptKey,
   });
+  // A mission's main session can't be replaced mid-mission: its first turn after an edit reads the settings again.
+  if (brainPlan.settingsChanged && needsContext) {
+    transcript.system = [
+      ...transcript.system,
+      { turn: true, found: true, text: settingsChangedNote(transcript.system) } as ContextBlock,
+    ];
+  }
   // A conversation run that fell back to the model brain keeps it when it resumes (an approval, an answer):
   // its transcript is the model's, and the computer would start the task again from the trigger.
   if (brainPlan.kind !== "model" && run.brain === "model" && transcript.fallback) {
@@ -4437,6 +4473,7 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),
     ...(stopped.passListed ? { passListed: true } : {}),
     ...(stopped.autoModel ? { autoModel: stopped.autoModel } : {}),
+    ...(stopped.promptKey ? { promptKey: stopped.promptKey } : {}),
     // The person who wrote into the stopped run is still behind the work it goes on with (`authority.ts`).
     ...(stopped.steeredBy ? { steeredBy: stopped.steeredBy } : {}),
   };
