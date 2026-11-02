@@ -327,7 +327,7 @@ pub fn fit_page(app: &AppHandle) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         let window = handle.get_window(LABEL);
-        let full = window.as_ref().and_then(|w| w.is_fullscreen().ok()).unwrap_or(false);
+        let full = window.as_ref().is_some_and(in_full_screen);
         let Some(page) = handle.get_webview(LABEL) else { return };
         let zoom = crate::menus::current_zoom(&handle);
         let _ = page.eval(format!(
@@ -335,6 +335,28 @@ pub fn fit_page(app: &AppHandle) {
              document.documentElement.toggleAttribute('data-fullscreen',{full});"
         ));
     });
+}
+
+/// Whether the window is in full screen, asked of AppKit. tao's `is_fullscreen` takes the lock it holds through a
+/// whole zoom (a double click on the title bar): called from anything a zoom's animation sets off on the main thread,
+/// a frame notice or a resize, the main thread would wait for itself and the window would stop for good.
+pub fn in_full_screen(window: &tauri::Window) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::{msg_send, runtime::AnyObject};
+        /// NSWindowStyleMaskFullScreen.
+        const FULL_SCREEN: usize = 1 << 14;
+        let Ok(ns) = window.ns_window() else { return false };
+        let ns = ns as *mut AnyObject;
+        if ns.is_null() {
+            return false;
+        }
+        // SAFETY: `ns` is this window's live NSWindow; `styleMask` only reads it.
+        let mask: usize = unsafe { msg_send![ns, styleMask] };
+        mask & FULL_SCREEN != 0
+    }
+    #[cfg(not(target_os = "macos"))]
+    window.is_fullscreen().unwrap_or(false)
 }
 
 /// The window's buttons back in the middle of the site's title bar after AppKit lays it out anew (a resize,
@@ -375,7 +397,7 @@ fn place_now(app: &AppHandle) {
     for _ in 0..3 {
         AGAIN.with(|a| a.set(false));
         if let Some(window) = app.get_window(LABEL) {
-            if window.is_fullscreen().unwrap_or(false) {
+            if in_full_screen(&window) {
                 LIGHTS_AT.with(|a| a.borrow_mut().clear());
             } else {
                 place_lights(&window);

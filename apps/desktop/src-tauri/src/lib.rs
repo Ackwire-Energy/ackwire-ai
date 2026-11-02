@@ -671,7 +671,7 @@ pub fn run() {
                     }
                     // ⌘W in full screen: out of full screen first, so no empty Space stays behind.
                     #[cfg(not(target_os = "linux"))]
-                    if window.is_fullscreen().unwrap_or(false) {
+                    if main_window::in_full_screen(window) {
                         let _ = window.set_fullscreen(false);
                         let window = window.clone();
                         std::thread::spawn(move || {
