@@ -13,7 +13,7 @@ type Sse = "crlf" | "multiline" | "cr";
  * every JSON-RPC answer. `sse`: answers as an event stream cut in the middle of its lines, with \r\n line endings, the
  * message pretty-printed over several `data:` lines, or bare \r line endings.
  */
-function chattyServer(mode: { sse?: Sse; down?: boolean } = {}) {
+function chattyServer(mode: { sse?: Sse; down?: boolean; twice?: boolean } = {}) {
   const fetch: FetchLike = async (_url, init) => {
     if (mode.down) return new Response("upstream timed out", { status: 502 });
     if ((init?.method ?? "GET") !== "POST") return new Response(null, { status: 405 });
@@ -30,6 +30,7 @@ function chattyServer(mode: { sse?: Sse; down?: boolean } = {}) {
             tools: [
               { name: "consultar_cnpj", description: "Consulta um CNPJ", inputSchema: { type: "object" } },
               { name: "buscar_empresas", inputSchema: { type: "object" }, annotations: { readOnlyHint: true } },
+              ...(mode.twice ? [{ name: "buscar_empresas", inputSchema: { type: "object" } }] : []),
             ],
           };
     const text = JSON.stringify({ jsonrpc: "2.0", id: msg.id, result, fonte: { nome: "Receita", em: "2026" } });
@@ -131,5 +132,25 @@ describe("a server whose tools can't be read", () => {
     const fresh = await refreshCustomServer(deps, f.owner.id, f.org.id, started.server.id);
     expect(fresh.toolsError).toBeNull();
     expect(fresh.tools.map((t) => t.name)).toEqual(["buscar_empresas", "consultar_cnpj"]);
+  });
+
+  test("a failure after the tools were read is still an error, not a quiet refresh", async () => {
+    f = await setup();
+    const mode = { down: true, twice: false };
+    const deps = {
+      db: f.db,
+      keyWrappers: [f.keyWrapper],
+      publicUrl: "https://chat.example.com",
+      resolveHost: async () => ["93.184.216.34"],
+      connect: (async () => over(chattyServer(mode))) as McpConnect,
+    };
+    const started = await connectCustomServer(deps, f.owner.id, f.org.id, {
+      serverUrl: SERVER,
+      apiKey: "fake-key-not-real",
+      label: "CNPJ",
+    });
+    if (started.status !== "connected") throw new Error(`expected connected, got ${started.status}`);
+    Object.assign(mode, { down: false, twice: true });
+    await expect(refreshCustomServer(deps, f.owner.id, f.org.id, started.server.id)).rejects.toThrow();
   });
 });

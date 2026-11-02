@@ -591,6 +591,9 @@ async function keepAccount(db: Database, c: ConnectorConnection, account: Provid
   caches.connections.delete(`${c.orgId}:active`);
 }
 
+/** The server couldn't be reached or its tools couldn't be listed; the reason is kept as the server's `toolsError`. */
+export class ToolsUnreadable extends Error {}
+
 /**
  * Lists the server's tools again: new ones come in unclassified (hidden from
  * agents until an admin classifies them), gone ones are marked removed. Each
@@ -623,7 +626,7 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
       .update(connectorConnections)
       .set({ lastError: reason })
       .where(and(eq(connectorConnections.id, c.id), eq(connectorConnections.status, "active")));
-    throw error;
+    throw new ToolsUnreadable(reason, { cause: error });
   }
   if (account) await keepAccount(deps.db, c, account);
   if (!composioServiceOf(c.serverUrl)) await seedToolPins(deps.db, c, listed);
@@ -838,7 +841,9 @@ export async function refreshCustomServer(deps: CustomDeps, actorId: string, org
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const c = await loadCustom(deps.db, orgId, id);
   // A server that can't be read comes back with `toolsError`, for the apps to say why and offer to try again.
-  await syncCustomTools(deps, c).catch(() => {});
+  await syncCustomTools(deps, c).catch((error) => {
+    if (!(error instanceof ToolsUnreadable)) throw error;
+  });
   return serverView(deps.db, c.orgId, c.id);
 }
 
