@@ -1123,8 +1123,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           {
             value: HERE,
             label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName),
-            description:
-              accountKind && ownPlan ? ownSignInTitle(t, { kind: accountKind, plan: ownPlan }) : undefined,
+            description: accountKind && ownPlan ? ownSignInTitle(t, { kind: accountKind, plan: ownPlan }) : undefined,
             leading: sharedIcon,
           },
         ]

@@ -1906,6 +1906,9 @@
     "rolesNone": "工作区还没有角色。",
     "rolesNeeded": "请至少选择一个角色。",
     "rolesLeave": "失去该角色的人会离开频道。",
+    "rolesChoose": "选择角色",
+    "rolesChange": "更改角色",
+    "rolesDone": "完成",
     "publicTitle": "将 #{{channel}} 设为公开?",
     "publicBody": "工作区中的所有人都可以加入并阅读所有消息,包括以前的消息。",
     "publicConfirm": "设为公开",
@@ -10470,6 +10473,10 @@
       "answeredRequestFar": "{{to}} 回应了 {{from}} 的请求",
       "answeredRequestFar_female": "{{to}} 回应了 {{from}} 的请求",
       "see": "查看"
+    },
+    "talk": {
+      "readAll": "阅读全部",
+      "more_other": "还有 {{count}} 行"
     },
     "consultPanel": {
       "label": "{{from}} 和 {{to}} 之间的对话",

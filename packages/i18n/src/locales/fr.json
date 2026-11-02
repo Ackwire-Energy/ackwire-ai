@@ -2037,6 +2037,9 @@
     "rolesNone": "Le workspace n'a pas encore de rôles.",
     "rolesNeeded": "Choisissez au moins un rôle.",
     "rolesLeave": "Qui perd le rôle quitte le canal.",
+    "rolesChoose": "Choisir des rôles",
+    "rolesChange": "Modifier les rôles",
+    "rolesDone": "Terminé",
     "publicTitle": "Rendre #{{channel}} public ?",
     "publicBody": "Tout le monde dans le workspace pourra le rejoindre et lire tous ses messages, y compris les anciens.",
     "publicConfirm": "Rendre public",
@@ -11229,6 +11232,12 @@
       "answeredRequestFar": "{{to}} a répondu à la demande de {{from}}",
       "answeredRequestFar_female": "{{to}} a répondu à la demande de {{from}}",
       "see": "Voir"
+    },
+    "talk": {
+      "readAll": "Tout lire",
+      "more_one": "{{count}} ligne de plus",
+      "more_many": "{{count}} lignes de plus",
+      "more_other": "{{count}} lignes de plus"
     },
     "consultPanel": {
       "label": "Conversation entre {{from}} et {{to}}",

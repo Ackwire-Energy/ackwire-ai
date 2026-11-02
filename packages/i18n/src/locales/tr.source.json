@@ -4760,6 +4760,15 @@
   "newChannel.rolesLeave": {
     "value": "Whoever loses the role leaves the channel."
   },
+  "newChannel.rolesChoose": {
+    "value": "Choose roles"
+  },
+  "newChannel.rolesChange": {
+    "value": "Change roles"
+  },
+  "newChannel.rolesDone": {
+    "value": "Done"
+  },
   "newChannel.publicTitle": {
     "value": "Make #{{channel}} public?"
   },
@@ -20789,6 +20798,9 @@
   "connectors.toolChanges.description": {
     "value": "Text"
   },
+  "connectors.toolChanges.input": {
+    "value": "Input"
+  },
   "connectors.toolChanges.field.added": {
     "value": "new"
   },
@@ -20804,14 +20816,11 @@
   "connectors.toolChanges.removed": {
     "value": "Removed"
   },
-  "connectors.toolChanges.acceptOne": {
-    "value": "Accept {{tool}}"
-  },
-  "connectors.toolChanges.input": {
-    "value": "Input"
-  },
   "connectors.toolChanges.accept": {
     "value": "Accept"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.accepted": {
     "value": "{{tool}} updated."
@@ -26169,6 +26178,15 @@
   },
   "chat.consultGroup.see": {
     "value": "See"
+  },
+  "chat.talk.readAll": {
+    "value": "Read all"
+  },
+  "chat.talk.more": {
+    "value": {
+      "one": "{{count}} more line",
+      "other": "{{count}} more lines"
+    }
   },
   "chat.consultPanel.label": {
     "value": "Conversation between {{from}} and {{to}}"

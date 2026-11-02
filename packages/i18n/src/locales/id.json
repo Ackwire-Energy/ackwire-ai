@@ -1914,6 +1914,9 @@
     "rolesNone": "Workspace belum punya peran.",
     "rolesNeeded": "Pilih setidaknya satu peran.",
     "rolesLeave": "Siapa pun yang kehilangan peran keluar dari kanal.",
+    "rolesChoose": "Pilih peran",
+    "rolesChange": "Ubah peran",
+    "rolesDone": "Selesai",
     "publicTitle": "Jadikan #{{channel}} publik?",
     "publicBody": "Semua orang di workspace bisa bergabung dan membaca semua pesannya, termasuk yang lama.",
     "publicConfirm": "Jadikan publik",
@@ -10453,6 +10456,10 @@
       "answeredFar": "{{to}} menjawab pertanyaan {{from}}",
       "answeredRequestFar": "{{to}} menjawab permintaan {{from}}",
       "see": "Lihat"
+    },
+    "talk": {
+      "readAll": "Baca semua",
+      "more_other": "{{count}} baris lagi"
     },
     "consultPanel": {
       "label": "Percakapan antara {{from}} dan {{to}}",

@@ -1959,6 +1959,9 @@
     "rolesNone": "Workspace'te henüz rol yok.",
     "rolesNeeded": "En az bir rol seç.",
     "rolesLeave": "Rolü kaybeden kanaldan çıkar.",
+    "rolesChoose": "Rolleri seç",
+    "rolesChange": "Rolleri değiştir",
+    "rolesDone": "Tamam",
     "publicTitle": "#{{channel}} herkese açık yapılsın mı?",
     "publicBody": "Çalışma alanındaki herkes katılabilecek ve eskiler dahil tüm mesajları okuyabilecek.",
     "publicConfirm": "Herkese açık yap",
@@ -10715,6 +10718,11 @@
       "answeredFar": "{{to}}, {{from}} ajanının sorusunu yanıtladı",
       "answeredRequestFar": "{{to}}, {{from}} ajanının isteğini yanıtladı",
       "see": "Gör"
+    },
+    "talk": {
+      "readAll": "Tümünü oku",
+      "more_one": "{{count}} satır daha",
+      "more_other": "{{count}} satır daha"
     },
     "consultPanel": {
       "label": "{{from}} ile {{to}} arasındaki konuşma",

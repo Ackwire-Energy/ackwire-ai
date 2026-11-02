@@ -1904,6 +1904,9 @@
     "rolesNone": "ワークスペースにはまだロールがありません。",
     "rolesNeeded": "ロールを1つ以上選んでください。",
     "rolesLeave": "ロールを失った人はチャンネルから外れます。",
+    "rolesChoose": "ロールを選ぶ",
+    "rolesChange": "ロールを変更",
+    "rolesDone": "完了",
     "publicTitle": "#{{channel}} を公開しますか?",
     "publicBody": "ワークスペースの全員が参加でき、過去のものも含めてすべてのメッセージを読めるようになります。",
     "publicConfirm": "公開する",
@@ -10386,6 +10389,10 @@
       "answeredFar": "{{to}}が{{from}}の質問に回答しました",
       "answeredRequestFar": "{{to}}が{{from}}の依頼に回答しました",
       "see": "見る"
+    },
+    "talk": {
+      "readAll": "すべて読む",
+      "more_other": "あと{{count}}行"
     },
     "consultPanel": {
       "label": "{{from}}と{{to}}の会話",
