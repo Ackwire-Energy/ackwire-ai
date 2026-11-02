@@ -1,6 +1,6 @@
 import { afterEach, expect } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
-import { createRoutine, executeRoutineRun, queueRoutineRun } from "../../src";
+import { schema } from "@agenteschat/db";
+import { createRoutine, DIGEST_AFTER_MS, executeRoutineRun, postAutonomyDigests, queueRoutineRun } from "../../src";
 import { routineDeps, routineRow, routineRunRow } from "../routine-fixtures";
 import { closeWorlds, type World, world } from "./harness";
 import { assertInvariants } from "./invariants";
@@ -56,16 +56,79 @@ scenario("S25", "a routine set to act hands an error to an agent, which fixes it
     },
   });
   await w.grant("lia", ["github:pr.write"]);
-  // A PR nobody asked for directly needs a person's go (ADR 0131 §3): Lia's owner said "Sempre" for PRs.
-  await w.db
-    .update(schema.agents)
-    .set({ autonomyBrakes: { go: ["pr"] } })
-    .where(eq(schema.agents.id, w.agents.lia?.id ?? ""));
+  // What a routine the workspace set up hands on is asked-for work: Lia opens the PR without a card (ADR 0131 §3).
   await fireRoutine(w, "sentinela", "Checa o Sentry e passa os erros novos para @lia.", "act");
   expect((await w.calls("sentinela")).find((c) => c.name === "tell_agent")?.isError).toBe(false);
   expect((await w.calls("lia")).map((c) => [c.name, c.isError])).toEqual([["open_pull_request", false]]);
   await assertInvariants(w);
 });
+
+scenario(
+  "S64",
+  "a Sentry routine sends 10 alerts: the agent fixes the 2 new ones without asking, the rest wait",
+  async () => {
+    const sentry = (id: number, what: string) => `Sentry: ${what} https://sentry.example.com/issues/${id}/`;
+    const fresh = [sentry(101, "TypeError em checkout.ts:42"), sentry(102, "Falha ao gravar pedido em orders.ts:88")];
+    const old = [201, 202, 203, 204, 205, 206].map((id) => sentry(id, `Timeout conhecido no relatório ${id}`));
+    // The same two items again, as Sentry sends another event of each while they are being fixed.
+    const again = [
+      sentry(101, "TypeError em checkout.ts:42 (mais 12 eventos)"),
+      sentry(102, "Falha ao gravar pedido (mais 3 eventos)"),
+    ];
+    const opened = new Set<string>();
+    const w = await world({
+      agents: ["sentinela", "lia"],
+      setup: { toolSources: [openPullRequestTool()] },
+      judge: { triage: (state) => (/conhecido/.test(String(state.message)) ? "noise" : "work") },
+      script: {
+        sentinela: ({ n }) =>
+          n === 1
+            ? {
+                calls: [...fresh, ...old, ...again].map((message) => ({
+                  name: "tell_agent",
+                  input: { agent: "@lia", message },
+                })),
+              }
+            : n === 2
+              ? { calls: [{ name: "hand_off", input: { message: "Passei os erros do Sentry para a Lia." } }] }
+              : { text: "Feito." },
+        lia: ({ request }) => {
+          const seen = JSON.stringify(request.messages);
+          for (const id of ["101", "102"])
+            if (seen.includes(`issues/${id}`) && !opened.has(id)) {
+              opened.add(id);
+              return { calls: [{ name: "open_pull_request", input: { repo: "acme/app", title: `Fix Sentry ${id}` } }] };
+            }
+          return { text: "Corrigido, PR aberto." };
+        },
+      },
+    });
+    await w.grant("lia", ["github:pr.write"]);
+    await fireRoutine(w, "sentinela", "Quando o Sentry mandar um erro, passe para @lia corrigir.", "act");
+    const prs = (await w.calls("lia")).filter((c) => c.name === "open_pull_request");
+    // Asked-for work (a source the workspace set up): no card, no refusal, one PR per new item.
+    expect(prs.map((c) => c.isError)).toEqual([false, false]);
+    expect([...opened].sort()).toEqual(["101", "102"]);
+    const cards = (await w.db.select().from(schema.messages)).filter(
+      (m) => (m.meta as { actionCard?: { kind?: string } }).actionCard?.kind === "autonomy_proposal",
+    );
+    expect(cards).toEqual([]);
+    const signals = await w.db.select().from(schema.autonomySignals);
+    const of = (kind: string) => signals.filter((x) => x.kind === kind).length;
+    expect({ wake: of("wake"), digest: of("digest"), linked: of("linked") }).toEqual({ wake: 2, digest: 6, linked: 2 });
+    // An hour later the 6 known ones go to a person in one summary, where the routine reports.
+    expect(await postAutonomyDigests({ db: w.db }, new Date(Date.now() + 2 * DIGEST_AFTER_MS))).toBe(1);
+    const digest = (await w.db.select().from(schema.messages)).find(
+      (m) => (m.meta as { bodyCode?: string }).bodyCode === "autonomy_digest",
+    );
+    expect(digest?.channelId).toBe(w.channelId);
+    expect(digest?.body.split("\n").filter((l) => l.startsWith("•"))).toHaveLength(6);
+    // It is for a person: nobody is routed to it.
+    await w.settle();
+    expect((await w.runs()).filter((r) => r.triggerMessageId === digest?.id)).toEqual([]);
+    await assertInvariants(w);
+  },
+);
 
 scenario("S26", "a routine says whose reach it works within, and its report run can still ask", async () => {
   const w = await world({

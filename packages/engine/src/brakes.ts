@@ -87,6 +87,13 @@ export function costlyKind(name: string, input: Record<string, unknown>): CostKi
  */
 export const unrequested = (authority: RunAuthority | null) => authority?.kind === "unattended";
 
+/**
+ * Work an agent started on its own, which nobody set up (§3's proposal): its chain roots in an agent's own work. What
+ * a source the workspace pointed at the agent sends (a routine's report or work, a webhook, a connector's trigger) is
+ * work a person asked for: it goes ahead on real items, bounded by §4–7 and the hourly PR cap only.
+ */
+export const selfStarted = (authority: RunAuthority | null) =>
+  authority?.kind === "unattended" && authority.reason === "agent";
 
 /** A proposal card's meta (`meta.actionCard`). The card keeps its state; the signal row is the source of truth. */
 export interface ProposalCard {
@@ -115,9 +122,9 @@ const PR_WINDOW_MS = 3600_000;
 
 /**
  * The gate a costly step of unrequested work meets (ADR 0131 §3), on every brain (the Tool Gateway sees API calls,
- * bridged tools and a computer brain's permission prompts). Null: go (a person said go for this run, "always", or the
- * agent's setting is `go`; PRs within the hourly cap). Otherwise the refusal the agent reads; the first one posts the
- * proposal card for the person accountable (the routine's creator, else the agent's owner).
+ * bridged tools and a computer brain's permission prompts). Null: go (work a source the workspace set up sent, a person
+ * said go for this run, "always", or the agent's setting is `go`; PRs within the hourly cap). Otherwise the refusal the
+ * agent reads; the first one posts the proposal card for the agent's owner.
  */
 export async function costlyGate(
   deps: { db: Database; pubsub?: PubSub },
@@ -133,7 +140,8 @@ export async function costlyGate(
     .from(agents)
     .where(and(eq(agents.orgId, run.orgId), eq(agents.id, run.agentId)));
   const settings = autonomySettings(agent?.autonomy);
-  if (settings.never.includes(cost))
+  const own = selfStarted(authority);
+  if (own && settings.never.includes(cost))
     return {
       code: "autonomy.never",
       message: `A person said never to ${COST_WORDS[cost]} for work nobody asked for. Don't do it; say in one line what you would have done, and stop.`,
@@ -155,7 +163,7 @@ export async function costlyGate(
       code: "autonomy.declined",
       message: `A person said no to ${COST_WORDS[cost]} for this. Don't do it; finish without it and say what is left.`,
     };
-  const go = settings.costly === "go" || settings.go.includes(cost) || said === "go" || said === "always";
+  const go = !own || settings.costly === "go" || settings.go.includes(cost) || said === "go" || said === "always";
   if (go) {
     if (cost !== "pr") return null;
     const [opened] = await db

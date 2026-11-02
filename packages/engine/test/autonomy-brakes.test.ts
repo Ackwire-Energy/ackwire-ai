@@ -181,7 +181,7 @@ test("§1: a follow-up of work nobody asked for, whose question is open, waits a
   const line = await insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
-    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 2 },
+    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 2, stretchId: null },
     body: "Rodar o benchmark",
     meta: {
       notice: {
@@ -193,12 +193,12 @@ test("§1: a follow-up of work nobody asked for, whose question is open, waits a
   });
   expect(await wakeFollowUp(f, f.org.id, line.id)).toBeNull();
   const kept = await getMessage(f.db, f.org.id, line.id);
-  expect((kept?.meta.notice as { refs?: { state?: string } }).refs?.state).toBe("pending");
+  expect((kept?.meta.notice as { refs?: { state?: string } } | undefined)?.refs?.state).toBe("pending");
   expect((await jobsOf(FOLLOW_UP_JOB)).map((j) => j.payload)).toEqual([{ messageId: line.id }]);
   expect((await f.db.select().from(agentRuns)).length).toBe(1);
 });
 
-describe("costly work nobody asked for needs a go (§3)", () => {
+describe("costly work an agent starts on its own needs a go (§3)", () => {
   test("what counts as costly: opening a PR, installing packages", () => {
     expect(costlyKind(PERMISSION_TOOL, { tool_name: "Bash", input: { command: "gh pr create --fill" } })).toBe("pr");
     expect(costlyKind("Bash", { command: "cd app && npm install hyperfine" })).toBe("install");
@@ -244,6 +244,32 @@ describe("costly work nobody asked for needs a go (§3)", () => {
     );
     expect(notes.map((n) => n.body)).toEqual([expect.stringContaining("said go")]);
     expect(await signalsOf("pr")).toHaveLength(1);
+  });
+
+  test("what a source the workspace set up sends is asked-for work: no card, only the hourly PR cap", async () => {
+    f = await setup();
+    const trigger = await alert(f.agent.id, "Sentry: TypeError em checkout https://sentry.example.com/issues/7/");
+    const run = await working(f.agent.id, trigger.id);
+    const at = {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: trigger.id,
+    };
+    await f.db
+      .update(schema.agents)
+      .set({ autonomyBrakes: { never: ["install"], maxPrsPerHour: 1 } })
+      .where(eq(schema.agents.id, f.agent.id));
+    for (const reason of ["routine_report", "routine"] as const) {
+      const fed: RunAuthority = { kind: "unattended", personId: null, reason, brief: null };
+      expect(await costlyGate(f, at, fed, "install", "npm install")).toBeNull();
+      expect(await costlyGate(f, at, fed, "long", "step 41")).toBeNull();
+    }
+    const fed: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report", brief: null };
+    expect(await costlyGate(f, at, fed, "pr", "gh pr create a")).toBeNull();
+    expect((await costlyGate(f, at, fed, "pr", "gh pr create b"))?.code).toBe("autonomy.pr_limit");
+    expect(await signalsOf("proposal")).toHaveLength(0);
   });
 
   test("a go clicked after the asking run ended reaches the run it wakes: no second card", async () => {
