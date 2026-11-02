@@ -60,7 +60,8 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
   const task = w.issue ? { ...w.issue, label: say("work.task", { number: w.issue.number }) } : null;
   const over = w.status === "done" || w.status === "failed" || w.status === "canceled";
   const stop = !over && c.canStop && w.runId ? { runId: w.runId } : null;
-  const base = { task, stop, threadId: w.threadId, update: w.lastUpdate?.text ?? null };
+  // The last update is news only while it works: once over, the report says where it ended.
+  const base = { task, stop, threadId: w.threadId, update: over ? null : (w.lastUpdate?.text ?? null) };
   const took = workDuration(t, (w.finishedAt ? Date.parse(w.finishedAt) : now.getTime()) - since);
   if (w.status === "done")
     return {

@@ -373,6 +373,13 @@ export async function moveToBackground(
       .set({ workId, ...(ownThread ? { threadRootId: anchor.id } : {}), updatedAt: now })
       .where(and(eq(agentRuns.id, run.id), isNull(agentRuns.workId)));
     if (!queued) await scheduleCheckIn(tx, work);
+    // The work's thread is named after the work, not after "Vou cuidar disso…".
+    if (ownThread) {
+      await tx
+        .insert(schema.threads)
+        .values({ orgId: run.orgId, channelId: run.channelId, rootMessageId: anchor.id, title })
+        .onConflictDoNothing({ target: [schema.threads.orgId, schema.threads.rootMessageId] });
+    }
     // The asker follows the work's thread: its updates count as unread for them, never as a push.
     if (requester && ownThread) {
       await tx

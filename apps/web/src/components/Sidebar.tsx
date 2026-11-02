@@ -1358,7 +1358,12 @@ function AgentRow({
         />
         <span className="sidebar__item-text">
           <span className="sidebar__item-label">{a.name}</span>
-          {a.role && <span className="sidebar__item-role">{a.role}</span>}
+          {/* Background work (ADR 0121) says what it is on, in place of the role. */}
+          {shown?.line?.kind === "work" && line ? (
+            <span className="sidebar__item-role sidebar__item-work">{line.text}</span>
+          ) : (
+            a.role && <span className="sidebar__item-role">{a.role}</span>
+          )}
         </span>
         {unread > 0 ? (
           <UnreadCount count={unread} />

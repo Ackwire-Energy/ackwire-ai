@@ -128,6 +128,11 @@ test("work_in_background: the anchor in the timeline, updates in its thread, the
   // From the move on, the run answers in the anchor's thread.
   expect(run?.threadRootId).toBe(anchor?.id as string);
   expect(run?.workId).toBe(work?.id as string);
+  const [thread] = await f.db
+    .select()
+    .from(schema.threads)
+    .where(eq(schema.threads.rootMessageId, anchor?.id ?? ""));
+  expect(thread?.title).toBe("Migrar a cobrança");
   const update = all.find((m) => m.meta.workUpdate);
   expect(update).toMatchObject({ threadId: anchor?.id, body: "Esquema lido; migrando as tabelas." });
   // The report goes home, where it was asked, as a real reply.

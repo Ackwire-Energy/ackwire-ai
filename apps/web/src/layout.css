@@ -984,6 +984,9 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .sidebar__item[data-status="active"] .sidebar__item-role {
   color: var(--ink2);
 }
+.sidebar__item-work {
+  color: var(--ink2);
+}
 .sidebar__lock {
   display: inline-flex;
   flex: none;
