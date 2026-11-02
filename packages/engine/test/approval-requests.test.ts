@@ -9,6 +9,7 @@ import {
   drainOutbox,
   ForbiddenError,
   listApprovals,
+  listNotifications,
   orgOverview,
   postPersonMessage,
   removeMember,
@@ -129,6 +130,17 @@ test("a role named in the request decides it; a refusal says who refused", async
   await drainOutbox(f.db, f.handlers);
   expect(results.at(-1)).toContain("carla refused this action");
   expect(results.at(-1)).toContain("not this quarter");
+});
+
+test("the people a request names see its inbox item, and the agent's owner it no longer asks doesn't", async () => {
+  const { bia, carla } = await memberAsks({ role: "diretoria" });
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  await ask(f.owner.id);
+  const inbox = async (userId: string) => (await listNotifications({ db: f.db }, userId, f.org.id)).items;
+  const [item] = await inbox(carla.id);
+  expect(item?.kind).toBe("approval");
+  expect((await listNotifications({ db: f.db }, carla.id, f.org.id)).counts.waiting).toBe(1);
+  expect(await inbox(bia.id)).toEqual([]);
 });
 
 test("an approver by role may decide their own request, and it says so", async () => {

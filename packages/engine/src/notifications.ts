@@ -16,12 +16,12 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { decidableBySql } from "./approvals";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { cutText } from "./format";
 import { noticeOn, noticePrefsOf, readNoticePrefs } from "./notice-prefs";
 import { requirePermission } from "./organizations";
-import { maySql } from "./permissions";
 import { enqueuePush } from "./push";
 import type { ApprovalOrigin } from "./tools/run-policy";
 
@@ -642,15 +642,14 @@ export async function wakeSnoozedNotifications(deps: NotificationDeps): Promise<
 // ── Reading ───────────────────────────────────────────────────────────────────
 
 /**
- * An approval stays only while the person may still decide it: `approve_actions` now, or the agent's owner it was
- * asked of (`approverIds`). Checked on read, so a role or a key taken away by any path takes the row with it.
+ * An approval stays only while the person may still decide it (`decidableBySql`, the rule `decideApproval` applies).
+ * Checked on read, so a role or a key taken away by any path takes the row with it.
  */
 function stillDecides(orgId: string, userId: string): SQL {
   return or(
     ne(notifications.kind, "approval"),
-    maySql(orgId, userId, "approve_actions"),
-    sql`exists (select 1 from ${schema.approvals} a where a.org_id = ${orgId}
-      and a.id = (${notifications.source}->>'approvalId')::uuid and a.owner_user_id = ${userId})`,
+    sql`exists (select 1 from ${schema.approvals} where ${schema.approvals.orgId} = ${orgId}
+      and ${schema.approvals.id} = (${notifications.source}->>'approvalId')::uuid and ${decidableBySql(userId)})`,
   ) as SQL;
 }
 
