@@ -20,6 +20,7 @@ import type { Readable, Writable } from "node:stream";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
+  grantedTo,
   HEARTBEAT_MS,
   inRange,
   isObject,
@@ -794,7 +795,7 @@ export class Supervisor {
   private sendState(w: Worker) {
     if (!w.ready) return;
     const s = this.opts.state();
-    const folders = s.access.folders.filter((f) => f.agents.includes(w.user.id));
+    const folders = s.access.folders.filter((f) => grantedTo(f, w.user.id));
     const viewers = this.opts.desktopViewers?.(w.user.id) ?? 0;
     const frame: WorkerLinkFrame = {
       type: "worker.state",
