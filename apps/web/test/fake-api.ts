@@ -2636,21 +2636,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           .filter((m) => m.body.toLowerCase().includes(q))
           .filter((m) => !f?.in?.length || f.in.includes(m.channelId))
           .filter((m) => !from.length || from.includes(m.author.id ?? ""))
-          .map((m) => ({
-            kind: "message" as const,
-            sourceId: m.id,
-            channelIds: [m.channelId],
-            title:
+          .map((m) => {
+            const name =
               m.author.type === "agent"
                 ? (state.agents.find((a) => a.id === m.author.id)?.name ?? "")
-                : (state.members.find((p) => p.userId === m.author.id)?.name ?? ""),
-            snippet: m.body,
-            score: 1,
-            createdAt: m.createdAt,
-            messageId: m.id,
-            threadId: m.threadId,
-            author: m.author.id ? { type: m.author.type, id: m.author.id, name: "" } : null,
-          }));
+                : (state.members.find((p) => p.userId === m.author.id)?.name ?? "");
+            return {
+              kind: "message" as const,
+              sourceId: m.id,
+              channelIds: [m.channelId],
+              title: name,
+              snippet: m.body,
+              score: 1,
+              createdAt: m.createdAt,
+              messageId: m.id,
+              threadId: m.threadId,
+              author: m.author.id ? { type: m.author.type, id: m.author.id, name } : null,
+            };
+          });
         const items = state.memories
           .filter((m) => m.text.toLowerCase().includes(q))
           .map((m) => ({
