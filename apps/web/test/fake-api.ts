@@ -1071,11 +1071,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       const keys = roles()
         .filter((r) => r.kind === "everyone" || mine.includes(r.id))
         .flatMap((r) => r.permissions);
-      const positions = roles()
-        .filter((r) => r.kind !== "everyone" && mine.includes(r.id))
-        .map((r) => r.position);
-      const rank = o.rank !== undefined ? o.rank : positions.length ? Math.min(...positions) : null;
-      return { ...o, permissions: ["read", ...grants(keys)], rank };
+      return { ...o, permissions: ["read", ...grants(keys)] };
     }),
   });
   // "Quem pensa": every agent starts on the API, with a MacBook that has Claude Code and Codex.
@@ -1459,10 +1455,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.role = role;
       },
-      removeMember: async (orgId, userId) => {
-        log("orgs.removeMember", orgId, userId);
-        state.members = state.members.filter((m) => m.userId !== userId);
-      },
+      removeMember: async (orgId, userId) => log("orgs.removeMember", orgId, userId),
       invitations: async () => structuredClone(state.invitations),
       invite: async (orgId, input) => {
         log("orgs.invite", orgId, input);

@@ -10,7 +10,6 @@ import {
   useMakeInviteLink,
   useMySuggestions,
   usePeople,
-  useRemoveMember,
   useResendInvitation,
   useRevokeInvitation,
   useRoles,
@@ -32,7 +31,7 @@ import {
 import { approvalNews, JOIN_NOTE_MAX, JOIN_REASON_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
-import { grants, removesMember, rolesOf } from "@agenteschat/client/lib/roles";
+import { grants, rolesOf } from "@agenteschat/client/lib/roles";
 import { isEmail } from "@agenteschat/client/lib/text";
 import {
   Alert,
@@ -130,8 +129,6 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const orgRoles = useRoles(org.id).data?.roles ?? [];
   const month = formatMonth(i18n.language, new Date());
   const [roles, setRoles] = useState<string[]>([]);
-  const [removing, setRemoving] = useState<Person | null>(null);
-  const viewer = { role: org.role, rank: org.rank, userId: me.user.id, permissions: org.permissions };
   // `?request=…&do=approve|deny`: the admins' email opens that request here.
   const search = useSearch({ strict: false }) as { request?: string; do?: string };
   const filterCopy = useFilterCopy();
@@ -261,30 +258,10 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                     />
                   )}
                 </span>
-                {removesMember(viewer, m, orgRoles) && (
-                  <Menu
-                    align="end"
-                    label={t("members.actionsOf", { name: m.name })}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconOnly
-                        icon="more"
-                        aria-label={t("members.actionsOf", { name: m.name })}
-                      />
-                    }
-                  >
-                    <MenuItem icon="trash" danger onSelect={() => setRemoving(m)}>
-                      {t("members.remove.action")}
-                    </MenuItem>
-                  </Menu>
-                )}
               </div>
             );
           })}
         </List>
-        <RemoveMemberDialog person={removing} onClose={() => setRemoving(null)} />
       </section>
 
       <section aria-labelledby="sec-agents" className="section section--tight">
@@ -1038,58 +1015,6 @@ function SuggestDialog({ open, onClose, inviters }: { open: boolean; onClose: ()
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" loading={suggest.isPending} onClick={submit}>
           {t("members.suggest.send")}
-        </Button>
-      </DialogFooter>
-    </Dialog>
-  );
-}
-
-/** "Remover do workspace", confirmed in place: the server checks again, and its refusals are said in our words. */
-function RemoveMemberDialog({ person, onClose }: { person: Person | null; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const remove = useRemoveMember(org.id);
-  const [error, setError] = useState<string | null>(null);
-  // The last one stays on screen while the dialog fades out.
-  const [shown, setShown] = useState(person);
-  if (person && person !== shown) setShown(person);
-  const close = () => {
-    setError(null);
-    onClose();
-  };
-  const name = shown?.name ?? "";
-  return (
-    <Dialog
-      open={person !== null}
-      onOpenChange={(o) => !o && close()}
-      title={t("members.remove.title", { name, org: org.name })}
-      description={t("members.remove.body", { org: org.name })}
-      closeLabel={t("common.close")}
-      width={440}
-    >
-      {error && (
-        <DialogBody>
-          <Alert tone="danger">{error}</Alert>
-        </DialogBody>
-      )}
-      <DialogFooter>
-        <Button onClick={close}>{t("common.cancel")}</Button>
-        <Button
-          variant="danger"
-          loading={remove.isPending}
-          onClick={() =>
-            shown &&
-            remove.mutate(shown.userId, {
-              onSuccess: () => {
-                toast.show(t("members.remove.done", { name, org: org.name }));
-                close();
-              },
-              onError: (e) => setError(errorText(t, e)),
-            })
-          }
-        >
-          {t("members.remove.confirm")}
         </Button>
       </DialogFooter>
     </Dialog>

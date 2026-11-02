@@ -857,7 +857,7 @@ export async function changeMemberRole(
   await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && role !== "owner" && (await ownerCount(tx, orgId)) <= 1) {
-      throw new ConflictError("An organization needs at least one owner", "org.last_owner");
+      throw new ConflictError("An organization needs at least one owner");
     }
     await tx
       .update(organizationMembers)
@@ -897,7 +897,7 @@ export async function removeMember(
   const { released, removed } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
-      throw new ConflictError("An organization needs at least one owner. Transfer ownership first.", "org.last_owner");
+      throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
     }
     await tx
       .delete(organizationMembers)

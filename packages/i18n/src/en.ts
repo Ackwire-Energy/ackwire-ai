@@ -3590,14 +3590,6 @@ export const en: Translations = {
     agentsOnlyYouHint: "On a plan, you can let each one answer other people on its page.",
     filters: "Filter people",
     rolesOf: "{{name}}'s roles",
-    actionsOf: "Options for {{name}}",
-    remove: {
-      action: "Remove from workspace",
-      title: "Remove {{name}} from {{org}}?",
-      body: "They lose access to {{org}} right away and leave its channels. Computers and AI sign-ins they connected here go with them, and their routines pause. Their messages and files stay.",
-      confirm: "Remove",
-      done: "{{name}} was removed from {{org}}.",
-    },
     everyoneNote: "Everyone applies to every person in the workspace.",
     noRolesToGive: "No roles below yours to give.",
     roleFilter: "Role",
@@ -8537,7 +8529,6 @@ export const en: Translations = {
     org: {
       createInviteOnly: "New workspaces need an invitation for now.",
       membersFull: "This workspace has no room for more people right now. Let whoever invited you know.",
-      lastOwner: "A workspace needs at least one owner. Make someone else an owner first.",
       deleting: "This workspace is being deleted.",
       notRestorable: "This workspace can't be restored anymore.",
     },

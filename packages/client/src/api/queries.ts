@@ -463,16 +463,6 @@ export function useSetMemberRoles(orgId: string) {
   });
 }
 
-/** Takes a person out of the workspace: their channels, computers and AI accounts here go with them. */
-export function useRemoveMember(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId),
-    onSettled: () => refreshRoles(qc, orgId),
-  });
-}
-
 export const useInvitations = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.invitations(orgId), queryFn: () => api.orgs.invitations(orgId), enabled });

@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ApiError, type BatchInviteResult, type InvitationWithStatus, type OrgRole } from "@agenteschat/client";
-import { knownErrorText } from "@agenteschat/client/lib/errors";
+import type { BatchInviteResult, InvitationWithStatus, OrgRole } from "@agenteschat/client";
 import {
   addressesLeft,
   addressState,
@@ -116,20 +115,6 @@ describe("Membros e convites (ADR 0090)", () => {
     expect(pt(`members.invitations.${sentWords(false).resent}`, { email, date })).not.toContain("Mandei");
     expect(sentWords(true).newLink).toBe("newLink");
     expect(sentWords(false).copied).toBe("copiedNoEmail");
-  });
-
-  test("removing someone: the confirmation and the last-owner refusal read in both languages", async () => {
-    for (const lng of ["pt-BR", "en"] as const) {
-      const t = await translator(lng);
-      for (const key of ["title", "body", "confirm", "done"]) {
-        const said = t(`members.remove.${key}`, { name: "Bia", org: "Acme" });
-        expect(said).not.toContain("members.remove");
-        expect(said).not.toContain("{{");
-      }
-      expect(knownErrorText(t, new ApiError(409, "org.last_owner", "x"), lng)).not.toBeNull();
-    }
-    const pt = await translator("pt-BR");
-    expect(pt("members.remove.title", { name: "Bia", org: "Acme" })).toBe("Remover Bia da Acme?");
   });
 
   test("a person's line: their role, or Membro, then when they were here", async () => {
