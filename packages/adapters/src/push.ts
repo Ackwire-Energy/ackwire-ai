@@ -85,10 +85,7 @@ const mayRetry = (error: unknown) => (error as { retryable?: unknown } | null)?.
  * decides; when some did, the failed platform's phones answer it as their own failure instead, since a retry
  * would push the others twice.
  */
-export function createPhonePushSender(senders: {
-  android?: PushSender | null;
-  ios?: PushSender | null;
-}): PushSender {
+export function createPhonePushSender(senders: { android?: PushSender | null; ios?: PushSender | null }): PushSender {
   const of = (platform: PushPlatform) => senders[platform] ?? null;
   const ios = of("ios");
   return {

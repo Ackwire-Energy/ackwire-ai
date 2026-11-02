@@ -2,8 +2,8 @@ import { PushError, type PushSender, type RateLimiter } from "@agenteschat/adapt
 import type { Database } from "@agenteschat/db";
 import {
   authenticateRelayInstance,
-  RelayRateLimitError,
   type RelayInstance,
+  RelayRateLimitError,
   registerRelayInstance,
   relaySend,
   ValidationError,

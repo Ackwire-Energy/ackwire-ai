@@ -64,10 +64,7 @@ describe("push relay routes", () => {
       [token(2), false, true],
     ]);
     expect(sender.sent).toEqual([msg(1)]);
-    const [row] = await db
-      .select()
-      .from(schema.pushRelayInstances)
-      .where(eq(schema.pushRelayInstances.id, instanceId));
+    const [row] = await db.select().from(schema.pushRelayInstances).where(eq(schema.pushRelayInstances.id, instanceId));
     expect(row?.sent).toBe(2);
   });
 

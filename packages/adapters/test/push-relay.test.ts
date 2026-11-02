@@ -108,7 +108,8 @@ describe("relay push sender", () => {
     const saved = credentials.current();
     expect(saved?.secret).toBe("secret-1");
     expect(relay.calls[1]?.auth).toBe(`Bearer ${saved?.instanceId}.secret-1`);
-    expect((relay.calls[1]?.body.messages as PushMessage[])[0]?.priority).toBe("high");
+    const firstSend = relay.calls[1]?.body.messages as PushMessage[] | undefined;
+    expect(firstSend?.[0]?.priority).toBe("high");
 
     // Next time: no registration.
     await sender.send([msg(4)]);

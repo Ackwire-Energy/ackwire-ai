@@ -37,8 +37,8 @@ import {
   type KeyWrapper,
   MAIL_PRESETS,
   type MailAdapters,
-  postgresJsNotifier,
   type PushSender,
+  postgresJsNotifier,
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, composioAuthConfigs, loadConfig, redactConfig } from "@agenteschat/config";
