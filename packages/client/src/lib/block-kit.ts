@@ -6,7 +6,8 @@
  *
  * A plain button is the app's button (the control ruler, the same shadows and press). The only one showing in a block
  * is its main action, so it takes the primary look (`data-lead`): an agent needn't say so, and blocks already in a
- * conversation get it too.
+ * conversation get it too. One stacked tight under what comes before it gets room (`data-air`), measured, because a
+ * block written by hand often leaves none.
  *
  * Plain HTML wears the app's look too (titles, fields, lists, tables, progress): an agent needn't know our design to
  * follow it, and blocks already sent get it. Those rules have no weight (`:where`), so an agent's CSS always wins.
@@ -26,6 +27,7 @@ body{display:flex;flex-direction:column;gap:14px;padding:6px 16px 16px;color:var
 :where(button:not([class]):not(.ac-seg button)){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:6px 16px;border-radius:12px;font-size:14px;font-weight:600;line-height:1.25;letter-spacing:-.005em;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .18s cubic-bezier(.34,1.4,.5,1),box-shadow .18s cubic-bezier(.2,.8,.2,1),filter .15s}
 :where(button:not([class]):not(.ac-seg button):not([disabled]):hover){box-shadow:var(--e2),var(--top)}
 :where(button:not([class]):not(.ac-seg button):not([disabled]):active){transform:scale(.97) translateY(.5px)}
+:where(button[data-air]:not([class])){margin-top:12px}
 :where(button[data-lead]:not([class])){color:var(--raised);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--raised)),var(--ink));box-shadow:inset 0 1px 0 var(--lit),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
 :where(button[data-lead]:not([class]):not([disabled]):hover){filter:brightness(1.08);box-shadow:inset 0 1px 0 var(--lit),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 10px 22px -8px rgba(0,0,0,.5)}
 button[disabled]{opacity:.45;cursor:default}
@@ -122,6 +124,7 @@ details.ac-more > div{margin-top:6px;font-size:12.5px;line-height:18px;color:var
 :where(meter)::-webkit-meter-bar{height:8px;border:0;background:var(--plate)}
 :where(meter)::-webkit-meter-optimum-value{background:var(--ink)}
 ac-card,ac-result{display:block;min-width:0}
+ac-result{width:100%}
 ac-card{padding:12px 14px;border-radius:14px 14px 14px var(--cut);background:var(--raised);box-shadow:0 0 0 1px var(--line2)}
 ac-card[data-on]{box-shadow:0 0 0 1.6px var(--ink)}
 ac-card[name]{cursor:pointer;transition:box-shadow .15s}
@@ -133,7 +136,7 @@ ac-card:focus-visible{outline:none;box-shadow:0 0 0 3px var(--focus)}
 .ac-result span{display:block;font-size:12.5px;color:var(--muted)}
 .ac-result b{display:block;font-size:20px;line-height:28px;font-weight:650;letter-spacing:-.01em}
 ac-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
-ac-actions[align=center]{justify-content:center}
+ac-result + ac-actions,ac-actions[align=center]{justify-content:center}
 ac-actions[align=start]{justify-content:flex-start}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}`;
 
@@ -150,7 +153,7 @@ function flush(){queued=false;derived={};calc.forEach(function(f){try{Object.ass
   var v=view();subs.forEach(function(f){try{f(v)}catch(e){post({type:"error",message:String(e.message||e).slice(0,200)})}});
   document.querySelectorAll("[when]").forEach(function(el){var m=/^(.+?)(!?=)(.*)$/.exec(el.getAttribute("when"));if(!m)return;var on=String(v[m[1]])===m[3];if(m[2]==="!=")on=!on;on?el.removeAttribute("data-off"):el.setAttribute("data-off","")});
   lead();post({type:"state",state:state})}
-function lead(){var all=Array.prototype.slice.call(document.querySelectorAll("button:not([class]):not(.ac-seg button)")),live=all.filter(function(b){return!b.closest("[hidden],[data-off]")});all.forEach(function(b){b.toggleAttribute("data-lead",live.length===1&&live[0]===b)})}
+function lead(){var all=Array.prototype.slice.call(document.querySelectorAll("button:not([class]):not(.ac-seg button)")),live=all.filter(function(b){return!b.closest("[hidden],[data-off]")});all.forEach(function(b){b.toggleAttribute("data-lead",live.length===1&&live[0]===b);var p=b.previousElementSibling;if(!p||b.hasAttribute("data-air")||!b.offsetParent)return;var gap=b.getBoundingClientRect().top-p.getBoundingClientRect().bottom;if(gap>-1&&gap<8)b.setAttribute("data-air","")})}
 var touch=function(){if(!queued){queued=true;queueMicrotask(flush)}};
 var fmt=function(v,f,u){if(v===undefined||v===null||v!==v)return"–";var n=Number(v),pt=function(x,d){return x.toLocaleString(LOC,{maximumFractionDigits:d===undefined?1:d})};
   if(f==="brl")return"R$ "+pt(n,0);if(f==="mil")return"R$ "+pt(n,1)+(L.thousand==="k"?"k":" "+L.thousand);if(f==="pct")return pt(n,1)+"%";if(f==="int")return pt(n,0);if(typeof v==="number")return pt(n)+(u?" "+u:"");return String(v)};

@@ -69,7 +69,15 @@ describe("a block's page", () => {
   test("the parts an agent builds from are there, and its tones follow the theme", () => {
     for (const part of ["ac-card", "ac-result"]) expect(BLOCK_KIT_JS).toContain(`E("${part}"`);
     expect(BLOCK_KIT_CSS).toContain("ac-actions{display:flex");
+    // The answer keeps the block's width in a centered layout, and its actions follow it.
+    expect(BLOCK_KIT_CSS).toContain("ac-result{width:100%}");
+    expect(BLOCK_KIT_CSS).toContain("ac-result + ac-actions,ac-actions[align=center]{justify-content:center}");
     expect(BLOCK_KIT_JS).toContain('d.style.setProperty("--s"+(i+1),c)');
+  });
+
+  test("a plain button stacked tight under something gets room, measured from the page", () => {
+    expect(BLOCK_KIT_CSS).toContain(":where(button[data-air]:not([class])){margin-top:12px}");
+    expect(BLOCK_KIT_JS).toContain('b.setAttribute("data-air","")');
   });
 
   test("the only plain button showing is the block's main action", () => {
