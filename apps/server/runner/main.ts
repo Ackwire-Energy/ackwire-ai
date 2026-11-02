@@ -32,9 +32,9 @@ import {
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import { browserPortsForUid } from "./browser-ports";
 import {
+  accessToStore,
   configPath,
   DEFAULT_AGENT_UID_RANGE,
-  accessToStore,
   effectiveAccess,
   expandHome,
   normalizeServerUrl,

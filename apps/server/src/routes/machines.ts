@@ -446,7 +446,9 @@ export function machineAppRoutes(deps: AppDeps) {
           z
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
-              disableTool: z.enum(["claude", "codex", "cursor", "commands", "browser", "desktop", "terminal"]).optional(),
+              disableTool: z
+                .enum(["claude", "codex", "cursor", "commands", "browser", "desktop", "terminal"])
+                .optional(),
             })
             .strict(),
         ),

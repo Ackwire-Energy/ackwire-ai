@@ -74,7 +74,9 @@ export const CURSOR_KEY_PLAN: Pick<CodingPlan, "label" | "name" | "maker" | "sit
 export function signInKey(provider: string | undefined, kind: string, cursorKey: boolean) {
   const coding = planOf(provider);
   if (coding) return { plan: coding as typeof CURSOR_KEY_PLAN, provider };
-  return kind === "cursor" && cursorKey ? { plan: CURSOR_KEY_PLAN, provider: "cursor" } : { plan: undefined, provider: undefined };
+  return kind === "cursor" && cursorKey
+    ? { plan: CURSOR_KEY_PLAN, provider: "cursor" }
+    : { plan: undefined, provider: undefined };
 }
 
 export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);

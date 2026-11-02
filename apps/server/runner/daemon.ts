@@ -55,10 +55,10 @@ import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import {
+  accessToStore,
   configPath,
   connectUrl,
   DEFAULT_AGENT_UID_RANGE,
-  accessToStore,
   effectiveAccess,
   expandHome,
   normalizeServerUrl,

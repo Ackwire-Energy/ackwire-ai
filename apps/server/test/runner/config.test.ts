@@ -5,8 +5,8 @@ import { redactCommon } from "@agenteschat/adapters/redact";
 import { setTool } from "../../runner/access";
 import { ActivityLog } from "../../runner/activity";
 import {
-  configPath,
   accessToStore,
+  configPath,
   effectiveAccess,
   normalizeStored,
   parseService,
@@ -114,7 +114,10 @@ test("a write from an app without Cursor's switch keeps Cursor following Codex's
   const offCursor = accessToStore(stored, setTool(effectiveAccess(stored), "cursor", false));
   expect(offCursor.tools.cursor).toBe(false);
   // Once stored, it no longer follows.
-  const own = { ...base, access: { folders: [], tools: { claude: true, codex: true, cursor: true, commands: true } } } as never;
+  const own = {
+    ...base,
+    access: { folders: [], tools: { claude: true, codex: true, cursor: true, commands: true } },
+  } as never;
   expect(accessToStore(own, setTool(effectiveAccess(own), "codex", false)).tools.cursor).toBe(true);
 });
 
