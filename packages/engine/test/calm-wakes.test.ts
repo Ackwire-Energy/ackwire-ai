@@ -15,11 +15,13 @@ import {
   PERSON_ASKED_MS,
   personAskedLately,
   postPersonMessage,
+  ROOM_RANK_AGE_MS,
   reportMentionReplies,
   roomGate,
   roomHead,
   STRETCH,
   sendNote,
+  stopOrgWork,
   stretchStop,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -130,6 +132,20 @@ describe("the computer's line", () => {
     expect(chatter.status).toBe("waiting_input");
   });
 
+  test("agents' own work that waited long moves up with asked work; a parked wake's wait counts", async () => {
+    f = await setup();
+    const rio = await agentOf("Rio", "rio");
+    const machineId = await computerFor(f.agent.id, rio.id);
+    const asked = await inLine(rio.id, machineId, { roomAsked: true }, 60_000);
+    const old = await inLine(f.agent.id, machineId, {}, ROOM_RANK_AGE_MS + 60_000);
+    expect((await roomHead(f.db, machineId))?.id).toBe(old.id);
+    await done(old.id);
+    // Refused once just now, but parked long before the asked run started waiting: it keeps that place.
+    const parked = await inLine(f.agent.id, machineId, { roomAsked: true, roomOrderSince: Date.now() - 120_000 }, 0);
+    expect((await roomHead(f.db, machineId))?.id).toBe(parked.id);
+    expect(asked.status).toBe("waiting_input");
+  });
+
   test("a stretch a person opened lately is asked work; an agent's own or an old one isn't", async () => {
     f = await setup();
     const fresh = await post("revisa o deploy");
@@ -154,10 +170,11 @@ describe("the agent inbox", () => {
       await dispatchMentions(f.db, { orgId: f.org.id, messageId: m.id }, { maxHops: 10 });
     expect(await runsOf(f.agent.id)).toEqual([]);
     const parked = await jobsOf(INBOX_JOB);
-    expect(parked.map((j) => j.payload)).toEqual([
+    expect(parked.map((j) => j.payload)).toMatchObject([
       { messageId: first.id, agentId: f.agent.id, trigger: "mention", look: 1 },
       { messageId: second.id, agentId: f.agent.id, trigger: "mention", look: 1 },
     ]);
+    const since = Number(parked[0]?.payload.since);
 
     // Still in line: it looks again later.
     await deliverParked(f.db, f.org.id, { messageId: first.id, agentId: f.agent.id, trigger: "mention", look: 1 });
@@ -166,10 +183,16 @@ describe("the agent inbox", () => {
       true,
     );
 
-    // Out of line: one run for the thread, the second wake read with it.
+    // Out of line: one run for the thread, the second wake read with it; its place in line counts from the park.
     await done(waiting.id);
     for (const m of [first, second])
-      await deliverParked(f.db, f.org.id, { messageId: m.id, agentId: f.agent.id, trigger: "mention", look: 2 });
+      await deliverParked(f.db, f.org.id, {
+        messageId: m.id,
+        agentId: f.agent.id,
+        trigger: "mention",
+        look: 2,
+        since,
+      });
     const runs = await runsOf(f.agent.id);
     expect(runs.filter((r) => r.id !== waiting.id)).toHaveLength(1);
     expect(runs.find((r) => r.id !== waiting.id)).toMatchObject({
@@ -178,6 +201,27 @@ describe("the agent inbox", () => {
       hop: 2,
       pendingMessageIds: [second.id],
     });
+    const started = runs.find((r) => r.id !== waiting.id);
+    const execute = (await jobsOf("agent_run.execute")).find((j) => j.payload.runId === started?.id);
+    expect(execute?.payload.lineSince).toBe(since);
+  });
+
+  test("a parked wake whose agent was archived meanwhile is dropped; a closed workspace drops them all", async () => {
+    f = await setup();
+    const rio = await agentOf("Rio", "rio");
+    const machineId = await computerFor(f.agent.id);
+    const waiting = await inLine(f.agent.id, machineId);
+    const root = await post("sobre o build");
+    const m = await agentWrites(rio.id, "@dev olha o build", { threadId: root.id });
+    await dispatchMentions(f.db, { orgId: f.org.id, messageId: m.id }, { maxHops: 10 });
+    expect(await jobsOf(INBOX_JOB)).toHaveLength(1);
+    await done(waiting.id);
+    await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
+    await deliverParked(f.db, f.org.id, { messageId: m.id, agentId: f.agent.id, trigger: "mention", look: 1 });
+    expect((await runsOf(f.agent.id)).filter((r) => r.triggerMessageId === m.id)).toEqual([]);
+
+    await stopOrgWork({ db: f.db, pubsub: f.pubsub }, f.org.id, "closed");
+    expect(await jobsOf(INBOX_JOB)).toEqual([]);
   });
 
   test("a person's message and work a person asked for never wait behind agents' chatter", async () => {
@@ -282,6 +326,44 @@ describe("report once for @mentions", () => {
     expect((await runsOf(f.agent.id)).filter((r) => r.id !== devRun.id)).toHaveLength(1);
   });
 
+  test("a woken agent still parked counts and holds the report; one look per message; a deadline", async () => {
+    f = await setup();
+    const rio = await agentOf("Rio", "rio");
+    const nova = await agentOf("Nova", "nova");
+    const machineId = await computerFor(nova.id);
+    const novaBusy = await inLine(nova.id, machineId, { roomAsked: true });
+    await post("@dev distribui a revisão");
+    const [devRun] = await f.db.select().from(agentRuns).where(eq(agentRuns.agentId, f.agent.id));
+    if (!devRun) throw new Error("no run");
+    await done(devRun.id);
+    const asked = await agentWrites(f.agent.id, "@rio @nova revisem o PR", { runId: devRun.id });
+    await dispatchMentions(f.db, { orgId: f.org.id, messageId: asked.id }, { maxHops: 10 });
+    const [rioRun] = await f.db.select().from(agentRuns).where(eq(agentRuns.triggerMessageId, asked.id));
+    if (!rioRun) throw new Error("no run");
+    expect(rioRun.agentId).toBe(rio.id);
+    expect((await jobsOf(INBOX_JOB)).map((j) => j.payload.agentId)).toEqual([nova.id]);
+
+    const rioReply = await agentWrites(rio.id, "@dev revisei", { runId: rioRun.id, hop: 2 });
+    expect(await deferMentionReport(f.db, rioReply, [f.agent.id])).toBe(f.agent.id);
+    const again = await agentWrites(rio.id, "@dev e mais uma coisa", { runId: rioRun.id, hop: 2 });
+    expect(await deferMentionReport(f.db, again, [f.agent.id])).toBe(f.agent.id);
+    expect(await jobsOf(MENTION_REPORT_JOB)).toHaveLength(1);
+
+    // Rio is done, Nova still parked: nothing yet.
+    await done(rioRun.id);
+    const look = { replyId: rioReply.id, triggerId: asked.id, agentId: f.agent.id, look: 0 };
+    expect(await reportMentionReplies(f.db, f.org.id, look, { maxHops: 10 })).toBeNull();
+
+    // Past the wait, the author hears the replies already in.
+    await f.db
+      .update(schema.messages)
+      .set({ createdAt: new Date(Date.now() - 36 * 60_000) })
+      .where(eq(schema.messages.id, asked.id));
+    const out = await reportMentionReplies(f.db, f.org.id, { ...look, look: 1 }, { maxHops: 10 });
+    expect(out?.runs.map((r) => r.triggerMessageId)).toEqual([again.id]);
+    expect(novaBusy.status).toBe("waiting_input");
+  });
+
   test("one agent woken, or the author's run still at work: replies wake it as before", async () => {
     f = await setup();
     const rio = await agentOf("Rio", "rio");
@@ -297,12 +379,13 @@ describe("report once for @mentions", () => {
 });
 
 describe("deeper chains on a crowded computer", () => {
-  test("the stretch's limits drop while the woken agent's computer has work waiting for room", async () => {
+  test("a stretch an agent opened holds sooner while the woken agent's computer has work waiting for room", async () => {
     f = await setup();
     const rio = await agentOf("Rio", "rio");
     const machineId = await computerFor(f.agent.id, rio.id);
-    const root = await post("um pedido");
-    await f.db.insert(agentRuns).values(
+    const root = await agentWrites(rio.id, "vou chamar o time");
+    const asked = await post("um pedido");
+    const runsIn = (stretchId: string) =>
       Array.from({ length: STRETCH.crowdedRuns }, () => {
         const id = Bun.randomUUIDv7();
         return {
@@ -313,17 +396,20 @@ describe("deeper chains on a crowded computer", () => {
           triggerMessageId: id,
           trigger: "mention" as const,
           hop: 2,
-          stretchId: root.id,
+          stretchId,
           status: "done" as const,
         };
-      }),
-    );
+      });
+    await f.db.insert(agentRuns).values([...runsIn(root.id), ...runsIn(asked.id)]);
     expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id)).toBeNull();
     const waiting = await inLine(rio.id, machineId);
     expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id)).toEqual({
       reason: "runs",
       limit: STRETCH.crowdedRuns,
     });
+    // Work a person asked for and a mission's turns keep their limits.
+    expect(await stretchStop(f.db, f.org.id, asked.id, f.agent.id)).toBeNull();
+    expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id, null, { mission: true })).toBeNull();
     await done(waiting.id);
     expect(await stretchStop(f.db, f.org.id, root.id, f.agent.id)).toBeNull();
   });

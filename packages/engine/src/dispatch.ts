@@ -6,10 +6,9 @@ import {
   eq,
   gte,
   inArray,
-  isNotNull,
   isNull,
   ne,
-  or,
+  rowsOf,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -26,7 +25,7 @@ import { inChannelRun, workKeepsThread } from "./run-scope";
 import type { AgentRun } from "./runs";
 import { holdOf, hopLimitReached, pauseStretch, personAskedLately, stretchOf, stretchStop } from "./stretch";
 
-const { agentConsultations, agents, channelMembers, channels, agentRuns, messages } = schema;
+const { agentConsultations, agents, channelMembers, channels, agentRuns, messages, outbox } = schema;
 
 /** The outbox job that looks again at an agent's wake waiting outside any run (`StartRunOptions.park`). */
 export const INBOX_JOB = "agent_inbox.deliver";
@@ -106,6 +105,8 @@ export interface StartRunOptions {
    * look's number) and starts or joins one once the agent has nothing in line; a person's message never waits so.
    */
   park?: number;
+  /** A parked wake: when it started waiting. Its run's place in the computer's line counts from then. */
+  parkedSince?: number;
 }
 
 /**
@@ -206,7 +207,13 @@ export async function startOrJoinRun(
       await enqueue(tx, {
         orgId: message.orgId,
         kind: INBOX_JOB,
-        payload: { messageId: message.id, agentId, trigger, look: options.park },
+        payload: {
+          messageId: message.id,
+          agentId,
+          trigger,
+          look: options.park,
+          since: options.parkedSince ?? Date.now(),
+        },
         dedupeKey: `${INBOX_JOB}:${agentId}:${message.id}:${options.park}`,
         runAt: new Date(Date.now() + INBOX_LOOK_MS),
       });
@@ -241,7 +248,7 @@ export async function startOrJoinRun(
   await enqueue(tx, {
     orgId: message.orgId,
     kind: "agent_run.execute",
-    payload: { runId: run.id },
+    payload: { runId: run.id, ...(options.parkedSince ? { lineSince: options.parkedSince } : {}) },
     dedupeKey: `agent_run.execute:${run.id}`,
     maxAttempts: 4,
   });
@@ -256,13 +263,26 @@ export async function startOrJoinRun(
 export async function deliverParked(
   db: Database,
   orgId: string,
-  input: { messageId: string; agentId: string; trigger: RunTrigger; look: number },
+  input: { messageId: string; agentId: string; trigger: RunTrigger; look: number; since?: number },
 ) {
   const message = await getMessage(db, orgId, input.messageId);
-  if (!message) return;
+  if (!message || message.deletedAt) return;
+  // Archived, out of the conversation or, for a mention, out of the reach of whom it acts for since it parked: the
+  // wake is dropped. A question or note so stops being kept open, and its asker hears it expired.
+  const [still] = await eligibleChannelAgents(
+    db,
+    orgId,
+    message.channelId,
+    [input.agentId],
+    input.trigger === "mention" ? { requesterUserId: await mentionRequester(db, message) } : {},
+  );
+  if (!still) return;
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`inbox:${input.agentId}`}))`);
-    const out = await startOrJoinRun(tx, message, input.agentId, input.trigger, { park: input.look + 1 });
+    const out = await startOrJoinRun(tx, message, input.agentId, input.trigger, {
+      park: input.look + 1,
+      parkedSince: input.since ?? Date.now(),
+    });
     await takeConsultation(
       tx,
       { orgId, messageId: message.id, agentId: input.agentId },
@@ -304,10 +324,18 @@ export async function takeConsultation(
 export const MENTION_REPORT_JOB = "mention.report_once";
 
 /**
+ * How long after the asked message its report waits at most for the agents it woke: past a run's whole wait for room
+ * (`COMPUTER_BUSY_WAIT_MS`, 30 minutes), the author hears the replies already in.
+ */
+const MENTION_REPORT_WAIT_MS = 35 * 60_000;
+
+/**
  * Report once for @mentions (ADR 0032 "Calm wakes"; `reportHandOffs` does it for notes): `reply` names the author of
- * the message its run answers, a message that woke at least one other agent too, and the author's run that wrote it
- * is no longer at work (one at work takes every reply). The author is then woken once, when all of them are done
- * (`reportMentionReplies`), instead of once per reply. Returns the author left out of this reply's wake, else null.
+ * the message its run answers, a message that woke at least one other agent too (a run on it, a run it joined, or a
+ * wake for it still parked), and the author's run that wrote it is no longer at work (one at work takes every reply).
+ * The author is then woken once, when all of them are done (`reportMentionReplies`), instead of once per reply. One
+ * look goes per message and author: it wakes on the newest reply anyway. Returns the author left out of this reply's
+ * wake, else null.
  */
 export async function deferMentionReport(db: Database, reply: Message, allowed: string[]): Promise<string | null> {
   if (!reply.agentRunId) return null;
@@ -325,32 +353,57 @@ export async function deferMentionReport(db: Database, reply: Message, allowed: 
       .where(and(eq(agentRuns.orgId, reply.orgId), eq(agentRuns.id, asked.agentRunId)));
     if (writer?.status === "queued" || writer?.status === "running") return null;
   }
-  const [woke] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(agentRuns)
-    .where(siblingRuns(reply.orgId, asked.id, author));
+  const [woke] = rowsOf<{ n: number }>(
+    await db.execute(sql`select count(*)::int as n from (
+        select ${agentRuns.agentId}::text from ${agentRuns} where ${siblingRuns(reply.orgId, asked.id, author, true)}
+        union ${parkedWakes(reply.orgId, asked.id, author)}) w`),
+  );
   if (Number(woke?.n ?? 0) < 2) return null;
-  await enqueue(db, {
-    orgId: reply.orgId,
-    kind: MENTION_REPORT_JOB,
-    payload: { replyId: reply.id, triggerId: asked.id, agentId: author, look: 0 },
-    dedupeKey: `${MENTION_REPORT_JOB}:${reply.id}:${author}:0`,
-  });
+  const [looking] = await db
+    .select({ id: outbox.id })
+    .from(outbox)
+    .where(
+      and(
+        eq(outbox.orgId, reply.orgId),
+        eq(outbox.kind, MENTION_REPORT_JOB),
+        eq(outbox.status, "pending"),
+        sql`${outbox.payload}->>'triggerId' = ${asked.id}`,
+        sql`${outbox.payload}->>'agentId' = ${author}`,
+      ),
+    )
+    .limit(1);
+  if (!looking)
+    await enqueue(db, {
+      orgId: reply.orgId,
+      kind: MENTION_REPORT_JOB,
+      payload: { replyId: reply.id, triggerId: asked.id, agentId: author, look: 0 },
+      dedupeKey: `${MENTION_REPORT_JOB}:${reply.id}:${author}:0`,
+    });
   return author;
 }
 
-const siblingRuns = (orgId: string, triggerId: string, authorId: string) =>
+/** Runs of agents other than the author on `triggerId`; with `joined`, also runs it joined that haven't read it. */
+const siblingRuns = (orgId: string, triggerId: string, authorId: string, joined = false) =>
   and(
     eq(agentRuns.orgId, orgId),
-    eq(agentRuns.triggerMessageId, triggerId),
+    joined
+      ? sql`(${agentRuns.triggerMessageId} = ${triggerId}::uuid or ${triggerId}::uuid = any(${agentRuns.pendingMessageIds}))`
+      : eq(agentRuns.triggerMessageId, triggerId),
     ne(agentRuns.agentId, authorId),
     eq(agentRuns.background, false),
   );
 
+/** The agents other than the author whose wake for `triggerId` still waits outside any run (`INBOX_JOB`). */
+const parkedWakes = (orgId: string, triggerId: string, authorId: string) =>
+  sql`select ${outbox.payload}->>'agentId' from ${outbox} where ${outbox.orgId} = ${orgId}::uuid
+    and ${outbox.kind} = ${INBOX_JOB} and ${outbox.status} in ('pending', 'processing')
+    and ${outbox.payload}->>'messageId' = ${triggerId} and ${outbox.payload}->>'agentId' <> ${authorId}`;
+
 /**
- * A deferred report's look (`MENTION_REPORT_JOB`): while a run the message woke is queued, running or in its
- * computer's line, it looks again later; then the author is woken once, on the newest reply that names it (the others
- * are in the conversation it reads).
+ * A deferred report's look (`MENTION_REPORT_JOB`): while an agent the message woke is at work on it (queued,
+ * running, in its computer's line, or parked), it looks again later, for at most `MENTION_REPORT_WAIT_MS`; then the
+ * author is woken once, on the newest reply that names it (the others are in the conversation it reads). Long work
+ * that stepped into the background and a wait for a computer that is gone don't hold it.
  */
 export async function reportMentionReplies(
   db: Database,
@@ -358,33 +411,29 @@ export async function reportMentionReplies(
   input: { replyId: string; triggerId: string; agentId: string; look: number },
   options: { maxHops: number },
 ) {
-  const siblings = siblingRuns(orgId, input.triggerId, input.agentId);
-  const [working] = await db
-    .select({ id: agentRuns.id })
-    .from(agentRuns)
-    .where(
-      and(
-        siblings,
-        or(
-          inArray(agentRuns.status, ["queued", "running"]),
-          and(eq(agentRuns.status, "waiting_input"), isNotNull(agentRuns.waitingMachineId)),
-        ),
-      ),
-    )
-    .limit(1);
-  if (working) {
-    const look = input.look + 1;
-    await enqueue(db, {
-      orgId,
-      kind: MENTION_REPORT_JOB,
-      payload: { ...input, look },
-      dedupeKey: `${MENTION_REPORT_JOB}:${input.replyId}:${input.agentId}:${look}`,
-      runAt: new Date(Date.now() + INBOX_LOOK_MS),
-    });
-    return null;
-  }
   const asked = await getMessage(db, orgId, input.triggerId);
   if (!asked) return null;
+  if (Date.now() - asked.createdAt.getTime() < MENTION_REPORT_WAIT_MS) {
+    const [working] = rowsOf<{ yes: boolean | string }>(
+      await db.execute(sql`select (exists (select 1 from ${agentRuns}
+          where ${siblingRuns(orgId, input.triggerId, input.agentId, true)} and ${agentRuns.workId} is null
+            and (${agentRuns.status} in ('queued', 'running') or (${agentRuns.status} = 'waiting_input'
+              and ${agentRuns.waitingMachineId} is not null
+              and ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy')))
+        or exists (${parkedWakes(orgId, input.triggerId, input.agentId)})) as yes`),
+    );
+    if (working?.yes === true || working?.yes === "t") {
+      const look = input.look + 1;
+      await enqueue(db, {
+        orgId,
+        kind: MENTION_REPORT_JOB,
+        payload: { ...input, look },
+        dedupeKey: `${MENTION_REPORT_JOB}:${input.replyId}:${input.agentId}:${look}`,
+        runAt: new Date(Date.now() + INBOX_LOOK_MS),
+      });
+      return null;
+    }
+  }
   const [last] = await db
     .select({ id: messages.id })
     .from(messages)
@@ -396,7 +445,7 @@ export async function reportMentionReplies(
         gte(messages.createdAt, asked.createdAt),
         isNull(messages.deletedAt),
         sql`${input.agentId}::uuid = any(${messages.mentionedAgentIds})`,
-        siblings,
+        siblingRuns(orgId, input.triggerId, input.agentId),
       ),
     )
     .orderBy(desc(messages.createdAt), desc(messages.id))
@@ -475,6 +524,18 @@ export const requesterOf = (db: Executor, message: Pick<Message, "orgId" | "id">
   personOfMessage(db, message.orgId, message.id);
 
 /**
+ * Whom a mention acts for: an agent asking another one acts for the person behind its run, who must be allowed to
+ * talk to it; a routine wakes only agents its creator can talk to.
+ */
+async function mentionRequester(db: Executor, message: Message) {
+  const behind = message.agentRunId ?? (await routinePostRun(db, message));
+  return (
+    (await requesterOf(db, message)) ??
+    (behind ? routineCreatorOf(await runAuthorityById(db, message.orgId, behind)) : null)
+  );
+}
+
+/**
  * Handles `message.posted` for messages with mentions: starts one run per
  * explicitly @mentioned agent. A message whose hop already reached `maxHops`
  * (the depth backstop, `hopLimitReached`) triggers nobody.
@@ -493,12 +554,7 @@ export async function dispatchMentions(
   if (await hopLimitReached(db, message, options.maxHops)) return { runs: [], skipped: "hop_limit" };
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
-  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it;
-  // a routine wakes only agents its creator can talk to.
-  const behind = message.agentRunId ?? (await routinePostRun(db, message));
-  const requester =
-    (await requesterOf(db, message)) ??
-    (behind ? routineCreatorOf(await runAuthorityById(db, message.orgId, behind)) : null);
+  const requester = await mentionRequester(db, message);
   const [eligible, here] = await Promise.all([
     eligibleChannelAgents(db, message.orgId, message.channelId, candidates, { requesterUserId: requester }),
     eligibleChannelAgents(db, message.orgId, message.channelId, candidates),

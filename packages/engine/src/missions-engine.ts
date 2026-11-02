@@ -553,7 +553,7 @@ export async function keepMissionGoing(deps: MissionDeps, missionId: string) {
     .limit(1);
   const stretchId = last ? runStretchOf(last) : undefined;
   if (last && stretchId) {
-    const stop = await stretchStop(deps.db, mission.orgId, stretchId, mission.agentId);
+    const stop = await stretchStop(deps.db, mission.orgId, stretchId, mission.agentId, null, { mission: true });
     if (stop) {
       await pauseStretch(deps.db, mission.orgId, {
         stretchId,
