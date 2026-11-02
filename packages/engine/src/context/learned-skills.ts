@@ -4,9 +4,16 @@ import { recordAgentActions } from "../agent-actions";
 import { runCalls } from "../continuation";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import type { Judge } from "../judge";
-import { can, requirePermission } from "../organizations";
+import { requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
-import { agentSkillByName, SKILL_NAME, type SkillRow, validateSkill, writeSkillBody } from "../skills";
+import {
+  agentSkillByName,
+  requireAgentSkillChange,
+  SKILL_NAME,
+  type SkillRow,
+  validateSkill,
+  writeSkillBody,
+} from "../skills";
 import type { ToolContext } from "../tools/types";
 import {
   type ContextItem,
@@ -100,21 +107,13 @@ export async function changeSkillAsAgent(
  * `skill.updated`, while it still reads as that change left it. Its agent's owner or who manages agents.
  */
 export async function revertSkillChange(db: Database, actorId: string, orgId: string, skillId: string) {
-  const membership = await requirePermission(db, actorId, orgId, "read");
+  await requirePermission(db, actorId, orgId, "read");
   const [skill] = await db
     .select()
     .from(skills)
     .where(and(eq(skills.id, skillId), eq(skills.orgId, orgId), isNull(skills.deletedAt)));
   if (!skill) throw new NotFoundError("Skill not found");
-  if (!can(membership, "manage_agents")) {
-    const [agent] = skill.ownerAgentId
-      ? await db
-          .select({ owner: schema.agents.ownerUserId })
-          .from(schema.agents)
-          .where(eq(schema.agents.id, skill.ownerAgentId))
-      : [];
-    if (agent?.owner !== actorId) throw new ForbiddenError("Only the agent's owner or an admin can change this");
-  }
+  await requireAgentSkillChange(db, actorId, orgId, skill);
   const [last] = await db
     .select()
     .from(agentActions)

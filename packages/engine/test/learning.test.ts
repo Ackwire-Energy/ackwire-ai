@@ -4,6 +4,7 @@ import { systemText } from "@agenteschat/providers";
 import {
   addRunStep,
   afterTurnDone,
+  agentMadeSkills,
   consolidateOrg,
   createAgent,
   drainOutbox,
@@ -17,11 +18,12 @@ import {
   postPersonMessage,
   recordContextUse,
   retrieveForRun,
+  setSkillLocked,
   shareAcrossAgents,
   type ToolContext,
   type ToolSource,
 } from "../src";
-import { setup as baseSetup, type Fixture } from "./fixtures";
+import { addMember, setup as baseSetup, type Fixture } from "./fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
@@ -694,5 +696,39 @@ describe("learning guards", () => {
     await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, used.id));
     expect((await learnRun(f.context, { orgId: f.org.id, runId: used.id })).skipped).toBe("running");
     expect(await f.db.select().from(schema.agentLearningDays)).toEqual([]);
+  });
+
+  test("the agent's owner may lock its skill; Desfazer shows only with a change of its own to undo", async () => {
+    f = await setup();
+    const owner = await addMember(f.db, f.org.id, "member", "Owner");
+    const other = await addMember(f.db, f.org.id, "member", "Other");
+    await f.db.update(schema.agents).set({ ownerUserId: owner.id }).where(eq(schema.agents.id, f.agent.id));
+    const [mine] = await f.db
+      .insert(schema.skills)
+      .values({
+        orgId: f.org.id,
+        slug: "northwind-api",
+        name: "northwind-api",
+        description: "Northwind",
+        body: "# northwind-api",
+        source: "manual",
+        origin: "agent",
+        ownerAgentId: f.agent.id,
+      })
+      .returning();
+    await f.db.insert(schema.agentSkills).values({ orgId: f.org.id, agentId: f.agent.id, skillId: mine?.id ?? "" });
+    const flags = async (userId: string) =>
+      (await agentMadeSkills(f.db, userId, f.org.id, f.agent.id)).map((s) => [s.canChange, s.canRevert]);
+    expect(await flags(owner.id)).toEqual([[true, false]]);
+    expect(await flags(other.id)).toEqual([[false, false]]);
+    expect((await setSkillLocked(f.db, owner.id, f.org.id, mine?.id ?? "", true)).locked).toBe(true);
+    await expect(setSkillLocked(f.db, other.id, f.org.id, mine?.id ?? "", false)).rejects.toThrow("agent's owner");
+    await setSkillLocked(f.db, owner.id, f.org.id, mine?.id ?? "", false);
+
+    const { run } = await personRun("@dev fix the skill");
+    await invoke(run, "load_skill", { name: "northwind-api" });
+    await invoke(run, "update_skill", { name: "northwind-api", body: "# northwind-api\n1. GET the models." });
+    expect(await flags(owner.id)).toEqual([[true, true]]);
+    expect(await flags(f.owner.id)).toEqual([[true, true]]);
   });
 });

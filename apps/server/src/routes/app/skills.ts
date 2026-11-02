@@ -416,7 +416,18 @@ export function skillRoutes(deps: AppDeps) {
       summary: "Skills the agent made from its own how-tos, archived ones too, newest first",
       request: { params: AgentParams },
       responses: {
-        200: json(z.object({ skills: z.array(Skill.extend({ body: z.string(), archived: z.boolean() })) })),
+        200: json(
+          z.object({
+            skills: z.array(
+              Skill.extend({
+                body: z.string(),
+                archived: z.boolean(),
+                canChange: z.boolean().openapi({ description: "The viewer may lock it and undo its changes." }),
+                canRevert: z.boolean().openapi({ description: "It has a change of its own to undo." }),
+              }),
+            ),
+          }),
+        ),
         ...errors,
       },
     }),

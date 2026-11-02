@@ -258,7 +258,7 @@ function LearnedSkillRow({ s }: { s: LearnedSkill }) {
         <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
           {open ? t("agentPage.memory.hide") : t("agentPage.memory.view")}
         </Button>
-        {s.archived ? (
+        {!s.canChange ? null : s.archived ? (
           <Button
             size="sm"
             variant="ghost"
@@ -269,16 +269,21 @@ function LearnedSkillRow({ s }: { s: LearnedSkill }) {
           </Button>
         ) : (
           <>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={act.isPending}
-              onClick={() =>
-                act.mutate({ type: "revert", id: s.id }, { onSuccess: () => toast.show(t("agentPage.memory.undone")) })
-              }
-            >
-              {t("agentPage.memory.undoChange")}
-            </Button>
+            {s.canRevert && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={act.isPending}
+                onClick={() =>
+                  act.mutate(
+                    { type: "revert", id: s.id },
+                    { onSuccess: () => toast.show(t("agentPage.memory.undone")) },
+                  )
+                }
+              >
+                {t("agentPage.memory.undoChange")}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"

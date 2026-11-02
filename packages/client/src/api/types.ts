@@ -3104,6 +3104,10 @@ export interface SkillPatch {
 export interface LearnedSkill extends Skill {
   body: string;
   archived: boolean;
+  /** The viewer may lock it and undo its changes (who manages agents, or the agent's owner). */
+  canChange: boolean;
+  /** It has a change of its own to undo (Desfazer última mudança). */
+  canRevert: boolean;
 }
 
 // ── Agent computer and Run code settings: apps/server/src/routes/app/sandboxes.ts ──

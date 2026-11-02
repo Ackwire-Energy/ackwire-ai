@@ -1013,10 +1013,27 @@ export async function writeSkillBody(db: Database, s: SkillRow, body: string): P
   return row;
 }
 
-/** A person locks or unlocks a skill: a locked one agents can't change and is never archived for disuse. */
+/** Who may lock or undo an agent-made skill: who manages agents, or the owner of the agent that made it. */
+async function mayChangeAgentSkill(db: Database, actorId: string, orgId: string, ownerAgentId: string | null) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  if (can(membership, "manage_agents")) return true;
+  if (!ownerAgentId) return false;
+  return (await getAgent(db, orgId, ownerAgentId))?.ownerUserId === actorId;
+}
+
+export async function requireAgentSkillChange(db: Database, actorId: string, orgId: string, s: SkillRow) {
+  if (s.origin !== "agent") await requirePermission(db, actorId, orgId, "manage_agents");
+  else if (!(await mayChangeAgentSkill(db, actorId, orgId, s.ownerAgentId)))
+    throw new ForbiddenError("Only the agent's owner or an admin can change this");
+}
+
+/**
+ * A person locks or unlocks a skill: a locked one agents can't change and is never archived for disuse. An agent-made
+ * one also its agent's owner.
+ */
 export async function setSkillLocked(db: Database, actorId: string, orgId: string, id: string, locked: boolean) {
-  await requirePermission(db, actorId, orgId, "manage_agents");
   const s = await loadSkill(db, orgId, id);
+  await requireAgentSkillChange(db, actorId, orgId, s);
   await db.update(skills).set({ locked, updatedAt: new Date() }).where(eq(skills.id, s.id));
   await recordAudit(db, {
     orgId,
@@ -1030,7 +1047,15 @@ export async function setSkillLocked(db: Database, actorId: string, orgId: strin
 
 /** Brings back a skill archived for disuse (or deleted), with its agents' assignments. */
 export async function restoreSkill(db: Database, actorId: string, orgId: string, id: string) {
-  await requirePermission(db, actorId, orgId, "manage_agents");
+  const [found] = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.id, id), eq(skills.orgId, orgId)));
+  if (!found) {
+    await requirePermission(db, actorId, orgId, "manage_agents");
+    throw new NotFoundError("Skill not found");
+  }
+  await requireAgentSkillChange(db, actorId, orgId, found);
   const [s] = await db
     .update(skills)
     .set({ deletedAt: null, lastUsedAt: new Date(), updatedAt: new Date() })
@@ -1049,13 +1074,52 @@ export async function restoreSkill(db: Database, actorId: string, orgId: string,
 
 /** The skills an agent made itself (`origin` agent), archived ones too, newest first: "What it learned". */
 export async function agentMadeSkills(db: Database, actorId: string, orgId: string, agentId: string) {
-  await requirePermission(db, actorId, orgId, "read");
+  const canChange = await mayChangeAgentSkill(db, actorId, orgId, agentId);
   const rows = await db
     .select()
     .from(skills)
     .where(and(eq(skills.orgId, orgId), eq(skills.origin, "agent"), eq(skills.ownerAgentId, agentId)))
     .orderBy(sql`${skills.createdAt} desc`);
-  return rows.map((r) => ({ ...view(r), body: r.body, archived: r.deletedAt !== null }));
+  // Each skill's latest change of its own not undone: Desfazer only while the body is still what it left.
+  const changes = rows.length
+    ? await db
+        .selectDistinctOn([schema.agentActions.targetId], {
+          targetId: schema.agentActions.targetId,
+          before: schema.agentActions.before,
+          after: schema.agentActions.after,
+        })
+        .from(schema.agentActions)
+        .where(
+          and(
+            eq(schema.agentActions.orgId, orgId),
+            eq(schema.agentActions.kind, "skill.updated"),
+            inArray(
+              schema.agentActions.targetId,
+              rows.map((r) => r.id),
+            ),
+            isNull(schema.agentActions.undoneAt),
+          ),
+        )
+        .orderBy(schema.agentActions.targetId, sql`${schema.agentActions.createdAt} desc`)
+    : [];
+  const revertible = new Set(
+    changes
+      .filter((c) => {
+        const row = rows.find((r) => r.id === c.targetId);
+        return (
+          typeof (c.before as { body?: unknown } | null)?.body === "string" &&
+          (c.after as { body?: unknown } | null)?.body === row?.body
+        );
+      })
+      .map((c) => c.targetId),
+  );
+  return rows.map((r) => ({
+    ...view(r),
+    body: r.body,
+    archived: r.deletedAt !== null,
+    canChange,
+    canRevert: canChange && revertible.has(r.id),
+  }));
 }
 
 /** The org's skills with whether this agent has each one on. */
