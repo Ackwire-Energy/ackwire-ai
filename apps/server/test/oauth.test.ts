@@ -614,13 +614,12 @@ describe("token", () => {
     expect(second.res.status).toBe(200);
     // The access token before the rotation still works until it expires (calls in flight).
     expect((await mcp(t, app.access, { jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(200);
-    // The same old token again, within 60 s and before the new one is used: a fresh pair, the other one revoked.
+    // The same old token again, within 60 s and before the new one is used: a sibling pair, the first left alive.
     const retry = await refresh(app.refresh);
     expect(retry.res.status).toBe(200);
     expect(
       (await mcp(t, String(second.json.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" })).status,
-    ).toBe(401);
-    expect((await refresh(String(second.json.refresh_token))).json.error).toBe("invalid_grant");
+    ).toBe(200);
     // Past the grace: the whole family goes.
     await t.db
       .update(schema.appTokens)
@@ -631,6 +630,30 @@ describe("token", () => {
       (await mcp(t, String(retry.json.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" })).status,
     ).toBe(401);
     expect((await refresh(String(retry.json.refresh_token))).json.error).toBe("invalid_grant");
+  });
+
+  test("two refreshes at once: whichever answer the client keeps, its session survives", async () => {
+    const { b, orgId } = await owner();
+    const refresh = (rt: string, client: string) =>
+      token(t, { grant_type: "refresh_token", refresh_token: rt, client_id: client });
+    for (const keep of ["first", "last"] as const) {
+      const app = await connectApp(t, b, orgId);
+      const [a, z] = await Promise.all([refresh(app.refresh, app.clientId), refresh(app.refresh, app.clientId)]);
+      expect([a.res.status, z.res.status]).toEqual([200, 200]);
+      const kept = keep === "first" ? a : z;
+      const dropped = keep === "first" ? z : a;
+      expect(
+        (await mcp(t, String(kept.json.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" })).status,
+      ).toBe(200);
+      const next = await refresh(String(kept.json.refresh_token), app.clientId);
+      expect(next.res.status).toBe(200);
+      // The answer it dropped can't refresh any more, and presenting it ends nothing.
+      expect((await refresh(String(dropped.json.refresh_token), app.clientId)).json.error).toBe("invalid_grant");
+      expect(
+        (await mcp(t, String(next.json.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" })).status,
+      ).toBe(200);
+      expect((await refresh(String(next.json.refresh_token), app.clientId)).res.status).toBe(200);
+    }
   });
 
   test("an expired refresh token is refused and leaves its family alone", async () => {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, gt, inArray, isNull, ne, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { sha256 } from "../crypto";
 import { emailLocale, queueEmail } from "../email";
@@ -459,10 +459,8 @@ export async function refreshTokens(deps: OauthDeps, form: Record<string, string
   if (!row) return tokenError("invalid_grant", "Unknown refresh token");
   const { token, grant } = row;
   if (grant.clientId !== form.client_id) return tokenError("invalid_grant", "The token was issued to another client");
-  if (token.revokedAt) {
-    await revokeFamily(db, [token.familyId]);
-    return tokenError("invalid_grant", "The token was revoked");
-  }
+  // Revoked with its family, or a sibling that lost a concurrent refresh (below): nothing left to end.
+  if (token.revokedAt) return tokenError("invalid_grant", "The token was revoked");
   if (token.expiresAt && token.expiresAt.getTime() <= Date.now())
     return tokenError("invalid_grant", "The token expired");
   if (!(await grantUsable(db, grant))) {
@@ -482,27 +480,19 @@ export async function refreshTokens(deps: OauthDeps, form: Record<string, string
   };
   const outcome = await db.transaction(async (tx) => {
     if (token.usedAt) {
-      // Rotated already. Inside the grace and while its child refresh token is unused, a retry gets a fresh pair
-      // (the child pair is revoked); otherwise someone else holds the old token: the whole family goes.
+      // Rotated already. Inside the grace and while no pair it minted has been refreshed, this is a client's
+      // retry (two calls refreshing at once, a lost answer): a sibling pair under the same parent, the earlier
+      // ones left alive, since the client keeps whichever answer came last. The first sibling refreshed revokes
+      // the others. Otherwise someone else holds the old token: the whole family goes.
       const children = await tx
-        .select()
+        .select({ usedAt: appTokens.usedAt })
         .from(appTokens)
-        .where(and(eq(appTokens.parentId, token.id), isNull(appTokens.revokedAt)));
-      const childRefresh = children.find((c) => c.kind === "refresh");
+        .where(and(eq(appTokens.parentId, token.id), eq(appTokens.kind, "refresh")));
       const inGrace = Date.now() - token.usedAt.getTime() <= APP_LIMITS.refreshGraceMs;
-      if (!inGrace || !childRefresh || childRefresh.usedAt) {
+      if (!inGrace || children.some((c) => c.usedAt)) {
         await revokeFamily(tx, [token.familyId]);
         return null;
       }
-      await tx
-        .update(appTokens)
-        .set({ revokedAt: new Date() })
-        .where(
-          inArray(
-            appTokens.id,
-            children.map((c) => c.id),
-          ),
-        );
       return mintPair(tx, grant, { familyId: token.familyId, parentId: token.id, ...family });
     }
     const [marked] = await tx
@@ -511,6 +501,19 @@ export async function refreshTokens(deps: OauthDeps, form: Record<string, string
       .where(and(eq(appTokens.id, token.id), isNull(appTokens.usedAt)))
       .returning({ id: appTokens.id });
     if (!marked) return "race" as const;
+    if (token.parentId)
+      await tx
+        .update(appTokens)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(appTokens.parentId, token.parentId),
+            eq(appTokens.kind, "refresh"),
+            ne(appTokens.id, token.id),
+            isNull(appTokens.usedAt),
+            isNull(appTokens.revokedAt),
+          ),
+        );
     return mintPair(tx, grant, { familyId: token.familyId, parentId: token.id, ...family });
   });
   if (outcome === "race") return refreshTokens(deps, form);
