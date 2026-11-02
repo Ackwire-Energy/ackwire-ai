@@ -8,6 +8,7 @@ import {
   decidingKeys,
   drainOutbox,
   ForbiddenError,
+  getApproval,
   listApprovals,
   missingPermissions,
   orgOverview,
@@ -151,6 +152,11 @@ test("turning on access is decided by who gives it on the agent's page, not by a
   ).rejects.toBeInstanceOf(ForbiddenError);
 
   expect((await orgOverview(f.db, lead.id, f.org.id)).approvalsWaitingForMe).toBe(1);
+  // Outside the channel, they still find and open what they decide.
+  await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, lead.id));
+  const [leadView] = await listApprovals(f.db, lead.id, f.org.id, { status: "pending" });
+  expect(leadView?.id).toBe(row.id);
+  expect((await getApproval(f.db, lead.id, f.org.id, row.id)).canDecide).toBe(true);
   await decideApproval({ db: f.db, pubsub: f.pubsub }, lead.id, f.org.id, row.id, { decision: "approve" });
   await drainOutbox(f.db, f.handlers);
   const [grant] = await f.db

@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { type Agent, getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
@@ -51,6 +51,51 @@ export function widensAudience(from: AgentAudience, to: AgentAudience, ownerUser
   const people = new Set(from.mode === "people" ? from.userIds : []);
   const roles = new Set(from.mode === "people" ? from.roleIds : []);
   return to.userIds.some((id) => id !== ownerUserId && !people.has(id)) || to.roleIds.some((id) => !roles.has(id));
+}
+
+/**
+ * An agent's audience changed from `before` to `after`: if someone new can talk to it, it loses the mailboxes others
+ * gave it (`dropForeignMailGrants`), `actorId`'s own aside. Consultations never reach someone else's mailbox (the mail
+ * tools check the person), so only people count here.
+ */
+export async function dropMailIfWidened(
+  db: Executor,
+  orgId: string,
+  agentId: string,
+  ownerUserId: string | null,
+  before: AgentAudience,
+  after: AgentAudience,
+  actorId: string,
+) {
+  const reach = (a: AgentAudience) => ({ ...a, consultable: true });
+  if (widensAudience(reach(before), reach(after), ownerUserId)) {
+    await dropForeignMailGrants(db, orgId, agentId, actorId, actorId);
+  }
+}
+
+/**
+ * `userId` now holds `added` roles: every agent those roles newly let them talk to loses the mailboxes others gave it
+ * (theirs aside), as if its audience had widened to them. A mailbox's owner gave it for the people it answered then.
+ */
+export async function dropMailForNewRoleMember(
+  db: Executor,
+  orgId: string,
+  userId: string,
+  rolesBefore: readonly string[],
+  added: readonly string[],
+  actorId: string,
+) {
+  if (added.length === 0) return;
+  const rows = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), eq(agents.audienceMode, "people")));
+  const speaker: Speaker = { talks: true, roleIds: [...rolesBefore] };
+  for (const agent of rows) {
+    if (!agent.audienceRoleIds.some((id) => added.includes(id))) continue;
+    if (canTalkTo(agent, userId, speaker)) continue;
+    await dropForeignMailGrants(db, orgId, agent.id, userId, actorId);
+  }
 }
 
 /** Someone besides its owner can talk to the agent. */
@@ -298,10 +343,8 @@ export async function setAgentAudience(
       })
       .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
       .returning();
-    // Consultations never reach someone else's mailbox (the mail tools check the person), so only people count here.
-    const reach = (a: AgentAudience) => ({ ...a, consultable: true });
-    if (updated && widensAudience(reach(audienceOf(agent)), reach(audienceOf(updated)), agent.ownerUserId)) {
-      await dropForeignMailGrants(tx, orgId, agentId, actorId, actorId);
+    if (updated) {
+      await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(updated), actorId);
     }
     return updated;
   });

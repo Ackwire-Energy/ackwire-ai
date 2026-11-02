@@ -993,6 +993,7 @@ export const cancelRoutineAhead = (
  */
 const seenBy = (db: Database, orgId: string, actorId: string) =>
   or(
+    decidableBySql(actorId),
     eq(approvals.ownerUserId, actorId),
     sql`coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb) @> to_jsonb(${actorId}::text)`,
     inArray(

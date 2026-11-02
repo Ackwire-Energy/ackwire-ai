@@ -78,4 +78,9 @@ sidebar's count (`decidableBySql`), "Aprovar tudo" and Aprovações:
 Also for a person's own mailbox: its tools are offered only to a run whose person is its owner or someone the agent
 answers directly (a consultation for someone outside the agent's audience doesn't reach it), and an agent loses the
 mailboxes others gave it when someone else widens its audience or it gets an owner who couldn't talk to it
-(`dropForeignMailGrants`, audited); the mailbox's owner gives it again if they still want to.
+(`dropForeignMailGrants`, audited); the mailbox's owner gives it again if they still want to. Every way the agent's
+reach grows counts: its audience (`setAgentAudience`), "only me" turned off in its brain settings (`setAgentBrain`), and
+someone joining one of its audience roles (`addMemberRolesInTx`, `dropMailIfWidened`/`dropMailForNewRoleMember`). A
+routine's run (or a consultation rooted in one) answers for the routine's creator, as the Tool Gateway's `requestedBy`
+does, and a mail watch stops feeding its routine once the agent can't read the mailbox. Whoever decides an approval
+also finds it in Aprovações and opens it, in a channel they aren't in too.

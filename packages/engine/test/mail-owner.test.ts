@@ -1,11 +1,18 @@
 import { afterEach, expect, test } from "bun:test";
 import { and, eq, like, schema } from "@agenteschat/db";
 import {
+  createRole,
+  createRoutine,
   decideApproval,
   ForbiddenError,
+  ingestMail,
   insertMessage,
   listApprovals,
+  notifyApproval,
+  type RoutineBrief,
   setAgentAudience,
+  setAgentBrain,
+  setMemberRoles,
   type ToolContext,
   updateAgent,
 } from "../src";
@@ -25,14 +32,29 @@ afterEach(async () => {
 
 const WHY = "The customer asked for this and it answers their question; sending closes the request.";
 
-/** A run of the agent in #general started by `userId`'s message (a consultation's run roots in its person the same way). */
-async function runFor(userId: string): Promise<ToolContext> {
+/**
+ * A run of the agent in #general started by `userId`'s message (a consultation's run roots in its person the same way).
+ * `routine`: the message is the brief of a routine `userId` created, so nobody is behind the run but the routine.
+ */
+async function runFor(userId: string, routine = false): Promise<ToolContext> {
   const { f } = m;
+  const brief: RoutineBrief = {
+    routineId: crypto.randomUUID(),
+    routineRunId: crypto.randomUUID(),
+    name: "Salários",
+    creatorUserId: userId,
+    deliverTo: { channelId: f.general.id, threadId: null },
+    access: "act",
+    report: "when_new",
+    trigger: "schedule",
+    dueAt: new Date().toISOString(),
+  };
   const trigger = await insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
     author: { type: "person", userId },
     body: "check the mail",
+    ...(routine ? { meta: { routineBrief: brief } } : {}),
   });
   const [run] = await f.db
     .insert(schema.agentRuns)
@@ -176,4 +198,105 @@ test("an email in someone's own mailbox: they approve their own; asked by anyone
     decision: "approve",
   });
   expect(decided.status).toBe("approved");
+});
+
+/** The agent answers its owner alone and holds the owner's mailbox; `carla` is an admin. */
+async function ownerOnlyWithMailbox(level: "read" | "read_write" = "read") {
+  const { f } = m;
+  const carla = await addMember(f.db, f.org.id, "member", "carla");
+  await makeAdmin(f.db, f.org.id, carla.id);
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: f.owner.id, audienceMode: "owner" })
+    .where(eq(schema.agents.id, f.agent.id));
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, level);
+  expect((await mailScopes()).length).toBeGreaterThan(0);
+  return { carla, account };
+}
+
+test("an admin who lets an owner-only agent out through its brain settings takes the owner's mailbox from it", async () => {
+  m = await mailSetup();
+  const { carla } = await ownerOnlyWithMailbox();
+  await setAgentBrain({ db: m.f.db }, carla.id, m.f.org.id, m.f.agent.id, { onlyOwner: false });
+  expect(await mailScopes()).toEqual([]);
+});
+
+test("a consultation that roots in someone's routine is theirs: outside the audience, no mailbox", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  await ownerOnlyWithMailbox();
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  expect(await mailTools(await runFor(lia.id, true))).toEqual([]);
+  expect(await mailTools(await runFor(f.owner.id, true))).toContain("mail_support_search");
+});
+
+test("someone who joins a role the agent answers gets no mailbox its owner gave it before", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const finance = await createRole(f.db, f.owner.id, f.org.id, { name: "Finance", permissions: ["talk_to_agents"] });
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: f.owner.id, audienceMode: "people", audienceRoleIds: [finance.id] })
+    .where(eq(schema.agents.id, f.agent.id));
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read");
+  expect((await mailScopes()).length).toBeGreaterThan(0);
+  await setMemberRoles(f.db, f.owner.id, f.org.id, lia.id, [finance.id]);
+  expect(await mailScopes()).toEqual([]);
+});
+
+test("a mail watch stops feeding the routine once the agent lost the mailbox", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const { carla, account } = await ownerOnlyWithMailbox();
+  const routine = await createRoutine({ db: f.db, pubsub: f.pubsub, mail: m.mail }, f.owner.id, f.org.id, {
+    agentId: f.agent.id,
+    prompt: "Triage new mail",
+    target: { type: "dm" },
+    trigger: { type: "email", accountId: account.id, folder: "INBOX", filter: {} },
+  });
+  const [watch] = await f.db.select().from(schema.mailWatches).where(eq(schema.mailWatches.routineId, routine.id));
+  if (!watch) throw new Error("no watch");
+  await setAgentAudience(f.db, carla.id, f.org.id, f.agent.id, { mode: "everyone", userIds: [] });
+  expect(await mailScopes()).toEqual([]);
+  const mail = {
+    id: "m1",
+    from: { address: "boss@example.com" },
+    to: [],
+    cc: [],
+    subject: "Salários",
+    date: new Date().toISOString(),
+    snippet: "the numbers",
+    unread: true,
+    hasAttachments: false,
+  };
+  expect(await ingestMail(m.deps, watch.id, [mail])).toEqual({ added: 0, fired: false });
+});
+
+test("a new owner takes over a card-less mailbox approval without taking it from the mailbox's owner", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read_write");
+  await f.db.update(schema.mailAccounts).set({ createdByUserId: bia.id }).where(eq(schema.mailAccounts.id, account.id));
+  const r = await m.tools.invoke(await runFor(caio.id), {
+    toolUseId: "tu_caio",
+    name: "mail_support_send",
+    input: { to: ["client@acme.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
+  });
+  if (r.type !== "approval") throw new Error("expected an approval");
+  expect(r.approval.messageId).toBeNull();
+  await notifyApproval({ db: f.db, pubsub: f.pubsub }, r.approval, [bia.id]);
+  await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { ownerUserId: caio.id }, { pubsub: f.pubsub });
+  const items = await f.db
+    .select()
+    .from(schema.notifications)
+    .where(
+      and(eq(schema.notifications.userId, bia.id), eq(schema.notifications.groupKey, `approval:${r.approval.id}`)),
+    );
+  expect(items.map((n) => n.doneAt)).toEqual([null]);
 });

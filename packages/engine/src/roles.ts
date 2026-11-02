@@ -375,8 +375,15 @@ export async function rolesStillThere(db: Executor, orgId: string, ids: readonly
 }
 
 /** Adds roles to a member in the caller's transaction, skipping any no longer in the workspace. */
-export async function addMemberRolesInTx(tx: Executor, orgId: string, userId: string, roleIds: readonly string[]) {
+export async function addMemberRolesInTx(
+  tx: Executor,
+  orgId: string,
+  userId: string,
+  roleIds: readonly string[],
+  actorId = userId,
+) {
   if (roleIds.length === 0) return;
+  const before = await memberRoleIds(tx, orgId, userId);
   const there = await tx
     .select({ id: orgRoles.id })
     .from(orgRoles)
@@ -386,6 +393,10 @@ export async function addMemberRolesInTx(tx: Executor, orgId: string, userId: st
     .insert(organizationMemberRoles)
     .values(there.map((r) => ({ orgId, userId, roleId: r.id })))
     .onConflictDoNothing();
+  // Loaded here: audience builds on this module.
+  const { dropMailForNewRoleMember } = await import("./audience");
+  const added = there.map((r) => r.id).filter((id) => !before.includes(id));
+  await dropMailForNewRoleMember(tx, orgId, userId, before, added, actorId);
 }
 
 /** A member's roles (ids), not `everyone`. */
@@ -436,7 +447,7 @@ export async function setMemberRoles(
             inArray(organizationMemberRoles.roleId, removed),
           ),
         );
-    await addMemberRolesInTx(tx, orgId, targetUserId, added);
+    await addMemberRolesInTx(tx, orgId, targetUserId, added, actorId);
     const names = await tx
       .select({ id: orgRoles.id, name: orgRoles.name })
       .from(orgRoles)

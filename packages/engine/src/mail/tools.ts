@@ -16,6 +16,7 @@ import { accountablePerson, fedByRoutine, type RunAuthority, runAuthorityById } 
 import { mailboxConnector } from "../connector-usage";
 import { cutText } from "../format";
 import { recordOperatorEvent } from "../operator-events";
+import { routineCreatorOf } from "../requester";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {
@@ -123,7 +124,8 @@ async function mailboxApprovers(db: Database, ownerId: string, requestedBy: stri
  * Nobody behind the run (an agent's own work, a watch): nobody's reach widens.
  */
 async function mailboxUserCheck(ctx: ToolContext, authority: RunAuthority | null) {
-  const person = authority ? accountablePerson(authority) : null;
+  // A routine's run answers for its creator, as the gateway asks them (`routineCreatorOf`).
+  const person = authority ? (accountablePerson(authority) ?? routineCreatorOf(authority)) : null;
   const agent = person ? await getAgent(ctx.db, ctx.orgId, ctx.agentId) : null;
   const direct = !person || (!!agent && canTalkTo(agent, person, await speakerFor(ctx.db, ctx.orgId, person)));
   return (account: Pick<MailAccountRow, "createdByUserId">) =>
