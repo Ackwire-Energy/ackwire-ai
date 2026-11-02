@@ -177,7 +177,7 @@ export function accountSaved(
   input: Pick<AgentBrainInput, "model">,
   saved: ThinkingView,
 ): string {
-  const g = agentGrammar(t, agentName);
+  const g = agentGrammar(agentName);
   if ("model" in input) return t("agentPage.work.saved.brain", { ...g, brain: thinksNow(t, saved) ?? "" });
   return a
     ? t("agentPage.work.saved.account", { ...g, account: a.label })
@@ -219,7 +219,7 @@ export function existingRows(
           row,
           label: row.key.label,
           sub: t("newAgent.otherKeyDesc", { provider: providerLabel(row.key.provider), hint: row.key.keyHint }),
-          below: t("agentPage.work.brain.modelText", agentGrammar(t, agentName)),
+          below: t("agentPage.work.brain.modelText", agentGrammar(agentName)),
           mark: row.key.provider,
           off: false,
         }

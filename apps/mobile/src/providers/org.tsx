@@ -1,7 +1,9 @@
-import { type OrgSummary, useMe } from "@agenteschat/client";
+import { type OrgSummary, useApi, useMe } from "@agenteschat/client";
+import { useLocaleSync } from "@agenteschat/client/lib/locale-sync";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { accountFailed, chooseOrg, openOrgs } from "@/lib/org-choice";
 import { readValue, STORED, writeValue } from "@/lib/storage";
+import { deviceLocale, i18n, readLocaleState, rememberLocale, setLocale } from "./i18n";
 import { useSession } from "./session";
 
 export interface OrgState {
@@ -46,6 +48,18 @@ const OrgContext = createContext<OrgGate>({
 export function OrgProvider({ children }: { children: ReactNode }) {
   const me = useMe();
   const session = useSession();
+  const api = useApi();
+  // The person's language here and on the server, matched once their `me` arrives (ADR 0121).
+  useLocaleSync({
+    user: me.data?.user,
+    read: readLocaleState,
+    detected: deviceLocale,
+    apply: (code, store) => {
+      rememberLocale(store, false);
+      if (code !== i18n.language) setLocale(code);
+    },
+    send: (patch) => api.account.updateMe(patch),
+  });
   const [remembered, setRemembered] = useState<string | null | undefined>(undefined);
 
   // `me` answered while signed out (null) a moment before the session arrived is not "no organization": that

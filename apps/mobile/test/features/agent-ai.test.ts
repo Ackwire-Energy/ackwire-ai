@@ -343,7 +343,7 @@ describe("the agent's AI", () => {
   test("a card whose plan's sign-in ended: the agent says so, and Entrar de novo opens on its own plan", async () => {
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
     const [card, sheet] = await Promise.all([read("NoAiCard.tsx"), read("ConnectAi.tsx")]);
-    expect(card).toContain('t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name))');
+    expect(card).toContain('t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name))');
     // The plan the client tests pin (`signInAgainPlan`): ChatGPT for a Codex agent, never Claude's page.
     expect(card).toContain("const again = signInAgainPlan(card, agent);");
     expect(card).toContain('t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")');

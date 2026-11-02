@@ -268,7 +268,7 @@ export function LiveTools({
             : blockItems
         }
         color={color}
-        label={t("chat.work.block", agentGrammar(t, agentName))}
+        label={t("chat.work.block", agentGrammar(agentName))}
         one={one}
       />
       {steers.map((s) => (
@@ -336,7 +336,7 @@ export function SavedTools({
         head={{ text: line.label }}
         items={work && oneCall(items) ? blockItems : [{ kind: "line", line: { ...line, detail: wait } }]}
         color={color}
-        label={t("chat.work.block", agentGrammar(t, agentName))}
+        label={t("chat.work.block", agentGrammar(agentName))}
         // Its steps stay once loaded: closing the line doesn't change what it says.
         onToggle={(o) => o && setOpen(true)}
       />
@@ -361,12 +361,12 @@ export function SavedTools({
     <ToolBlock
       logos={apps.map((a) => <span key={appKey(a)}>{logo(a)}</span>)}
       head={{
-        text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.block", agentGrammar(t, agentName)),
+        text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.block", agentGrammar(agentName)),
         time: durationMs !== null ? formatDuration(t, durationMs) : undefined,
       }}
       items={[...status, ...blockItems]}
       color={color}
-      label={t("chat.work.block", agentGrammar(t, agentName))}
+      label={t("chat.work.block", agentGrammar(agentName))}
       onToggle={setOpen}
     />
   );

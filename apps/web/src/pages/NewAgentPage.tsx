@@ -388,7 +388,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const ownerFirst = ownerMember?.name.split(/\s+/)[0] ?? null;
   const displayName = name.trim() || t("newAgent.defaultName");
   const previewName = name.trim() || t("newAgent.previewName");
-  const g = agentGrammar(t, displayName);
+  const g = agentGrammar(displayName);
   const rolePreset = role ? ROLE_PRESETS[role] : null;
   const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText || null;
   // A proposed agent with nothing to think with yet is created all the same, and Connect opens for it after.

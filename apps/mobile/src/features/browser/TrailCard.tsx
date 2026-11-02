@@ -108,7 +108,7 @@ export function TrailCard({
   };
 
   return (
-    <View style={[styles.card, surface]} accessibilityLabel={tt("inCard.group", agentGrammar(t, agent?.name ?? ""))}>
+    <View style={[styles.card, surface]} accessibilityLabel={tt("inCard.group", agentGrammar(agent?.name ?? ""))}>
       <TrailSky color={color} />
       <Pressable
         onPress={toggle}

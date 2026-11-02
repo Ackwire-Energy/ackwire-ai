@@ -64,7 +64,7 @@ export function BrowserTrailCard({
   const [open, setOpen] = useState(false);
   // A take over that holds the browser has its live card on the chat; the desktop's has its panel.
   const held = useHeldTakeover(agentId, runId ?? "", recent && runId !== null && screen === "browser");
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const color = colorOf(dir.agentById.get(agentId));
   const last = steps.at(-1);
   if (!last || held) return null;

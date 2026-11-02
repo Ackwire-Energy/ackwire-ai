@@ -177,7 +177,7 @@ export function AiAccountsScreen() {
       a.label,
       [
         ...toGive.map((g) => ({
-          label: t("aiAccounts.page.useFor", agentGrammar(t, g.name)),
+          label: t("aiAccounts.page.useFor", agentGrammar(g.name)),
           onPress: () => void give(a, g),
         })),
         ...(Platform.OS === "ios" ? [{ label: t("aiAccounts.page.rename"), onPress: () => rename(a) }] : []),

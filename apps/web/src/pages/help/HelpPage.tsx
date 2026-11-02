@@ -1,10 +1,11 @@
 import { useAuthConfig } from "@agenteschat/client";
 import { type HelpBlock, helpDocument, helpInline, isHelpSlug } from "@agenteschat/i18n/help";
-import { Logo, Segmented } from "@agenteschat/ui";
+import { isAppLocale } from "@agenteschat/i18n/locale";
+import { Logo, Select } from "@agenteschat/ui";
 import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
-import { type LocaleCode, locales, setLocale, usePageT } from "@/i18n";
+import { DEFAULT_LOCALE, type LocaleCode, locales, setLocale, usePageT } from "@/i18n";
 import { useDocumentTitle } from "@/lib/desktop";
 import "../legal.css";
 import "./help.css";
@@ -16,7 +17,7 @@ import "./help.css";
 export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
-  const locale: LocaleCode = lang ?? (i18n.language === "en" ? "en" : "pt-BR");
+  const locale: LocaleCode = lang ?? (isAppLocale(i18n.language) ? i18n.language : DEFAULT_LOCALE);
   const t = usePageT(locale);
   const config = useAuthConfig().data;
   const doc = isHelpSlug(slug) ? helpDocument(slug, locale) : null;
@@ -33,9 +34,9 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
         <Link to="/" aria-label={t("legal.home")}>
           <Logo size={24} />
         </Link>
-        <Segmented
+        <Select
           size="sm"
-          label={t("shell.language")}
+          aria-label={t("shell.language")}
           value={locale}
           onValueChange={(v) => switchTo(v as LocaleCode)}
           options={locales.map((l) => ({ value: l.code, label: l.label }))}

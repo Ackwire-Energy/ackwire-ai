@@ -158,6 +158,10 @@ export interface User {
    * access allowed them; `org.create_refused` and `org.create_unpaid` can still refuse it).
    */
   canCreateWorkspace?: boolean;
+  /** The app's language for emails, pushes and every device (ADR 0121); null before any app said one. */
+  locale?: string | null;
+  /** The language follows each device's own (Automático) until the person picks one. */
+  localeAuto?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */

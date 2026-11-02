@@ -494,12 +494,9 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         target = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
         setCreated(target);
         await api.orgs.updateSettings(target.orgId, { timezone: zone });
-        // The person's own zone and language, detected here: agents read the local time from it.
+        // The person's own zone, detected here: agents read the local time from it (the language is `useServerLocale`'s).
         const mine = browserTimezone();
-        await Promise.all([
-          mine ? api.orgs.updateMe(target.orgId, { timezone: mine }) : null,
-          api.account.updateMe({ locale: i18n.language.startsWith("en") ? "en" : "pt-BR" }),
-        ]).catch(() => undefined);
+        if (mine) await api.orgs.updateMe(target.orgId, { timezone: mine }).catch(() => undefined);
         // The platform key is only offered where the server has one (Cloud).
         const available = await api.agents.platformKeyAvailable(target.orgId).catch(() => false);
         setPlatform(available);

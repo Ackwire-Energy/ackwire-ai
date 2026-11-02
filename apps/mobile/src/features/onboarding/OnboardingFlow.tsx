@@ -225,7 +225,6 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
         await Promise.all([
           zone ? api.orgs.updateSettings(target.orgId, { timezone: zone }) : null,
           zone ? api.orgs.updateMe(target.orgId, { timezone: zone }) : null,
-          api.account.updateMe({ locale: i18n.language.startsWith("en") ? "en" : "pt-BR" }),
         ]).catch(() => undefined);
       } else {
         await api.orgs.updateSettings(target.orgId, { name: orgName });

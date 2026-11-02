@@ -439,7 +439,7 @@ function placeholderFor(t: TFunction, n: AppNotification, dir: Dir, channelName:
       : t("notifications.composer.issueNoNumber");
   if (target.kind === "question" || n.kind === "dm") {
     const name = nameOf(t, dir, n.actors[0]);
-    return t("notifications.composer.replyTo", { to: agentGrammar(t, name).to, name });
+    return t("notifications.composer.replyTo", { context: agentGrammar(name).context, name });
   }
   if (target.threadId) return t("notifications.composer.thread");
   const channel = channelName(target.channelId);
@@ -1166,7 +1166,7 @@ function WaitCard({
   const { t, i18n } = useTranslation();
   const first = n.actors[0];
   const name = nameOf(t, dir, first);
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const feminine = isFeminineName(name);
   const l = n.latest;
   const unread = n.readAt === null;
@@ -1255,7 +1255,7 @@ function WaitCard({
     body = resolving ? (
       <div className="nt-resolved">
         <Spinner size={14} />
-        {t("notifications.wait.resolved", { The: g.The, name })}
+        {t("notifications.wait.resolved", { context: g.context, name })}
       </div>
     ) : s.replying ? (
       <Composer

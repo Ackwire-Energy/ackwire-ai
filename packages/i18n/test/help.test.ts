@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
+  HELP,
   HELP_PAGES,
   type HelpBlock,
   type HelpDocument,
@@ -205,4 +206,20 @@ describe("the ⓘ's name", () => {
     expect(en.common.about).toBe("About {{label}}");
     expect(ptBR.common.about).toBe("Sobre {{label}}");
   });
+});
+
+describe("help pages in every language", () => {
+  const shape = (b: HelpBlock) => (typeof b === "string" ? "p" : "list" in b ? `list:${b.list.length}` : "code");
+  for (const [code, pages] of Object.entries(HELP)) {
+    test(`${code}: each page it has matches English section by section, and the rest show in English`, () => {
+      for (const [slug, doc] of Object.entries(pages) as [HelpSlug, HelpDocument][]) {
+        const english = HELP.en[slug];
+        expect(doc.sections.map((s) => s.id)).toEqual(english?.sections.map((s) => s.id) ?? []);
+        doc.sections.forEach((s, i) => {
+          expect(s.blocks.map(shape)).toEqual(english?.sections[i]?.blocks.map(shape) ?? []);
+        });
+      }
+      for (const slug of SLUGS) expect(helpDocument(slug, code)).toBe(pages[slug] ?? (HELP.en[slug] as HelpDocument));
+    });
+  }
 });

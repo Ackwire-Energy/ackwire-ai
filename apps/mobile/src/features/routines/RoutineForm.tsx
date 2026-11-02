@@ -701,15 +701,14 @@ function Form({ routine }: { routine: Routine | undefined }) {
         }).map((w) => (
           <View key={w.agent.id} style={styles.warning}>
             <Text variant="footnote" tone="ink2" accessibilityLiveRegion="polite">
-              {boldRuns(t("routines.reachWarning.blocked", { ...agentGrammar(t, w.agent.name) }) as string).map(
-                (r, i) =>
-                  r.bold ? (
-                    <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
-                      {r.text}
-                    </Text>
-                  ) : (
-                    r.text
-                  ),
+              {boldRuns(t("routines.reachWarning.blocked", { ...agentGrammar(w.agent.name) }) as string).map((r, i) =>
+                r.bold ? (
+                  <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
+                    {r.text}
+                  </Text>
+                ) : (
+                  r.text
+                ),
               )}
             </Text>
             {creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}

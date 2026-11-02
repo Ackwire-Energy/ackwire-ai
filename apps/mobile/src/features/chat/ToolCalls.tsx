@@ -663,7 +663,7 @@ export function TurnTools({
             : blockItems
         }
         color={color}
-        label={t("chat.work.block", agentGrammar(t, agentName))}
+        label={t("chat.work.block", agentGrammar(agentName))}
         live={!done && !settled}
         one={one}
       />
@@ -748,7 +748,7 @@ export function SavedTools({
           work && oneCall(items) ? blockItems : [{ kind: "line", line: { ...line, detail: pending ?? undefined } }]
         }
         color={color}
-        label={t("chat.work.block", agentGrammar(t, agentName))}
+        label={t("chat.work.block", agentGrammar(agentName))}
         // Its steps stay once loaded: closing the line doesn't change what it says.
         onToggle={(o) => o && setOpen(true)}
       />
@@ -766,7 +766,7 @@ export function SavedTools({
       }}
       items={[...status, ...blockItems]}
       color={color}
-      label={t("chat.work.block", agentGrammar(t, agentName))}
+      label={t("chat.work.block", agentGrammar(agentName))}
       onToggle={setOpen}
     />
   );

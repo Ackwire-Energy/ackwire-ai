@@ -26,7 +26,7 @@ export function AgentPanel({ agentId, tab, onClose }: { agentId: string; tab?: A
         aria-label={t("common.close")}
         onClick={() => setCloseRequest((n) => n + 1)}
       />
-      <aside className="thread-panel thread-panel--wide" aria-label={t("agentPage.panel.label", agentGrammar(t, name))}>
+      <aside className="thread-panel thread-panel--wide" aria-label={t("agentPage.panel.label", agentGrammar(name))}>
         <div className="thread-panel__page">
           <AgentPage
             agentId={agentId}

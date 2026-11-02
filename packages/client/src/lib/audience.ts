@@ -114,7 +114,7 @@ export function audienceNames(agent: Agent, nameOf: NameOf, roleName: NameOf = (
 export function audienceNotice(t: TFunction, agent: Agent, nameOf: NameOf, roleName?: NameOf): string {
   const mode = modeOf(agent);
   if (mode === "everyone") return "";
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   // From the directory list (mode only, no user ids): don't guess names.
   if (mode === "people" && !agent.audience) return t("audience.notice.some", g);
   const names = audienceNames(agent, nameOf, roleName);

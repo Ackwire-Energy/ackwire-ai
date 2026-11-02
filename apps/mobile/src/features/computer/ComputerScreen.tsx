@@ -46,7 +46,7 @@ export function ComputerScreen({ agentId }: { agentId: string }) {
   const leave = (held: BrowserHandoff | null) => {
     if (!held) return;
     const agent = dir.agentById.get(agentId);
-    const g = agentGrammar(t, agent?.name ?? "");
+    const g = agentGrammar(agent?.name ?? "");
     // The toast names the agent: its face leads it.
     const face = agentLook(agent);
     if (held.kind === "takeover") {
@@ -105,7 +105,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const now = useNow(15_000);
   const agent = dir.agentById.get(agentId);
   const name = agent?.name ?? "";
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const machine = view.machine;
   const computer = computerName(t, org?.name ?? "", machine);
   const manages = can(org, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);

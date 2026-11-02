@@ -11,7 +11,7 @@ import { readPref } from "./hooks";
 import { createFakeHost, SCENARIOS, type Scenario } from "./host/fake";
 import { createTauriHost, inTauri } from "./host/tauri";
 import { type Host, WINDOW_NAMES, type WindowName } from "./host/types";
-import { createDesktopI18n, pickLocale, systemLocale } from "./i18n";
+import { createDesktopI18n, LOCALE_PREF, pickLocale, switchDesktopLocale, systemLocale } from "./i18n";
 import { ToastProvider } from "./ui/Toast";
 import { baseName } from "./ui/time";
 import { WindowError, WindowView } from "./WindowView";
@@ -52,6 +52,10 @@ const i18n = createDesktopI18n(
   host.platform,
 );
 document.documentElement.lang = i18n.language;
+// A language picked in Preferences reaches every open window.
+window.addEventListener("storage", (e) => {
+  if (e.key === `agentes.desktop.${LOCALE_PREF}`) switchDesktopLocale(i18n, systemLocale(), host.platform);
+});
 
 // Light or dark like the system (`?theme=` while designing).
 const dark = window.matchMedia("(prefers-color-scheme: dark)");

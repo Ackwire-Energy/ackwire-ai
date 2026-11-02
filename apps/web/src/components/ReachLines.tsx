@@ -53,7 +53,7 @@ function ReachRow({
   const toast = useToast();
   const add = useAddChannelMember(org.id);
   const agent = dir.agentById.get(e.agentId);
-  const g = agentGrammar(t, agent?.name ?? `@${e.handle}`);
+  const g = agentGrammar(agent?.name ?? `@${e.handle}`);
   const values = { ...g, place };
   const handed = Boolean(e.consultationId);
   const detail = [
@@ -115,7 +115,7 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
   const person = dir.memberById.get(userId)?.name;
   const audience = audienceWith(agent, userId);
   if (!person || !audience || modeOf(agent) === "everyone" || !canEditAudience(org, agent, me.user.id)) return null;
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   return (
     <button
       type="button"
@@ -126,7 +126,7 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
         update.mutate({ audience }, { onSuccess: () => toast.show(t("reach.allowed", { person, name: g.name })) });
       }}
     >
-      {t("reach.allow", { person, pronoun: g.pronoun })}
+      {t("reach.allow", { person, context: g.context })}
     </button>
   );
 }

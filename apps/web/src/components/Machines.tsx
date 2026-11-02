@@ -961,7 +961,7 @@ function OpenComputerButton({ agentId, name }: { agentId: string; name: string }
       variant="ghost"
       icon="computer"
       className="machine-page__screen"
-      aria-label={`${t("agentComputer.open")}: ${t("agentComputer.title", agentGrammar(t, name))}`}
+      aria-label={`${t("agentComputer.open")}: ${t("agentComputer.title", agentGrammar(name))}`}
       onClick={() => openComputer(agentId)}
     >
       {t("agentComputer.open")}
@@ -1090,10 +1090,10 @@ export function MachinePage({ machineId }: { machineId: string }) {
                           <span className="small muted">
                             {folders.length > 0
                               ? t("machines.page.agentFolders", {
-                                  ...agentGrammar(t, a.name),
+                                  ...agentGrammar(a.name),
                                   folders: joinNames(folders, t("newAgent.and")),
                                 })
-                              : t("machines.page.agentOwnFolder", agentGrammar(t, a.name))}
+                              : t("machines.page.agentOwnFolder", agentGrammar(a.name))}
                           </span>
                         )}
                       </span>

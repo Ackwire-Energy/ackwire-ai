@@ -200,7 +200,7 @@ export function AiAccountsSection() {
                 <div className="ac-acts">
                   {give.length === 1 && give[0] ? (
                     <Button variant="ghost" size="sm" onClick={() => give[0] && void giveTo(a, give[0])}>
-                      {t("aiAccounts.page.useFor", agentGrammar(t, give[0].name))}
+                      {t("aiAccounts.page.useFor", agentGrammar(give[0].name))}
                     </Button>
                   ) : (
                     give.length > 1 && (

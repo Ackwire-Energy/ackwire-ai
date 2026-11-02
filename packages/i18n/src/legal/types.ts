@@ -18,6 +18,11 @@ export interface LegalDocument {
   title: string;
   /** One line under the title. */
   summary: string;
+  /**
+   * A translation's notice at the top, in its language: "This is a courtesy translation. If it differs from the
+   * English version, the English version prevails." English has none.
+   */
+  courtesy?: string;
   /** ISO date of the last change (`2026-10-23`). */
   updated: string;
   sections: LegalSection[];

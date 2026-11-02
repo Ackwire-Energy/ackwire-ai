@@ -59,7 +59,7 @@ export function AgentUsageScreen({ agentId }: { agentId: string }) {
   }
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("usageViews.agent.title", agentGrammar(t, name))} solid={false} grouped />
+      <PushedHeader title={t("usageViews.agent.title", agentGrammar(name))} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
@@ -91,7 +91,7 @@ export function AgentUsageScreen({ agentId }: { agentId: string }) {
 
 function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tones: Map<string, string> }) {
   const { t, i18n } = useTranslation();
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const month = formatMonth(i18n.language, new Date(`${data.month}-15T12:00:00`));
   const total = (d: { tokens: Record<string, number> }) => Object.values(d.tokens).reduce((a, b) => a + b, 0);
   const max = Math.max(1, ...data.days.map(total));
@@ -156,7 +156,7 @@ function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tone
 function Now({ data, agentId, name }: { data: AgentPlanUsage; agentId: string; name: string }) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const current = data.current;
   if (!current) return null;
   // Who else thinks with it now; one that used it earlier this month only counts in the windows' parts.
@@ -211,7 +211,7 @@ function BySource({
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   return (
     <UsageCard icon="drive" title={t("usageViews.agent.byAccount")}>
       <View>

@@ -29,7 +29,7 @@ import { useOrg } from "@/components/org-context";
 import { MyFace, ProfilePhotoDialog } from "@/components/ProfilePhoto";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
-import { type LocaleCode, locales, setLocale } from "@/i18n";
+import { localePatch } from "@/i18n";
 import { type MenuLook, menuLook, onMenuLookChange, setMenuLook } from "@/lib/context-menu";
 import { inDesktopApp } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
@@ -37,6 +37,7 @@ import { ownPlanLines, planMeterText } from "@/lib/plan-usage";
 import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
+import { LanguageSelect } from "./LanguageSelect";
 
 /**
  * Configurações › Sua conta: your profile in this workspace, your time zone, whether agents' work shows under their replies, opening the phone app and a password
@@ -163,12 +164,10 @@ export function AccountSection() {
             icon="globe"
             label={t("shell.language")}
             control={
-              <Segmented
-                size="sm"
-                label={t("shell.language")}
-                value={i18n.language}
-                onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
-                options={locales.map((l) => ({ value: l.code, label: l.label }))}
+              <LanguageSelect
+                signedIn
+                align="end"
+                onPick={(choice) => void api.account.updateMe(localePatch(choice)).catch(() => {})}
               />
             }
           />

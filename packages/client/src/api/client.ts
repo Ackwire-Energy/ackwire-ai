@@ -1,3 +1,4 @@
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { WikiAccess } from "../lib/wiki";
 import type {
@@ -296,7 +297,7 @@ export interface ApiClient {
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
-    updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
+    updateMe(input: { locale: AppLocale; auto?: boolean }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
     /**

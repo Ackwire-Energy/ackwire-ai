@@ -138,7 +138,7 @@ function SetupSays({ view }: { view: SetupView }) {
           data-on={key === on.key || undefined}
           lead={<AgentAvatar agentId={agent.id} name={agent.name} size="xs" framed />}
         >
-          {t(key, { ...agentGrammar(t, agent.name), gb: view.specs?.memoryGb })}
+          {t(key, { ...agentGrammar(agent.name), gb: view.specs?.memoryGb })}
         </Chip>
       ))}
     </span>

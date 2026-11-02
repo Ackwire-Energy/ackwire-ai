@@ -259,7 +259,7 @@ export function AddressBar({
       await onOpen(typed);
       setUrl("");
     } catch (e) {
-      setError(t(openRefusalKey(e instanceof ApiError ? e.code : undefined, cloud), agentGrammar(t, name)));
+      setError(t(openRefusalKey(e instanceof ApiError ? e.code : undefined, cloud), agentGrammar(name)));
     } finally {
       setBusy(false);
     }

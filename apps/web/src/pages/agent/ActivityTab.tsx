@@ -9,7 +9,6 @@ import {
   formatTokensShort,
   formatUsd,
 } from "@agenteschat/client/lib/format";
-import { runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { covers } from "@agenteschat/client/lib/repos";
 import {
   type AgentColor,
@@ -47,7 +46,7 @@ function failure(t: TFunction, run: Run) {
   const code = run.errorCode?.replace(/^run\./, "");
   if (code && code !== "failed") {
     const text = (t as unknown as TT)(`agentPage.activity.errors.${code}`, {
-      ...runErrorGrammar(t, run.errorParams),
+      ...run.errorParams,
       defaultValue: "",
     });
     if (text) return text;

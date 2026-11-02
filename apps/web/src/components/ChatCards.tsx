@@ -75,7 +75,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
     return ids[0] ? <InlineProposal proposalId={ids[0]} /> : null;
   }
   const name = dir.anyAgent(agentId)?.name ?? t("channel.unknownAgent");
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
@@ -606,7 +606,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       <MessageText>{current.text}</MessageText>
       <RequestDone done label={t("question.group", { agent: name })}>
         {current.withdrawn ? (
-          t("question.withdrawn", agentGrammar(t, name))
+          t("question.withdrawn", agentGrammar(name))
         ) : current.answer === null ? (
           t("question.closed")
         ) : who ? (

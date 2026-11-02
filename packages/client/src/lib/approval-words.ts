@@ -206,9 +206,8 @@ export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "appro
  * (a remembered push covers that one branch, so it says no more).
  */
 export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approveAlways">, agentName: string) {
-  const g = agentGrammar(t, agentName);
   const key = approval.approveAlways?.tool === BRANCH_PUSH ? "approval.always.hintTarget" : "approval.always.hint";
-  return t(key, { of: g.of, name: g.name, actions: approveAlwaysWords(t, approval) });
+  return t(key, { ...agentGrammar(agentName), actions: approveAlwaysWords(t, approval) });
 }
 
 /** A rule the agent runs without asking, in words: a push by its branch, its action, else the tool as labelled. */

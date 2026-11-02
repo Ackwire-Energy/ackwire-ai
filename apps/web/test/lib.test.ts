@@ -13,7 +13,7 @@ import {
   timeLeft,
   whenAt,
 } from "@agenteschat/client/lib/format";
-import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
   earlyAccessHeaders,
   earlyAccessState,
@@ -211,12 +211,12 @@ describe("grammar", () => {
   test("gender of agent names drives Portuguese articles", () => {
     expect(isFeminineName("Ada")).toBe(true);
     expect(isFeminineName("Theo")).toBe(false);
-    expect(t("agent.howWorks", agentGrammar(t, "Ada"))).toBe("Como a Ada trabalha");
-    expect(t("agentPage.overview.does", agentGrammar(t, "Atlas"))).toBe("O que o Atlas faz");
-    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toBe(
+    expect(t("agent.howWorks", agentGrammar("Ada"))).toBe("Como a Ada trabalha");
+    expect(t("agentPage.overview.does", agentGrammar("Atlas"))).toBe("O que o Atlas faz");
+    expect(t("memory.subtitle", agentGrammar("Ada"))).toBe(
       "O que a Ada aprendeu com as conversas e as correções do time.",
     );
-    expect(t("agent.instructionsHelp", { ...agentGrammar(t, "Atlas"), org: "Acme" })).toEndWith(
+    expect(t("agent.instructionsHelp", { ...agentGrammar("Atlas"), org: "Acme" })).toEndWith(
       "escreva aqui só o que é do Atlas.",
     );
   });
@@ -224,8 +224,8 @@ describe("grammar", () => {
   test("one agent, one pronoun: she or he in English as in Portuguese, never it", () => {
     const english = createI18n("en");
     const te = english.t.bind(english) as TFunction;
-    const ada = agentGrammar(te, "Ada");
-    const theo = agentGrammar(te, "Theo");
+    const ada = agentGrammar("Ada");
+    const theo = agentGrammar("Theo");
     // Her page says "her" in both lines it has for her.
     expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI\u00a0connected.");
     expect(te("dm.emptyAgent", ada)).toBe("Ask her to remember, forget or work differently.");
@@ -255,12 +255,12 @@ describe("grammar", () => {
     expect(te("machines.page.agentOwnFolder", ada)).toBe("Only her own folder");
     expect(te("machines.page.agentFolders", { ...theo, folders: "Desktop" })).toBe("Uses Desktop and his own folder");
     // Portuguese says each one's own words, articles and forms too.
-    expect(t("chat.joined.tip", agentGrammar(t, "Ada"))).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
-    expect(t("missions.settings.defaults.title", agentGrammar(t, "Ada"))).toBe("Próximas missões da Ada");
-    expect(t("access.areaText.desktop.write", agentGrammar(t, "Ada"))).toStartWith(
+    expect(t("chat.joined.tip", agentGrammar("Ada"))).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
+    expect(t("missions.settings.defaults.title", agentGrammar("Ada"))).toBe("Próximas missões da Ada");
+    expect(t("access.areaText.desktop.write", agentGrammar("Ada"))).toStartWith(
       "Usa qualquer app na própria tela, no computador dela,",
     );
-    expect(t("browser.agent.signedIn", agentGrammar(t, "Ada"))).toBe(
+    expect(t("browser.agent.signedIn", agentGrammar("Ada"))).toBe(
       "A Ada fica com o login feito nos sites em que entrar, neste computador.",
     );
   });
@@ -276,29 +276,21 @@ describe("grammar", () => {
         [...feminine, ...masculine].toSorted(),
       );
     }
-    for (const name of feminine)
-      expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "she", "a"]);
-    for (const name of masculine)
-      expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "he", "o"]);
-    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI\u00a0connected.");
-    expect(t("chat.joined.tip", agentGrammar(t, "Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
+    for (const name of feminine) expect(agentGrammar(name)).toEqual({ name, context: "female" });
+    for (const name of masculine) expect(agentGrammar(name)).toEqual({ name, context: undefined });
+    expect(te("noAi.agent", agentGrammar("Iris"))).toBe("Iris won't reply because she has no AI\u00a0connected.");
+    expect(t("chat.joined.tip", agentGrammar("Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
   });
 
-  test("providers in Portuguese: do Claude, da OpenAI; by id or by the label a run error carries", () => {
-    expect(t("newAgent.noKeyFor", providerGrammar(t, "anthropic"))).toBe("Sem chave do Claude");
-    expect(t("newAgent.modelNeedsKey", providerGrammar(t, "openai"))).toBe("Precisa de uma chave da OpenAI");
-    expect(providerGrammar(t, "Claude")).toEqual({ provider: "Claude", of: "do" });
-    // One this app doesn't know keeps its name, with the usual "da".
-    expect(providerGrammar(t, "mistral")).toEqual({ provider: "mistral", of: "da" });
-    expect(t("agentPage.activity.errors.missing_credential", runErrorGrammar(t, { provider: "Claude" }))).toBe(
-      "Falta uma chave do Claude no workspace.",
+  test("providers by name, with no article to agree with", () => {
+    expect(t("newAgent.noKeyFor", { provider: "Claude" })).toBe("Sem chave Claude");
+    expect(t("newAgent.modelNeedsKey", { provider: "OpenAI" })).toBe("Precisa de uma chave de API OpenAI");
+    expect(t("agentPage.activity.errors.missing_credential", { provider: "Claude" })).toBe(
+      "Falta uma chave Claude no workspace.",
     );
     expect(
-      t(
-        "agentPage.activity.errors.credential_wrong_provider",
-        runErrorGrammar(t, { modelProvider: "Claude", keyProvider: "DeepSeek" }),
-      ),
-    ).toBe("O modelo é do Claude, mas a chave é da DeepSeek.");
+      t("agentPage.activity.errors.credential_wrong_provider", { modelProvider: "Claude", keyProvider: "DeepSeek" }),
+    ).toBe("O modelo usa Claude, mas a chave é para DeepSeek.");
   });
 });
 

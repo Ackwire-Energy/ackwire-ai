@@ -117,7 +117,7 @@ export function AgentHero({
   const name = draft.name.trim() || agent.name;
   const channelNames = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
   const home = channelNames[0];
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const face = useRef<HTMLSpanElement>(null);
   const acts = useRef<HTMLDivElement>(null);
   return (

@@ -39,7 +39,7 @@ import {
   wheelEvent,
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
-import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
 import {
@@ -369,7 +369,7 @@ export function BrowserCard({
   // The workspace's own computer is never off and nobody connects one: its words say so.
   const cloud = useComputerEdition(org.id) === "cloud";
   const agent = dir.agentById.get(agentId);
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const color = colorOf(agent);
   // In the conversation (not the dialog, not a computer's page that folds it away) the page is always in
   // view, framed in the agent's color.
@@ -1509,8 +1509,7 @@ function ProfileWaitCover({ wait, waiter }: { wait: BrowserProfileWait; waiter: 
     holder.type === "agent"
       ? (dir.agentById.get(holder.agentId)?.name ?? "")
       : (dir.memberById.get(holder.userId)?.name ?? t("channel.unknownPerson"));
-  const she = agentGrammar(t, holderName).she;
-  const w = agentGrammar(t, waiter.name);
+  const w = agentGrammar(waiter.name);
   return (
     <div className="brw-dim">
       <span className="brw-dim__box" role="status">
@@ -1528,8 +1527,9 @@ function ProfileWaitCover({ wait, waiter }: { wait: BrowserProfileWait; waiter: 
           </span>
           <small>
             <Trans
-              i18nKey={isFeminineName(waiter.name) ? "browser.profiles.waitingNextF" : "browser.profiles.waitingNextM"}
-              values={{ The: w.The, she }}
+              i18nKey="browser.profiles.waitingNext"
+              context={w.context}
+              values={{ holder: holderName }}
               components={{ who: <AgentWho agentId={waiter.agentId} name={waiter.name} /> }}
             />
           </small>

@@ -221,7 +221,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
   /* ---------- What changed, said in words ---------- */
 
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const ownerFirst = agent.ownerUserId ? (dir.memberById.get(agent.ownerUserId)?.name.split(/\s+/)[0] ?? null) : null;
   const lookText = (l: Look) =>
     [
@@ -542,7 +542,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     }
     setEdits((e) => dropFields(e, done));
     setSaving(false);
-    if (!failed) toast.show(t("agent.savedToast", agentGrammar(t, draft.name.trim() || agent.name)));
+    if (!failed) toast.show(t("agent.savedToast", agentGrammar(draft.name.trim() || agent.name)));
   };
 
   // ⌘/Ctrl+S saves.

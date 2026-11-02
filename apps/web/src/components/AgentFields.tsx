@@ -1,5 +1,5 @@
 import type { BrainMachine, Credential, Member, Model } from "@agenteschat/client";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
+
 import { namesComputers } from "@agenteschat/client/lib/machines";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
@@ -78,7 +78,7 @@ export function modelOptions(t: TFunction, locale: string, choices: [string, Mod
       leading: <ProviderLogo id={provider} size="sm" />,
       description: available
         ? modelDescription(t, locale, m)
-        : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
+        : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
     })),
   );
 }
@@ -497,7 +497,9 @@ function ModelCard({
       {/* Other models describe themselves by price: only for those who see money. */}
       {(money || !available || claudeFamily(model)) && (
         <span className="newag__model-desc">
-          {available ? modelDescription(t, locale, model) : t("newAgent.modelNeedsKey", providerGrammar(t, provider))}
+          {available
+            ? modelDescription(t, locale, model)
+            : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) })}
         </span>
       )}
       {available ? (
@@ -517,7 +519,7 @@ function ModelCard({
       ) : (
         <span className="newag__cost">
           <ProviderLogo id={provider} size="xs" />
-          {t("newAgent.noKeyFor", providerGrammar(t, provider))}
+          {t("newAgent.noKeyFor", { provider: providerLabel(provider) })}
         </span>
       )}
     </>

@@ -313,7 +313,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
             </Block>
           </Section>
 
-          <Section title={t("routines.panel.what", agentGrammar(t, agentName))}>
+          <Section title={t("routines.panel.what", agentGrammar(agentName))}>
             <Block>
               {r.canSeeDetails && r.prompt !== null ? (
                 <Text variant="body" selectable>

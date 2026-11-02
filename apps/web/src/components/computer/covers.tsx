@@ -27,7 +27,7 @@ export function ScreenNotice({ name }: { name: string }) {
   return (
     <div className="dsk-line">
       <span className="dsk-words">
-        <span className="muted">{t("desktop.watch.notice", agentGrammar(t, name))}</span>
+        <span className="muted">{t("desktop.watch.notice", agentGrammar(name))}</span>
       </span>
     </div>
   );
@@ -59,7 +59,7 @@ export function CantShowCover({
   onRetry: () => void;
 }) {
   const { t } = useTranslation();
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const again = (
     <Button size="sm" icon="refresh" onClick={onRetry}>
       {t("desktop.retry")}

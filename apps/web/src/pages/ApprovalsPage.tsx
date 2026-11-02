@@ -798,7 +798,7 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
   const toast = useToast();
   const decide = useDecideApproval(org.id);
   const [reason, setReason] = useState("");
-  const g = agentGrammar(t, agent?.name ?? "");
+  const g = agentGrammar(agent?.name ?? "");
   const id = `ap-reason-${approval.id}`;
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => ref.current?.focus(), []);
@@ -830,7 +830,7 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
         ))}
       </div>
       <div className="ap-refuse__row">
-        <span className="ap-refuse__learn">{t("approvals.refuseLearn", { of: g.of, name: g.name })}</span>
+        <span className="ap-refuse__learn">{t("approvals.refuseLearn", { context: g.context, name: g.name })}</span>
         <span className="ap-grow" />
         <Button variant="ghost" size="sm" onClick={onCancel}>
           {t("approvals.back")}
@@ -874,7 +874,7 @@ function RequestCard({
 }) {
   const { t, i18n } = useTranslation();
   const name = agent?.name ?? t("channel.unknownAgent");
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const phase = approvalPhase(a);
   const running = phase === "running";
   const leftMs = new Date(a.expiresAt).getTime() - Date.now();
@@ -941,7 +941,7 @@ function RequestCard({
           </p>
         )}
         <Traits approval={a} />
-        {running && <p className="ap-card__running">{t("approvals.running", { The: g.The, name })}</p>}
+        {running && <p className="ap-card__running">{t("approvals.running", { context: g.context, name })}</p>}
         {refusing && a.canDecide && <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />}
         {!running && !refusing && a.canDecide && (
           <div className="ap-card__actions">
@@ -1135,7 +1135,7 @@ function ApprovalDetails({
   const a: Approval = { ...listed, trail: detail.data?.trail ?? listed.trail };
   const agent = dir.agentById.get(a.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const p = approvalPhase(a);
   const kind = approvalAction(a);
   const record = all
@@ -1303,7 +1303,7 @@ function ApprovalDetails({
         </Link>
       )}
 
-      <DetailsSection title={t("approvals.panel.history", { of: g.of, name })}>
+      <DetailsSection title={t("approvals.panel.history", { context: g.context, name })}>
         {record.length > 0 ? (
           <div className="ap-record">
             <span role="img" aria-label={t("approvals.panel.historyCount", { ok, count: record.length })}>
@@ -1351,7 +1351,7 @@ function Outcome({ approval: a, agent }: { approval: Approval; agent: Agent | un
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const name = agent?.name ?? t("channel.unknownAgent");
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const p = approvalPhase(a);
   const who =
     a.decidedByUserId === me.user.id
@@ -1362,7 +1362,7 @@ function Outcome({ approval: a, agent }: { approval: Approval; agent: Agent | un
     <div className={cx("ap-outcome", `ap-outcome--${p}`)}>
       <PhaseChip approval={a} />
       <div className="ap-outcome__text">
-        {p === "running" && <b>{t("approvals.panel.runningLine", { The: g.The, name })}</b>}
+        {p === "running" && <b>{t("approvals.panel.runningLine", { context: g.context, name })}</b>}
         {(p === "done" || p === "failed") && (
           <>
             <b>{p === "done" ? t("approvals.panel.done") : t("approvals.panel.failed")}</b>

@@ -194,10 +194,10 @@ export function MachineScreen({ machineId }: { machineId: string }) {
                 folders && (folders.length > 0 || !managed)
                   ? folders.length > 0
                     ? t("machines.page.agentFolders", {
-                        ...agentGrammar(t, a.name),
+                        ...agentGrammar(a.name),
                         folders: joinNames(folders, t("newAgent.and")),
                       })
-                    : t("machines.page.agentOwnFolder", agentGrammar(t, a.name))
+                    : t("machines.page.agentOwnFolder", agentGrammar(a.name))
                   : null;
               const agentRow = (
                 <GroupedRow
@@ -218,7 +218,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
                 <GroupedRow
                   key={`${a.id}:computer`}
                   icon="laptop"
-                  label={t("agentComputer.title", agentGrammar(t, a.name))}
+                  label={t("agentComputer.title", agentGrammar(a.name))}
                   value={t("agentComputer.open")}
                   chevron
                   onPress={() => router.push(`/computer/${a.id}`)}
@@ -535,7 +535,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
     return [{ agent: a, domains: settings[i]?.data?.allowedDomains ?? null }];
   });
   const stop = (agentId: string, name: string) => {
-    const g = agentGrammar(t, name);
+    const g = agentGrammar(name);
     confirmAction({
       title: t("browser.machine.stopConfirm", g),
       action: t("browser.machine.stop"),
@@ -600,7 +600,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
           ) : (
             <GroupedList>
               {uses.map(({ agent, open }) => {
-                const g = agentGrammar(t, agent.name);
+                const g = agentGrammar(agent.name);
                 const waiting = open.status === "pending";
                 return (
                   <GroupedRow

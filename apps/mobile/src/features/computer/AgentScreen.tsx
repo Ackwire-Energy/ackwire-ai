@@ -189,7 +189,7 @@ export function AgentScreen({
   const userId = f?.userId ?? "";
   const agent = dir.agentById.get(agentId);
   const name = agent?.name ?? "";
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
 
   const web = useRef<WebView<object>>(null);
   const [life, setLife] = useState(0);

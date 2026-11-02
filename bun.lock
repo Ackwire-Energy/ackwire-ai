@@ -184,6 +184,7 @@
       "name": "@agenteschat/client",
       "version": "0.0.0",
       "dependencies": {
+        "@agenteschat/i18n": "workspace:*",
         "@agenteschat/providers": "workspace:*",
         "@agenteschat/tokens": "workspace:*",
         "yaml": "^2.9.1",
@@ -244,6 +245,9 @@
     "packages/i18n": {
       "name": "@agenteschat/i18n",
       "version": "0.0.0",
+      "devDependencies": {
+        "i18next": "^26.4.2",
+      },
     },
     "packages/modules": {
       "name": "@agenteschat/modules",

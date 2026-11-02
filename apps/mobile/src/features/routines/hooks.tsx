@@ -168,7 +168,7 @@ export function useTargetLabel() {
       // From the chat: "na DM com o Dev", "no #produto (thread)".
       if (target.type === "conversation") {
         const dm = dms.data?.find((d) => d.channelId === target.channelId);
-        if (dm) return t("routines.inDm", agentGrammar(t, dm.with.name));
+        if (dm) return t("routines.inDm", agentGrammar(dm.with.name));
         const c = channels.data?.find((x) => x.id === target.channelId);
         if (!c) return t("routines.inConversation");
         return target.threadId

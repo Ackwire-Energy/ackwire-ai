@@ -55,7 +55,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const actions = useBrowserHandoffMutations(org.id);
   const agent = dir.agentById.get(current.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   // It stops waiting the moment it expires, even before the server's event says so.
   const expired = useExpired(current.status === "pending" ? current.expiresAt : null);
   const waiting = !expired && isWaitingHandoff(current);

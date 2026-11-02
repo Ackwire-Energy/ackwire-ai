@@ -116,8 +116,8 @@ export function DmPage({ target }: { target: DmTarget }) {
           agent && !canTalk(agent)
             ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name, dir.roleName)
             : undefined,
-        emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : undefined,
-        emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),
+        emptyText: agent ? t("dm.emptyAgent", agentGrammar(agent.name)) : undefined,
+        emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(agent.name)) : t("chat.sayHiPerson", { name }),
         suggestions: agent ? greetingSuggestions(t, agent.role) : [],
       }}
     />

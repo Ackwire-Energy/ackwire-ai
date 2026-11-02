@@ -293,7 +293,7 @@ function Profile({ id }: { id: string }) {
           {noAi ? (
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
-              label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
+              label={t("noAi.agent", agentGrammar(agent?.name ?? ""))}
               onPress={() => openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })}
             />
           ) : null}
@@ -326,7 +326,7 @@ function Profile({ id }: { id: string }) {
 
         {forYou.data || forYou.isError ? (
           <Section
-            title={t("mobile.intentAgents.did.title", agentGrammar(t, name))}
+            title={t("mobile.intentAgents.did.title", agentGrammar(name))}
             {...(did.length > DID_SHOWN
               ? {
                   action: {
@@ -386,7 +386,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {knows.data ? (
-          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(t, name))}>
+          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(name))}>
             {memories.length > 0 ? (
               <>
                 <Card>
@@ -433,7 +433,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {access.data ? (
-          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(t, name))}>
+          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(name))}>
             {uses.lines.length > 0 ? (
               <Card>
                 {uses.lines.map((u) => (
@@ -552,7 +552,7 @@ function Profile({ id }: { id: string }) {
             <Card>
               <Row
                 leading={<Tile icon="chart" />}
-                title={t("usageViews.agent.title", agentGrammar(t, name))}
+                title={t("usageViews.agent.title", agentGrammar(name))}
                 chevron
                 onPress={() => openAgentUsage(id)}
               />

@@ -215,7 +215,8 @@ function editionKeys(strings: object) {
   const computer = all.filter((k) => k.startsWith("agentComputer."));
   const cloud = [
     ...all.filter((k) => k.startsWith("computerSetup.")),
-    ...computer.filter((k) => !SELFHOST_ONLY.includes(k)),
+    // A key's agent-gender variant (`_female`) goes where its base key goes.
+    ...computer.filter((k) => !SELFHOST_ONLY.includes(k.replace(/_female$/, ""))),
     ...CLOUD_EXTRA,
   ];
   return { cloud, selfhost: [...computer, ...SELFHOST_EXTRA] };

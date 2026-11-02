@@ -239,7 +239,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
           ) : null}
           {noAi ? (
             <Text variant="small" tone="muted">
-              {t("noAi.agent", agentGrammar(t, name))}
+              {t("noAi.agent", agentGrammar(name))}
             </Text>
           ) : w.reason ? (
             <Text variant="small" tone="muted">
@@ -267,7 +267,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
                     { type: "ask", id: i.id, agentId: w.agentId },
                     {
                       onSuccess: () =>
-                        toast({ title: t("issues.work.resumed", agentGrammar(t, name)), agentId: w.agentId }),
+                        toast({ title: t("issues.work.resumed", agentGrammar(name)), agentId: w.agentId }),
                       onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
                     },
                   )

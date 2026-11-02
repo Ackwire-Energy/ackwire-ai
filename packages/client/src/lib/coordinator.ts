@@ -15,6 +15,6 @@ export function coordinatorNote(
   const now = agents.find((a) => a.coordinator);
   if (now?.id === agentId) return null;
   if (!now) return t("coordinator.none");
-  const line = t("coordinator.current", agentGrammar(t, now.name));
+  const line = t("coordinator.current", agentGrammar(now.name));
   return on ? `${line} ${t("coordinator.one")}` : line;
 }

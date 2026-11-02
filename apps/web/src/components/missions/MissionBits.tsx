@@ -74,7 +74,7 @@ export function ExecutorChip({
  * its mark (`leading`).
  */
 export function executorOptions(t: TFunction, executors: MissionExecutor[], agentName: string, agentId?: string) {
-  const g = agentGrammar(t, agentName);
+  const g = agentGrammar(agentName);
   return executors.map((e) => ({
     value: e,
     label: t(`missions.executor.${e}` as const, g),

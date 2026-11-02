@@ -14,7 +14,7 @@ import { accountTitle, type ExistingAi, groupPlans, planWordOf, signInPlan } fro
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
-import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
@@ -39,6 +39,7 @@ import {
   keyRuns,
   keyStepHint,
   PROVIDERS,
+  providerLabel,
   providerOf,
   providersForKey,
 } from "@agenteschat/client/lib/providers";
@@ -364,7 +365,7 @@ function Home({
       {have.length > 0 ? (
         <>
           <GroupedHeader>
-            {haveFor ? t("connectAi.have.titleFor", agentGrammar(t, haveFor)) : t("connectAi.have.title")}
+            {haveFor ? t("connectAi.have.titleFor", agentGrammar(haveFor)) : t("connectAi.have.title")}
           </GroupedHeader>
           <GroupedList>
             {have.map((r) => (
@@ -854,7 +855,7 @@ function PlanSteps({
             />
           ))}
           <GroupedRow
-            label={ownable ? t("connectAi.own.one", agentGrammar(t, agentName)) : t("connectAi.another")}
+            label={ownable ? t("connectAi.own.one", agentGrammar(agentName)) : t("connectAi.another")}
             checked={other}
             onPress={() => setOther(true)}
           />
@@ -930,7 +931,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
             <Step
               n={1}
               state={opened || clean ? "done" : "now"}
-              title={t("connectAi.key.create", providerGrammar(t, form.provider))}
+              title={t("connectAi.key.create", { provider: providerLabel(form.provider) })}
               hint={hint && t(hint)}
               side={
                 <OpenPage
