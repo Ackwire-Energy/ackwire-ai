@@ -58,10 +58,14 @@ export const usageWaitKey = (
  * (not background) go first, then the rest in the order they parked. A person's run that parks after
  * background ones moves their jobs one gap later, so it goes before them.
  */
-export async function usageWaitPlace(db: Database, run: { id: string; background: boolean }, key: string) {
+export async function usageWaitPlace(
+  db: Database,
+  run: { id: string; background: boolean; workId?: string | null },
+  key: string,
+) {
   const { agentRuns, outbox } = schema;
   const parked = await db
-    .select({ id: agentRuns.id, background: agentRuns.background })
+    .select({ id: agentRuns.id, background: agentRuns.background, workId: agentRuns.workId })
     .from(agentRuns)
     .where(
       and(
@@ -70,8 +74,10 @@ export async function usageWaitPlace(db: Database, run: { id: string; background
         sql`${agentRuns.transcript}->'waitingForBrain'->>'waitKey' = ${key}`,
       ),
     );
-  const people = parked.filter((r) => !r.background);
+  // Background work (ADR 0121) goes on after the conversations a person waits on, before routines.
+  const people = parked.filter((r) => !r.background && !r.workId);
   if (run.background) return parked.length;
+  if (run.workId) return people.length + parked.filter((r) => !r.background && r.workId).length;
   const behind = parked.filter((r) => r.background).map((r) => r.id);
   if (behind.length > 0) {
     await db

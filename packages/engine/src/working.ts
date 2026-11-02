@@ -28,6 +28,8 @@ export interface WorkingRun {
   pendingMessageIds: string[];
   /** A routine's work in the background: it holds no conversation (people's messages never go to it). */
   background: boolean;
+  /** Long work (ADR 0121): what it is, its plan's progress and since when. Null: a conversation's run. */
+  work: { id: string; title: string; plan: { done: number; total: number } | null; since: string } | null;
 }
 
 /**
@@ -55,11 +57,17 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
     root_body: string | null;
     pending: string[] | string | null;
     background: boolean | string;
+    work_id: string | null;
+    work_title: string | null;
+    work_plan: { state: string }[] | string | null;
+    work_started: string | Date | null;
   }>(
     await db.execute(sql`select r.id, r.agent_id, r.channel_id, r.status, r.thread_root_id, r.trigger_message_id,
         r.started_at, r.created_at, c.kind, c.name, t.title, root.body as root_body,
-        array_to_json(r.pending_message_ids) as pending, r.background
+        array_to_json(r.pending_message_ids) as pending, r.background,
+        w.id as work_id, w.title as work_title, w.plan as work_plan, w.started_at as work_started
       from ${agentRuns} r
+      left join ${schema.agentWorks} w on w.id = r.work_id
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
         and c.archived_at is null and c.kind in ('channel', 'dm')
       join ${channelMembers} cm on cm.org_id = ${orgId}::uuid and cm.channel_id = c.id and cm.user_id = ${userId}
@@ -91,6 +99,19 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
       label: label || null,
       pendingMessageIds: pendingIds(r.pending),
       background: r.background === true || r.background === "t",
+      work: r.work_id
+        ? workOf(r.work_id, r.work_title ?? "", r.work_plan, iso(r.work_started) ?? iso(r.created_at) ?? "")
+        : null,
     };
   });
 }
+
+const workOf = (id: string, title: string, raw: { state: string }[] | string | null, since: string) => {
+  const plan = typeof raw === "string" ? (JSON.parse(raw) as { state: string }[]) : (raw ?? []);
+  return {
+    id,
+    title,
+    plan: plan.length ? { done: plan.filter((p) => p.state === "done").length, total: plan.length } : null,
+    since,
+  };
+};

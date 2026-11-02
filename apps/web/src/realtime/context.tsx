@@ -38,6 +38,7 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheMessageWork,
   cachePinned,
   cacheReceipts,
   cacheTask,
@@ -781,6 +782,11 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         void qc.invalidateQueries({ queryKey: keys.pins(orgId, channelId) });
       }
       // Act with undo: an agent message's receipts changed (made, undone, redone): replace the list.
+      // A long work moved, updated or ended (ADR 0121): its anchor's line redraws; its card on the board too.
+      if (event.type === "agent.work") {
+        cacheMessageWork(qc, orgId, event.channelId, event.work);
+        if (event.work.issue) void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      }
       if (event.type === "message.actions") {
         cacheMessageActions(qc, orgId, event.channelId, event.messageId, event.actions);
         // A channel an agent created (or its undo archived): the sidebar lists it now, not at the next refetch.

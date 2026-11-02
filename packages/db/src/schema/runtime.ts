@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   date,
@@ -22,6 +23,7 @@ import { connectorConnections } from "./connectors";
 import { machines } from "./machines";
 import { missions } from "./missions";
 import { organizations } from "./tenancy";
+import { issues } from "./work";
 
 export const outboxStatusEnum = pgEnum("outbox_status", ["pending", "processing", "done", "failed"]);
 
@@ -157,6 +159,11 @@ export const agentRuns = pgTable(
      * the agent's stored brain.
      */
     brain: text(),
+    /**
+     * Long work (ADR 0121): this run stepped out of its conversation into the background. Its replies land in the
+     * work's thread and its end goes home; the newest run with this id is the work's current one.
+     */
+    workId: uuid().references((): AnyPgColumn => agentWorks.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -164,6 +171,7 @@ export const agentRuns = pgTable(
   },
   (t) => [
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index("agent_runs_work_idx").on(t.workId).where(sql`${t.workId} is not null`),
     // One run per (trigger, agent): redelivered outbox events can't double-answer.
     unique().on(t.triggerMessageId, t.agentId),
     index().on(t.orgId, t.status),
@@ -175,6 +183,56 @@ export const agentRuns = pgTable(
     index().on(t.orgId, t.stretchId).where(sql`${t.stretchId} is not null`),
     // Runs waiting for a computer, found when it reconnects (only those rows are indexed).
     index("agent_runs_waiting_machine_idx").on(t.waitingMachineId).where(sql`${t.waitingMachineId} is not null`),
+  ],
+);
+
+/** One step of a long work's plan, as the agent wrote it (ADR 0121 §4). */
+export type WorkPlanItem = { id: string; text: string; state: "todo" | "doing" | "done" };
+
+/**
+ * Long work (ADR 0121): a run that stepped out of its conversation to keep working in the background, with its
+ * anchor message ("Vou cuidar disso…"), the updates it promised and where its report goes. The live sub-state
+ * (working, waiting on a person, paused) is read from its current run.
+ */
+export const agentWorks = pgTable(
+  "agent_works",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    /** Where the ask was; null = the main timeline. The report goes here. */
+    homeThreadId: uuid(),
+    anchorMessageId: uuid().notNull().unique(),
+    /** Updates go to the anchor's own thread (the ask was in the main timeline). */
+    ownThread: boolean().notNull(),
+    title: text().notNull(),
+    plan: jsonb().$type<WorkPlanItem[]>().notNull().default([]),
+    issueId: uuid().references(() => issues.id, { onDelete: "set null" }),
+    /** `queued` | `live` | `done` | `failed` | `canceled`. */
+    status: text().notNull(),
+    /** `agent` (it called work_in_background) | `auto` (the safety net moved it). */
+    how: text().notNull(),
+    /** The person behind it, for lists and notifications. */
+    requestedByUserId: text(),
+    updateSeq: integer().notNull().default(0),
+    lastUpdateAt: timestamp({ withTimezone: true }).notNull(),
+    lastUpdateText: text(),
+    /** When the promised update is due; null while it waits on something (no check-in runs). */
+    nextUpdateAt: timestamp({ withTimezone: true }),
+    resultMessageId: uuid(),
+    startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index().on(t.orgId, t.status).where(sql`${t.status} in ('queued', 'live')`),
+    index().on(t.agentId, t.status).where(sql`${t.status} in ('queued', 'live')`),
+    index().on(t.issueId).where(sql`${t.issueId} is not null`),
   ],
 );
 

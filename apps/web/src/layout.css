@@ -984,6 +984,13 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .sidebar__item[data-status="active"] .sidebar__item-role {
   color: var(--ink2);
 }
+/* What the agent is on wraps in full: a title cut short would hide the work and its minutes. */
+.sidebar__item-work {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  color: var(--ink2);
+}
 .sidebar__lock {
   display: inline-flex;
   flex: none;

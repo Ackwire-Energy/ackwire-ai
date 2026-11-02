@@ -382,6 +382,41 @@ export const AgentAction = z
   })
   .openapi("AgentAction", { description: "A change an agent made, shown as a receipt with Undo (ADR 0037)." });
 
+/** A long work's view (ADR 0121): its anchor's line, its card's block, the agent's status. */
+export const WorkView = z
+  .object({
+    id: z.uuid(),
+    agentId: z.uuid(),
+    channelId: z.uuid(),
+    title: z.string(),
+    status: z.enum(["queued", "live", "done", "failed", "canceled"]),
+    state: z
+      .enum(["working", "waiting_approval", "waiting_input", "paused", "waiting_computer", "queued"])
+      .nullable()
+      .openapi({ description: "While live: what its run does now." }),
+    how: z.enum(["agent", "auto"]),
+    anchorMessageId: z.uuid(),
+    threadId: z.uuid().nullable().openapi({ description: "Where its updates are." }),
+    homeThreadId: z.uuid().nullable().openapi({ description: "Where it was asked (its report goes there)." }),
+    runId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "Its current run: Parar stops it (`POST …/runs/{runId}/cancel`)." }),
+    requestedByUserId: z.string().nullable(),
+    startedAt: z.string(),
+    finishedAt: z.string().nullable(),
+    nextUpdateAt: z.string().nullable(),
+    lastUpdate: z.object({ text: z.string(), at: z.string(), seq: z.number() }).nullable(),
+    plan: z.array(z.object({ id: z.string(), text: z.string(), state: z.enum(["todo", "doing", "done"]) })),
+    issue: z.object({ id: z.uuid(), number: z.number() }).nullable(),
+    resultMessageId: z.uuid().nullable(),
+    queuePosition: z.number().nullable(),
+    pausedUntil: z.string().nullable(),
+    canceledByUserId: z.string().nullable(),
+    errorCode: z.string().nullable(),
+  })
+  .openapi("WorkView");
+
 const MessageBase = z.object({
   id: z.uuid(),
   channelId: z.uuid(),
@@ -488,6 +523,9 @@ const MessageBase = z.object({
   actions: z.array(AgentAction).optional().openapi({
     description:
       "Agents' messages in lists: the changes made with this reply, as receipts with Undo; live via `message.actions`.",
+  }),
+  longWork: WorkView.optional().openapi({
+    description: "A long work's anchor (`meta.longWork`, ADR 0121): its line; live via `agent.work`.",
   }),
   createdAt: z.string(),
 });

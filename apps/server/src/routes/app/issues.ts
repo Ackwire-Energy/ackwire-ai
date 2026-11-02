@@ -11,11 +11,13 @@ import {
   listIssueColumns,
   listIssues,
   setCriterion,
+  shareIssueWithEveryone,
   updateIssue,
   updateIssueColumn,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
+import { WorkView } from "./schemas";
 
 const tags = ["Issues"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string() });
@@ -75,6 +77,12 @@ const Issue = z
         description:
           "The assigned agent's work, from its runs: live (running, waiting) or stalled (in progress, no run alive).",
       }),
+    blocked: z.object({ reason: z.string(), since: z.string(), text: z.string().optional() }).nullable().openapi({
+      description: "Background work stopped on something (ADR 0121): a badge, the card stays in its stage.",
+    }),
+    backgroundWork: WorkView.nullable().openapi({
+      description: "The agent's background work this card tracks: its plan, last update and line (ADR 0121).",
+    }),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -355,6 +363,24 @@ export function issueRoutes(deps: AppDeps) {
         c.req.valid("json").done,
       );
       return c.json(issue, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/issues/{issueId}/share",
+      tags,
+      security,
+      summary: "Show a card to the whole workspace (Mostrar para todos)",
+      description:
+        "A card made from a conversation (an agent's background work, ADR 0121) is seen by who reads that conversation; anyone who can see it may share it with everyone in the workspace.",
+      request: { params: IssueParams },
+      responses: { 200: json(Issue), ...errors },
+    }),
+    async (c) => {
+      const { orgId, issueId } = c.req.valid("param");
+      return c.json(await shareIssueWithEveryone(issues, person(c.get("user").id), orgId, issueId), 200);
     },
   );
 

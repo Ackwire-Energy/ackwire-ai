@@ -1,5 +1,6 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
 import { dueLabel } from "@agenteschat/client/lib/format";
+import { blockedText, workPlanProgress } from "@agenteschat/client/lib/long-work";
 import { stepPhrase } from "@agenteschat/client/lib/work";
 import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
 import { router } from "expo-router";
@@ -197,6 +198,7 @@ export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Is
         </View>
       ) : null}
       <CriteriaTrack issue={i} color={color} going={state === "running"} />
+      <BoardWork issue={i} />
       <View style={styles.meta}>
         <Text variant="caption" tone="faint">
           #{i.number}
@@ -234,4 +236,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   columnName: { fontWeight: "600", flexShrink: 1 },
+});
+
+/** Background work on a board card (ADR 0121): the blocked badge, the plan's progress, the last update. */
+function BoardWork({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const work = i.backgroundWork;
+  const blocked = blockedText(t, i.blocked);
+  const live = work && (work.status === "live" || work.status === "queued");
+  const progress = live ? workPlanProgress(work) : null;
+  if (!blocked && !live) return null;
+  const doing = live ? work.plan.find((p) => p.state === "doing") : undefined;
+  return (
+    <View style={boardWork.box}>
+      {blocked ? (
+        <Text variant="caption" style={[boardWork.badge, { backgroundColor: c.warnSoft, color: c.warn }]}>
+          {blocked}
+        </Text>
+      ) : null}
+      {progress ? (
+        <Text variant="caption" tone="muted">
+          {t("work.plan")} · {t("work.planProgress", progress)}
+          {doing ? ` · ${doing.text}` : ""}
+        </Text>
+      ) : null}
+      {live && work.lastUpdate ? (
+        <Text variant="caption" tone="muted">
+          {t("work.lastUpdate")}: {work.lastUpdate.text}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const boardWork = StyleSheet.create({
+  box: { gap: 4 },
+  badge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 6,
+    overflow: "hidden",
+    fontWeight: "600",
+  },
 });

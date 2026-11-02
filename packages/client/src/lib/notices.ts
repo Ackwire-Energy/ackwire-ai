@@ -14,7 +14,8 @@ export type NoticeKind =
   | "proposal_result"
   | "poll_result"
   | "follow_up"
-  | "wake_skipped";
+  | "wake_skipped"
+  | "work_check_in";
 
 /**
  * An event an agent's conversation got (`meta.notice`): its routine's report,
@@ -40,6 +41,7 @@ export const AGENT_ONLY_NOTICES: ReadonlySet<string> = new Set<NoticeKind>([
   "wait_result",
   "proposal_result",
   "poll_result",
+  "work_check_in",
 ]);
 
 /** A message that is a notice only its agent reads: left out of the conversation. */

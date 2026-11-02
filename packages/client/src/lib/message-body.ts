@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
+import { autoUpdateText, workEndBody } from "./long-work";
 import { mediaKindOf, mediaWord } from "./media";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
@@ -78,6 +79,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     const window = typeof params.window === "string" && params.window ? usageWindowText(t, params.window) : "";
     return t(`chat.body.${code}`, { ...params, window, defaultValue: body });
   }
+  // Long work's own update of a silent work (ADR 0121): what it does now, in the reader's words.
+  if (code === "work_auto_update") return autoUpdateText(t, params);
+  // A work that didn't finish or was stopped: why or by whom, and its last update.
+  if (code === "work_end_failed" || code === "work_end_canceled") return workEndBody(t, code, params, m.workEnd, body);
   // An older note about a plan's limit (sent as the computer brain being unavailable): the plan's words.
   if (code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "plan_limit") {
     const plan = params.brain === "Codex" ? "ChatGPT" : "Claude";

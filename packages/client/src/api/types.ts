@@ -825,6 +825,8 @@ export interface Message {
   pinned?: boolean;
   /** Agents' messages: what the agent changed with it, as receipts with Undo; live via `message.actions`. */
   actions?: AgentAction[];
+  /** A long work's anchor (`meta.longWork`, ADR 0121): its line; live via `agent.work`. */
+  longWork?: WorkView;
   /** Client only: an optimistic message waiting for the server, or one that failed to send. */
   local?: "pending" | "failed";
   createdAt: string;
@@ -1007,6 +1009,15 @@ export type ChannelEvent =
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: Poll }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
+  /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws. */
+  | {
+      type: "agent.work";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string | null;
+      work: WorkView;
+    }
   /** An agent message's receipts changed (linked to it, undone or redone): its whole list now (replace). */
   | { type: "message.actions"; channelId: string; threadId: string | null; messageId: string; actions: AgentAction[] }
   /** A message was pinned here (`pins.list` has them all, newest first). */
@@ -1700,7 +1711,9 @@ export type AgentStatusKind =
   | "waiting_computer"
   | "waiting_plan"
   | "waiting_budget"
-  | "provider_down";
+  | "provider_down"
+  /** Background work (ADR 0121): `subject` its title where everyone may read it, `count` how many. */
+  | "work";
 
 /** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
 export interface AgentStatusLine {
@@ -1712,6 +1725,44 @@ export interface AgentStatusLine {
   emoji: string | null;
   /** ISO; null = until the run ends. */
   until: string | null;
+  /** Background work: since when. */
+  since?: string;
+  /** Background work: how many at once. */
+  count?: number;
+  /** Background work: a second title. */
+  second?: string | null;
+  /** One background work that waits: on what. */
+  wait?: "approval" | "answer" | "plan" | "computer" | "line";
+}
+
+/** A long work (ADR 0121): the line under its anchor, its card's block and its agent's status. */
+export interface WorkView {
+  id: string;
+  agentId: string;
+  channelId: string;
+  title: string;
+  status: "queued" | "live" | "done" | "failed" | "canceled";
+  /** While live: what its run does now. */
+  state: "working" | "waiting_approval" | "waiting_input" | "paused" | "waiting_computer" | "queued" | null;
+  how: "agent" | "auto";
+  anchorMessageId: string;
+  /** Where its updates are. */
+  threadId: string | null;
+  /** Where it was asked: its report is there. */
+  homeThreadId: string | null;
+  runId: string | null;
+  requestedByUserId: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  nextUpdateAt: string | null;
+  lastUpdate: { text: string; at: string; seq: number } | null;
+  plan: { id: string; text: string; state: "todo" | "doing" | "done" }[];
+  issue: { id: string; number: number } | null;
+  resultMessageId: string | null;
+  queuePosition: number | null;
+  pausedUntil: string | null;
+  canceledByUserId: string | null;
+  errorCode: string | null;
 }
 
 /** `GET …/agent-status`: one agent's presence and its line. */
@@ -2604,6 +2655,10 @@ export interface Issue {
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
   artifacts: { id: string; title: string; createdBy: Actor }[];
   work?: IssueWork | null;
+  /** Background work stopped on something (ADR 0121): a badge, the card stays in its stage. */
+  blocked?: { reason: string; since: string; text?: string } | null;
+  /** The agent's background work this card tracks: its plan, last update and line (ADR 0121). */
+  backgroundWork?: WorkView | null;
   /** The issue this one is a sub-issue of (a plan step from the forum). */
   parentIssueId?: string | null;
   /** On the detail: its sub-issues. */
@@ -5344,6 +5399,8 @@ export interface WorkingRun {
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
   background?: boolean;
+  /** Long work in the background (ADR 0121): its title, plan and start. */
+  work?: { id: string; title: string; plan: { done: number; total: number } | null; since: string } | null;
 }
 
 /** A one-off reminder in a conversation (`reminders.*`; also a routine in Rotinas). */

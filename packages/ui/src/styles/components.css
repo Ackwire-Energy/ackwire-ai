@@ -5306,6 +5306,135 @@ html:not([data-pointer]) .ac-work__head:focus-visible {
   }
 }
 
+/* A long work's line (ADR 0121): under the agent's "Vou cuidar disso" and on its card. Plain text that wraps. */
+.ac-workline {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 10px;
+  max-width: var(--msg-card-w);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--plate-soft);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.ac-workline__mark {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--ink2);
+}
+.ac-workline--waiting .ac-workline__mark,
+.ac-workline--queued .ac-workline__mark {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.ac-workline--done .ac-workline__mark {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+}
+.ac-workline--failed .ac-workline__mark {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.ac-workline--stopped .ac-workline__mark {
+  background: var(--plate);
+  color: var(--muted);
+}
+.ac-workline__body {
+  min-width: 0;
+  flex: 1;
+}
+.ac-workline__text {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.ac-workline__update {
+  margin: 4px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ac-workline__action {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ac-workline__action:hover {
+  text-decoration-color: currentColor;
+}
+html:not([data-pointer]) .ac-workline__action:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.ac-workline__action--danger {
+  color: var(--danger);
+}
+.ac-workline__action:disabled {
+  color: var(--faint);
+  cursor: default;
+  text-decoration: none;
+}
+.ac-workplan {
+  margin-top: 12px;
+}
+.ac-workplan__head {
+  margin: 0 0 6px;
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ac-workplan__count {
+  font-weight: 400;
+  color: var(--faint);
+}
+.ac-workplan__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.ac-workplan__step {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.ac-workplan__step--todo {
+  color: var(--muted);
+}
+.ac-workplan__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
 /* Reactions: compact 32px toggles (rounded rect, not pills); counts in the text face. */
 .ac-reacts {
   display: flex;

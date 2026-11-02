@@ -15,6 +15,7 @@ import {
   cacheMessageActions,
   cacheMessageMemories,
   cacheMessageMeta,
+  cacheMessageWork,
   cachePinned,
   catchUpChannel,
   consultSeeds,
@@ -255,6 +256,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "message.actions":
       // An agent's receipts changed (undone, redone, a new one): replace the list.
       cacheMessageActions(qc, orgId, channelId, event.messageId, event.actions);
+      break;
+    case "agent.work":
+      // A long work moved, updated or ended (ADR 0121): its anchor's line redraws.
+      cacheMessageWork(qc, orgId, channelId, event.work);
       break;
     case "approval.created":
     case "approval.decided":

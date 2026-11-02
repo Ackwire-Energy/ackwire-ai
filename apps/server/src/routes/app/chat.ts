@@ -142,6 +142,15 @@ export function chatRoutes(deps: AppDeps) {
                   background: z.boolean().openapi({
                     description: "A routine's work in the background: people's messages never go to it.",
                   }),
+                  work: z
+                    .object({
+                      id: z.uuid(),
+                      title: z.string(),
+                      plan: z.object({ done: z.number().int(), total: z.number().int() }).nullable(),
+                      since: z.string(),
+                    })
+                    .nullable()
+                    .openapi({ description: "Long work in the background (ADR 0121): its title, plan and start." }),
                 })
                 .openapi("WorkingRun"),
             ),
@@ -319,7 +328,8 @@ export function chatRoutes(deps: AppDeps) {
                     "Messages sent while it works that it hasn't read yet. A message whose `meta.steeredRunIds` names a run that is not here, or is here without it in this list, was read (or handed on: `agent.run.redispatched`).",
                 }),
                 background: z.boolean().openapi({
-                  description: "A routine's work in the background: people's messages never go to it.",
+                  description:
+                    "Work in the background (a routine's, or long work, ADR 0121): not the conversation's working row.",
                 }),
               }),
             ),

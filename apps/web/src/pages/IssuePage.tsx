@@ -43,6 +43,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
+import { IssueWorkBlock } from "@/components/BackgroundWork";
 import { IssueForumCard, NewTopicDialog } from "@/components/Forum";
 import { useOrg } from "@/components/org-context";
 import { useEmojiLabels } from "@/components/Reactions";
@@ -174,6 +175,7 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
       )}
       {variant === "dialog" && <Details issue={i} />}
       <WorkBox issue={i} />
+      <IssueWorkBlock issue={i} />
       {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
       <DetailsSection title={t("issues.description")}>
         {i.description ? (

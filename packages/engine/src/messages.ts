@@ -38,12 +38,13 @@ import { type MessageMemory, memoriesFor } from "./message-memories";
 import { agentOnlyNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
-import { inChannelRun } from "./run-scope";
+import { inChannelRun, workKeepsThread } from "./run-scope";
 import { NO_AI, outageParkedSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
+import { type WorkView, workViews } from "./works";
 
 export { stopChecksSettled } from "./steering";
 
@@ -86,6 +87,8 @@ export interface MessageView {
    * receipts with Undo (ADR 0037 round 2); live via `message.actions`.
    */
   actions?: AgentActionView[];
+  /** On a long work's anchor (`meta.longWork`, ADR 0121): its line, live via `agent.work`. */
+  longWork?: WorkView;
   createdAt: string;
 }
 
@@ -664,6 +667,7 @@ export async function insertMessageWithRuns(
         where ${startRuns && !threadId}::boolean and ${deliver}::boolean and not exists (select 1 from mentioned)
           and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running') and not r.background and ${inChannelRun(sql`r`)}
+          and ${workKeepsThread(sql`r`)}
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
@@ -688,6 +692,8 @@ export async function insertMessageWithRuns(
         where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_input')
           and not r.background
+          -- Background work (ADR 0121) answers only in its own thread: in the conversation it left, the agent is free.
+          and ${workKeepsThread(sql`r`)}
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
@@ -1510,12 +1516,22 @@ async function pinnedOf(db: Database, orgId: string, list: Message[]): Promise<S
   return new Set(rows.map((r) => r.messageId));
 }
 
+const longWorkOf = (m: Message, works: Map<string, WorkView>) => {
+  const id = (m.meta.longWork as { id?: unknown } | undefined)?.id;
+  const view = typeof id === "string" ? works.get(id) : undefined;
+  return view ? { longWork: view } : {};
+};
+
 /** Message views with what lists carry: receipts, usage, reactions, memory marks, pins, wiki links. */
 export const withMessageDetails = (db: Database, orgId: string, list: Message[]) => withReceipts(db, orgId, list);
 
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
   const agentMessageIds = list.flatMap((m) => (m.authorType === "agent" ? [m.id] : []));
-  const [receipts, usage, reactions, memories, pinned, actions] = await Promise.all([
+  const workIds = list.flatMap((m) => {
+    const id = (m.meta.longWork as { id?: unknown } | undefined)?.id;
+    return typeof id === "string" ? [id] : [];
+  });
+  const [receipts, usage, reactions, memories, pinned, actions, works] = await Promise.all([
     // A person's message, and an agent's that mentions agents (whom it handed work to, ADR 0089).
     receiptsFor(
       db,
@@ -1531,6 +1547,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
     memoriesFor(db, orgId, list),
     pinnedOf(db, orgId, list),
     actionsFor(db, orgId, agentMessageIds),
+    workIds.length ? workViews(db, orgId, workIds) : Promise.resolve(new Map<string, WorkView>()),
   ]);
   const views = list.map((m) => {
     const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
@@ -1543,6 +1560,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...(memories.has(m.id) ? { memories: memories.get(m.id) } : {}),
       ...(pinned.has(m.id) ? { pinned: true } : {}),
       ...(actions.has(m.id) ? { actions: actions.get(m.id) } : {}),
+      ...longWorkOf(m, works),
     };
   });
   return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));

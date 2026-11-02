@@ -67,6 +67,7 @@ import {
   createWikiToolSource,
   createWithdrawRequestToolSource,
   createWorkspaceToolSource,
+  createWorkToolSource,
   type EmailArt,
   emailArtAt,
   type GitProxyDeps,
@@ -90,6 +91,7 @@ import {
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  setWorkOrgCap,
   smallModelFor,
   standingJudge,
   streamClosed,
@@ -297,6 +299,8 @@ export function buildEngine(o: EngineOptions) {
     vision,
     publicUrl: config.PUBLIC_URL,
   });
+  // The workspace's cap of live background works (ADR 0121 §7).
+  setWorkOrgCap(config.AGENT_WORK_MAX_PER_ORG);
   const tools = createToolGateway({
     sources: [
       // A question for what the agent could find, or a secret asked in the chat, is held first (ADR 0109).
@@ -316,6 +320,8 @@ export function buildEngine(o: EngineOptions) {
       createReactToolSource({ pubsub: adapters.pubsub }),
       // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
       createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
+      // Long work goes to the background and reports back by itself, on every brain (ADR 0121).
+      createWorkToolSource({ pubsub: adapters.pubsub }),
       // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.

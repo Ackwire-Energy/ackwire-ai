@@ -52,6 +52,7 @@ import {
   createSkillToolSource,
   createToolGateway,
   createWikiToolSource,
+  createWorkToolSource,
   type FakeScheduleAnswer,
   type FakeScheduleAnswers,
   localDateTimeOf,
@@ -225,6 +226,10 @@ export async function setup(
     gifs?: GifProvider | null;
     /** How long a run started on a person's message waits for their next one (`waitForBurst`). None: no wait. */
     quietMs?: number;
+    /** Add long work's tools (work_in_background, post_update, steer_work, stop_work; ADR 0121). */
+    workTools?: boolean;
+    /** Long work's safety net (ADR 0121 §1). None: off (no test moves by accident). */
+    workAuto?: { afterMs?: number; afterCalls?: number; minMs?: number; tickMs?: number };
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -331,6 +336,7 @@ export async function setup(
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.mediaTools ? [createMediaToolSource({ pubsub, gifs: options.gifs ?? null })] : []),
     ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
+    ...(options.workTools ? [createWorkToolSource({ pubsub })] : []),
     ...(options.handOff
       ? [createHandOffToolSource({ pubsub, judge: context.judge, tools: (): ToolGateway | undefined => tools })]
       : []),
@@ -379,6 +385,10 @@ export async function setup(
     ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
     ...(options.gifs ? { gifs: options.gifs } : {}),
     ...(options.quietMs ? { quietMs: options.quietMs } : {}),
+    workAutoAfterMs: options.workAuto?.afterMs ?? 24 * 3600_000,
+    workAutoAfterCalls: options.workAuto?.afterCalls ?? 100_000,
+    workAutoMinMs: options.workAuto?.minMs,
+    workTickMs: options.workAuto?.tickMs ?? 60_000,
   };
   const handlers = createJobHandlers(jobDeps);
 

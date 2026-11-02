@@ -90,6 +90,9 @@ const ELSEWHERE = new Set([
   "propose_event",
 ]);
 
+/** Long work's tools (ADR 0121), on the run's own work: `self`. */
+const SELF_WORK = new Set(["work_in_background", "post_update", "steer_work", "stop_work"]);
+
 /** What a routine may use of `ELSEWHERE`, by name. */
 const ROUTINE_REACH = new Set(["post_message", "send_dm", "ask_agent", "tell_agent"]);
 
@@ -184,6 +187,8 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "pass") return { kind: "pass" };
   if (tool.name === "set_status" || tool.name === "withdraw_request") return { kind: "self" };
+  // Long work (ADR 0121): the run's own work only; who may go to the background is the tool source's.
+  if (!tool.scope && SELF_WORK.has(tool.name)) return { kind: "self" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
   if (MISSION.has(tool.name)) return { kind: "mission" };
   if (ELSEWHERE.has(tool.name)) return { kind: "elsewhere" };
