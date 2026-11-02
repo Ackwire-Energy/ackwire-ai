@@ -166,7 +166,7 @@ configs:
     content: |
       ${DOMAIN:-localhost} {
       	request_body /mcp* {
-      		max_size 128KB
+      		max_size 128KiB
       	}
       	reverse_proxy agentes:3000
       	handle_errors 502 503 504 {
