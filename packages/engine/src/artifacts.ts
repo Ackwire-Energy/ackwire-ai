@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, or, rowsOf, schema, sql } from "@agenteschat/db";
-import { type AgentsDmReads, agentsDmReads } from "./agents-dm-reads";
+import { type AgentsDmReads, agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { recordAudit } from "./audit";
 import { runAuthorityById } from "./authority";
 import { markdownToDocx } from "./docx";
@@ -467,7 +467,7 @@ async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pic
   if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId)) {
     return person !== null && (await requesterSharedChannels(db, orgId, actor.agentId, person)).includes(a.channelId);
   }
-  const dm = await agentsDmReads(db, orgId, a.channelId, person);
+  const dm = await agentsDmReads(db, orgId, a.channelId, () => readerOfRun(db, orgId, actor.runId));
   return !dm || madeForSamePerson(db, dm, a.id);
 }
 
@@ -979,7 +979,7 @@ export async function listArtifacts(
   let visible: string[];
   let dm: AgentsDmReads | null = null;
   if (actor.type === "agent") {
-    dm = await agentsDmReads(db, orgId, actor.channelId, await personOfActor(db, orgId, actor));
+    dm = await agentsDmReads(db, orgId, actor.channelId, () => readerOfRun(db, orgId, actor.runId));
     visible = await agentSearchChannels(db, orgId, actor.agentId, actor.channelId);
     if (filters.requesterUserId) {
       const shared = await requesterSharedChannels(db, orgId, actor.agentId, filters.requesterUserId);

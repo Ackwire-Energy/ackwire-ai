@@ -202,7 +202,7 @@ export async function runAuthority(db: Executor, run: AuthorityRun): Promise<Run
 }
 
 /** The brief of the routine a chain roots in (its own, or the one whose run handed off the report); null when gone. */
-async function feedingBrief(
+export async function feedingBrief(
   db: Executor,
   orgId: string,
   root: Extract<MessageRoot, { kind: "routine" | "routine_report" }>,

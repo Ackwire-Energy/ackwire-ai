@@ -18,9 +18,10 @@ import {
 import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
+import { readerOf, readerOfMessage } from "./agents-dm-reads";
 import type { AiStatusDeps } from "./ai-status";
 import { NO_PERSON, speakerFor } from "./audience";
-import { personOfMessage, runAuthority, UUID } from "./authority";
+import { runAuthority, UUID } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { type HandOff, handOffsFrom } from "./consultations";
@@ -1250,25 +1251,26 @@ async function userNameOf(db: Database, userId: string) {
 
 /**
  * The agents' DM, for one person (ADR 0053 §9): only the exchanges made for the same person as this run
- * (the person behind each message's question or note, `authority.ts`), and for nobody only when nobody
- * is behind this run either. The trigger always stays. `runIds`: the runs behind what stays.
+ * (the person behind each message's question or note, `authority.ts`; for a routine, its creator's
+ * routines: `readerOf`), and for nobody only when nobody is behind this run either. The trigger always stays. `runIds`: the runs behind what stays.
  */
 async function forSamePerson(db: Database, run: AgentRun, history: Message[], triggerId: string) {
   const authority = await runAuthority(db, run);
   const personId = authority.kind === "person" ? authority.personId : null;
-  // Messages one run wrote share its person: one lookup per run.
+  const reader = readerOf(authority);
+  // Messages one run wrote share its reader: one lookup per run.
   const lookups = new Map<string, Promise<string | null>>();
   const personOf = (m: Message) => {
     const key = m.agentRunId ? `run:${m.agentRunId}` : `message:${m.id}`;
     let found = lookups.get(key);
     if (!found) {
-      found = personOfMessage(db, run.orgId, m.id).catch(() => null);
+      found = readerOfMessage(db, run.orgId, m.id).catch(() => null);
       lookups.set(key, found);
     }
     return found;
   };
-  const people = await Promise.all(history.map((m) => (m.id === triggerId ? personId : personOf(m))));
-  const kept = history.filter((m, i) => m.id === triggerId || people[i] === personId);
+  const readers = await Promise.all(history.map((m) => (m.id === triggerId ? reader : personOf(m))));
+  const kept = history.filter((m, i) => m.id === triggerId || readers[i] === reader);
   return {
     personId,
     history: kept,

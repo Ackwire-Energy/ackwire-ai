@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import {
+  buildRunContext,
   createAgent,
   createArtifactToolSource,
   createContextToolSource,
@@ -27,7 +28,7 @@ afterEach(async () => {
 });
 
 /** A run of `agentId` on `trigger`, as the dispatcher starts one. */
-async function runOn(agentId: string, channelId: string, triggerId: string): Promise<ToolContext> {
+async function runOn(agentId: string, channelId: string, triggerId: string, background = false): Promise<ToolContext> {
   const [run] = await f.db
     .insert(schema.agentRuns)
     .values({
@@ -39,6 +40,7 @@ async function runOn(agentId: string, channelId: string, triggerId: string): Pro
       trigger: "mention",
       hop: 1,
       status: "running",
+      background,
     })
     .returning();
   if (!run) throw new Error("no run");
@@ -69,6 +71,38 @@ async function consultationFor(userId: string, infraId: string, dmId: string, qu
     body: question,
   });
   return { dev, infra: await runOn(infraId, dmId, consult.id) };
+}
+
+/** A routine of `creatorId` makes @dev consult @infra in the agents' DM: @infra's run there. */
+async function routineConsultation(creatorId: string, infraId: string, dmId: string, question: string) {
+  const fired = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "person", userId: creatorId },
+    body: question,
+    meta: {
+      background: true,
+      routineBrief: {
+        routineId: crypto.randomUUID(),
+        routineRunId: crypto.randomUUID(),
+        name: "Daily check",
+        creatorUserId: creatorId,
+        deliverTo: { channelId: f.general.id, threadId: null },
+        access: "act",
+        report: "when_new",
+        trigger: "schedule",
+        dueAt: new Date().toISOString(),
+      },
+    },
+  });
+  const dev = await runOn(f.agent.id, f.general.id, fired.id, true);
+  const consult = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: dmId,
+    author: { type: "agent", agentId: f.agent.id, runId: dev.runId, hop: 1 },
+    body: question,
+  });
+  return runOn(infraId, dmId, consult.id);
 }
 
 async function toolsOf(source: ToolSource, ctx: ToolContext) {
@@ -174,6 +208,52 @@ describe("the agents' DM reads only what was made for the same person (consultat
     expect((await anaTools("list_artifacts", {})).content).toContain("Payroll export");
 
     const bobTools = await toolsOf(createArtifactToolSource(f.artifactDeps), forBob.infra);
+    expect((await bobTools("list_artifacts", {})).content).not.toContain("Payroll export");
+    expect(await bobTools("read_artifact", { artifact_id: id })).toMatchObject({ isError: true });
+  });
+});
+
+describe("the agents' DM: routines of different people read apart", () => {
+  test("search_context, list_artifacts and read_artifact keep one creator's routine work from another's", async () => {
+    f = await setup();
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    const infra = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Infra", handle: "infra", role: "Payroll", instructions: "Answer.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const dm = await openAgentDm(f.db, f.org.id, f.agent.id, infra.id);
+    const forAna = await routineConsultation(f.owner.id, infra.id, dm.id, "payroll total for today");
+    const answer = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: dm.id,
+      author: { type: "agent", agentId: infra.id, runId: forAna.runId, hop: 2 },
+      body: "Payroll figures: Ana earns 9000 per month.",
+    });
+    await indexSource(f.context, { orgId: f.org.id, kind: "message", sourceId: answer.id });
+    const anaTools = await toolsOf(createArtifactToolSource(f.artifactDeps), forAna);
+    const made = await anaTools("create_artifact", { title: "Payroll export", kind: "document", markdown: "Ana 9000" });
+    const id = (made.data as { artifact: { id: string } }).artifact.id;
+    const forBob = await routineConsultation(bob.id, infra.id, dm.id, "how is the deploy going?");
+
+    const search = async (ctx: ToolContext) =>
+      (await (await toolsOf(createContextToolSource(f.context), ctx))("search_context", { query: "payroll figures" }))
+        .content;
+    const againAna = await routineConsultation(f.owner.id, infra.id, dm.id, "and yesterday?");
+    expect(await search(againAna)).toContain("9000");
+    expect(await search(forBob)).not.toContain("9000");
+    const history = async (ctx: ToolContext) => {
+      const [run] = await f.db
+        .select()
+        .from(schema.agentRuns)
+        .where(eq(schema.agentRuns.id, ctx.runId as string));
+      return JSON.stringify(await buildRunContext(f.db, run as NonNullable<typeof run>, infra, { maxMessages: 30 }));
+    };
+    expect(await history(againAna)).toContain("9000");
+    expect(await history(forBob)).not.toContain("9000");
+    const bobTools = await toolsOf(createArtifactToolSource(f.artifactDeps), forBob);
     expect((await bobTools("list_artifacts", {})).content).not.toContain("Payroll export");
     expect(await bobTools("read_artifact", { artifact_id: id })).toMatchObject({ isError: true });
   });

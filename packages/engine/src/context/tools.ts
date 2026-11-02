@@ -15,7 +15,7 @@ import {
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
-import { type AgentsDmReads, agentsDmReads } from "../agents-dm-reads";
+import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -94,7 +94,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
       async execute(input, ctx) {
         const [channels, person] = await Promise.all([visible(ctx), personRequester(ctx)]);
-        const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, person);
+        const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         const kinds = Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined;
         const [found, steps] = await Promise.all([
           searchVisible(deps, {
@@ -218,7 +218,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         if (!root || !(await visible(ctx)).includes(root.channelId)) {
           return { content: "Thread not found.", isError: true };
         }
-        const dm = await agentsDmReads(ctx.db, ctx.orgId, root.channelId, await personRequester(ctx));
+        const dm = await agentsDmReads(ctx.db, ctx.orgId, root.channelId, () => readerOfCall(ctx));
         if (dm) {
           const thread = await ctx.db
             .select({ id: messages.id })
@@ -248,7 +248,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         if (!/^[0-9a-f-]{36}$/i.test(id)) return { content: "Not found.", isError: true };
         const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
         const person = await personRequester(ctx);
-        const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, person);
+        const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         if (
           !item?.channelIds.every((c) => allowed.includes(c)) ||
           !personMayRead(item, person, ctx.agentId) ||
@@ -616,6 +616,9 @@ const decidedBy = (p: Proposal) =>
 /** Memory tools only act on a person's request in the current turn (never on tool, webhook or document text). */
 /** The person behind the run (`authority.ts`); null for a routine's work and unattended runs. */
 const personRequester = (ctx: ToolContext): Promise<string | null> => personBehindCall(ctx);
+/** Whom the call's run works for in the agents' DM (`readerOf`); the trigger's person without a run. */
+const readerOfCall = (ctx: ToolContext): Promise<string | null> =>
+  ctx.runId ? readerOfRun(ctx.db, ctx.orgId, ctx.runId) : personBehindCall(ctx);
 
 const notRequested = {
   content:
@@ -802,6 +805,8 @@ export async function retrieveForRun(
     known?: string;
     /** The people this run is for (its requester, the trigger's author): their own preferences come in (ADR 0120). */
     personIds?: string[];
+    /** The run reading: in the agents' DM, whom it works for (`readerOf`); else the first of `personIds`. */
+    runId?: string;
   },
 ): Promise<{ text: string; itemIds: string[] }> {
   const { db } = deps;
@@ -818,7 +823,9 @@ export async function retrieveForRun(
   const allowed = await injectableChannels(db, input.orgId, input.agentId, input.channelId);
   const people = [...new Set(input.personIds ?? [])];
   // In the agents' DM nobody writes in their own name: the one person a run there is for is the one behind it.
-  const dm = await agentsDmReads(db, input.orgId, input.channelId, people[0] ?? null);
+  const dm = await agentsDmReads(db, input.orgId, input.channelId, () =>
+    input.runId ? readerOfRun(db, input.orgId, input.runId) : Promise.resolve(people[0] ?? null),
+  );
   const forPeople = (i: Pick<ContextItem, "scopeType" | "scopeId">) =>
     i.scopeType !== "person" || people.includes(i.scopeId ?? "");
   const base = and(

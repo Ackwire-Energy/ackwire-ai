@@ -31,7 +31,7 @@ import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
-import { agentsDmReads } from "./agents-dm-reads";
+import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
 import { fedByRoutine, personOfMessage, runAuthority } from "./authority";
@@ -1426,6 +1426,7 @@ async function executeRunInner(
                 known: agent.instructions,
                 // A person's own preferences come in for the runs they are behind (ADR 0120).
                 personIds: personId ? [personId] : [],
+                runId: run.id,
               }),
             )
             .catch(() => ({ text: "", itemIds: [] as string[] }))
@@ -1456,7 +1457,7 @@ async function executeRunInner(
         () => null,
       );
       const dm = found
-        ? await agentsDmReads(db, run.orgId, run.channelId, await personBehind().catch(() => null))
+        ? await agentsDmReads(db, run.orgId, run.channelId, () => readerOfRun(db, run.orgId, run.id))
         : null;
       const summary = found && (!dm || (await dm.item(found))) ? found : null;
       if (summary)
