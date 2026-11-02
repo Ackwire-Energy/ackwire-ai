@@ -5131,14 +5131,6 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   width: 14px;
   height: 14px;
 }
-/* A small mark, a finger: the button reaches past it, over nothing else it could press. */
-@media (hover: none), (pointer: coarse) {
-  .ac-msg__own-foot .ac-receipt__check::after {
-    content: "";
-    position: absolute;
-    inset: -14px -10px;
-  }
-}
 /* Left of the bubble, on hover: the action bar, its middle on the bubble's top edge, as on everyone's rows. */
 .ac-msg--own > .ac-msg__body > .ac-msg__actions,
 .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
@@ -5155,6 +5147,12 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
     top: -4px;
     right: 8px;
+  }
+  /* A small mark, a finger: the button reaches past it, over nothing else it could press. */
+  .ac-msg__own-foot .ac-receipt__check::after {
+    content: "";
+    position: absolute;
+    inset: -14px -10px;
   }
 }
 /*
@@ -5188,26 +5186,16 @@ html:not([data-pointer]) .ac-hint:focus-visible {
  * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
  * the usual gap under it, its corner round, and the next bubble's top corner round too.
  */
-.ac-msg--own:has(
-  > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
-) {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) {
   padding-bottom: 6px;
 }
-.ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
-  )
-  .ac-msg__text {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) .ac-msg__text {
   border-bottom-right-radius: var(--own-cut);
 }
-.ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
-  )
-  + .ac-msg--own {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) + .ac-msg--own {
   padding-top: 6px;
 }
-.ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)
-  )
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))
   + .ac-msg--own
   .ac-msg__text {
   border-top-right-radius: 18px;

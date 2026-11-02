@@ -192,8 +192,10 @@ describe("own message styles", () => {
 
   test("a turn's bubble ends on the cut corner, on the side it stands", async () => {
     const r = await rules();
-    const last = r.get('.ac-msg--own:is([data-run="solo"], [data-run="end"]) .ac-msg__text');
-    expect(last).toContain("border-bottom-right-radius: var(--own-cut)");
+    const css = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(/\s+/g, " ");
+    expect(css).toContain(
+      '.ac-msg--own:is([data-run="solo"], [data-run="end"]) .ac-msg__text { border-bottom-right-radius: var(--own-cut); }',
+    );
     expect(r.get('.ac-msg--own[data-run="start"] .ac-msg__text')).toContain("border-bottom-right-radius: 6px");
   });
 
