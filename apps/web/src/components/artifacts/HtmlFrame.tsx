@@ -38,11 +38,24 @@ post({agentesHtml:"ready"});
 @supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:rgba(128,128,128,.4) transparent}}
 }</style>`;
 
-/** The page with the shim first: after `<head>`, else after the doctype (a script before it would switch to quirks mode), else at the top. */
-export function withShim(html: string): string {
+/**
+ * A chat card's preview loads nothing from the network (ADR 0117): looking at a conversation can't send its data
+ * anywhere. Scripts and fonts from the usual CDNs still run, so the picture looks like the page. A script can still
+ * navigate the frame itself; the opened page has no such rule.
+ */
+export const PREVIEW_CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src data: https://fonts.gstatic.com; img-src data: blob:; connect-src 'none'; form-action 'none'">`;
+
+/**
+ * The page with the shim first: after `<head>`, else after the doctype (a script before it would switch to quirks
+ * mode), else at the top. A `preview`'s policy goes before anything of the page's, right after its doctype: a policy
+ * covers only what comes after it.
+ */
+export function withShim(html: string, preview = false): string {
+  const doctype = /^\s*<!doctype[^>]*>/i.exec(html)?.[0].length ?? 0;
   const head = /<head(\s[^>]*)?>/i.exec(html);
-  const at = head ? head.index + head[0].length : (/^\s*<!doctype[^>]*>/i.exec(html)?.[0].length ?? 0);
-  return html.slice(0, at) + SHIM + html.slice(at);
+  const at = head ? head.index + head[0].length : doctype;
+  const page = html.slice(0, at) + SHIM + html.slice(at);
+  return preview ? page.slice(0, doctype) + PREVIEW_CSP + page.slice(doctype) : page;
 }
 
 type Load = "blob" | "data" | "failed";
@@ -74,7 +87,7 @@ export function HtmlFrame({
   useEffect(() => {
     setReady(false);
     setError(null);
-    const page = withShim(html);
+    const page = withShim(html, thumbnail);
     if (load === "failed") return;
     if (load === "data" || typeof URL.createObjectURL !== "function") {
       setUrl(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
@@ -83,7 +96,7 @@ export function HtmlFrame({
     const next = URL.createObjectURL(new Blob([page], { type: "text/html" }));
     setUrl(next);
     return () => URL.revokeObjectURL(next);
-  }, [html, load]);
+  }, [html, load, thumbnail]);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {

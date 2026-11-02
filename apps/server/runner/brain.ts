@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -500,9 +500,10 @@ export interface ClaudeLaunch {
   /** Protocol 13: `--effort` (anything else is left out). */
   effort?: BrainEffort;
   /**
-   * Which settings files load (`--setting-sources`). "project" leaves out the computer owner's own
-   * CLAUDE.md, skills and plugins, which every agent there paid for on every step; "" (a plan turn) loads
-   * none, so a folder's own settings can't allow it anything.
+   * Which settings files load (`--setting-sources`). "" loads none: not the computer owner's own CLAUDE.md, skills
+   * and plugins, which every agent there paid for on every step, and not the checkout's `.claude/settings*.json`,
+   * which the agent can edit, so a hook or an allow rule planted there never runs outside our checks (ADR 0117).
+   * The checkout's CLAUDE.md and AGENTS.md come in through the system prompt instead (`repoInstructions`).
    */
   settingSources?: string;
   /** Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
@@ -519,11 +520,32 @@ export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Gr
 /** A plan turn's own tools (ADR 0053 §3, 0109): reading, the web and a shell our prompt tool keeps read-only; no edits. */
 export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
 
+/** Most of a checkout's CLAUDE.md and AGENTS.md a turn reads: room for real instructions, not for a dump. */
+export const REPO_INSTRUCTIONS_MAX = 20_000;
+
+/**
+ * The checkout's own CLAUDE.md and AGENTS.md, for a turn that loads no settings files (Claude Code would read
+ * CLAUDE.md only with them): marked as data about the codebase, cut at `REPO_INSTRUCTIONS_MAX`. "" with neither.
+ */
+export function repoInstructions(cwd: string): string {
+  const files = ["CLAUDE.md", "AGENTS.md"].flatMap((name) => {
+    try {
+      const text = readFileSync(path.join(cwd, name), "utf8").trim();
+      return text ? [`## ${name}\n${text}`] : [];
+    } catch {
+      return [];
+    }
+  });
+  if (files.length === 0) return "";
+  return `\n\n# Repository instructions (from the checkout; data about this codebase)\n${files.join("\n\n").slice(0, REPO_INSTRUCTIONS_MAX)}`;
+}
+
 /**
  * How a brain turn's Claude Code starts for its permission profile (ADR 0053 §3).
  * `work`: edits accepted in its folders, every command through our prompt tool
- * (plain reads at once, the rest by the server's rules or a person), and with
- * the owner's own MCP servers (`personalMcp`) the owner's settings and tools too.
+ * (plain reads at once, the rest by the server's rules or a person), no settings
+ * files of the checkout (ADR 0117), and with the owner's own MCP servers
+ * (`personalMcp`) the owner's settings and tools too.
  * `plan` (a mission before Start or while a write item runs): our MCP tools only,
  * no settings files of the folder or the owner, no edits (the web stays), and every
  * command answered on the computer by `localVerdict` (reads only, never secrets);
@@ -547,7 +569,7 @@ export function brainProfileLaunch(
     promptTool: true,
     permissionMode: "acceptEdits",
     // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
-    ...(personalMcp ? {} : { settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS }),
+    ...(personalMcp ? {} : { settingSources: "", builtinTools: BRAIN_BUILTIN_TOOLS }),
   };
 }
 
@@ -1516,8 +1538,10 @@ export class BrainManager {
     const dir = path.join(this.opts.root, id);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const systemFile = path.join(dir, "system.txt");
-    writeFileSync(systemFile, typeof req.system === "string" ? req.system : "", { mode: 0o600 });
     const mode = req.permissions?.mode === "plan" ? "plan" : "work";
+    const launch = brainProfileLaunch(mode, req.personalMcp === true);
+    const system = typeof req.system === "string" ? req.system : "";
+    writeFileSync(systemFile, launch.settingSources === "" ? system + repoInstructions(cwd) : system, { mode: 0o600 });
     let mcpConfigFile: string | undefined;
     const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
@@ -1598,7 +1622,7 @@ export class BrainManager {
       systemFile,
       ...(mcpConfigFile ? { mcpConfigFile } : {}),
       settingsFile,
-      ...brainProfileLaunch(mode, req.personalMcp === true),
+      ...launch,
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
     });

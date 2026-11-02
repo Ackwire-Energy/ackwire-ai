@@ -1,4 +1,13 @@
-import { commandOf, commandWords, normalizedCommand, PERMISSION_TOOL, redactCommon } from "@agenteschat/adapters";
+import {
+  commandOf,
+  commandWords,
+  KEY_SHAPES,
+  normalizedCommand,
+  PERMISSION_TOOL,
+  PRIVATE_KEY,
+  redactCommon,
+  SIGNED_SHAPES,
+} from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 
 const MAX = 80;
@@ -166,13 +175,9 @@ export async function artifactToolDetail(
 }
 
 /** Things that look like credentials, masked in previews and live output (agents should never have any). */
-const SECRET =
-  /\b(sk-[A-Za-z0-9_-]{12,}|sk-ant-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{8,})/g;
+const SECRET = new RegExp(`${KEY_SHAPES.source}|${SIGNED_SHAPES.source}`, "g");
 
 export const maskSecrets = (text: string) => text.replace(SECRET, "••••");
-
-/** A private key, by its first line. */
-const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 
 /**
  * Whether a value carries a credential by its format (an API key, a token, a private key): what a run

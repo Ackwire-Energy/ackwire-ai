@@ -10,6 +10,7 @@ import { answersAgentsOnly, consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
+import { recordRead } from "../outbound";
 import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
 import { describeWhen } from "../schedule";
@@ -626,6 +627,7 @@ export function createToolGateway(deps: {
       .update(approvals)
       .set({ result: { content: shown(output.content), isError: output.isError === true } })
       .where(sql`${approvals.id} = ${approval.id}`);
+    recordRead(ctx.runId, approval.tool, output.content);
     await addRunStep(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, "tool_result", {
       toolUseId,
       name: approval.tool,
@@ -759,6 +761,7 @@ export function createToolGateway(deps: {
         // A result read from outside marks the run (`runReadOutside`, ADR 0117), an error too: its text came from there.
         const outside = ran && tool && readsOutsideText(tool, output) ? { outside: true } : null;
         const data = output.data || outside ? { ...output.data, ...outside } : null;
+        recordRead(ctx.runId, call.name, output.content);
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
