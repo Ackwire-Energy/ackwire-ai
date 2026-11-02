@@ -57,11 +57,13 @@
 .members-row__state[data-tone="ok"] > .ac-icon {
   color: var(--ok);
 }
-/* The actions never shrink into a stack of their own: when the row runs out of width they go under it whole. */
+/* A row breaks before it shrinks, so the actions go under the words whole when the row runs out of width; their
+   buttons wrap among themselves only when even a line of their own is too narrow (the list clips what overflows). */
 .members-row__acts {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
@@ -74,8 +76,11 @@
 }
 /* Ghost buttons in a row of their own keep their plates' rhythm (`.ac-acts`). */
 .members-row__acts.ac-acts {
-  gap: 0;
-  column-gap: calc(2 * var(--ghost-plate));
+  gap: var(--space-2) calc(2 * var(--ghost-plate));
+}
+/* Why approving can't let them in at once: in the row's flow beside the state. */
+.members-row__flag {
+  display: contents;
 }
 /* What the person wrote: under the words, as quoted, in a well. Its edge on the words' edge (the face and the gap). */
 .members-row__note {
@@ -131,6 +136,12 @@
   }
   .members-row__acts {
     flex-basis: 100%;
+  }
+  /* On a line of its own under the words, so it never squeezes the name nor pushes the actions apart. */
+  .members-row__flag {
+    display: block;
+    flex-basis: 100%;
+    margin-left: calc(36px + var(--space-3));
   }
 }
 

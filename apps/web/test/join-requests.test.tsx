@@ -692,6 +692,7 @@ describe("Members › Esperando você", () => {
     // Nobody proved Bruno's address: "Não verificado", the only hint approving can't add him at once.
     const bruno = card("Bruno Lima");
     expect(chips(bruno)).toEqual(["Não verificado"]);
+    expect(bruno.querySelector(".members-row__flag > .ac-chip")?.textContent).toBe("Não verificado");
     expect(stateOf(bruno)).toMatch(/^Pediu pelo link em \d+ \S+$/);
     expect(noteOf(bruno)).toBeNull();
     // A member's suggestion says who suggested it, and never "Não verificado": nobody was asked to prove anything.

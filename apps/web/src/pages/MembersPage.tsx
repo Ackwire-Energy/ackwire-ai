@@ -504,7 +504,11 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
                   <Who face={<Avatar size="md" name={r.name} />} name={r.name} sub={r.email} />
                   <State icon={by ? "person" : "link"}>{how}</State>
                   {/* Nobody proved the address: approving can't let them in at once (ADR 0072). */}
-                  {!r.verified && !by && <Chip icon="mail">{t("members.requests.unverified")}</Chip>}
+                  {!r.verified && !by && (
+                    <span className="members-row__flag">
+                      <Chip icon="mail">{t("members.requests.unverified")}</Chip>
+                    </span>
+                  )}
                   <span className="members-row__acts">
                     <RolesPicker
                       size="sm"

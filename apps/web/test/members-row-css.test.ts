@@ -10,10 +10,13 @@ test("what ships keeps a join request or an invitation on one centred row, and w
       .filter(([p]) => p === property)
       .at(-1)?.[1];
 
-  // The role picker and the buttons stay on one line: the actions never shrink into a stack, and the picker is as
-  // wide as its words (a form's picker fills its field), on the buttons' 28px.
-  expect(last(shipped, ".members-row__acts", "flex")).toBe("none");
-  expect(last(shipped, ".members-row__acts", "flex-wrap")).toBe("nowrap");
+  // The row breaks before it shrinks, so the actions go under the words whole; they still shrink and wrap among
+  // themselves when even their own line is too narrow, because the list clips what overflows. The picker is as wide
+  // as its words (a form's picker fills its field), on the buttons' 28px.
+  expect(last(shipped, ".members-row__acts", "flex")).toBe("0 auto");
+  expect(last(shipped, ".members-row__acts", "min-width")).toBe("0");
+  expect(last(shipped, ".members-row__acts", "flex-wrap")).toBe("wrap");
+  expect(last(shipped, ".members-row__acts.ac-acts", "gap")).toBe("var(--space-2) calc(2 * var(--ghost-plate))");
   expect(last(shipped, ".members-row__acts", "align-items")).toBe("center");
   expect(last(shipped, ".members-row__acts", "gap")).toBe("var(--space-2)");
   expect(last(shipped, ".members-row__acts", "margin-left")).toBe("auto");
@@ -33,6 +36,10 @@ test("what ships keeps a join request or an invitation on one centred row, and w
   expect(last(phone, ".members-row__acts", "margin-left")).toBeUndefined();
   expect(last(phone, ".members-row__acts", "justify-content")).toBeUndefined();
   expect(last(shipped, ".members-row__acts", "justify-content")).toBe("flex-end");
+  // An unconfirmed address: beside the state on a wide row, on a line of its own under the words on a phone.
+  expect(last(shipped, ".members-row__flag", "display")).toBe("contents");
+  expect(last(phone, ".members-row__flag", "display")).toBe("block");
+  expect(last(phone, ".members-row__flag", "flex-basis")).toBe("100%");
   // No older breakpoint sends the state and the actions under the words on the left.
   expect(declarations(atRule(css, "@media (max-width: 760px)"), ".members-row__state")).toEqual([]);
 });
