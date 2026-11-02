@@ -1979,6 +1979,9 @@
     "rolesNone": "De workspace heeft nog geen rollen.",
     "rolesNeeded": "Kies minstens één rol.",
     "rolesLeave": "Wie de rol verliest, verlaat het kanaal.",
+    "rolesChoose": "Rollen kiezen",
+    "rolesChange": "Rollen wijzigen",
+    "rolesDone": "Klaar",
     "publicTitle": "#{{channel}} openbaar maken?",
     "publicBody": "Iedereen in de workspace kan erbij en alle berichten lezen, ook de oudere.",
     "publicConfirm": "Openbaar maken",
@@ -2875,6 +2878,7 @@
     "runsEmpty": "Geen runs gevonden voor “{{q}}”.",
     "runsNone": "Nog geen runs.",
     "runNoText": "Geen tekst",
+    "runPrivate": "In een gesprek waar je geen deel van uitmaakt",
     "runTokens": "{{input}} in · {{cached}} uit cache · {{output}} uit",
     "runTokensTip": "{{input}} nieuwe invoertokens, {{cached}} uit de cache gelezen (goedkoper), {{output}} uitvoer",
     "budgetHelp": "Bij de limiet stopt {{name}} en meldt dat in het kanaal. {{ownerNote}}",
@@ -6554,6 +6558,68 @@
       "symbols": "Symbolen"
     }
   },
+  "voice": {
+    "word": "Spraakbericht",
+    "wordTime": "Spraakbericht · {{time}}",
+    "holdToRecord": "Houd ingedrukt om op te nemen",
+    "slideToDelete": "Veeg om te verwijderen",
+    "send": "Audio versturen",
+    "delete": "Opname verwijderen",
+    "deleted": "Opname verwijderd.",
+    "pause": "Pauzeren",
+    "resume": "Verder opnemen",
+    "listen": "Luister naar je opname",
+    "play": "Afspelen",
+    "stop": "Stoppen",
+    "speed": "Snelheid",
+    "left": "Nog {{seconds}} s",
+    "tooShort": "Te kort. Zeg nog iets meer.",
+    "silent": "Niets gehoord. Er is niets verstuurd.",
+    "notSent": "Kon de audio niet versturen.",
+    "limit": "Dat is veel audio voor vandaag. Typ hier en probeer het morgen opnieuw.",
+    "micBlocked": "De microfoon is geblokkeerd",
+    "micBlockedHint": "Sta de microfoon toe in de instellingen van je apparaat om op te nemen.",
+    "openSettings": "Instellingen openen",
+    "notNow": "Niet nu",
+    "expired": "Audio verlopen",
+    "showText": "Tekst tonen",
+    "hideText": "Tekst verbergen",
+    "record": "Audio opnemen",
+    "recording": "Audio wordt opgenomen",
+    "discard": "Opname verwijderen",
+    "stopListening": "Stoppen met luisteren",
+    "keys": "Enter verstuurt · Esc verwijdert",
+    "keysHold": "Loslaten om te versturen · Esc verwijdert",
+    "keysPaused": "Gepauzeerd · Spatie luistert · Enter verstuurt · Esc verwijdert",
+    "pausePlay": "Pauzeren",
+    "seek": "Positie in de audio",
+    "speedAt": "Snelheid {{speed}}×",
+    "waiting": "Gaat zodra je weer online bent",
+    "notUnderstood": "De audio was niet te verstaan. Er is niets verstuurd.",
+    "refused": "De audio kon niet in dit gesprek worden verstuurd.",
+    "blockedMac": "De microfoon is geblokkeerd. Op een Mac: Systeeminstellingen › Privacy en beveiliging › Microfoon.",
+    "blockedWeb": "De microfoon is geblokkeerd. Sta hem toe via het slotje naast het adres van de site.",
+    "noMic": "Geen microfoon gevonden.",
+    "failed": "Kon de microfoon niet openen. Probeer het opnieuw.",
+    "noPlayback": "Kan nu niet afspelen. Je kunt het nog steeds versturen of verder opnemen.",
+    "settings": {
+      "title": "Spraakberichten",
+      "on": "Spraakberichten",
+      "onHelp": "Mensen in deze werkruimte kunnen audio sturen in gesprekken.",
+      "noEngine": "Spraakberichten zijn hier nog niet beschikbaar.",
+      "engineTitle": "Wat spraak omzet in tekst",
+      "own": "Je eigen server",
+      "ownHelp": "Whisper of Parakeet op je eigen machine. De audio blijft daar.",
+      "address": "Serveradres",
+      "key": "{{name}}-sleutel",
+      "keyPlaceholder": "Hier plakken",
+      "test": "Testen",
+      "tested": "Het werkt. Iedereen ziet nu de microfoon.",
+      "sealed": "Versleuteld bewaard op je server en nooit meer getoond.",
+      "leaves": "Audio van spraakberichten gaat naar {{name}} om tekst te worden.",
+      "invalid": "De opgeslagen sleutel opent niet op deze server. Plak hem opnieuw."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -9014,6 +9080,7 @@
     "clearSearch": "Zoekopdracht wissen",
     "noMatch": "Niets gevonden voor “{{q}}”.",
     "noTools": "De server bood geen tools aan.",
+    "unreadable": "De tools van de connector konden niet worden gelezen: {{reason}}",
     "refresh": "Zoeken naar nieuwe tools",
     "decideTitle": "Jouw beslissing nodig · {{count}}",
     "decideHelp": "Hun naam zegt niet wat ze doen. Bevestig de suggestie of kies iets anders.",
@@ -9830,6 +9897,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Het netwerk verandert. Open sessies van de computer starten om {{when}} opnieuw.",
+      "restart": "De sessies van de computer starten opnieuw om het netwerk toe te passen. Nieuw werk wacht tot dit klaar is.",
+      "line": "Uitgaand IP {{ip}}",
+      "hint": "Het adres dat websites zien als de agents browsen. Het verandert mee met het netwerk van de computer."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Opdrachten uit",
@@ -10528,6 +10601,7 @@
       "import": "Importeren en exporteren",
       "billing": "Abonnement en facturatie",
       "media": "GIF's en stickers",
+      "voice": "Spraak",
       "apps": "AI-apps"
     },
     "sectionText": {
@@ -10546,6 +10620,7 @@
       "import": "Haal agents uit een andere app of werkruimte, en neem deze mee waarheen je wilt.",
       "billing": "Het agentes.chat-abonnement, de kaart en de facturen van deze werkruimte staan op een pagina van ons, buiten de app.",
       "media": "Wat mensen in een gesprek kunnen sturen, en wanneer agents een GIF of sticker sturen.",
+      "voice": "Spraakberichten in gesprekken, en wie spraak omzet in tekst.",
       "apps": "Vraag de agents van deze werkruimte om taken vanuit Claude, Cursor en andere apps."
     },
     "title": "Instellingen",
@@ -10944,6 +11019,11 @@
       "answeredRequestFar": "{{to}} beantwoordde het verzoek van {{from}}",
       "answeredRequestFar_female": "{{to}} beantwoordde het verzoek van {{from}}",
       "see": "Bekijken"
+    },
+    "talk": {
+      "readAll": "Alles lezen",
+      "more_one": "nog {{count}} regel",
+      "more_other": "nog {{count}} regels"
     },
     "consultPanel": {
       "label": "Gesprek tussen {{from}} en {{to}}",
@@ -12271,6 +12351,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Je kijkt alleen mee.",
+      "title": "Wil je de controle overnemen?",
+      "working": "{{name}} pauzeert zolang jij de controle hebt."
+    },
     "sub": {
       "control": "Jij hebt de controle · {{name}} wacht",
       "control_female": "Jij hebt de controle · {{name}} wacht",

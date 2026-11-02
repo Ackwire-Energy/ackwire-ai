@@ -90,6 +90,7 @@ import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from ".
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
+import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
 import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
 import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
@@ -129,6 +130,8 @@ export interface JobDeps extends RunExecutorDeps {
   gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Voice messages (job `voice.transcribe`, ADR 0100). */
+  voice?: VoiceDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;
   /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
@@ -760,6 +763,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         { db: deps.db, pubsub: deps.pubsub, artifacts: deps.artifacts },
         String(job.payload.topicId),
       );
+    },
+    [VOICE_JOB]: async (job, ctx) => {
+      if (!deps.voice) throw new PermanentJobError("no voice engine configured");
+      await transcribeVoiceClip(deps.voice, String(job.payload.clipId), { finalAttempt: ctx.finalAttempt });
     },
     "storage.migrate": async (job) => {
       if (!deps.storage) throw new PermanentJobError("no storage configured");

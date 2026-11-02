@@ -467,14 +467,14 @@ test.if(posix)(
       "GET http://127.0.0.1:9301/json/list",
       "GET http://127.0.0.1:9301/json/activate/P7",
     ]);
-    // Its last tab closed and Chrome still up: a blank one, in a window of its own.
+    // Its last tab closed and Chrome still up: the offline start page, in a window of its own.
     devtools.targets = devtools.targets.filter((x) => x.type !== "page");
     devtools.urls = [];
     await t.manager.show(dev, folder, installing);
     expect(t.chromes).toHaveLength(1);
     expect(devtools.urls).toEqual([
       "GET http://127.0.0.1:9301/json/list",
-      "PUT http://127.0.0.1:9301/json/new?about:blank",
+      "PUT http://127.0.0.1:9301/json/new?chrome://newtab/",
     ]);
 
     // Headless while a person's turn is open and its live view is watched: a click from the desktop moves it there,

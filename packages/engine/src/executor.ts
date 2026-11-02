@@ -1,4 +1,4 @@
-import { PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
+import { CODEX_FOLDER_PROTOCOL, PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   count,
@@ -31,6 +31,7 @@ import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
+import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
 import { fedByRoutine, personOfMessage, runAuthority } from "./authority";
@@ -98,11 +99,11 @@ import {
   buildRunContext,
   type ContextBlock,
   getChannelCached,
-  isTurnBlock,
+  isComputerTurnBlock,
   restatesReaction,
   stableFirst,
   teammatesNowAgain,
-  thisTurnText,
+  thisTurnParts,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
@@ -138,6 +139,7 @@ import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
+import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
@@ -224,6 +226,8 @@ import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials, maskCredentialsExcept } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
+  isCore,
+  isStableTool,
   ON_DEMAND_FIND,
   ON_DEMAND_USE,
   presentTools,
@@ -347,6 +351,11 @@ export interface EngineDeps {
    * engine with fakes.
    */
   brains?: Partial<Record<BrainKind, BrainFactory>>;
+  /**
+   * The checkouts' sync before a computer brain's chat turn (`prepareAgentCode`, the brains' own `prepare`): started
+   * here while a run waits out the quiet window, so the turn doesn't wait for it after.
+   */
+  prepareCode?(turn: BrainTurn, signal: AbortSignal): Promise<CodeSetup | null>;
   /** Computers' status (machine hub): a computer brain's availability is checked before its turn. */
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
@@ -601,8 +610,20 @@ const settingsChangedNote = (system: readonly SystemBlock[]) =>
   [
     "# Your settings changed",
     "People edited your settings (your instructions, the organization's context, your team or what you may use) after this session started. This is how they are now; where it differs from your system prompt, this wins:",
-    ...system.filter((b) => !isTurnBlock(b)).map((b) => b.text),
+    ...system.filter((b) => !isComputerTurnBlock(b)).map((b) => b.text),
   ].join("\n\n");
+
+/** The tools whose presence the context's text follows (`buildRunContext`'s options), besides "What you can do". */
+const CONTEXT_TOOLS: readonly string[] = [
+  ASK_USER_TOOL,
+  REACT_TOOL,
+  FOLLOW_UP_TOOL,
+  WORK_IN_BACKGROUND_TOOL,
+  SHOW_BLOCK_TOOL,
+  FIND_AGENT_TOOL,
+  "load_skill",
+  "read_wiki_page",
+];
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
@@ -1208,7 +1229,7 @@ async function executeRunInner(
   }
   if (!askingForRoom) await publishChannelEvent(deps.pubsub, event("running"));
   // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
-  let toolChoice: ToolGroupChoice | null = null;
+  let toolChoice = null as ToolGroupChoice | null;
   const judge = deps.context?.judge;
   /** The latest messages where the run answers, read once for every judge that needs them. */
   let recentRead: Promise<string[]> | null = null;
@@ -1239,27 +1260,34 @@ async function executeRunInner(
       .catch(() => fallbackChoice("error"));
   };
   const autoAsked = needsContext && autoWanted(agent) ? askAuto() : null;
-  if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
-    const [recent, keep] = await Promise.all([
-      recentMessages(),
-      keptToolGroups(db, run, granted).catch(() => [] as string[]),
-    ]);
-    toolChoice = await chooseToolGroups(judge, {
-      orgId: run.orgId,
-      agentId: agent.id,
-      runId: run.id,
-      agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
-      message: trigger?.body ?? "",
-      recent,
-      tools: granted,
-      keep,
-    });
-    ctx.loadedGroups = toolChoice.groups;
-    tools = presentTools(granted, isSensitive, ctx.loadedGroups);
-    if (toolChoice.groups.includes(toolGroupKey({ scope: BROWSER_SCOPE }))) {
-      deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
-    }
-  }
+  // The judge's answer is awaited where the tools are needed: the context is read meanwhile (`CONTEXT_TOOLS`).
+  const judging: Promise<void> | null =
+    needsContext && deps.toolsOnDemand && judge && granted.length > 0
+      ? (async () => {
+          const [recent, keep] = await Promise.all([
+            recentMessages(),
+            keptToolGroups(db, run, granted).catch(() => [] as string[]),
+          ]);
+          const choice = await chooseToolGroups(judge, {
+            orgId: run.orgId,
+            agentId: agent.id,
+            runId: run.id,
+            agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+            message: trigger?.body ?? "",
+            recent,
+            tools: granted,
+            keep,
+          });
+          toolChoice = choice;
+          ctx.loadedGroups = choice.groups;
+          tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+          if (choice.groups.includes(toolGroupKey({ scope: BROWSER_SCOPE }))) {
+            deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
+          }
+        })()
+      : null;
+  // Read only when the context is built; a failure surfaces there.
+  judging?.catch(() => {});
   // What the agent shows it is doing (ADR 0084 §8–9): lines from facts everyone may see, picked by Jev in a request
   // of its own, beside the run and never in its way: its statements count apart from the run's.
   if (needsContext) {
@@ -1444,6 +1472,9 @@ async function executeRunInner(
   }
   if (!transcript) {
     const contextDeps = deps.context;
+    // The tools the context names are core ones: listed whatever groups the judge loads, so it needn't wait for it.
+    // A connector's tool of the same name could come with a group: then it waits.
+    if (judging && !granted.every((t) => isCore(t) || !CONTEXT_TOOLS.includes(t.name))) await judging;
     const pending: { label: string; reason: string }[] = deps.tools
       ? await pendingConnectors(db, run.orgId, new Set(granted.map((t) => t.name))).catch(() => [])
       : [];
@@ -1470,7 +1501,10 @@ async function executeRunInner(
         work: tools.some((t) => t.name === WORK_IN_BACKGROUND_TOOL),
         blocks: tools.some((t) => t.name === SHOW_BLOCK_TOOL),
         choices: tools.some((t) => t.name === ASK_CHOICES_TOOL),
-        capabilities: [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
+        // "What you can do" names the loaded groups: it waits for the judge.
+        capabilities: Promise.resolve(judging).then(() =>
+          [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
+        ),
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),
         // Granted is enough: on demand (ADR 0043) it is one `use_tool` away.
@@ -1493,6 +1527,7 @@ async function executeRunInner(
                 known: agent.instructions,
                 // A person's own preferences come in for the runs they are behind (ADR 0120).
                 personIds: personId ? [personId] : [],
+                runId: run.id,
               }),
             )
             .catch(() => ({ text: "", itemIds: [] as string[] }))
@@ -1514,14 +1549,19 @@ async function executeRunInner(
           ).catch(() => ({ text: "", pageIds: [] as string[], held: false }))
         : Promise.resolve({ text: "", pageIds: [] as string[], held: false }),
     ]);
+    await judging;
     const issueId = context.issueId;
     if (issueId) later(() => linkRunToIssue({ db, pubsub: deps.pubsub }, run, issueId));
     const system: ContextBlock[] = [...context.system];
     if (contextDeps && context.stats.truncated) {
       // Long thread: the summary stands in for what didn't fit.
-      const summary = await ensureThreadSummary(contextDeps, run.orgId, run.threadRootId, { force: true }).catch(
+      const found = await ensureThreadSummary(contextDeps, run.orgId, run.threadRootId, { force: true }).catch(
         () => null,
       );
+      const dm = found
+        ? await agentsDmReads(db, run.orgId, run.channelId, () => readerOfRun(db, run.orgId, run.id))
+        : null;
+      const summary = found && (!dm || (await dm.item(found))) ? found : null;
       if (summary)
         system.push({ text: `# Earlier in this thread (summary)\n${itemLabel(summary)} ${summary.content}` });
     }
@@ -2999,6 +3039,8 @@ async function executeRunInner(
         { messageId: delivered.message.id, urgent: false },
       );
   };
+  /** The first computer turn's checkouts sync, started during the quiet window for that plan. */
+  let earlyCode: { plan: BrainPlan; code: Promise<CodeSetup | null> } | null = null;
   const autoTick: ReturnType<typeof setInterval> | null =
     run.background || run.workId || forum
       ? null
@@ -3013,6 +3055,21 @@ async function executeRunInner(
       run.trigger !== "router" &&
       triggerMessage?.authorType === "person"
     ) {
+      // Meanwhile a computer brain's checkouts get synced for its first turn (used only if that turn is the same).
+      if (plan.kind !== "model" && plan.session && deps.prepareCode && computerTurns === 0 && !nextPrompt) {
+        const early = brainTurnOf(run, thinker, transcript, tools, triggerText, plan);
+        const prepare = deps.prepareCode;
+        const machineId = plan.session.machineId;
+        // Not for Codex on a runner that never uses its checkouts (`CodexBrain`): a sync nobody reads.
+        const code = (async () => {
+          if (plan.kind === "codex") {
+            const protocol = (await deps.machines?.status(machineId).catch(() => null))?.protocol;
+            if (protocol !== undefined && protocol < CODEX_FOLDER_PROTOCOL) return null;
+          }
+          return prepare(early, signal);
+        })().catch(() => null);
+        earlyCode = { plan, code };
+      }
       await waitForBurst(db, triggerMessage, deps.quietMs, signal);
     }
     for (;;) {
@@ -3191,6 +3248,16 @@ async function executeRunInner(
           // Memory and wiki once per run: its first turn, or a session started afresh.
           brainTurnOf(run, thinker, transcript, turnTools, prompt, turnPlan, {
             found: computerTurns === 0 || !turnPlan.session?.resume,
+            // Synced during the quiet window for this very turn; where it starts is picked again from its words now
+            // (what came in meanwhile may name another repository).
+            ...(earlyCode?.plan === turnPlan && computerTurns === 0
+              ? {
+                  code: startAgain(earlyCode.code, {
+                    trigger: prompt,
+                    messages: transcript.messages.map((m) => ({ content: flattenContent(m.content) })),
+                  }),
+                }
+              : {}),
           }),
           io,
           deltas.push,
@@ -4069,9 +4136,16 @@ function brainTurnOf(
   tools: ToolDefinition[],
   trigger: string,
   plan: BrainPlan,
-  options: { found?: boolean } = {},
+  options: { found?: boolean; code?: Promise<CodeSetup | null> } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
+  const turnParts = () => {
+    if (plan.kind === "model") return undefined;
+    // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
+    const lost: ContextBlock[] =
+      t.sessionLost && !plan.session?.resume ? [{ turn: true, found: true, text: sessionLostNote(t.sessionLost) }] : [];
+    return thisTurnParts([...t.system, ...lost], new Date(), options);
+  };
   return {
     runId: run.id,
     orgId: run.orgId,
@@ -4081,7 +4155,7 @@ function brainTurnOf(
     get system() {
       if (plan.kind === "model") return t.system.map((b) => b.text).join("\n\n");
       const text = t.system
-        .filter((b) => !isTurnBlock(b))
+        .filter((b) => !isComputerTurnBlock(b))
         .map((b) => b.text)
         .join("\n\n");
       // A computer brain has its own tools (read, search, shell, git) besides ours.
@@ -4097,26 +4171,29 @@ function brainTurnOf(
         .join("\n\n");
     },
     get thisTurn() {
-      if (plan.kind === "model") return undefined;
-      // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
-      const lost: ContextBlock[] =
-        t.sessionLost && !plan.session?.resume
-          ? [{ turn: true, found: true, text: sessionLostNote(t.sessionLost) }]
-          : [];
-      return thisTurnText([...t.system, ...lost], new Date(), options) || undefined;
+      const parts = turnParts();
+      return [parts?.head, parts?.found].filter(Boolean).join("\n\n") || undefined;
+    },
+    get thisTurnFound() {
+      return turnParts()?.found || undefined;
     },
     get messages() {
       return t.messages.map((m) => ({ role: m.role, content: flattenContent(m.content) }));
     },
-    tools: tools.map(brainToolOf),
+    tools: tools.map((d) => (isStableTool(d) ? { ...brainToolOf(d), stable: true } : brainToolOf(d))),
     ...(model ? { model } : {}),
     ...(plan.session ? { session: t.sessionLost ? { ...plan.session, ownFolder: true } : plan.session } : {}),
     ...(plan.account ? { account: plan.account } : {}),
     ...(plan.effort ? { effort: plan.effort } : {}),
     ...(agent.contextTokens ? { contextTokens: agent.contextTokens } : {}),
     trigger,
+    ...(options.code ? { code: options.code } : {}),
   };
 }
+
+/** An early checkouts sync for a turn whose words may have changed since: where it starts picked again from them. */
+const startAgain = (code: Promise<CodeSetup | null>, turn: Parameters<typeof codeStart>[1]) =>
+  code.then((c) => (c?.pick ? { ...c, ...codeStart(c.pick, turn) } : c));
 
 /** A message as plain text for brains that take text: tool calls and results inline, provider blocks dropped. */
 const flattenContent = (content: string | ContentBlock[]): string =>

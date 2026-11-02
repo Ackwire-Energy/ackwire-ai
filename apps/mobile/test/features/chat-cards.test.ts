@@ -19,7 +19,8 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(row, [
-          ") : body ? (\n          <MessageText\n            body={body}",
+          // A long message to another agent shows its first paragraph (`talk.lead`), the rest behind "Ler tudo".
+          ") : body ? (\n          <MessageText\n            body={talk ? talk.lead : body}",
           "<Receipts message={m} />",
           "{cards}\n        {/* Its tools after",
           "<ConsultGroup message={m} color={color} />",

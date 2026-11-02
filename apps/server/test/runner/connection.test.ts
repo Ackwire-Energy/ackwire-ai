@@ -29,6 +29,7 @@ afterEach(() => removeDirs(dirs));
 class FakeSocket implements Socket {
   readonly sent: Record<string, unknown>[] = [];
   closed = false;
+  bufferedAmount = 0;
   constructor(readonly handlers: SocketHandlers) {}
   send(data: string) {
     this.sent.push(JSON.parse(data) as Record<string, unknown>);
@@ -538,4 +539,73 @@ test("no room for a turn: idle warm CLIs close first, one at a time, before no_s
   release();
   await Promise.all(holding);
   runner.close();
+});
+
+test("backpressure drops only browser pictures and observations are resent after reconnect", async () => {
+  const egress = { ip: "8.8.8.8", country: "US" };
+  const { sockets, connection } = setup({ egress: () => egress });
+  const done = connection.run();
+  await waitFor(() => sockets.length === 1);
+  const s = sock(sockets, 0);
+  s.handlers.onOpen();
+  s.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25000, observeEgress: true });
+  s.frame({ type: "ping", at: 1 });
+  s.frame({ type: "ping", at: 2 });
+  expect(s.sent.filter((f) => f.type === "pong")).toEqual([
+    { type: "pong", at: 1, egress },
+    { type: "pong", at: 2 },
+  ]);
+  s.bufferedAmount = 3 * 1024 * 1024;
+  connection.send({
+    type: "browser.frame",
+    agentId: "a",
+    seq: 1,
+    data: "eA==",
+    metadata: { deviceWidth: 1, deviceHeight: 1 },
+  });
+  expect(s.sent.some((f) => f.type === "browser.frame")).toBe(false);
+  s.frame({ type: "ping", at: 3 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 3 });
+  s.bufferedAmount = 0;
+  connection.send({
+    type: "browser.frame",
+    agentId: "a",
+    seq: 2,
+    data: "eA==",
+    metadata: { deviceWidth: 1, deviceHeight: 1 },
+  });
+  expect(s.sent.at(-1)?.type).toBe("browser.frame");
+  connection.reconnect();
+  await waitFor(() => sockets.length === 2);
+  const next = sock(sockets, 1);
+  next.handlers.onOpen();
+  next.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25000, observeEgress: true });
+  next.frame({ type: "ping", at: 4 });
+  expect(next.sent.at(-1)).toEqual({ type: "pong", at: 4, egress });
+  connection.stop();
+  await done;
+});
+
+test("personal computers never read or emit egress, including direct out-of-band frames", async () => {
+  let samples = 0;
+  const { sockets, connection } = setup({
+    egress: () => {
+      samples++;
+      return { ip: "8.8.8.8" };
+    },
+  });
+  const done = connection.run();
+  await waitFor(() => sockets.length === 1);
+  const s = sock(sockets, 0);
+  s.handlers.onOpen();
+  s.frame({ type: "welcome", machineId: "m1", name: "Personal", heartbeatMs: 25000 });
+  s.frame({ type: "ping", at: 1 });
+  connection.send({ type: "pong", at: 2, egress: { ip: "8.8.8.8", country: "US" } });
+  expect(samples).toBe(0);
+  expect(s.sent.filter((f) => f.type === "pong")).toEqual([
+    { type: "pong", at: 1 },
+    { type: "pong", at: 2 },
+  ]);
+  connection.stop();
+  await done;
 });

@@ -172,6 +172,7 @@ import type {
   Skill,
   SkillDetail,
   SkillPick,
+  SpeechKey,
   StartChoice,
   StorageConfig,
   StorageMigration,
@@ -425,6 +426,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       gifKey: () => nullOn(404, () => request<GifKey>("/api/app/gif-key")),
       saveGifKey: (apiKey) => request<GifKey>("/api/app/gif-key", { method: "PUT", json: { apiKey } }),
       removeGifKey: () => request<GifKey>("/api/app/gif-key", { method: "DELETE" }),
+      speechKey: () => nullOn(404, () => request<SpeechKey>("/api/app/speech-key")),
+      saveSpeechKey: (input) => request<SpeechKey>("/api/app/speech-key", { method: "PUT", json: input }),
+      removeSpeechKey: () => request<SpeechKey>("/api/app/speech-key", { method: "DELETE" }),
     },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),
@@ -690,6 +694,21 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         return files.upload<ImportedFile>(`${org(orgId)}/imports/files`, form);
       },
       exportUrl: (orgId) => `${base}${org(orgId)}/export`,
+    },
+    voice: {
+      allowed: (orgId) => request<{ allowed: boolean }>(`${org(orgId)}/voice/allowed`),
+      send: (orgId, channelId, input) => {
+        const form = new FormData();
+        const name = input.blob.type.startsWith("audio/webm") ? "voice.webm" : "voice.m4a";
+        form.set("file", input.blob, name);
+        form.set("durationMs", String(Math.round(input.durationMs)));
+        form.set("peaks", JSON.stringify(input.peaks));
+        form.set("clientId", input.clientId);
+        if (input.threadId) form.set("threadId", input.threadId);
+        if (input.replyTo) form.set("replyTo", input.replyTo);
+        if (input.language) form.set("language", input.language);
+        return files.upload<{ clipId: string }>(`${org(orgId)}/channels/${enc(channelId)}/voice`, form);
+      },
     },
     chat: {
       channels: async (orgId) => (await request<{ channels: Channel[] }>(`${org(orgId)}/channels`)).channels,

@@ -19,5 +19,5 @@ export const instanceSecrets = pgTable(
     updatedBy: text().references(() => users.id, { onDelete: "set null" }),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [check("instance_secrets_name", sql`${t.name} in ('typesafe', 'giphy')`)],
+  (t) => [check("instance_secrets_name", sql`${t.name} in ('typesafe', 'giphy', 'speech')`)],
 );

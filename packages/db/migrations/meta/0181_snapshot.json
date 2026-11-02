@@ -1,5 +1,5 @@
 {
-  "id": "f46bddc6-8700-4754-996e-0c7029efc6e6",
+  "id": "4847ffb9-0ae5-4686-8509-b8b27a7792ca",
   "prevId": "985f17c2-d660-4f5f-a306-140bbd9a2065",
   "version": "7",
   "dialect": "postgresql",
@@ -8776,6 +8776,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "egress": {
+          "name": "egress",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "network_transition": {
+          "name": "network_transition",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "resume_tasks": {
           "name": "resume_tasks",
           "type": "boolean",
@@ -12564,24 +12576,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "agent_run_steps_run_id_index": {
-          "name": "agent_run_steps_run_id_index",
-          "columns": [
-            {
-              "expression": "run_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"agent_run_steps\".\"kind\" = 'error' and \"agent_run_steps\".\"data\"->>'reason' = 'brain_unavailable'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "agent_run_steps_run_id_agent_runs_id_fk": {
           "name": "agent_run_steps_run_id_agent_runs_id_fk",
@@ -12867,21 +12862,6 @@
               "asc": true,
               "nulls": "last"
             },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agent_runs_created_at_index": {
-          "name": "agent_runs_created_at_index",
-          "columns": [
             {
               "expression": "created_at",
               "isExpression": false,
@@ -15329,21 +15309,6 @@
               "asc": true,
               "nulls": "last"
             },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_records_created_at_index": {
-          "name": "usage_records_created_at_index",
-          "columns": [
             {
               "expression": "created_at",
               "isExpression": false,

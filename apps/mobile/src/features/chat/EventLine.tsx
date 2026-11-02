@@ -84,7 +84,11 @@ export function EventLine({
   if (consulted)
     return (
       <View style={styles.line}>
-        <ConsultationCard askerId={consulted.askerId} consultation={consulted.consultation} />
+        <ConsultationCard
+          askerId={consulted.askerId}
+          consultation={consulted.consultation}
+          channelId={message.channelId}
+        />
       </View>
     );
   if (!line) return null;

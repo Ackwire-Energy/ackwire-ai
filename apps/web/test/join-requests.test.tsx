@@ -683,6 +683,8 @@ describe("Members › Esperando você", () => {
     expect(ana.querySelector(".members-row__name")?.textContent).toBe("Ana Souza");
     expect(ana.textContent).toContain("ana@estudio.com");
     expect(stateOf(ana)).toBe("Pediu pelo link há 2 h");
+    // The state's icon on its words' first line, as every icon line.
+    expect(ana.querySelector(".members-row__state")?.classList.contains("ac-iconline")).toBe(true);
     // What they wrote, as they wrote it, in a well under the row.
     expect(noteOf(ana)).toBe("“Designer nova da Paula”");
     const chips = (el: HTMLElement) => [...el.querySelectorAll(".ac-chip")].map((c) => c.textContent);
@@ -690,6 +692,7 @@ describe("Members › Esperando você", () => {
     // Nobody proved Bruno's address: "Não verificado", the only hint approving can't add him at once.
     const bruno = card("Bruno Lima");
     expect(chips(bruno)).toEqual(["Não verificado"]);
+    expect(bruno.querySelector(".members-row__flag > .ac-chip")?.textContent).toBe("Não verificado");
     expect(stateOf(bruno)).toMatch(/^Pediu pelo link em \d+ \S+$/);
     expect(noteOf(bruno)).toBeNull();
     // A member's suggestion says who suggested it, and never "Não verificado": nobody was asked to prove anything.

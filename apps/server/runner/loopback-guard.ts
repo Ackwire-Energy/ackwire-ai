@@ -3,6 +3,7 @@ import path from "node:path";
 import { NETWORK_ENV } from "./accounts";
 import { browserBand, checkEphemeralRange, EPHEMERAL_RANGE_FILE, validateBrowserUidRange } from "./browser-ports";
 import { parseService } from "./config";
+import { networkMarkExemption, validateNetworkMark } from "./network-mark";
 import { AGENTS_CGROUP, agentCgroup, agentSlice, type RunCommand, runSync, systemdBooted } from "./service";
 
 /**
@@ -103,6 +104,7 @@ export interface RulesetInput {
   uidRange: [number, number];
   /** What agents may reach of the computer's own listeners besides DNS (`tcp/11434`). */
   services: string[];
+  networkMark?: number;
   /** Interfaces with a default route (`defaultRouteInterfaces`). */
   uplinks: string[];
   /** False where the kernel has no `nft_reject_inet`: a refused connection is dropped (it hangs, then fails). */
@@ -131,6 +133,7 @@ export function renderRuleset(i: RulesetInput): string {
     `\tset uplinks {\n\t\ttype ifname${elements(i.uplinks.map((name) => JSON.stringify(name)))}\n\t}`,
     "\tchain output {",
     "\t\ttype filter hook output priority filter; policy accept;",
+    ...networkMarkExemption(i.networkMark),
     '\t\toif "lo" meta l4proto { tcp, udp } ct state new jump sender',
     '\t\tct state { new, untracked } socket cgroupv2 level 1 "agents.slice" jump agent_out',
     `\t\tct state { new, untracked } meta skuid ${uids} socket cgroupv2 level 1 != "agents.slice" jump agent_out`,
@@ -156,6 +159,7 @@ export function renderRuleset(i: RulesetInput): string {
     "\t}",
     "\tchain input {",
     "\t\ttype filter hook input priority filter; policy accept;",
+    ...networkMarkExemption(i.networkMark),
     '\t\tiif "lo" meta l4proto { tcp, udp } ct state new jump local',
     "\t}",
     // Where it goes: the socket the kernel delivers it to (for a SYN, the listener).
@@ -186,6 +190,7 @@ export interface LoopbackGuardOptions {
   uidRange: [number, number];
   /** What else of the computer agents may reach (`tcp/11434`), read at every check. */
   services?: () => string[];
+  networkMark?: number;
   log: (line: string) => void;
   run?: RunCommand;
   /** Tests: the computer's state. */
@@ -232,6 +237,7 @@ export class LoopbackGuard {
   private lastError = "";
 
   constructor(private readonly opts: LoopbackGuardOptions) {
+    if (opts.networkMark !== undefined) validateNetworkMark(opts.networkMark);
     this.run = opts.run ?? runSync;
     this.rulesetFile = path.join(opts.home, "loopback-guard.nft");
     this.reject = opts.reject ?? true;
@@ -274,6 +280,16 @@ export class LoopbackGuard {
       }
     }, GUARD_RESCAN_MS);
     this.timer.unref?.();
+  }
+
+  setNetworkMark(mark: number | undefined): boolean {
+    if (mark !== undefined) validateNetworkMark(mark);
+    if (this.opts.networkMark === mark) return true;
+    const before = this.opts.networkMark;
+    this.opts.networkMark = mark;
+    if (this.reconcile()) return true;
+    this.opts.networkMark = before;
+    return false;
   }
 
   stop() {
@@ -332,7 +348,7 @@ export class LoopbackGuard {
     }
     const services = listed.filter((s) => serviceElement(s) !== null).sort();
     const uplinks = defaultRouteInterfaces(...(this.opts.routes ?? procRoutes)());
-    const input = { agents, uidRange: this.opts.uidRange, services, uplinks };
+    const input = { agents, uidRange: this.opts.uidRange, services, uplinks, networkMark: this.opts.networkMark };
     return { key: JSON.stringify({ ...input, root, ids }), input };
   }
 

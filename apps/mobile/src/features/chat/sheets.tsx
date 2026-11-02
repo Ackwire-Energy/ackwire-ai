@@ -24,6 +24,7 @@ import {
 } from "@agenteschat/client";
 import { textOrMedia } from "@agenteschat/client/lib/media";
 import { summaryParts } from "@agenteschat/client/lib/missions";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
@@ -97,7 +98,8 @@ export function MessageActions({
   const pills = reactionPills(cached.data ?? m.reactions, meId);
   const agentName = m.author.type === "agent" ? dir.nameOf(m.author) : "";
   const rootId = m.threadId ?? m.id;
-  const text = previewOf(m.body);
+  // A voice message is its audio: no words to preview or copy here.
+  const text = voiceOf(m.meta) ? "" : previewOf(m.body);
   const react = (emoji: string) => {
     tapHaptic();
     const reaction = reactionName(emoji);

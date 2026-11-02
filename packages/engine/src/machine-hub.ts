@@ -534,6 +534,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       .update(machines)
       .set({
         online: true,
+        egress: null,
         connectedReplica: replicaId,
         lastSeenAt: now,
         hostname: frame.hostname,
@@ -591,7 +592,14 @@ export function createMachineHub(deps: MachineHubDeps) {
         : [];
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
-    send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs, mcpOnce: true });
+    send(conn, {
+      type: "welcome",
+      machineId: machine.id,
+      name: machine.name,
+      heartbeatMs,
+      mcpOnce: true,
+      observeEgress: machine.kind === "managed",
+    });
     // The workspace's own computer (ADR 0056 §10): ready on its first hello, with its agents, before they are listed.
     const readyEmail = deps.readyEmail ? { ...deps.readyEmail, machines: hub } : null;
     await onManagedMachineHello({ db, pubsub, readyEmail }, machine).catch((error) =>
@@ -804,10 +812,25 @@ export function createMachineHub(deps: MachineHubDeps) {
    * A `pong`: `last_seen_at` at most every 40 s, and the day's load (protocol 22) or its agents' browsers'
    * traffic (protocol 23) whenever the runner has a new one.
    */
-  async function touch(conn: MachineConnection, { load, browserTraffic }: Extract<RunnerFrame, { type: "pong" }>) {
+  async function touch(
+    conn: MachineConnection,
+    { load, browserTraffic, egress, networkTransition }: Extract<RunnerFrame, { type: "pong" }>,
+  ) {
     conn.lastPong = Date.now();
     if (!conn.machineId) return;
-    if (!load && !browserTraffic && Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)) return;
+    // The authenticated database kind is authoritative, including for an older or modified personal runner.
+    if (conn.kind !== "managed") {
+      egress = undefined;
+      networkTransition = undefined;
+    }
+    if (
+      !load &&
+      !browserTraffic &&
+      !egress &&
+      networkTransition === undefined &&
+      Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)
+    )
+      return;
     conn.lastSeenWrite = Date.now();
     const now = new Date();
     const at = now.toISOString();
@@ -834,16 +857,25 @@ export function createMachineHub(deps: MachineHubDeps) {
     const wasWarned = prev?.diskWarned === true;
     const use = next?.diskUse;
     const diskWarned = use === undefined ? wasWarned : use >= DISK_WARN_USE || (wasWarned && use >= DISK_REARM_USE);
-    await db
+    const changed = await db
       .update(machines)
       .set({
         lastSeenAt: now,
         online: true,
+        ...(networkTransition !== undefined ? { networkTransition } : {}),
         ...(next ? { load: { ...next, ...(diskWarned ? { diskWarned } : {}), at } } : {}),
         ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
+        ...(conn.kind !== "managed" ? { egress: null } : egress ? { egress: { ...egress, at } } : {}),
       })
       .where(and(eq(machines.id, machineId), eq(machines.connectedReplica, replicaId)))
-      .catch(() => undefined);
+      .returning({ id: machines.id })
+      .catch(() => []);
+    if (networkTransition !== undefined && changed.length && conn.orgId) {
+      await publishMachineUpdated(pubsub, conn.orgId, machineId, { networkTransition });
+    }
+    if (egress && changed.length && conn.orgId) {
+      await publishMachineUpdated(pubsub, conn.orgId, machineId, { egress: egress.ip ? { ...egress, at } : null });
+    }
     if (stored && diskWarned && !wasWarned && use !== undefined) {
       await notifyComputerDiskFull(
         { db, pubsub },

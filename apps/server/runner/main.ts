@@ -983,7 +983,12 @@ async function desktopCheck(p: Parsed): Promise<number> {
   try {
     if (stored?.mode === "system") {
       const u = new AgentUsers({ home, range: stored.agentUidRange ?? DEFAULT_AGENT_UID_RANGE }).ensure(agent);
-      const launcher = systemLauncher(u);
+      const launcher = systemLauncher({
+        ...u,
+        networkLauncher: stored.networkLauncher,
+        networkMark: stored.networkMark,
+        networkRevision: stored.networkRevision,
+      });
       const desktop = await checkDesktop(
         report,
         home,

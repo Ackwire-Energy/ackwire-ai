@@ -562,7 +562,7 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { locale, auto } = c.req.valid("json");
-      await setMyLocale(db, c.get("user").id, locale, auto);
+      await setMyLocale(db, c.get("user").id, locale, auto, deps.adapters.pubsub);
       return c.body(null, 204);
     },
   );
