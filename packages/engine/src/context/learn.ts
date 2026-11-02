@@ -26,7 +26,10 @@ const OUTSIDE_MARK = /<\s*(?:external_data|page_content|email_content|database_r
 
 /** A call that brought outside content into the run. */
 export const readsOutside = (c: RunCall) =>
-  OUTSIDE_TOOLS.has(c.name) || c.name.startsWith("browser_") || OUTSIDE_MARK.test(c.result?.content ?? "");
+  OUTSIDE_TOOLS.has(c.name) ||
+  c.name.startsWith("browser_") ||
+  c.result?.external === true ||
+  OUTSIDE_MARK.test(c.result?.content ?? "");
 
 /**
  * How far what a run learns is trusted (ADR 0120): high only with a person behind it (`personBehindCall`) and no

@@ -215,7 +215,11 @@ export async function runCalls(db: Database, run: { id: string; orgId: string })
     if (kind === "tool_call") calls.set(id, { name, input: data.input });
     else {
       const call = calls.get(id) ?? { name, input: undefined };
-      call.result = { content: String(data.content ?? ""), isError: data.isError === true };
+      call.result = {
+        content: String(data.content ?? ""),
+        isError: data.isError === true,
+        external: data.external === true,
+      };
       calls.set(id, call);
     }
   }
@@ -225,7 +229,8 @@ export async function runCalls(db: Database, run: { id: string; orgId: string })
 export interface RunCall {
   name: string;
   input: unknown;
-  result?: { content: string; isError?: boolean };
+  /** `external`: an outside tool's answer (an MCP server), recorded without its envelope. */
+  result?: { content: string; isError?: boolean; external?: boolean };
 }
 
 export type TurnKind = "conversation" | "agents_dm" | "routine";
