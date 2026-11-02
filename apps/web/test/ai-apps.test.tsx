@@ -416,6 +416,23 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     expect(screen().getByRole("dialog").textContent).toContain("A pessoa não é avisada.");
   });
 
+  test("in the whole workspace, one's own app is one's own: no De …, no 'not notified'", async () => {
+    const state = seedState();
+    const me = { id: state.me?.user.id ?? "", name: state.me?.user.name ?? "" };
+    await go(state, (apps) => {
+      apps.connect({ name: "Cursor", brand: "cursor", displayKind: "app_scheme", person: me });
+    });
+    await pickTab(section().getByRole("tab", { name: "Todo o workspace" }));
+    const list = section().getByRole("region", { name: "Conectados" });
+    expect(list.textContent).not.toContain(`De ${me.name}`);
+    await click(
+      (await openMenu(within(list).getByRole("button", { name: "Opções de Cursor" }))).getByRole("menuitem", {
+        name: "Desconectar",
+      }),
+    );
+    expect(screen().getByRole("dialog").textContent).not.toContain("A pessoa não é avisada.");
+  });
+
   test("a member without manage_members sees only their own", async () => {
     const state = seedState();
     meWithRole(state, ["read", "post"]);

@@ -1,5 +1,5 @@
 import type { AppAccess, AppsList, ConnectedApp, Me, PersonalToken, PersonalTokenInput } from "@agenteschat/client";
-import { ApiError, keys, useAppActions, useApps } from "@agenteschat/client";
+import { ApiError, keys, useAppActions, useApps, useMe } from "@agenteschat/client";
 import {
   APP_CLIENTS,
   type AppClientId,
@@ -169,8 +169,12 @@ function AppsBody({
   onConfirm: (c: Confirm) => void;
 }) {
   const { t } = useTranslation();
+  const myId = useMe().data?.user.id;
   if (loading) return <LoadingList count={2} trailing />;
   if (error || !list) return <ErrorState error={error} onRetry={onRetry} />;
+  // In the whole workspace's list, one's own rows say no "De …".
+  const own = <T extends { person?: { id: string } }>(item: T): T =>
+    item.person?.id === myId ? { ...item, person: undefined } : item;
   return (
     <>
       {isAppsEmpty(list) && !whole ? (
@@ -183,7 +187,7 @@ function AppsBody({
             </h2>
             <List aria-label={t("apps.connected")}>
               {list.apps.map((app) => (
-                <AppRow key={app.id} app={app} onDisconnect={() => onConfirm({ kind: "app", item: app })} />
+                <AppRow key={app.id} app={own(app)} onDisconnect={() => onConfirm({ kind: "app", item: own(app) })} />
               ))}
             </List>
           </Card>
@@ -206,7 +210,11 @@ function AppsBody({
         {list.tokens.length > 0 ? (
           <List aria-label={t("apps.tokens.title")}>
             {list.tokens.map((token) => (
-              <TokenRow key={token.id} token={token} onRevoke={() => onConfirm({ kind: "token", item: token })} />
+              <TokenRow
+                key={token.id}
+                token={own(token)}
+                onRevoke={() => onConfirm({ kind: "token", item: own(token) })}
+              />
             ))}
           </List>
         ) : (
