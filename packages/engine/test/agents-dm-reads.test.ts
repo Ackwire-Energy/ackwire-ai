@@ -257,6 +257,35 @@ describe("the agents' DM: routines of different people read apart", () => {
     expect((await bobTools("list_artifacts", {})).content).not.toContain("Payroll export");
     expect(await bobTools("read_artifact", { artifact_id: id })).toMatchObject({ isError: true });
   });
+
+  test("a summary that may cover more than it names stays out", async () => {
+    const { infra, dm, answer, forAna } = await twoConsultations();
+    const summaryOf = async (kind: "period_summary" | "thread_summary", sourceIds: string[]) => {
+      const item = await insertContextItem(f.db, {
+        orgId: f.org.id,
+        kind,
+        scopeType: "channel",
+        scopeId: dm.id,
+        agentId: infra.id,
+        content: `Payroll ${kind}: figures were shared.`,
+        sourceIds,
+        channelIds: [dm.id],
+      });
+      await indexSource(f.context, { orgId: f.org.id, kind: "context_item", sourceId: item.id });
+      return item;
+    };
+    const expand = async (itemId: string) =>
+      (await toolsOf(createContextToolSource(f.context), forAna.infra))("expand", { item_id: itemId });
+    const short = await summaryOf("thread_summary", [answer.id]);
+    expect((await expand(short.id)).isError).toBeFalsy();
+    const period = await summaryOf("period_summary", [answer.id]);
+    expect(await expand(period.id)).toMatchObject({ isError: true });
+    const capped = await summaryOf(
+      "thread_summary",
+      Array.from({ length: 200 }, () => answer.id),
+    );
+    expect(await expand(capped.id)).toMatchObject({ isError: true });
+  });
 });
 
 describe("read_artifact allows what list_artifacts offers", () => {

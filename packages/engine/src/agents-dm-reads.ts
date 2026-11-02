@@ -30,6 +30,9 @@ export async function readerOfMessage(db: Executor, orgId: string, messageId: st
 export const readerOfRun = async (db: Executor, orgId: string, runId: string | null | undefined) =>
   runId ? readerOf(await runAuthorityById(db, orgId, runId)) : null;
 
+/** Summaries keep only their last 200 source ids (`summaries.ts`), so one this long may cover more than it names. */
+const SUMMARY_SOURCES_KEPT = 200;
+
 /**
  * What a run in the agents' DM may read of that DM (ADR 0053 §9). Every person's consultations between two agents
  * land in the one DM, so explicit reads there (search hits, memories, summaries, past steps, files) keep only what
@@ -81,9 +84,19 @@ export async function agentsDmReads(
   return {
     channelId,
     ofMessages,
-    /** A memory or summary from this DM only when every message it came from was; one from elsewhere passes. */
-    item: (item: { kind: string; channelIds: string[]; sourceIds: string[] }) =>
-      item.channelIds.includes(channelId) ? ofMessages(item.sourceIds) : Promise.resolve(true),
+    /**
+     * A memory or summary from this DM only when every message it came from was; one from elsewhere passes. A
+     * summary that may cover more messages than it names (a period's, a capped thread's) never does.
+     */
+    item: (item: { kind: string; channelIds: string[]; sourceIds: string[] }) => {
+      if (!item.channelIds.includes(channelId)) return Promise.resolve(true);
+      if (
+        item.kind === "period_summary" ||
+        (item.kind === "thread_summary" && item.sourceIds.length >= SUMMARY_SOURCES_KEPT)
+      )
+        return Promise.resolve(false);
+      return ofMessages(item.sourceIds);
+    },
     ofRun,
   };
 }
