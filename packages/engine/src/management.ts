@@ -267,13 +267,10 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     .select({ n: sql<number>`count(*)::int` })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
-  const admin = can(membership, "approve_actions");
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
-    .where(
-      and(eq(approvals.orgId, orgId), eq(approvals.status, "pending"), admin ? undefined : decidableBySql(actorId)),
-    );
+    .where(and(eq(approvals.orgId, orgId), eq(approvals.status, "pending"), decidableBySql(actorId)));
   return {
     name: membership.orgName,
     role: membership.role,

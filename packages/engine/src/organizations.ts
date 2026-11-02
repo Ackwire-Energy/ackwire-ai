@@ -1042,7 +1042,7 @@ export async function removeMember(
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
-  const { released, removed, handed, changed } = await db.transaction(async (tx) => {
+  const { released, removed, handed, changed, heir } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -1101,7 +1101,7 @@ export async function removeMember(
           .update(agents)
           .set({ ownerUserId: heir, updatedAt: new Date() })
           .where(and(eq(agents.orgId, orgId), eq(agents.ownerUserId, targetUserId)))
-          .returning({ id: agents.id })
+          .returning()
       : [];
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, {
@@ -1132,13 +1132,19 @@ export async function removeMember(
           ),
         );
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
-    return { released, removed, handed, changed };
+    return { released, removed, handed, changed, heir };
   });
   forgetAgents(
     orgId,
     handed.map((a) => a.id),
   );
   if (handed.length) caches.agents.delete(`${orgId}:team`);
+  if (heir && handed.length) {
+    const { handOver } = await import("./agents");
+    for (const agent of handed) {
+      await handOver({ db, pubsub: options.pubsub }, actorId, { ...agent, ownerUserId: targetUserId }, heir);
+    }
+  }
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);

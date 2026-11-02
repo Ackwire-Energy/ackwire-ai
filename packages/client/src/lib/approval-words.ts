@@ -261,6 +261,18 @@ export function approvalGroupWaitsFor(items: Pick<Approval, "approvers" | "statu
 }
 
 /**
+ * The keys that let someone decide any approval of its kind, as the server's `decidingKeys` (engine `approvals.ts`):
+ * `approve_actions`; turning on access for good (`request_permission`), the keys that give it on the agent's page.
+ */
+export function approvalDecidingKeys(a: Pick<Approval, "tool" | "params">): string[] {
+  if (a.tool !== "request_permission") return ["approve_actions"];
+  const permission = a.params?.permission;
+  return typeof permission === "string" && permission.startsWith("browser-profile:")
+    ? ["manage_agents", "manage_connectors"]
+    : ["manage_agents"];
+}
+
+/**
  * The line saying the person whose request it is decides it too, as an approver by role (ADR 0126): while it waits
  * and once they decided it. Null for any other approval.
  */

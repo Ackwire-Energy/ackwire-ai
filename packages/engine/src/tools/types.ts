@@ -166,8 +166,9 @@ export interface ToolDefinition {
   /** Human summary of a call, for approval cards. */
   describe?(input: Record<string, unknown>): { title: string; detail?: string };
   /**
-   * Our own tools only (`request_approval`, ADR 0126): who decides this call's approval instead of the agent's owner
-   * and admins; `requestedBy` is the person behind the run. A message refuses the call (a role that isn't there).
+   * Our own tools only (`request_approval`, ADR 0126; a person's own mailbox, ADR 0038): who decides this call's
+   * approval instead of the agent's owner and admins; `requestedBy` is the person behind the run. A message refuses
+   * the call (a role that isn't there).
    */
   approvers?(
     input: Record<string, unknown>,

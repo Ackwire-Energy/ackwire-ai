@@ -409,7 +409,10 @@ export const approvalStatusEnum = pgEnum("approval_status", [
   "canceled",
 ]);
 
-/** Who decides an approval an agent asked with `request_approval` (ADR 0126). */
+/**
+ * Who decides an approval an agent asked with `request_approval` (ADR 0126), or one in a person's own mailbox (its
+ * owner, ADR 0038).
+ */
 export interface ApprovalApprovers {
   /** The people asked: those named and the holders of the role named; empty: the agent's owner and admins. */
   userIds: string[];
@@ -419,6 +422,8 @@ export interface ApprovalApprovers {
   requestedBy: string | null;
   /** The requester holds the role named: they may decide it, and the card says so. */
   requesterDecides: boolean;
+  /** Only `userIds` decide it, admins too: someone else asked to act in that person's own mailbox. */
+  required?: boolean;
 }
 
 /**

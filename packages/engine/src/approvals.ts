@@ -26,9 +26,9 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
 import { type MailPreview, parseMailDetail, withoutReplyPrefix } from "./mail/preview";
 import { notifyApproval, resolveApprovalNotifications } from "./notification-producers";
-import { can, requirePermission } from "./organizations";
+import { can, type Membership, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
-import { maySql } from "./permissions";
+import { maySql, type RolePermission } from "./permissions";
 import { AHEAD_GRACE_MS, type Approval } from "./tools/gateway";
 import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 import type { ApprovalOrigin } from "./tools/run-policy";
@@ -45,6 +45,7 @@ const {
   mailAccounts,
   messages,
   routines,
+  users,
 } = schema;
 
 /** The email a mail approval would write (a draft, a send, a reply or a forward), as its card shows it. */
@@ -419,51 +420,79 @@ const aheadLive = (a: Pick<Approval, "runAt" | "status" | "executedAt">) =>
  */
 export const adminsDecide = (approval: Pick<Approval, "tool">) => approval.tool === REQUEST_PERMISSION_TOOL;
 
+const BROWSER_PROFILE_PREFIX = "browser-profile:";
+
 /**
- * Whether `actorId` may decide `approval`: whoever may approve actions (`admin`), the agent's owner (`adminsDecide`
- * aside), or for one asked with `request_approval` the people it names instead of the owner (ADR 0126). The person
- * whose request it was never decides it, unless they approve by role (admins, the role it names).
+ * The keys that let someone decide any approval of its kind: `approve_actions`; for `request_permission`, the keys
+ * that give the same access on the agent's page (`manage_agents`, and `manage_connectors` for a browser profile).
+ */
+export function decidingKeys(approval: Pick<Approval, "tool"> & Partial<Pick<Approval, "params">>): RolePermission[] {
+  if (!adminsDecide(approval)) return ["approve_actions"];
+  const permission = approval.params?.permission;
+  return typeof permission === "string" && permission.startsWith(BROWSER_PROFILE_PREFIX)
+    ? ["manage_agents", "manage_connectors"]
+    : ["manage_agents"];
+}
+
+/**
+ * Whether `actorId` may decide `approval`: whoever holds its `decidingKeys` (admins), the agent's owner
+ * (`adminsDecide` aside), or for one asked with `request_approval` the people it names instead of the owner (ADR
+ * 0126). The person whose request it was never decides it, unless they approve by role (admins, the role it names).
+ * One in someone's own mailbox that someone else asked (`required`) only that person decides.
  */
 export function decides(
-  approval: Pick<Approval, "ownerUserId" | "tool"> & Partial<Pick<Approval, "approvers">>,
+  approval: Pick<Approval, "ownerUserId" | "tool"> & Partial<Pick<Approval, "approvers" | "params">>,
   actorId: string,
-  admin: boolean,
+  membership: Pick<Membership, "permissions"> | null,
 ) {
   const named = approval.approvers;
-  if (admin) return true;
+  if (named?.required) return named.userIds.includes(actorId);
+  if (decidingKeys(approval).every((key) => can(membership, key))) return true;
   if (named?.requestedBy === actorId && !named.requesterDecides) return false;
   if (adminsDecide(approval)) return false;
   return named?.userIds.length ? named.userIds.includes(actorId) : approval.ownerUserId === actorId;
 }
 
-/** `decides` for someone who doesn't approve every action, as SQL over `approvals` (the sidebar's count). */
-export const decidableBySql = (actorId: string) => sql`(
-  ${approvals.tool} <> ${REQUEST_PERMISSION_TOOL}
-  and not (coalesce(${approvals.approvers} ->> 'requestedBy', '') = ${actorId}
-    and not coalesce((${approvals.approvers} ->> 'requesterDecides')::boolean, false))
-  and case when jsonb_array_length(coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb)) > 0
+/** `decides` as SQL over `approvals` (the sidebar's count). */
+export const decidableBySql = (actorId: string) => sql`(case
+  when coalesce((${approvals.approvers} ->> 'required')::boolean, false)
     then ${approvals.approvers} -> 'userIds' @> to_jsonb(${actorId}::text)
-    else ${approvals.ownerUserId} is not distinct from ${actorId} end)`;
+  when ${approvals.tool} = ${REQUEST_PERMISSION_TOOL}
+    then ${maySql(approvals.orgId, actorId, "manage_agents")}
+      and (coalesce(${approvals.params} ->> 'permission', '') not like ${`${BROWSER_PROFILE_PREFIX}%`}
+        or ${maySql(approvals.orgId, actorId, "manage_connectors")})
+  when ${maySql(approvals.orgId, actorId, "approve_actions")} then true
+  when coalesce(${approvals.approvers} ->> 'requestedBy', '') = ${actorId}
+    and not coalesce((${approvals.approvers} ->> 'requesterDecides')::boolean, false) then false
+  when jsonb_array_length(coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb)) > 0
+    then ${approvals.approvers} -> 'userIds' @> to_jsonb(${actorId}::text)
+  else ${approvals.ownerUserId} is not distinct from ${actorId} end)`;
 
 /**
- * The people asked to decide (the card's badge, the inbox, push, email): whoever may approve actions (ADR 0085) and
- * the agent's owner (`adminsDecide` aside); for one asked with `request_approval`, the people it names instead,
- * without the person whose request it was unless they approve by role (ADR 0126). Nobody left: the admins.
+ * The people asked to decide (the card's badge, the inbox, push, email): whoever holds its `decidingKeys` (ADR 0085)
+ * and the agent's owner (`adminsDecide` aside); for one asked with `request_approval`, the people it names instead,
+ * without the person whose request it was unless they approve by role (ADR 0126). Nobody left: the admins. One that
+ * `required` its people: only them.
  */
 export async function approverIds(
   db: Database,
-  approval: Pick<Approval, "orgId" | "ownerUserId"> & Partial<Pick<Approval, "tool" | "approvers">>,
+  approval: Pick<Approval, "orgId" | "ownerUserId"> & Partial<Pick<Approval, "tool" | "approvers" | "params">>,
 ) {
+  const keys = decidingKeys({ tool: approval.tool ?? "", params: approval.params ?? {} });
   const members = await db
     .select({
       userId: organizationMembers.userId,
-      admin: maySql(approval.orgId, organizationMembers.userId, "approve_actions"),
+      admin: sql<boolean>`(${sql.join(
+        keys.map((key) => maySql(approval.orgId, organizationMembers.userId, key)),
+        sql` and `,
+      )})`,
     })
     .from(organizationMembers)
     .where(eq(organizationMembers.orgId, approval.orgId));
   const admins = members.filter((m) => m.admin).map((m) => m.userId);
   const member = new Set(members.map((m) => m.userId));
   const named = approval.approvers;
+  if (named?.required) return named.userIds.filter((id) => member.has(id));
   const ids = new Set(
     named?.userIds.length
       ? named.userIds.filter((id) => member.has(id))
@@ -477,6 +506,61 @@ export async function approverIds(
   const requester = named?.requestedBy;
   if (requester && !named.requesterDecides && !admins.includes(requester)) ids.delete(requester);
   return ids.size > 0 ? [...ids] : admins;
+}
+
+/** People's names as a card says who decides: "Ana, Bruno e Caio" is the app's; here "Ana, Bruno, Caio +2". */
+export const namesLabel = (names: string[]) =>
+  names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : names.join(", ");
+
+/** These people's names, in their order (those gone left out). */
+export async function namesOf(db: Executor, ids: string[]) {
+  if (ids.length === 0) return [];
+  const rows = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids));
+  const byId = new Map(rows.map((r) => [r.id, r.name]));
+  return ids.map((id) => byId.get(id)).filter((n): n is string => !!n);
+}
+
+/**
+ * The agents changed owner: their approvals still waiting, or approved ahead and not run, are decided against the new
+ * owner from now on (`ownerUserId`, which `decides` and `approverIds` read), and the inbox follows: the old owner's
+ * items go, the new owner's come. A `request_approval` that asked the owner (no one named) says the new names.
+ */
+export async function repointApprovals(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  agentIds: string[],
+  ownerUserId: string | null,
+) {
+  if (agentIds.length === 0) return;
+  const rows = await deps.db
+    .update(approvals)
+    .set({ ownerUserId })
+    .where(
+      and(
+        eq(approvals.orgId, orgId),
+        inArray(approvals.agentId, agentIds),
+        sql`${approvals.ownerUserId} is distinct from ${ownerUserId}`,
+        or(
+          eq(approvals.status, "pending"),
+          and(eq(approvals.status, "approved"), isNull(approvals.executedAt), sql`${approvals.runAt} is not null`),
+        ),
+      ),
+    )
+    .returning();
+  for (const row of rows) {
+    if (row.status !== "pending") continue;
+    let current = row;
+    if (row.approvers && row.approvers.userIds.length === 0) {
+      const label = namesLabel(await namesOf(deps.db, await approverIds(deps.db, row)));
+      const approvers = { ...row.approvers, label };
+      await deps.db.update(approvals).set({ approvers }).where(eq(approvals.id, row.id));
+      current = { ...row, approvers };
+    }
+    await resolveApprovalNotifications(deps, current).catch(() => {});
+    if (ownerUserId && (await approverIds(deps.db, current)).includes(ownerUserId)) {
+      await notifyApproval(deps, current, [ownerUserId]).catch(() => {});
+    }
+  }
 }
 
 /** Tells the channel and every approver about an approval (card in the chat, badge on the Approvals screen). */
@@ -517,7 +601,7 @@ async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | 
 
 async function mayDecide(db: Database, actorId: string, approval: Approval) {
   const membership = await requirePermission(db, actorId, approval.orgId, "read");
-  return decides(approval, actorId, can(membership, "approve_actions"));
+  return decides(approval, actorId, membership);
 }
 
 /**
@@ -545,13 +629,15 @@ export async function decideApproval(
   if (!current) throw new NotFoundError("Approval not found");
   if (!(await mayDecide(db, actorId, current))) {
     throw new ForbiddenError(
-      current.approvers?.requestedBy === actorId
-        ? "You asked for this: someone else approves it"
-        : adminsDecide(current)
-          ? "Only an admin can give an agent new access"
-          : current.approvers?.userIds.length
-            ? `Only ${current.approvers.label} or an admin can decide this`
-            : "Only the agent's owner or an admin can decide this",
+      current.approvers?.required
+        ? `Only ${current.approvers.label} can decide this: it's their mailbox`
+        : current.approvers?.requestedBy === actorId
+          ? "You asked for this: someone else approves it"
+          : adminsDecide(current)
+            ? "Only an admin who manages agents can give an agent new access"
+            : current.approvers?.userIds.length
+              ? `Only ${current.approvers.label} or an admin can decide this`
+              : "Only the agent's owner or an admin can decide this",
     );
   }
   const kind = input.always ? rememberedKindOf(current.approveAlways) : null;
@@ -611,8 +697,7 @@ export async function decideApprovals(
   const at = deps.now?.() ?? new Date();
   const ids = [...new Set(input.ids)];
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership, "approve_actions");
-  const allowed = (r: Approval) => decides(r, actorId, admin);
+  const allowed = (r: Approval) => decides(r, actorId, membership);
   const decided = await db.transaction(async (tx) => {
     const rows = ids.length
       ? await tx
@@ -908,6 +993,7 @@ export const cancelRoutineAhead = (
  */
 const seenBy = (db: Database, orgId: string, actorId: string) =>
   or(
+    decidableBySql(actorId),
     eq(approvals.ownerUserId, actorId),
     sql`coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb) @> to_jsonb(${actorId}::text)`,
     inArray(
@@ -949,7 +1035,7 @@ export async function listApprovals(
     )
     .orderBy(desc(approvals.createdAt))
     .limit(Math.min(options.limit ?? 100, 500));
-  return viewsOf(db, rows, (r) => decides(r, actorId, admin));
+  return viewsOf(db, rows, (r) => decides(r, actorId, membership));
 }
 
 export async function getApproval(db: Database, actorId: string, orgId: string, approvalId: string) {

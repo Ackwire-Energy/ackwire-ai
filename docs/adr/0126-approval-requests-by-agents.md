@@ -59,3 +59,28 @@ a question card to the person who made the request, who answered "Aprovo" to the
   asked sees who it waits for.
 - The approvers are a snapshot: someone given the role after the request isn't asked (an admin still may decide).
 - Migration 0180 adds `approvals.approvers` (jsonb, null for every other approval).
+
+## Addendum: who decides, everywhere (2026-11-02)
+
+The same `approvers` model now covers three more cases, so who may decide is the same in `decides`, `approverIds`, the
+sidebar's count (`decidableBySql`), "Aprovar tudo" and Aprovações:
+
+1. **Turning on access for good** (`request_permission`): decided by whoever gives the same access on the agent's
+   page, `manage_agents` (and `manage_connectors` for a browser profile), not by `approve_actions` (`decidingKeys`; the
+   web mirror is `approvalDecidingKeys`). The grant is recorded as the person's who approved it.
+2. **A new owner**: an agent handed to someone else (`updateAgent`, or a member removed, `removeMember`) moves its
+   approvals waiting or approved ahead to them (`repointApprovals`): the old owner no longer decides, the inbox item
+   moves, and a `request_approval` that asked the owner says the new names.
+3. **A person's own mailbox** (ADR 0038): its actions that ask go to the mailbox's owner (`approvers.userIds`). Asked by
+   them, they decide it (and admins may); asked by anyone else, or by nobody, only they do (`approvers.required`):
+   an email in their name is theirs to approve.
+
+Also for a person's own mailbox: its tools are offered only to a run whose person is its owner or someone the agent
+answers directly (a consultation for someone outside the agent's audience doesn't reach it), and an agent loses the
+mailboxes others gave it when someone else widens its audience or it gets an owner who couldn't talk to it
+(`dropForeignMailGrants`, audited); the mailbox's owner gives it again if they still want to. Every way the agent's
+reach grows counts: its audience (`setAgentAudience`), "only me" turned off in its brain settings (`setAgentBrain`), and
+someone joining one of its audience roles (`addMemberRolesInTx`, `dropMailIfWidened`/`dropMailForNewRoleMember`). A
+routine's run (or a consultation rooted in one) answers for the routine's creator, as the Tool Gateway's `requestedBy`
+does, and a mail watch stops feeding its routine once the agent can't read the mailbox. Whoever decides an approval
+also finds it in Aprovações and opens it, in a channel they aren't in too.
