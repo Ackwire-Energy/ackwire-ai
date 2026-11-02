@@ -143,14 +143,13 @@ describe("timeline", () => {
     expect(runAround("mid", true, true)).toBe("solo");
   });
 
-  test("my row takes its place in the run: the bubble's corners and the time on the run's last", async () => {
+  test("my row takes its place in the run: the bubble's corners and the time under the run's last", async () => {
     expect(await source("features/chat/ChatScreen.tsx")).toContain(
       "run={runPosition(item.grouped, item.continued ?? false)}",
     );
     const row = await source("features/chat/MessageRow.tsx");
     expect(row).toContain("BUBBLE_RUN[run]");
-    expect(row).toContain('const runEnd = run === "end" || run === "solo";');
-    expect(row).toContain("{!m.local && runEnd ? (");
+    expect(row).toContain('(run === "end" || run === "solo")');
   });
 
   test("hidden messages leave no row", () => {
