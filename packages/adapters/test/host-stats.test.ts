@@ -6,6 +6,7 @@ import {
   cgroupCounters,
   combineLoads,
   combineTraffic,
+  diskFigures,
   diskSpace,
   LoadWindow,
   machineSize,
@@ -124,6 +125,26 @@ describe("the load sampler", () => {
     const plain = new LoadWindow();
     plain.add({ load: 0.2, memory: 0.3 }, t0);
     expect(plain.summary()).not.toHaveProperty("oomKills");
+  });
+
+  test("the disk's latest figures and the shared folder's size ride on the summary as they are (ADR 0115)", () => {
+    expect(diskFigures({ sizeBytes: 100 * GIB, freeBytes: 12.34 * GIB })).toEqual({ diskFreeGb: 12.3, diskUse: 0.88 });
+    expect(diskFigures(null)).toEqual({});
+    expect(diskFigures({ sizeBytes: 0, freeBytes: 0 })).toEqual({});
+    const w = new LoadWindow();
+    const t0 = Date.UTC(2026, 10, 1, 12);
+    w.add({ load: 0.2, memory: 0.3 }, t0, { diskFreeGb: 40, diskUse: 0.6, sharedGb: 3.5 });
+    w.add({ load: 0.4, memory: 0.3 }, t0 + LOAD_SAMPLE_MS, { diskFreeGb: 10, diskUse: 0.9, sharedGb: 33 });
+    expect(w.summary()).toMatchObject({ loadAvg: 0.3, diskFreeGb: 10, diskUse: 0.9, sharedGb: 33 });
+    // Through the protocol: sane numbers kept, others dropped.
+    const pong = (load: Record<string, unknown>) => parseRunnerFrame(JSON.stringify({ type: "pong", at: 1, load }));
+    const base = { loadAvg: 0.3, loadPeak: 0.4, memoryAvg: 0.3, memoryPeak: 0.3, hours: 0.2 };
+    expect(pong({ ...base, diskFreeGb: 10, diskUse: 0.9, sharedGb: 33 })).toEqual({
+      type: "pong",
+      at: 1,
+      load: { ...base, diskFreeGb: 10, diskUse: 0.9, sharedGb: 33 },
+    });
+    expect(pong({ ...base, diskFreeGb: -1, diskUse: 2, sharedGb: "x" })).toEqual({ type: "pong", at: 1, load: base });
   });
 
   test("in a container with limits: the machine's size with the limit beside it, the load per machine CPU", async () => {

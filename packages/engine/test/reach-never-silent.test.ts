@@ -118,7 +118,7 @@ describe("an agent's mention of an agent outside the conversation", () => {
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db
       .update(schema.agents)
-      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
       .where(eq(schema.agents.id, ivo.id));
     const sent = await devWrites("@ivo revisa o relatório de hoje.", ["ivo"]);
     await drainOutbox(f.db, f.handlers);
@@ -141,7 +141,7 @@ describe("a member the person behind an agent's message can't talk to", () => {
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db
       .update(schema.agents)
-      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
       .where(eq(schema.agents.id, gil.id));
     const sent = await devWrites("@gil revisa o relatório de hoje.", []);
     await drainOutbox(f.db, f.handlers);
@@ -151,6 +151,39 @@ describe("a member the person behind an agent's message can't talk to", () => {
       { agentId: gil.id, handle: "gil", reason: "audience", userId: f.owner.id },
     ]);
     expect((await decisionOf(sent.id))?.reason).toContain("audience: @gil");
+  });
+});
+
+describe("a member that takes consultations for the person behind an agent's message", () => {
+  test("isn't woken here: it is asked privately by note, and answers the agent in their DM", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
+      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
+    });
+    const gil = await agentOf("Gil", "gil", { inGeneral: true });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .where(eq(schema.agents.id, gil.id));
+    const sent = await devWrites("@gil revisa o relatório de hoje.", []);
+    await drainOutbox(f.db, f.handlers);
+
+    const [note] = await f.db.select().from(schema.agentConsultations);
+    expect(note).toMatchObject({ targetAgentId: gil.id, kind: "note" });
+    const gilRuns = (await runsOf()).filter((r) => r.agentId === gil.id);
+    expect(gilRuns.map((r) => r.channelId)).toEqual([note?.channelId ?? ""]);
+    const said = await f.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, gil.id));
+    expect(said.every((m) => m.channelId === note?.channelId)).toBe(true);
+    const reach = reachOf((await messageOf(sent.id))?.meta);
+    expect(reach).toEqual([{ agentId: gil.id, handle: "gil", reason: "audience", consultationId: note?.id ?? "" }]);
+    expect(reachNote(reach)).toContain("only answers the people here through other agents");
+    // It was reached: the author isn't told its mention woke nobody.
+    const skipped = (await f.db.select().from(schema.messages)).filter(
+      (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "wake_skipped",
+    );
+    expect(skipped).toEqual([]);
   });
 });
 
@@ -169,7 +202,7 @@ describe("a routine whose creator can't reach the agent it names", () => {
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db
       .update(schema.agents)
-      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
       .where(eq(schema.agents.id, gil.id));
     const routine = await channelRoutine(f, {
       access: "act",
@@ -259,7 +292,7 @@ describe("never silent, the edges", () => {
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db
       .update(schema.agents)
-      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
       .where(eq(schema.agents.id, eva.id));
     const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
     const sent = await devWrites("@ivo e @eva, revisem o resumo.", ["eva", "ivo"], dm.id);
@@ -345,7 +378,7 @@ describe("a routine's own tell_agent to an agent its creator can't reach", () =>
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db
       .update(schema.agents)
-      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
       .where(eq(schema.agents.id, gil.id));
     const routine = await channelRoutine(f, { access: "act", report: "always", prompt: "Cobre o Gil sobre o PR #42." });
     await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);

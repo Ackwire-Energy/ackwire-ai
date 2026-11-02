@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { Pressable, type PressableProps, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  type AnimatedStyle,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { useTheme } from "./theme";
 
@@ -22,7 +28,7 @@ export interface PressScaleProps extends Omit<PressableProps, "style" | "childre
    * set there moves the press area, not what is inside it, so a sized circle's icon stayed in its top corner.
    */
   contentStyle?: StyleProp<ViewStyle>;
-  style?: StyleProp<ViewStyle>;
+  style?: StyleProp<AnimatedStyle<ViewStyle>>;
   children?: ReactNode;
 }
 

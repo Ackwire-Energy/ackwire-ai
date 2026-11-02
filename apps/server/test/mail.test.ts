@@ -4,14 +4,10 @@ import {
   createFakeMailConnector,
   createFakeMailPoller,
   createFakeMailTester,
-  createFakeMillionSend,
   FAKE_COMPOSIO_SIGNATURE,
-  FAKE_MILLIONSEND_KEY,
   type MailAdapters,
-  standardWebhookSignature,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { createMillionSendAccount } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -51,7 +47,6 @@ test("without mail adapters: no providers, Gmail connect is a conflict", async (
     composio: false,
     imap: false,
     presets: [],
-    millionsend: null,
   });
   const r = await owner(`/api/app/organizations/${orgId}/mail/accounts/composio`, { json: { provider: "gmail" } });
   expect(r.status).toBe(409);
@@ -72,7 +67,6 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
     composio: true,
     imap: true,
     presets: [ICLOUD],
-    millionsend: null,
   });
 
   fake.tester.state.result = { ok: false, error: "auth" };
@@ -405,158 +399,4 @@ test("email routines through the routines API, woken by a signed Composio webhoo
   expect(listed.routines.find((r) => r.id === routine.id)?.trigger.type).toBe("email");
   expect((await api(`/routines/${routine.id}`, { method: "DELETE" })).status).toBe(204);
   expect(fake.composio.state.triggers.size).toBe(0);
-});
-
-const SUPORTE = "7eeb9517-aed7-40d7-ad65-500be42ed147";
-const VENDAS = "2c6d1e0a-5b4f-4a3e-9c2d-1b0a9f8e7d6c";
-
-/** The fake mail adapters with a fake MillionSend of two inboxes. */
-function fakeMillionSend() {
-  const fake = fakeMail();
-  const millionsend = createFakeMillionSend([
-    { id: SUPORTE, address: "suporte@acme.agents.millionsend.com", name: "Suporte", kind: "agent", shared: true },
-    { id: VENDAS, address: "vendas@acme.com", name: "Vendas", kind: "agent", shared: false },
-  ]);
-  const mail: MailAdapters = {
-    ...fake.mail,
-    millionsend: { client: millionsend.client, connector: fake.box.connector, poller: createFakeMailPoller().poller },
-  };
-  return { ...fake, mail, millionsend };
-}
-
-test("MillionSend: a key lists its inboxes, one connects, the key never comes back, a new one reconnects it", async () => {
-  const fake = fakeMillionSend();
-  t = await createTestServer({ mail: fake.mail });
-  const owner = browser(t);
-  await signUp(owner, "owner@example.com");
-  const { orgId } = await seedOrg(owner);
-  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
-    owner(`/api/app/organizations/${orgId}${path}`, init);
-
-  expect(((await (await api("/mail/providers")).json()) as { millionsend: unknown }).millionsend).toEqual({
-    connectorKey: false,
-    keysUrl: "https://app.millionsend.com/api-keys",
-  });
-  const refused = await api("/mail/millionsend/inboxes", { json: { apiKey: "ms_wrong_key" } });
-  expect(refused.status).toBe(422);
-  expect(await refused.json()).toEqual({ error: "auth" });
-  const listed = await api("/mail/millionsend/inboxes", { json: { apiKey: FAKE_MILLIONSEND_KEY } });
-  expect(listed.status).toBe(200);
-  expect(((await listed.json()) as { inboxes: { address: string; connected: boolean }[] }).inboxes).toMatchObject([
-    { address: "suporte@acme.agents.millionsend.com", connected: false },
-    { address: "vendas@acme.com", connected: false },
-  ]);
-  // The workspace's MillionSend connector has no key: nothing to reuse.
-  expect((await api("/mail/millionsend/inboxes", { json: { useConnector: true } })).status).toBe(400);
-
-  const created = await api("/mail/accounts/millionsend", { json: { apiKey: FAKE_MILLIONSEND_KEY, inboxId: SUPORTE } });
-  expect(created.status).toBe(201);
-  const { account, instant } = (await created.json()) as { account: { id: string }; instant: boolean };
-  expect(account).toMatchObject({ provider: "millionsend", via: "millionsend", label: "Suporte", status: "active" });
-  // This test server isn't reachable from MillionSend (http): checked every few minutes instead.
-  expect(instant).toBe(false);
-  expect(await (await api("/mail/accounts")).text()).not.toContain(FAKE_MILLIONSEND_KEY);
-  const twice = await api("/mail/accounts/millionsend", { json: { apiKey: FAKE_MILLIONSEND_KEY, inboxId: SUPORTE } });
-  expect(twice.status).toBe(409);
-
-  const wrong = await api(`/mail/accounts/${account.id}`, { method: "PATCH", json: { apiKey: "ms_wrong_key" } });
-  expect(wrong.status).toBe(422);
-  expect(await wrong.json()).toEqual({ error: "auth" });
-  const right = await api(`/mail/accounts/${account.id}`, { method: "PATCH", json: { apiKey: FAKE_MILLIONSEND_KEY } });
-  expect(((await right.json()) as { account: { status: string } }).account.status).toBe("active");
-});
-
-test("MillionSend webhook: only a delivery our secret signs counts, and it wakes the routine watching the inbox", async () => {
-  const fake = fakeMillionSend();
-  t = await createTestServer({ mail: fake.mail });
-  const owner = browser(t);
-  await signUp(owner, "owner@example.com");
-  const { orgId, agentId } = await seedOrg(owner);
-  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
-    owner(`/api/app/organizations/${orgId}${path}`, init);
-  const [user] = await t.db.select().from(schema.users).where(eq(schema.users.email, "owner@example.com"));
-  // Connected where MillionSend reaches the server (https): the webhook, with our secret.
-  const r = await createMillionSendAccount(
-    {
-      db: t.db,
-      keyWrappers: [t.adapters.keyWrapper],
-      mail: fake.mail,
-      publicUrl: "https://agentes.example.com",
-    },
-    user?.id ?? "",
-    orgId,
-    { apiKey: FAKE_MILLIONSEND_KEY, inboxId: VENDAS },
-  );
-  if (!r.ok || !r.instant) throw new Error("expected a webhook");
-  const secret = [...fake.millionsend.state.webhooks.values()][0]?.secret ?? "";
-  await api(`/agents/${agentId}/mail/${r.account.id}`, {
-    method: "PUT",
-    json: {
-      level: "read",
-      canDelete: false,
-      policy: {
-        folders: [],
-        senders: [],
-        windowDays: null,
-        allowedRecipients: [],
-        dailySendCap: 25,
-        sendWithoutAsking: false,
-        fromAddress: null,
-      },
-    },
-  });
-  const routine = await api("/routines", {
-    json: {
-      agentId,
-      prompt: "Answer sales mail",
-      target: { type: "dm" },
-      trigger: { type: "email", accountId: r.account.id },
-    },
-  });
-  expect(routine.status).toBe(201);
-  const { id: routineId } = (await routine.json()) as { id: string };
-
-  const body = JSON.stringify({
-    type: "inbox.email.received",
-    created_at: new Date().toISOString(),
-    data: {
-      source: "system",
-      inbox_id: VENDAS,
-      thread_id: "b9e1837b-c150-45c6-a055-73b02ec9f1dc",
-      email_id: "155252fb-e93e-45ee-8c19-5080a929c28b",
-      thread: { folder: "inbox", subject: "Orçamento" },
-      email: { from: "Bia <bia@cliente.com.br>", to: ["vendas@acme.com"], cc: [], subject: "Orçamento", read: false },
-    },
-  });
-  const deliver = (key: string) => {
-    const ts = Math.floor(Date.now() / 1000);
-    return t.app.request("/api/webhooks/millionsend", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "webhook-id": "msg_1",
-        "webhook-timestamp": String(ts),
-        "webhook-signature": standardWebhookSignature(key, "msg_1", ts, body),
-      },
-      body,
-    });
-  };
-  const forged = await deliver("whsec_Zm9yZ2VkLXNlY3JldA==");
-  expect(forged.status).toBe(401);
-  const good = await deliver(secret);
-  expect(good.status).toBe(202);
-  expect(await good.json()).toEqual({ ok: true, type: "mail.received", fired: 1 });
-  const runs = await t.db.select().from(schema.routineRuns).where(eq(schema.routineRuns.routineId, routineId));
-  expect(runs).toHaveLength(1);
-
-  // Disconnecting deletes the webhook at MillionSend. A late delivery is taken (MillionSend would report a refused
-  // one as failing to the team) and runs nothing.
-  expect((await api(`/mail/accounts/${r.account.id}`, { method: "DELETE" })).status).toBe(204);
-  expect(fake.millionsend.state.deletedWebhooks).toHaveLength(1);
-  const late = await deliver(secret);
-  expect(late.status).toBe(202);
-  expect(await late.json()).toEqual({ ok: true, type: "mail.received", fired: 0 });
-  expect(await t.db.select().from(schema.routineRuns).where(eq(schema.routineRuns.routineId, routineId))).toHaveLength(
-    1,
-  );
 });

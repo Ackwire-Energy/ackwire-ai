@@ -491,6 +491,8 @@ export interface DesktopSessionsOptions {
   openBrowser?: (agent: AgentScope, installing: () => void) => Promise<void>;
   /** How this runner starts itself, which Browser runs (default: this process). */
   runner?: string[];
+  /** The computer's shared folder (ADR 0115), bookmarked in the desktop's file manager. */
+  shared?: () => string | null;
 }
 
 /** What `<runner home>/desktop/<id8>.json` keeps of a running desktop. */
@@ -1051,6 +1053,7 @@ export class DesktopSessions {
       agent,
       shell: user.env.SHELL ?? "",
       browser: [...this.runner, "desktop-browser", browserSocket(passwd)],
+      shared: this.opts.shared?.() ?? null,
     };
   }
 

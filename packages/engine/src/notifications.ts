@@ -116,6 +116,18 @@ export const NOTIFICATION_KINDS = [
    * (`manage_connectors`), one row per agent, `source.agentId` and its name in `source.label`. Waiting until seen.
    */
   "browser_profile_request",
+  /**
+   * A connected MCP server changed the description or input of tools an admin approved (ADR 0117): who manages
+   * connectors, once per change, `source.label` the connection's name and `latest.title` the tools. Agents keep the
+   * approved text until it is accepted in Settings › Conectores, which resolves it. Waiting.
+   */
+  "connector_tool_changed",
+  /**
+   * A computer's workspace disk passed `DISK_WARN_USE` in use (ADR 0115): who configures the workspace hears it once
+   * each time it crosses, `source.machineId` and its name in `source.label`, `latest.diskUse` the share in use and
+   * `latest.diskFreeGb` what is left.
+   */
+  "computer_disk_full",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -190,6 +202,9 @@ export interface NotificationLatest {
   suggestedBy?: string;
   /** `composio_limit`: the calls a month allows. */
   calls?: number;
+  /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
+  diskUse?: number;
+  diskFreeGb?: number;
   /** `browser_handoff` still unanswered an hour later (`remindNotifications`): its push says the agent still needs them. */
   reminder?: boolean;
 }

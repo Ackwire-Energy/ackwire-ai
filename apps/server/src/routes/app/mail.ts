@@ -1,16 +1,12 @@
 import {
   completeComposioConnect,
   createImapAccount,
-  createMillionSendAccount,
   desktopMailRedirect,
   getAgentMail,
   listMailAccounts,
   listMailFolders,
-  listMillionSendInboxes,
   type MailDeps,
   mailProviders,
-  millionSendConnectorKey,
-  millionSendKeysUrl,
   requirePermission,
   revokeMailAccount,
   setAgentMail,
@@ -61,8 +57,8 @@ const MailActionName = z
 const MailAccount = z
   .object({
     id: z.uuid(),
-    provider: z.enum(["gmail", "outlook", "imap", "millionsend"]),
-    via: z.enum(["composio", "imap", "millionsend"]),
+    provider: z.enum(["gmail", "outlook", "imap"]),
+    via: z.enum(["composio", "imap"]),
     address: z.string(),
     label: z.string(),
     status: z.enum(["pending", "active", "needs_reconnect"]),
@@ -110,23 +106,6 @@ const AgentMailbox = z
   })
   .openapi("AgentMailbox");
 
-const MillionSendInbox = z
-  .object({
-    id: z.string(),
-    address: z.string(),
-    name: z.string().nullable(),
-    kind: z.enum(["agent", "human"]),
-    shared: z.boolean().openapi({ description: "On MillionSend's shared domain." }),
-    connected: z.boolean().openapi({ description: "Already a mailbox of this workspace." }),
-  })
-  .openapi("MillionSendInbox");
-
-/** A MillionSend key: pasted, or the workspace's MillionSend connector's (the person chose it). */
-const MillionSendKey = {
-  apiKey: z.string().min(8).max(500).optional(),
-  useConnector: z.boolean().optional(),
-};
-
 const testFailed = { 422: json(z.object({ error: MailTestError }), "The connection test failed") };
 const AccountParams = OrgParams.extend({ accountId: z.uuid() });
 /** Composio's return needs no session. Per address, far above a person connecting mailboxes. */
@@ -155,10 +134,7 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
       path: "/organizations/{orgId}/mail/providers",
       tags,
       security,
-      summary:
-        "Which mailboxes this server can connect (Gmail/Outlook through Composio, IMAP presets, MillionSend inboxes)",
-      description:
-        "`millionsend.connectorKey`: the workspace's MillionSend connector holds an API key a person may choose to reuse; `keysUrl`: where MillionSend Cloud makes keys.",
+      summary: "Which mailboxes this server can connect (Gmail/Outlook through Composio, IMAP presets)",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -166,7 +142,6 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
             composio: z.boolean(),
             imap: z.boolean(),
             presets: z.array(MailPreset),
-            millionsend: z.object({ connectorKey: z.boolean(), keysUrl: z.string().nullable() }).nullable(),
           }),
         ),
         ...errors,
@@ -175,69 +150,7 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       await requirePermission(db, c.get("user").id, orgId, "read");
-      const providers = mailProviders(adapters.mail);
-      const millionsend = providers.millionsend
-        ? {
-            connectorKey: (await millionSendConnectorKey(mailDeps, orgId)) !== null,
-            keysUrl: millionSendKeysUrl(config.MILLIONSEND_INBOXES_API_URL),
-          }
-        : null;
-      return c.json({ ...providers, millionsend }, 200);
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/organizations/{orgId}/mail/millionsend/inboxes",
-      tags,
-      security,
-      summary: "The MillionSend inboxes a key reaches, to pick one (admins); the key isn't kept",
-      description:
-        "`useConnector` reads the key of the workspace's MillionSend connector instead (400 `mail.millionsend_no_connector_key` when it has none). 422 `auth` when MillionSend refuses the key or it can't read inboxes. 409 when MillionSend inboxes are off on this server.",
-      request: { params: OrgParams, body: body(z.object(MillionSendKey)) },
-      responses: { 200: json(z.object({ inboxes: z.array(MillionSendInbox) })), ...testFailed, ...errors },
-    }),
-    async (c) => {
-      const r = await listMillionSendInboxes(
-        mailDeps,
-        c.get("user").id,
-        c.req.valid("param").orgId,
-        c.req.valid("json"),
-      );
-      if (!r.ok) return c.json({ error: r.error }, 422);
-      return c.json({ inboxes: r.inboxes }, 200);
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/organizations/{orgId}/mail/accounts/millionsend",
-      tags,
-      security,
-      summary: "Connect a MillionSend inbox (admins); the key is sealed and never returned",
-      description:
-        "`instant`: MillionSend posts new mail to `/api/webhooks/millionsend` (a webhook was made, signed with our secret); false: it is checked every few minutes. 404 when the key doesn't reach the inbox; 409 `mail.already_connected`.",
-      request: {
-        params: OrgParams,
-        body: body(z.object({ ...MillionSendKey, inboxId: z.uuid(), label: z.string().max(80).optional() })),
-      },
-      responses: {
-        201: json(z.object({ account: MailAccount, instant: z.boolean() }), "Connected"),
-        ...testFailed,
-        ...errors,
-      },
-    }),
-    async (c) => {
-      const r = await createMillionSendAccount(
-        mailDeps,
-        c.get("user").id,
-        c.req.valid("param").orgId,
-        c.req.valid("json"),
-      );
-      if (!r.ok) return c.json({ error: r.error }, 422);
-      return c.json({ account: r.account, instant: r.instant }, 201);
+      return c.json(mailProviders(adapters.mail), 200);
     },
   );
 
@@ -365,7 +278,7 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
       tags,
       security,
       summary:
-        "Rename a mailbox, turn its actions on or off for every agent, set its other addresses, or replace an IMAP mailbox's app password or a MillionSend inbox's API key (tested first) (admins)",
+        "Rename a mailbox, turn its actions on or off for every agent, set its other addresses, or replace an IMAP mailbox's app password (tested first) (admins)",
       description:
         "Replies go out from the address a message arrived at (`address` or one of `aliases`); new mail from `defaultFrom`. 400 `mail.from_not_mailbox` when `defaultFrom` isn't one of them.",
       request: {
@@ -374,7 +287,6 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
           z.object({
             label: z.string().max(80).optional(),
             password: z.string().min(1).max(500).optional(),
-            apiKey: z.string().min(8).max(500).optional(),
             offActions: z.array(MailActionName).max(9).optional(),
             askActions: z
               .array(z.enum(["draft", "organize"]))

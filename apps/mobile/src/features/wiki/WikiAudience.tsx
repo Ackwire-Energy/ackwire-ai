@@ -193,22 +193,20 @@ function Form({
             base("agents", t("wiki.audienceAgentsAll"), t("wiki.audienceAgentsAllText"), "person"),
           ]}
         />
-        <>
-          <AccessList
-            title={t("wiki.audienceRoles")}
-            levelName={levelName}
-            rows={roleList.map((r) =>
-              row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
-            )}
-          />
-          <AccessList
-            title={t("wiki.audiencePeople")}
-            levelName={levelName}
-            rows={[...dir.memberById.values()].map((m) =>
-              row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
-            )}
-          />
-        </>
+        <AccessList
+          title={t("wiki.audienceRoles")}
+          levelName={levelName}
+          rows={roleList.map((r) =>
+            row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
+          )}
+        />
+        <AccessList
+          title={t("wiki.audiencePeople")}
+          levelName={levelName}
+          rows={[...dir.memberById.values()].map((m) =>
+            row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
+          )}
+        />
         <AccessList
           title={t("wiki.audienceAgents")}
           levelName={levelName}

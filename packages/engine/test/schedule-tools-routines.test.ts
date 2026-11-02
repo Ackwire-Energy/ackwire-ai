@@ -214,11 +214,10 @@ describe("schedule tools: routines", () => {
     });
     expect(mail).toMatchObject({ isError: true });
     expect(mail.content).toContain("can't read any mailbox");
-    // Where a person connects one, on the web and on the phone, in both languages.
+    // Where a person connects one, in both languages.
     expect(mail.content).toContain("Settings › Connectors › Add connector › Email");
     expect(mail.content).toContain("Configurações › Conectores › Adicionar conector › Email");
-    expect(mail.content).toContain("You › Connectors › MillionSend");
-    expect(mail.content).toContain("Você › Conectores › MillionSend");
+    expect(mail.content).not.toContain("MillionSend");
     const unknown = await call("create_routine", { prompt: "x", trigger: { type: "event", event: "email.received" } });
     expect(unknown.content).toContain("Say which event");
   });

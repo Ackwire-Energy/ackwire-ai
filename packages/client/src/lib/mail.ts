@@ -19,21 +19,19 @@ import { webmailOf } from "./text";
 import type { ReviewTool } from "./tool-review";
 
 /** The cards in the catalog's "Email" group. */
-export type MailChoice = "gmail" | "outlook" | "icloud" | "millionsend" | "other";
+export type MailChoice = "gmail" | "outlook" | "icloud" | "other";
 
 /** `Outro email` with no preset: the person types the servers (under "Avançado"). */
 export const CUSTOM_PRESET = "custom";
 
 /**
  * The mailboxes drawn with their maker's mark, by provider or IMAP preset (the catalog cards' names too): Gmail's
- * and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors, MillionSend's M (the MillionSend
- * connector's) in the ink. Any other mailbox is our envelope.
+ * and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors. Any other mailbox is our envelope.
  */
 export const MAIL_BRANDS: Partial<Record<string, { name: string; iconUrl: string; brandColor: string | null }>> = {
   gmail: { name: "Gmail", iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
   outlook: { name: "Outlook", iconUrl: "/brands/outlook.svg", brandColor: null },
   icloud: { name: "iCloud", iconUrl: "/connectors/icloud.svg", brandColor: "#3693F3" },
-  millionsend: { name: "MillionSend", iconUrl: "/connectors/millionsend.svg", brandColor: null },
 };
 
 export const MAIL_ERRORS: MailConnectError[] = [
@@ -54,22 +52,10 @@ export function mailErrorOf(error: unknown): MailConnectError {
   return "unknown";
 }
 
-/**
- * What a MillionSend key step says when it fails. A key that doesn't reach the inbox (another MillionSend team's, or
- * limited to another inbox) and a connector with no key aren't fixed by trying again, so each says why.
- */
-export function millionSendErrorText(t: TFunction, error: unknown, address = ""): string {
-  const code = error instanceof ApiError ? error.code : "";
-  if (code === "mail.millionsend_inbox_not_found") return t("mail.millionsend.notReached", { address });
-  if (code === "mail.millionsend_no_connector_key") return t("mail.millionsend.noConnectorKey");
-  return t(mailErrorOf(error) === "auth" ? "mail.millionsend.auth" : "mail.error.unknown");
-}
-
 /** The catalog card a connected mailbox belongs to. */
 export function choiceOf(account: Pick<MailAccount, "provider" | "preset">): MailChoice {
   if (account.provider === "gmail") return "gmail";
   if (account.provider === "outlook") return "outlook";
-  if (account.provider === "millionsend") return "millionsend";
   return account.preset === "icloud" ? "icloud" : "other";
 }
 

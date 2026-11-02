@@ -38,7 +38,7 @@ export async function sendHeldToDm(deps: { db: Database; pubsub?: PubSub }, run:
     .from(messages)
     .innerJoin(channels, eq(channels.id, messages.channelId))
     .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
-  if (!asked || asked.authorType !== "person" || !asked.authorUserId || asked.kind === "dm") return false;
+  if (asked?.authorType !== "person" || !asked.authorUserId || asked.kind === "dm") return false;
   const userId = asked.authorUserId;
   const delivered = await db.transaction(async (tx) => {
     const dm = await openPersonAgentDm(tx, run.orgId, userId, run.agentId);

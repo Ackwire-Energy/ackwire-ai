@@ -1,7 +1,7 @@
 import { isReservedSecretName } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
-import type { ComputerHandle } from "./sandbox";
+import { type ComputerHandle, requireComputerManager } from "./sandbox";
 import { MAX_PENDING_SECRETS, REQUEST_SECRET_TOOL, requesterOfRun, SECRET_TTL_MS, secretOnComputer } from "./secrets";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
@@ -16,6 +16,10 @@ export function secretSite(raw: string): string | null {
     return null;
   }
 }
+
+/** Asking again under a held name is how a refused key gets replaced: the newest delivery wins on the computer. */
+const AGAIN =
+  "If a key you were given is refused (a 401, or a 403 saying the key is invalid or expired), first check you sent it as the API's docs say (header, prefix, test or live address); if you did, ask once for a new one under the same `name`, with a `purpose` that says in one line, in the person's language, what failed: it replaces the old one. If the new one is refused too, don't ask again: say what failed and stop.";
 
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -44,9 +48,12 @@ export function requestSecretTool(opts: {
   } as const;
   return {
     name: REQUEST_SECRET_TOOL,
-    description: opts.browserOnly
-      ? "Ask the person who asked you for a password or code to sign in on a site in your browser. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
-      : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it.",
+    description: [
+      opts.browserOnly
+        ? "Ask the person who asked you for a password or code to sign in on a site in your browser. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
+        : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it.",
+      AGAIN,
+    ].join(" "),
     scope: opts.scope,
     inputSchema: opts.browserOnly
       ? {
@@ -116,6 +123,46 @@ export function requestSecretTool(opts: {
           return { content: `At most ${MAX_PENDING_SECRETS} secret requests at a time.`, isError: true };
         }
         const row = await opts.onComputer(ctx, async (computer) => {
+          const [held] = await ctx.db
+            .select({
+              runId: schema.secretRequests.runId,
+              replaces: schema.secretRequests.replaces,
+              givenBy: schema.secretRequests.requestedForUserId,
+              giver: schema.users.name,
+            })
+            .from(schema.secretRequests)
+            .leftJoin(schema.users, eq(schema.users.id, schema.secretRequests.requestedForUserId))
+            .where(
+              and(
+                eq(schema.secretRequests.orgId, ctx.orgId),
+                eq(schema.secretRequests.agentId, ctx.agentId),
+                eq(schema.secretRequests.name, name),
+                eq(schema.secretRequests.machineId, computer.machineId),
+                eq(schema.secretRequests.status, "delivered"),
+                isNull(schema.secretRequests.removedAt),
+              ),
+            )
+            .limit(1);
+          // The replacement this run asked for was refused too: a second one would only loop.
+          if (held?.replaces && held.runId === ctx.runId) {
+            return {
+              refused: `The ${name} you were just given was refused too. Don't ask for it again: say in one line what failed and stop.`,
+            };
+          }
+          // A key is shared by every run of the agent: only its giver, the agent's owner or an admin swaps it.
+          if (
+            held &&
+            held.givenBy !== requester &&
+            !(await requireComputerManager(ctx.db, requester, ctx.orgId, ctx.agentId).then(
+              () => true,
+              () => false,
+            ))
+          ) {
+            const giver = held.giver ?? "the person who gave it";
+            return {
+              refused: `${name} was given by ${giver}; only ${giver}, your owner or an admin can replace it. Don't ask for it: say in the conversation what failed with it and that ${giver} gave it.`,
+            };
+          }
           const id = Bun.randomUUIDv7();
           const { publicKey, sites } = await secretOnComputer(computer, { action: "keypair", requestId: id });
           if (!publicKey) throw new Error("the computer made no key");
@@ -139,6 +186,7 @@ export function requestSecretTool(opts: {
               targetPath: file ? path : null,
               machineId: computer.machineId,
               publicKey,
+              replaces: held !== undefined,
               expiresAt: new Date(Date.now() + SECRET_TTL_MS),
             })
             .returning();
@@ -153,10 +201,12 @@ export function requestSecretTool(opts: {
               name,
               target: kind === "file" ? { kind, path } : kind === "site" && origin ? { kind, site: origin } : { kind },
               requestedFor: requester,
+              ...(held ? { replaces: true } : {}),
             },
           });
           return inserted;
         });
+        if ("refused" in row) return { content: row.refused, isError: true };
         return { content: "", waitForSecret: { requestId: row.id } };
       } catch (error) {
         return failed(error);

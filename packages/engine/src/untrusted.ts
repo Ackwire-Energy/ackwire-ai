@@ -1,4 +1,7 @@
+import { cleanOutside, replaceDisguised } from "@agenteschat/adapters";
 import { cutText } from "./format";
+
+export { cleanOutside };
 
 /**
  * One envelope for outside content (ADR 0053): an MCP server's answer, an email, a webhook's event,
@@ -9,7 +12,10 @@ import { cutText } from "./format";
  */
 
 /** Markers of every envelope the engine writes, old and current: none may appear inside a block. */
-const MARKERS = /<\s*\/?\s*(?:external_data|email_content|database_rows|untrusted_data)\b[^>]*>/gi;
+const MARKERS = /<\s*\/?\s*(?:external_data|email_content|database_rows|untrusted_data|page_content|thread)\b[^>]*>/gi;
+
+/** Said once when outside text carried characters that hide or reorder it (bidi overrides, tag characters). */
+export const HIDDEN_CHARS_NOTE = "[hidden characters removed]";
 
 /** A block's longest text by default (a routine's event or record, not a whole page of results). */
 export const UNTRUSTED_MAX_CHARS = 8000;
@@ -21,8 +27,16 @@ const sourceLabel = (source: string) =>
     .trim()
     .slice(0, 80) || "external";
 
-/** Outside text with its markers neutralised (for text placed inside an existing envelope). */
-export const neutralizeUntrusted = (text: string) => text.replace(MARKERS, "[marker removed]");
+/**
+ * Outside text with characters that hide or reorder it stripped (`cleanOutside`) and every envelope marker
+ * neutralised, also when disguised (full-width, zero-width split, look-alike letters: `replaceDisguised`). The rest
+ * stays exactly as written, so a file read and written back is unchanged.
+ */
+export function neutralizeUntrusted(text: string): string {
+  const clean = cleanOutside(text);
+  const out = replaceDisguised(clean, MARKERS, "[marker removed]");
+  return clean !== text ? `${out}\n${HIDDEN_CHARS_NOTE}` : out;
+}
 
 /** Outside text inside the `<external_data>` envelope, neutralised and cut to `maxChars`. */
 export function untrustedBlock(source: string, text: string, maxChars = UNTRUSTED_MAX_CHARS): string {

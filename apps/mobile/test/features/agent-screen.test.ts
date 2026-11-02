@@ -11,8 +11,8 @@ import {
   sessionCookieScript,
 } from "../../src/features/computer/screen-page";
 import {
-  boundCamera,
   atDesktopEdge,
+  boundCamera,
   controlScale,
   cursorGain,
   DEFAULT_DESKTOP,

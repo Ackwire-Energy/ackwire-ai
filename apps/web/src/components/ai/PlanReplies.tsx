@@ -22,7 +22,7 @@ export function PlanReplies({
   onChange: (on: boolean) => void;
   /** The agent's name, or null for every agent of a plan's panel ("Atendem outras pessoas"). */
   agent: string | null;
-  brain: "claude_code" | "codex";
+  brain: "claude_code" | "codex" | "cursor";
   /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
   plan?: string | null;
   /** A coding plan, named by the line, its maker's words behind the ⓘ. */

@@ -5,6 +5,7 @@ import {
   useDms,
   useNoticePrefs,
   useSetNoticePref,
+  useSetShowActivity,
   useSetStart,
 } from "@agenteschat/client";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
@@ -31,8 +32,8 @@ import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 
 /**
- * Você's smaller screens, each pushed from its row: Workspaces, Notificações, Ao abrir o app, Sons, Aparência and
- * Idioma.
+ * Você's smaller screens, each pushed from its row: Workspaces, Notificações, Ao abrir o app, Respostas dos agentes,
+ * Sons, Aparência and Idioma.
  */
 
 const SOUND_LABELS: Record<SoundStyle, string> = {
@@ -221,6 +222,28 @@ export function StartPage() {
         </>
       ) : null}
       <GroupedFooter>{t("mobile.me.startHint")}</GroupedFooter>
+    </Page>
+  );
+}
+
+/** Respostas dos agentes: whether each reply shows what the agent did, the same on every device. */
+export function ActivityPage() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { orgId, org } = useOrg();
+  const set = useSetShowActivity(orgId);
+  const on = org?.showActivity === true;
+  return (
+    <Page title={t("mobile.me.activity")}>
+      <View style={styles.gap} />
+      <GroupedList>
+        <GroupedRow
+          label={t("mobile.me.activityShow")}
+          toggle={on}
+          onPress={() => set.mutate(!on, { onError: () => toast({ title: t("mobile.me.activityFailed"), icon: "x" }) })}
+        />
+      </GroupedList>
+      <GroupedFooter>{t("mobile.me.activityHint")}</GroupedFooter>
     </Page>
   );
 }

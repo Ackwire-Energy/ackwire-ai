@@ -7,16 +7,7 @@
  * the bottom like the web's mask; 2 = no fade), `clear` (1 = the first tone is see-through, for a drawing
  * over glass). Arrays are only read with loop indices (SkSL rule).
  */
-export type DitherKind =
-  | "sky"
-  | "computer"
-  | "fuse"
-  | "bar"
-  | "track"
-  | "sweep"
-  | "pill"
-  | "horizon"
-  | "workspace";
+export type DitherKind = "sky" | "computer" | "fuse" | "bar" | "track" | "sweep" | "pill" | "horizon" | "workspace";
 
 const PRELUDE = `
 uniform float2 size;

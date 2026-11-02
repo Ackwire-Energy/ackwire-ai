@@ -505,7 +505,10 @@ export async function scheduleDoneCheck(
 /** How long after the last plan change the done check runs. */
 export const DONE_CHECK_DELAY_MS = 30_000;
 
-/** A line written in the mission's thread by its agent (no run, no routing). */
+/**
+ * A line written in the mission's thread by its agent (no run, no routing). Its executor works on a computer with
+ * its own internet, so what it writes counts as relaying outside content (`meta.readOutside`, ADR 0117).
+ */
 export async function postMissionMessage(
   deps: Pick<MissionDeps, "db" | "pubsub">,
   mission: Pick<MissionRow, "orgId" | "agentId" | "channelId" | "threadRootId">,
@@ -519,7 +522,7 @@ export async function postMissionMessage(
     threadId: mission.threadRootId,
     author: { type: "agent", agentId: mission.agentId, runId: null, hop: 0, stretchId: null },
     body: noMentions(body).slice(0, 39_000) || "…",
-    meta,
+    meta: { ...meta, readOutside: true },
   });
   if (!tx && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
   return message;

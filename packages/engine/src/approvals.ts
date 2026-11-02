@@ -233,7 +233,6 @@ const MAIL_VERBS = ["draft", "send", "reply", "forward"] as const;
 function mailProviderName(m: { provider: string; preset: string | null }) {
   if (m.provider === "gmail") return "Gmail";
   if (m.provider === "outlook") return "Outlook";
-  if (m.provider === "millionsend") return "MillionSend";
   const preset = m.preset && m.preset !== "custom" ? MAIL_PRESETS.find((p) => p.id === m.preset) : undefined;
   return preset ? preset.label.replace(/\s*\(.*\)$/, "") : null;
 }

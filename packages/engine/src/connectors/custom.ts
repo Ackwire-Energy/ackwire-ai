@@ -22,7 +22,7 @@ import {
   type ToolToClassify,
   UNKNOWN_CLASS,
 } from "./classify";
-import { beginComposioConnect, forgetComposioAccount } from "./composio";
+import { beginComposioConnect, composioServiceOf, forgetComposioAccount } from "./composio";
 import {
   bearerHeaders,
   type ConnectionSecret,
@@ -49,6 +49,7 @@ import {
   serverKey,
 } from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
+import { seedToolPins } from "./pins";
 import { composioToolkitOf, type McpPreset, presetForServer } from "./presets";
 import { type McpServerInfo, refreshServerIcon } from "./server-icon";
 
@@ -610,6 +611,7 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
     await session.close().catch(() => {});
   }
   if (account) await keepAccount(deps.db, c, account);
+  if (!composioServiceOf(c.serverUrl)) await seedToolPins(deps.db, c, listed);
   const existing = await deps.db.select().from(customTools).where(eq(customTools.connectionId, c.id));
   const byName = new Map(existing.map((t) => [t.name, t]));
   const cached = new Map<string, ToolClass>();

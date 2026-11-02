@@ -22,6 +22,8 @@ export interface DeliverNoticeInput {
   /** `false`: write the notice only (the run that waits on it reads it some other way). */
   wake?: boolean;
   trigger?: RunTrigger;
+  /** It relays what a run read outside (`meta.readOutside`, ADR 0117). */
+  readOutside?: boolean;
 }
 
 /**
@@ -42,7 +44,7 @@ export async function deliverNotice(
     threadId: input.threadId ?? undefined,
     author: { type: "agent", agentId: input.agentId, runId: null, hop: input.hop, stretchId: input.stretchId },
     body: input.body ?? input.notice.text,
-    meta: { notice: input.notice },
+    meta: { notice: input.notice, ...(input.readOutside ? { readOutside: true } : {}) },
   });
   const runs =
     input.wake === false ? [] : await createAgentRuns(tx, message, [input.agentId], input.trigger ?? "mention");

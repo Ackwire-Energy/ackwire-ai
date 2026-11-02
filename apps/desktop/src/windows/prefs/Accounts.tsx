@@ -36,9 +36,13 @@ import { OrgTile } from "../../ui/bits";
 import { CardTitle, hintFor, PrefCard, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 
-/** What changes between Claude Code and Codex (names stay in the strings; sites are not words). */
+/**
+ * What changes between Claude Code and Codex (names stay in the strings; sites are not words). Cursor's accounts
+ * (ADR 0114) are added from the web app, not here yet.
+ */
+type DesktopKind = Exclude<AccountKind, "cursor">;
 const KINDS: Record<
-  AccountKind,
+  DesktopKind,
   { title: string; tool: string; product: string; signIn: string; signInLead: string; site: string }
 > = {
   claude_code: {
@@ -67,7 +71,7 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
   const toast = useToast();
   const [picked, setPicked] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
-  const [adding, setAdding] = useState<AccountKind | null>(null);
+  const [adding, setAdding] = useState<DesktopKind | null>(null);
   const [removing, setRemoving] = useState<RunnerAccountInfo | null>(null);
   const [busy, setBusy] = useState(false);
   /** Shown once a list came back: an older runner never shows the cards, switching organizations doesn't blink. */
@@ -131,9 +135,9 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
     setRemoving(null);
   };
 
-  const executorOf = (kind: AccountKind) => (kind === "claude_code" ? executors.claude : executors.codex);
+  const executorOf = (kind: DesktopKind) => (kind === "claude_code" ? executors.claude : executors.codex);
   const accountName = (a: RunnerAccountInfo) => a.email ?? t("desktop.prefs.accounts.noEmail");
-  const logo = (kind: AccountKind) => (
+  const logo = (kind: DesktopKind) => (
     <span className="dk-logo">
       <Icon name={BRAIN_ICONS[kind]} size={16} />
     </span>
@@ -240,7 +244,9 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
         open={!!removing}
         onOpenChange={(o) => !o && !busy && setRemoving(null)}
         title={t("desktop.prefs.accounts.removeTitle", { account: removing ? accountName(removing) : "" })}
-        description={t("desktop.prefs.accounts.removeBody", { site: removing ? KINDS[removing.kind].site : "" })}
+        description={t("desktop.prefs.accounts.removeBody", {
+          site: removing && removing.kind !== "cursor" ? KINDS[removing.kind].site : "",
+        })}
         closeLabel={t("desktop.common.close")}
         width={440}
       >
@@ -264,7 +270,7 @@ function AddAccountDialog({
   onClose,
   onAdded,
 }: {
-  kind: AccountKind;
+  kind: DesktopKind;
   homeId: string;
   onClose: () => void;
   onAdded: () => void;

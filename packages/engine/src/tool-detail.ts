@@ -1,4 +1,13 @@
-import { commandOf, commandWords, normalizedCommand, PERMISSION_TOOL, redactCommon } from "@agenteschat/adapters";
+import {
+  commandOf,
+  commandWords,
+  KEY_SHAPES,
+  normalizedCommand,
+  PERMISSION_TOOL,
+  PRIVATE_KEY,
+  redactCommon,
+  SIGNED_SHAPES,
+} from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 
 const MAX = 80;
@@ -166,13 +175,9 @@ export async function artifactToolDetail(
 }
 
 /** Things that look like credentials, masked in previews and live output (agents should never have any). */
-const SECRET =
-  /\b(sk-[A-Za-z0-9_-]{12,}|sk-ant-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{8,})/g;
+const SECRET = new RegExp(`${KEY_SHAPES.source}|${SIGNED_SHAPES.source}`, "g");
 
 export const maskSecrets = (text: string) => text.replace(SECRET, "••••");
-
-/** A private key, by its first line. */
-const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 
 /**
  * Whether a value carries a credential by its format (an API key, a token, a private key): what a run
@@ -183,9 +188,16 @@ export function carriesCredential(value: unknown): boolean {
   return PRIVATE_KEY.test(text) || text.replace(SECRET, "") !== text;
 }
 
+const PRIVATE_KEY_BLOCK = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g;
+
 /** `maskSecrets`, private keys too (from their first line on): text people read that must hold none. */
-export const maskCredentials = (text: string) =>
-  maskSecrets(text).replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, "••••");
+export const maskCredentials = (text: string) => maskSecrets(text).replace(PRIVATE_KEY_BLOCK, "••••");
+
+/** `maskCredentials`, except a credential that appears word for word in `pasted` (what people wrote themselves). */
+export const maskCredentialsExcept = (text: string, pasted: string) => {
+  const keep = (found: string) => (pasted.includes(found) ? found : "••••");
+  return text.replace(SECRET, keep).replace(PRIVATE_KEY_BLOCK, keep);
+};
 
 /** An address's user and password (`postgres://user:pass@host`). */
 const USERINFO = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#@'"]+@/gi;

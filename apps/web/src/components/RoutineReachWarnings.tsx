@@ -28,6 +28,7 @@ export function RoutineReachWarnings({
   const warnings = routineReachWarnings(prompt, dir.agents, {
     agentId,
     creatorUserId: creator === me.user.id ? null : creator,
+    creatorRoleIds: dir.memberById.get(creator)?.roleIds,
   });
   if (warnings.length === 0) return null;
   return (

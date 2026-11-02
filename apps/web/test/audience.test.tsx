@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/audience";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, ORG_ID, seedRoles, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -47,7 +47,7 @@ describe("Quem pode falar com a Ada", () => {
         .getByRole("radio", { name: /^Todos do workspace/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
-    await click(within(group).getByRole("radio", { name: /^Só algumas pessoas/ }));
+    await click(within(group).getByRole("radio", { name: /^Só algumas pessoas ou papéis/ }));
     // Nobody picked yet: only the owner (João), who isn't in the list and always can.
     expect(section.textContent).toContain("Só João, por enquanto");
     await click(within(section).getAllByLabelText(/Walter/)[0] as HTMLElement);
@@ -57,8 +57,70 @@ describe("Quem pode falar com a Ada", () => {
     );
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
-      audience: { mode: "people", userIds: ["u-walter"] },
+      audience: { mode: "people", userIds: ["u-walter"], roleIds: [], consultable: true },
     });
+  });
+
+  test("Só algumas pessoas ou papéis: roles first with their icon and people, one search for both, sent as roleIds", async () => {
+    const state = seedState();
+    state.roles = seedRoles().map((r) => (r.kind === "custom" ? { ...r, name: "Suporte" } : r));
+    await go(`agents/${ADA_ID}?tab=settings&sec=audience`, state);
+    const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
+    await click(within(section).getByRole("radio", { name: /^Só algumas pessoas ou papéis/ }));
+    const results = within(section).getByRole("region", { name: "Buscar papéis e pessoas" });
+    // "Todos" is the first choice, never a role to pick.
+    expect(results.textContent).not.toContain("everyone");
+    const text = results.textContent ?? "";
+    expect(text.indexOf("Papéis")).toBeLessThan(text.indexOf("Pessoas"));
+    expect(
+      within(results)
+        .getByLabelText(/Suporte/)
+        .closest("label")?.textContent,
+    ).toMatch(/^Suporte\d+ pessoas?$/);
+    expect(results.querySelector(".ac-rolemark")).toBeTruthy();
+    const search = within(section).getByRole("searchbox", { name: "Buscar papéis e pessoas" });
+    await act(async () => fireEvent.change(search, { target: { value: "sup" } }));
+    expect(results.textContent).toContain("Suporte");
+    expect(results.textContent).not.toContain("Walter");
+    await act(async () => fireEvent.change(search, { target: { value: "walt" } }));
+    expect(results.textContent).not.toContain("Suporte");
+    expect(results.textContent).toContain("Walter");
+    await act(async () => fireEvent.change(search, { target: { value: "" } }));
+    await click(within(results).getByLabelText(/Suporte/));
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
+      audience: { mode: "people", userIds: [], roleIds: [ADMIN_ROLE_ID], consultable: true },
+    });
+  });
+
+  test("Outros agentes podem consultar: on by default when it leaves someone out, turned off and sent with the audience", async () => {
+    const state = await go(`agents/${ADA_ID}?tab=settings&sec=audience`);
+    const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
+    expect(within(section).queryByRole("switch", { name: "Outros agentes podem consultar a Ada" })).toBeNull();
+    await click(within(section).getByRole("radio", { name: /^Só o responsável/ }));
+    const toggle = within(section).getByRole("switch", { name: "Outros agentes podem consultar a Ada" });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(section.textContent).toContain("ela responde só ao agente que perguntou, nunca direto à pessoa");
+    await click(toggle);
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
+      audience: { mode: "owner", userIds: [], roleIds: [], consultable: false },
+    });
+  });
+
+  test("on a plan answering only its owner the switch isn't offered: nobody else is answered, consulted or not", async () => {
+    const state = onlyOwner();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "claude_code", model: "Sonnet" };
+    await go(`agents/${ADA_ID}?tab=settings&sec=audience`, state);
+    const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
+    expect(within(section).queryByRole("switch", { name: "Outros agentes podem consultar a Ada" })).toBeNull();
   });
 
   test("an agent that doesn't answer me: chip, no @ suggestion, DM composer off with the notice", async () => {
@@ -103,7 +165,7 @@ describe("Quem pode falar com a Ada", () => {
     await settle(6);
     expect(
       (state.calls.find((c) => c.method === "agents.create")?.args[1] as { audience?: unknown } | undefined)?.audience,
-    ).toEqual({ mode: "owner", userIds: [] });
+    ).toEqual({ mode: "owner", userIds: [], roleIds: [], consultable: true });
   });
 
   test("Criar agente: Só algumas pessoas with nobody picked says only me for now and is sent restricted", async () => {
@@ -119,7 +181,7 @@ describe("Quem pode falar com a Ada", () => {
     await settle(6);
     expect(
       (state.calls.find((c) => c.method === "agents.create")?.args[1] as { audience?: unknown } | undefined)?.audience,
-    ).toEqual({ mode: "people", userIds: [] });
+    ).toEqual({ mode: "people", userIds: [], roleIds: [], consultable: true });
   });
 });
 
@@ -156,8 +218,18 @@ describe("audience rules", () => {
     );
     expect(audienceSummary(t, theo({ audience: { mode: "owner", userIds: [] } }), nameOf)).toBe("Só Walter");
     expect(audienceSummary(t, theo({ audience: { mode: "people", userIds: ["u2", "u3", "u4"] } }), nameOf)).toBe(
-      "Walter, Ana e mais 2",
+      "Walter, Ana e mais 2 pessoas",
     );
+    // Roles first, the people after them counted.
+    const roleName = (id: string) => ({ r1: "Suporte", r2: "Tecnologia" })[id];
+    const both = theo({ audience: { mode: "people", userIds: ["u2", "u3"], roleIds: ["r1", "r2"] } });
+    expect(audienceSummary(t, both, nameOf, roleName)).toBe("Suporte, Tecnologia e mais 3 pessoas");
+    expect(audienceNotice(t, both, nameOf, roleName)).toBe(
+      "O Theo só responde a Suporte, Tecnologia, Walter, Ana e Bia.",
+    );
+    expect(
+      audienceSummary(t, theo({ audience: { mode: "people", userIds: [], roleIds: ["r1"] } }), nameOf, roleName),
+    ).toBe("Suporte e Walter");
   });
 
   test("who can talk and who can edit", () => {

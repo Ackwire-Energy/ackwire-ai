@@ -53,6 +53,7 @@ export const keys = {
   githubRepos: (orgId: string) => ["org", orgId, "github-repositories"] as const,
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
+  toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   /** What the agent runs without asking ("Aprovar sempre"). */
   approvalRules: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "approval-rules"] as const,

@@ -94,7 +94,9 @@ describe("binary files", () => {
     );
     expect(await call(ctx, "export_file", { path: "out/data.zip" })).toMatchObject({ isError: true });
     expect((await call(ctx, "write_file", { path: "notes.md", content: "olá 🐝" })).isError).toBeFalsy();
-    expect((await call(ctx, "read_file", { path: "notes.md" })).content).toEndWith(":\nolá 🐝");
+    expect((await call(ctx, "read_file", { path: "notes.md" })).content).toEndWith(
+      ':\n<external_data source="file notes.md">\nolá 🐝\n</external_data>',
+    );
   });
 });
 
@@ -160,6 +162,11 @@ describe("limits", () => {
     const long = await call(ctx, "run_code", { language: "bash", code: "yes x" });
     expect(long.content.length).toBeLessThan(21_000);
     expect(long.content).toContain("characters cut");
+    // What a command prints reaches the model inside the outside-content envelope (ADR 0117), cut once.
+    expect(long.content).toStartWith("run_code bash: exit code 0");
+    expect(long.content).toContain('\n<external_data source="run_code output">\nstdout:\n');
+    expect(long.content).toEndWith("\n</external_data>");
+    expect(long.content.match(/characters cut/g)).toHaveLength(1);
 
     // A member can't change the Run code settings (`configure`).
     const member = await addMember(f.db, f.org.id, "member", "bia");

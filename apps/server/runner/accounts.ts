@@ -11,6 +11,7 @@ import {
   type AccountKind,
   type AccountLoginState,
   accountCodeAad,
+  CURSOR_KEY_PROVIDER,
   isAccountId,
   isAccountKind,
   isLoginEmail,
@@ -34,7 +35,7 @@ import {
 } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
+import { CURSOR_BIN, claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
 import { readSmallJson, writeJson } from "./json-file";
 import {
   codexUsage,
@@ -110,17 +111,30 @@ const MAX_CODE_CHARS = 2000;
 const OUTPUT_KEEP = 16_000;
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
 
-const LABEL: Record<AccountKind, string> = { claude_code: "Claude Code", codex: "Codex" };
-const ENV_VAR: Record<AccountKind, string> = { claude_code: "CLAUDE_CONFIG_DIR", codex: "CODEX_HOME" };
+const LABEL: Record<AccountKind, string> = { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor" };
+/** Cursor's CLI keeps its config in `CURSOR_CONFIG_DIR` (cursor.com/docs/cli/reference/configuration). */
+const ENV_VAR: Record<AccountKind, string> = {
+  claude_code: "CLAUDE_CONFIG_DIR",
+  codex: "CODEX_HOME",
+  cursor: "CURSOR_CONFIG_DIR",
+};
 const LOGIN_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "login"],
   codex: ["login", "--device-auth"],
+  cursor: ["login"],
 };
 const STATUS_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "status", "--json"],
   codex: ["login", "status"],
+  cursor: ["status"],
 };
-const LOGOUT_ARGS: Record<AccountKind, string[]> = { claude_code: ["auth", "logout"], codex: ["logout"] };
+const LOGOUT_ARGS: Record<AccountKind, string[]> = {
+  claude_code: ["auth", "logout"],
+  codex: ["logout"],
+  cursor: ["logout"],
+};
+/** Each CLI's executable (Cursor's was `cursor-agent` before it was renamed). */
+const COMMAND: Record<AccountKind, string> = { claude_code: "claude", codex: "codex", cursor: CURSOR_BIN };
 
 /** What a brain turn says when its account folder is gone (people read it). */
 export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
@@ -128,18 +142,38 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
     "The Claude account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
   codex:
     "The ChatGPT account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
+  cursor:
+    "The Cursor account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY)$/;
 
 /** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
 export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
   env[ENV_VAR[kind]] = dir;
+  if (kind === "cursor") {
+    // Linux keeps the sign-in under `$XDG_CONFIG_HOME/cursor`, macOS in the Keychain unless told to use a file: both
+    // in the account's folder, so two accounts never share one sign-in. The sign-in prints its link, opens nothing.
+    env.XDG_CONFIG_HOME = dir;
+    env.AGENT_CLI_CREDENTIAL_STORE = "file";
+    env.NO_OPEN_BROWSER = "1";
+  }
   return env;
+}
+
+/** A Cursor account made with an API key keeps it here (600). */
+const CURSOR_KEY_FILE = "cursor-key.json";
+/** Cursor's API keys (`key_…`, a few dozen characters): loose, only to catch a paste that isn't one. */
+const CURSOR_KEY = /^[\x21-\x7e]{16,512}$/;
+
+/** A Cursor key account's key (`cursor-key.json`); null when the folder signs in instead. */
+export async function cursorKeyOf(dir: string): Promise<string | null> {
+  const o = readSmallJson(path.join(dir, CURSOR_KEY_FILE), 1000) as Record<string, unknown> | null;
+  return typeof o?.key === "string" && CURSOR_KEY.test(o.key) ? o.key : null;
 }
 
 /**
@@ -661,6 +695,23 @@ export function parseClaudeStatus(
   };
 }
 
+/** Cursor's sign-in link (`agent login` with `NO_OPEN_BROWSER`): the first complete https URL on cursor.com. */
+export function parseCursorLoginUrl(output: string, final = false): string | null {
+  return urlsIn(stripAnsi(output), (h) => hostIs(h, "cursor.com") || hostIs(h, "cursor.sh"), final)[0]?.url ?? null;
+}
+
+/**
+ * `agent status`: signed in when it exits 0 and names the account (`Logged in as someone@example.com`), the email
+ * kept when it is one. Anything that says it isn't (`Not logged in`) is signed out.
+ */
+export function parseCursorStatus(status: number | null, output: string): Omit<RunnerAccountInfo, "id" | "kind"> {
+  const text = stripAnsi(output);
+  const loggedIn =
+    status === 0 && /logged in|authenticated/i.test(text) && !/not (?:logged in|authenticated)/i.test(text);
+  const email = loggedIn ? /[^\s@<>()"']+@[^\s@<>()"']+\.[a-z]{2,}/i.exec(text)?.[0] : undefined;
+  return { loggedIn, ...(email && email.length <= 254 ? { email } : {}) };
+}
+
 /** `codex login status` (`Logged in using ChatGPT`, on either stream): signed in when it exits 0 and says so. */
 export function parseCodexStatus(status: number | null, output: string): Omit<RunnerAccountInfo, "id" | "kind"> {
   const text = stripAnsi(output);
@@ -772,8 +823,8 @@ interface Login {
   token?: string;
   /** System mode: made for all agents (`<id>.shared` once it signs in). */
   shared: boolean;
-  /** A key account's plan. */
-  provider?: PlanId;
+  /** A key account's plan, or `cursor` for a Cursor API key. */
+  provider?: PlanId | typeof CURSOR_KEY_PROVIDER;
   state: AccountLoginState;
   output: string;
   /** Claude Code: the ephemeral key the pasted code is sealed to (in memory only). */
@@ -817,7 +868,7 @@ export class AccountManager {
   }
 
   private command(kind: AccountKind): string[] {
-    return this.opts.commands?.[kind] ?? [kind === "codex" ? "codex" : "claude"];
+    return this.opts.commands?.[kind] ?? [COMMAND[kind]];
   }
 
   private dirOf(kind: AccountKind, id: string) {
@@ -893,7 +944,8 @@ export class AccountManager {
     if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
       throw new RunnerError("bad_request", "That email can't name the account to sign in to");
     }
-    if (provider !== undefined && (kind !== "claude_code" || !isPlanId(provider))) {
+    const cursorKey = kind === "cursor" && provider === CURSOR_KEY_PROVIDER;
+    if (provider !== undefined && !cursorKey && (kind !== "claude_code" || !isPlanId(provider))) {
       throw new RunnerError("bad_request", "This computer doesn't know that plan");
     }
     if (this.logins.get(loginId)?.state === "waiting") {
@@ -928,7 +980,7 @@ export class AccountManager {
       }
     }
     // Claude Code: the key the browser seals the pasted code (or a plan's key) to; the private half stays in memory.
-    const pair = kind === "claude_code" ? await generateSecretKeyPair() : undefined;
+    const pair = kind === "claude_code" || cursorKey ? await generateSecretKeyPair() : undefined;
     if (!again) {
       // System mode: agents' users pass through to the one folder lent to each, and list nothing.
       const parents = this.opts.lending ? 0o711 : 0o700;
@@ -945,6 +997,7 @@ export class AccountManager {
       // Until it signs in: a runner that dies mid sign-in leaves this behind, and the list skips (then clears) it.
       await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
     }
+    if (cursorKey && pair) return this.beginKey(kind, loginId, dir, CURSOR_KEY_PROVIDER, pair, again, false);
     if (provider && pair) return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again, forAll);
 
     const login: Login = {
@@ -979,7 +1032,11 @@ export class AccountManager {
 
     const found = await new Promise<{ url: string; userCode?: string } | null>((resolve) => {
       const parse = (final: boolean) =>
-        kind === "codex" ? parseCodexLogin(login.output, final) : toUrl(parseClaudeLoginUrl(this.shown(login), final));
+        kind === "codex"
+          ? parseCodexLogin(login.output, final)
+          : kind === "cursor"
+            ? toUrl(parseCursorLoginUrl(login.output, final))
+            : toUrl(parseClaudeLoginUrl(this.shown(login), final));
       let done = false;
       const finish = (v: { url: string; userCode?: string } | null) => {
         if (done) return;
@@ -1119,7 +1176,7 @@ export class AccountManager {
     kind: AccountKind,
     loginId: string,
     dir: string,
-    provider: PlanId,
+    provider: PlanId | typeof CURSOR_KEY_PROVIDER,
     pair: { publicKey: string; privateKey: string },
     again: boolean,
     shared: boolean,
@@ -1162,7 +1219,7 @@ export class AccountManager {
   /** The code the person pasted (Claude Code) or a plan's key, sealed to this sign-in's key: written to the CLI, or kept. */
   async code(loginId: string, aad: string, box: WireSecretBox): Promise<void> {
     const login = this.waiting(loginId);
-    if (login.kind !== "claude_code" || !login.privateKey) {
+    if ((login.kind !== "claude_code" && login.provider !== CURSOR_KEY_PROVIDER) || !login.privateKey) {
       throw new RunnerError("bad_request", "This sign-in doesn't take a code");
     }
     const org = this.opts.orgId?.();
@@ -1178,6 +1235,7 @@ export class AccountManager {
     } catch {
       throw new RunnerError("bad_request", "The code couldn't be opened (wrong key or altered on the way)");
     }
+    if (login.provider === CURSOR_KEY_PROVIDER) return this.keepCursorKey(login, code);
     if (login.provider) return this.keepKey(login, login.provider, code);
     if (!code || code.length > MAX_CODE_CHARS || /[\r\n]/.test(code)) {
       throw new RunnerError("bad_request", "That doesn't look like a sign-in code");
@@ -1203,6 +1261,27 @@ export class AccountManager {
   /** Whether an account thinks for all of its owner's agents: every one where they are the runner's own user. */
   private sharedFlag(kind: AccountKind, id: string): { shared?: true } {
     return !this.opts.lending || this.isShared(kind, id) ? { shared: true } : {};
+  }
+
+  /** A Cursor API key, kept in the folder (600, written whole): the account thinks with it. Never logged. */
+  private async keepCursorKey(login: Login, key: string) {
+    if (!CURSOR_KEY.test(key))
+      throw new RunnerError("bad_request", "That doesn't look like a Cursor API key. Copy the whole key.");
+    writeJson(path.join(login.dir, CURSOR_KEY_FILE), { key });
+    await rm(path.join(login.dir, SIGNING_IN), { force: true });
+    await rm(this.marker(login.kind, login.id, "invalid"), { force: true });
+    const info: RunnerAccountInfo = {
+      id: login.id,
+      kind: login.kind,
+      loggedIn: true,
+      provider: CURSOR_KEY_PROVIDER,
+      keyHint: key.slice(-4),
+      ...this.sharedFlag(login.kind, login.id),
+    };
+    this.settle(login, "done");
+    login.account = info;
+    this.added(info);
+    this.log(`account ${login.id.slice(0, 8)} (cursor key) kept`);
   }
 
   /** A plan's key, checked and kept in the folder (600, written whole): the account is signed in. Never logged. */
@@ -1397,6 +1476,10 @@ export class AccountManager {
     const shared = this.sharedFlag(kind, id);
     const plan = kind === "claude_code" ? await planKeyOf(dir) : null;
     if (plan) return { id, kind, loggedIn: !refused, provider: plan.provider, keyHint: plan.key.slice(-4), ...shared };
+    const cursorKey = kind === "cursor" ? await cursorKeyOf(dir) : null;
+    if (cursorKey) {
+      return { id, kind, loggedIn: !refused, provider: CURSOR_KEY_PROVIDER, keyHint: cursorKey.slice(-4), ...shared };
+    }
     if (this.isShared(kind, id)) return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
     if (refused || this.lentTo(kind, id) !== null) {
       const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
@@ -1408,7 +1491,9 @@ export class AccountManager {
     const status =
       kind === "claude_code"
         ? parseClaudeStatus(r.status, r.stdout, () => claudeTier(dir))
-        : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
+        : kind === "cursor"
+          ? parseCursorStatus(r.status, `${r.stdout}\n${r.stderr}`)
+          : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
     return { id, kind, ...status, ...shared };
   }
 
@@ -1510,7 +1595,11 @@ export class AccountManager {
     // A key has no sign-in to end, nor has a token on this computer (only Claude's settings revoke it); a folder an
     // agent's user had is never run as root (deleting it is the sign-out).
     if (lent) await this.serial(id, () => this.reclaimNow(kind, id));
-    else if (!this.isShared(kind, id) && !(kind === "claude_code" && (await planKeyOf(dir)))) {
+    else if (
+      !this.isShared(kind, id) &&
+      !(kind === "claude_code" && (await planKeyOf(dir))) &&
+      !(kind === "cursor" && (await cursorKeyOf(dir)))
+    ) {
       const r = await runCli(this.command(kind), LOGOUT_ARGS[kind], this.env(kind, dir), STATUS_TIMEOUT_MS);
       if (r.status !== 0) this.log(`account ${id.slice(0, 8)} (${kind}): sign-out didn't finish; removing it anyway`);
     }
@@ -1739,6 +1828,8 @@ export class AccountManager {
     // A token makes model requests only: its usage comes from its turns.
     if (!own && (this.lentTo(target.kind, id) !== null || this.isShared(target.kind, id))) return null;
     const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
+    // Cursor's CLI reports no plan usage: its turns' `usage` is all there is.
+    if (target.kind === "cursor") return null;
     return target.kind === "codex" ? probeCodexUsage(probe) : probeClaudeUsage(probe);
   }
 

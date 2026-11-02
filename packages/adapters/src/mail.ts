@@ -3,11 +3,11 @@
  * per-call checks and approvals; these interfaces only reach a mailbox.
  *
  * - `MailConnector.open` gives a `MailProvider` for one account: Gmail and
- *   Outlook through Composio (`via = composio`), a MillionSend inbox through
- *   its API (`via = millionsend`), anything else over IMAP/SMTP (`via = imap`).
- * - `MailPoller` (IMAP and MillionSend) lists messages that arrived since the last check.
+ *   Outlook through Composio (`via = composio`), anything else over IMAP/SMTP
+ *   (`via = imap`).
+ * - `MailPoller` (IMAP) lists messages that arrived since the last check.
  * - `ComposioClient` is the Composio-specific part (connect links, connected
- *   accounts, triggers, webhooks); `MillionSendClient` MillionSend's (inboxes, webhooks).
+ *   accounts, triggers, webhooks).
  *
  * Every text field coming out of a mailbox is untrusted: the engine wraps it
  * before a model sees it.
@@ -126,15 +126,13 @@ export interface MailProvider {
 export interface MailAccountRef {
   id: string;
   orgId: string;
-  provider: "gmail" | "outlook" | "imap" | "millionsend";
-  via: "composio" | "imap" | "millionsend";
+  provider: "gmail" | "outlook" | "imap";
+  via: "composio" | "imap";
   address: string;
   /** Composio connected account id. */
   externalAccountId?: string | null;
   /** Composio user id the connected account belongs to. */
   externalUserId?: string | null;
-  /** MillionSend: the inbox and the key that reaches it. */
-  millionsend?: { apiKey: string; inboxId: string };
   imap?: {
     host: string;
     port: number;
@@ -176,8 +174,7 @@ export interface MailPollState {
 
 /**
  * Messages that arrived in a folder since `state` (null = start from now, return nothing). IMAP's state is a UID
- * and its folder's `UIDVALIDITY`; MillionSend's is the arrival time (ms) of the newest message seen, and when its
- * checks started (ms) in `uidValidity`.
+ * and its folder's `UIDVALIDITY`.
  */
 export interface MailPoller {
   newMessages(
@@ -341,40 +338,10 @@ export class ComposioSignatureError extends Error {
   }
 }
 
-/** An inbox a MillionSend API key reaches. */
-export interface MillionSendInbox {
-  id: string;
-  /** Lowercase. */
-  address: string;
-  name: string | null;
-  /** `agent` (screened, replies inside its threads by default) or `human`. */
-  kind: "agent" | "human";
-  /** On MillionSend's shared domain (no DNS of the team's own). */
-  shared: boolean;
-}
-
-/** MillionSend (an inbox per mailbox): the key is the mailbox's own, opened by the engine for each call. */
-export interface MillionSendClient {
-  /** The inboxes the key reaches (a key limited to one inbox: that one). `MailAuthError` when the key can't read them. */
-  listInboxes(apiKey: string): Promise<MillionSendInbox[]>;
-  /**
-   * A webhook for new mail in one inbox, signed with `secret` (ours, `whsec_…`). Null when the key may not create
-   * webhooks (one limited to an inbox).
-   */
-  createWebhook(
-    apiKey: string,
-    input: { endpoint: string; inboxId: string; secret: string },
-  ): Promise<{ id: string } | null>;
-  /** A 404 counts as done. */
-  deleteWebhook(apiKey: string, webhookId: string): Promise<void>;
-}
-
 /** The mail adapters the server wires (each absent when not configured). */
 export interface MailAdapters {
   /** Gmail and Outlook through Composio; null = Composio not configured. */
   composio: { client: ComposioClient; connector: MailConnector } | null;
   /** Any IMAP/SMTP server; null = off. */
   imap: { connector: MailConnector; poller: MailPoller; tester: MailConnectionTester; presets: MailPreset[] } | null;
-  /** MillionSend inboxes (ADR 0102); absent or null = off. */
-  millionsend?: { client: MillionSendClient; connector: MailConnector; poller: MailPoller } | null;
 }

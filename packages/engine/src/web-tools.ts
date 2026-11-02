@@ -1,6 +1,7 @@
 import { decodeEntities, htmlToText } from "@agenteschat/adapters";
 import { cutText } from "./format";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
+import { outboundRefusal } from "./outbound";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
 /** The usage rows of web calls (no tokens, no model): readers of model calls leave them out. */
@@ -235,20 +236,25 @@ export function createWebToolSource(deps: WebToolDeps = {}): ToolSource {
       const asked = String(input.url ?? "")
         .trim()
         .replace(/^http:\/\//i, "https://");
-      const page = await getPage(asked, ctx.signal);
+      const refused = await outboundRefusal(ctx, asked);
+      if (refused) return refused;
+      const page = await getPage(asked, ctx);
       await record(ctx, "fetch");
       if (!page.ok) return { content: page.text, isError: true, data: { url: asked } };
       return { content: page.text, data: { url: page.url, status: page.status } };
     },
   };
 
-  /** One GET through the public-URL guard on every hop, at most `MAX_BYTES`, as text. */
+  /**
+   * One GET through the public-URL guard on every hop, at most `MAX_BYTES`, as text. A redirect's target needs no
+   * outbound check: the site chose it, and its `Page:` line makes it seen for the rest of the run.
+   */
   async function getPage(
     raw: string,
-    signal?: AbortSignal,
+    ctx: Pick<ToolContext, "signal">,
   ): Promise<{ ok: true; text: string; url: string; status: number } | { ok: false; text: string }> {
     let next = raw;
-    const wait = timeout(signal);
+    const wait = timeout(ctx.signal);
     for (let hop = 0; ; hop++) {
       let at: URL;
       try {

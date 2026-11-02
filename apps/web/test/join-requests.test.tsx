@@ -11,7 +11,7 @@ import type {
   Member,
   NotificationLatest,
 } from "@agenteschat/client";
-import { ApiError } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -740,9 +740,11 @@ describe("Members › Esperando você", () => {
   });
 
   test("someone let in elsewhere (another admin, another tab) shows at once: in the people and the sidebar's count", async () => {
-    const { state, sockets } = await members();
+    const { state, sockets, services } = await members();
     const socket = sockets.last();
     await act(async () => socket.open());
+    const agentFetches = () => services.queryClient.getQueryState(keys.agents(ORG_ID))?.dataUpdateCount ?? 0;
+    const fetchedBefore = agentFetches();
     const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
     expect(sidebarCount()).toBe("2 membros · 2 agentes");
     const joao = state.members[1] as Member;
@@ -751,6 +753,8 @@ describe("Members › Esperando você", () => {
     await settle(6);
     expect(sidebarCount()).toBe("3 membros · 2 agentes");
     expect(text()).toContain("Carla Dias");
+    // A role change may let someone talk to an agent or take it away: the agents refetch too.
+    expect(agentFetches()).toBeGreaterThan(fetchedBefore);
   });
 
   test("deny: an optional reason they read in the email; someone else answering first is said", async () => {

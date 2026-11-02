@@ -1024,6 +1024,35 @@ export async function notifyMachineConnected(
   });
 }
 
+/** The share of a computer's workspace disk in use past which its admins hear it (ADR 0115). */
+export const DISK_WARN_USE = 0.85;
+/** Under this share the warning is armed again, so a disk hovering at the line doesn't notify on every report. */
+export const DISK_REARM_USE = 0.8;
+
+/**
+ * A computer's disk passed `DISK_WARN_USE` (ADR 0115): who configures the workspace hears it, once each time it
+ * crosses (the caller compares with the last report), since agents filling the shared folder fail together.
+ */
+export async function notifyComputerDiskFull(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string },
+  disk: { diskUse: number; diskFreeGb?: number },
+  at: Date,
+) {
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: await adminsOf(deps, machine.orgId, "configure"),
+    kind: "computer_disk_full",
+    groupKey: `computer_disk_full:${machine.id}:${at.getTime()}`,
+    source: { machineId: machine.id, label: machine.name },
+    latest: {
+      title: machine.name,
+      diskUse: disk.diskUse,
+      ...(disk.diskFreeGb === undefined ? {} : { diskFreeGb: disk.diskFreeGb }),
+    },
+  });
+}
+
 /**
  * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
  * from seconds to an approval hours later. One row each time it gets ready.
@@ -1057,6 +1086,31 @@ export async function notifyComposioLimit(deps: NotificationDeps, orgId: string,
     latest: { title: month, calls },
   });
 }
+
+const toolChangedGroup = (connectionId: string) => `connector_tool_changed:${connectionId}:`;
+
+/**
+ * A connected MCP server changed tools an admin approved (ADR 0117): who manages connectors hears it once per change,
+ * `source.label` the connection's name and `latest.title` the tools. Resolved when nothing of it waits any more.
+ */
+export async function notifyToolChanged(
+  deps: NotificationDeps,
+  connection: { id: string; orgId: string; label: string },
+  tools: { name: string; fingerprint: string }[],
+) {
+  await notify(deps, {
+    orgId: connection.orgId,
+    userIds: await adminsOf(deps, connection.orgId, "manage_connectors"),
+    kind: "connector_tool_changed",
+    groupKey: `${toolChangedGroup(connection.id)}${tools[0]?.fingerprint ?? ""}`,
+    waiting: true,
+    source: { label: connection.label },
+    latest: { title: tools.map((t) => t.name).join(", ") },
+  });
+}
+
+export const resolveToolChanged = (deps: NotificationDeps, orgId: string, connectionId: string) =>
+  resolveNotifications(deps, orgId, { groupKeyPrefix: toolChangedGroup(connectionId) });
 
 // ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
 

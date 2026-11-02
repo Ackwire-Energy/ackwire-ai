@@ -711,6 +711,10 @@ describe("an agent's question (ask_user)", () => {
       status: "answered",
       answer: "Agora",
     });
+    // Taken back by the agent: the card says it no longer needs an answer.
+    expect(
+      questionOf({ question: { ...question, status: "answered", answer: null, withdrawn: true } })?.withdrawn,
+    ).toBe(true);
     expect(questionOf({ question: { id: "q", text: "" } })).toBeNull();
     expect(questionOf({})).toBeNull();
     expect(questionOf(undefined)).toBeNull();
@@ -1215,6 +1219,20 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(secretWhere(pt, { ...request, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
       "Vai para o arquivo .npmrc no computador de Theo.",
     );
+    // Asked again under a name the agent holds (a key that was refused): the card says it replaces that one.
+    const again = { ...request, name: "TYPESAFE_API_KEY", target: { kind: "env" as const }, replaces: true };
+    expect(secretWhere(pt, again, "Theo")).toBe(
+      "Vai como a variável TYPESAFE_API_KEY no computador de Theo. Substitui a chave com esse nome que Theo já tem.",
+    );
+    expect(secretWhere(en, again, "Theo")).toBe(
+      "Goes in as the variable TYPESAFE_API_KEY on Theo's computer. Replaces the key Theo already has under this name.",
+    );
+    // Answered or closed, nothing is being replaced: the details say only where it goes.
+    for (const status of ["delivered", "declined", "expired"] as const) {
+      expect(secretWhere(pt, { ...again, status }, "Theo")).toBe(
+        "Vai como a variável TYPESAFE_API_KEY no computador de Theo.",
+      );
+    }
   });
 
   test("an empty or too large value is caught before it is sealed", async () => {

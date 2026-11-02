@@ -69,6 +69,7 @@ import {
   mailChoices,
 } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
+import { ToolChanges } from "@/components/ToolChanges";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
@@ -203,6 +204,7 @@ export function ConnectorsSection({
       {composio.data && nearComposioLimit(composio.data) && (
         <p className="small muted">{composioUsageText(t, i18n.language, composio.data)}</p>
       )}
+      {admin && <ToolChanges orgId={org.id} />}
       {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
       {connections.isSuccess &&
         servers.isSuccess &&

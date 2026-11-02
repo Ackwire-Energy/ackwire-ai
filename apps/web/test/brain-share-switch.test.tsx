@@ -309,7 +309,7 @@ describe("Quem pode falar, on a plan", () => {
     await save();
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
-      audience: { mode: "everyone", userIds: [] },
+      audience: { mode: "everyone", userIds: [], roleIds: [], consultable: true },
     });
   });
 

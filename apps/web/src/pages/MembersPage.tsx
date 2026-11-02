@@ -31,7 +31,7 @@ import {
 import { approvalNews, JOIN_NOTE_MAX, JOIN_REASON_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
-import { grants, rolesOf } from "@agenteschat/client/lib/roles";
+import { grants, leaves, removes, rolesOf } from "@agenteschat/client/lib/roles";
 import { isEmail } from "@agenteschat/client/lib/text";
 import {
   Alert,
@@ -62,16 +62,20 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { MenuEntries } from "@/components/DesktopMenus";
+import { usePersonMenu } from "@/components/entity-menus";
 import { useFilterCopy } from "@/components/filters";
 import { useCopied } from "@/components/invite/copied";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MembersFull } from "@/components/Limits";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { RemoveMemberDialog } from "@/components/RemoveMember";
 import { RolesPicker } from "@/components/roles/RolesPicker";
 import { RoleChip } from "@/components/roles/RolesSection";
 import { useDirectory } from "@/hooks/useDirectory";
-import { copyText } from "@/lib/context-menu";
+import { copyText, type MenuEntry, tidy } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { TOAST_MS, useToast } from "@/lib/toast";
 import "./members.css";
@@ -129,17 +133,42 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const orgRoles = useRoles(org.id).data?.roles ?? [];
   const month = formatMonth(i18n.language, new Date());
   const [roles, setRoles] = useState<string[]>([]);
+  const personEntries = usePersonMenu();
+  const [removing, setRemoving] = useState<Person | null>(null);
+  const viewer = { role: org.role, rank: org.rank, userId: me.user.id, permissions: org.permissions };
+  const allPeople = peopleQuery.data ?? [];
+  // The person's menu (right click and "…"), and Remover do workspace for whoever may, or Sair on one's own row.
+  const entriesOf = (m: Person): MenuEntry[] => {
+    const mine = m.userId === me.user.id;
+    const out = mine ? leaves(org, allPeople) : removes(viewer, m, orgRoles);
+    return tidy([
+      ...personEntries(m),
+      { kind: "separator" },
+      ...(out
+        ? ([
+            {
+              kind: "item",
+              id: "remove",
+              label: mine ? t("members.remove.leave") : t("members.remove.item"),
+              icon: mine ? "arrowRight" : "trash",
+              danger: true,
+              run: () => setRemoving(m),
+            },
+          ] satisfies MenuEntry[])
+        : []),
+    ]);
+  };
   // `?request=…&do=approve|deny`: the admins' email opens that request here.
   const search = useSearch({ strict: false }) as { request?: string; do?: string };
   const filterCopy = useFilterCopy();
   // The filter's values: `owner`, or a role's id.
-  const people = (peopleQuery.data ?? []).filter(
+  const people = allPeople.filter(
     (m) =>
       roles.length === 0 || roles.some((r) => (r === "owner" ? m.role === "owner" : (m.roleIds ?? []).includes(r))),
   );
 
   return (
-    <div className={embedded ? "settings__section" : "page"} style={{ gap: 28 }}>
+    <div className={`${embedded ? "settings__section" : "page"} members-page`} style={{ gap: 28 }}>
       <header className="page__header page__header--row">
         <div className="page__header-text">
           {embedded ? (
@@ -202,9 +231,9 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             // The server says who is below whom; here the "+" shows when there's anything to give.
             const gives = manage && (m.role !== "owner" || org.role === "owner") && orgRoles.some((r) => r.givable);
             return (
-              <div key={m.userId} className="ac-list__row members-person">
+              <div key={m.userId} className="ac-list__row members-person" {...entityMenu(() => entriesOf(m))}>
                 <Avatar
-                  size="sm"
+                  size="md"
                   name={m.name}
                   imageUrl={m.image}
                   presence={m.presence}
@@ -258,10 +287,26 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                     />
                   )}
                 </span>
+                <Menu
+                  align="end"
+                  label={t("members.more", { name: m.name })}
+                  trigger={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      iconOnly
+                      icon="more"
+                      aria-label={t("members.more", { name: m.name })}
+                    />
+                  }
+                >
+                  <MenuEntries entries={entriesOf(m)} />
+                </Menu>
               </div>
             );
           })}
         </List>
+        <RemoveMemberDialog person={removing} onClose={() => setRemoving(null)} />
       </section>
 
       <section aria-labelledby="sec-agents" className="section section--tight">
@@ -289,7 +334,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                 params={{ orgId: org.id, agentId: a.id }}
                 className="ac-list__row"
               >
-                <AgentAvatar agentId={a.id} size="sm" name={a.name} />
+                <AgentAvatar agentId={a.id} size="md" name={a.name} />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>
                     {a.name}
@@ -456,7 +501,7 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
                       : t("members.requests.label", { name: r.name })
                   }
                 >
-                  <Who face={<Avatar size="sm" name={r.name} />} name={r.name} sub={r.email} />
+                  <Who face={<Avatar size="md" name={r.name} />} name={r.name} sub={r.email} />
                   <State icon={by ? "person" : "link"}>{how}</State>
                   {/* Nobody proved the address: approving can't let them in at once (ADR 0072). */}
                   {!r.verified && !by && <Chip icon="mail">{t("members.requests.unverified")}</Chip>}
@@ -679,7 +724,7 @@ function SentInvitations() {
               aria-label={t("members.invitations.label", { email: inv.email })}
             >
               <Who
-                face={<Avatar size="sm" name={inv.email} initials={inv.email.slice(0, 2).toUpperCase()} />}
+                face={<Avatar size="md" name={inv.email} initials={inv.email.slice(0, 2).toUpperCase()} />}
                 name={inv.email}
                 sub={sub}
               />
@@ -904,7 +949,7 @@ function Suggestions() {
                 aria-label={t("members.suggest.label", { email: s.email })}
               >
                 <Who
-                  face={<Avatar size="sm" name={s.email} initials={s.email.slice(0, 2).toUpperCase()} />}
+                  face={<Avatar size="md" name={s.email} initials={s.email.slice(0, 2).toUpperCase()} />}
                   name={s.email}
                   sub={s.note ?? ""}
                 />

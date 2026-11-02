@@ -1272,6 +1272,16 @@ test.if(posix)(
       error: expect.stringContaining("only for shop.example.com"),
     });
     expect(t.logged().filter((c) => c.args.includes("batch"))).toHaveLength(1);
+    // What the browser reads back (a field just typed into, a page that shows it) leaves the machine redacted.
+    t.page({ attrs: { "@e4": { type: "text", autocomplete: "one-time-code", value } } });
+    const browserCtx = { ...ctx, browser: t.manager };
+    const act = (command: string, args: string[]) =>
+      handleRequest(browserCtx, { agent: dev, op: "browser.act", command, args, timeoutSeconds: 5 }, scope);
+    await act("open", ["https://shop.example.com/login"]);
+    expect(await act("get", ["attr", "@e4", "value"])).toMatchObject({
+      success: true,
+      data: { value: "[secret:SHOP_PASSWORD]" },
+    });
   },
 );
 

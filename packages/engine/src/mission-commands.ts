@@ -8,6 +8,7 @@ import {
   forbiddenReason,
   inlineCodeCall,
   NO_TERMINAL_COMMANDS,
+  outboundCallProblem,
   PERMISSION_TIMEOUT_MESSAGE,
   PERMISSION_WAIT_MS,
   readOnlyCall,
@@ -318,6 +319,8 @@ export async function handlePermissionPrompt(
   // The deny list: refused, never shown, never judged; the refusal names the kind and how to ask a person.
   const denied = deniedMessage(tool, input);
   if (denied) return deny(denied, "never");
+  const outbound = outboundCallProblem(tool, input);
+  if (outbound) return deny(outbound.message, outbound.code);
   const scope = scopeOf(args.scope);
   // Secrets, with any tool that reads: refused the same way (ADR 0053 §3).
   if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE, "secret");
@@ -546,6 +549,8 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
   if (!tool || !command) return deny("Unknown tool.", "unknown");
   const denied = deniedMessage(tool, input);
   if (denied) return deny(denied, "never");
+  const outbound = outboundCallProblem(tool, input);
+  if (outbound) return deny(outbound.message, outbound.code);
   const scope = scopeOf(args.scope);
   if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE, "secret");
   if (scope && readOnlyCall(tool, input, scope)) return allow();
