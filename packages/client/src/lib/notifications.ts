@@ -16,7 +16,11 @@ import type {
 import { billingHoldOf } from "./billing";
 import { secretNoticeLine } from "./secret-requests";
 
-export const NOTIFICATION_FILTERS: NotificationFilter[] = ["all", "mentions", "waiting", "unread", "reactions"];
+/** The inbox's filters, each counted ("Concluídas" is apart: `done`). */
+export const NOTIFICATION_FILTERS = ["all", "mentions", "waiting", "unread", "reactions"] as const satisfies Exclude<
+  NotificationFilter,
+  "done"
+>[];
 
 /** Kinds counted under "Menções": someone talks to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
@@ -41,6 +45,7 @@ export const isVisible = (n: Pick<AppNotification, "doneAt" | "snoozedUntil">, n
   !n.doneAt && !isSnoozed(n, now);
 
 export function matchesFilter(n: AppNotification, filter: NotificationFilter, now = Date.now()) {
+  if (filter === "done") return !!n.doneAt;
   if (!isVisible(n, now)) return false;
   switch (filter) {
     case "all":
@@ -61,6 +66,9 @@ export function compareNotifications(a: AppNotification, b: AppNotification) {
   if (a.waiting !== b.waiting) return a.waiting ? -1 : 1;
   return b.updatedAt.localeCompare(a.updatedAt);
 }
+
+/** "Concluídas": the latest marked done first. */
+const compareDone = (a: AppNotification, b: AppNotification) => (b.doneAt ?? "").localeCompare(a.doneAt ?? "");
 
 /** The waiting section's order (question, forum, approval), the newest first within a kind. */
 export function sortWaiting(list: AppNotification[]) {
@@ -115,7 +123,9 @@ export function upsertInPages(
   const old = findIn(data, item.id) ?? before;
   const [first, ...rest] = data.pages.map((p) => ({ ...p, items: p.items.filter((n) => n.id !== item.id) }));
   if (!first) return data;
-  const items = matchesFilter(item, filter, now) ? [...first.items, item].sort(compareNotifications) : first.items;
+  const items = matchesFilter(item, filter, now)
+    ? [...first.items, item].sort(filter === "done" ? compareDone : compareNotifications)
+    : first.items;
   return {
     ...data,
     pages: [{ ...first, items, counts: countsDelta(first.counts, old, item, now) }, ...rest],
@@ -159,11 +169,14 @@ export function dayGroupOf(iso: string, now = new Date()): DayGroup {
   return "older";
 }
 
-/** Not waiting, by day group, in order; empty groups left out. */
-export function groupByDay(list: AppNotification[], now = new Date()): [DayGroup, AppNotification[]][] {
+/** Not waiting, by day group, in order; empty groups left out. `at`: the time it goes by ("Concluídas": `doneAt`). */
+export function groupByDay(
+  list: AppNotification[],
+  now = new Date(),
+  at: (n: AppNotification) => string = (n) => n.updatedAt,
+): [DayGroup, AppNotification[]][] {
   const out = new Map<DayGroup, AppNotification[]>(DAY_GROUPS.map((g) => [g, []]));
-  for (const n of [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
-    out.get(dayGroupOf(n.updatedAt, now))?.push(n);
+  for (const n of [...list].sort((a, b) => at(b).localeCompare(at(a)))) out.get(dayGroupOf(at(n), now))?.push(n);
   return [...out].filter(([, l]) => l.length > 0);
 }
 

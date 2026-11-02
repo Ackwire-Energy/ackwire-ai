@@ -36,7 +36,7 @@ const AGENTS_ONLY =
 const SAME_CONVERSATION = "That is this conversation: just reply.";
 
 /** For matching what someone typed against names: lower case, no accents, no leading @. */
-const plain = (v: string) =>
+export const plainName = (v: string) =>
   v
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
@@ -59,13 +59,13 @@ export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: st
     .from(schema.organizationMembers)
     .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
     .where(eq(schema.organizationMembers.orgId, ctx.orgId));
-  const q = plain(who);
+  const q = plainName(who);
   if (!q) return [];
   const exact = people.filter(
-    (p) => (p.handle && plain(p.handle) === q) || plain(p.email) === q || plain(p.name) === q,
+    (p) => (p.handle && plainName(p.handle) === q) || plainName(p.email) === q || plainName(p.name) === q,
   );
   if (exact.length > 0) return exact;
-  return people.filter((p) => plain(p.name).split(/\s+/)[0] === q.split(/\s+/)[0] && !q.includes(" "));
+  return people.filter((p) => plainName(p.name).split(/\s+/)[0] === q.split(/\s+/)[0] && !q.includes(" "));
 }
 
 /**

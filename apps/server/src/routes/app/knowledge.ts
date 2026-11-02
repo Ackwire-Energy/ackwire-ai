@@ -1,3 +1,4 @@
+import { MESSAGE_HAS, type MessageHas } from "@agenteschat/adapters";
 import { and, desc, eq, schema } from "@agenteschat/db";
 import {
   addContextItemByPerson,
@@ -53,6 +54,66 @@ const SEARCH_KINDS = [
   "wiki",
   "action",
 ] as const;
+
+/** A comma-separated list of ids in a query string (at most 50). */
+const ids = (description: string, id: z.ZodType<string, string>) =>
+  z
+    .string()
+    .max(4000)
+    .optional()
+    .transform((v) =>
+      v
+        ?.split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(id).max(50).optional())
+    .openapi({ description, type: "string" });
+const userId = z.string().regex(/^[\w-]{1,100}$/);
+
+/** Search filters (ADR 0123): any of them searches messages only. */
+const SearchFilterQuery = {
+  in: ids("Comma-separated channel or DM ids (`in:`). Ones you can't read are ignored.", z.uuid()),
+  fromUsers: ids("Comma-separated user ids: written by any of them or of `fromAgents` (`from:`).", userId),
+  fromAgents: ids("Comma-separated agent ids (`from:`).", z.uuid()),
+  mentionsUsers: ids("Comma-separated user ids: mentions any of them or of `mentionsAgents` (`mentions:`).", userId),
+  mentionsAgents: ids("Comma-separated agent ids (`mentions:`).", z.uuid()),
+  has: z
+    .string()
+    .optional()
+    .transform((v) => v?.split(",").filter((x): x is MessageHas => (MESSAGE_HAS as readonly string[]).includes(x)))
+    .openapi({ description: `Comma-separated, all required: ${MESSAGE_HAS.join(", ")}`, type: "string" }),
+  author: z.enum(["person", "agent"]).optional().openapi({ description: "Written by a person or by an agent." }),
+  pinned: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+  after: z.iso.datetime({ offset: true }).optional().openapi({ description: "Created at or after (`after:`)." }),
+  before: z.iso.datetime({ offset: true }).optional().openapi({ description: "Created before (`before:`)." }),
+  sort: z.enum(["relevance", "newest", "oldest"]).optional(),
+};
+
+type FilterQuery = z.output<z.ZodObject<typeof SearchFilterQuery>>;
+
+function searchFilters(q: FilterQuery) {
+  const has = q.has?.length ? q.has : undefined;
+  const messages = {
+    ...(q.fromUsers?.length ? { fromUserIds: q.fromUsers } : {}),
+    ...(q.fromAgents?.length ? { fromAgentIds: q.fromAgents } : {}),
+    ...(q.mentionsUsers?.length ? { mentionsUserIds: q.mentionsUsers } : {}),
+    ...(q.mentionsAgents?.length ? { mentionsAgentIds: q.mentionsAgents } : {}),
+    ...(q.author ? { authorType: q.author } : {}),
+    ...(has ? { has } : {}),
+    ...(q.pinned ? { pinned: true } : {}),
+  };
+  return {
+    channelIds: q.in?.length ? q.in : undefined,
+    messages: Object.keys(messages).length ? messages : undefined,
+    after: q.after ? new Date(q.after) : undefined,
+    before: q.before ? new Date(q.before) : undefined,
+    sort: q.sort,
+  };
+}
 
 const Item = z
   .object({
@@ -139,12 +200,13 @@ export function knowledgeRoutes(deps: AppDeps) {
       request: {
         params: OrgParams,
         query: z.object({
-          q: z.string().min(1).max(500),
+          q: z.string().max(500).default("").openapi({ description: "Words. Optional when a filter is set." }),
           kinds: z
             .string()
             .optional()
             .openapi({ description: `Comma-separated: ${SEARCH_KINDS.join(", ")}` }),
           limit: z.coerce.number().int().min(1).max(100).optional(),
+          ...SearchFilterQuery,
         }),
       },
       responses: {
@@ -176,7 +238,12 @@ export function knowledgeRoutes(deps: AppDeps) {
         ?.split(",")
         .map((k) => k.trim())
         .filter((k): k is (typeof SEARCH_KINDS)[number] => (SEARCH_KINDS as readonly string[]).includes(k));
-      const found = await searchForUser(searchDeps, c.get("user").id, orgId, { text: q.q, kinds, limit: q.limit });
+      const found = await searchForUser(searchDeps, c.get("user").id, orgId, {
+        text: q.q,
+        kinds,
+        limit: q.limit,
+        ...searchFilters(q),
+      });
       const hits = await describeHits(db, orgId, found);
       return c.json({ hits: hits.map((h) => ({ ...h, createdAt: h.createdAt.toISOString() })) }, 200);
     },

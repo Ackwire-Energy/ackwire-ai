@@ -6,6 +6,7 @@
 import type { FakeReply } from "@agenteschat/providers/testing";
 import {
   ASK_APPROVALS_TOGETHER,
+  ASK_CHOICES_LINE,
   CONTINUE_THE_CONVERSATION,
   createAgent,
   createSetStatusToolSource,
@@ -32,6 +33,7 @@ export const AUTONOMY_PHRASES: string[] = [
   WORK_IN_BACKGROUND_LINE,
   CONTINUE_THE_CONVERSATION,
   ASK_APPROVALS_TOGETHER,
+  ASK_CHOICES_LINE,
   "- Something to use rather than read (a what-if, options to see side by side, a view to filter, a short form): show it yourself with show_block, inside your reply; what the person picks comes back to you. A group deciding together: start_poll.",
   '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply',
   "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user`",
@@ -94,8 +96,8 @@ export const TURNS: ScriptedTurn[] = [
     title: "A choice between options",
     where: "dm",
     body: "Postgres ou MySQL pro serviço novo de faturas? é decisão de produto, me ajuda a escolher",
-    listed: ["ask_user", "show_block", "search_context"],
-    wants: ["ask_user", "show_block"],
+    listed: ["ask_user", "ask_choices", "show_block", "search_context"],
+    wants: ["ask_choices", "ask_user", "show_block"],
   },
   {
     id: "block",

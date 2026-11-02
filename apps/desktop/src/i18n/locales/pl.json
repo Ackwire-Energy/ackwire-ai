@@ -538,7 +538,9 @@
     "copied": "Skopiowano",
     "retry": "Spróbuj ponownie",
     "openTailscale": "Otwórz Tailscale",
-    "otherServer": "Użyj innego serwera"
+    "otherServer": "Użyj innego serwera",
+    "stuck": "agentes.chat się nie otworzył. Spróbuj ponownie albo zobacz stronę taką, jaka jest.",
+    "showAnyway": "Pokaż mimo to"
   },
   "menu": {
     "about": "O agentes.chat",

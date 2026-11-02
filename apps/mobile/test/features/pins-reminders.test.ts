@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { MessagePin } from "@agenteschat/client";
+import { pinsIn } from "@agenteschat/client/lib/pins";
 import { orderPins, pinTarget } from "../../src/features/chat/logic";
 import {
   atDayTime,
@@ -25,6 +28,12 @@ const pin = (messageId: string, pinnedMinutesAgo: number, threadId: string | nul
 });
 
 describe("Fixadas", () => {
+  test("× (unpin) shows only to who may post, as on the web", () => {
+    const sheet = readFileSync(join(import.meta.dir, "../../src/features/chat/PinsSheet.tsx"), "utf8");
+    expect(sheet).toContain('const mayUnpin = can(org, "post")');
+    expect(sheet).toMatch(/\{mayUnpin \? \(\s*<IconButton icon="x"/);
+  });
+
   test("the latest pin first, one entry per message", () => {
     const list = orderPins([pin("a", 30), pin("b", 5), pin("a", 2), pin("c", 60)]);
     expect(list.map((p) => [p.messageId, p.pinnedAt])).toEqual([
@@ -34,12 +43,22 @@ describe("Fixadas", () => {
     ]);
   });
 
-  test("a pin on screen scrolls to it; else its thread opens (a top-level message as its own)", () => {
-    const onScreen = new Set(["a", "b"]);
-    expect(pinTarget(pin("a", 1), onScreen)).toEqual({ kind: "scroll", messageId: "a" });
-    expect(pinTarget(pin("r", 1, "t1"), onScreen)).toEqual({ kind: "open", threadId: "t1" });
-    expect(pinTarget(pin("old", 1), onScreen)).toEqual({ kind: "open", threadId: "old" });
+  test("a pin in this timeline is found here (paged in if older); one elsewhere opens where it lives, at it", () => {
+    // The main timeline: its own messages here, however old; a thread's reply opens its thread.
+    expect(pinTarget(pin("old", 1), null)).toEqual({ kind: "here", messageId: "old" });
+    expect(pinTarget(pin("r", 1, "t1"), null)).toEqual({ kind: "open", threadId: "t1", messageId: "r" });
+    // In thread t1: its root and replies here; the main timeline's, or another thread's, open there.
+    expect(pinTarget(pin("t1", 1), "t1")).toEqual({ kind: "here", messageId: "t1" });
+    expect(pinTarget(pin("r", 1, "t1"), "t1")).toEqual({ kind: "here", messageId: "r" });
+    expect(pinTarget(pin("a", 1), "t1")).toEqual({ kind: "open", threadId: null, messageId: "a" });
+    expect(pinTarget(pin("s", 1, "t2"), "t1")).toEqual({ kind: "open", threadId: "t2", messageId: "s" });
   });
+});
+
+test("the pinned bar: a thread shows its root and replies; the main timeline every pin, in order", () => {
+  const pins = [pin("r", 1, "t1"), pin("a", 2), pin("t1", 3), pin("s", 4, "t2")];
+  expect(pinsIn(pins, "t1").map((p) => p.messageId)).toEqual(["r", "t1"]);
+  expect(pinsIn(pins, null).map((p) => p.messageId)).toEqual(["r", "a", "t1", "s"]);
 });
 
 describe("Lembrar", () => {

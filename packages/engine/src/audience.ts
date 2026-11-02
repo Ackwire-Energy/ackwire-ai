@@ -128,6 +128,39 @@ export function canTalkTo(a: AudienceFields, userId: string | null, person: Spea
 }
 
 /**
+ * Whether a person sees how an agent works (its instructions, tools and access, memory, usage and activity): its
+ * owner, who manages agents, and whoever it answers. Everyone else sees its public card: face, name, role, owner,
+ * where it works and who it answers.
+ */
+export const seesAgentDetails = (
+  a: AudienceFields,
+  userId: string,
+  membership: Pick<Membership, "permissions" | "roleIds"> | null,
+) => can(membership, "manage_agents") || canTalkTo(a, userId, speakerOf(membership));
+
+/** The agent, for someone who sees how it works (`seesAgentDetails`); 403 `agent.details_hidden` for anyone else. */
+export async function requireAgentDetails(db: Database, userId: string, orgId: string, agentId: string) {
+  const membership = await requirePermission(db, userId, orgId, "read");
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent) throw new NotFoundError("Agent not found");
+  if (!seesAgentDetails(agent, userId, membership)) {
+    throw new ForbiddenError(`Only who talks to ${agent.name} sees how it works`, "agent.details_hidden", {
+      agentName: agent.name,
+    });
+  }
+  return agent;
+}
+
+/** The ids of the workspace's agents whose details this person sees (`seesAgentDetails`). */
+export async function agentIdsWithDetails(db: Database, userId: string, orgId: string) {
+  const [membership, rows] = await Promise.all([
+    getMembership(db, userId, orgId),
+    db.select().from(agents).where(eq(agents.orgId, orgId)),
+  ]);
+  return new Set(rows.filter((a) => seesAgentDetails(a, userId, membership)).map((a) => a.id));
+}
+
+/**
  * The same rule in SQL, for an `agents` row aliased `alias` and a person id expression. An agent with no owner
  * compares to null: `coalesce` makes that a no, so `not allowed` holds for it too (the blocked person's notice).
  */

@@ -546,6 +546,8 @@ const READ_ONLY_TOOLS = new Set(["get_context"]);
 export const ALWAYS_LOADED: ReadonlySet<string> = new Set([
   "react",
   "ask_user",
+  "ask_choices",
+  "request_approval",
   "remember",
   "search_context",
   "follow_up",

@@ -109,6 +109,18 @@ describe("the prompt", () => {
     expect(await system(run, { blocks: true, routine: true })).not.toContain("show_block");
     expect(await system({ ...run, background: true }, { blocks: true })).not.toContain("show_block");
   });
+
+  test("the ask_choices line, there only when a person is behind the run, keeps a computer session going", async () => {
+    f = await setup();
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+    const context = (choices: boolean) =>
+      buildRunContext(f.db, run, f.agent, { maxMessages: 30, toolsAvailable: true, choices });
+    const [person, agentAsks] = await Promise.all([context(true), context(false)]);
+    expect(systemText(person.system)).toContain("ask_choices");
+    expect(person.sessionPrompt).toEqual(agentAsks.sessionPrompt);
+  });
 });
 
 describe("live blocks", () => {

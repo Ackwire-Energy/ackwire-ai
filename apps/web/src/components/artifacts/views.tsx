@@ -3,6 +3,7 @@ import { parsePatch, patchCounts, sideBySide, sortRows } from "@agenteschat/clie
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ChoicesCard } from "@/components/blocks/ChoicesCard";
 import { LiveBlock } from "@/components/blocks/LiveBlock";
 import { PollCard } from "@/components/blocks/PollCard";
 import { Markdown } from "@/lib/markdown";
@@ -52,6 +53,8 @@ export function ArtifactContentView({
       ) : null;
     case "poll":
       return source ? <PollCard id={source.id} version={source.version} /> : null;
+    case "choices":
+      return source ? <ChoicesCard id={source.id} version={source.version} /> : null;
     case "file":
       return source ? (
         <FileView content={content} artifactId={source.id} version={source.version} title={title} />

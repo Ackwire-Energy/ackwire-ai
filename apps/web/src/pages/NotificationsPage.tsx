@@ -672,19 +672,30 @@ function RowActions({ n, h }: { n: AppNotification; h: RowHandlers }) {
         act("reply", "reply", t("notifications.reply"), t("notifications.replyTip"), t("notifications.reply"), () =>
           h.onReply(n),
         )}
-      {act("done", "check", t("notifications.done"), t("notifications.doneTip"), t("notifications.done"), () =>
-        h.onDone(n),
+      {n.doneAt
+        ? act(
+            "done",
+            "undo",
+            t("notifications.restore"),
+            t("notifications.restoreTip"),
+            t("notifications.restore"),
+            () => h.onDone(n),
+          )
+        : act("done", "check", t("notifications.done"), t("notifications.doneTip"), t("notifications.done"), () =>
+            h.onDone(n),
+          )}
+      {!n.doneAt && (
+        <SnoozeMenu
+          onPick={(c) => h.onSnooze(n, c)}
+          trigger={act(
+            "snooze",
+            "clock",
+            t("notifications.snooze"),
+            t("notifications.snooze"),
+            t("notifications.snoozeShort"),
+          )}
+        />
       )}
-      <SnoozeMenu
-        onPick={(c) => h.onSnooze(n, c)}
-        trigger={act(
-          "snooze",
-          "clock",
-          t("notifications.snooze"),
-          t("notifications.snooze"),
-          t("notifications.snoozeShort"),
-        )}
-      />
       {act("open", "external", t("notifications.open"), t("notifications.openTip"), t("notifications.open"), () =>
         h.onOpen(n),
       )}
@@ -1603,9 +1614,11 @@ export function NotificationsPage() {
   const { fresh, pulse } = useArrivals(items, filter, list.isSuccess && !list.isPlaceholderData);
   const mine = dir.memberById.get(me.user.id)?.handle ?? null;
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
-  const waiting = sortWaiting(items.filter((n) => n.waiting));
-  const rest = items.filter((n) => !n.waiting);
-  const days = groupByDay(rest);
+  // "Concluídas": by when each was marked done, waiting or not.
+  const doneView = filter === "done";
+  const waiting = doneView ? [] : sortWaiting(items.filter((n) => n.waiting));
+  const rest = doneView ? items : items.filter((n) => !n.waiting);
+  const days = groupByDay(rest, undefined, doneView ? (n) => n.doneAt ?? n.updatedAt : undefined);
   const unreadTotal = counts?.unread ?? badge.data?.unread ?? 0;
   const waitingTotal = counts?.waiting ?? 0;
   const nothing = list.isSuccess && (counts?.all ?? 0) === 0 && items.length === 0;
@@ -1658,6 +1671,14 @@ export function NotificationsPage() {
   };
 
   const done = (n: AppNotification) => {
+    if (n.doneAt) {
+      leave(n, () => action.mutate({ type: "done", item: n, done: false }));
+      toast.show(t("notifications.toast.restored"), "info", {
+        label: t("notifications.toast.undo"),
+        run: () => action.mutate({ type: "done", item: { ...n, doneAt: null }, done: true }),
+      });
+      return;
+    }
     const name = nameOf(t, dir, n.actors[0]);
     leave(n, () => action.mutate({ type: "done", item: n, done: true }));
     toast.show(
@@ -1931,7 +1952,7 @@ export function NotificationsPage() {
               {t("notifications.keys.open")}
             </MenuItem>
           </Menu>
-          <Button size="sm" disabled={!counts?.unread || action.isPending} onClick={readAll}>
+          <Button size="sm" disabled={doneView || !counts?.unread || action.isPending} onClick={readAll}>
             {t("notifications.readAll")}
           </Button>
         </div>
@@ -1946,11 +1967,14 @@ export function NotificationsPage() {
               setFilter(f);
               setCur(null);
             }}
-            options={NOTIFICATION_FILTERS.map((f) => ({
-              value: f,
-              label: t(`notifications.filter.${f}`),
-              hint: counts?.[f] ? counts[f] : undefined,
-            }))}
+            options={[
+              ...NOTIFICATION_FILTERS.map((f) => ({
+                value: f,
+                label: t(`notifications.filter.${f}`),
+                hint: counts?.[f] ? counts[f] : undefined,
+              })),
+              { value: "done" as const, label: t("notifications.filter.done"), hint: undefined },
+            ]}
           />
         </div>
       </div>
@@ -1980,7 +2004,9 @@ export function NotificationsPage() {
               ? t("notifications.noneWaiting")
               : filter === "unread"
                 ? t("notifications.noneUnread")
-                : t("notifications.noneHere")}
+                : doneView
+                  ? t("notifications.noneDone")
+                  : t("notifications.noneHere")}
           </span>
         </div>
       )}

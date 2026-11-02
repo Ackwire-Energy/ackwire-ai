@@ -3478,9 +3478,6 @@
   "channel.pins.in": {
     "value": "Pinned in #{{channel}}"
   },
-  "channel.pins.empty": {
-    "value": "Nothing pinned here yet. Pin a message from its menu."
-  },
   "channel.pins.unpin": {
     "value": "Unpin {{name}}'s message"
   },
@@ -3852,6 +3849,9 @@
   },
   "receipts.status.referenced": {
     "value": "Only mentioned"
+  },
+  "receipts.status.reacted": {
+    "value": "Reacted"
   },
   "receipts.failedShort": {
     "value": "Couldn't answer"
@@ -4290,6 +4290,18 @@
   },
   "usageCard.ended": {
     "value": "This work ended before it picked up"
+  },
+  "usageCard.canceled": {
+    "value": "Canceled. It won't run when the limit is back."
+  },
+  "usageCard.dontRun": {
+    "value": "Don't run it"
+  },
+  "usageCard.dontRunHint": {
+    "value": "Cancel it: nothing runs when the limit is back"
+  },
+  "usageCard.dontRunForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can cancel it"
   },
   "usageCard.extraTitle": {
     "value": "Long work may use paid extra usage"
@@ -4730,6 +4742,33 @@
   "newChannel.privateDesc": {
     "value": "Only who is added."
   },
+  "newChannel.roles": {
+    "value": "Departments or roles"
+  },
+  "newChannel.rolesDesc": {
+    "value": "Whoever holds a role you pick sees and joins it, now or later."
+  },
+  "newChannel.rolesPick": {
+    "value": "Roles that see the channel"
+  },
+  "newChannel.rolesNone": {
+    "value": "The workspace has no roles yet."
+  },
+  "newChannel.rolesNeeded": {
+    "value": "Pick at least one role."
+  },
+  "newChannel.rolesLeave": {
+    "value": "Whoever loses the role leaves the channel."
+  },
+  "newChannel.publicTitle": {
+    "value": "Make #{{channel}} public?"
+  },
+  "newChannel.publicBody": {
+    "value": "Everyone in the workspace will be able to join it and read all its messages, past ones included."
+  },
+  "newChannel.publicConfirm": {
+    "value": "Make public"
+  },
   "newChannel.members": {
     "value": "Initial members"
   },
@@ -5025,6 +5064,15 @@
   },
   "profile.former": {
     "value": "No longer in this workspace"
+  },
+  "profile.askAccess": {
+    "value": "Ask for access"
+  },
+  "profile.detailsHiddenTitle": {
+    "value": "How it works"
+  },
+  "profile.detailsHidden": {
+    "value": "Only the people {{name}} answers, its owner and admins see its instructions, tools, memory and usage."
   },
   "presence.online": {
     "value": "Online"
@@ -5713,6 +5761,9 @@
   "approval.outcomeApprovedBy": {
     "value": "Approved by {{name}}"
   },
+  "approval.requesterDecides": {
+    "value": "Asked by someone who approves it by role, so they may decide it too"
+  },
   "approval.outcomeApprovedByYou": {
     "value": "Approved by you"
   },
@@ -5970,6 +6021,9 @@
   },
   "notifications.filter.reactions": {
     "value": "Reactions"
+  },
+  "notifications.filter.done": {
+    "value": "Done"
   },
   "notifications.keys.title": {
     "value": "Shortcuts"
@@ -6349,6 +6403,12 @@
   "notifications.doneTip": {
     "value": "Done · E"
   },
+  "notifications.restore": {
+    "value": "Move back"
+  },
+  "notifications.restoreTip": {
+    "value": "Move back · E"
+  },
   "notifications.snooze": {
     "value": "Remind me later"
   },
@@ -6427,6 +6487,9 @@
   "notifications.toast.doneApproval": {
     "value": "The request stays in Approvals."
   },
+  "notifications.toast.restored": {
+    "value": "Back in your inbox"
+  },
   "notifications.toast.undo": {
     "value": "Undo"
   },
@@ -6471,6 +6534,9 @@
   },
   "notifications.noneHere": {
     "value": "Nothing here for now."
+  },
+  "notifications.noneDone": {
+    "value": "Nothing marked done in the last 30 days."
   },
   "notifications.more": {
     "value": "Show more"
@@ -9228,6 +9294,21 @@
   "newAgent.modelNeedsKey": {
     "value": "{{provider}} API key needed"
   },
+  "newAgent.brainPick.searchPlaceholder": {
+    "value": "Model, plan or maker"
+  },
+  "newAgent.brainPick.connect": {
+    "value": "Connect {{plan}}"
+  },
+  "newAgent.brainPick.connectText": {
+    "value": "Needs a {{plan}} key. You add it right after creating the agent."
+  },
+  "newAgent.brainPick.needsKey": {
+    "value": "Needs a {{plan}} key"
+  },
+  "newAgent.brainPick.other": {
+    "value": "Choose another"
+  },
   "newAgent.noKeys": {
     "value": "No keys yet"
   },
@@ -11538,6 +11619,12 @@
   "routines.state.usagePausedBudgetUnknown": {
     "value": "Paused until the budget renews (budget limit)"
   },
+  "routines.state.waitingPlan": {
+    "value": "Waiting for the {{plan}} plan · runs at {{until}}"
+  },
+  "routines.state.waitingPlanUnknown": {
+    "value": "Waiting for the {{plan}} plan to reset"
+  },
   "routines.pausedReason.creator_left": {
     "value": "Paused: whoever created it left the workspace"
   },
@@ -11640,6 +11727,12 @@
   },
   "routines.outcome.waitingComputer": {
     "value": "Waiting for the computer"
+  },
+  "routines.outcome.waitingPlan": {
+    "value": "Waiting for the plan to reset"
+  },
+  "routines.outcome.waitingBudget": {
+    "value": "Waiting for the budget to renew"
   },
   "routines.outcome.reported": {
     "value": "Told what it found"
@@ -11799,6 +11892,18 @@
   },
   "routines.usagePause.line": {
     "value": "It picks up by itself when the limit resets. Nothing is posted in the conversation."
+  },
+  "routines.usagePause.lineLimit": {
+    "value": "It runs by itself when the limit is back. Nothing is posted in the conversation."
+  },
+  "routines.usagePause.dontRun": {
+    "value": "Don't run it"
+  },
+  "routines.usagePause.dontRunName": {
+    "value": "Don't run {{name}} when the limit is back"
+  },
+  "routines.usagePause.canceledToast": {
+    "value": "Canceled. It won't run when the limit is back."
   },
   "routines.usagePause.continuedToast": {
     "value": "Run continuing."
@@ -18550,6 +18655,9 @@
   "brain.recommended": {
     "value": "Recommended"
   },
+  "brain.free": {
+    "value": "Free"
+  },
   "brain.modelHelp": {
     "value": "Bigger models think more and use up the plan faster."
   },
@@ -18895,6 +19003,9 @@
   "artifacts.kind.poll": {
     "value": "Poll"
   },
+  "artifacts.kind.choices": {
+    "value": "Choices"
+  },
   "artifacts.version": {
     "value": "v{{version}}"
   },
@@ -19123,6 +19234,30 @@
   "blocks.voteFailed": {
     "value": "Your vote didn't go through."
   },
+  "choices.step": {
+    "value": "{{step}} of {{total}}"
+  },
+  "choices.back": {
+    "value": "Back"
+  },
+  "choices.next": {
+    "value": "Next"
+  },
+  "choices.close": {
+    "value": "Close"
+  },
+  "choices.closed": {
+    "value": "{{title}} · closed"
+  },
+  "choices.reopen": {
+    "value": "Show again"
+  },
+  "choices.answeredBy": {
+    "value": "{{name}} picked"
+  },
+  "choices.failed": {
+    "value": "Your pick didn't go through. Try again."
+  },
   "drive.title": {
     "value": "Drive"
   },
@@ -19230,6 +19365,9 @@
   },
   "drive.kindMany.poll": {
     "value": "Polls"
+  },
+  "drive.kindMany.choices": {
+    "value": "Choices"
   },
   "drive.kindCount": {
     "value": "{{kind}}: {{count}}"
@@ -20615,20 +20753,62 @@
   "connectors.toolChanges.intro": {
     "value": "These servers changed what a tool says or asks for. Agents keep the version you approved until you accept the new one."
   },
-  "connectors.toolChanges.before": {
-    "value": "Approved"
+  "connectors.toolChanges.count": {
+    "value": {
+      "one": "{{count}} tool changed",
+      "other": "{{count}} tools changed"
+    }
   },
-  "connectors.toolChanges.after": {
-    "value": "Now"
+  "connectors.toolChanges.acceptAll": {
+    "value": "Accept all"
+  },
+  "connectors.toolChanges.acceptedAll": {
+    "value": "{{name}}'s tools updated."
+  },
+  "connectors.toolChanges.show": {
+    "value": "See the change"
+  },
+  "connectors.toolChanges.hide": {
+    "value": "Hide"
+  },
+  "connectors.toolChanges.showAll": {
+    "value": "Show all ({{total}})"
+  },
+  "connectors.toolChanges.textChanged": {
+    "value": "The text changed"
+  },
+  "connectors.toolChanges.fieldsChanged": {
+    "value": {
+      "one": "{{count}} field changed",
+      "other": "{{count}} fields changed"
+    }
+  },
+  "connectors.toolChanges.inputChanged": {
+    "value": "The input changed"
+  },
+  "connectors.toolChanges.description": {
+    "value": "Text"
+  },
+  "connectors.toolChanges.field.added": {
+    "value": "new"
+  },
+  "connectors.toolChanges.field.removed": {
+    "value": "removed"
+  },
+  "connectors.toolChanges.field.changed": {
+    "value": "changed"
+  },
+  "connectors.toolChanges.added": {
+    "value": "Added"
+  },
+  "connectors.toolChanges.removed": {
+    "value": "Removed"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.input": {
     "value": "Input"
-  },
-  "connectors.toolChanges.fieldChanged": {
-    "value": "changed"
-  },
-  "connectors.toolChanges.noInput": {
-    "value": "No input"
   },
   "connectors.toolChanges.accept": {
     "value": "Accept"
@@ -22618,6 +22798,153 @@
       "one": "{{count}} result",
       "other": "{{count}} results"
     }
+  },
+  "searchPage.countMore": {
+    "value": "{{count}}+ results"
+  },
+  "searchPage.words.ops.from": {
+    "value": "from"
+  },
+  "searchPage.words.ops.in": {
+    "value": "in"
+  },
+  "searchPage.words.ops.has": {
+    "value": "has"
+  },
+  "searchPage.words.ops.mentions": {
+    "value": "mentions"
+  },
+  "searchPage.words.ops.before": {
+    "value": "before"
+  },
+  "searchPage.words.ops.after": {
+    "value": "after"
+  },
+  "searchPage.words.ops.during": {
+    "value": "during"
+  },
+  "searchPage.words.ops.author": {
+    "value": "author"
+  },
+  "searchPage.words.ops.pinned": {
+    "value": "pinned"
+  },
+  "searchPage.words.has.link": {
+    "value": "link"
+  },
+  "searchPage.words.has.file": {
+    "value": "file"
+  },
+  "searchPage.words.has.image": {
+    "value": "image"
+  },
+  "searchPage.words.has.card": {
+    "value": "card"
+  },
+  "searchPage.words.author.person": {
+    "value": "person"
+  },
+  "searchPage.words.author.agent": {
+    "value": "agent"
+  },
+  "searchPage.options": {
+    "value": "Search options"
+  },
+  "searchPage.option.from": {
+    "value": "From a specific person or agent"
+  },
+  "searchPage.option.in": {
+    "value": "Sent in a specific channel or DM"
+  },
+  "searchPage.option.has": {
+    "value": "Includes a link, file, image or card"
+  },
+  "searchPage.option.mentions": {
+    "value": "Mentions a specific person or agent"
+  },
+  "searchPage.option.before": {
+    "value": "Before a date"
+  },
+  "searchPage.option.after": {
+    "value": "After a date"
+  },
+  "searchPage.option.during": {
+    "value": "On a day, in a month or a year"
+  },
+  "searchPage.option.author": {
+    "value": "Written by people or by agents"
+  },
+  "searchPage.option.pinned": {
+    "value": "Pinned messages"
+  },
+  "searchPage.moreFilters": {
+    "value": "More filters"
+  },
+  "searchPage.hasLabel.link": {
+    "value": "Link"
+  },
+  "searchPage.hasLabel.file": {
+    "value": "File"
+  },
+  "searchPage.hasLabel.image": {
+    "value": "Image"
+  },
+  "searchPage.hasLabel.card": {
+    "value": "Card"
+  },
+  "searchPage.authorLabel.person": {
+    "value": "People"
+  },
+  "searchPage.authorLabel.agent": {
+    "value": "Agents"
+  },
+  "searchPage.pinnedChip": {
+    "value": "Pinned"
+  },
+  "searchPage.removeFilter": {
+    "value": "Remove {{filter}}"
+  },
+  "searchPage.filtersApplied": {
+    "value": {
+      "one": "{{count}} filter",
+      "other": "{{count}} filters"
+    }
+  },
+  "searchPage.recent": {
+    "value": "Recent searches"
+  },
+  "searchPage.clearRecent": {
+    "value": "Clear"
+  },
+  "searchPage.pickDate": {
+    "value": "Date"
+  },
+  "searchPage.dateHint": {
+    "value": "Type a date: 2026-10-05, 2026-10 or 2026"
+  },
+  "searchPage.noMatch": {
+    "value": "No one by that name here."
+  },
+  "searchPage.noPlace": {
+    "value": "No channel or DM by that name."
+  },
+  "searchPage.sort.label": {
+    "value": "Sort"
+  },
+  "searchPage.sort.newest": {
+    "value": "Newest"
+  },
+  "searchPage.sort.oldest": {
+    "value": "Oldest"
+  },
+  "searchPage.sort.relevance": {
+    "value": "Most relevant"
+  },
+  "searchPage.searchHere": {
+    "value": "Search in this conversation"
+  },
+  "searchPage.dm": {
+    "value": "DM with {{name}}"
   },
   "files.upload": {
     "value": "Upload file"
@@ -25589,7 +25916,7 @@
     "value": "Paused at the plan's limit · back at {{time}}"
   },
   "work.line.done": {
-    "value": "Done in {{duration}}"
+    "value": "Finished in {{duration}}"
   },
   "work.line.failed": {
     "value": "Didn't finish"
@@ -26703,6 +27030,9 @@
   "chat.body.budget_wait": {
     "value": "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it."
   },
+  "chat.body.usage_wait_canceled": {
+    "value": "Canceled. It won't run when the limit is back."
+  },
   "chat.body.usage_paused": {
     "value": "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}"
   },
@@ -26711,6 +27041,9 @@
   },
   "chat.body.work_auto_moved": {
     "value": "This will take a while, so I'll keep going in the background. I'll post updates here, the next one in about {{minutes}} min."
+  },
+  "chat.body.work_auto_movedOver": {
+    "value": "This will take a while, so I'll keep going in the background. I'll post updates here."
   },
   "chat.body.work_end_done": {
     "value": "Done ({{minutes}} min)."

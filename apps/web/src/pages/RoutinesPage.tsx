@@ -55,7 +55,9 @@ import {
   runPixelStatus,
   runPixels,
   runsPerDay,
+  stopWordsKey,
   usageContinueBlock,
+  usageContinueOffered,
   usageParts,
   type Words,
   whereItRuns,
@@ -551,7 +553,14 @@ function useRoutineControls(r: Routine) {
         },
       ),
     run: () => action.mutate({ type: "run", id: r.id }),
-    stop: () => action.mutate({ type: "stop", id: r.id }, { onSuccess: () => toast.show(t("routines.stoppedToast")) }),
+    stop: () =>
+      action.mutate(
+        { type: "stop", id: r.id },
+        {
+          onSuccess: () =>
+            toast.show(t(r.state === "usage_paused" ? "routines.usagePause.canceledToast" : "routines.stoppedToast")),
+        },
+      ),
     continueUsage: () =>
       action.mutate(
         { type: "continueUsage", id: r.id },
@@ -602,14 +611,21 @@ function RoutineStateChip({ routine: r, className }: { routine: Routine; classNa
 }
 
 /**
- * A run paused near its plan's or budget's limit: it picks up by itself, and Continuar agora lets it go on now for
- * its creator, the agent's owner and admins. Everyone else sees the button greyed with the reason.
+ * A run waiting on its plan's or budget's limit: it picks up by itself. Paused near the limit, Continuar agora lets it
+ * go on now for its creator, the agent's owner and admins (everyone else sees the button greyed with the reason); at
+ * the limit itself there is nothing to continue. Not running it is Parar's "Don't run it".
  */
 function UsagePausedNote({ routine: r }: { routine: Routine }) {
   const { t } = useTranslation();
   const controls = useRoutineControls(r);
   const blocked = usageContinueBlock(r);
   const reason = blocked ? t(`routines.usagePause.${blocked}`) : null;
+  if (!usageContinueOffered(r))
+    return (
+      <div className="routine-details__usage-pause">
+        <p className="small muted">{t("routines.usagePause.lineLimit")}</p>
+      </div>
+    );
   return (
     <div className="routine-details__usage-pause">
       <p className="small muted">{t("routines.usagePause.line")}</p>
@@ -691,7 +707,7 @@ function RoutineRow({
     ...(r.canManage && !reminder && (stoppable || !fired)
       ? ([
           stoppable
-            ? { kind: "item", id: "stop", label: t("routines.stop"), icon: "stop", run: controls.stop }
+            ? { kind: "item", id: "stop", label: t(stopWordsKey(r)), icon: "stop", run: controls.stop }
             : { kind: "item", id: "run", label: t("routines.runNow"), icon: "play", run: controls.run },
         ] satisfies MenuEntry[])
       : []),
@@ -843,8 +859,10 @@ function RoutineRow({
               variant="ghost"
               iconOnly
               icon="stop"
-              title={t("routines.stop")}
-              aria-label={t("routines.stopName", { name: title })}
+              title={t(stopWordsKey(r))}
+              aria-label={t(r.state === "usage_paused" ? "routines.usagePause.dontRunName" : "routines.stopName", {
+                name: title,
+              })}
               disabled={action.isPending}
               onClick={controls.stop}
             />
@@ -1182,7 +1200,7 @@ function RoutineDetails({
             !reminder &&
             (stoppable ? (
               <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
-                {t("routines.stop")}
+                {t(stopWordsKey(r))}
               </Button>
             ) : (
               <Button size="sm" icon="play" disabled={action.isPending} onClick={controls.run}>

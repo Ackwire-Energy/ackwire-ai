@@ -1464,7 +1464,6 @@
       "button_other": "Mensajes fijados ({{count}})",
       "label": "Mensajes fijados en #{{channel}}",
       "in": "Fijado en #{{channel}}",
-      "empty": "Todavía no hay nada fijado aquí. Fija un mensaje desde su menú.",
       "unpin": "Dejar de fijar el mensaje de {{name}}"
     },
     "membersButton_one": "Miembros del canal ({{count}})",
@@ -1607,7 +1606,8 @@
       "outage": "El proveedor de IA no responde · reintenta solo",
       "handled": "Respondió",
       "failed": "Falló",
-      "referenced": "Solo mencionado"
+      "referenced": "Solo mencionado",
+      "reacted": "Reaccionó"
     },
     "failedShort": "No pudo responder",
     "popoverTitle": "Agentes",
@@ -1828,6 +1828,10 @@
     "forbidden": "Solo quien lo pidió, el responsable del agente o un admin pueden continuar ahora",
     "resumed": "{{agent}} retomó el trabajo",
     "ended": "Este trabajo terminó antes de retomarse",
+    "canceled": "Cancelado. No se ejecutará cuando el límite se renueve.",
+    "dontRun": "No ejecutar",
+    "dontRunHint": "Cancélalo: nada se ejecuta cuando el límite se renueve",
+    "dontRunForbidden": "Solo quien lo pidió, el responsable del agente o un admin pueden cancelarlo",
     "extraTitle": "El trabajo largo puede usar uso extra pagado",
     "extraHint": "Con el uso extra activado en el plan, el trabajo largo sigue después del 95%. Si está desactivado, se pausa en el 95% y retoma cuando el plan se renueva."
   },
@@ -2024,6 +2028,15 @@
     "publicDesc": "Cualquiera del espacio de trabajo lo ve y puede unirse.",
     "private": "Privado",
     "privateDesc": "Solo quienes se añadan.",
+    "roles": "Departamentos o roles",
+    "rolesDesc": "Quien tenga uno de los roles elegidos lo ve y entra, ahora o más adelante.",
+    "rolesPick": "Roles que ven el canal",
+    "rolesNone": "El workspace aún no tiene roles.",
+    "rolesNeeded": "Elige al menos un rol.",
+    "rolesLeave": "Quien pierde el rol sale del canal.",
+    "publicTitle": "¿Hacer público #{{channel}}?",
+    "publicBody": "Todos en el workspace podrán unirse y leer todos sus mensajes, incluidos los anteriores.",
+    "publicConfirm": "Hacer público",
     "members": "Miembros iniciales",
     "membersSearch": "Buscar personas o agentes",
     "membersEmpty": "No se encontró a nadie para “{{q}}”.",
@@ -2135,7 +2148,10 @@
     "can": "Puede",
     "budgetUsed": "{{percent}} del presupuesto usado este mes",
     "spendLabel": "Presupuesto usado este mes",
-    "former": "Ya no está en este espacio de trabajo"
+    "former": "Ya no está en este espacio de trabajo",
+    "askAccess": "Pedir acceso",
+    "detailsHiddenTitle": "Cómo trabaja",
+    "detailsHidden": "Las instrucciones, herramientas, memoria y uso de {{name}} solo los ven las personas a las que responde, su responsable y los admins."
   },
   "presence": {
     "online": "En línea",
@@ -2416,6 +2432,7 @@
     "refusedBy": "Rechazado por {{name}} · {{when}}",
     "approvedByYou": "Aprobado por ti · {{when}}",
     "outcomeApprovedBy": "Aprobado por {{name}}",
+    "requesterDecides": "Lo pidió alguien que lo aprueba por su rol, así que también puede decidirlo",
     "outcomeApprovedByYou": "Aprobado por ti",
     "outcomeRefusedBy": "Rechazado por {{name}}",
     "outcomeRefusedByYou": "Rechazado por ti",
@@ -2548,7 +2565,8 @@
       "mentions": "Menciones",
       "waiting": "Te esperan",
       "unread": "Sin leer",
-      "reactions": "Reacciones"
+      "reactions": "Reacciones",
+      "done": "Completadas"
     },
     "keys": {
       "title": "Atajos",
@@ -2697,6 +2715,8 @@
     "replyTip": "Responder · R",
     "done": "Hecho",
     "doneTip": "Hecho · E",
+    "restore": "Devolver",
+    "restoreTip": "Devolver · E",
     "snooze": "Recordármelo más tarde",
     "snoozeShort": "Recordar",
     "open": "Abrir",
@@ -2728,6 +2748,7 @@
       "done": "Marcada como hecha",
       "doneQuestion": "{{name}} sigue esperando. La pregunta queda en la conversación.",
       "doneApproval": "La solicitud queda en Aprobaciones.",
+      "restored": "De vuelta en tu bandeja de entrada",
       "undo": "Deshacer",
       "readAll_one": "{{count}} marcada como leída",
       "readAll_many": "{{count}} marcadas como leídas",
@@ -2745,6 +2766,7 @@
     "noneWaiting": "Nadie te está esperando.",
     "noneUnread": "Todo leído.",
     "noneHere": "Nada por aquí por ahora.",
+    "noneDone": "Nada marcado como completado en los últimos 30 días.",
     "more": "Mostrar más"
   },
   "approvals": {
@@ -3905,6 +3927,13 @@
     "defaultKeyDesc": "{{provider}} · termina en {{hint}}",
     "otherKeyDesc": "{{provider}} · termina en {{hint}}",
     "modelNeedsKey": "Se necesita una clave de API de {{provider}}",
+    "brainPick": {
+      "searchPlaceholder": "Modelo, plan o fabricante",
+      "connect": "Conectar {{plan}}",
+      "connectText": "Necesita una clave de {{plan}}. La agregas justo después de crear el agente.",
+      "needsKey": "Necesita una clave de {{plan}}",
+      "other": "Elegir otro"
+    },
     "noKeys": "Aún no hay claves",
     "budgetTitle": "Presupuesto mensual",
     "budget": "Presupuesto mensual (US$)",
@@ -4905,7 +4934,9 @@
       "usagePaused": "En pausa hasta {{until}} (límite del plan)",
       "usagePausedUnknown": "En pausa hasta que el plan se renueve (límite del plan)",
       "usagePausedBudget": "En pausa hasta {{until}} (límite del presupuesto)",
-      "usagePausedBudgetUnknown": "En pausa hasta que el presupuesto se renueve (límite del presupuesto)"
+      "usagePausedBudgetUnknown": "En pausa hasta que el presupuesto se renueve (límite del presupuesto)",
+      "waitingPlan": "Esperando el plan de {{plan}} · se ejecuta a las {{until}}",
+      "waitingPlanUnknown": "Esperando que se renueve el plan de {{plan}}"
     },
     "pausedReason": {
       "creator_left": "En pausa: quien la creó dejó el espacio de trabajo",
@@ -4960,6 +4991,8 @@
       "waiting": "Esperando que alguien responda",
       "waitingApproval": "Esperando tu aprobación",
       "waitingComputer": "Esperando la computadora",
+      "waitingPlan": "Esperando que se renueve el plan",
+      "waitingBudget": "Esperando que se renueve el presupuesto",
       "reported": "Contó lo que encontró",
       "silent": "Nada nuevo, se quedó callada",
       "failed": "No funcionó",
@@ -5017,6 +5050,10 @@
     "stoppedToast": "Ejecución detenida.",
     "usagePause": {
       "line": "Retoma sola cuando el límite se renueva. No se publica nada en la conversación.",
+      "lineLimit": "Se ejecuta sola cuando el límite se renueva. No se publica nada en la conversación.",
+      "dontRun": "No ejecutar",
+      "dontRunName": "No ejecutar {{name}} cuando el límite se renueve",
+      "canceledToast": "Cancelado. No se ejecutará cuando el límite se renueve.",
       "continuedToast": "La ejecución continúa.",
       "forbidden": "Solo quien creó la rutina, el responsable del agente o un admin pueden continuarla ahora",
       "extra_off": "La ventana de este plan se agotó y el trabajo largo de este agente no usa uso extra pagado. Actívalo en su configuración de IA para continuar ahora, o retoma después de la renovación",
@@ -7871,6 +7908,7 @@
       "freeTraining": "El proveedor de este modelo puede usar las solicitudes para entrenarlo. En OpenCode, en Settings › Privacy, activa el permiso para modelos gratuitos. Sin eso, este modelo no responde."
     },
     "recommended": "Recomendado",
+    "free": "Gratis",
     "modelHelp": "Los modelos más grandes piensan más y consumen el plan más rápido.",
     "hidden": "{{owner}} o un admin elige quién piensa.",
     "hiddenAdmins": "Solo los admins eligen quién piensa.",
@@ -8038,7 +8076,8 @@
       "html": "Página HTML",
       "file": "Archivo",
       "block": "Bloque",
-      "poll": "Encuesta"
+      "poll": "Encuesta",
+      "choices": "Opciones"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · hecho por {{name}}",
@@ -8122,6 +8161,16 @@
     "pollAnswered_other": "{{count}} de {{total}} respondieron",
     "voteFailed": "Tu voto no se registró."
   },
+  "choices": {
+    "step": "{{step}} de {{total}}",
+    "back": "Volver",
+    "next": "Siguiente",
+    "close": "Cerrar",
+    "closed": "{{title}} · cerrado",
+    "reopen": "Mostrar de nuevo",
+    "answeredBy": "{{name}} eligió",
+    "failed": "Tu elección no se envió. Inténtalo de nuevo."
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "Todo lo que las personas y los agentes hicieron o subieron.",
@@ -8160,7 +8209,8 @@
       "html": "Páginas HTML",
       "file": "Archivos",
       "block": "Bloques",
-      "poll": "Encuestas"
+      "poll": "Encuestas",
+      "choices": "Opciones"
     },
     "kindCount": "{{kind}}: {{count}}",
     "view": "Vista",
@@ -8835,12 +8885,30 @@
     "toolChanges": {
       "title": "Herramientas que cambiaron",
       "intro": "Estos servidores cambiaron lo que dice o pide una herramienta. Los agentes siguen con la versión que aprobaste hasta que aceptes la nueva.",
-      "before": "Aprobada",
-      "after": "Ahora",
+      "count_one": "{{count}} herramienta cambió",
+      "count_many": "{{count}} herramientas cambiaron",
+      "count_other": "{{count}} herramientas cambiaron",
+      "acceptAll": "Aceptar todas",
+      "acceptedAll": "Herramientas de {{name}} actualizadas.",
+      "show": "Ver el cambio",
+      "hide": "Ocultar",
+      "showAll": "Mostrar todas ({{total}})",
+      "textChanged": "El texto cambió",
+      "fieldsChanged_one": "{{count}} campo cambió",
+      "fieldsChanged_many": "{{count}} campos cambiaron",
+      "fieldsChanged_other": "{{count}} campos cambiaron",
+      "inputChanged": "La entrada cambió",
+      "description": "Texto",
       "input": "Entrada",
-      "fieldChanged": "cambió",
-      "noInput": "Sin entrada",
+      "field": {
+        "added": "nuevo",
+        "removed": "eliminado",
+        "changed": "cambió"
+      },
+      "added": "Añadido",
+      "removed": "Eliminado",
       "accept": "Aceptar",
+      "acceptOne": "Aceptar {{tool}}",
       "accepted": "{{tool}} actualizada.",
       "notice": "{{name}} cambió herramientas que aprobaste"
     },
@@ -9658,7 +9726,73 @@
     "inChannel": "en #{{channel}}",
     "count_one": "{{count}} resultado",
     "count_many": "{{count}} resultados",
-    "count_other": "{{count}} resultados"
+    "count_other": "{{count}} resultados",
+    "countMore": "{{count}}+ resultados",
+    "words": {
+      "ops": {
+        "from": "de",
+        "in": "en",
+        "has": "tiene",
+        "mentions": "menciona",
+        "before": "antes",
+        "after": "después",
+        "during": "durante",
+        "author": "autor",
+        "pinned": "fijado"
+      },
+      "has": {
+        "link": "enlace",
+        "file": "archivo",
+        "image": "imagen",
+        "card": "tarjeta"
+      },
+      "author": {
+        "person": "persona",
+        "agent": "agente"
+      }
+    },
+    "options": "Opciones de búsqueda",
+    "option": {
+      "from": "De una persona o agente concreto",
+      "in": "Enviado en un canal o MD concreto",
+      "has": "Incluye un enlace, archivo, imagen o tarjeta",
+      "mentions": "Menciona a una persona o agente concreto",
+      "before": "Antes de una fecha",
+      "after": "Después de una fecha",
+      "during": "Un día, un mes o un año",
+      "author": "Escrito por personas o por agentes",
+      "pinned": "Mensajes fijados"
+    },
+    "moreFilters": "Más filtros",
+    "hasLabel": {
+      "link": "Enlace",
+      "file": "Archivo",
+      "image": "Imagen",
+      "card": "Tarjeta"
+    },
+    "authorLabel": {
+      "person": "Personas",
+      "agent": "Agentes"
+    },
+    "pinnedChip": "Fijados",
+    "removeFilter": "Quitar {{filter}}",
+    "filtersApplied_one": "{{count}} filtro",
+    "filtersApplied_many": "{{count}} filtros",
+    "filtersApplied_other": "{{count}} filtros",
+    "recent": "Búsquedas recientes",
+    "clearRecent": "Borrar",
+    "pickDate": "Fecha",
+    "dateHint": "Escribe una fecha: 2026-10-05, 2026-10 o 2026",
+    "noMatch": "No hay nadie con ese nombre aquí.",
+    "noPlace": "No hay ningún canal ni MD con ese nombre.",
+    "sort": {
+      "label": "Ordenar",
+      "newest": "Más recientes",
+      "oldest": "Más antiguos",
+      "relevance": "Más relevantes"
+    },
+    "searchHere": "Buscar en esta conversación",
+    "dm": "MD con {{name}}"
   },
   "files": {
     "upload": "Subir archivo",
@@ -10903,7 +11037,7 @@
       "waitingComputer": "Esperando la computadora",
       "paused": "En pausa por el límite del plan",
       "pausedUntil": "En pausa por el límite del plan · vuelve a las {{time}}",
-      "done": "Hecho en {{duration}}",
+      "done": "Terminado en {{duration}}",
       "failed": "No terminó",
       "canceled": "Detenido por {{name}} después de {{duration}}",
       "canceledAnon": "Detenido después de {{duration}}"
@@ -11322,9 +11456,11 @@
       "plan_limit_wait": "El plan {{plan}} llegó a su límite. Responderé {{when}}, cuando se renueve.",
       "plan_limit_wait_unknown": "El plan {{plan}} llegó a su límite. Responderé en cuanto se renueve.",
       "budget_wait": "Se agotó mi presupuesto del mes. Seguiré {{when}}, o antes si un admin lo aumenta.",
+      "usage_wait_canceled": "Cancelado. No se ejecutará cuando el límite se renueve.",
       "usage_paused": "{{agent}} pausó este trabajo · plan {{plan}} al {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} pausó este trabajo · presupuesto mensual al {{percent}}%",
       "work_auto_moved": "Esto va a tardar, así que sigo en segundo plano. Publicaré novedades aquí, la próxima en unos {{minutes}} min.",
+      "work_auto_movedOver": "Esto va a tardar, así que sigo en segundo plano. Publicaré novedades aquí.",
       "work_end_done": "Listo ({{minutes}} min).",
       "work_end_failed": "Este trabajo en segundo plano no terminó ({{minutes}} min).",
       "work_end_failedWhy": "Este trabajo en segundo plano no terminó ({{minutes}} min): {{why}}.",

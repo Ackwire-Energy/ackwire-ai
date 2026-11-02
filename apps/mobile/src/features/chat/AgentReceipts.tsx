@@ -4,6 +4,7 @@ import {
   type MessageReceipt,
   receiptView,
   useModelLabel,
+  useReactions,
   useSteerState,
 } from "@agenteschat/client";
 import { listNames } from "@agenteschat/client/lib/activity";
@@ -13,7 +14,19 @@ import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Card, Icon, type IconName, InkOrbit, ProviderLogo, Row, Text, useReducedMotion, useToast } from "@/ui";
+import {
+  Button,
+  Card,
+  Icon,
+  type IconName,
+  InkOrbit,
+  ProviderLogo,
+  Row,
+  SectionHeader,
+  Text,
+  useReducedMotion,
+  useToast,
+} from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { Note, OpenPage } from "../ai/parts";
 import { AgentFace, Face } from "../shared/Face";
@@ -29,6 +42,7 @@ import {
   receiptRows,
   receiptShows,
 } from "./agent-receipts";
+import { requestComposerText } from "./composer-request";
 
 /**
  * Under a person's latest message, for what asks something of you (./agent-receipts.ts says what): the agents'
@@ -78,6 +92,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const openSheet = () =>
     sheet.open(
       <ReceiptsSheet
+        message={m}
         receipt={receipt}
         action={action}
         onAction={() => {
@@ -168,7 +183,7 @@ export const ReceiptMark = memo(function ReceiptMark({
   // The agents' sheet when there are agents to list (none yet while the author's plan picks), else the words.
   const say = () =>
     view.kind === "agents" && receiptRows(receipt).length > 0
-      ? sheet.open(<ReceiptsSheet receipt={receipt} action={null} onAction={() => sheet.close()} />)
+      ? sheet.open(<ReceiptsSheet message={m} receipt={receipt} action={null} onAction={() => sheet.close()} />)
       : toast({ title: label, ...(view.kind === "steer" ? { agentId: view.agentId } : {}) });
   return (
     <Animated.View
@@ -204,22 +219,8 @@ export const ReceiptMark = memo(function ReceiptMark({
 });
 
 function Mark({ mark, color }: { mark: ReceiptLine["mark"]; color: string }) {
-  switch (mark) {
-    case "seen":
-      return <Icon name="check" size={14} color={color} />;
-    case "done":
-      return <Icon name="checks" size={14} color={color} />;
-    case "working":
-      return <InkOrbit size={10} color={color} />;
-    case "waiting":
-      return <Icon name="pause" size={14} color={color} />;
-    case "asking":
-      return <Icon name="help" size={14} color={color} />;
-    case "picking":
-      return <Icon name="clock" size={14} color={color} />;
-    default:
-      return null;
-  }
+  if (mark === "none") return null;
+  return <Icon name={mark} size={14} color={color} />;
 }
 
 /** The web's icon for what a rule follows: the reply, the one person with the agent, the thread, the coordinator. */
@@ -232,24 +233,40 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
 };
 
 /**
- * "Agentes": each agent the message reached and where it is with it, who picked them, and the line's action.
- * When nothing could pick, why, and how agents are picked.
+ * "Agentes": each agent the message reached and where it is with it (an agent's reaction is its answer), who picked
+ * them, and the line's action. When no agent will answer, it says so and offers "Chamar um agente": a tap puts its
+ * @handle in the box. When nothing could pick, why, and how agents are picked.
  */
 function ReceiptsSheet({
+  message: m,
   receipt,
   action,
   onAction,
 }: {
+  message: Message;
   receipt: MessageReceipt | undefined;
   action: "retry" | "connect" | null;
   onAction: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const orgId = useOrgId();
   const dir = useDirectory();
   const meId = useMeId();
   const modelLabel = useModelLabel();
-  const rows = receiptRows(receipt);
+  const sheet = useSheet();
+  const reactions = useReactions(orgId, m.id, false).data ?? m.reactions;
+  const rows = receiptRows(
+    receipt,
+    (reactions ?? []).flatMap((r) => r.agentIds ?? []),
+  );
   const view = receiptView(receipt);
+  const nobody = view.status?.kind === "nobody";
+  const callable = nobody
+    ? rows.flatMap(({ agentId }) => {
+        const handle = dir.agentById.get(agentId)?.handle;
+        return handle ? [{ agentId, handle }] : [];
+      })
+    : [];
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const by = deciderOf(t, view, {
     meId,
@@ -275,6 +292,26 @@ function ReceiptsSheet({
         <Note icon={"logo" in by.mark ? <ProviderLogo id={by.mark.logo} size="xs" /> : RULE_ICON[by.mark.rule]}>
           {by.text}
         </Note>
+      ) : null}
+      {nobody ? <Note icon="checks">{t(mentionNeeded ? "receipts.mentionNeeded" : "receipts.nobody")}</Note> : null}
+      {callable.length > 0 ? (
+        <>
+          <SectionHeader title={t("channel.callAgent")} />
+          <Card>
+            {callable.map((c) => (
+              <Row
+                key={c.agentId}
+                leading={<AgentFace agentId={c.agentId} size={30} live={false} />}
+                title={name(c.agentId)}
+                subtitle={`@${c.handle}`}
+                onPress={() => {
+                  requestComposerText(m.channelId, `@${c.handle} `);
+                  sheet.close();
+                }}
+              />
+            ))}
+          </Card>
+        </>
       ) : null}
       {mentionNeeded ? (
         <>

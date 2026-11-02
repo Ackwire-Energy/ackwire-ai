@@ -3,6 +3,7 @@ import {
   type MessageReceipt,
   type ReceiptPhase,
   type ReceiptsState,
+  receiptTicks,
   receiptView,
   type SteerPhase,
   type SteerState,
@@ -15,14 +16,15 @@ import type { TFunction } from "i18next";
  * The agents' receipt of a person's message, the phone's way: on the latest one only (the web marks every message
  * with a check and a popover). Faces of the agents it is about, a small mark, and words: who saw it, a wait, a
  * failure, nobody or no AI, and while the author's own plan picks who answers. A receipt never takes a line of its
- * own: it is a mark beside the message (`markOf`), its words its label, except what asks something of you (send it
- * again, connect an AI, nobody will answer) and the AI provider being down, which keep their line under the message,
- * as on the web. Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved
+ * own: it is a mark beside the message (`markOf`): the clock, one tick or two (`receiptTicks`), its words its label,
+ * except what asks something of you (send it again, connect an AI) and the AI provider being down, which keep their
+ * line under the message, as on the web. "Nobody will answer" is two ticks whose sheet says it, with "Chamar um
+ * agente". Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved
  * by the channel's events).
  */
 
-/** The small mark before the words: a check (seen, answered), the orbit (on it), paused, a question, the clock, none. */
-export type ReceiptMark = "seen" | "working" | "waiting" | "asking" | "done" | "picking" | "none";
+/** The small mark: the clock (nobody picked it up yet), one tick (an agent is on it), two (everyone acted), none. */
+export type ReceiptMark = "clock" | "check" | "checks" | "none";
 
 export interface ReceiptLine {
   /** The agents whose faces show (at most `FACES`), and how many more there are. */
@@ -62,29 +64,27 @@ const faces = (ids: string[]) => ({ faces: ids.slice(0, FACES), more: Math.max(0
 export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | null {
   const view = receiptView(receipt);
   const status = view.status;
+  const mark = receiptTicks(receipt);
   if (view.picking) {
     const words = { key: "receipts.picking" as const, agents: [] };
-    return { faces: [], more: 0, mark: "picking", words, label: words, action: null, alert: false };
+    return { faces: [], more: 0, mark, words, label: words, action: null, alert: false };
   }
   if (view.seen.length === 0 && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
   if (status === null) {
     const words = { key: "receipts.seenBy" as const, agents: view.seen };
-    return { ...faces(view.seen), mark: "seen", words, label: words, action: null, alert: false };
+    return { ...faces(view.seen), mark, words, label: words, action: null, alert: false };
   }
   switch (status.kind) {
     case "picked":
-    case "claimed": {
-      const label = { key: `receipts.${status.kind}` as const, agents: status.agents };
-      return { ...faces(status.agents), mark: "working", words: null, label, action: null, alert: false };
-    }
+    case "claimed":
     case "handled": {
-      const label = { key: "receipts.handled" as const, agents: status.agents };
-      return { ...faces(status.agents), mark: "done", words: null, label, action: null, alert: false };
+      const label = { key: `receipts.${status.kind}` as const, agents: status.agents };
+      return { ...faces(status.agents), mark, words: null, label, action: null, alert: false };
     }
     case "waiting":
     case "asking": {
       const words = { key: `receipts.${status.kind}` as const, agents: status.agents };
-      return { ...faces(status.agents), mark: status.kind, words, label: words, action: null, alert: false };
+      return { ...faces(status.agents), mark, words, label: words, action: null, alert: false };
     }
     case "outage": {
       const words = { key: "receipts.outage" as const, agents: status.agents };
@@ -97,7 +97,7 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
     case "nobody": {
       const key = status.mentionNeeded ? ("receipts.mentionNeeded" as const) : ("receipts.nobody" as const);
       const words = { key, agents: [] };
-      return { faces: [], more: 0, mark: "none", words, label: words, action: null, alert: false };
+      return { faces: [], more: 0, mark, words: null, label: words, action: null, alert: false };
     }
     case "platform_cap": {
       const words = { key: "receipts.platformCap" as const, agents: [] };
@@ -172,8 +172,7 @@ export function turnHeadId(
 /**
  * The message the line goes under: the latest on screen that the server has, a person's or an agent's that mentions
  * agents (whom it handed work to, and who it only mentioned: ADR 0089). An agent's never takes it from the latest
- * person's message while that one's line asks something of you (`keepsLine`: send it again, connect an AI, nobody
- * will answer).
+ * person's message while that one's line asks something of you (`keepsLine`: send it again, connect an AI).
  */
 export function receiptMessageId(messages: readonly Message[], receipts: ReceiptsState = {}): string | null {
   let byAgent: string | null = null;
@@ -190,15 +189,21 @@ export function receiptMessageId(messages: readonly Message[], receipts: Receipt
   return byAgent;
 }
 
-/** Each agent's line in the sheet: its phase, "only mentioned" for one the message just names. */
-export type ReceiptRowPhase = ReceiptPhase | "referenced";
+/** Each agent's line in the sheet: its phase, "only mentioned" for one the message just names, "reacted" for one
+ * whose reaction was its answer. */
+export type ReceiptRowPhase = ReceiptPhase | "referenced" | "reacted";
 
-export function receiptRows(receipt: MessageReceipt | undefined): { agentId: string; phase: ReceiptRowPhase }[] {
+export function receiptRows(
+  receipt: MessageReceipt | undefined,
+  reactedBy: readonly string[] = [],
+): { agentId: string; phase: ReceiptRowPhase }[] {
   const view = receiptView(receipt);
   const phases = new Map<string, ReceiptPhase>(receipt?.agents ?? []);
   return view.seen.map((agentId) => {
     const phase = phases.get(agentId) ?? "seen";
-    return { agentId, phase: phase === "seen" && view.referenced.includes(agentId) ? "referenced" : phase };
+    if (phase !== "seen") return { agentId, phase };
+    if (view.referenced.includes(agentId)) return { agentId, phase: "referenced" };
+    return { agentId, phase: reactedBy.includes(agentId) ? "reacted" : "seen" };
   });
 }
 

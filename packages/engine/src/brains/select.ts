@@ -93,6 +93,11 @@ export function notePlanLimit(
   });
 }
 
+/** A turn on this plan went through: the limit seen here no longer holds. */
+export function forgetPlanLimit(machineId: string, kind: BrainKind, accountId?: string) {
+  planLimits.delete(limitKey(machineId, kind, accountId));
+}
+
 /** Tests: forget the plan limits seen. */
 export function clearPlanLimits() {
   planLimits.clear();

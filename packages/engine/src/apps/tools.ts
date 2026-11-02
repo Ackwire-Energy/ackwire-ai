@@ -766,7 +766,7 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
     {
       scope: "read",
       title: "List channels",
-      description: `Lists the channels ${person} can read in this workspace: public channels and private channels ${person} is in. Direct conversations are not listed: send_to_agent without channel_id uses the direct conversation with that agent. Reading or posting in a channel needs is_member true.`,
+      description: `Lists the channels ${person} can read in this workspace: public channels, private channels ${person} is in and private channels limited to a department or role ${person} holds (is_member false until they join in the app). Direct conversations are not listed: send_to_agent without channel_id uses the direct conversation with that agent. Reading or posting in a channel needs is_member true.`,
       input: listChannelsInput,
       readOnly: true,
       destructive: false,
