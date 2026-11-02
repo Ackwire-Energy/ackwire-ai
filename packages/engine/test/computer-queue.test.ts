@@ -224,4 +224,12 @@ test("a computer's queue: working turns and the line in roomHead's order, purpos
   await expect(computerQueue(f.db, f.owner.id, f.org.id, crypto.randomUUID(), now)).rejects.toThrow(
     "Computer not found",
   );
+
+  // Work a person asked for lately ranks after people's runs and before the rest, however short its wait.
+  const asked = await run(nova.id, await msg({ agentId: rio.id }), "waiting_input", {
+    ...busy(now - 2 * MIN),
+    roomAsked: true,
+  });
+  const line = await computerQueue(f.db, f.owner.id, f.org.id, machineId, now);
+  expect(line.waiting.map((w) => w.runId)).toEqual([person.id, asked.id, routine.id, byAgent.id]);
 });

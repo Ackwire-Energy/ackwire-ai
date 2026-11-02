@@ -324,8 +324,8 @@ export async function takeConsultation(
 export const MENTION_REPORT_JOB = "mention.report_once";
 
 /**
- * How long after the asked message its report waits at most for the agents it woke: past a run's whole wait for room
- * (`COMPUTER_BUSY_WAIT_MS`, 30 minutes), the author hears the replies already in.
+ * How long after the asked message its report waits at most for the agents it woke: past it, the author hears the
+ * replies already in, even while one of them still waits for room on its computer (a run asks until it runs).
  */
 const MENTION_REPORT_WAIT_MS = 35 * 60_000;
 

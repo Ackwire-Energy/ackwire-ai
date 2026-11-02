@@ -21,7 +21,7 @@ export const ROOM_ASK_SPACING_MS = 10_000;
 
 /**
  * A run of the last rank waiting this long ranks with work a person asked for, so a steady stream of that work can't
- * keep it in line until its wait for room runs out (`COMPUTER_BUSY_WAIT_MS`, 30 minutes).
+ * keep it in line for good (a run asks for room until it runs).
  */
 export const ROOM_RANK_AGE_MS = 10 * 60_000;
 
@@ -35,7 +35,7 @@ const peopleSql = sql`coalesce((${agentRuns.transcript}->>'roomPeople')::boolean
 const askedSql = sql`coalesce((${agentRuns.transcript}->>'roomAsked')::boolean, false)`;
 /**
  * Its place in the line: since it started waiting for room, or, a wake that waited outside any run first, since then
- * (`roomOrderSince`). The 30-minute deadline reads `roomWaitSince` alone.
+ * (`roomOrderSince`). The note after `COMPUTER_QUEUE_NOTE_MS` reads `roomWaitSince` alone.
  */
 const sinceSql = sql`coalesce((${agentRuns.transcript}->>'roomOrderSince')::bigint, (${agentRuns.transcript}->>'roomWaitSince')::bigint, 0)`;
 /** A run's rank in the line: 0 a person waits on it, 1 work a person asked for lately (or waiting long), 2 the rest. */
@@ -376,7 +376,7 @@ export async function computerQueue(
       .from(agentRuns)
       .leftJoin(messages, trigger)
       .where(and(eq(agentRuns.orgId, orgId), waitingForRoom(machineId)))
-      .orderBy(sql`${peopleSql} desc`, sinceSql, agentRuns.id),
+      .orderBy(rankSql(now), sinceSql, agentRuns.id),
     typicalTurns(db, orgId),
   ]);
   const working = workingRows.map((r) => ({ ...r, startedAt: Number(r.askAt) }));
