@@ -745,6 +745,8 @@ export interface Channel {
   name: string;
   topic: string;
   visibility: "public" | "private";
+  /** Private and limited to these roles (departments, ADR 0125): their people see it and may join. Empty or absent: public or invite only. */
+  audienceRoleIds?: string[];
   isMember: boolean;
   createdAt: string;
   /** Who created it: may change it and its members, like admins. */
@@ -763,12 +765,22 @@ export interface Channel {
   lastMessage?: ChannelLastMessage | null;
 }
 
+/** Who may join a channel, on creating it or changing it later. */
+export interface ChannelInput {
+  topic?: string;
+  visibility?: "public" | "private";
+  /** Private only: limits it to people holding one of these roles (ADR 0125); empty: invite only. */
+  audienceRoleIds?: string[];
+}
+
 /** A `#channel` link's card (`chat.card`): what the channel is and who is in it. */
 export interface ChannelCard {
   id: string;
   name: string;
   topic: string;
   visibility: "public" | "private";
+  /** As on `Channel`. */
+  audienceRoleIds?: string[];
   isMember: boolean;
   archived: boolean;
   /** People in it. */

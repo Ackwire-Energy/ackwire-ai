@@ -1,9 +1,16 @@
+import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
 import { MODEL_TIERS, type ModelTier } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import type { AutoModels } from "./auto-model";
 import { caches } from "./cache";
-import { CHANNEL_NAME_PATTERN, placesAgentsIn } from "./channels";
+import {
+  announceChannelLeavers,
+  CHANNEL_NAME_PATTERN,
+  channelRoleIds,
+  dropRoleLeavers,
+  placesAgentsIn,
+} from "./channels";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
@@ -16,7 +23,7 @@ import {
   mediaSettingsCacheKey,
   mediaSettingsFrom,
 } from "./media";
-import { can, requireActiveMembership, requirePermission } from "./organizations";
+import { can, lockOrgMembers, requireActiveMembership, requirePermission } from "./organizations";
 import {
   agentBudgetsThisMonth,
   budgetPercent,
@@ -456,13 +463,18 @@ export async function setAgentChannels(
 
 // ── Channels ─────────────────────────────────────────────────────────────────
 
-/** Renames a channel or changes its topic or visibility (creator or admin). */
+/**
+ * Renames a channel or changes its topic or who may join (creator or admin). `audienceRoleIds` limits a private
+ * channel to departments or roles (ADR 0125; empty: invite only); dropping a role takes out the people who were
+ * there through it alone.
+ */
 export async function updateChannel(
   db: Database,
   actorId: string,
   orgId: string,
   channelId: string,
-  input: { name?: string; topic?: string; visibility?: "public" | "private" },
+  input: { name?: string; topic?: string; visibility?: "public" | "private"; audienceRoleIds?: string[] },
+  options: { pubsub?: PubSub } = {},
 ) {
   const membership = await requireActiveMembership(db, actorId, orgId);
   const [channel] = await db
@@ -478,20 +490,47 @@ export async function updateChannel(
     throw new ValidationError("channel name: lower-case letters, digits, - or _ (max 80)");
   if (channel.name === "general" && name !== undefined && name !== "general")
     throw new ValidationError("#general can't be renamed");
+  if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
+  const accessChanges = input.visibility !== undefined || input.audienceRoleIds !== undefined;
+  const visibility = input.visibility ?? channel.visibility;
+  const asked =
+    visibility === "public" || input.audienceRoleIds === undefined
+      ? undefined
+      : await channelRoleIds(db, orgId, visibility, input.audienceRoleIds);
   try {
-    const [row] = await db
-      .update(channels)
-      .set({
-        ...(name !== undefined ? { name } : {}),
-        ...(input.topic !== undefined ? { topic: input.topic } : {}),
-        ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
-      })
-      .where(eq(channels.id, channelId))
-      .returning();
+    const { row, leavers } = await db.transaction(async (tx) => {
+      let access = {};
+      let dropped: string[] = [];
+      if (accessChanges) {
+        // Under the lock deleteRole and joinChannel take, on the roles as they are now: a role deleted meanwhile is
+        // neither written back nor missed by the leavers.
+        await lockOrgMembers(tx, orgId);
+        const [now] = await tx
+          .select({ audienceRoleIds: channels.audienceRoleIds })
+          .from(channels)
+          .where(eq(channels.id, channelId));
+        const before = now?.audienceRoleIds ?? [];
+        const audienceRoleIds = visibility === "public" ? [] : (asked ?? before);
+        // Turned invite only, whoever is in stays; still limited to roles, only the dropped roles' people go.
+        dropped = audienceRoleIds.length > 0 ? before.filter((id) => !audienceRoleIds.includes(id)) : [];
+        access = { visibility, audienceRoleIds };
+      }
+      const [row] = await tx
+        .update(channels)
+        .set({
+          ...(name !== undefined ? { name } : {}),
+          ...(input.topic !== undefined ? { topic: input.topic } : {}),
+          ...access,
+        })
+        .where(eq(channels.id, channelId))
+        .returning();
+      return { row, leavers: row ? await dropRoleLeavers(tx, orgId, { channelId, roleIds: dropped }) : [] };
+    });
     if (!row) throw new NotFoundError("Channel not found");
     caches.channels.delete(`${orgId}:${channelId}`);
     // What agents may search depends on visibility (agentSearchChannels).
     if (input.visibility !== undefined) caches.scopes.deletePrefix(`${orgId}:`);
+    await announceChannelLeavers(options.pubsub, orgId, leavers);
     return row;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`#${name} already exists`);

@@ -64,6 +64,7 @@ import type {
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
+  ChannelInput,
   ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
@@ -2143,7 +2144,7 @@ export function useUpdateChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name?: string; topic?: string }) => api.chat.update(orgId, channelId, input),
+    mutationFn: (input: ChannelInput & { name?: string }) => api.chat.update(orgId, channelId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
   });
 }

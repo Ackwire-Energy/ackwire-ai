@@ -1,5 +1,6 @@
 import { useAuthConfig, useChannels, useForumTopics, useWikiTree } from "@agenteschat/client";
 import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
+import { joinable } from "@agenteschat/client/lib/channel-access";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui";
@@ -57,7 +58,7 @@ export function CommandMenu() {
     const orgId = org.id;
     const list: PaletteItem[] = [];
     for (const c of channels.data ?? []) {
-      if (!c.isMember && c.visibility !== "public") continue;
+      if (!c.isMember && !joinable(c)) continue;
       list.push({
         key: `c:${c.id}`,
         group: goTo,
