@@ -1368,8 +1368,7 @@
       "button_other": "置顶消息（{{count}}）",
       "label": "#{{channel}} 中的置顶消息",
       "in": "置顶于 #{{channel}}",
-      "unpin": "取消置顶 {{name}} 的消息",
-      "empty": "这里还没有置顶内容。可以从消息菜单中置顶。"
+      "unpin": "取消置顶 {{name}} 的消息"
     },
     "membersButton_other": "频道成员（{{count}}）",
     "membersPeople": "成员",

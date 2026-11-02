@@ -1368,8 +1368,7 @@
       "button_other": "Pesan yang disematkan ({{count}})",
       "label": "Pesan yang disematkan di #{{channel}}",
       "in": "Disematkan di #{{channel}}",
-      "unpin": "Lepas sematan pesan {{name}}",
-      "empty": "Belum ada yang disematkan di sini. Sematkan pesan dari menunya."
+      "unpin": "Lepas sematan pesan {{name}}"
     },
     "membersButton_other": "Anggota kanal ({{count}})",
     "membersPeople": "Orang",

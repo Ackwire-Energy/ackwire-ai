@@ -1416,8 +1416,7 @@
       "button_other": "Sabitlenen mesajlar ({{count}})",
       "label": "#{{channel}} kanalında sabitlenen mesajlar",
       "in": "#{{channel}} kanalında sabitlendi",
-      "unpin": "{{name}} mesajının sabitlemesini kaldır",
-      "empty": "Burada henüz sabitlenen bir şey yok. Bir mesajı menüsünden sabitleyin."
+      "unpin": "{{name}} mesajının sabitlemesini kaldır"
     },
     "membersButton_one": "Kanal üyeleri ({{count}})",
     "membersButton_other": "Kanal üyeleri ({{count}})",

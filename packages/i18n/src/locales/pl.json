@@ -1512,8 +1512,7 @@
       "button_other": "Przypięte wiadomości ({{count}})",
       "label": "Przypięte wiadomości na #{{channel}}",
       "in": "Przypięte na #{{channel}}",
-      "unpin": "Odepnij wiadomość od: {{name}}",
-      "empty": "Nic tu jeszcze nie przypięto. Przypnij wiadomość z jej menu."
+      "unpin": "Odepnij wiadomość od: {{name}}"
     },
     "membersButton_one": "Członkowie kanału ({{count}})",
     "membersButton_few": "Członkowie kanału ({{count}})",

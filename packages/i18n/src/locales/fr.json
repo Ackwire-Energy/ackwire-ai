@@ -1464,8 +1464,7 @@
       "button_other": "Messages épinglés ({{count}})",
       "label": "Messages épinglés dans #{{channel}}",
       "in": "Épinglé dans #{{channel}}",
-      "unpin": "Désépingler le message de {{name}}",
-      "empty": "Rien d'épinglé ici pour l'instant. Épinglez un message depuis son menu."
+      "unpin": "Désépingler le message de {{name}}"
     },
     "membersButton_one": "Membres du canal ({{count}})",
     "membersButton_many": "Membres du canal ({{count}})",

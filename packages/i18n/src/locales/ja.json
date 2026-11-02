@@ -1368,8 +1368,7 @@
       "button_other": "ピン留めしたメッセージ（{{count}}）",
       "label": "#{{channel}}のピン留めしたメッセージ",
       "in": "#{{channel}}にピン留め",
-      "unpin": "{{name}}のメッセージのピン留めを外す",
-      "empty": "ここにはまだピン留めがありません。メッセージのメニューからピン留めしてください。"
+      "unpin": "{{name}}のメッセージのピン留めを外す"
     },
     "membersButton_other": "チャンネルのメンバー（{{count}}）",
     "membersPeople": "人",

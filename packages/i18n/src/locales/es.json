@@ -1464,8 +1464,7 @@
       "button_other": "Mensajes fijados ({{count}})",
       "label": "Mensajes fijados en #{{channel}}",
       "in": "Fijado en #{{channel}}",
-      "unpin": "Dejar de fijar el mensaje de {{name}}",
-      "empty": "Todavía no hay nada fijado aquí. Fija un mensaje desde su menú."
+      "unpin": "Dejar de fijar el mensaje de {{name}}"
     },
     "membersButton_one": "Miembros del canal ({{count}})",
     "membersButton_many": "Miembros del canal ({{count}})",

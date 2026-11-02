@@ -3481,9 +3481,6 @@
   "channel.pins.unpin": {
     "value": "Unpin {{name}}'s message"
   },
-  "channel.pins.empty": {
-    "value": "Nothing pinned here yet. Pin a message from its menu."
-  },
   "channel.membersButton": {
     "value": {
       "one": "Channel members ({{count}})",

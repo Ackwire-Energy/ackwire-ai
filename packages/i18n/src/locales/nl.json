@@ -1416,8 +1416,7 @@
       "button_other": "Vastgezette berichten ({{count}})",
       "label": "Vastgezette berichten in #{{channel}}",
       "in": "Vastgezet in #{{channel}}",
-      "unpin": "Bericht van {{name}} losmaken",
-      "empty": "Nog niets vastgezet. Zet een bericht vast via het menu ervan."
+      "unpin": "Bericht van {{name}} losmaken"
     },
     "membersButton_one": "Kanaalleden ({{count}})",
     "membersButton_other": "Kanaalleden ({{count}})",

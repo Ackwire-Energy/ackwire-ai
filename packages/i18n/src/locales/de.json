@@ -1416,8 +1416,7 @@
       "button_other": "Angeheftete Nachrichten ({{count}})",
       "label": "Angeheftete Nachrichten in #{{channel}}",
       "in": "Angeheftet in #{{channel}}",
-      "unpin": "Nachricht von {{name}} lösen",
-      "empty": "Hier ist noch nichts angeheftet. Hefte eine Nachricht über ihr Menü an."
+      "unpin": "Nachricht von {{name}} lösen"
     },
     "membersButton_one": "Mitglieder des Kanals ({{count}})",
     "membersButton_other": "Mitglieder des Kanals ({{count}})",
