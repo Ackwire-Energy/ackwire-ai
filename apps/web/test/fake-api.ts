@@ -569,7 +569,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   return {
     me: {
       user: { id: walter.userId, name: walter.name, email: walter.email, image: null },
-      organizations: [{ id: ORG_ID, name: "Acme", role: "owner" }],
+      // On, so the chat tests read the tool blocks; off (the server's default) is tool-activity.test.tsx's.
+      organizations: [{ id: ORG_ID, name: "Acme", role: "owner", showActivity: true }],
     },
     members: [walter, joao],
     agents: [agent(ADA_ID, "Ada", "Dev", "u-joao", 40), agent(ATLAS_ID, "Atlas", "Ops", "u-joao", 20)],
@@ -1390,6 +1391,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!org) throw new ApiError(404, "not_found", "Organization not found");
         org.start = { page: input.page, channelId: input.page === "channel" ? (input.channelId ?? null) : null };
         return org.start;
+      },
+      setShowActivity: async (orgId, show) => {
+        log("orgs.setShowActivity", orgId, show);
+        const org = state.me?.organizations.find((o) => o.id === orgId);
+        if (!org) throw new ApiError(404, "not_found", "Organization not found");
+        org.showActivity = show;
+        return show;
       },
       sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
       setSidebarItem: async (orgId, item, place) => {

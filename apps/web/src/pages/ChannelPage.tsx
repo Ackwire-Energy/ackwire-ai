@@ -3575,6 +3575,8 @@ export const TimelineMessage = memo(function TimelineMessage({
           {!missionCard &&
             // A request says its action itself ("Pedido de aprovação: …" would repeat it).
             !approvalId &&
+            // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
+            !secretRequest &&
             !forumSuggestion &&
             !issueWork &&
             !waitNotice &&

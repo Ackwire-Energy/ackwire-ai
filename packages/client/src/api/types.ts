@@ -195,6 +195,8 @@ export interface OrgSummary {
   deletion?: OrgDeletion;
   /** From `GET /me`: what opens when the app starts here (ADR 0108). Absent from older servers: the home. */
   start?: StartChoice;
+  /** From `GET /me`: whether I see what agents did under each reply. Absent (an older server): off. */
+  showActivity?: boolean;
 }
 
 /** What opens when the app starts in a workspace (ADR 0108): the app's home, where the person was, or a channel. */

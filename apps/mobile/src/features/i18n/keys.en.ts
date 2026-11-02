@@ -855,6 +855,11 @@ export const featureKeysEn: FeatureTranslations = {
     startChannels: "A channel",
     startHint: "For this workspace, here and on your computer, where home is the Home page.",
     startFailed: "Couldn't save that. Try again.",
+    activity: "Agents' replies",
+    activityShow: "Show what agents did under each reply",
+    activityHint:
+      "The tools they used and how long it took, in this workspace, here and on your computer. While they work, you still see what they're doing.",
+    activityFailed: "Couldn't save that. Try again.",
     langPt: "Português",
     langEn: "English",
     sounds: "Sounds",

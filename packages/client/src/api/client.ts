@@ -356,6 +356,8 @@ export interface ApiClient {
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** What opens when the app starts here, on every device (ADR 0108; `start.channel_unknown`). */
     setStart(orgId: string, input: { page: StartPage; channelId?: string | null }): Promise<StartChoice>;
+    /** Whether I see what agents did under each reply here, on every device. */
+    setShowActivity(orgId: string, show: boolean): Promise<boolean>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */

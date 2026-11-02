@@ -75,7 +75,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     const plan = params.brain === "Codex" ? "ChatGPT" : "Claude";
     return t("chat.body.plan_limit_wait_unknown", { plan, defaultValue: body });
   }
-  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : code;
+  // A secret request posted before the body named its agent.
+  const anon = code === "secret_request" && typeof params.agent !== "string";
+  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : anon ? "secret_requestAnon" : code;
   const key = `chat.body.${shown}`;
   // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
   return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });

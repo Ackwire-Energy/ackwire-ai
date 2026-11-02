@@ -82,11 +82,33 @@ describe("one call is its own line", () => {
 describe("nothing more than the message shows", () => {
   test("a lone quick read draws no block; no block opens on nothing or says it used no tools", () => {
     const tools = source("ToolCalls.tsx");
-    expect(tools).toContain("const now = quietWork(items) ? null : toolNow(items);");
+    expect(tools).toContain("const now = quietWork(items) || (done && !showsActivity(org)) ? null : toolNow(items);");
     expect(tools).toContain("if (lone && lone.ms !== null && quietLine(lone)) return null;");
     expect(tools).toContain("const shown = compact ? workSteps(compact, onCard) : 0;");
     expect(tools).not.toContain("chat.work.none");
     expect(tools).not.toContain("chat.work.see");
+  });
+});
+
+describe("what agents did under each reply: the person's own setting, off by default", () => {
+  test("off, a done reply keeps only what it read and a saved one draws no block; the live block stays", () => {
+    const tools = source("ToolCalls.tsx");
+    // Done and off: no call is "now", so only the messages it read stay (the branch for a reply with no call).
+    expect(tools).toContain("(done && !showsActivity(org)) ? null : toolNow(items);");
+    expect(tools).toContain('const shown = done ? items.filter((i) => i.kind === "steer") : items;');
+    expect(tools).toContain("if (!compact || shown === 0 || !showsActivity(org)) return null;");
+    // The cards that carry content or wait for a person aren't the tools' and stay in the row.
+    const row = source("MessageRow.tsx");
+    expect(row).toContain("<SecretCard");
+    expect(row).not.toContain("showsActivity");
+  });
+
+  test("Você has the row and its page, and a secret request's card shows without its text", () => {
+    const me = readFileSync(join(import.meta.dir, "../../src/features/me/MeScreen.tsx"), "utf8");
+    expect(me).toContain('href: "/me/activity"');
+    const route = readFileSync(join(import.meta.dir, "../../app/(app)/me/activity.tsx"), "utf8");
+    expect(route).toContain("<ActivityPage />");
+    expect(source("logic.ts")).toMatch(/hidesBody = [^;]*secretRequestOf\(m\.meta\)/);
   });
 });
 

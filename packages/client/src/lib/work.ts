@@ -1,11 +1,17 @@
 import type { TFunction } from "i18next";
-import type { ConnectorDef, Run, RunStep } from "../api/types";
+import type { ConnectorDef, OrgSummary, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
 import { joinNames, shortTarget } from "./format";
 import { MAIL_BRANDS } from "./mail";
+
+/**
+ * Whether a finished reply shows what the agent did ("Usou 4 ferramentas"): only for a person who turned it on in this
+ * workspace; off by default, and off with a server that doesn't send it. The live step line shows either way.
+ */
+export const showsActivity = (org: Pick<OrgSummary, "showActivity"> | null | undefined) => org?.showActivity === true;
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
