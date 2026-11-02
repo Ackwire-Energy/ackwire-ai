@@ -111,6 +111,8 @@ export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   if (kind === "machine_connected" || kind === "computer_ready")
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   if (kind && ROUTINE_TROUBLE.has(kind as NotificationKind)) return { to: "/org/$orgId/routines" };
+  // A help request's card may be in a DM, which a push can't tell from a channel (`/c/<dm id>` doesn't exist).
+  if (kind === "browser_handoff") return null;
   if (data.threadId) return { to: "/org/$orgId/threads/$threadId", params: { threadId: data.threadId } };
   if (data.channelId) return { to: "/org/$orgId/c/$channelId", params: { channelId: data.channelId } };
   if (data.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };

@@ -614,7 +614,12 @@ export function agentRoutes(deps: AppDeps) {
           db,
           c.get("user").id,
           orgId,
-          { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
+          {
+            ...input,
+            monthlyBudgetNanoUsd: budget(monthlyBudgetUsd),
+            // A restricted one is born answering only its owner, so an audience refused below never leaves it open.
+            ...(audience && audience.mode !== "everyone" ? { audienceMode: "owner" as const } : {}),
+          },
           // New agents start on "Automático".
           NEW_AGENT_DEFAULTS,
           // The person's Criar agente: what they pick is what the next one starts with (ADR 0094).

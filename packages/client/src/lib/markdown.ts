@@ -216,6 +216,10 @@ export function plainLines(source: string): string[] {
     .filter(Boolean);
 }
 
+/** A text with a code block or a table: it needs the conversation's whole width, never a bubble's. */
+export const hasWideBlock = (source: string) =>
+  /```|\|/.test(source) && parseMarkdown(source).some((b) => b.type === "code" || b.type === "table");
+
 /** Heading anchor ids for the outline: "Como pedimos acesso" → "como-pedimos-acesso". */
 export const headingId = (text: string) =>
   text

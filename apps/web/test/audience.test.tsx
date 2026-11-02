@@ -48,9 +48,10 @@ describe("Quem pode falar com a Ada", () => {
         .getAttribute("aria-checked"),
     ).toBe("true");
     await click(within(group).getByRole("radio", { name: /^Só algumas pessoas/ }));
-    // The owner (João) always can; he isn't in the list.
-    expect(section.textContent).toContain("João sempre pode, como responsável.");
+    // Nobody picked yet: only the owner (João), who isn't in the list and always can.
+    expect(section.textContent).toContain("Só João, por enquanto");
     await click(within(section).getAllByLabelText(/Walter/)[0] as HTMLElement);
+    expect(section.textContent).toContain("João sempre pode, como responsável.");
     await click(
       within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
     );
@@ -103,6 +104,22 @@ describe("Quem pode falar com a Ada", () => {
     expect(
       (state.calls.find((c) => c.method === "agents.create")?.args[1] as { audience?: unknown } | undefined)?.audience,
     ).toEqual({ mode: "owner", userIds: [] });
+  });
+
+  test("Criar agente: Só algumas pessoas with nobody picked says only me for now and is sent restricted", async () => {
+    const state = await go("agents/new");
+    await startAs("PM");
+    await proceed(3);
+    const group = screen().getByRole("radiogroup", { name: "Quem pode falar com o Theo" });
+    await click(within(group).getByRole("radio", { name: /Só algumas pessoas/ }));
+    expect(document.body.textContent).toContain("Só você, por enquanto");
+    expect(document.body.textContent).not.toContain("sempre pode, como responsável");
+    await proceed(2);
+    await click(screen().getByRole("button", { name: "Criar Theo" }));
+    await settle(6);
+    expect(
+      (state.calls.find((c) => c.method === "agents.create")?.args[1] as { audience?: unknown } | undefined)?.audience,
+    ).toEqual({ mode: "people", userIds: [] });
   });
 });
 

@@ -1145,24 +1145,31 @@ export async function notifyBrowserHandoff(
     .select({ kind: channels.kind, name: channels.name })
     .from(channels)
     .where(eq(channels.id, where.channelId));
-  await notify(deps, {
+  const handoff = { handoffId: h.id, agentId: h.agentId, ...(h.screen !== "browser" ? { screen: h.screen } : {}) };
+  const base = {
     orgId: h.orgId,
-    userIds,
     kind: "browser_handoff",
     groupKey: `browser_handoff:${h.id}`,
     waiting: true,
     actor: agent(h.agentId),
+    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
+  } as const;
+  const members = await inChannel(deps, where.channelId, userIds);
+  await notify(deps, {
+    ...base,
+    userIds: members,
     source: {
       channelId: where.channelId,
       ...(where.threadId ? { threadId: where.threadId } : {}),
       messageId: h.id,
       ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
-      handoffId: h.id,
-      ...(h.screen !== "browser" ? { screen: h.screen } : {}),
+      ...handoff,
     },
-    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });
+  // Who can't open the card's conversation gets no link to it: the request opens on the agent's computer.
+  const others = userIds.filter((id) => !members.includes(id));
+  if (others.length > 0) await notify(deps, { ...base, userIds: others, source: handoff });
 }
 
 /** Still unanswered an hour later: back on top, unread, and pushed once more saying the agent still needs them. */

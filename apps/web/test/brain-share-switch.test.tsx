@@ -30,14 +30,14 @@ const brainCalls = (state: ReturnType<typeof seedState>) =>
  */
 async function ada(
   patch: Partial<AgentBrain>,
-  { mine = true, tab = "", provider = "", ownPlan = "", en = false } = {},
+  { mine = true, tab = "", provider = "", ownPlan = "", en = false, people = false } = {},
 ) {
   const state = seedState();
   const agent = state.agents.find((a) => a.id === ADA_ID);
   if (agent) {
     agent.ownerUserId = mine ? "u-walter" : "u-joao";
     agent.brain = { kind: patch.brain ?? "claude_code", model: "Sonnet", ...(provider ? { provider } : {}) };
-    agent.audience = { mode: patch.onlyOwner === false ? "everyone" : "owner", userIds: [] };
+    agent.audience = { mode: people ? "people" : patch.onlyOwner === false ? "everyone" : "owner", userIds: [] };
   }
   const api = createFakeApi(state);
   fakeMachinesOf.get(api)?.pair({
@@ -255,6 +255,38 @@ describe("Atende outras pessoas (Quem pensa)", () => {
     await click(screen().getByRole("button", { name: "Deixar a Ada atender todos" }));
     await settle(4);
     expect(brainCalls(state)).toEqual([{ brain: "model", fallback: true }, { onlyOwner: false }]);
+  });
+});
+
+describe("Só algumas pessoas with nobody picked yet", () => {
+  test("Atende outras pessoas lets nobody in: the switch goes back off and says to pick people", async () => {
+    const state = await ada({}, { people: true });
+    const d = await brainDialog();
+    const a = await advanced(d);
+    await click(replies(a));
+    await done(a);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ onlyOwner: false });
+    expect(document.body.textContent).not.toContain("Agora a Ada atende outras pessoas.");
+    expect(document.body.textContent).toContain(
+      "A Ada só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
+    );
+    expect(state.agents.find((x) => x.id === ADA_ID)?.audience).toEqual({ mode: "people", userIds: [] });
+  });
+
+  test("back on the API: no button that would let everyone in", async () => {
+    await ada({}, { people: true });
+    const d = await brainDialog();
+    await click(
+      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
+        name: /^Chave de API/,
+      }),
+    );
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(document.body.textContent).toContain("A Ada voltou a pensar pela API e ainda só atende você.");
+    expect(screen().queryByRole("button", { name: /^Deixar a Ada atender/ })).toBeNull();
   });
 });
 

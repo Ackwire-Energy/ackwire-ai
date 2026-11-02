@@ -107,8 +107,14 @@ export function useSectionOrder(orgId: string) {
             dragging.current = id;
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData(SECTION_DRAG, id);
-            const box = e.currentTarget.parentElement;
-            if (box) e.dataTransfer.setDragImage(box, 12, 12);
+            // The ghost is the section's header row (the tools: their first row), not the whole section over the others.
+            const head = e.currentTarget.parentElement?.querySelector<HTMLElement>(
+              ".sidebar__section-head, .sidebar__item",
+            );
+            if (head) {
+              const r = head.getBoundingClientRect();
+              e.dataTransfer.setDragImage(head, Math.max(0, e.clientX - r.left), Math.max(0, e.clientY - r.top));
+            }
           }}
           onDragEnd={end}
           onClick={(e) => {

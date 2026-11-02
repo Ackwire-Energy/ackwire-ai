@@ -307,27 +307,71 @@ describe("the card in the message", () => {
     clientY: y,
   });
 
+  const HINT = "Rolar agora move a página. Esc para sair";
+  const wheelOnPage = async (page: HTMLElement) => {
+    const e = new WheelEvent("wheel", { deltaY: 120, clientX: 100, clientY: 100, bubbles: true, cancelable: true });
+    await act(async () => page.dispatchEvent(e));
+    return e;
+  };
+
   test("the wheel scrolls the conversation until the page is pressed; Esc gives it back", async () => {
     const { card, page } = await inControlOfPage();
-    const wheelOn = async () => {
-      const e = new WheelEvent("wheel", { deltaY: 120, clientX: 100, clientY: 100, bubbles: true, cancelable: true });
-      await act(async () => page.dispatchEvent(e));
-      return e;
-    };
+    const hint = () => card.querySelector(".brw-ac__capture")?.textContent ?? null;
 
     // Not pressed yet: the wheel is the conversation's (not taken by the page).
-    expect((await wheelOn()).defaultPrevented).toBe(false);
-    expect(card.querySelector(".brw-ac__capture")).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
+    expect(hint()).toBeNull();
 
-    // A click into the page takes the wheel: the hint says how to scroll it, and the page keeps the wheel.
+    // A click into the page takes the wheel, with no hint for the click itself; the hint shows once it scrolls.
     await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
     await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
-    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolar agora move a página. Esc para sair");
-    expect((await wheelOn()).defaultPrevented).toBe(true);
+    expect(hint()).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(true);
+    expect(hint()).toBe(HINT);
 
-    // Esc gives the wheel back to the conversation.
+    // Esc gives the wheel back to the conversation, also with the focus outside the page.
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    expect(hint()).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
+  });
+
+  test("the scroll hint goes on its own after the wheel stops, on a click and when the mouse leaves", async () => {
+    const { card, page, sentToPage } = await inControlOfPage();
+    const hint = () => card.querySelector(".brw-ac__capture")?.textContent ?? null;
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
+
+    await wheelOnPage(page);
+    expect(hint()).toBe(HINT);
+    await act(() => new Promise((r) => setTimeout(r, 1300)));
+    expect(hint()).toBeNull();
+    // Still the page's wheel: idle only hides the hint.
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(true);
+
+    // A click while it shows: the hint goes and the click reaches the page.
+    expect(hint()).toBe(HINT);
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 10, 20)));
+    expect(hint()).toBeNull();
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 10, 20)));
+    expect(hint()).toBeNull();
+    expect(sentToPage().slice(-2)).toEqual(["pressed@20,40", "released@20,40"]);
+
+    // The mouse leaving the page: the hint goes and the wheel is the conversation's again.
+    await wheelOnPage(page);
+    expect(hint()).toBe(HINT);
+    await act(async () => fireEvent.pointerLeave(page, { pointerId: 1, pointerType: "mouse" }));
+    expect(hint()).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
+  });
+
+  test("Esc with no hint showing still reaches the page", async () => {
+    const { page, sentToPage } = await inControlOfPage();
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
     await act(async () => fireEvent.keyDown(page, { key: "Escape" }));
-    expect(card.querySelector(".brw-ac__capture")).toBeNull();
+    expect(sentToPage().filter((m) => m.startsWith("key"))).not.toHaveLength(0);
+    // And the wheel is the conversation's again.
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
   });
 
   test("a press and a move drag on the page with the button held, past its edge too; a click stays a click", async () => {
@@ -370,13 +414,13 @@ describe("the card in the message", () => {
     });
   }
 
-  test("no scroll hint while the mouse is held; it shows once the press lifts", async () => {
+  test("no scroll hint for a press, a drag or its release", async () => {
     const { card, page } = await inControlOfPage();
     await act(async () => fireEvent.pointerDown(page, pointer(1, 50, 100)));
     await act(async () => fireEvent.pointerMove(page, pointer(1, 90, 100)));
     expect(card.querySelector(".brw-ac__capture")).toBeNull();
     await act(async () => fireEvent.pointerUp(page, pointer(1, 90, 100)));
-    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolar agora move a página. Esc para sair");
+    expect(card.querySelector(".brw-ac__capture")).toBeNull();
   });
 
   test("a release lost elsewhere: the next move with no button down lets go, never drags", async () => {

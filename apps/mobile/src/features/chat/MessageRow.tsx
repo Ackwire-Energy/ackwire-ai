@@ -16,6 +16,7 @@ import {
   useWaiting,
 } from "@agenteschat/client";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
+import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -61,6 +62,7 @@ import {
   approvalIdOf,
   artifactsOf,
   consultationsOf,
+  hangsUnder,
   hidesBody,
   mayStopRun,
   missionCardRef,
@@ -104,9 +106,17 @@ export const MessageRow = memo(function MessageRow({
   receipt,
   seenBy,
   readOnly = false,
+  run: runAt = "solo",
+  above,
+  aboveThread = false,
 }: {
   message: Message;
   grouped: boolean;
+  /** My own row's place in a run of my rows (`runPosition`): the corners it shares square off, the time ends it. */
+  run?: RunPosition;
+  /** The message it groups under, and whether that one shows its thread's link: what hangs under it ends the run. */
+  above?: Message;
+  aboveThread?: boolean;
   meId: string | null;
   /** Its thread, when it is the root of one the conversation shows as a link. */
   thread?: ThreadInfo;
@@ -197,6 +207,13 @@ export const MessageRow = memo(function MessageRow({
   const setup = missionSetupOf(meta);
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
+  const aboveReactions = useReactions(orgId, above?.id ?? "", false).data;
+  const ownReactions = useReactions(orgId, m.id, false).data;
+  const run = runAround(
+    runAt,
+    above ? hangsUnder(above, aboveThread, aboveReactions, meId) : false,
+    hangsUnder(m, Boolean(thread), ownReactions, meId),
+  );
   const question = isAgent ? questionOf(meta) : null;
   // An agent asks a person for a secret for its computer (ADR 0027).
   const secret = isAgent ? secretRequestOf(meta) : null;
@@ -276,7 +293,7 @@ export const MessageRow = memo(function MessageRow({
     // The bubble, or the GIF or sticker or the files of a message with no words, leads; the receipt's mark stands
     // beside it.
     const lead = body ? (
-      <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
+      <View style={[styles.bubble, BUBBLE_RUN[run], styles.lead, { backgroundColor: c.bubble }]}>
         <MessageText
           body={body}
           muted={m.local === "pending"}
@@ -299,7 +316,12 @@ export const MessageRow = memo(function MessageRow({
         onLongPress={press}
         delayLongPress={380}
         accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
-        style={({ pressed }) => [styles.me, grouped && styles.meCont, pressed && press && styles.mePressed]}
+        style={({ pressed }) => [
+          styles.me,
+          grouped && styles.meCont,
+          (run === "start" || run === "mid") && styles.meRunOn,
+          pressed && press && styles.mePressed,
+        ]}
       >
         {m.pinned ? (
           <View style={[styles.pinLine, styles.meEnd]}>
@@ -332,6 +354,12 @@ export const MessageRow = memo(function MessageRow({
           {missionDecision}
           {foot}
         </View>
+        {/* One time per run of my rows (they group a few minutes apart), under its last; a send in flight says so. */}
+        {!m.local && (run === "end" || run === "solo") ? (
+          <Text variant="caption" tone="faint" style={styles.meTime}>
+            {when.time(m.createdAt)}
+          </Text>
+        ) : null}
       </Pressable>
     );
   }
@@ -767,6 +795,14 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   );
 }
 
+/** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
+const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
+  solo: {},
+  start: { borderBottomRightRadius: 6 },
+  mid: { borderTopRightRadius: 6, borderBottomRightRadius: 6 },
+  end: { borderTopRightRadius: 6 },
+};
+
 const styles = StyleSheet.create({
   // Readable turns: more room between turns, a quieter name and time.
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
@@ -781,17 +817,17 @@ const styles = StyleSheet.create({
   whoMark: { position: "absolute", top: 0, right: 0, height: 19, justifyContent: "center" },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
-  meCont: { paddingTop: 2, marginTop: 0 },
+  meCont: { paddingTop: 1, marginTop: 0 },
+  // A run of my rows sits 2px apart (1 under this one, 1 over the next).
+  meRunOn: { paddingBottom: 1 },
+  meTime: { marginTop: 4, textAlign: "right" },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
     maxWidth: "100%",
     paddingVertical: 10,
     paddingHorizontal: 15,
-    borderTopLeftRadius: 21,
-    borderTopRightRadius: 21,
-    borderBottomLeftRadius: 21,
-    borderBottomRightRadius: 6,
+    borderRadius: 18,
   },
   // My row keeps 64px free on the left, 48 of them past the screen's 16px edge: the receipt's mark stands there, on
   // the bubble's last line (10px under the text, 24px lines), so it never adds a line.

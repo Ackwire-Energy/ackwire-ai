@@ -436,12 +436,16 @@ function nextAudience(
   changed: boolean,
   onlyOwner: boolean | undefined,
 ): { base: AgentAudience; to: AgentAudience } {
-  const base = changed && isComputerBrain(brain) ? OWNER_ONLY : audienceOf(agent);
+  const current = audienceOf(agent);
+  // One that already answers its owner alone keeps its mode: "Só algumas pessoas" with nobody picked stays that.
+  const narrow = (a: AgentAudience) => (answersOthers(a, agent.ownerUserId) ? OWNER_ONLY : a);
+  const base = changed && isComputerBrain(brain) ? narrow(current) : current;
   if (onlyOwner === undefined) return { base, to: base };
-  if (onlyOwner) return { base, to: OWNER_ONLY };
+  if (onlyOwner) return { base, to: narrow(base) };
   if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
-  // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only.
-  const kept = agent.audienceUserIds.length > 0;
+  // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only. One a person
+  // restricted ("Só algumas pessoas", even with nobody picked yet) stays restricted: never everyone.
+  const kept = agent.audienceUserIds.length > 0 || agent.audienceMode === "people";
   return { base, to: kept ? { mode: "people", userIds: agent.audienceUserIds } : EVERYONE };
 }
 

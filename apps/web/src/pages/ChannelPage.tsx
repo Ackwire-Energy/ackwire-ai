@@ -90,6 +90,8 @@ import {
   isScrollUpKey,
   messageUsage,
   nearBottom,
+  type RunPosition,
+  runPosition,
   usageLine,
 } from "@agenteschat/client/lib/chat";
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
@@ -101,7 +103,7 @@ import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { mentionsHandle } from "@agenteschat/client/lib/markdown";
+import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
@@ -2333,8 +2335,11 @@ const Timeline = memo(function Timeline({
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
   const newestKey = items.findLast((i) => i.kind === "message")?.key;
-  for (const item of items) {
+  for (const [at, item] of items.entries()) {
     const grouped = item.kind === "message" && item.grouped && !afterUnshown();
+    const after = items[at + 1];
+    // Where it sits in its author's run: my own rows' bubbles square the corners they share.
+    const run = runPosition(grouped, after?.kind === "message" && after.grouped && !unshown.has(item.key));
     if (divider?.key === item.key) {
       rows.push(
         <div key="unread-divider" className="channel__unread" data-fade={divider.fading || undefined}>
@@ -2369,6 +2374,7 @@ const Timeline = memo(function Timeline({
           replyContext={item.context}
           lastOfRun={lastByRun.get(m.agentRunId) === item.key}
           latest={item.key === newestKey}
+          run={run}
         />
       ) : (
         <TimelineMessage
@@ -2384,6 +2390,7 @@ const Timeline = memo(function Timeline({
           seen={m.id === seenId}
           helping={m.agentRunId && !isMediaAfterReply(m.meta) ? consultGroups.helping.get(m.agentRunId) : undefined}
           latest={item.key === newestKey}
+          run={run}
         />
       ),
     );
@@ -2487,6 +2494,7 @@ function RunBlock({
   replyContext?: ReplyRef;
   lastOfRun?: boolean;
   latest?: boolean;
+  run?: RunPosition;
 }) {
   const run = useStreams((s) => (message ? undefined : s.runs[runId]));
   const last = useRef<LiveRun | undefined>(undefined);
@@ -3099,6 +3107,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   helping,
   readOnly = false,
   latest = true,
+  run = "solo",
 }: {
   message: MessageType;
   grouped: boolean;
@@ -3127,6 +3136,8 @@ export const TimelineMessage = memo(function TimelineMessage({
    * responder sem @"); older ones keep the check, with the same words in its popover.
    */
   latest?: boolean;
+  /** Its place in its author's run (`runPosition`): on my own rows, which bubble corners square off. */
+  run?: RunPosition;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -3163,7 +3174,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // An agent's message that mentions agents has one too: whom it handed work to, and who it only mentioned (ADR 0089).
   const receipted = (m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local;
   // Mine in a DM between people: the slot of their face, from the moment it is sent, so it never rewraps a line.
-  const seenSlot = dmPersonId !== undefined && m.author.type === "person" && m.author.id === me.user.id;
+  const own = m.author.type === "person" && m.author.id === me.user.id;
+  const seenSlot = dmPersonId !== undefined && own;
   const name = dir.authorName(m.author);
   // What a routine found, told by its agent (`meta.routine`): a tag that opens the routine, and the report
   // it answers on demand (that report's own line folds into this message).
@@ -3202,6 +3214,8 @@ export const TimelineMessage = memo(function TimelineMessage({
     [t, m.body, m.meta, i18n.language],
   );
   const body = reminderBody(stopped.body, m.meta);
+  // My own message with a code block or a table: the bubble takes the row's whole width.
+  const wide = useMemo(() => own && hasWideBlock(body), [own, body]);
   // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
   const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
   const atLimit = ended ? (ended.stuck === true ? "stuck" : "steps") : undefined;
@@ -3363,6 +3377,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               : undefined
       }
       grouped={grouped && !waiting}
+      own={own}
+      run={run}
       waiting={waiting}
       entering={entering && !replacesLive}
       streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
@@ -3370,6 +3386,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         local && `ac-msg--local ac-msg--${local}`,
         contextMark && "msg--context",
         mentionsMe && "ac-msg--mentions-me",
+        wide && "ac-msg--wide",
       )}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}

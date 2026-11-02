@@ -5765,6 +5765,7 @@ export const en: Translations = {
       backOnApi: "{{name}} is back on the API and still answers only you.",
       letEveryone: "Let {{pronoun}} answer everyone",
       letPeople: "Let {{pronoun}} answer other people",
+      pickPeople: "{{name}} answers only the people picked, and nobody is picked yet. Pick them under Who can talk.",
     },
     errors: {
       planOwnerOnly:
@@ -5880,6 +5881,8 @@ export const en: Translations = {
     },
     people: "People",
     ownerAlways: "{{name}} always can, as the owner.",
+    onlyYouForNow: "Only you, for now",
+    onlyOwnerForNow: "Only {{name}}, for now",
     search: "Search people",
     noMatch: "No one with that name.",
     pickSomeone: "Pick at least one person.",
