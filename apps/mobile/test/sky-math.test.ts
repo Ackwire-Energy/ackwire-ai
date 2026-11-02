@@ -146,7 +146,7 @@ test("the header pill: sky only at its right end; working, a sweep that crosses 
   // Working: the band's center starts off the left edge and reaches the middle ~1.9 s later, every 3.8 s.
   expect(pillWorkField(0.5, 0, 0.8 / 0.42, 0, 0)).toBeGreaterThan(pillWorkField(0.5, 0, 0, 0, 0));
   expect(pillWorkField(0.4, 0, 1.6 / 0.42, 0, 0)).toBeCloseTo(pillWorkField(0.4, 0, 0, 0, 0), 1);
-  expect(shaderSource("pillwork")).toContain("mod(t * 0.42, 1.6) - 0.3");
+  expect(shaderSource("pill")).toContain("mod(t * 0.42, 1.6) - 0.3");
   // Over glass the lowest tone is see-through.
   expect(shaderSource("pill")).toContain("if (clear > 0.5 && idx < 0.5) return half4(0.0);");
 });
