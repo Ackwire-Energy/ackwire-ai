@@ -173,6 +173,8 @@ export interface CustomServerView {
   via?: "composio";
   /** `needs_reconnect`: its Composio account stopped working, and it has no tools until Reconectar. */
   status: "active" | "needs_reconnect";
+  /** Why its tools couldn't be read the last time we asked (short, the server's or the SDK's words); null when read. */
+  toolsError: string | null;
   tools: CustomToolView[];
   reviewedAt: string | null;
   createdAt: string;
@@ -192,6 +194,7 @@ export interface CustomDeps extends McpOAuthDeps {
   judge?: Judge;
   /** Where servers' icons are kept (the platform store); none: no icons. */
   blobs?: BlobStore;
+  log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
 const aadFor = (orgId: string, id: string) => `connector-connection|${orgId}|${id}`;
@@ -251,6 +254,7 @@ function view(c: ConnectorConnection, tools: ToolRow[]): CustomServerView {
     iconUrl: c.icon,
     ...(composioToolkitOf(c.serverUrl) ? { via: "composio" as const } : {}),
     status: c.status === "needs_reconnect" ? "needs_reconnect" : "active",
+    toolsError: c.status === "needs_reconnect" ? null : c.lastError,
     tools: mine.map((t) => toolView(t, prefix)),
     reviewedAt: c.reviewedAt ? c.reviewedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),
@@ -587,6 +591,9 @@ async function keepAccount(db: Database, c: ConnectorConnection, account: Provid
   caches.connections.delete(`${c.orgId}:active`);
 }
 
+/** The server couldn't be reached or its tools couldn't be listed; the reason is kept as the server's `toolsError`. */
+export class ToolsUnreadable extends Error {}
+
 /**
  * Lists the server's tools again: new ones come in unclassified (hidden from
  * agents until an admin classifies them), gone ones are marked removed. Each
@@ -595,20 +602,31 @@ async function keepAccount(db: Database, c: ConnectorConnection, account: Provid
  * can't stay free: its read/write decision becomes approval.
  */
 export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) {
-  if (!deps.connect) throw new Error("no MCP connect configured");
-  const session = await deps.connect(c, await connectionHeaders(deps, c));
   const preset = presetForServer(c.serverUrl);
   let listed: McpTool[];
   let info: McpServerInfo | null = null;
   let account: ProviderAccount | null = null;
   try {
-    listed = await session.listTools();
-    info = session.serverInfo?.() ?? null;
-    if (listed.some((t) => t.name === preset?.account?.tool)) {
-      account = await askAccount(session, preset?.account).catch(() => null);
+    if (!deps.connect) throw new Error("no MCP connect configured");
+    const session = await deps.connect(c, await connectionHeaders(deps, c));
+    try {
+      listed = await session.listTools();
+      info = session.serverInfo?.() ?? null;
+      if (listed.some((t) => t.name === preset?.account?.tool)) {
+        account = await askAccount(session, preset?.account).catch(() => null);
+      }
+    } finally {
+      await session.close().catch(() => {});
     }
-  } finally {
-    await session.close().catch(() => {});
+  } catch (error) {
+    const reason = oneLine(error instanceof Error ? error.message : String(error), 200) || "failed";
+    deps.log?.warn("custom connector tools unreadable", { orgId: c.orgId, connectionId: c.id, reason });
+    // A Composio account marked to reconnect keeps its own reason.
+    await deps.db
+      .update(connectorConnections)
+      .set({ lastError: reason })
+      .where(and(eq(connectorConnections.id, c.id), eq(connectorConnections.status, "active")));
+    throw new ToolsUnreadable(reason, { cause: error });
   }
   if (account) await keepAccount(deps.db, c, account);
   if (!composioServiceOf(c.serverUrl)) await seedToolPins(deps.db, c, listed);
@@ -675,7 +693,10 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
   if (gone.length > 0) {
     await deps.db.update(customTools).set({ removedAt: new Date() }).where(inArray(customTools.id, gone));
   }
-  await deps.db.update(connectorConnections).set({ updatedAt: new Date() }).where(eq(connectorConnections.id, c.id));
+  await deps.db
+    .update(connectorConnections)
+    .set({ updatedAt: new Date(), ...(c.status === "needs_reconnect" ? {} : { lastError: null }) })
+    .where(eq(connectorConnections.id, c.id));
   caches.connections.delete(`${c.orgId}:active`);
   await refreshServerIcon(deps, c, info).catch(() => {});
 }
@@ -819,7 +840,10 @@ export async function beginMcpOAuth(
 export async function refreshCustomServer(deps: CustomDeps, actorId: string, orgId: string, id: string) {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const c = await loadCustom(deps.db, orgId, id);
-  await syncCustomTools(deps, c);
+  // A server that can't be read comes back with `toolsError`, for the apps to say why and offer to try again.
+  await syncCustomTools(deps, c).catch((error) => {
+    if (!(error instanceof ToolsUnreadable)) throw error;
+  });
   return serverView(deps.db, c.orgId, c.id);
 }
 

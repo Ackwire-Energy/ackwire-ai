@@ -21548,6 +21548,9 @@
   "toolReview.noTools": {
     "value": "The server didn't offer any tools."
   },
+  "toolReview.unreadable": {
+    "value": "Couldn't read this server's tools: {{reason}}"
+  },
   "toolReview.refresh": {
     "value": "Look for new tools"
   },

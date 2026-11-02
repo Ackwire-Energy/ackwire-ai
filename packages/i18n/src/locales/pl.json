@@ -9484,6 +9484,7 @@
     "clearSearch": "Wyczyść wyszukiwanie",
     "noMatch": "Nic nie znaleziono dla „{{q}}”.",
     "noTools": "Serwer nie udostępnił żadnych narzędzi.",
+    "unreadable": "Nie udało się odczytać narzędzi tego serwera: {{reason}}",
     "refresh": "Poszukaj nowych narzędzi",
     "decideTitle": "Potrzebna twoja decyzja · {{count}}",
     "decideHelp": "Ich nazwy nie mówią, co robią. Potwierdź sugestię albo wybierz inną.",
