@@ -39,7 +39,14 @@ import {
 import { ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
-import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
+import {
+  claudeMcpConfig,
+  claudePermissionSettings,
+  type McpTaskInfo,
+  missionBranchPrefix,
+  newMcpToken,
+  redactDeep,
+} from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
 import { resetIso } from "./plan-usage";
 import type { Spawn } from "./scope-gate";
@@ -922,7 +929,7 @@ export function runTurnOnProcess(
         return {
           ...e,
           ...(e.executed ? { executed: { ...e.executed, content: redact(e.executed.content) } } : {}),
-          input: JSON.parse(redact(JSON.stringify(e.input ?? {}))) as unknown,
+          input: redactDeep(e.input ?? {}, redact),
         };
       }
       if (e.type === "done") return { ...e, text: redact(e.text) };

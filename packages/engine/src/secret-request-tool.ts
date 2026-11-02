@@ -1,7 +1,7 @@
 import { isReservedSecretName } from "@agenteschat/adapters";
 import { and, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
-import type { ComputerHandle } from "./sandbox";
+import { type ComputerHandle, requireComputerManager } from "./sandbox";
 import { MAX_PENDING_SECRETS, REQUEST_SECRET_TOOL, requesterOfRun, SECRET_TTL_MS, secretOnComputer } from "./secrets";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
@@ -19,7 +19,7 @@ export function secretSite(raw: string): string | null {
 
 /** Asking again under a held name is how a refused key gets replaced: the newest delivery wins on the computer. */
 const AGAIN =
-  "If a key you were given is refused (401, 403, invalid or expired), ask once for a new one under the same `name`, with a `purpose` that says in one line what failed: it replaces the old one.";
+  "If a key you were given is refused (a 401, or a 403 saying the key is invalid or expired), first check you sent it as the API's docs say (header, prefix, test or live address); if you did, ask once for a new one under the same `name`, with a `purpose` that says in one line, in the person's language, what failed: it replaces the old one. If the new one is refused too, don't ask again: say what failed and stop.";
 
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -123,12 +123,15 @@ export function requestSecretTool(opts: {
           return { content: `At most ${MAX_PENDING_SECRETS} secret requests at a time.`, isError: true };
         }
         const row = await opts.onComputer(ctx, async (computer) => {
-          const id = Bun.randomUUIDv7();
-          const { publicKey, sites } = await secretOnComputer(computer, { action: "keypair", requestId: id });
-          if (!publicKey) throw new Error("the computer made no key");
           const [held] = await ctx.db
-            .select({ id: schema.secretRequests.id })
+            .select({
+              runId: schema.secretRequests.runId,
+              replaces: schema.secretRequests.replaces,
+              givenBy: schema.secretRequests.requestedForUserId,
+              giver: schema.users.name,
+            })
             .from(schema.secretRequests)
+            .leftJoin(schema.users, eq(schema.users.id, schema.secretRequests.requestedForUserId))
             .where(
               and(
                 eq(schema.secretRequests.orgId, ctx.orgId),
@@ -140,6 +143,29 @@ export function requestSecretTool(opts: {
               ),
             )
             .limit(1);
+          // The replacement this run asked for was refused too: a second one would only loop.
+          if (held?.replaces && held.runId === ctx.runId) {
+            return {
+              refused: `The ${name} you were just given was refused too. Don't ask for it again: say in one line what failed and stop.`,
+            };
+          }
+          // A key is shared by every run of the agent: only its giver, the agent's owner or an admin swaps it.
+          if (
+            held &&
+            held.givenBy !== requester &&
+            !(await requireComputerManager(ctx.db, requester, ctx.orgId, ctx.agentId).then(
+              () => true,
+              () => false,
+            ))
+          ) {
+            const giver = held.giver ?? "the person who gave it";
+            return {
+              refused: `${name} was given by ${giver}; only ${giver}, your owner or an admin can replace it. Don't ask for it: say in the conversation what failed with it and that ${giver} gave it.`,
+            };
+          }
+          const id = Bun.randomUUIDv7();
+          const { publicKey, sites } = await secretOnComputer(computer, { action: "keypair", requestId: id });
+          if (!publicKey) throw new Error("the computer made no key");
           // A site's password is for the browser alone where the runner keeps it so; an older one gets a variable.
           const kind = file ? "file" : origin && sites === true ? "site" : "env";
           const [inserted] = await ctx.db
@@ -180,6 +206,7 @@ export function requestSecretTool(opts: {
           });
           return inserted;
         });
+        if ("refused" in row) return { content: row.refused, isError: true };
         return { content: "", waitForSecret: { requestId: row.id } };
       } catch (error) {
         return failed(error);

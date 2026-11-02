@@ -1092,7 +1092,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
   });
 
-  test("a refused key is asked for again under the same name: the card says it replaces the held one, and none of it reaches the model", async () => {
+  test("a refused key is asked for again under the same name, by its giver or the owner, once: the card says it replaces the held one, and none of it reaches the model", async () => {
     const OLD = "tsk_old_key_value_000000000";
     const NEW = "tsk_new_key_value_111111111";
     const asks: Record<string, unknown>[] = [];
@@ -1106,24 +1106,25 @@ describe("secrets for a connected machine (ADR 0027)", () => {
           asks.push(input);
           return { chunks: [""], toolUses: [{ name: "request_secret", input }] };
         };
+        const list = () => ({
+          chunks: [""],
+          toolUses: [
+            {
+              name: "run_code",
+              input: {
+                language: "bash",
+                code: 'curl -s -H "Authorization: Bearer $TYPESAFE_API_KEY" https://api.typesafe.example/v1/items',
+              },
+            },
+          ],
+        });
         if (last.includes("401 Unauthorized"))
           return ask("A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?");
+        // The replacement arrived: try the call again.
+        if (last.includes("replacing the one you had")) return list();
         if (last.includes("tool_result")) return { chunks: ["Pronto."] };
         if (last.includes("conecta")) return ask("acessar a API do Typesafe");
-        if (last.includes("lista")) {
-          return {
-            chunks: [""],
-            toolUses: [
-              {
-                name: "run_code",
-                input: {
-                  language: "bash",
-                  code: 'curl -s -H "Authorization: Bearer $TYPESAFE_API_KEY" https://api.typesafe.example/v1/items',
-                },
-              },
-            ],
-          };
-        }
+        if (last.includes("lista")) return list();
         return { chunks: ["ok"] };
       },
     });
@@ -1139,8 +1140,8 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     await runner.hello(paired.token);
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
-    const say = async (body: string) => {
-      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+    const say = async (body: string, by = f.owner.id) => {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, by, f.org.id, f.general.id, { body });
       await drainOutbox(f.db, f.handlers);
     };
     const give = async (value: string) => {
@@ -1165,16 +1166,37 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(request?.tools?.find((t) => t.name === "request_secret")?.description).toContain(
       "ask once for a new one under the same `name`",
     );
+    const toolResults = async () =>
+      (await f.db.select().from(schema.agentRunSteps))
+        .filter((x) => x.kind === "tool_result")
+        .map((x) => (x.data as { content: string }).content);
 
-    // The key works: nothing is asked.
+    // The key works: nothing is asked. The agent knows the key by name from then on (never its value).
     api = "200";
     await say("@dev lista os itens");
     expect(asks).toHaveLength(1);
+    expect(systemText(f.provider.calls.at(-1)?.request.system ?? "")).toContain(
+      "# Your keys on your computer\nGiven to you through request_secret; use them by name, never print them: TYPESAFE_API_KEY (a variable).",
+    );
 
-    // The API refuses it: the agent asks once, under the same name, saying what failed.
+    // Refused while a member who didn't give it asked: the owner's key isn't swapped for the member's.
     api = "401";
-    await say("@dev lista os itens de novo");
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    await say("@dev lista os itens de novo", bia.id);
     expect(asks).toHaveLength(2);
+    expect(await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"))).toEqual(
+      [],
+    );
+    expect(await toolResults()).toContainEqual(
+      expect.stringContaining(
+        `TYPESAFE_API_KEY was given by ${f.owner.name}; only ${f.owner.name}, your owner or an admin can replace it.`,
+      ),
+    );
+
+    // Refused while its giver asked: the agent asks once, under the same name, saying what failed.
+    await say("@dev lista os itens de novo");
+    expect(asks).toHaveLength(3);
     const [again] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"));
     expect(again).toMatchObject({ name: "TYPESAFE_API_KEY", replaces: true });
     const [card] = await f.db
@@ -1187,17 +1209,21 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       replaces: true,
     });
 
-    // The new one replaces the old on the computer; the agent hears it did.
+    // The new one replaces the old on the computer; the agent hears it did and calls again.
     await give(NEW);
     expect(runner.secrets.get("TYPESAFE_API_KEY")).toBe(NEW);
     const [old] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, first.id));
     expect(old?.removedAt).not.toBeNull();
-    const results = (await f.db.select().from(schema.agentRunSteps))
-      .filter((x) => x.kind === "tool_result")
-      .map((x) => (x.data as { content: string }).content);
+    const results = await toolResults();
     expect(
       results.some((r) => r.includes("TYPESAFE_API_KEY was delivered to your computer, replacing the one you had")),
     ).toBe(true);
+    // The new one is refused too: a third ask in that run is refused, so the agent stops instead of looping.
+    expect(asks).toHaveLength(4);
+    expect(await f.db.select().from(schema.secretRequests)).toHaveLength(2);
+    expect(results).toContainEqual(
+      expect.stringContaining("The TYPESAFE_API_KEY you were just given was refused too. Don't ask for it again"),
+    );
 
     // Neither value ever reached the model or our database.
     const everything = JSON.stringify([

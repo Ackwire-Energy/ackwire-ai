@@ -2056,7 +2056,7 @@ export const en: Translations = {
     targetEnv: "Goes in as the variable {{name}} on {{agent}}'s computer.",
     targetFile: "Goes to the file {{path}} on {{agent}}'s computer.",
     targetSite: "Only {{agent}}'s browser types it, on {{host}}. It stays out of {{agent}}'s commands.",
-    replaces: "Replaces the one {{agent}} has now.",
+    replaces: "Replaces the key {{agent}} already has under this name.",
     label: "Value of {{name}}",
     private: "Sent encrypted straight to the computer. It stays out of the chat and away from the agent.",
     send: "Send",

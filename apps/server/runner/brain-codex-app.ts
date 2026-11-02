@@ -1042,24 +1042,30 @@ export class CodexAppServers implements CodexAppRunner {
       /** Answers of Codex turns that ended before the last one (an urgent message arrived as one completed). */
       const held: string[] = [];
       let buf = "";
+      /** Redacted text kept back from the last batch, so a value split between batches never leaves in pieces. */
+      let tail = "";
+      const hold = opts.redact ? Math.max(0, opts.redactHold ?? 0) : 0;
       let timer: ReturnType<typeof setTimeout> | null = null;
       /** Commands and changes Codex started (an approval names its item; a change's files are only here). */
       const items = new Map<string, Record<string, unknown>>();
       /** Approvals end with the turn: one still waiting for a person is refused then. */
       const approvals = new AbortController();
 
-      const flush = () => {
+      /** Sends the text so far; a batch (`whole` false) keeps back its last `hold` characters for the next one. */
+      const flush = (whole = true) => {
         if (timer) clearTimeout(timer);
         timer = null;
-        if (!buf) return;
-        const t = redact(buf);
+        if (!buf && !(whole && tail)) return;
+        const out = redact(tail + buf);
         buf = "";
-        opts.emit({ type: "text_delta", text: t });
+        const cut = whole ? out.length : Math.max(0, out.length - hold);
+        tail = out.slice(cut);
+        if (cut > 0) opts.emit({ type: "text_delta", text: out.slice(0, cut) });
       };
       const addText = (t: string) => {
         if (!t) return;
         buf += t;
-        if (!timer) timer = setTimeout(flush, deltaMs);
+        if (!timer) timer = setTimeout(() => flush(false), deltaMs);
       };
       const emit = (e: CodexBrainEvent) => {
         flush();
