@@ -8,11 +8,13 @@ import {
   createWikiPage,
   getWikiPage,
   recordWikiReads,
-  searchWiki,
+  searchWikiForRun,
   updateWikiPage,
   type WikiActor,
   type WikiDeps,
+  wikiPageHeld,
 } from "./wiki";
+import { RESTRICTED_HERE, sendHeldToDm } from "./wiki-dm";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const failed = (error: unknown): ToolOutput => ({
@@ -58,6 +60,14 @@ const wikiEdit = (
         after: { version: p.version },
       };
 
+const heldRun = (ctx: ToolContext) => ({
+  orgId: ctx.orgId,
+  agentId: ctx.agentId,
+  channelId: ctx.channelId,
+  runId: ctx.runId,
+  triggerMessageId: ctx.triggerMessageId,
+});
+
 /**
  * The org wiki for agents (ADR 0023): `search_wiki` and `read_wiki_page`
  * (`wiki:read`), `create_wiki_page`, `update_wiki_page` and `link_to_wiki`
@@ -87,14 +97,20 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
       },
       async execute(input, ctx) {
         try {
-          const pages = await searchWiki(wiki(ctx), await wikiActorOfCall(ctx), ctx.orgId, str(input.query), 8);
-          if (pages.length === 0) return { content: "No wiki pages match." };
+          const actor = await wikiActorOfCall(ctx);
+          const { pages, held } = await searchWikiForRun(wiki(ctx), actor, ctx.orgId, str(input.query), 8);
+          const note =
+            held && (await sendHeldToDm({ db: ctx.db, pubsub: deps.pubsub }, heldRun(ctx))) ? RESTRICTED_HERE : "";
+          if (pages.length === 0) return { content: note || "No wiki pages match." };
           return {
-            content: pages
-              .map(
+            content: [
+              note,
+              ...pages.map(
                 (p) =>
                   `- [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}): ${cutText(p.body.replace(/\s+/g, " "), 200)}`,
-              )
+              ),
+            ]
+              .filter(Boolean)
               .join("\n"),
           };
         } catch (error) {
@@ -114,7 +130,14 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
       },
       async execute(input, ctx) {
         try {
-          const p = await getWikiPage(ctx.db, await wikiActorOfCall(ctx), ctx.orgId, str(input.page));
+          const actor = await wikiActorOfCall(ctx);
+          if (
+            (await wikiPageHeld(ctx.db, actor, ctx.orgId, str(input.page))) &&
+            (await sendHeldToDm({ db: ctx.db, pubsub: deps.pubsub }, heldRun(ctx)))
+          ) {
+            return { content: RESTRICTED_HERE };
+          }
+          const p = await getWikiPage(ctx.db, actor, ctx.orgId, str(input.page));
           await recordWikiReads(ctx.db, {
             orgId: ctx.orgId,
             agentId: ctx.agentId,

@@ -86,7 +86,7 @@ describe("wiki pages limited to some agents", () => {
       text: "resuma [[Margens]]",
       reader: async () => agent(other.id),
     });
-    expect(off).toEqual({ text: "", pageIds: [] });
+    expect(off).toEqual({ text: "", pageIds: [], held: false });
   });
 
   test("search over everything drops what the run may not read", async () => {

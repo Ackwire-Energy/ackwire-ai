@@ -2430,7 +2430,7 @@ export async function createPageFromSource(
 export async function retrieveWikiForRun(
   deps: WikiDeps,
   input: { orgId: string; text: string; budgetChars?: number; reader: () => Promise<WikiActor> },
-): Promise<{ text: string; pageIds: string[] }> {
+): Promise<{ text: string; pageIds: string[]; held: boolean }> {
   const { db } = deps;
   const hasAny = (await caches.contextPresence.getOrLoad(`${input.orgId}:wiki`, async () => {
     const [row] = await db
@@ -2440,8 +2440,9 @@ export async function retrieveWikiForRun(
       .limit(1);
     return Boolean(row);
   })) as boolean;
-  if (!hasAny || !input.text.trim()) return { text: "", pageIds: [] };
+  if (!hasAny || !input.text.trim()) return { text: "", pageIds: [], held: false };
   const actor = await input.reader();
+  const wide = withoutConversation(actor);
   const linked = parseWikiLinks(input.text);
   const named = linked.length
     ? [
@@ -2458,17 +2459,22 @@ export async function retrieveWikiForRun(
     ? await db
         .select()
         .from(wikiPages)
-        .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt), visibleTo(actor)))
+        .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt), visibleTo(wide)))
     : [];
-  const found = await searchPages(deps, actor, input.orgId, input.text, 5).catch(() => [] as PageRow[]);
+  const hits = await searchPages(deps, wide, input.orgId, input.text, 5).catch(() => [] as PageRow[]);
+  const seen = await visibleIds(db, actor, [...new Set([...namedRows, ...hits].map((p) => p.id))]);
+  // What the message names, or the best match, kept from this conversation only: it goes to the person's DM.
+  const held = [...namedRows, ...hits.slice(0, 1)].some((p) => !seen.has(p.id));
+  const namedSeen = namedRows.filter((p) => seen.has(p.id));
+  const found = hits.filter((p) => seen.has(p.id));
   const budget = input.budgetChars ?? 6000;
   const lines: string[] = [];
   const ids: string[] = [];
   let used = 0;
   // Context on demand (ADR 0043): pages the message names and the best match go in (cut at `WIKI_PAGE_CHARS`);
   // the other matches only as an index line, read with read_wiki_page when the run needs them.
-  const full = new Set([...namedRows.map((p) => p.id), ...found.slice(0, 1).map((p) => p.id)]);
-  for (const p of [...namedRows, ...found]) {
+  const full = new Set([...namedSeen.map((p) => p.id), ...found.slice(0, 1).map((p) => p.id)]);
+  for (const p of [...namedSeen, ...found]) {
     if (ids.includes(p.id)) continue;
     const room = Math.min(full.has(p.id) ? WIKI_PAGE_CHARS : WIKI_INDEX_CHARS, budget - used);
     if (room < 120) break;
@@ -2481,7 +2487,36 @@ export async function retrieveWikiForRun(
     ids.push(p.id);
     used += text.length;
   }
-  return { text: lines.join("\n\n"), pageIds: ids };
+  return { text: lines.join("\n\n"), pageIds: ids, held };
+}
+
+/** The same reader away from any conversation: the agent and the person only. */
+const withoutConversation = (actor: WikiActor): WikiActor =>
+  actor.type === "agent" && actor.requestedByUserId ? { ...actor, channelId: null } : actor;
+
+/**
+ * Whether only the conversation keeps `actor` from this page: the agent and the person behind it may read it, the
+ * others there may not. Never says what the page is.
+ */
+export async function wikiPageHeld(db: Database, actor: WikiActor, orgId: string, ref: string) {
+  const row = await findAnyPage(db, orgId, ref).catch(() => null);
+  if (!row) return false;
+  return (
+    !(await visibleIds(db, actor, [row.id])).has(row.id) &&
+    (await visibleIds(db, withoutConversation(actor), [row.id])).has(row.id)
+  );
+}
+
+/** `searchWiki` for a run: what it may read, and whether the best match is kept from this conversation only. */
+export async function searchWikiForRun(deps: WikiDeps, actor: WikiActor, orgId: string, text: string, limit = 8) {
+  const hits = await searchWiki(deps, withoutConversation(actor), orgId, text, limit);
+  const seen = await visibleIds(
+    deps.db,
+    actor,
+    hits.map((p) => p.id),
+  );
+  const best = hits[0];
+  return { pages: hits.filter((p) => seen.has(p.id)), held: Boolean(best && !seen.has(best.id)) };
 }
 
 /** What a search over everything hands an agent: wiki hits only for pages this run may read. */

@@ -10,7 +10,9 @@ import {
   insertMessage,
   listWikiPages,
   NotFoundError,
+  openPersonAgentDm,
   parseWikiLinks,
+  RESTRICTED_HERE,
   recordWikiReads,
   removeMember,
   renameWikiPage,
@@ -29,7 +31,7 @@ import {
   wikiGraph,
   withWikiLinks,
 } from "../src";
-import { wikiPersonOf } from "../src/requester";
+import { personBehindCall, wikiPersonOf } from "../src/requester";
 import type { RoutineBrief } from "../src/routine-brief";
 import { addMember, adminRoleId, type Fixture, setup } from "./fixtures";
 
@@ -228,6 +230,71 @@ describe("agents with a restricted page", () => {
     expect((await inChannel()).pageIds).toContain(secret.id);
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
     expect((await inChannel()).pageIds).not.toContain(secret.id);
+  });
+
+  test("someone with access asking in an open channel gets it by DM; someone without gets nothing", async () => {
+    f = await setup({ wikiTools: true });
+    const deps = wikiDeps();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Margens", body: "Margem mínima de 40%." });
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", { roleIds: [], userIds: [ana.id] });
+    const askIn = async (userId: string): Promise<ToolContext> => {
+      const trigger = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId },
+        body: "@dev qual é a margem mínima?",
+      });
+      const [run] = await f.db
+        .insert(schema.agentRuns)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          channelId: f.general.id,
+          threadRootId: trigger.id,
+          triggerMessageId: trigger.id,
+          trigger: "mention",
+          hop: 0,
+        })
+        .returning();
+      return {
+        db: f.db,
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        runId: (run as { id: string }).id,
+        channelId: f.general.id,
+        threadRootId: trigger.id,
+        triggerMessageId: trigger.id,
+      };
+    };
+    const ctx = await askIn(ana.id);
+    const tools = await createWikiToolSource({ pubsub: f.pubsub, search: f.context }).tools(ctx);
+    const read = tools.find((t) => t.name === "read_wiki_page");
+    if (!read) throw new Error("read_wiki_page missing");
+    // In the open channel the run gets a line, no title and no text; the question goes to Ana's DM.
+    const here = await read.execute({ page: "margens" }, ctx);
+    expect(here.content).toBe(RESTRICTED_HERE);
+    expect(here.content).not.toContain("40%");
+    await read.execute({ page: "margens" }, ctx);
+    const dm = await openPersonAgentDm(f.db, f.org.id, ana.id, f.agent.id);
+    const notes = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm.id));
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.body).toContain("qual é a margem mínima?");
+    expect(notes[0]?.body).not.toContain("40%");
+    const [woken] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.channelId, dm.id));
+    expect(woken).toBeTruthy();
+    // That run acts for Ana, and there the page is there.
+    const inDm = { ...ctx, channelId: dm.id, runId: (woken as { id: string }).id };
+    expect(await personBehindCall(inDm)).toBe(ana.id);
+    expect((await read.execute({ page: "margens" }, inDm)).content).toContain("40%");
+    // Bia: no line, no DM, the page isn't there.
+    const hers = await askIn(bia.id);
+    const refused = await read.execute({ page: "margens" }, hers);
+    expect(refused.isError).toBe(true);
+    expect(refused.content).not.toBe(RESTRICTED_HERE);
+    const biaDm = await openPersonAgentDm(f.db, f.org.id, bia.id, f.agent.id);
+    expect(await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, biaDm.id))).toEqual([]);
   });
 
   test("the wiki tools act for the person behind the call, and the receipt leaves out the title", async () => {
