@@ -168,6 +168,9 @@ describe("a plan account's agents on the phone (Contas dos planos)", () => {
     expect(ascending(at(list, ["usageViews.thisMonth", "openAgentUsage(a.agentId)", "usageViews.moreAgents"]))).toBe(
       true,
     );
+    // "Usa agora" only for an agent using it now, never for the folded row.
+    expect(list).toContain("tokens(a.tokens, a.now)");
+    expect(list).toContain("tokens(shares.restTokens)");
     // The renewal moves under the list, once.
     const parts = source("../usage/parts.tsx");
     expect(

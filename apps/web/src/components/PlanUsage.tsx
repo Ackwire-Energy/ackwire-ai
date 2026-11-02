@@ -148,7 +148,8 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
   const percent = (share: number) => (window ? formatPercent(i18n.language, share) : "");
-  const tokens = (n: number) => (n > 0 ? formatTokensShort(t, i18n.language, n) : t("usageViews.usesNow"));
+  const tokens = (n: number, now = false) =>
+    n > 0 ? formatTokensShort(t, i18n.language, n) : now ? t("usageViews.usesNow") : "";
   return (
     <div className="plan-shares">
       <div className="plan-shares__head">
@@ -170,7 +171,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
             <AgentAvatar agentId={a.agentId} size="xs" name={name} />
             <b>{name}</b>
             <span>{percent(a.share)}</span>
-            <span>{tokens(a.tokens)}</span>
+            <span>{tokens(a.tokens, a.now)}</span>
           </Link>
         );
       })}

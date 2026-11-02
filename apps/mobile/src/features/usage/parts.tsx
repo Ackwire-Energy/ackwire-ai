@@ -73,10 +73,7 @@ export function Meter({
           {split.map((g) => (
             <View
               key={g.key}
-              style={[
-                styles.seg,
-                { width: `${Math.min(100, g.value)}%`, backgroundColor: scheme === "dark" ? g.light : g.deep },
-              ]}
+              style={{ width: `${Math.min(100, g.value)}%`, backgroundColor: scheme === "dark" ? g.light : g.deep }}
             />
           ))}
         </View>
@@ -380,7 +377,6 @@ const styles = StyleSheet.create({
   bar: { position: "absolute", top: 0, bottom: 0, left: 0, borderRadius: 3 },
   mark: { position: "absolute", top: 0, bottom: 0, width: 2, marginLeft: -1 },
   segs: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, flexDirection: "row", gap: 1 },
-  seg: { minWidth: 2 },
   meter: { gap: 10 },
   meterCompact: { gap: 4 },
   window: { gap: 4 },

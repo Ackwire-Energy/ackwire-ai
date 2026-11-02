@@ -233,9 +233,16 @@ export function partedUsage(
   };
 }
 
+/** How many agents an account's list shows before the rest fold into one row. */
+export const SHARES_SHOWN = 5;
+
+/** The rows a list shows before the fold; a single row left over shows as itself, its row costs the same. */
+const unfolded = <T>(rows: T[]) => (rows.length > SHARES_SHOWN + 1 ? rows.slice(0, SHARES_SHOWN) : rows);
+
 /**
- * An account's windows with the bar split by agent: each one's estimated part in its colours (`tone`: light, deep),
- * biggest first, the rest of the use plain. A window of unknown length has no parts.
+ * An account's windows with the bar split by agent: the biggest parts (as many as the list shows) each in its
+ * agent's colours (`tone`: light, deep), the rest of the use plain, so many small agents never fill more of the bar
+ * than they used. A window of unknown length has no parts.
  */
 export function splitUsage(
   usage: Omit<PlanUsage, "windows"> & { windows: PlanWindowParts[] },
@@ -247,7 +254,7 @@ export function splitUsage(
       agents && agents.length > 0
         ? {
             ...w,
-            segments: agents.map((a) => {
+            segments: unfolded([...agents].sort((a, b) => b.percent - a.percent)).map((a) => {
               const [light, deep] = tone(a.agentId);
               return { key: a.agentId, value: a.percent, light, deep };
             }),
@@ -256,9 +263,6 @@ export function splitUsage(
     ),
   };
 }
-
-/** How many agents an account's list shows before the rest fold into one row. */
-export const SHARES_SHOWN = 5;
 
 /**
  * An account's one list of agents: each one's estimated share of the window its bar splits (the week, else the
@@ -277,11 +281,11 @@ export function accountShares(account: Pick<PlanAccountUsage, "usage" | "agents"
     if (!rows.some((r) => r.agentId === a.agentId))
       rows.push({ agentId: a.agentId, name: a.name, tokens: 0, now: false, share: a.percent });
   rows.sort((a, b) => b.share - a.share || b.tokens - a.tokens);
-  const fold = rows.length > SHARES_SHOWN + 1;
-  const rest = fold ? rows.slice(SHARES_SHOWN) : [];
+  const shown = unfolded(rows);
+  const rest = rows.slice(shown.length);
   return {
     window,
-    shown: fold ? rows.slice(0, SHARES_SHOWN) : rows,
+    shown,
     rest,
     restShare: rest.reduce((sum, r) => sum + r.share, 0),
     restTokens: rest.reduce((sum, r) => sum + r.tokens, 0),

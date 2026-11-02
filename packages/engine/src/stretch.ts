@@ -257,7 +257,8 @@ export interface StretchCard {
   /** The agents that stopped, in order. */
   agentIds: string[];
   /** What Continuar starts: each agent on the message that would have woken it (null: on this card). */
-  held: { agentId: string; messageId: string | null; trigger: RunTrigger }[];
+  /** `threadId` (when `messageId` is null): the thread of the card's channel it was held in (null: the timeline). */
+  held: { agentId: string; messageId: string | null; threadId?: string | null; trigger: RunTrigger }[];
   continuedByUserId: string | null;
   continuedAt: string | null;
 }
@@ -323,20 +324,28 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
   const { db } = deps;
   const behind = hold.messageId ?? (await runTriggerOf(db, orgId, hold.runId));
   const forUserId = behind ? await accountableFor(db, orgId, behind, hold.stretchId) : null;
-  const entry = { agentId: hold.agentId, messageId: hold.messageId, trigger: hold.trigger };
+  const entry = {
+    agentId: hold.agentId,
+    messageId: hold.messageId,
+    ...(hold.messageId ? {} : { threadId: hold.threadId }),
+    trigger: hold.trigger,
+  };
   const stopped = hold.stoppedAgentId ?? hold.agentId;
   const card = await db.transaction(async (tx) => {
     await lockCard(tx, hold.stretchId);
-    // Where it can wait: this hold's channel, or one the stretch's runs work in (by their index, not the meta).
+    // Where it can wait: this hold's channel, or one the stretch's runs work in (by their index, not the meta). A
+    // wake-up with no message starts on the card, so only a card in its own channel can hold it.
     const [open] = await tx
       .select()
       .from(messages)
       .where(
         and(
           eq(messages.orgId, orgId),
-          sql`(${messages.channelId} = ${hold.channelId}::uuid or ${messages.channelId} in (
+          hold.messageId
+            ? sql`(${messages.channelId} = ${hold.channelId}::uuid or ${messages.channelId} in (
             select distinct ${agentRuns.channelId} from ${agentRuns}
-            where ${agentRuns.orgId} = ${orgId}::uuid and ${agentRuns.stretchId} = ${hold.stretchId}::uuid))`,
+            where ${agentRuns.orgId} = ${orgId}::uuid and ${agentRuns.stretchId} = ${hold.stretchId}::uuid))`
+            : eq(messages.channelId, hold.channelId),
           gt(messages.createdAt, new Date(Date.now() - 7 * 86_400_000)),
           isNull(messages.deletedAt),
           sql`${messages.meta}->'actionCard'->>'kind' = 'stretch_paused'`,
@@ -352,7 +361,12 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
           ...was,
           ...(was.reason === "spend" && hold.stop.reason === "runs" ? { reason: "runs", limit: hold.stop.limit } : {}),
           agentIds: was.agentIds.includes(stopped) ? was.agentIds : [...was.agentIds, stopped],
-          held: was.held.some((h) => h.agentId === entry.agentId && h.messageId === entry.messageId)
+          held: was.held.some(
+            (h) =>
+              h.agentId === entry.agentId &&
+              h.messageId === entry.messageId &&
+              (h.threadId ?? null) === (entry.threadId ?? null),
+          )
             ? was.held
             : [...was.held, entry],
         }
@@ -473,7 +487,12 @@ export async function continueStretch(
     const runs: AgentRun[] = [];
     const started: { agentId: string; runId: string }[] = [];
     for (const h of next.held) {
-      const trigger = h.messageId ? await getMessage(tx, message.orgId, h.messageId) : row;
+      // No message: on the card, in the thread it was held in (the card may wait in another one).
+      const trigger = h.messageId
+        ? await getMessage(tx, message.orgId, h.messageId)
+        : h.threadId === undefined
+          ? row
+          : { ...row, threadId: h.threadId };
       if (!trigger || trigger.deletedAt) continue;
       const [active] = await eligibleChannelAgents(tx, message.orgId, trigger.channelId, [h.agentId]);
       if (!active) continue;

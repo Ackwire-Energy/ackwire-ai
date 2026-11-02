@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { and, asc, eq, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, inArray, schema, sql } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   answerNow,
@@ -589,11 +589,24 @@ test("one card per stretch: Ada's refused tool in her long work's thread joins t
     agentIds: [ada.id],
     held: [
       { agentId: ada.id, messageId: handOff.id },
-      { agentId: ada.id, messageId: null },
+      { agentId: ada.id, messageId: null, threadId: anchor.id },
     ],
   });
   expect(card.body).toBe("Ada paused to check with you before going on.");
   expect(card.meta.bodyParams).toEqual({ agents: "Ada", count: 1 });
+  // Continuar: the hand-off on the timeline, and her refused work back in her thread, not under the card.
+  await withMicroseconds(f, card.id);
+  const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
+  const started = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(
+      inArray(
+        schema.agentRuns.id,
+        go.runs.map((r) => r.runId),
+      ),
+    );
+  expect(started.map((r) => r.threadRootId).sort()).toEqual([handOff.id, anchor.id].sort());
 });
 
 test("Continuar starts every wake-up the card holds, also one held there after the card was read", async () => {

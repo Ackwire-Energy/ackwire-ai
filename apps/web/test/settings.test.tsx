@@ -650,7 +650,8 @@ describe("a plan account's agents (Contas dos planos)", () => {
     const plans = screen().getByRole("region", { name: "Contas dos planos" });
     const week = within(plans).getByRole("meter", { name: "Semana" });
     const segs = [...week.querySelectorAll<HTMLElement>(".ac-meter__seg")];
-    expect(segs.map((s) => s.style.width)).toEqual(["30%", "11%", "2%", "1.5%", "1.2%", "0.9%", "0.6%"]);
+    // Colours only for the agents the list shows: the folded ones stay the plain use under them.
+    expect(segs.map((s) => s.style.width)).toEqual(["30%", "11%", "2%", "1.5%", "1.2%"]);
     expect(segs.every((s) => s.style.getPropertyValue("--seg-deep").startsWith("#"))).toBe(true);
     // The total stays at the bar's right.
     expect(plans.textContent).toContain("Semana41%");

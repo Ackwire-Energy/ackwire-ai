@@ -5,6 +5,7 @@ import {
   accountShares,
   ownPlanLines,
   planMeterText,
+  SHARES_SHOWN,
   splitUsage,
   usageShown,
   workspaceUsesApi,
@@ -277,6 +278,11 @@ describe("a plan account's agents in one list, its bar split by agent (Contas do
     expect([shares.restShare, shares.restTokens]).toEqual([3, 13_000]);
   });
 
+  test("an agent in the week's parts but not this month's (last month, or archived) has no tokens and is not using it now", () => {
+    const shares = accountShares(account({ agents: account().agents.filter((a) => a.agentId !== "ada") }), NOW);
+    expect(shares.shown[0]).toMatchObject({ agentId: "ada", share: 7, tokens: 0, now: false });
+  });
+
   test("one agent over five shows as itself; no week, the first window with parts; renewed, no shares", () => {
     const six = account({ agents: account().agents.slice(0, 6) });
     six.usage?.windows[1]?.agents?.splice(6);
@@ -307,7 +313,22 @@ describe("a plan account's agents in one list, its bar split by agent (Contas do
       (id) => [`#light-${id}`, `#deep-${id}`],
     );
     expect(split.windows[0]?.segments).toEqual([{ key: "bia", value: 9, light: "#light-bia", deep: "#deep-bia" }]);
-    expect(split.windows[1]?.segments?.map((g) => g.key)).toEqual(crew);
+    expect(split.windows[1]?.segments?.map((g) => g.key)).toEqual(crew.slice(0, SHARES_SHOWN));
     expect(split.windows[2]).toEqual({ kind: "monthly", usedPercent: 3 });
+  });
+
+  test("15 small agents on a week at 3%: colours only for the ones the list shows, never more than the use", () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({ agentId: `a${i}`, name: `A${i}`, percent: 0.2 }));
+    const split = splitUsage(
+      {
+        source: "turn",
+        at: "2026-11-02T11:59:00.000Z",
+        windows: [{ kind: "seven_day", usedPercent: 3, agents: many }],
+      },
+      () => ["#light", "#deep"],
+    );
+    const segments = split.windows[0]?.segments ?? [];
+    expect(segments).toHaveLength(SHARES_SHOWN);
+    expect(segments.reduce((sum, g) => sum + g.value, 0)).toBeLessThanOrEqual(3);
   });
 });

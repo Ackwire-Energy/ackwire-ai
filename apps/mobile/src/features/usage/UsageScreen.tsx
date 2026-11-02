@@ -188,7 +188,8 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
   const c = useColors();
   const [open, setOpen] = useState(false);
   const percent = (share: number) => (window ? formatPercent(i18n.language, share) : "");
-  const tokens = (n: number) => (n > 0 ? formatTokensShort(t, i18n.language, n) : t("usageViews.usesNow"));
+  const tokens = (n: number, now = false) =>
+    n > 0 ? formatTokensShort(t, i18n.language, n) : now ? t("usageViews.usesNow") : "";
   const divided = { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth };
   return (
     <View>
@@ -217,7 +218,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
             {percent(a.share)}
           </Text>
           <Text variant="small" tone="muted" style={styles.shareTokens}>
-            {tokens(a.tokens)}
+            {tokens(a.tokens, a.now)}
           </Text>
         </Pressable>
       ))}

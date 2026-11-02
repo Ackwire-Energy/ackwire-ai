@@ -2212,7 +2212,6 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 }
 .ac-meter__seg {
   flex: none;
-  min-width: 2px;
   background: var(--seg-deep);
 }
 [data-theme="dark"] .ac-meter__seg {
