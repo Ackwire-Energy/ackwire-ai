@@ -514,6 +514,11 @@ export interface Agent {
   audienceMode?: AudienceMode;
   /** Whether I can talk to it (absent = yes). */
   canTalk?: boolean;
+  /**
+   * Whether I see how it works (its owner, who manages agents, whoever it answers); absent = yes (an older server).
+   * Without it `instructions` is empty and its tools, memory, usage and activity are refused: only its public card.
+   */
+  seesDetails?: boolean;
   /** Its look (color, eyes, accessory), from the backend's allow-list. */
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
@@ -562,6 +567,8 @@ export interface TeamAgent {
   /** Working on something right now. */
   busy: boolean;
   canTalk: boolean;
+  /** Whether I see how it works (absent = yes); without it `capabilities` is empty. */
+  seesDetails?: boolean;
 }
 
 /** One agent asked another (`ask_agent`); the question itself stays private. */

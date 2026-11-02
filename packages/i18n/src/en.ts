@@ -2021,6 +2021,10 @@ export const en = {
     budgetUsed: "{{percent}} of the budget used this month",
     spendLabel: "Budget used this month",
     former: "No longer in this workspace",
+    askAccess: "Ask for access",
+    detailsHiddenTitle: "How it works",
+    detailsHidden:
+      "Only the people {{name}} answers, its owner and admins see its instructions, tools, memory and usage.",
   },
   presence: {
     online: "Online",

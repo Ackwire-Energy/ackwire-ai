@@ -2003,7 +2003,10 @@
     "can": "可以",
     "budgetUsed": "本月已用预算的 {{percent}}",
     "spendLabel": "本月已用预算",
-    "former": "已不在此工作区"
+    "former": "已不在此工作区",
+    "askAccess": "申请访问",
+    "detailsHiddenTitle": "工作方式",
+    "detailsHidden": "只有 {{name}} 回复的人、负责人和管理员能看到它的指令、工具、记忆和用量。"
   },
   "presence": {
     "online": "在线",

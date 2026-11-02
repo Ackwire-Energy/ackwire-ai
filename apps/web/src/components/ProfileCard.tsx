@@ -1,6 +1,6 @@
 import type { Actor, Agent } from "@agenteschat/client";
 import { useAgentDetail, useModels, usePeople, useRoles, useSettings } from "@agenteschat/client";
-import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
+import { audienceNotice, audienceSummary, canTalk, modeOf, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { clockHour, formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -22,6 +22,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
+import { AskAccessButton } from "@/pages/agent/PublicCard";
 import { useAgentMenu, usePersonMenu } from "./entity-menus";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
@@ -219,6 +220,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const models = useModels();
   const openPanel = useOpenAgentPanel();
   const seesSpend = can(org, "view_usage") || agent.ownerUserId === me.user.id;
+  const details = seesDetails(agent);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
   const model = isAuto(agent.model)
     ? t("brain.auto.label")
@@ -277,28 +279,36 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             <dd>{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</dd>
           </>
         )}
-        <dt>{t("profile.model")}</dt>
-        <dd>
-          {thinks ? (
-            <span className="profile-card__brain ac-iconline">
-              {thinks.mark && <ProviderLogo id={thinks.mark} size="xs" />}
-              {thinks.text}
-            </span>
-          ) : (
-            shortModel(model)
-          )}
-        </dd>
+        {details && (
+          <>
+            <dt>{t("profile.model")}</dt>
+            <dd>
+              {thinks ? (
+                <span className="profile-card__brain ac-iconline">
+                  {thinks.mark && <ProviderLogo id={thinks.mark} size="xs" />}
+                  {thinks.text}
+                </span>
+              ) : (
+                shortModel(model)
+              )}
+            </dd>
+          </>
+        )}
       </dl>
-      {seesSpend && <Spend agent={agent} locale={i18n.language} />}
+      {seesSpend && details && <Spend agent={agent} locale={i18n.language} />}
       {!canTalk(agent) && (
         <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</p>
       )}
       <div className="profile-card__actions">
-        <Button asChild size="sm" variant="primary">
-          <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-            {t("profile.dm")}
-          </Link>
-        </Button>
+        {canTalk(agent) || details ? (
+          <Button asChild size="sm" variant="primary">
+            <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+              {t("profile.dm")}
+            </Link>
+          </Button>
+        ) : (
+          <AskAccessButton agent={agent} />
+        )}
         {/* In a conversation, its page opens in the panel beside it; elsewhere, the page. */}
         {openPanel ? (
           <Button

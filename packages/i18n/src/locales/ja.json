@@ -2001,7 +2001,10 @@
     "can": "できること",
     "budgetUsed": "今月の予算の{{percent}}を使用",
     "spendLabel": "今月の予算使用量",
-    "former": "このワークスペースのメンバーではなくなりました"
+    "former": "このワークスペースのメンバーではなくなりました",
+    "askAccess": "アクセスをリクエスト",
+    "detailsHiddenTitle": "仕組み",
+    "detailsHidden": "{{name}}の指示、ツール、メモリ、使用量を見られるのは、{{name}}が応答する人、担当者、管理者だけです。"
   },
   "presence": {
     "online": "オンライン",

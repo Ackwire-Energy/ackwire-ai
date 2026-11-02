@@ -1999,7 +1999,10 @@
     "can": "권한",
     "budgetUsed": "이번 달 예산의 {{percent}} 사용",
     "spendLabel": "이번 달 사용한 예산",
-    "former": "더 이상 이 워크스페이스에 없어요"
+    "former": "더 이상 이 워크스페이스에 없어요",
+    "askAccess": "접근 요청",
+    "detailsHiddenTitle": "작동 방식",
+    "detailsHidden": "{{name}}의 지침, 도구, 메모리, 사용량은 {{name}}이(가) 답하는 사람, 담당자, 관리자만 볼 수 있습니다."
   },
   "presence": {
     "online": "온라인",

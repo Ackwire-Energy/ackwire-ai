@@ -2195,7 +2195,10 @@
     "can": "Może",
     "budgetUsed": "{{percent}} budżetu wykorzystane w tym miesiącu",
     "spendLabel": "Budżet wykorzystany w tym miesiącu",
-    "former": "Nie należy już do tej przestrzeni roboczej"
+    "former": "Nie należy już do tej przestrzeni roboczej",
+    "askAccess": "Poproś o dostęp",
+    "detailsHiddenTitle": "Jak działa",
+    "detailsHidden": "Instrukcje, narzędzia, pamięć i użycie {{name}} widzą tylko osoby, którym {{name}} odpowiada, osoba odpowiedzialna i administratorzy."
   },
   "presence": {
     "online": "Online",

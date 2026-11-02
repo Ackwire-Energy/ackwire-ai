@@ -2071,7 +2071,10 @@
     "can": "Darf",
     "budgetUsed": "{{percent}} des Budgets diesen Monat verbraucht",
     "spendLabel": "Diesen Monat verbrauchtes Budget",
-    "former": "Nicht mehr in diesem Workspace"
+    "former": "Nicht mehr in diesem Workspace",
+    "askAccess": "Zugriff anfragen",
+    "detailsHiddenTitle": "Wie es arbeitet",
+    "detailsHidden": "Anweisungen, Tools, Gedächtnis und Nutzung von {{name}} sehen nur die Personen, denen {{name}} antwortet, die verantwortliche Person und Admins."
   },
   "presence": {
     "online": "Online",
