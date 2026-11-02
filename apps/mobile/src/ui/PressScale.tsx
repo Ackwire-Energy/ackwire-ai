@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { Pressable, type PressableProps, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
-import Animated, { type AnimatedStyle, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  type AnimatedStyle,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { useTheme } from "./theme";
 

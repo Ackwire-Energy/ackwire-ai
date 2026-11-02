@@ -48,18 +48,7 @@ import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { rgba } from "@/sky/math";
 import { TRACKPAD_SHADER } from "@/sky/shaders";
-import {
-  Button,
-  Glass,
-  haptics,
-  Icon,
-  IconButton,
-  PressScale,
-  Text,
-  useReducedMotion,
-  useTheme,
-  useToast,
-} from "@/ui";
+import { Button, Glass, haptics, Icon, IconButton, PressScale, Text, useReducedMotion, useTheme, useToast } from "@/ui";
 import { useInfoHint } from "@/ui/InfoHint";
 import { type LiveKey, stepText } from "../browser/logic";
 import { TypeBar } from "../browser/parts";
@@ -96,9 +85,9 @@ import {
   WHEEL_STEP,
   zoomCamera,
 } from "./screen-view";
-import { useSideways } from "./useSideways";
 import { type PadLesson, padLesson } from "./trackpad";
 import type { AgentComputerView } from "./useAgentComputer";
+import { useSideways } from "./useSideways";
 
 /** How long the screen may stay opening before it says it can't: a socket refused before it opens never closes with a code. */
 const STUCK_MS = 30_000;
@@ -568,7 +557,11 @@ export function AgentScreen({
   }));
   const ring = useAnimatedStyle(() => ({
     opacity: 1 - ringT.value,
-    transform: [{ translateX: ringX.value }, { translateY: ringY.value }, { scale: 1 + (RING_GROWTH - 1) * ringT.value }],
+    transform: [
+      { translateX: ringX.value },
+      { translateY: ringY.value },
+      { scale: 1 + (RING_GROWTH - 1) * ringT.value },
+    ],
   }));
 
   const onLayout = (e: LayoutChangeEvent) => {

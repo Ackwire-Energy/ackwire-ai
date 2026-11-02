@@ -97,17 +97,7 @@ describe("palettes", () => {
 });
 
 test("every shader declares the uniforms the component passes", () => {
-  for (const kind of [
-    "sky",
-    "computer",
-    "fuse",
-    "bar",
-    "track",
-    "sweep",
-    "pill",
-    "horizon",
-    "workspace",
-  ] as const) {
+  for (const kind of ["sky", "computer", "fuse", "bar", "track", "sweep", "pill", "horizon", "workspace"] as const) {
     const src = shaderSource(kind);
     for (const u of ["size", "px", "t", "last", "fade", "clear", "pal"])
       expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
