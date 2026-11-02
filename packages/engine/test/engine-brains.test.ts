@@ -54,6 +54,7 @@ import {
   sessionLostNote,
   type ToolSource,
 } from "../src";
+import { computerPrompt } from "../src/brains/prompt";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
@@ -354,6 +355,65 @@ test("computer sessions: the conversation's session goes on while recent and sma
   const plan = await resolveBrain({ db: f.db }, agent, routineRun, question.id, { fresh: true });
   expect(plan.session).toMatchObject({ resume: false, machineId });
   expect(plan.session?.id).not.toBe(seen[4]?.session?.id);
+});
+
+test("edited instructions or org context reach a kept-alive session's next turn: a fresh session with the conversation", async () => {
+  f = await setup();
+  await computerAgent(f, { instructions: "Never query the database." });
+  const systems: string[] = [];
+  const prompts: string[] = [];
+  const { brain, seen } = scriptedComputerBrain((_n, turn) => {
+    systems.push(turn.system);
+    prompts.push(computerPrompt(turn));
+    return [
+      { type: "usage", input: 40, output: 5, source: "plan", model: "claude-sonnet-5-5" },
+      { type: "done", text: "ok" },
+    ];
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const question = await post(f, "@dev quantos pedidos hoje?");
+  await drainOutbox(f.db, handlers);
+  const reply = async (body: string) => {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body,
+      threadId: question.id,
+    });
+    await drainOutbox(f.db, handlers);
+  };
+
+  // Nothing changed: the same session goes on.
+  await reply("@dev e ontem?");
+  expect(seen[1]?.session).toMatchObject({ id: seen[0]?.session?.id, resume: true });
+
+  await f.db
+    .update(schema.agents)
+    .set({ instructions: "You may query the orders database." })
+    .where(eq(schema.agents.id, f.agent.id));
+  await reply("@dev agora pode consultar?");
+  expect(seen[2]?.session?.resume).toBe(false);
+  expect(seen[2]?.session?.id).not.toBe(seen[1]?.session?.id);
+  expect(systems[2]).toContain("You may query the orders database.");
+  expect(systems[2]).not.toContain("Never query the database.");
+  // The new session reads the conversation so far.
+  expect(prompts[2]).toContain("The conversation so far");
+  expect(prompts[2]).toContain("quantos pedidos hoje?");
+
+  // And it goes on itself while nothing changes again.
+  await reply("@dev e amanhã?");
+  expect(seen[3]?.session).toMatchObject({ id: seen[2]?.session?.id, resume: true });
+
+  // The org's context is part of it too.
+  await f.db
+    .update(schema.organizations)
+    .set({ context: "We sell bikes." })
+    .where(eq(schema.organizations.id, f.org.id));
+  await reply("@dev e a loja?");
+  expect(seen[4]?.session?.resume).toBe(false);
+  expect(systems[4]).toContain("We sell bikes.");
 });
 
 test("a gated call through the bridge leaves the run waiting; the decision resumes the session with the result", async () => {

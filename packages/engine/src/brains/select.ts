@@ -459,7 +459,7 @@ async function sessionFor(
   run: AgentRun,
   kind: BrainKind,
   conversation: string,
-  options: { fresh?: boolean },
+  options: { fresh?: boolean; promptKey?: string },
   now: Date,
 ): Promise<{ id: string; resume: boolean }> {
   if (run.brainSessionId) {
@@ -478,6 +478,7 @@ async function sessionFor(
         // Qualified by hand: inside the subquery a bare "id" would be usage_records.id.
         input: sql<number>`coalesce((select max(u.input_tokens) from ${usageRecords} u
           where u.run_id = "agent_runs"."id" and u.provider = ${kind}), 0)`.mapWith(Number),
+        promptKey: sql<string | null>`${agentRuns.transcript}->>'promptKey'`,
       })
       .from(agentRuns)
       .where(
@@ -509,7 +510,10 @@ async function sessionFor(
     if (
       last?.sessionId &&
       now.getTime() - last.at.getTime() < SESSION_IDLE_MS &&
-      last.input < SESSION_MAX_INPUT_TOKENS
+      last.input < SESSION_MAX_INPUT_TOKENS &&
+      // A live session keeps the system prompt it started with: after an edit to the instructions (or anything
+      // else `promptKey` covers) a new one starts, with the conversation so far in its first prompt.
+      (options.promptKey === undefined || last.promptKey === options.promptKey)
     ) {
       id = last.sessionId;
     }
@@ -534,8 +538,11 @@ export async function resolveBrain(
   agent: Agent,
   run: AgentRun,
   conversation: string,
-  /** `fresh`: a new computer session whatever the conversation had (routine runs). */
-  options: { fresh?: boolean; now?: Date } = {},
+  /**
+   * `fresh`: a new computer session whatever the conversation had (routine runs). `promptKey`: the run's
+   * (`Transcript.promptKey`); the conversation's session is picked up only when it started with the same.
+   */
+  options: { fresh?: boolean; now?: Date; promptKey?: string } = {},
 ): Promise<BrainPlan> {
   const mission: MissionTurn | null = await missionTurnFor(deps.db, run).catch(() => null);
   const kind = brainFor(agent, run, mission);

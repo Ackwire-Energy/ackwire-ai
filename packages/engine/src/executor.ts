@@ -120,6 +120,7 @@ import {
   verdictRecord,
 } from "./continuation";
 import { modelInfoFor } from "./credentials";
+import { sha256 } from "./crypto";
 import { publishDelivery } from "./delivery";
 import { isAgentOnlyDm } from "./dms";
 import {
@@ -384,6 +385,8 @@ export interface Transcript {
   messages: ModelMessage[];
   /** Tools on demand (ADR 0043): the tool groups this run listed up front; absent = every tool. */
   toolGroups?: string[];
+  /** Hash of what its computer session's system prompt depends on (`RunContext.sessionPrompt`, granted scopes). */
+  promptKey?: string;
   /** "Automático": the model tier and effort chosen for this run; a resume thinks with the same. */
   autoModel?: AutoModelRecord;
   /** Assistant text before this index was already posted to the chat (or was history). */
@@ -1530,6 +1533,7 @@ async function executeRunInner(
       messages: context.messages,
       ...(toolChoice ? { toolGroups: toolChoice.groups } : {}),
       ...(tools.some((t) => t.name === PASS_TOOL) ? { passListed: true } : {}),
+      promptKey: sha256(JSON.stringify([...context.sessionPrompt, [...new Set(granted.map((t) => t.scope))].sort()])),
       postedUpTo: context.messages.length,
       postedCount: 0,
       deltaSeq: 0,
@@ -1861,6 +1865,7 @@ async function executeRunInner(
   brainPlan = await resolveBrain(deps, agent, run, replyThreadId ?? run.channelId, {
     // A routine's or any background run's work never continues a conversation's session, nor the other way.
     fresh: Boolean(viaRoutine) || run.background,
+    promptKey: transcript.promptKey,
   });
   // A conversation run that fell back to the model brain keeps it when it resumes (an approval, an answer):
   // its transcript is the model's, and the computer would start the task again from the trigger.
@@ -4399,6 +4404,7 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),
     ...(stopped.passListed ? { passListed: true } : {}),
     ...(stopped.autoModel ? { autoModel: stopped.autoModel } : {}),
+    ...(stopped.promptKey ? { promptKey: stopped.promptKey } : {}),
     // The person who wrote into the stopped run is still behind the work it goes on with (`authority.ts`).
     ...(stopped.steeredBy ? { steeredBy: stopped.steeredBy } : {}),
   };

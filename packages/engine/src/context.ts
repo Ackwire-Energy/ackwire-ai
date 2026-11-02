@@ -293,6 +293,11 @@ export interface RunContext {
   stats: { historyMessages: number; systemChars: number; truncated: boolean };
   /** The issue this run works on: its thread is this agent's work on it, or its trigger starts that work. */
   issueId: string | null;
+  /**
+   * What a computer brain's system prompt holds that only a setting changes (the org's context, the agent's
+   * name, role and instructions, its team and skills): a session started with other text isn't picked up again.
+   */
+  sessionPrompt: string[];
 }
 
 /**
@@ -885,6 +890,7 @@ export async function buildRunContext(
     messages: toTurns(history, agent.id, names, trigger.id, { canAddAgents: channel.kind === "channel" }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
+    sessionPrompt: [...system.filter((b) => b.cache).map((b) => b.text), team, JSON.stringify(options.skills ?? [])],
   };
 }
 
