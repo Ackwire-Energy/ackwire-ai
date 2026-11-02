@@ -58,6 +58,7 @@ test("a written status clears itself when its time is up", () => {
   expect(memberStatus({ statusText: null, statusEmoji: null, statusUntil: null }, now)).toBeNull();
 });
 
+// This can be the shard's first database: allow the PGlite template to finish migrating.
 test("a person sets and clears their availability and line; the workspace hears it", async () => {
   f = await setup();
   const bia = await addMember(f.db, f.org.id, "member", "bia");

@@ -28,6 +28,7 @@ import {
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
 
@@ -318,6 +319,7 @@ export const hidesBody = (m: Message) =>
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
       m.meta?.missionSetup ||
+      voiceOf(m.meta) ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );
 

@@ -1,9 +1,10 @@
-import { appendFileSync, chmodSync, readFileSync } from "node:fs";
+import { appendFileSync, chmodSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { isAgentUid } from "./config";
 import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
+import { validateNetworkMark } from "./network-mark";
 import { agentId8 } from "./paths";
 import {
   AGENT_RAM_ROOT,
@@ -31,6 +32,11 @@ export interface AgentUser {
   id: string;
   user: string;
   uid: number;
+  /** Supplied only by the root daemon, never persisted in the agent list. */
+  networkLauncher?: string;
+  /** Root-only routing configuration: also prevents acquiring network capabilities through file caps. */
+  networkMark?: number;
+  networkRevision?: number;
 }
 
 /** How root runs a command as an agent: `prefix` before the command, exactly `env`, in `home`. */
@@ -305,6 +311,7 @@ export function systemLauncher(
 ): Launcher {
   const home = agentHome(u.user);
   const runuser = ["/usr/sbin/runuser", "-u", u.user, "--"];
+  const command = [...networkPrefix(u), ...networkRestrictions(u), ...runuser];
   const env = {
     HOME: home,
     USER: u.user,
@@ -317,7 +324,7 @@ export function systemLauncher(
     ANDROID_ADB_SERVER_PORT: String(adbServerPort(u.uid)),
     GRADLE_OPTS,
   };
-  if (!systemd) return { prefix: runuser, env, home };
+  if (!systemd) return { prefix: command, env, home };
   return {
     prefix: [
       "/usr/bin/systemd-run",
@@ -339,15 +346,39 @@ export function systemLauncher(
       "--",
       "/bin/sh",
       "-c",
-      PRIVATE_TMP,
+      // A configured isolation policy gets a fresh private proc instance, never a host remount.
+      u.networkLauncher || u.networkMark || u.networkRevision
+        ? `set -e\n/usr/bin/mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc\n${PRIVATE_TMP}`
+        : PRIVATE_TMP,
       "sh",
       String(u.uid),
-      ...runuser,
+      ...command,
     ],
     env,
     home,
     tmp: agentTmp(u.uid),
   };
+}
+
+/** Root executes this hook before dropping privileges. Every path component must remain root-controlled. */
+export function trustedNetworkLauncher(file: string, stat = lstatSync): string[] {
+  if (!path.isAbsolute(file) || file.includes("\0")) throw new Error("The network launcher must be an absolute path");
+  let current = path.resolve(file);
+  while (true) {
+    const info = stat(current);
+    if (
+      info.uid !== 0 ||
+      (info.mode & 0o022) !== 0 ||
+      info.isSymbolicLink() ||
+      (current === path.resolve(file) ? !info.isFile() || (info.mode & 0o111) === 0 : !info.isDirectory())
+    ) {
+      throw new Error("The network launcher and its parent directories must be owned and writable only by root");
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return [path.resolve(file)];
 }
 
 /** The agent user's own group (`useradd --user-group` made it; its id needn't be the uid). */
@@ -358,6 +389,18 @@ export function agentGid(user: string, run: RunCommand = runSync): number {
     throw new RunnerError("internal", `The group of ${user} isn't known here (${r.code}): ${r.output.slice(0, 200)}`);
   }
   return gid;
+}
+
+/** Commands before runuser and root's network diagnostics enter the same optional network context. */
+export function networkPrefix(user: AgentUser): string[] {
+  return user.networkLauncher ? [...trustedNetworkLauncher(user.networkLauncher), String(user.uid), "--"] : [];
+}
+
+/** A configured routing exemption must not be forgeable by gaining file capabilities after exec. */
+export function networkRestrictions(user: AgentUser): string[] {
+  if (user.networkMark === undefined) return [];
+  validateNetworkMark(user.networkMark);
+  return ["/usr/bin/setpriv", "--no-new-privs", "--bounding-set=-net_admin,-net_raw", "--"];
 }
 
 /** Root's shared git cache on a system-mode computer (ADR 0116 §4) and the system user that owns it. */

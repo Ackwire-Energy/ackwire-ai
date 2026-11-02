@@ -68,6 +68,12 @@
   gap: 6px;
   margin-left: auto;
 }
+/* The roles picker beside Aprovar and Recusar: as wide as what it names, never the whole row (it fills a form's field
+   elsewhere), so the three sit on one line. */
+.members-row__acts > .roles-picker.ac-btn {
+  width: auto;
+  max-width: 220px;
+}
 /* Ghost buttons in a row of their own keep their plates' rhythm (`.ac-acts`). */
 .members-row__acts.ac-acts {
   gap: 0;

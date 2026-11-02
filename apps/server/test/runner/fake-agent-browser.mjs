@@ -1,7 +1,7 @@
 // A fake `agent-browser` for browser tests: answers `--json` like the real one.
 // Each run appends `{ args, stdin }` to $FAKE_AB_LOG (one JSON line). The page
 // lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, tabTo, noHistory, port, delayMs }`.
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
 const stdin = await new Promise((resolve) => {
@@ -38,7 +38,13 @@ for (let i = 0; i < argv.length; i++) {
 }
 const file = process.env.FAKE_AB_STATE;
 const state = file && existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { open: false, url: "about:blank" };
-const save = () => file && writeFileSync(file, JSON.stringify(state));
+const save = () => {
+  if (!file) return;
+  // Concurrent agents use separate fake processes: a reader must never see a truncated state document.
+  const next = `${file}.${process.pid}.tmp`;
+  writeFileSync(next, JSON.stringify(state));
+  renameSync(next, file);
+};
 const out = (o) => {
   process.stdout.write(`${JSON.stringify(o)}\n`);
   save();

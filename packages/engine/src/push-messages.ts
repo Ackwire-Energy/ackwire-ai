@@ -39,8 +39,8 @@ export interface PushTextInput {
   suggestedBy?: string | null;
   /** Snippet of what was said. */
   text?: string | null;
-  /** A GIF or a sticker sent with no words (ADR 0091): the push says so in place of the snippet. */
-  media?: "gif" | "sticker" | null;
+  /** A GIF or a sticker with no words (ADR 0091), or a voice message (ADR 0100): the push says so in place of the snippet. */
+  media?: "gif" | "sticker" | "voice" | null;
   /** An approval of a production, irreversible or external action. */
   highRisk?: boolean;
   /** The routine that asked for an approval while nobody watched (ADR 0053 §8): the push says so. */
@@ -61,7 +61,7 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
   const s = pushStrings(locale);
   const actor = input.actorName?.trim() || (input.actorType === "agent" ? s.anAgent : s.someone);
   // A GIF or a sticker alone (ADR 0091) says what it was where its words would go.
-  const sent = input.media === "gif" ? s.sentGif : input.media === "sticker" ? s.sentSticker : "";
+  const sent = input.media ? { gif: s.sentGif, sticker: s.sentSticker, voice: s.sentVoice }[input.media] : "";
   const text = input.text?.trim() || sent;
   const what = input.title?.trim() || input.label?.trim() || "";
   const out = (title: string, body: string) => ({

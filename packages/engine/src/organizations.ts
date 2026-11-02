@@ -785,9 +785,15 @@ export type UserLocale = AppLocale;
  * Saves the person's app language (ADR 0122): `auto` when a device detected it ("Automático"), false when they
  * picked it, so every device shows that one.
  */
-export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false) {
+export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false, pubsub?: PubSub) {
   if (!isAppLocale(locale)) throw new ValidationError(`locale must be one of ${LOCALE_CODES.join(", ")}`);
   await db.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+  // Runners render each agent's browser start page in its responsible person's language.
+  if (pubsub) {
+    const orgs = await db.selectDistinct({ id: agents.orgId }).from(agents).where(eq(agents.ownerUserId, userId));
+    const { publishMachineAgentsChanged } = await import("./machines");
+    await Promise.all(orgs.map((org) => publishMachineAgentsChanged(pubsub, org.id)));
+  }
 }
 
 /** The person's language and whether it follows each device's. */
@@ -1220,10 +1226,12 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
-    // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091).
+    // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091); so would
+    // the speech provider's key (ADR 0100).
     if (userId === owner) {
       await deleteJevKey(tx, { type: "system", id: null });
       await deleteGifKey(tx, { type: "system", id: null });
+      await tx.delete(schema.instanceSecrets).where(eq(schema.instanceSecrets.name, "speech"));
     }
     // With nobody left, the next first account owns the server again.
     await tx.update(instanceTelemetry).set({ ownerUserId: null }).where(sql`not exists (select 1 from ${users})`);

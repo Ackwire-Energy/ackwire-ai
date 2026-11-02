@@ -5,6 +5,7 @@ import { mediaKindOf, mediaWord } from "./media";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
 import { usageWindowText } from "./usage-pause";
+import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
 /** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
 const USAGE_NOTES = new Set([
@@ -128,6 +129,8 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
  * as is.
  */
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
+  // Never a voice message's words, even from a server that sent them (ADR 0100).
+  if (isVoiceMeta(meta) || mediaKindOf(mediaKind) === "voice") return voiceWord(t, voiceLength(meta));
   if (!text.trim()) {
     const kind = mediaKindOf(mediaKind) ?? mediaKindOf(meta?.mediaKind) ?? mediaKindOf(meta?.media);
     if (kind) return mediaWord(t, kind);

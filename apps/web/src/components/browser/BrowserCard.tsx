@@ -46,6 +46,7 @@ import {
   agentGradient,
   Button,
   Chip,
+  cx,
   FilterToggle,
   Icon,
   type IconName,
@@ -276,7 +277,11 @@ export function Cover({
   text,
   help,
   action,
+  className,
+  onDismiss,
 }: {
+  className?: string;
+  onDismiss?: () => void;
   icon?: IconName;
   /** A picture over the words instead of the icon (the computer's portrait). */
   art?: ReactNode;
@@ -290,7 +295,12 @@ export function Cover({
 }) {
   const box = useRef<HTMLSpanElement>(null);
   return (
-    <div className={sky ? "brw-dim brw-dim--sky" : "brw-dim"}>
+    <div
+      className={cx("brw-dim", sky && "brw-dim--sky", className)}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onDismiss?.();
+      }}
+    >
       {sky && <ComputerSky color={color} clear={() => [box.current]} />}
       <span className="brw-dim__box" role="status" ref={box}>
         {art}

@@ -2085,6 +2085,9 @@
     "rolesNone": "El workspace aún no tiene roles.",
     "rolesNeeded": "Elige al menos un rol.",
     "rolesLeave": "Quien pierde el rol sale del canal.",
+    "rolesChoose": "Elegir roles",
+    "rolesChange": "Cambiar roles",
+    "rolesDone": "Listo",
     "publicTitle": "¿Hacer público #{{channel}}?",
     "publicBody": "Todos en el workspace podrán unirse y leer todos sus mensajes, incluidos los anteriores.",
     "publicConfirm": "Hacer público",
@@ -6756,6 +6759,68 @@
       "symbols": "Símbolos"
     }
   },
+  "voice": {
+    "word": "Mensaje de voz",
+    "wordTime": "Mensaje de voz · {{time}}",
+    "holdToRecord": "Mantén presionado para grabar",
+    "slideToDelete": "Desliza para borrar",
+    "send": "Enviar audio",
+    "delete": "Borrar grabación",
+    "deleted": "Grabación borrada.",
+    "pause": "Pausar",
+    "resume": "Seguir grabando",
+    "listen": "Escucha tu grabación",
+    "play": "Reproducir",
+    "stop": "Detener",
+    "speed": "Velocidad",
+    "left": "Quedan {{seconds}} s",
+    "tooShort": "Muy corto. Di un poco más.",
+    "silent": "No se escuchó nada. No se envió nada.",
+    "notSent": "No se pudo enviar el audio.",
+    "limit": "Es mucho audio por hoy. Escribe aquí y vuelve a intentarlo mañana.",
+    "micBlocked": "El micrófono está bloqueado",
+    "micBlockedHint": "Permite el micrófono en la configuración de tu dispositivo para grabar.",
+    "openSettings": "Abrir configuración",
+    "notNow": "Ahora no",
+    "expired": "Audio expirado",
+    "showText": "Ver texto",
+    "hideText": "Ocultar texto",
+    "record": "Grabar audio",
+    "recording": "Grabando audio",
+    "discard": "Borrar grabación",
+    "stopListening": "Dejar de escuchar",
+    "keys": "Enter envía · Esc borra",
+    "keysHold": "Suelta para enviar · Esc borra",
+    "keysPaused": "En pausa · Espacio escucha · Enter envía · Esc borra",
+    "pausePlay": "Pausar",
+    "seek": "Posición del audio",
+    "speedAt": "Velocidad {{speed}}×",
+    "waiting": "Se envía en cuanto vuelvas a estar en línea",
+    "notUnderstood": "No se entendió el audio. No se envió nada.",
+    "refused": "No se pudo enviar el audio en esta conversación.",
+    "blockedMac": "El micrófono está bloqueado. En una Mac: Ajustes del Sistema › Privacidad y seguridad › Micrófono.",
+    "blockedWeb": "El micrófono está bloqueado. Permítelo desde el candado junto a la dirección del sitio.",
+    "noMic": "No se encontró ningún micrófono.",
+    "failed": "No se pudo abrir el micrófono. Inténtalo de nuevo.",
+    "noPlayback": "No se puede reproducir ahora. Igual puedes enviarlo o seguir grabando.",
+    "settings": {
+      "title": "Mensajes de voz",
+      "on": "Mensajes de voz",
+      "onHelp": "Las personas de este espacio de trabajo pueden enviar audios en las conversaciones.",
+      "noEngine": "Los mensajes de voz todavía no están disponibles aquí.",
+      "engineTitle": "Qué convierte la voz en texto",
+      "own": "Tu propio servidor",
+      "ownHelp": "Whisper o Parakeet en tu máquina. El audio se queda ahí.",
+      "address": "Dirección del servidor",
+      "key": "Clave de {{name}}",
+      "keyPlaceholder": "Pega aquí",
+      "test": "Probar",
+      "tested": "Funciona. Ahora todos ven el micrófono.",
+      "sealed": "Se guarda cifrada en tu servidor y no se vuelve a mostrar.",
+      "leaves": "El audio de los mensajes de voz va a {{name}} para convertirse en texto.",
+      "invalid": "La clave guardada no se puede abrir en este servidor. Pégala de nuevo."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -10059,6 +10124,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "La red está cambiando. Las sesiones abiertas de la computadora se reiniciarán a las {{when}}.",
+      "restart": "Las sesiones de la computadora se están reiniciando para aplicar la red. El trabajo nuevo espera hasta que terminen.",
+      "line": "IP de salida {{ip}}",
+      "hint": "La dirección que ven los sitios web cuando los agentes navegan. Se actualiza cuando cambia la red de la computadora."
+    },
     "online": "En línea",
     "offline": "Sin conexión",
     "execOff": "Comandos desactivados",
@@ -10771,6 +10842,7 @@
       "import": "Importar y exportar",
       "billing": "Plan y facturación",
       "media": "GIFs y stickers",
+      "voice": "Voz",
       "apps": "Apps de IA"
     },
     "sectionText": {
@@ -10789,6 +10861,7 @@
       "import": "Trae agentes de otra app o espacio de trabajo, y lleva este adonde quieras.",
       "billing": "El plan de agentes.chat, la tarjeta y las facturas de este espacio de trabajo están en una página nuestra, fuera de la app.",
       "media": "Lo que las personas pueden enviar en una conversación, y cuándo los agentes envían un GIF o un sticker.",
+      "voice": "Mensajes de voz en las conversaciones, y quién convierte la voz en texto.",
       "apps": "Pide tareas a los agentes de este espacio de trabajo desde Claude, Cursor y otras apps."
     },
     "title": "Configuración",
@@ -11198,6 +11271,12 @@
       "answeredFar": "{{to}} respondió la pregunta de {{from}}",
       "answeredRequestFar": "{{to}} respondió el pedido de {{from}}",
       "see": "Ver"
+    },
+    "talk": {
+      "readAll": "Leer todo",
+      "more_one": "{{count}} línea más",
+      "more_many": "{{count}} líneas más",
+      "more_other": "{{count}} líneas más"
     },
     "consultPanel": {
       "label": "Conversación entre {{from}} y {{to}}",
@@ -12495,6 +12574,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Solo estás mirando.",
+      "title": "¿Quieres tomar el control?",
+      "working": "{{name}} se pausa mientras tienes el control."
+    },
     "sub": {
       "control": "Tienes el control · {{name}} espera",
       "control_female": "Tienes el control · {{name}} espera",

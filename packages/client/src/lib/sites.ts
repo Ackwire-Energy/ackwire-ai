@@ -9,7 +9,13 @@ export function cleanSite(input: string): string {
 }
 
 /** A page with nothing on it yet (`about:blank`): the person in control gets the address bar at once. */
-export const isBlankPage = (url: string | null | undefined) => Boolean(url && /^about:/i.test(url));
+export const isBlankPage = (url: string | null | undefined) =>
+  Boolean(
+    url &&
+      (/^about:/i.test(url) ||
+        url === "chrome://newtab/" ||
+        url === "chrome-extension://mbgkclemiokgppkieijlfaoehgdjlhbl/start.html"),
+  );
 
 /**
  * Why opening a site in the agent's browser was refused (`POST …/browser/open`), as the i18n key that says it.

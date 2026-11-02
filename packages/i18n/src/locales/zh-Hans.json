@@ -1955,6 +1955,9 @@
     "rolesNone": "工作区还没有角色。",
     "rolesNeeded": "请至少选择一个角色。",
     "rolesLeave": "失去该角色的人会离开频道。",
+    "rolesChoose": "选择角色",
+    "rolesChange": "更改角色",
+    "rolesDone": "完成",
     "publicTitle": "将 #{{channel}} 设为公开?",
     "publicBody": "工作区中的所有人都可以加入并阅读所有消息,包括以前的消息。",
     "publicConfirm": "设为公开",
@@ -6321,6 +6324,68 @@
       "symbols": "符号"
     }
   },
+  "voice": {
+    "word": "语音消息",
+    "wordTime": "语音消息 · {{time}}",
+    "holdToRecord": "按住录音",
+    "slideToDelete": "滑动删除",
+    "send": "发送语音",
+    "delete": "删除录音",
+    "deleted": "录音已删除。",
+    "pause": "暂停",
+    "resume": "继续录音",
+    "listen": "听一下你的录音",
+    "play": "播放",
+    "stop": "停止",
+    "speed": "速度",
+    "left": "还剩 {{seconds}} 秒",
+    "tooShort": "太短了。再多说一点。",
+    "silent": "什么都没听到。没有发送任何内容。",
+    "notSent": "语音发送失败。",
+    "limit": "今天的语音已经很多了。请在这里打字，明天再试。",
+    "micBlocked": "麦克风已被阻止",
+    "micBlockedHint": "请在设备设置中允许使用麦克风，才能录音。",
+    "openSettings": "打开设置",
+    "notNow": "暂不",
+    "expired": "语音已过期",
+    "showText": "显示文字",
+    "hideText": "隐藏文字",
+    "record": "录制语音",
+    "recording": "正在录音",
+    "discard": "删除录音",
+    "stopListening": "停止收听",
+    "keys": "Enter 发送 · Esc 删除",
+    "keysHold": "松开发送 · Esc 删除",
+    "keysPaused": "已暂停 · 空格键收听 · Enter 发送 · Esc 删除",
+    "pausePlay": "暂停",
+    "seek": "播放位置",
+    "speedAt": "速度 {{speed}}×",
+    "waiting": "恢复联网后立即发送",
+    "notUnderstood": "没能听清语音。没有发送任何内容。",
+    "refused": "无法在此对话中发送语音。",
+    "blockedMac": "麦克风已被阻止。在 Mac 上：系统设置 › 隐私与安全性 › 麦克风。",
+    "blockedWeb": "麦克风已被阻止。请通过网站地址旁的锁形图标允许使用。",
+    "noMic": "未找到麦克风。",
+    "failed": "无法打开麦克风。请重试。",
+    "noPlayback": "现在无法播放。你仍然可以发送，或继续录音。",
+    "settings": {
+      "title": "语音消息",
+      "on": "语音消息",
+      "onHelp": "这个工作区的成员可以在对话中发送语音。",
+      "noEngine": "这里还不能使用语音消息。",
+      "engineTitle": "把语音转成文字的服务",
+      "own": "你自己的服务器",
+      "ownHelp": "你机器上的 Whisper 或 Parakeet。语音留在那里。",
+      "address": "服务器地址",
+      "key": "{{name}} 密钥",
+      "keyPlaceholder": "粘贴到这里",
+      "test": "测试",
+      "tested": "可以用了。现在所有人都能看到麦克风。",
+      "sealed": "加密保存在你的服务器上，不会再次显示。",
+      "leaves": "语音消息的音频会发送到 {{name}} 转成文字。",
+      "invalid": "保存的密钥无法在这台服务器上打开。请重新粘贴。"
+    }
+  },
   "media": {
     "word": {
       "gif": "动图",
@@ -9440,6 +9505,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "网络正在变更。电脑上打开的会话将在 {{when}} 重启。",
+      "restart": "电脑会话正在重启以应用网络设置。新工作会等到完成后再开始。",
+      "line": "出口 IP {{ip}}",
+      "hint": "智能体浏览网页时网站看到的地址。电脑的网络变化时会随之更新。"
+    },
     "online": "在线",
     "offline": "离线",
     "execOff": "命令已关闭",
@@ -10124,6 +10195,7 @@
       "import": "导入和导出",
       "billing": "套餐和账单",
       "media": "GIF 和贴纸",
+      "voice": "语音",
       "apps": "AI 应用"
     },
     "sectionText": {
@@ -10142,6 +10214,7 @@
       "import": "从其他应用或工作区导入智能体，也可以把这个工作区带到任何地方。",
       "billing": "此工作区的 agentes.chat 套餐、银行卡和发票在我们的一个独立页面上，不在应用内。",
       "media": "成员可以在对话中发送什么，以及智能体何时发送 GIF 或贴纸。",
+      "voice": "对话中的语音消息，以及由谁把语音转成文字。",
       "apps": "在 Claude、Cursor 和其他应用中向这个工作区的智能体分配任务。"
     },
     "title": "设置",
@@ -10521,6 +10594,10 @@
       "answeredRequestFar": "{{to}} 回应了 {{from}} 的请求",
       "answeredRequestFar_female": "{{to}} 回应了 {{from}} 的请求",
       "see": "查看"
+    },
+    "talk": {
+      "readAll": "阅读全部",
+      "more_other": "还有 {{count}} 行"
     },
     "consultPanel": {
       "label": "{{from}} 和 {{to}} 之间的对话",
@@ -11843,6 +11920,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "你只是在观看。",
+      "title": "要接管控制吗？",
+      "working": "你控制期间，{{name}} 会暂停。"
+    },
     "sub": {
       "control": "由你控制 · {{name}} 等待中",
       "control_female": "由你控制 · {{name}} 等待中",
