@@ -4,8 +4,8 @@
 // `run --format json` reads the message from standard input and prints one turn's JSON lines: a text part, a bash
 // call, a call to our MCP bridge, a second text part and two steps' tokens; `--session` resumes that session, else a
 // new one. A message with "LIMIT": a rate limit error, exit 1. "BADKEY": a 401, exit 1. "ENV": the shell printing
-// $OPENCODE_API_KEY.
-import { appendFileSync } from "node:fs";
+// $OPENCODE_API_KEY. `--session ses_gone`: "Session not found", exit 1 (OpenCode lost that session).
+import { appendFileSync, existsSync, readdirSync } from "node:fs";
 
 const args = process.argv.slice(2);
 const env = process.env;
@@ -42,10 +42,21 @@ if (env.FAKE_OPENCODE_LOG) {
       apiKey: env.OPENCODE_API_KEY ?? null,
       config: env.OPENCODE_CONFIG_CONTENT ?? null,
       projectConfig: env.OPENCODE_DISABLE_PROJECT_CONFIG ?? null,
+      configHome: env.XDG_CONFIG_HOME ?? null,
+      configDir: env.OPENCODE_CONFIG_DIR ?? null,
+      configEntries:
+        env.XDG_CONFIG_HOME && existsSync(env.XDG_CONFIG_HOME) ? readdirSync(env.XDG_CONFIG_HOME).sort() : [],
+      permission: env.OPENCODE_PERMISSION ?? null,
+      anthropicKey: env.ANTHROPIC_API_KEY ?? null,
+      lspDownload: env.OPENCODE_DISABLE_LSP_DOWNLOAD ?? null,
       run: env.AGENTES_MCP_RUN ?? null,
       token: env.AGENTES_MCP_TOKEN ?? null,
     })}\n`,
   );
+}
+if (flag("--session") === "ses_gone") {
+  process.stderr.write("Error: Session not found\n");
+  process.exit(1);
 }
 const sessionID = flag("--session") ?? "ses_fake0001";
 const line = (type, data) => process.stdout.write(`${JSON.stringify({ type, timestamp: 1, sessionID, ...data })}\n`);

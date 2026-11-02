@@ -1,12 +1,14 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { isAccountId } from "@agenteschat/adapters/machine-protocol";
 import { redactSecrets } from "@agenteschat/adapters/secret-box";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, opencodeKeyOf } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, opencodeKeyOf, withoutSignIns } from "./accounts";
 import {
   CODEX_TOOL_OUTPUT_MAX,
   type CodexBrainEvent,
@@ -34,11 +36,18 @@ import { agentSecrets } from "./secrets";
  * - The session: every line carries `sessionID`; our session → OpenCode's lives in
  *   `<runner home>/brain/opencode-sessions.json` (per account, like Codex's threads). A runner that lost it starts a
  *   new session, with the context again.
- * - Everything we set rides on `OPENCODE_CONFIG_CONTENT`, which OpenCode merges last, over every other config: our
- *   MCP server alone under `agenteschat_agentes` (stdio `agentes-runner mcp --run <run>`, or the bridge's URL), the
- *   token, socket and home as `{env:…}` references, the permissions (ADR 0053 §3), no sharing, no self-update. With
- *   `OPENCODE_DISABLE_PROJECT_CONFIG` no project `opencode.json` or `.opencode/` (agents, plugins) is read, so a
- *   checkout or an earlier turn can't add servers, plugins or permissions.
+ * - Everything we set rides on `OPENCODE_CONFIG_CONTENT`: our MCP server under `agenteschat_agentes` (stdio
+ *   `agentes-runner mcp --run <run>`, or the bridge's URL), the token, socket and home as `{env:…}` references, the
+ *   permissions (ADR 0053 §3), no sharing, no self-update. OpenCode deep-merges it over the other configs it reads,
+ *   and joins their plugin lists, so it removes nothing they add: those configs are kept empty instead.
+ *   `OPENCODE_DISABLE_PROJECT_CONFIG`: no project `opencode.json` or `.opencode/`. Its global config folder
+ *   (`XDG_CONFIG_HOME`, `OPENCODE_CONFIG_DIR`) is `<runner home>/brain/opencode-config`, emptied of everything but
+ *   OpenCode's own packages before each turn, so a `work` turn's writes there never reach a later turn. A
+ *   `~/.opencode` with settings, plugins, agents, modes or tools refuses the turn (OpenCode always reads it, and only
+ *   a person should remove it). `OPENCODE_PERMISSION`, `OPENCODE_CONFIG` and `OPENCODE_CONFIG_DIR` aren't inherited.
+ *   Left as they are: the computer's managed config folder (its administrator's, root's to write).
+ * - The free tier (`freeTier`: no account, a computer nobody connected): no stray key in the env and
+ *   `enabled_providers: ["opencode"]`, so no key the runner or the computer holds thinks for anyone's agent.
  * - ADR 0053 §3: `plan` denies edits, commands, sub-agents and folders outside the turn's; `work` allows everything
  *   inside it. OpenCode has no sandbox: its own permission checks are all that hold it, and `run` rejects whatever
  *   would ask (the model goes on without it).
@@ -69,10 +78,47 @@ export interface OpencodeBrainTurnRequest {
   account?: string;
   permissions?: { mode?: "plan" | "work" };
   keepAlive?: boolean;
+  /** No account on a computer nobody connected: OpenCode's own free tier and nothing else (ADR 0127). */
+  freeTier?: boolean;
 }
 
 /** Where our session → OpenCode session ids live in the runner home. */
 export const opencodeSessionsFile = (runnerHome: string) => path.join(runnerHome, "brain", "opencode-sessions.json");
+
+/** OpenCode's global config folder for our turns: emptied before each one but for `OPENCODE_CONFIG_KEPT`. */
+export const opencodeConfigDir = (runnerHome: string) => path.join(runnerHome, "brain", "opencode-config");
+
+/** What OpenCode keeps in its config folder itself (`@opencode-ai/plugin` installed with bun): kept between turns. */
+const OPENCODE_CONFIG_KEPT = new Set(["node_modules", "package.json", "bun.lock", ".gitignore"]);
+
+/** What OpenCode reads from `~/.opencode` on every run: settings, plugins, agents, modes, tools. */
+export const OPENCODE_HOME_LOADED = [
+  "opencode.json",
+  "opencode.jsonc",
+  "plugin",
+  "plugins",
+  "agent",
+  "agents",
+  "mode",
+  "modes",
+  "tool",
+  "tools",
+] as const;
+
+/** Empties (or makes) the config folder, keeping only `OPENCODE_CONFIG_KEPT`. */
+export function resetOpencodeConfig(dir: string) {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  for (const name of readdirSync(dir)) {
+    if (!OPENCODE_CONFIG_KEPT.has(name)) rmSync(path.join(dir, name), { recursive: true, force: true });
+  }
+}
+
+/** What of `OPENCODE_HOME_LOADED` is in `<home>/.opencode`. */
+export const opencodeHomePlanted = (home: string) =>
+  OPENCODE_HOME_LOADED.filter((name) => existsSync(path.join(home, ".opencode", name)));
+
+/** OpenCode's answer to a `--session` it no longer has. */
+const SESSION_GONE = /session not found/i;
 
 /** The env name the bridge's run id comes through (`{env:…}` in the config). */
 export const OPENCODE_RUN_ENV = "AGENTES_MCP_RUN";
@@ -97,6 +143,8 @@ export function opencodeConfig(input: {
   profile: CommandProfile;
   /** The account has a key: the `opencode` provider reads it from `OPENCODE_API_KEY`. */
   key?: boolean;
+  /** OpenCode's own provider alone. */
+  freeTier?: boolean;
 }): string {
   const env = (name: string) => `{env:${name}}`;
   const [command, ...args] = input.command ?? [];
@@ -114,6 +162,7 @@ export function opencodeConfig(input: {
     share: "disabled",
     autoupdate: false,
     ...(input.key ? { provider: { opencode: { options: { apiKey: env(OPENCODE_KEY_ENV) } } } } : {}),
+    ...(input.freeTier ? { enabled_providers: ["opencode"] } : {}),
   });
 }
 
@@ -269,6 +318,7 @@ export interface OpencodeTurnInput {
   /** The account (its sessions are its own): its folder, and its key. */
   account?: { id: string; home: string; key?: string };
   profile?: CommandProfile;
+  freeTier?: boolean;
 }
 
 export interface OpencodeTurnOptions {
@@ -277,7 +327,7 @@ export interface OpencodeTurnOptions {
   signal: AbortSignal;
   mcpCommand?: string[];
   socketPath?: string;
-  runnerHome?: string;
+  runnerHome: string;
   env?: Record<string, string>;
   redact?: (text: string) => string;
   /** Tests: the executable. */
@@ -295,84 +345,126 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
   }
   const key = input.account?.key;
   const sessionKey = codexThreadKey(input.sessionId, input.account?.id);
-  const session = opts.sessions.get(sessionKey);
-  const args = opencodeTurnArgs({ ...(session ? { session } : {}), ...(input.model ? { model: input.model } : {}) });
+  const inherited: NodeJS.ProcessEnv = { ...process.env, ...(opts.env ?? {}) };
+  const home = inherited.HOME || os.homedir();
+  const planted = opencodeHomePlanted(home);
+  if (planted.length) {
+    return fail(
+      "opencode_failed",
+      `OpenCode on this computer reads ${planted.join(", ")} in ${path.join(home, ".opencode")} on every run, which could change what an agent may do. Move them out of that folder for agents to think with OpenCode.`,
+    );
+  }
+  const configDir = opencodeConfigDir(opts.runnerHome);
+  try {
+    resetOpencodeConfig(configDir);
+  } catch (err) {
+    return fail("opencode_failed", err instanceof Error ? err.message : String(err), true);
+  }
+  for (const name of ["OPENCODE_PERMISSION", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"]) {
+    delete inherited[name];
+  }
   const base: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...(opts.env ?? {}),
+    ...(input.freeTier && !input.account ? withoutSignIns(inherited) : inherited),
     [OPENCODE_RUN_ENV]: input.runId,
     [CODEX_MCP_ENV[0]]: input.mcp.token,
     ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
-    ...(opts.runnerHome ? { [CODEX_MCP_ENV[2]]: opts.runnerHome } : {}),
+    [CODEX_MCP_ENV[2]]: opts.runnerHome,
   };
   const env = input.account ? accountEnv("opencode", input.account.home, base) : base;
+  // The agent's commands inherit XDG_CONFIG_HOME: gh keeps finding its sign-in where it was.
+  env.GH_CONFIG_DIR ??= path.join(inherited.XDG_CONFIG_HOME || path.join(home, ".config"), "gh");
+  env.XDG_CONFIG_HOME = configDir;
+  env.OPENCODE_CONFIG_DIR = configDir;
   env.OPENCODE_CONFIG_CONTENT = opencodeConfig({
     ...(input.mcp.url ? { url: input.mcp.url } : { command: opts.mcpCommand }),
     profile: input.profile ?? "work",
     key: Boolean(key),
+    freeTier: Boolean(input.freeTier && !input.account),
   });
   if (key) env[OPENCODE_KEY_ENV] = key;
   env.OPENCODE_DISABLE_PROJECT_CONFIG = "1";
   env.OPENCODE_DISABLE_AUTOUPDATE = "1";
+  // Language servers would be downloaded, unpinned, into each agent's home.
+  env.OPENCODE_DISABLE_LSP_DOWNLOAD = "1";
   // The agent's shell could print the key (its env, its file in the lent folder).
   const redact = key
     ? (text: string) => redactSecrets(opts.redact ? opts.redact(text) : text, [{ name: OPENCODE_KEY_ENV, value: key }])
     : opts.redact;
-  const mapper = new OpencodeEventMapper({
-    ...(input.model ? { model: input.model } : {}),
-    ...(redact ? { redact } : {}),
-  });
 
-  let child: ChildProcess;
-  try {
-    child = (opts.spawn ?? spawn)(resolveCommand(opts.bin ?? OPENCODE_BIN, env.PATH), args, {
-      cwd: input.cwd,
-      env,
-      stdio: ["pipe", "pipe", "pipe"],
-      detached: true,
+  const once = async (session: string | undefined) => {
+    const args = opencodeTurnArgs({ ...(session ? { session } : {}), ...(input.model ? { model: input.model } : {}) });
+    const mapper = new OpencodeEventMapper({
+      ...(input.model ? { model: input.model } : {}),
+      ...(redact ? { redact } : {}),
     });
-  } catch (err) {
-    return fail("opencode_failed", err instanceof Error ? err.message : String(err));
-  }
-  // A CLI gone before it read the prompt fails the turn by its exit, not by a broken pipe.
-  child.stdin?.on("error", () => undefined);
-  child.stdin?.end(opencodePrompt(input.system, input.prompt, !session));
-  let stderr = "";
-  child.stderr?.on("data", (c: Buffer) => {
-    stderr = (stderr + c.toString("utf8")).slice(-2000);
-  });
-  const lines = createInterface({ input: child.stdout as NonNullable<ChildProcess["stdout"]> });
-  (lines as unknown as EventEmitter).on("line", (line: string) => {
-    for (const event of mapper.line(line)) opts.emit(event);
-    if (mapper.session) opts.sessions.set(sessionKey, mapper.session);
-  });
-  let killTimer: ReturnType<typeof setTimeout> | undefined;
-  const abort = () => {
-    killTree(child, "SIGTERM");
-    killTimer = setTimeout(() => killTree(child, "SIGKILL"), KILL_GRACE_MS);
+    let child: ChildProcess;
+    try {
+      child = (opts.spawn ?? spawn)(resolveCommand(opts.bin ?? OPENCODE_BIN, env.PATH), args, {
+        cwd: input.cwd,
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
+        detached: true,
+      });
+    } catch (err) {
+      return { mapper, exit: { code: null, error: err instanceof Error ? err : new Error(String(err)) }, stderr: "" };
+    }
+    // A CLI gone before it read the prompt fails the turn by its exit, not by a broken pipe.
+    child.stdin?.on("error", () => undefined);
+    child.stdin?.end(opencodePrompt(input.system, input.prompt, !session));
+    let stderr = "";
+    child.stderr?.on("data", (c: Buffer) => {
+      stderr = (stderr + c.toString("utf8")).slice(-2000);
+    });
+    const lines = createInterface({ input: child.stdout as NonNullable<ChildProcess["stdout"]> });
+    (lines as unknown as EventEmitter).on("line", (line: string) => {
+      for (const event of mapper.line(line)) opts.emit(event);
+      if (mapper.session) opts.sessions.set(sessionKey, mapper.session);
+    });
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const abort = () => {
+      killTree(child, "SIGTERM");
+      killTimer = setTimeout(() => killTree(child, "SIGKILL"), KILL_GRACE_MS);
+    };
+    if (opts.signal.aborted) abort();
+    else opts.signal.addEventListener("abort", abort, { once: true });
+    const exit = await new Promise<{ code: number | null; error?: Error }>((resolve) => {
+      let settled = false;
+      const proc = child as unknown as EventEmitter;
+      proc.on("error", (error: Error) => {
+        if (!settled) {
+          settled = true;
+          resolve({ code: null, error });
+        }
+      });
+      proc.on("close", (code: number | null) => {
+        if (!settled) {
+          settled = true;
+          resolve({ code });
+        }
+      });
+    });
+    opts.signal.removeEventListener("abort", abort);
+    if (killTimer) clearTimeout(killTimer);
+    lines.close();
+    return { mapper, exit, stderr: stderr.trim() };
   };
-  if (opts.signal.aborted) abort();
-  else opts.signal.addEventListener("abort", abort, { once: true });
-  const exit = await new Promise<{ code: number | null; error?: Error }>((resolve) => {
-    let settled = false;
-    const proc = child as unknown as EventEmitter;
-    proc.on("error", (error: Error) => {
-      if (!settled) {
-        settled = true;
-        resolve({ code: null, error });
-      }
-    });
-    proc.on("close", (code: number | null) => {
-      if (!settled) {
-        settled = true;
-        resolve({ code });
-      }
-    });
-  });
-  opts.signal.removeEventListener("abort", abort);
-  if (killTimer) clearTimeout(killTimer);
-  lines.close();
+
+  const stored = opts.sessions.get(sessionKey);
+  let turn = await once(stored);
+  // OpenCode lost the session (its storage is in the agent's or the account's folder, our map in the runner home):
+  // forget it and start a new one, with the context again.
+  if (
+    stored &&
+    !opts.signal.aborted &&
+    turn.exit.code !== 0 &&
+    !turn.mapper.streamed &&
+    SESSION_GONE.test(`${turn.mapper.failed ?? ""}\n${turn.stderr}`)
+  ) {
+    opts.sessions.delete(sessionKey);
+    turn = await once(undefined);
+  }
   if (opts.signal.aborted) return fail("canceled", "The turn was canceled.");
+  const { mapper, exit, stderr } = turn;
   if (exit.error) {
     const missing = (exit.error as NodeJS.ErrnoException).code === "ENOENT";
     return fail(
@@ -381,7 +473,7 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
       true,
     );
   }
-  for (const event of mapper.finish({ exitCode: exit.code, sessionId: input.sessionId, stderr: stderr.trim() })) {
+  for (const event of mapper.finish({ exitCode: exit.code, sessionId: input.sessionId, stderr })) {
     opts.emit(event);
   }
 }
@@ -420,6 +512,10 @@ export async function handleOpencodeBrainTurn(
     throw new RunnerError("bad_request", "mcp.token is required");
   if (typeof req.model === "string" && req.model && !/^[\w.-]{1,40}\/[\w.:-]{1,79}$/.test(req.model)) {
     throw new RunnerError("bad_request", "model is provider/model");
+  }
+  const freeTier = req.freeTier === true && !req.account;
+  if (freeTier && typeof req.model === "string" && req.model && !req.model.startsWith("opencode/")) {
+    throw new RunnerError("bad_request", "OpenCode's free tier thinks only with OpenCode's own models");
   }
   let cwd = ctx.folder;
   if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
@@ -460,6 +556,7 @@ export async function handleOpencodeBrainTurn(
       mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
       ...(account ? { account } : {}),
       profile: codexProfileOf(req),
+      ...(freeTier ? { freeTier } : {}),
     },
     {
       sessions,

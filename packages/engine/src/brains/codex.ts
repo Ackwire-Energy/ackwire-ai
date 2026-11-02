@@ -64,6 +64,8 @@ export interface ComputerBrainLink {
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
     name?: string;
+    /** Who connected the computer; null: nobody (a server), absent: not known. */
+    pairedByUserId?: string | null;
     /** What the machine allows (protocol 10): with it, Codex needs its own tool on, not commands. */
     access?: {
       tools: { claude: boolean; codex: boolean; cursor?: boolean; opencode?: boolean; commands: boolean };
@@ -273,6 +275,17 @@ export class CodexBrain implements Brain {
       yield { type: "error", code: account.code, message: account.message, retryable: true };
       return;
     }
+    // OpenCode with no account on a computer nobody connected: its free tier, never a key the computer holds.
+    const freeTier = this.kind === "opencode" && !turn.account && status.pairedByUserId === null;
+    if (freeTier && turn.model && !turn.model.startsWith("opencode/")) {
+      yield {
+        type: "error",
+        code: "not_logged_in",
+        message: `${name} isn't signed in on ${status.name ?? "the computer"}: only OpenCode's own models work there. Choose one, or connect an OpenCode account on the agent's page.`,
+        retryable: true,
+      };
+      return;
+    }
     const permissions = await this.deps.permissions?.(turn);
     // An older runner ignores the profile (no approvals, network on): never more power than asked for.
     if (permissions && status.protocol !== undefined && status.protocol < BRAIN_PROFILES_PROTOCOL) {
@@ -309,6 +322,7 @@ export class CodexBrain implements Brain {
       ...contextFields(status.protocol, turn),
       ...(permissions ? { permissions } : {}),
       ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
+      ...(freeTier ? { freeTier } : {}),
     };
 
     const events = channel<BrainEvent>();

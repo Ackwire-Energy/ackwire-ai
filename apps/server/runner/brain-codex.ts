@@ -183,6 +183,17 @@ export class CodexThreads {
     map[session] = thread;
     const keys = Object.keys(map);
     for (const k of keys.slice(0, Math.max(0, keys.length - CODEX_THREADS_MAX))) delete map[k];
+    this.save(map);
+  }
+
+  delete(session: string) {
+    const map = this.load();
+    if (!(session in map)) return;
+    delete map[session];
+    this.save(map);
+  }
+
+  private save(map: Record<string, string>) {
     mkdirSync(path.dirname(this.file), { recursive: true });
     const tmp = `${this.file}.tmp`;
     writeFileSync(tmp, JSON.stringify(map), { mode: 0o600 });

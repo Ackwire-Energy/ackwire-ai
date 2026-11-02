@@ -29,6 +29,7 @@ function link(opts: {
   opencode?: boolean;
   tools?: { claude: boolean; codex: boolean; opencode?: boolean; commands: boolean };
   events?: BrainEvent[];
+  pairedByUserId?: string | null;
 }): ComputerBrainLink & { sent: BrainTurnRequest[] } {
   const sent: BrainTurnRequest[] = [];
   return {
@@ -40,6 +41,7 @@ function link(opts: {
         protocol: opts.protocol ?? OPENCODE_PROTOCOL,
         executors: opts.opencode === false ? {} : { opencode: { version: "1.19.5" } },
         ...(opts.tools ? { access: { tools: opts.tools } } : {}),
+        ...(opts.pairedByUserId !== undefined ? { pairedByUserId: opts.pairedByUserId } : {}),
       };
     },
     async turn(_machineId, request, { onEvent }) {
@@ -102,6 +104,29 @@ test("OpenCode needs runner protocol 38, its CLI and its switch (Codex's on a ru
   expect(await run({ tools: { claude: false, codex: false, opencode: true, commands: false } })).toMatchObject({
     type: "done",
   });
+});
+
+test("on a computer nobody connected, a turn with no account is the free tier: OpenCode's own models only", async () => {
+  const done: BrainEvent[] = [{ type: "done", text: "ok", session: { id: "s" } }];
+  const send = async (over: Partial<BrainTurn>, pairedByUserId: string | null) => {
+    const l = link({ events: done, pairedByUserId });
+    const events = await collect(
+      new OpencodeBrain({ link: l, mcp: async () => ({ token: "t" }) }).run(turn(over), io()),
+    );
+    return { sent: l.sent[0], first: events[0] };
+  };
+  expect((await send({ model: "opencode/big-pickle" }, null)).sent?.freeTier).toBe(true);
+  expect((await send({ model: "opencode/big-pickle" }, "u1")).sent?.freeTier).toBeUndefined();
+  const account = {
+    id: "0193eeee-0000-7000-8000-0000000000f1",
+    label: "Zen",
+    status: "active",
+  } as BrainTurn["account"];
+  expect((await send({ account }, null)).sent?.freeTier).toBeUndefined();
+  const paid = await send({ model: "anthropic/claude-x" }, null);
+  expect(paid.sent).toBeUndefined();
+  expect(paid.first).toMatchObject({ type: "error", code: "not_logged_in" });
+  expect((await send({ model: "anthropic/claude-x" }, "u1")).sent?.model).toBe("anthropic/claude-x");
 });
 
 test("which brain a run thinks with, and why OpenCode can't now", () => {

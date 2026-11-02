@@ -11,6 +11,7 @@ import type { CodexBrainEvent } from "../../runner/brain-codex";
 import {
   OpencodeEventMapper,
   opencodeConfig,
+  opencodeConfigDir,
   opencodePrompt,
   opencodeSessionsFile,
   opencodeTurnArgs,
@@ -24,9 +25,12 @@ import { removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
 const managers: AccountManager[] = [];
+const realHome = process.env.HOME;
 afterEach(async () => {
   for (const m of managers.splice(0)) await m.close();
   delete process.env.FAKE_OPENCODE_LOG;
+  for (const name of ["OPENCODE_PERMISSION", "ANTHROPIC_API_KEY"]) delete process.env[name];
+  process.env.HOME = realHome;
   removeDirs(dirs);
 });
 
@@ -193,7 +197,9 @@ test("access stored before OpenCode's switch follows Codex's", () => {
 function turnContext(root: string) {
   const ws = path.join(root, "ws");
   const home = path.join(root, "home");
-  for (const d of [ws, home]) mkdirSync(d, { recursive: true });
+  // The agent's own home (`~/.opencode`), never the test machine's.
+  process.env.HOME = path.join(root, "agent-home");
+  for (const d of [ws, home, process.env.HOME]) mkdirSync(d, { recursive: true });
   return {
     home,
     ctx: {
@@ -227,6 +233,12 @@ interface Logged {
   args: string[];
   message: string;
   dataHome: string | null;
+  configHome: string | null;
+  configDir: string | null;
+  configEntries: string[];
+  permission: string | null;
+  anthropicKey: string | null;
+  lspDownload: string | null;
   apiKey: string | null;
   config: string;
   projectConfig: string | null;
@@ -329,6 +341,99 @@ test.skipIf(!posix)(
     });
     expect(await run({ runId: RUN.replace(/1$/, "6"), prompt: "BADKEY" })).toMatchObject({ code: "not_logged_in" });
     expect(await run({ runId: RUN.replace(/1$/, "7"), prompt: "LIMIT" })).toMatchObject({ code: "plan_limit" });
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "OpenCode reads no config but ours: its config folder emptied each turn, no inherited permission, ~/.opencode refused",
+  async () => {
+    const root = tempDir("brain-opencode-");
+    dirs.push(root);
+    const { ctx, home } = turnContext(root);
+    const log = path.join(root, "opencode.log");
+    process.env.FAKE_OPENCODE_LOG = log;
+    process.env.OPENCODE_PERMISSION = JSON.stringify({ bash: "allow", edit: "allow" });
+    const configDir = opencodeConfigDir(home);
+    // What an earlier `work` turn could have left there.
+    mkdirSync(path.join(configDir, "plugin"), { recursive: true });
+    mkdirSync(path.join(configDir, "node_modules"), { recursive: true });
+    writeFileSync(path.join(configDir, "plugin", "x.js"), "export default {}");
+    writeFileSync(path.join(configDir, "opencode.json"), JSON.stringify({ mcp: { other: { type: "local" } } }));
+    const scope = { signal: new AbortController().signal, output: () => {}, emit: () => {} };
+    const final = async (over: Record<string, unknown>) =>
+      ((await handleRequest(ctx, turn(over), scope as never)) as { final: CodexBrainEvent }).final;
+
+    expect(await final({ permissions: { mode: "plan" } })).toMatchObject({ type: "done" });
+    expect(logOf(log)[0]).toMatchObject({
+      configHome: configDir,
+      configDir,
+      configEntries: ["node_modules"],
+      permission: null,
+      lspDownload: "1",
+    });
+
+    mkdirSync(path.join(process.env.HOME as string, ".opencode", "plugin"), { recursive: true });
+    expect(await final({ runId: RUN.replace(/1$/, "2") })).toMatchObject({
+      type: "error",
+      code: "opencode_failed",
+      message: expect.stringContaining("plugin"),
+    });
+    expect(logOf(log)).toHaveLength(1);
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "the free tier: no key from the runner's env, OpenCode's own provider alone, its models only",
+  async () => {
+    const root = tempDir("brain-opencode-");
+    dirs.push(root);
+    const { ctx } = turnContext(root);
+    const log = path.join(root, "opencode.log");
+    process.env.FAKE_OPENCODE_LOG = log;
+    process.env.ANTHROPIC_API_KEY = "sk-ant-fake-runner-key";
+    const scope = { signal: new AbortController().signal, output: () => {}, emit: () => {} };
+    await handleRequest(ctx, turn({ freeTier: true, model: "opencode/big-pickle" }), scope as never);
+    const free = logOf(log)[0];
+    expect(free?.anthropicKey).toBeNull();
+    expect(JSON.parse(free?.config ?? "{}").enabled_providers).toEqual(["opencode"]);
+
+    await handleRequest(ctx, turn({ runId: RUN.replace(/1$/, "2") }), scope as never);
+    const own = logOf(log)[1];
+    expect(own?.anthropicKey).toBe("sk-ant-fake-runner-key");
+    expect(JSON.parse(own?.config ?? "{}").enabled_providers).toBeUndefined();
+
+    await expect(
+      handleRequest(
+        ctx,
+        turn({ runId: RUN.replace(/1$/, "3"), freeTier: true, model: "anthropic/claude-x" }),
+        scope as never,
+      ),
+    ).rejects.toMatchObject({ code: "bad_request" });
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "a session OpenCode lost is forgotten: the turn starts a new one, with the context",
+  async () => {
+    const root = tempDir("brain-opencode-");
+    dirs.push(root);
+    const { ctx, home } = turnContext(root);
+    const log = path.join(root, "opencode.log");
+    process.env.FAKE_OPENCODE_LOG = log;
+    mkdirSync(path.join(home, "brain"), { recursive: true });
+    writeFileSync(opencodeSessionsFile(home), JSON.stringify({ [SESSION]: "ses_gone" }));
+    const scope = { signal: new AbortController().signal, output: () => {}, emit: () => {} };
+    const reply = (await handleRequest(ctx, turn({ prompt: "and now?" }), scope as never)) as {
+      final: CodexBrainEvent;
+    };
+    expect(reply.final).toMatchObject({ type: "done" });
+    const [, fresh] = logOf(log);
+    expect(fresh?.args).toEqual(["run", "--format", "json"]);
+    expect(fresh?.message).toBe("You are Dev, the team's developer.\n\nand now?");
+    expect(JSON.parse(readFileSync(opencodeSessionsFile(home), "utf8"))).toEqual({ [SESSION]: "ses_fake0001" });
   },
   20_000,
 );

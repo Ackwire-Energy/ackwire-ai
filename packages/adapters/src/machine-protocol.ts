@@ -1196,6 +1196,11 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /**
+   * `opencode`: no account on a computer nobody connected, so OpenCode's own free tier alone (`opencode/*` models,
+   * no key from the runner's env); ADR 0127.
+   */
+  freeTier?: boolean;
   /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
   contextTokens?: number;
 }

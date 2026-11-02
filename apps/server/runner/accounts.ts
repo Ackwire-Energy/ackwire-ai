@@ -169,10 +169,16 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
 const STRAY_SIGN_IN =
   /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT)$/;
 
-/** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
-export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+/** `base` without any key, token, endpoint or cloud a CLI would think with instead of its own sign-in. */
+export function withoutSignIns(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
+  return env;
+}
+
+/** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
+export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = withoutSignIns(base);
   env[ENV_VAR[kind]] = dir;
   if (kind === "cursor") {
     // Linux keeps the sign-in under `$XDG_CONFIG_HOME/cursor`, macOS in the Keychain unless told to use a file: both
