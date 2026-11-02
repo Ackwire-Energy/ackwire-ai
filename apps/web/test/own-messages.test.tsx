@@ -174,7 +174,9 @@ describe("own message styles", () => {
     // 15.5px / 1.7 line - half a 30px button), inside the row, so never in the gap above.
     const mouse =
       css
-        .split("@media (hover: hover) and (pointer: fine) {\n  .ac-msg--own > .ac-msg__body > .ac-msg__actions,")[1]
+        .split(
+          "@media not ((hover: none) or (pointer: coarse)) {\n  .ac-msg--own > .ac-msg__body > .ac-msg__actions,",
+        )[1]
         ?.split("\n}")[0] ?? "";
     expect(mouse).toContain("right: calc(100% + 2px);");
     for (const sel of [
@@ -208,15 +210,21 @@ describe("own message styles", () => {
     for (const [, , body = ""] of own) expect(body).not.toMatch(/opacity|visibility|display:\s*none/);
   });
 
-  test("my bar's buttons are in screen order, Reagir nearest the bubble; others' keep Reagir first", async () => {
+  test("every bar keeps Reagir first; only beside my bubble does the screen reverse it, and nowhere on touch", async () => {
     await open([said("j1", "u-joao", "Bom dia!", 10), said("w1", "u-walter", "Vi o alerta também", 9)]);
     const names = (id: string) =>
       within(row(id))
         .getAllByRole("button")
         .filter((b) => b.closest(".ac-msg__actions"))
         .map((b) => b.getAttribute("aria-label"));
-    expect(names("w1")).toEqual(["Mais ações da mensagem", "Responder", "Reagir"]);
+    expect(names("w1")).toEqual(["Reagir", "Responder", "Mais ações da mensagem"]);
     expect(names("j1")).toEqual(["Reagir", "Responder", "Mais ações da mensagem"]);
+    const css = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
+    const blocks = css.split(/\n@media /).map((b) => b.split("\n}\n")[0] ?? "");
+    const reversing = blocks.filter((b) => /\.ac-msg--own[^{]*\.ac-msg__actions \{[^}]*row-reverse/.test(b));
+    // The left-of-bubble block is the touch block's exact complement, so no pointer setup gets neither.
+    expect(reversing.map((b) => b.split(" {")[0])).toEqual(["not ((hover: none) or (pointer: coarse))"]);
+    expect(blocks.some((b) => b.startsWith("(hover: none), (pointer: coarse) {\n  .ac-msg--own"))).toBe(true);
   });
 
   test("a turn's bubble ends on the cut corner, on the side it stands", async () => {

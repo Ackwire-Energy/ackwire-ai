@@ -56,31 +56,23 @@ export function ReplyButton({ message }: { message: Message }) {
   );
 }
 
-/**
- * People's messages: the same glass bar as agents': Reagir, Responder and "…". `own` (left of my bubble) puts them in
- * screen order, Reagir nearest the bubble, so Tab and a screen reader go left to right.
- */
+/** People's messages: the same glass bar as agents': Reagir, Responder and "…". */
 export function PersonMessageActions({
   message,
   authorName,
   more,
-  own,
 }: {
   message: Message;
   authorName: string;
   more: MenuEntry[];
-  own?: boolean;
 }) {
   const { t } = useTranslation();
   const reactions = useMessageReactions(message.id, message.reactions);
-  const buttons = [
-    <ReactButton key="react" onPick={(emoji) => reactions.toggle(reactionOf(emoji))} />,
-    <ReplyButton key="reply" message={message} />,
-    <MessageMoreMenu key="more" entries={more} />,
-  ];
   return (
     <div className="ac-msg__actions" role="toolbar" aria-label={t("channel.actions", { name: authorName })}>
-      {own ? buttons.reverse() : buttons}
+      <ReactButton onPick={(emoji) => reactions.toggle(reactionOf(emoji))} />
+      <ReplyButton message={message} />
+      <MessageMoreMenu entries={more} />
     </div>
   );
 }
