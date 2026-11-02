@@ -3,6 +3,7 @@ import { accessSync, constants } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import type { CursorModelInfo, RunnerInfo } from "@agenteschat/adapters/machine-protocol";
+import { isOpencodeFreeModel, OPENCODE_FREE_MODELS } from "@agenteschat/providers/plans";
 import { readSmallJson } from "./json-file";
 import { SHARED_BIN_ENV } from "./shared-folder";
 
@@ -174,6 +175,41 @@ function detectCursor(run: Run): NonNullable<RunnerInfo["executors"]>["cursor"] 
   return { version, ...(models.length ? { models } : {}) };
 }
 
+/** OpenCode's CLI (`opencode-ai` on npm). */
+export const OPENCODE_BIN = "opencode";
+
+/**
+ * `opencode models` → the models it can run: one `provider/model` per line (its own sort, OpenCode's first). With no
+ * key that is OpenCode's free tier and whatever providers the computer's own config signs in; `free` marks the free
+ * tier's. Anything that isn't a `provider/model` id is skipped.
+ */
+export function parseOpencodeModels(output: string): CursorModelInfo[] {
+  const out: CursorModelInfo[] = [];
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the CLI's colors
+  for (const raw of output.replace(/\u001b\[[0-9;]*m/g, "").split("\n")) {
+    const id = raw.trim();
+    if (!/^[\w.-]{1,40}\/[\w.:-]{1,79}$/.test(id) || id.length > 80 || out.some((x) => x.id === id)) continue;
+    const label = OPENCODE_FREE_MODELS.find((m) => m.id === id)?.label;
+    out.push({ id, ...(label ? { label } : {}), ...(isOpencodeFreeModel(id) ? { free: true } : {}) });
+    if (out.length >= 60) break;
+  }
+  return out;
+}
+
+/** OpenCode's versions are plain semver (`1.19.5`): an `opencode` on the PATH that says anything else is skipped. */
+const OPENCODE_VERSION = /^v?\d+\.\d+\.\d+\b/;
+
+/** Protocol 38 (ADR 0127): OpenCode's CLI and the models it lists (`opencode models`: the free tier with no key). */
+function detectOpencode(run: Run): NonNullable<RunnerInfo["executors"]>["opencode"] {
+  const r = run(OPENCODE_BIN, ["--version"]);
+  if (r.error || r.status !== 0) return undefined;
+  const version = r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
+  if (!OPENCODE_VERSION.test(version)) return undefined;
+  const m = run(OPENCODE_BIN, ["models"]);
+  const models = !m.error && m.status === 0 ? parseOpencodeModels(m.stdout) : [];
+  return { version, ...(models.length ? { models } : {}) };
+}
+
 export function detectExecutors(run: Run = defaultRun): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   for (const name of ["claude", "codex"] as const) {
@@ -189,6 +225,12 @@ export function detectExecutors(run: Run = defaultRun): NonNullable<RunnerInfo["
   try {
     const cursor = detectCursor(run);
     if (cursor) out.cursor = cursor;
+  } catch {
+    // not installed
+  }
+  try {
+    const opencode = detectOpencode(run);
+    if (opencode) out.opencode = opencode;
   } catch {
     // not installed
   }

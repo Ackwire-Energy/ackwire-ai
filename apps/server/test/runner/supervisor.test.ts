@@ -454,6 +454,39 @@ test("a Cursor turn's account is lent as a Cursor account, never as Claude's", a
   expect(await run).toEqual({ runId: "run-00000009", final });
 });
 
+test("an OpenCode turn's account is lent as an OpenCode account, never as Claude's", async () => {
+  const lends: [string, string, number][] = [];
+  const t = setup({
+    lend: async (kind, id, uid) => {
+      lends.push([kind, id, uid]);
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const ACCOUNT = "0193ffff-0000-7000-8000-00000000000a";
+  const run = handleRequest(
+    t.ctx,
+    {
+      op: "brain.turn",
+      kind: "opencode",
+      runId: "run-0000000a",
+      session: { id: "0193aaaa-0000-7000-8000-00000000000a", resume: false },
+      prompt: "hi",
+      account: ACCOUNT,
+      agent: BIA,
+    } as MachineRequest,
+    scope().scope,
+  );
+  await waitFor(() => t.workers.length === 1);
+  expect(lends).toEqual([["opencode", ACCOUNT, 21001]]);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const q = await requestOn(bia);
+  const final = { type: "done", text: "ok" };
+  bia.send({ type: "result", id: q.id, ok: true, data: { runId: "run-0000000a", final } });
+  expect(await run).toEqual({ runId: "run-0000000a", final });
+});
+
 test("an account root keeps goes with each turn as root's own grant, never the server's; usage only for its turn", async () => {
   const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
   const OTHER = "0193ffff-0000-7000-8000-000000000002";

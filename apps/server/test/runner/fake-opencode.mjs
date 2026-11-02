@@ -1,0 +1,96 @@
+// A fake OpenCode CLI (`opencode`) for runner tests. Each start appends its argv, cwd, piped message and the env
+// that matters (XDG folders, key, config, MCP run and token) to $FAKE_OPENCODE_LOG (one JSON line).
+// `--version` prints a semver, `models` OpenCode's free models (and a paid one when a key is in the config).
+// `run --format json` reads the message from standard input and prints one turn's JSON lines: a text part, a bash
+// call, a call to our MCP bridge, a second text part and two steps' tokens; `--session` resumes that session, else a
+// new one. A message with "LIMIT": a rate limit error, exit 1. "BADKEY": a 401, exit 1. "ENV": the shell printing
+// $OPENCODE_API_KEY.
+import { appendFileSync } from "node:fs";
+
+const args = process.argv.slice(2);
+const env = process.env;
+const flag = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+
+if (args[0] === "--version") {
+  process.stdout.write("1.19.5\n");
+  process.exit(0);
+}
+if (args[0] === "models") {
+  const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? "{}");
+  const paid = config.provider?.opencode ? "opencode/glm-5.3\n" : "";
+  process.stdout.write(`opencode/big-pickle\nopencode/glm-5.3-flash-free\n${paid}`);
+  process.exit(0);
+}
+if (args[0] !== "run" || flag("--format") !== "json") {
+  process.stderr.write(`fake opencode: unknown command ${args.join(" ")}\n`);
+  process.exit(2);
+}
+
+let message = "";
+for await (const chunk of process.stdin) message += chunk;
+if (env.FAKE_OPENCODE_LOG) {
+  appendFileSync(
+    env.FAKE_OPENCODE_LOG,
+    `${JSON.stringify({
+      args,
+      cwd: process.cwd(),
+      message,
+      dataHome: env.XDG_DATA_HOME ?? null,
+      apiKey: env.OPENCODE_API_KEY ?? null,
+      config: env.OPENCODE_CONFIG_CONTENT ?? null,
+      projectConfig: env.OPENCODE_DISABLE_PROJECT_CONFIG ?? null,
+      run: env.AGENTES_MCP_RUN ?? null,
+      token: env.AGENTES_MCP_TOKEN ?? null,
+    })}\n`,
+  );
+}
+const sessionID = flag("--session") ?? "ses_fake0001";
+const line = (type, data) => process.stdout.write(`${JSON.stringify({ type, timestamp: 1, sessionID, ...data })}\n`);
+const error = (text) => {
+  line("error", { error: { name: "APIError", data: { message: text } } });
+  process.exit(1);
+};
+if (message.includes("LIMIT")) error("Rate limit exceeded: free usage limit reached, try again later");
+if (message.includes("BADKEY")) error("401 Unauthorized: invalid api key");
+
+line("step_start", { part: { type: "step-start" } });
+if (message.includes("ENV")) {
+  const out = `OPENCODE_API_KEY=${env.OPENCODE_API_KEY ?? ""}`;
+  const state = { status: "completed", input: { command: "env" }, output: out };
+  line("tool_use", { part: { type: "tool", tool: "bash", callID: "call_env", state } });
+  line("text", { part: { type: "text", text: out, time: { start: 1, end: 2 } } });
+  line("step_finish", { part: { type: "step-finish", tokens: { input: 5, output: 1 } } });
+  process.exit(0);
+}
+line("text", { part: { type: "text", text: "Let me check.", time: { start: 1, end: 2 } } });
+line("tool_use", {
+  part: {
+    type: "tool",
+    tool: "bash",
+    callID: "call_1",
+    state: { status: "completed", input: { command: "npm test" }, output: "2 passed\n" },
+  },
+});
+line("tool_use", {
+  part: {
+    type: "tool",
+    tool: "agenteschat_agentes_search",
+    callID: "call_2",
+    state: { status: "completed", input: { q: "x" }, output: "found" },
+  },
+});
+line("step_finish", {
+  part: {
+    type: "step-finish",
+    cost: 0,
+    tokens: { input: 800, output: 30, reasoning: 5, cache: { read: 100, write: 0 } },
+  },
+});
+line("text", { part: { type: "text", text: "All good.", time: { start: 3, end: 4 } } });
+line("step_finish", {
+  part: { type: "step-finish", cost: 0, tokens: { input: 100, output: 5, cache: { read: 0, write: 0 } } },
+});
+process.exit(0);

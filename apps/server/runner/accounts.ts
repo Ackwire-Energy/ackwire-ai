@@ -17,6 +17,7 @@ import {
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
+  OPENCODE_KEY_PROVIDER,
   OWN_USAGE_ID,
   type OwnPlanUsage,
   type PlanUsage,
@@ -35,7 +36,7 @@ import {
 } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { CURSOR_BIN, claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
+import { CURSOR_BIN, claudeKeptPlan, claudePlan, claudeTier, OPENCODE_BIN, resolveCommand } from "./executors";
 import { readSmallJson, writeJson } from "./json-file";
 import {
   codexUsage,
@@ -111,30 +112,46 @@ const MAX_CODE_CHARS = 2000;
 const OUTPUT_KEEP = 16_000;
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
 
-const LABEL: Record<AccountKind, string> = { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor" };
+const LABEL: Record<AccountKind, string> = {
+  claude_code: "Claude Code",
+  codex: "Codex",
+  cursor: "Cursor",
+  opencode: "OpenCode",
+};
 /** Cursor's CLI keeps its config in `CURSOR_CONFIG_DIR` (cursor.com/docs/cli/reference/configuration). */
 const ENV_VAR: Record<AccountKind, string> = {
   claude_code: "CLAUDE_CONFIG_DIR",
   codex: "CODEX_HOME",
   cursor: "CURSOR_CONFIG_DIR",
+  // OpenCode keeps its config, sessions and sign-ins under the XDG folders (`accountEnv` sets them all).
+  opencode: "XDG_DATA_HOME",
 };
 const LOGIN_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "login"],
   codex: ["login", "--device-auth"],
   cursor: ["login"],
+  // Never run: an OpenCode account is its key alone (`begin` refuses a sign-in without one).
+  opencode: ["auth", "login"],
 };
 const STATUS_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "status", "--json"],
   codex: ["login", "status"],
   cursor: ["status"],
+  opencode: ["auth", "list"],
 };
 const LOGOUT_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "logout"],
   codex: ["logout"],
   cursor: ["logout"],
+  opencode: ["auth", "logout"],
 };
 /** Each CLI's executable (Cursor's was `cursor-agent` before it was renamed). */
-const COMMAND: Record<AccountKind, string> = { claude_code: "claude", codex: "codex", cursor: CURSOR_BIN };
+const COMMAND: Record<AccountKind, string> = {
+  claude_code: "claude",
+  codex: "codex",
+  cursor: CURSOR_BIN,
+  opencode: OPENCODE_BIN,
+};
 
 /** What a brain turn says when its account folder is gone (people read it). */
 export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
@@ -144,11 +161,13 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
     "The ChatGPT account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
   cursor:
     "The Cursor account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
+  opencode:
+    "The OpenCode account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT)$/;
 
 /** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
 export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
@@ -162,6 +181,12 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
     env.AGENT_CLI_CREDENTIAL_STORE = "file";
     env.NO_OPEN_BROWSER = "1";
   }
+  if (kind === "opencode") {
+    // Its config, its sessions, its caches: all in the account's folder, so two accounts never share a sign-in.
+    env.XDG_CONFIG_HOME = dir;
+    env.XDG_CACHE_HOME = dir;
+    env.XDG_STATE_HOME = dir;
+  }
   return env;
 }
 
@@ -172,9 +197,28 @@ const CURSOR_KEY = /^[\x21-\x7e]{16,512}$/;
 
 /** A Cursor key account's key (`cursor-key.json`); null when the folder signs in instead. */
 export async function cursorKeyOf(dir: string): Promise<string | null> {
-  const o = readSmallJson(path.join(dir, CURSOR_KEY_FILE), 1000) as Record<string, unknown> | null;
+  return keyIn(dir, CURSOR_KEY_FILE);
+}
+
+/** An OpenCode account keeps its key here (600): an OpenCode key is its only sign-in (ADR 0127). */
+const OPENCODE_KEY_FILE = "opencode-key.json";
+
+/** An OpenCode account's key (`opencode-key.json`); null when it has none (yet). */
+export async function opencodeKeyOf(dir: string): Promise<string | null> {
+  return keyIn(dir, OPENCODE_KEY_FILE);
+}
+
+function keyIn(dir: string, file: string): string | null {
+  const o = readSmallJson(path.join(dir, file), 1000) as Record<string, unknown> | null;
   return typeof o?.key === "string" && CURSOR_KEY.test(o.key) ? o.key : null;
 }
+
+/** The key file and words of a CLI made with an API key alone (Cursor's, chosen; OpenCode's, its only sign-in). */
+const CLI_KEYS = {
+  [CURSOR_KEY_PROVIDER]: { file: CURSOR_KEY_FILE, label: "a Cursor API key" },
+  [OPENCODE_KEY_PROVIDER]: { file: OPENCODE_KEY_FILE, label: "an OpenCode API key" },
+} as const;
+type CliKeyProvider = keyof typeof CLI_KEYS;
 
 /**
  * How Claude Code gets a token root hands over: on descriptor 3, which it reads at its start, then closes, dropping
@@ -823,8 +867,8 @@ interface Login {
   token?: string;
   /** System mode: made for all agents (`<id>.shared` once it signs in). */
   shared: boolean;
-  /** A key account's plan, or `cursor` for a Cursor API key. */
-  provider?: PlanId | typeof CURSOR_KEY_PROVIDER;
+  /** A key account's plan, `cursor` for a Cursor API key, or `zen` for an OpenCode key. */
+  provider?: PlanId | CliKeyProvider;
   state: AccountLoginState;
   output: string;
   /** Claude Code: the ephemeral key the pasted code is sealed to (in memory only). */
@@ -944,9 +988,17 @@ export class AccountManager {
     if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
       throw new RunnerError("bad_request", "That email can't name the account to sign in to");
     }
-    const cursorKey = kind === "cursor" && provider === CURSOR_KEY_PROVIDER;
-    if (provider !== undefined && !cursorKey && (kind !== "claude_code" || !isPlanId(provider))) {
+    const cliKey: CliKeyProvider | null =
+      kind === "cursor" && provider === CURSOR_KEY_PROVIDER
+        ? CURSOR_KEY_PROVIDER
+        : kind === "opencode" && provider === OPENCODE_KEY_PROVIDER
+          ? OPENCODE_KEY_PROVIDER
+          : null;
+    if (provider !== undefined && !cliKey && (kind !== "claude_code" || !isPlanId(provider))) {
       throw new RunnerError("bad_request", "This computer doesn't know that plan");
+    }
+    if (kind === "opencode" && !cliKey) {
+      throw new RunnerError("bad_request", "OpenCode signs in with its API key");
     }
     if (this.logins.get(loginId)?.state === "waiting") {
       throw new RunnerError("bad_request", "This sign-in already exists");
@@ -980,7 +1032,7 @@ export class AccountManager {
       }
     }
     // Claude Code: the key the browser seals the pasted code (or a plan's key) to; the private half stays in memory.
-    const pair = kind === "claude_code" || cursorKey ? await generateSecretKeyPair() : undefined;
+    const pair = kind === "claude_code" || cliKey ? await generateSecretKeyPair() : undefined;
     if (!again) {
       // System mode: agents' users pass through to the one folder lent to each, and list nothing.
       const parents = this.opts.lending ? 0o711 : 0o700;
@@ -997,7 +1049,7 @@ export class AccountManager {
       // Until it signs in: a runner that dies mid sign-in leaves this behind, and the list skips (then clears) it.
       await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
     }
-    if (cursorKey && pair) return this.beginKey(kind, loginId, dir, CURSOR_KEY_PROVIDER, pair, again, false);
+    if (cliKey && pair) return this.beginKey(kind, loginId, dir, cliKey, pair, again, false);
     if (provider && pair) return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again, forAll);
 
     const login: Login = {
@@ -1176,7 +1228,7 @@ export class AccountManager {
     kind: AccountKind,
     loginId: string,
     dir: string,
-    provider: PlanId | typeof CURSOR_KEY_PROVIDER,
+    provider: PlanId | CliKeyProvider,
     pair: { publicKey: string; privateKey: string },
     again: boolean,
     shared: boolean,
@@ -1219,7 +1271,8 @@ export class AccountManager {
   /** The code the person pasted (Claude Code) or a plan's key, sealed to this sign-in's key: written to the CLI, or kept. */
   async code(loginId: string, aad: string, box: WireSecretBox): Promise<void> {
     const login = this.waiting(loginId);
-    if ((login.kind !== "claude_code" && login.provider !== CURSOR_KEY_PROVIDER) || !login.privateKey) {
+    const cliKey = login.provider === CURSOR_KEY_PROVIDER || login.provider === OPENCODE_KEY_PROVIDER;
+    if ((login.kind !== "claude_code" && !cliKey) || !login.privateKey) {
       throw new RunnerError("bad_request", "This sign-in doesn't take a code");
     }
     const org = this.opts.orgId?.();
@@ -1235,7 +1288,9 @@ export class AccountManager {
     } catch {
       throw new RunnerError("bad_request", "The code couldn't be opened (wrong key or altered on the way)");
     }
-    if (login.provider === CURSOR_KEY_PROVIDER) return this.keepCursorKey(login, code);
+    if (login.provider === CURSOR_KEY_PROVIDER || login.provider === OPENCODE_KEY_PROVIDER) {
+      return this.keepCliKey(login, login.provider, code);
+    }
     if (login.provider) return this.keepKey(login, login.provider, code);
     if (!code || code.length > MAX_CODE_CHARS || /[\r\n]/.test(code)) {
       throw new RunnerError("bad_request", "That doesn't look like a sign-in code");
@@ -1263,25 +1318,26 @@ export class AccountManager {
     return !this.opts.lending || this.isShared(kind, id) ? { shared: true } : {};
   }
 
-  /** A Cursor API key, kept in the folder (600, written whole): the account thinks with it. Never logged. */
-  private async keepCursorKey(login: Login, key: string) {
+  /** A Cursor or OpenCode API key, kept in the folder (600, written whole): the account thinks with it. Never logged. */
+  private async keepCliKey(login: Login, provider: CliKeyProvider, key: string) {
+    const { file, label } = CLI_KEYS[provider];
     if (!CURSOR_KEY.test(key))
-      throw new RunnerError("bad_request", "That doesn't look like a Cursor API key. Copy the whole key.");
-    writeJson(path.join(login.dir, CURSOR_KEY_FILE), { key });
+      throw new RunnerError("bad_request", `That doesn't look like ${label}. Copy the whole key.`);
+    writeJson(path.join(login.dir, file), { key });
     await rm(path.join(login.dir, SIGNING_IN), { force: true });
     await rm(this.marker(login.kind, login.id, "invalid"), { force: true });
     const info: RunnerAccountInfo = {
       id: login.id,
       kind: login.kind,
       loggedIn: true,
-      provider: CURSOR_KEY_PROVIDER,
+      provider,
       keyHint: key.slice(-4),
       ...this.sharedFlag(login.kind, login.id),
     };
     this.settle(login, "done");
     login.account = info;
     this.added(info);
-    this.log(`account ${login.id.slice(0, 8)} (cursor key) kept`);
+    this.log(`account ${login.id.slice(0, 8)} (${provider} key) kept`);
   }
 
   /** A plan's key, checked and kept in the folder (600, written whole): the account is signed in. Never logged. */
@@ -1480,6 +1536,13 @@ export class AccountManager {
     if (cursorKey) {
       return { id, kind, loggedIn: !refused, provider: CURSOR_KEY_PROVIDER, keyHint: cursorKey.slice(-4), ...shared };
     }
+    if (kind === "opencode") {
+      // Its key is its only sign-in: no key, signed out (its CLI is never asked).
+      const key = await opencodeKeyOf(dir);
+      return key
+        ? { id, kind, loggedIn: !refused, provider: OPENCODE_KEY_PROVIDER, keyHint: key.slice(-4), ...shared }
+        : { id, kind, loggedIn: false, ...shared };
+    }
     if (this.isShared(kind, id)) return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
     if (refused || this.lentTo(kind, id) !== null) {
       const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
@@ -1598,7 +1661,8 @@ export class AccountManager {
     else if (
       !this.isShared(kind, id) &&
       !(kind === "claude_code" && (await planKeyOf(dir))) &&
-      !(kind === "cursor" && (await cursorKeyOf(dir)))
+      !(kind === "cursor" && (await cursorKeyOf(dir))) &&
+      kind !== "opencode"
     ) {
       const r = await runCli(this.command(kind), LOGOUT_ARGS[kind], this.env(kind, dir), STATUS_TIMEOUT_MS);
       if (r.status !== 0) this.log(`account ${id.slice(0, 8)} (${kind}): sign-out didn't finish; removing it anyway`);
@@ -1829,7 +1893,8 @@ export class AccountManager {
     if (!own && (this.lentTo(target.kind, id) !== null || this.isShared(target.kind, id))) return null;
     const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
     // Cursor's CLI reports no plan usage: its turns' `usage` is all there is.
-    if (target.kind === "cursor") return null;
+    // Nor does OpenCode's: its key's usage is on OpenCode's console.
+    if (target.kind === "cursor" || target.kind === "opencode") return null;
     return target.kind === "codex" ? probeCodexUsage(probe) : probeClaudeUsage(probe);
   }
 

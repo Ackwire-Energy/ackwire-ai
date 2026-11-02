@@ -213,7 +213,7 @@ const OUTPUT_MAX = 1 << 20;
  */
 export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Promise<BrainRouteReply> {
   if (process.platform === "win32") throw new RunnerError("not_allowed", "Plans don't pick who answers on Windows yet");
-  if (!isAccountKind(req.kind) || req.kind === "cursor") {
+  if (!isAccountKind(req.kind) || req.kind === "cursor" || req.kind === "opencode") {
     throw new RunnerError("bad_request", "kind must be claude_code or codex");
   }
   if (typeof req.system !== "string" || req.system.length > ROUTE_LIMITS.system) {
