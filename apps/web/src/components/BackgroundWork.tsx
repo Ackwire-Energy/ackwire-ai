@@ -191,7 +191,7 @@ export function IssueCardWork({ issue }: { issue: Issue }) {
             {t("work.plan")} · {t("work.planProgress", progress)}
           </span>
           {step && (
-            <span className="issue-card__step" data-state={issue.blocked ? "blocked" : step.state}>
+            <span className="ac-iconline issue-card__step" data-state={issue.blocked ? "blocked" : step.state}>
               <span className="issue-card__step-mark" aria-hidden="true" />
               {step.text}
             </span>

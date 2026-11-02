@@ -8,8 +8,8 @@ import type {
   MemberPresence,
   MemberStatus,
 } from "../api/types";
-import { workStatusText } from "./long-work";
 import { clockHour } from "./format";
+import { workStatusText } from "./long-work";
 
 /**
  * Presence and written status (ADR 0084), platform-neutral: what you pick, the suggestions, when a status

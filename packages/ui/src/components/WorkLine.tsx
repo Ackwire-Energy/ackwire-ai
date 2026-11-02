@@ -25,7 +25,7 @@ export function WorkLine({
   className?: string;
 }) {
   return (
-    <div className={cx("ac-workline", `ac-workline--${tone}`, className)} role="status">
+    <div className={cx("ac-iconline", "ac-workline", `ac-workline--${tone}`, className)} role="status">
       <span className="ac-workline__mark" aria-hidden="true">
         {tone === "working" ? <Spinner size={14} /> : <WorkMark tone={tone} />}
       </span>

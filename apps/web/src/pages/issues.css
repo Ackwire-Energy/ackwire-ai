@@ -389,7 +389,6 @@ html:not([data-pointer]) .issue-card:focus-visible {
 .issue-card__step {
   display: flex;
   gap: 6px;
-  align-items: baseline;
   color: var(--ink2);
 }
 .issue-card__step[data-state="todo"] {
@@ -405,7 +404,6 @@ html:not([data-pointer]) .issue-card:focus-visible {
   flex: none;
   border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px var(--line-strong);
-  transform: translateY(-1px);
 }
 .issue-card__step[data-state="doing"] .issue-card__step-mark {
   background: var(--agent);
