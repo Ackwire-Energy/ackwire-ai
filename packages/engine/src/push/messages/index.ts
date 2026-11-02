@@ -16,7 +16,8 @@ import { strings as zhHans } from "./zh-Hans";
 
 export type { PushStrings };
 
-const STRINGS: Record<AppLocale, Partial<PushStrings>> = {
+/** Every language's translation as written (`bun run i18n:status` counts them). */
+export const PUSH: Record<AppLocale, Partial<PushStrings>> = {
   en,
   "pt-BR": ptBR,
   es,
@@ -34,4 +35,4 @@ const STRINGS: Record<AppLocale, Partial<PushStrings>> = {
 };
 
 /** A language's push words, English where it has none. */
-export const pushStrings = (locale: AppLocale): PushStrings => ({ ...en, ...STRINGS[locale] });
+export const pushStrings = (locale: AppLocale): PushStrings => ({ ...en, ...PUSH[locale] });

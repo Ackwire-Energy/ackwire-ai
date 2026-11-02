@@ -21,7 +21,8 @@ type DeepPartial<T> = { [K in keyof T]?: T[K] extends (...args: never[]) => unkn
 /** A translation of the emails: any word group or word English has, in the same shape. */
 export type EmailWords = DeepPartial<Words>;
 
-const WORDS: Record<AppLocale, EmailWords> = {
+/** Every language's translation as written (`bun run i18n:status` counts them). */
+export const WORDS: Record<AppLocale, EmailWords> = {
   en,
   "pt-BR": ptBR,
   es,
