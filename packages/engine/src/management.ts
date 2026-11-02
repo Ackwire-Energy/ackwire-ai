@@ -10,6 +10,7 @@ import {
   CHANNEL_NAME_PATTERN,
   channelRoleIds,
   dropRoleLeavers,
+  managesChannel,
   placesAgentsIn,
   readableChannelIds,
 } from "./channels";
@@ -477,7 +478,7 @@ export async function updateChannel(
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+  if (!(await managesChannel(db, membership, actorId, channel))) {
     throw new ForbiddenError("Only the channel's creator or an admin can change it");
   }
   const name = input.name?.trim().toLowerCase();

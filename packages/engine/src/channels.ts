@@ -546,8 +546,21 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
 }
 
 /**
+ * Who manages a channel (its name, members, category, archiving): `manage_channels`, or its creator only while still
+ * in it, so a creator taken out of it can't put himself back. The apps mirror it (`managesChannel` in packages/client).
+ */
+export const managesChannel = async (
+  db: Database,
+  membership: Membership,
+  actorId: string,
+  channel: { id: string; orgId: string; createdByUserId: string | null },
+) =>
+  can(membership, "manage_channels") ||
+  (channel.createdByUserId === actorId && (await isChannelMember(db, channel.orgId, channel.id, actorId)));
+
+/**
  * Where `actorId` may put an agent of theirs (or any, with `manage_agents`) or take it out (ADR 0085 §5): a channel
- * they're in and may post in, or one they manage (its creator, `manage_channels`). One rule for an agent's page
+ * they're in and may post in or created, or any with `manage_channels`. One rule for an agent's page
  * (`setAgentChannels`) and a channel's members; the apps mirror it (`addsAgentsTo` in packages/client).
  */
 export const placesAgentsIn = (
@@ -555,7 +568,8 @@ export const placesAgentsIn = (
   actorId: string,
   channel: { createdByUserId: string | null },
   actorIn: boolean,
-) => (actorIn && can(membership, "post")) || channel.createdByUserId === actorId || can(membership, "manage_channels");
+) =>
+  (actorIn && (can(membership, "post") || channel.createdByUserId === actorId)) || can(membership, "manage_channels");
 
 /**
  * Refuses unless `actorId` may put `agentId` in `channel` or take it out: the agent theirs or `manage_agents`, and
@@ -607,7 +621,7 @@ export async function addChannelMember(
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
   if ("userId" in member) {
-    if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+    if (!(await managesChannel(db, membership, actorId, channel))) {
       throw new ForbiddenError("Only the channel's creator or an admin can add members");
     }
     if (!(await getMembership(db, member.userId, orgId))) {
@@ -666,7 +680,10 @@ export async function setChannelAgentAutoReply(
       ),
     );
   if (!row) throw new NotFoundError("That agent is not in this channel");
-  if (row.createdBy !== actorId && row.ownerUserId !== actorId && !can(membership, "manage_channels")) {
+  if (
+    row.ownerUserId !== actorId &&
+    !(await managesChannel(db, membership, actorId, { id: channelId, orgId, createdByUserId: row.createdBy }))
+  ) {
     throw new ForbiddenError("Only the channel's creator, an admin or the agent's owner can change this");
   }
   await db
@@ -713,7 +730,7 @@ export async function removeChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
-  if (!self && channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+  if (!self && !(await managesChannel(db, membership, actorId, channel))) {
     if ("userId" in member) throw new ForbiddenError("Only the channel's creator or an admin can remove members");
     await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   }
@@ -750,7 +767,7 @@ async function archivableChannel(db: Database, actorId: string, orgId: string, c
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+  if (!(await managesChannel(db, membership, actorId, channel))) {
     throw new ForbiddenError("Only the channel's creator or an admin can archive it");
   }
   return channel;

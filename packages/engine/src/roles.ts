@@ -382,6 +382,24 @@ export async function givableRoleIds(db: Executor, actor: Membership, orgId: str
   return rows.map((r) => r.id);
 }
 
+/**
+ * The ids among `ids` that `actor` could still give today (`givableRoleIds`, by someone who may invite), the others
+ * left out: none when `actor` is no longer a member.
+ */
+export async function stillGivableRoleIds(
+  db: Executor,
+  actor: Membership | null,
+  orgId: string,
+  ids: readonly string[],
+) {
+  if (!actor || !can(actor, "invite_people") || ids.length === 0) return [];
+  const rows = await db
+    .select({ id: orgRoles.id, position: orgRoles.position, permissions: orgRoles.permissions })
+    .from(orgRoles)
+    .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, [...new Set(ids)])));
+  return rows.filter((r) => outranks(actor, r.position) && holdsAll(actor, r.permissions)).map((r) => r.id);
+}
+
 /** The ids among `ids` that are still custom roles of the workspace. */
 export async function rolesStillThere(db: Executor, orgId: string, ids: readonly string[]) {
   if (ids.length === 0) return [];
