@@ -14,6 +14,7 @@ import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
+import { forPeople } from "../lib/consultations";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
 import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
@@ -2143,7 +2144,11 @@ export const useConsultationConversation = (orgId: string, channelId: string, co
   const api = useApi();
   return useQuery({
     queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
-    queryFn: () => api.agents.consultation(orgId, channelId, consultationId ?? ""),
+    // The relay line the server opens a mention to an agent outside the conversation with is the agent's, not people's.
+    queryFn: async () => {
+      const talk = await api.agents.consultation(orgId, channelId, consultationId ?? "");
+      return talk && { ...talk, ...forPeople(talk) };
+    },
     enabled: consultationId !== null,
     refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
   });

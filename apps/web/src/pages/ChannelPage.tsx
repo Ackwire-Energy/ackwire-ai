@@ -3557,9 +3557,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         <Parts resetKey={m}>
           <WaitLine work={live.work} color={colorOf(agent)} />
           <LiveRunStatus run={live} quietOnly />
-          {m.author.id && m.agentRunId && (
-            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
-          )}
+          {m.author.id && m.agentRunId && <ConsultGroup runId={m.agentRunId} askerId={m.author.id} />}
           <RunBrowserCard run={live} name={name} />
           <span className="ac-visually-hidden">{t("channel.writing")}</span>
         </Parts>
@@ -3622,9 +3620,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           ) : (
             !liveFailed && <LiveRunStatus run={live} />
           )}
-          {m.author.id && m.agentRunId && (
-            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
-          )}
+          {m.author.id && m.agentRunId && <ConsultGroup runId={m.agentRunId} askerId={m.author.id} />}
           {/* Its tools, as on its saved message: one line (what it does now) opening into each call. */}
           <LiveTools
             work={opening.work}
@@ -3648,10 +3644,13 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {routine && report && reportOpen && <RoutineReport text={report} />}
           {quoted && <QuotedMessage reply={quoted} />}
-          {m.author.id &&
-            consulted.map((c) => (
-              <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />
-            ))}
+          {m.author.id && consulted.length > 0 && (
+            <div className="ac-talks">
+              {consulted.map((c) => (
+                <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />
+              ))}
+            </div>
+          )}
           {!missionCard &&
             // A request says its action itself ("Pedido de aprovação: …" would repeat it).
             !approvalId &&
@@ -3762,7 +3761,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
           {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
-            <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
+            <ConsultGroup runId={replyRun} askerId={m.author.id} saved />
           )}
           {keptSteps?.length && seenLive ? (
             <LiveTools

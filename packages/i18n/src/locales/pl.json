@@ -11540,6 +11540,13 @@
       "answeredRequestFar_female": "Odpowiedź od {{to}} na prośbę od {{from}}",
       "see": "Zobacz"
     },
+    "agentTalk": {
+      "waiting": "rozmawiają…",
+      "waitingFor": "rozmawiają od {{time}}",
+      "answered": "jest odpowiedź",
+      "answeredIn": "odpowiedź po {{time}}",
+      "failed": "brak odpowiedzi"
+    },
     "consultPanel": {
       "label": "Rozmowa między {{from}} a {{to}}",
       "title": "{{from}} ⇄ {{to}}",

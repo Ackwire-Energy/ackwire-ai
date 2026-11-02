@@ -27,7 +27,8 @@ import {
   decisionOutcome,
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
-import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
+import { consultAskedKey, openableConsultation } from "@agenteschat/client/lib/consult-group";
+import { withoutRelayLine } from "@agenteschat/client/lib/consultations";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
@@ -56,6 +57,7 @@ import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { askEndedAt } from "./ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "./asks";
+import { AgentTalkPill, TalkPills } from "./ConsultGroup";
 import { markName, threadFaces } from "./logic";
 
 /**
@@ -65,14 +67,31 @@ import { markName, threadFaces } from "./logic";
 
 // ── Consultation ─────────────────────────────────────────────────────────────
 
-/** "Infra respondeu": what the agent asked another agent before answering, in a private conversation. */
+/**
+ * What the agent asked another agent before answering, in a private conversation: the two agents' pill opening it
+ * ("Ada ⇄ Infra · respondeu"); with no conversation to open, "Infra respondeu" opening to the question and answer.
+ */
 export function ConsultationCard({
   askerId,
   consultation: cs,
+  channelId,
 }: {
   askerId: string;
   consultation: MessageConsultation;
+  /** The conversation it was asked from: the pill opens the two agents' talk from it. */
+  channelId?: string;
 }) {
+  const id = openableConsultation(cs.consultationId);
+  if (id && channelId)
+    return (
+      <TalkPills>
+        <AgentTalkPill consultationId={id} channelId={channelId} fromId={askerId} toId={cs.agentId} stored={cs} />
+      </TalkPills>
+    );
+  return <ConsultationDetails askerId={askerId} consultation={cs} />;
+}
+
+function ConsultationDetails({ askerId, consultation: cs }: { askerId: string; consultation: MessageConsultation }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
@@ -115,7 +134,7 @@ export function ConsultationCard({
             {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
           </Text>
           <Text variant="small" tone="muted">
-            {cs.question}
+            {withoutRelayLine(cs.question)}
           </Text>
           <Text variant="caption" tone="faint" style={[styles.bold, styles.gap]}>
             {t(`mobile.chat.consult.answerOf${gn}`, { name })}

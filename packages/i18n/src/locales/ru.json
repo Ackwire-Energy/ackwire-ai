@@ -11492,6 +11492,13 @@
       "answeredRequestFar": "{{to}} ответил на запрос {{from}}",
       "see": "Показать"
     },
+    "agentTalk": {
+      "waiting": "общаются…",
+      "waitingFor": "общаются уже {{time}}",
+      "answered": "есть ответ",
+      "answeredIn": "ответ за {{time}}",
+      "failed": "нет ответа"
+    },
     "consultPanel": {
       "label": "Разговор между {{from}} и {{to}}",
       "title": "{{from}} ⇄ {{to}}",

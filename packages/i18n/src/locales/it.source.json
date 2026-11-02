@@ -20810,6 +20810,9 @@
   "connectors.toolChanges.description": {
     "value": "Text"
   },
+  "connectors.toolChanges.input": {
+    "value": "Input"
+  },
   "connectors.toolChanges.field.added": {
     "value": "new"
   },
@@ -20825,14 +20828,11 @@
   "connectors.toolChanges.removed": {
     "value": "Removed"
   },
-  "connectors.toolChanges.acceptOne": {
-    "value": "Accept {{tool}}"
-  },
-  "connectors.toolChanges.input": {
-    "value": "Input"
-  },
   "connectors.toolChanges.accept": {
     "value": "Accept"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.accepted": {
     "value": "{{tool}} updated."
@@ -26202,6 +26202,21 @@
   },
   "chat.consultGroup.see": {
     "value": "See"
+  },
+  "chat.agentTalk.waiting": {
+    "value": "talking…"
+  },
+  "chat.agentTalk.waitingFor": {
+    "value": "talking for {{time}}"
+  },
+  "chat.agentTalk.answered": {
+    "value": "answered"
+  },
+  "chat.agentTalk.answeredIn": {
+    "value": "answered in {{time}}"
+  },
+  "chat.agentTalk.failed": {
+    "value": "no answer"
   },
   "chat.consultPanel.label": {
     "value": "Conversation between {{from}} and {{to}}"

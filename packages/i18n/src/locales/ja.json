@@ -10398,6 +10398,13 @@
       "answeredRequestFar": "{{to}}が{{from}}の依頼に回答しました",
       "see": "見る"
     },
+    "agentTalk": {
+      "waiting": "やり取り中…",
+      "waitingFor": "やり取り中（{{time}}）",
+      "answered": "回答済み",
+      "answeredIn": "{{time}}で回答",
+      "failed": "回答なし"
+    },
     "consultPanel": {
       "label": "{{from}}と{{to}}の会話",
       "title": "{{from}} ⇄ {{to}}",

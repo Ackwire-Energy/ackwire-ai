@@ -10796,6 +10796,13 @@
       "answeredRequestFar": "{{to}} hat die Anfrage von {{from}} beantwortet",
       "see": "Ansehen"
     },
+    "agentTalk": {
+      "waiting": "spricht…",
+      "waitingFor": "spricht seit {{time}}",
+      "answered": "hat geantwortet",
+      "answeredIn": "hat in {{time}} geantwortet",
+      "failed": "keine Antwort"
+    },
     "consultPanel": {
       "label": "Unterhaltung zwischen {{from}} und {{to}}",
       "title": "{{from}} ⇄ {{to}}",

@@ -10729,6 +10729,13 @@
       "answeredRequestFar": "{{to}}, {{from}} ajanının isteğini yanıtladı",
       "see": "Gör"
     },
+    "agentTalk": {
+      "waiting": "konuşuyor…",
+      "waitingFor": "{{time}} süredir konuşuyor",
+      "answered": "yanıtladı",
+      "answeredIn": "{{time}} içinde yanıtladı",
+      "failed": "yanıt yok"
+    },
     "consultPanel": {
       "label": "{{from}} ile {{to}} arasındaki konuşma",
       "title": "{{from}} ⇄ {{to}}",

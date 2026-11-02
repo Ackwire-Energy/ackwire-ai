@@ -10482,6 +10482,13 @@
       "answeredRequestFar_female": "{{to}} 回应了 {{from}} 的请求",
       "see": "查看"
     },
+    "agentTalk": {
+      "waiting": "交流中…",
+      "waitingFor": "已交流 {{time}}",
+      "answered": "已回复",
+      "answeredIn": "{{time}} 内回复",
+      "failed": "没有回复"
+    },
     "consultPanel": {
       "label": "{{from}} 和 {{to}} 之间的对话",
       "title": "{{from}} ⇄ {{to}}",

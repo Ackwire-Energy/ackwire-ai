@@ -148,7 +148,7 @@ export function NoticeLine({ message }: { message: Message }) {
   const consulted = consultationOfNotice(message.meta);
   if (consulted)
     return (
-      <div className="cn-line" data-message-id={message.id}>
+      <div className="ac-talks" data-message-id={message.id}>
         <ConsultationCard consultation={consulted.consultation} askerId={consulted.askerId} />
       </div>
     );

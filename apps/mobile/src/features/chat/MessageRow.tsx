@@ -480,7 +480,12 @@ export const MessageRow = memo(function MessageRow({
           </View>
         ) : null}
         {consulted.map((cs) => (
-          <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
+          <ConsultationCard
+            key={cs.consultationId}
+            askerId={m.author.id ?? ""}
+            consultation={cs}
+            channelId={m.channelId}
+          />
         ))}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {brainWait ? (
@@ -549,7 +554,7 @@ export const MessageRow = memo(function MessageRow({
         {cards}
         {/* Its tools after its words, what it changed and its cards: the same place live, kept and saved. */}
         {isAgent && m.agentRunId && !m.local && !readOnly && !mediaAfter && consulted.length === 0 ? (
-          <ConsultGroup message={m} color={color} />
+          <ConsultGroup message={m} />
         ) : null}
         {kept ? (
           <TurnTools

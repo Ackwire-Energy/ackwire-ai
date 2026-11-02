@@ -11159,6 +11159,13 @@
       "answeredRequestFar": "{{to}} respondió el pedido de {{from}}",
       "see": "Ver"
     },
+    "agentTalk": {
+      "waiting": "conversando…",
+      "waitingFor": "conversando desde hace {{time}}",
+      "answered": "respondió",
+      "answeredIn": "respondió en {{time}}",
+      "failed": "sin respuesta"
+    },
     "consultPanel": {
       "label": "Conversación entre {{from}} y {{to}}",
       "title": "{{from}} ⇄ {{to}}",

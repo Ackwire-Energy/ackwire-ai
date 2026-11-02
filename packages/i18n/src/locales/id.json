@@ -10465,6 +10465,13 @@
       "answeredRequestFar": "{{to}} menjawab permintaan {{from}}",
       "see": "Lihat"
     },
+    "agentTalk": {
+      "waiting": "sedang bicara…",
+      "waitingFor": "bicara selama {{time}}",
+      "answered": "menjawab",
+      "answeredIn": "menjawab dalam {{time}}",
+      "failed": "tidak ada jawaban"
+    },
     "consultPanel": {
       "label": "Percakapan antara {{from}} dan {{to}}",
       "title": "{{from}} ⇄ {{to}}",
