@@ -18,9 +18,11 @@ import {
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
+import { choiceReplyLine } from "@agenteschat/client/lib/choices";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
+import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
@@ -180,9 +182,14 @@ export const MessageRow = memo(function MessageRow({
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a
   // task ran is said only where the workspace has more than one computer.
   const names = useNamesComputers();
-  const body = hidesBody(m)
+  const said = hidesBody(m)
     ? ""
     : reminderBody(splitCanceled(serverBody(t, m.body, meta, i18n.language, names), meta).body, meta);
+  // A long work's anchor once it's over: no promise left, and dimmed (its line says how it ended).
+  const body = m.longWork ? workAnchorBody(t, said, meta, m.longWork) : said;
+  const workOver = Boolean(m.longWork && workIsOver(m.longWork));
+  // The person's pick on a choice card (ADR 0124): one compact line, not a bubble.
+  const choiceReply = meta?.choiceReply && body ? <ChoiceReply text={choiceReplyLine(body)} /> : null;
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);
@@ -211,6 +218,8 @@ export const MessageRow = memo(function MessageRow({
   const stopped = isAgent && m.agentRunId && !mediaAfter ? stoppedOf(meta) : null;
   // The reply of a run that reached its step limit: the same line, with Continuar.
   const atLimit = isAgent && m.agentRunId && !stopped && !mediaAfter ? stepLimitOf(meta) : null;
+  // A long work's end after its AI provider failed: Continuar under it too.
+  const providerCut = isAgent && m.agentRunId && !stopped && !atLimit ? workContinuable(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
@@ -308,7 +317,9 @@ export const MessageRow = memo(function MessageRow({
 
   if (mine) {
     // The bubble, or the GIF or sticker or the files of a message with no words, leads.
-    const lead = body ? (
+    const lead = choiceReply ? (
+      <View style={styles.meFiles}>{choiceReply}</View>
+    ) : body ? (
       <View style={[styles.bubble, BUBBLE_RUN[run], { backgroundColor: c.bubble }]}>
         <MessageText
           body={body}
@@ -487,22 +498,29 @@ export const MessageRow = memo(function MessageRow({
               ) : null
             }
           />
+        ) : choiceReply ? (
+          choiceReply
         ) : body ? (
           <MessageText
             body={body}
-            muted={m.local === "pending"}
+            muted={m.local === "pending" || workOver}
             selectable={false}
             accent={accent}
             channelRefs={channelRefsOf(m.meta)}
           />
         ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
-        {(stopped || atLimit) && m.agentRunId ? (
+        {(stopped || atLimit || providerCut) && m.agentRunId ? (
           <StoppedLine
             message={m}
             runId={m.agentRunId}
-            stopped={stopped ?? { byUserId: null, continuedRunId: atLimit?.continuedRunId ?? null }}
-            limit={atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
+            stopped={
+              stopped ?? {
+                byUserId: null,
+                continuedRunId: atLimit?.continuedRunId ?? providerCut?.continuedRunId ?? null,
+              }
+            }
+            limit={providerCut ? "failed" : atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
           />
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
@@ -602,8 +620,11 @@ function StoppedLine({
   message: Message;
   runId: string;
   stopped: { byUserId: string | null; continuedRunId: string | null };
-  /** It ended at its step limit, or because it got stuck: nobody stopped it. */
-  limit?: "steps" | "stuck";
+  /**
+   * It ended at its step limit, or because it got stuck, or its long work failed on its AI provider (the end's text
+   * already says so, so only Continuar shows): nobody stopped it.
+   */
+  limit?: "steps" | "stuck" | "failed";
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -654,17 +675,23 @@ function StoppedLine({
         });
       });
   };
+  const said = limit !== "failed";
+  if (!said && !open) return null;
   return (
     <View style={styles.stopped}>
-      <PixelStopped size={12} />
-      <Text variant="caption" tone="muted">
-        {by}
-      </Text>
+      {said ? <PixelStopped size={12} /> : null}
+      {said ? (
+        <Text variant="caption" tone="muted">
+          {by}
+        </Text>
+      ) : null}
       {open ? (
         <>
-          <Text variant="caption" tone="faint">
-            ·
-          </Text>
+          {said ? (
+            <Text variant="caption" tone="faint">
+              ·
+            </Text>
+          ) : null}
           <PressScale
             onPress={onContinue}
             accessibilityRole="button"
@@ -679,6 +706,19 @@ function StoppedLine({
           </PressScale>
         </>
       ) : null}
+    </View>
+  );
+}
+
+/** The person's pick sent from a choice card (ADR 0124): a check and what they picked. */
+function ChoiceReply({ text }: { text: string }) {
+  const c = useColors();
+  return (
+    <View style={styles.choiceReply}>
+      <Icon name="check" size={13} color={c.muted} />
+      <Text variant="footnote" tone="ink" style={[styles.medium, styles.shrink]}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -837,6 +877,7 @@ const styles = StyleSheet.create({
   cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
+  choiceReply: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 },
   // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
   who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
   // A person's name line keeps room at its end for the receipt's mark, with or without one, so a mark that comes

@@ -48,7 +48,7 @@ import {
   orgAutoModels,
   withAuto,
 } from "./auto-model";
-import { SHOW_BLOCK_TOOL } from "./blocks";
+import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL } from "./blocks";
 import { brainOf } from "./brain-settings";
 import { missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
@@ -1402,6 +1402,7 @@ async function executeRunInner(
         followUp: tools.some((t) => t.name === FOLLOW_UP_TOOL),
         work: tools.some((t) => t.name === WORK_IN_BACKGROUND_TOOL),
         blocks: tools.some((t) => t.name === SHOW_BLOCK_TOOL),
+        choices: tools.some((t) => t.name === ASK_CHOICES_TOOL),
         capabilities: [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),

@@ -5,6 +5,7 @@ import {
   type ArtifactDeps,
   type ArtifactKind,
   artifactOrigins,
+  choicesText,
   createArtifact,
   diffToPatch,
   getArtifact,
@@ -62,6 +63,7 @@ function contentFrom(kind: ArtifactKind, input: Record<string, unknown>): unknow
     case "block":
       return { kind, html: input.html };
     case "poll":
+    case "choices":
     case "file":
       // Refused: files come from bytes (upload_file), and a poll stays as it was asked.
       return { kind };
@@ -89,6 +91,8 @@ function asText(content: ArtifactContent): string {
       return content.html;
     case "poll":
       return [content.question, ...content.options.map((o) => `- ${o}`)].join("\n");
+    case "choices":
+      return choicesText(content.questions);
   }
 }
 

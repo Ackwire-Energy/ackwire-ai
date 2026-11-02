@@ -52,6 +52,16 @@ export const featureKeysPtBR = {
     pollAnswered_other: "{{count}} de {{total}} responderam",
     voteFailed: "Não deu para registrar seu voto.",
   },
+  choices: {
+    step: "{{step}} de {{total}}",
+    back: "Voltar",
+    next: "Próxima",
+    close: "Fechar",
+    closed: "{{title}} · fechado",
+    reopen: "Mostrar de novo",
+    answeredBy: "{{name}} escolheu",
+    failed: "Não deu para mandar sua escolha. Tente de novo.",
+  },
   chart: {
     pending: "Montando o gráfico…",
     table: "Tabela",

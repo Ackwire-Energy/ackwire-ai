@@ -159,6 +159,7 @@ function PreviewBody({
     case "html":
     case "block":
     case "poll":
+    case "choices":
       return (
         <div className="drive-pv__sheet drive-pv__browser">
           <span className="drive-pv__bar">

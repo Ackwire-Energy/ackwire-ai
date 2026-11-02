@@ -721,3 +721,52 @@ test("Continuar on a work stopped at its step limit carries the same work", asyn
   expect(next?.threadRootId).toBe(work?.anchorMessageId as string);
   expect((await workView(f.db, f.org.id, work?.id ?? ""))?.status).toBe("live");
 });
+
+test("Continuar on a work its AI provider cut off goes on from its end, once; other failures don't", async () => {
+  f = await setup();
+  const fail = async (body: string, error: string) => {
+    const run = await working(body);
+    const { work } = await moved(run);
+    const transcript = { system: [], messages: [], postedUpTo: 0, postedCount: 0, deltaSeq: 0 };
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "failed", error, transcript })
+      .where(eq(schema.agentRuns.id, run.id));
+    await endWork(deps(), { ...run, workId: work.id, error }, "failed");
+    return { run, work };
+  };
+  const { run, work } = await fail("@dev migra a cobrança", "provider_error: overloaded");
+  const [closed] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, work.id));
+  const end = (await messages()).find((m) => m.id === closed?.resultMessageId);
+  expect(end?.agentRunId).toBe(run.id);
+  expect(end?.meta.workEnd).toMatchObject({ status: "failed", errorCode: "run.provider_error" });
+
+  const { runId } = await continueRun(deps(), f.owner.id, f.org.id, run.id);
+  const [next] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, runId));
+  expect(next).toMatchObject({ workId: work.id, triggerMessageId: end?.id, threadRootId: work.anchorMessageId });
+  expect((await workView(f.db, f.org.id, work.id))?.status).toBe("live");
+  const [marked] = await f.db
+    .select()
+    .from(schema.messages)
+    .where(eq(schema.messages.id, end?.id ?? ""));
+  expect(marked?.meta.workEnd).toMatchObject({ status: "failed", continuedRunId: runId });
+  await expect(continueRun(deps(), f.owner.id, f.org.id, run.id)).rejects.toThrow("can't be continued");
+
+  const budget = await fail("@dev outra coisa", "budget_exceeded");
+  await expect(continueRun(deps(), f.owner.id, f.org.id, budget.run.id)).rejects.toThrow("can't be continued");
+});
+
+test("a work's card from a DM stays with who reads the DM until someone shows it to everyone", async () => {
+  f = await setup();
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  const made = await moved(await working("monta o relatório", undefined, dm.id), { card: true, title: "Relatório" });
+  const [w] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, made.work.id));
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const seen = async (userId: string) =>
+    (await listIssues(f.db, { type: "person", userId }, f.org.id)).some((i) => i.id === w?.issueId);
+  expect(await seen(f.owner.id)).toBe(true);
+  expect(await seen(bia.id)).toBe(false);
+  const { shareIssueWithEveryone } = await import("../src");
+  await shareIssueWithEveryone(deps(), { type: "person", userId: f.owner.id }, f.org.id, w?.issueId ?? "");
+  expect(await seen(bia.id)).toBe(true);
+});

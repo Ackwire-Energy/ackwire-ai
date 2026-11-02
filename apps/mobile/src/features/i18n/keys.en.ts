@@ -46,6 +46,16 @@ export const featureKeysEn = {
     pollAnswered_other: "{{count}} of {{total}} answered",
     voteFailed: "Your vote didn't go through.",
   },
+  choices: {
+    step: "{{step}} of {{total}}",
+    back: "Back",
+    next: "Next",
+    close: "Close",
+    closed: "{{title}} · closed",
+    reopen: "Show again",
+    answeredBy: "{{name}} picked",
+    failed: "Your pick didn't go through. Try again.",
+  },
   chart: {
     pending: "Building the chart…",
     table: "Table",

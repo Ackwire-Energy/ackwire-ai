@@ -1,9 +1,17 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, count, type Database, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
-import { type ArtifactDeps, createConversationArtifact, getArtifact, updateArtifact } from "./artifacts";
+import {
+  type ArtifactDeps,
+  type ChoiceQuestion,
+  createConversationArtifact,
+  getArtifact,
+  updateArtifact,
+} from "./artifacts";
+import { runAuthorityById } from "./authority";
 import { requireChannelAccess } from "./channels";
 import { publishDelivery } from "./delivery";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { isAgentOnlyDm } from "./dms";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
@@ -16,7 +24,7 @@ import { replyThreadOf } from "./runs";
 import type { Talker } from "./talker";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
-const { agentRuns, agents, artifacts, channelMembers, channels, pollVotes, polls, users } = schema;
+const { agentRuns, agents, artifacts, channelMembers, channels, choiceAnswers, pollVotes, polls, users } = schema;
 
 /**
  * What lives in a conversation and not in the Drive (ADR 0113). A file is for keeping; a block is for using now: a
@@ -26,6 +34,7 @@ const { agentRuns, agents, artifacts, channelMembers, channels, pollVotes, polls
 
 export const SHOW_BLOCK_TOOL = "show_block";
 export const START_POLL_TOOL = "start_poll";
+export const ASK_CHOICES_TOOL = "ask_choices";
 export const POLL_CLOSE_JOB = "poll.close";
 
 const DEFAULT_POLL_HOURS = 24;
@@ -236,12 +245,14 @@ export async function closePoll(deps: ArtifactDeps, orgId: string, artifactId: s
   return poll;
 }
 
+type ReplyDeps = ArtifactDeps & { pubsub: PubSub; judge?: Judge; talker?: Talker };
+
 /**
  * What a person sent back from a block: their own message to the agent that made it, in the block's place. The apps
  * show this exact text beside the button, outside the block: the block proposes, the person sends.
  */
 export async function replyToBlock(
-  deps: ArtifactDeps & { pubsub: PubSub; judge?: Judge; talker?: Talker },
+  deps: ReplyDeps,
   userId: string,
   orgId: string,
   artifactId: string,
@@ -252,6 +263,20 @@ export async function replyToBlock(
   const text = input.text.trim();
   if (!text) throw new ValidationError("Nothing to send");
   if (text.length > BLOCK_REPLY_CHARS) throw new ValidationError("That is too long to send");
+  return replyAsPerson(deps, userId, orgId, a, text, { blockReply: { id: a.id, title: a.title } }, input.clientId);
+}
+
+/** The person's own message to the agent that made `a`, where `a` is: in a channel it names the agent. */
+async function replyAsPerson(
+  deps: ReplyDeps,
+  userId: string,
+  orgId: string,
+  a: { channelId: string | null; threadId: string | null; createdBy: { id: string } },
+  text: string,
+  meta: Record<string, unknown>,
+  clientId?: string | null,
+): Promise<MessageView> {
+  if (!a.channelId) throw new NotFoundError("Not in a conversation");
   const [where] = await deps.db
     .select({ kind: channels.kind, handle: agents.handle })
     .from(channels)
@@ -259,12 +284,83 @@ export async function replyToBlock(
     .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)));
   // Other agents may be in the channel: the answer goes to the one that asked.
   const body = where?.handle && where.kind !== "dm" ? `@${where.handle} ${text}` : text;
-  return postPersonMessage(deps, userId, orgId, a.channelId, {
-    body,
-    threadId: a.threadId,
-    clientId: input.clientId,
-    meta: { blockReply: { id: a.id, title: a.title } },
+  return postPersonMessage(deps, userId, orgId, a.channelId, { body, threadId: a.threadId, clientId, meta });
+}
+
+/** A choice card's answer as the apps draw it (`choices.updated`); its questions are the artifact's content. */
+export interface ChoicesView {
+  id: string;
+  answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
+}
+
+async function loadChoicesView(db: Database, orgId: string, artifactId: string): Promise<ChoicesView> {
+  const [row] = await db
+    .select()
+    .from(choiceAnswers)
+    .where(and(eq(choiceAnswers.artifactId, artifactId), eq(choiceAnswers.orgId, orgId)));
+  return {
+    id: artifactId,
+    answer: row
+      ? { userId: row.userId, picks: row.picks, messageId: row.messageId, at: row.createdAt.toISOString() }
+      : null,
+  };
+}
+
+/** A choice card and its answer, for someone who can see its conversation. */
+export async function getChoices(deps: ArtifactDeps, userId: string, orgId: string, artifactId: string) {
+  const a = await getArtifact(deps, { type: "person", userId }, orgId, artifactId);
+  if (a.kind !== "choices") throw new NotFoundError("Choice card not found");
+  return loadChoicesView(deps.db, orgId, artifactId);
+}
+
+/** What the agent reads as the person's reply: the option, or each question's option on its own line. */
+export function choiceReplyText(questions: ChoiceQuestion[], picks: number[]): string {
+  const label = (q: ChoiceQuestion, i: number) => q.options[picks[i] as number]?.label ?? "";
+  if (questions.length === 1 && questions[0]) return label(questions[0], 0);
+  return questions.map((q, i) => `${q.question} ${label(q, i)}`).join("\n");
+}
+
+/**
+ * A person picks on a choice card (ADR 0124): one option per question, once, the first answer in. It goes to the agent
+ * as that person's own message (`meta.choiceReply`), and the card shows what was picked to everyone.
+ */
+export async function answerChoices(
+  deps: ReplyDeps,
+  userId: string,
+  orgId: string,
+  artifactId: string,
+  input: { picks: number[]; clientId?: string | null },
+): Promise<{ choices: ChoicesView; message: MessageView }> {
+  const a = await getArtifact(deps, { type: "person", userId }, orgId, artifactId);
+  if (a.kind !== "choices" || a.content.kind !== "choices" || !a.channelId)
+    throw new NotFoundError("Choice card not found");
+  const { questions } = a.content;
+  const picks = input.picks;
+  if (picks.length !== questions.length || picks.some((p, i) => !Number.isInteger(p) || !questions[i]?.options[p]))
+    throw new ValidationError("Pick one option for each question");
+  const [claimed] = await deps.db
+    .insert(choiceAnswers)
+    .values({ artifactId, orgId, userId, picks })
+    .onConflictDoNothing()
+    .returning({ artifactId: choiceAnswers.artifactId });
+  if (!claimed) throw new ConflictError("This card was already answered", "choices.answered");
+  const message = await replyAsPerson(
+    deps,
+    userId,
+    orgId,
+    a,
+    choiceReplyText(questions, picks),
+    { choiceReply: { id: a.id, title: a.title } },
+    input.clientId,
+  ).catch(async (error: unknown) => {
+    // Not sent: the card stays open for another try.
+    await deps.db.delete(choiceAnswers).where(eq(choiceAnswers.artifactId, artifactId));
+    throw error;
   });
+  await deps.db.update(choiceAnswers).set({ messageId: message.id }).where(eq(choiceAnswers.artifactId, artifactId));
+  const choices = await loadChoicesView(deps.db, orgId, artifactId);
+  await publishChannelEvent(deps.pubsub, { type: "choices.updated", channelId: a.channelId, choices });
+  return { choices, message };
 }
 
 /**
@@ -371,5 +467,76 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
     },
   };
 
-  return { name: "blocks", tools: async () => [showBlock, startPoll] };
+  const askChoices: ToolDefinition = {
+    name: ASK_CHOICES_TOOL,
+    description:
+      'Ask the person to pick between a few clear options, as a card they answer with one click (options lettered A, B, C…), instead of writing "you have two options: 1… 2…" in your reply. Use it for a short decision between options you can name: which way to go, which of two fixes, whether to do it now or later. Several related decisions can go in one card (questions, up to 5). Never for an open question, for a secret (request_secret) or for an approval of a sensitive action (that action asks by itself). Their pick reaches you as their next message. To stop in the middle of work for an answer, use ask_user instead. After calling, write at most one short line around it and end your turn: don\'t repeat the options in your text.',
+    scope: "",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", minLength: 1, maxLength: 120, description: "A few words: what is being decided" },
+        questions: {
+          type: "array",
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: "object",
+            properties: {
+              question: { type: "string", minLength: 1, maxLength: 300 },
+              options: {
+                type: "array",
+                minItems: 2,
+                maxItems: 6,
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string", minLength: 1, maxLength: 120 },
+                    description: { type: "string", maxLength: 200, description: "One short line, when it helps" },
+                  },
+                  required: ["label"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["question", "options"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["title", "questions"],
+      additionalProperties: false,
+    },
+    describe: (input) => ({ title: `Ask: ${cutText(str(input.title), 60)}` }),
+    async execute(input, ctx) {
+      try {
+        const a = await createConversationArtifact(deps, actorOf(ctx), ctx.orgId, {
+          title: str(input.title).trim(),
+          content: { kind: "choices", questions: (input.questions as ChoiceQuestion[]) ?? [] },
+        });
+        return {
+          content: "The card is in your reply. Their pick reaches you as their next message: end your turn now.",
+          data: { artifact: { id: a.id, version: a.version } },
+        };
+      } catch (error) {
+        return failed(error);
+      }
+    },
+  };
+
+  /** Choices need someone to pick: a run a person is behind, where people read (ADR 0124). */
+  const someoneAnswers = async (ctx: ToolContext) => {
+    if (ctx.background || !ctx.runId) return false;
+    const [channel] = await ctx.db
+      .select({ kind: channels.kind, dmKey: channels.dmKey })
+      .from(channels)
+      .where(and(eq(channels.id, ctx.channelId), eq(channels.orgId, ctx.orgId)));
+    if (!channel || isAgentOnlyDm(channel)) return false;
+    return (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).kind === "person";
+  };
+
+  return {
+    name: "blocks",
+    tools: async (ctx) => [showBlock, startPoll, ...((await someoneAnswers(ctx)) ? [askChoices] : [])],
+  };
 }
