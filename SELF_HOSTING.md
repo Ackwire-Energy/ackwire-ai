@@ -916,7 +916,11 @@ That computer runs the commands agents execute, the browser they drive (Chrome f
 runner installs as it starts once the browser is turned on there), and Claude Code, Codex or Cursor's
 CLI when an agent thinks with a subscription signed in there. Install the ones you want on that
 computer, as the user that runs the runner: Cursor's with `curl https://cursor.com/install -fsS | bash`
-(it lands in `~/.local/bin`, which the runner's PATH must include).
+(it lands in `~/.local/bin`, which the runner's PATH must include). A runner in system mode (each agent
+its own system user) needs the CLI where every agent's user can run it, not in one user's home: install it
+under a shared folder and link it into `/usr/local/bin`, for example
+`sudo env HOME=/opt/cursor sh -c 'curl https://cursor.com/install -fsS | bash'`, then
+`sudo chmod -R a+rX /opt/cursor` and `sudo ln -sf /opt/cursor/.local/bin/agent /usr/local/bin/agent`.
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
 `agentes-runner tools disable commands` (or `claude`, `codex` or `cursor`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.

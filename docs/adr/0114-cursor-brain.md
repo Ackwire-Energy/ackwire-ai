@@ -32,7 +32,7 @@ Nothing documents mid-turn input in print mode, a prompt on standard input, usag
 
 ### 3. Our tools through Cursor's MCP config
 
-Cursor reads `.cursor/mcp.json` from the workspace and its parents, so the agent's own folder holds our server's entry (`agenteschat_agentes`), merged into whatever else is there and written only when it changes. Every value that changes per turn is an `${env:…}` reference: `agentes-runner mcp --run ${env:AGENTES_MCP_RUN}` with the token, socket and runner home from the turn's environment (stdio), or the bridge's URL with `Authorization: Bearer ${env:AGENTES_MCP_TOKEN}` (HTTP). Two turns of one agent in two threads share the file and never race on it. `--approve-mcps` loads it without a prompt.
+Cursor reads `.cursor/mcp.json` from the workspace and its parents, so the agent's own folder holds our server's entry (`agenteschat_agentes`), rewritten every turn with ours alone: a work turn can write that file, and a server it added would otherwise start on the next turn, outside Cursor's sandbox and outside `--mode ask`. Every value that changes per turn is an `${env:…}` reference: `agentes-runner mcp --run ${env:AGENTES_MCP_RUN}` with the token, socket and runner home from the turn's environment (stdio), or the bridge's URL with `Authorization: Bearer ${env:AGENTES_MCP_TOKEN}` (HTTP). Two turns of one agent in two threads share the file and never race on it. `--approve-mcps` loads it without a prompt, but it approves every server Cursor finds, so it goes only when the turn's folder is the agent's own folder or under it with no other `.cursor/mcp.json` on the way. A turn in a granted folder elsewhere runs without it: no server loads unapproved in print mode, so that turn has neither our tools nor the folder's own servers. `agent mcp enable <name>` approves one server, but where that approval is kept (and whether it is per workspace) is undocumented; the probe on a real machine decides whether our server can be approved alone, and a turn in a granted folder then gets our tools through a per-turn config.
 
 ### 4. Permission profiles (ADR 0053 §3)
 
@@ -61,7 +61,7 @@ Cursor is a plan next to Claude and ChatGPT everywhere a plan is chosen (`PLAN_C
 
 ### 9. Installing the CLI
 
-Nothing installs Claude Code or Codex in the core: whoever runs a computer installs them, and the Cloud's image does for its computers. Cursor's CLI is the same: `curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`). `SELF_HOSTING.md` says so. The Cloud image's manifest (in the private Cloud repository) must add that step for the agents' user, with `~/.local/bin` on the runner service's PATH, and its runner must be one with protocol 35.
+Nothing installs Claude Code or Codex in the core: whoever runs a computer installs them, and the Cloud's image does for its computers. Cursor's CLI is the same: `curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`). `SELF_HOSTING.md` says so. On a Cloud computer the runner runs in system mode, each agent its own system user, so a per-user `~/.local/bin` install is either invisible to the agents' workers or not readable by them. The Cloud image's manifest (in the private Cloud repository) must install it system-wide instead: the installer run with a shared `HOME` (for example `/opt/cursor`), the folder readable by all (`chmod -R a+rX`), and `agent` linked into `/usr/local/bin`. Its runner must be one with protocol 35.
 
 ## Risks we accept
 
