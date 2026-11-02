@@ -378,7 +378,8 @@ describe("who an agent may call (§8)", () => {
   });
 
   test("an agent's mention of an agent it may not call wakes nobody and tells it why", async () => {
-    f = await setup();
+    // The mention needs Ada: without the setting it would wake her.
+    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined) });
     const ada = await agentOf("Ada", "ada");
     await f.db
       .update(schema.agents)
@@ -406,7 +407,7 @@ describe("who an agent may call (§8)", () => {
     const told = (await f.db.select().from(messages)).filter(
       (m) => (m.meta as { notice?: { kind?: string } }).notice?.kind === "wake_skipped",
     );
-    expect(told.map((m) => m.body)).toEqual([expect.stringContaining("@ada")]);
+    expect(told.map((m) => m.body)).toEqual([expect.stringContaining("call ada")]);
   });
 
   test("settings are stored whole and normalized", async () => {

@@ -1,5 +1,5 @@
 import { afterEach, expect } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { createRoutine, executeRoutineRun, queueRoutineRun } from "../../src";
 import { routineDeps, routineRow, routineRunRow } from "../routine-fixtures";
 import { closeWorlds, type World, world } from "./harness";
@@ -56,6 +56,11 @@ scenario("S25", "a routine set to act hands an error to an agent, which fixes it
     },
   });
   await w.grant("lia", ["github:pr.write"]);
+  // A PR nobody asked for directly needs a person's go (ADR 0131 §3): Lia's owner said "Sempre" for PRs.
+  await w.db
+    .update(schema.agents)
+    .set({ autonomyBrakes: { go: ["pr"] } })
+    .where(eq(schema.agents.id, w.agents.lia?.id ?? ""));
   await fireRoutine(w, "sentinela", "Checa o Sentry e passa os erros novos para @lia.", "act");
   expect((await w.calls("sentinela")).find((c) => c.name === "tell_agent")?.isError).toBe(false);
   expect((await w.calls("lia")).map((c) => [c.name, c.isError])).toEqual([["open_pull_request", false]]);

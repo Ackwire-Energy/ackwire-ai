@@ -438,7 +438,8 @@ export async function triageItem(judge: Judge, input: { orgId: string; agentId: 
  * The brakes on agents' wakes from a message nobody asked for directly (its chain roots in a routine, a webhook or an
  * agent's own work): per agent, open work on the same item takes it (`linked`, a note to that run), an item it already
  * tried `LOOP_MAX` times in a day stops (`loop`, one summary to a person), noise waits for the digest (`digest`), and
- * an agent at its cap of unrequested runs, or whose computer has turns waiting for room, looks again later (`later`).
+ * an agent at its cap of unrequested runs, or (for a routine's or a webhook's item) whose computer has turns waiting for
+ * room, looks again later (`later`).
  * Returns the agents to wake now; every outcome is recorded (`autonomy_signals`).
  */
 export async function brakeWakes(
@@ -454,7 +455,12 @@ export async function brakeWakes(
   if (root.kind === "person") return { wake: agentIds, held };
   const sig = signatureOf(message.body);
   let triage: "work" | "noise" | null = null;
-  const crowded = await crowdedAgents(db, message.orgId, agentIds);
+  // A full computer defers new work that a routine or a webhook started; agents' own chains already wait in calm
+  // wakes' inbox and ranks (ADR 0032).
+  const crowded =
+    root.kind === "routine" || root.kind === "routine_report"
+      ? await crowdedAgents(db, message.orgId, agentIds)
+      : new Set<string>();
   for (const agentId of agentIds) {
     const outcome = await brakeOne(
       deps,
