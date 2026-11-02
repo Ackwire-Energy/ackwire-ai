@@ -146,7 +146,7 @@ export async function recoverStaleRuns(
       orgId: run.orgId,
       kind: "agent_run.execute",
       payload: { runId: run.id, wait: run.waitId },
-      dedupeKey: `agent_run.execute:${run.id}:overdue:${run.waitId}`,
+      dedupeKey: `agent_run.execute:${run.id}:overdue:${run.waitId}:${now.getTime()}`,
       maxAttempts: 4,
     });
     out.requeued.push(run.id);

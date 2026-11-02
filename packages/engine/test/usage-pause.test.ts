@@ -598,7 +598,7 @@ test("a turn that goes through on the plan wakes the runs parked on its limit no
   expect((await runs(f)).map((r) => r.status)).toEqual(["done", "done"]);
 });
 
-test("a wait on the plan whose wake job was lost is woken by the sweep once its time passed", async () => {
+test("a wait on the plan whose wake job was lost is woken by the sweep once its time passed, again if that fails", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   await computerAgent(f, { brainFallback: false });
   const { brain, seen } = scripted((n) =>
@@ -623,7 +623,14 @@ test("a wait on the plan whose wake job was lost is woken by the sweep once its 
   await Bun.sleep(200);
   const swept = await recoverStaleRuns({ db: f.db, pubsub: f.pubsub }, { now: later(RESUME_AFTER_MS + 3 * 60_000) });
   expect(swept.requeued).toEqual([slot?.id ?? ""]);
-  await drainOutbox(f.db, handlers);
+  // The sweep's own job fails too (the database away at the reset): a later sweep tries again.
+  await f.db
+    .update(schema.outbox)
+    .set({ status: "failed" })
+    .where(and(eq(schema.outbox.status, "pending"), eq(schema.outbox.kind, "agent_run.execute")));
+  const again = await recoverStaleRuns({ db: f.db, pubsub: f.pubsub }, { now: later(RESUME_AFTER_MS + 4 * 60_000) });
+  expect(again.requeued).toEqual([slot?.id ?? ""]);
+  await drainOutbox(f.db, handlers, { now: later(RESUME_AFTER_MS + 4 * 60_000) });
   expect(seen).toHaveLength(2);
   expect((await runs(f))[0]?.status).toBe("done");
 });
