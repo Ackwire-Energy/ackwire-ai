@@ -1006,6 +1006,7 @@ describe("a server whose tools can't be read", () => {
     await click(within(review()).getByRole("button", { name: "Tentar de novo" }));
     await settle(4);
     expect(within(review()).queryByRole("alert")).toBeNull();
-    expect(review().textContent).toContain(`Classificamos as ${res.server.tools.length} ferramentas do Suporte.`);
+    // The fake finds one tool more on a refresh.
+    expect(review().textContent).toContain("Classificamos as 6 ferramentas do Suporte.");
   });
 });
