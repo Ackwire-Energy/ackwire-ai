@@ -29,6 +29,13 @@ function messages(): Message[] {
       createdAt: ago(120_000),
       meta: {
         work: { steps: 2, calls: [{ name: "run_code" }, { name: "create_issue" }], durationMs: 5000 },
+        browser: {
+          steps: [
+            { tool: "browser_open", detail: "example.com/usage", at: ago(125_000), failed: false },
+            { tool: "browser_click", detail: null, at: ago(124_000), failed: false },
+          ],
+        },
+        desktop: { steps: [{ tool: "desktop_open", detail: "Terminal", at: ago(123_000), failed: false }] },
       },
     },
     {
@@ -91,6 +98,8 @@ describe("what agents did under each reply (a person's own setting, off by defau
     expect(screen().getByText("O que você queria ver nessa lista?")).toBeTruthy();
     expect(document.querySelector(".ac-tools")).toBeNull();
     expect(document.body.textContent).not.toContain("Usou 2 ferramentas");
+    // Where it browsed and what it did on its desktop are step summaries (no picture): activity too.
+    expect(document.querySelectorAll(".brw-trail").length).toBe(0);
     const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
     expect(card.textContent).toContain("BILLING_API_KEY");
     // The card alone speaks: its fallback sentence is for previews and notifications.
@@ -101,6 +110,7 @@ describe("what agents did under each reply (a person's own setting, off by defau
   test("on: the reply shows its tools, the secret request still without its raw line", async () => {
     await openChannel(true);
     expect(document.querySelector(".ac-tools")?.textContent).toContain("Usou 2 ferramentas");
+    expect(document.querySelectorAll(".brw-trail").length).toBe(2);
     expect(screen().getByRole("group", { name: "Pedido de segredo de Ada" })).toBeTruthy();
     expect(document.body.textContent).not.toContain("pediu uma chave");
   });
@@ -137,4 +147,21 @@ describe("what agents did under each reply (a person's own setting, off by defau
         .getAttribute("aria-checked"),
     ).toBe("true");
   });
+});
+
+test("Sua conta: a save that fails puts the switch back and says so", async () => {
+  const state = seedState();
+  const org = state.me?.organizations[0];
+  if (org) org.showActivity = false;
+  const api = createFakeApi(state);
+  api.orgs.setShowActivity = async () => {
+    throw new Error("offline");
+  };
+  await renderApp(`/org/${ORG_ID}/settings/account`, { api });
+  await settle(8);
+  const name = "Mostrar o que os agentes fizeram em cada resposta";
+  await act(async () => fireEvent.click(screen().getByRole("switch", { name })));
+  await settle(4);
+  expect(screen().getByRole("switch", { name }).getAttribute("aria-checked")).toBe("false");
+  expect(document.body.textContent).toContain("Não deu para salvar. Tente de novo.");
 });

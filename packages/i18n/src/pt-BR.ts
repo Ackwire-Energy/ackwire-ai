@@ -9193,6 +9193,7 @@ export const ptBR = {
       activity: "Mostrar o que os agentes fizeram em cada resposta",
       activityHelp:
         "As ferramentas que usaram e quanto tempo levou. Enquanto trabalham, você continua vendo o que estão fazendo.",
+      activityFailed: "Não deu para salvar. Tente de novo.",
     },
     orgTitle: "Workspace",
     name: "Nome",

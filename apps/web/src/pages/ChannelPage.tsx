@@ -127,7 +127,7 @@ import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
-import { splitCanceled } from "@agenteschat/client/lib/work";
+import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,
   Avatar,
@@ -3242,14 +3242,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   const browserHandoff = m.author.type === "agent" ? browserHandoffOf(meta) : null;
   // Where it browsed (`meta.browser`) and what it did on its desktop (`meta.desktop`): each card stays
   // after the run, and its steps leave the work list.
-  const browserTrail = useMemo(
-    () => (m.author.type === "agent" ? browserTrailOf(m.meta) : []),
-    [m.author.type, m.meta],
-  );
-  const desktopTrail = useMemo(
-    () => (m.author.type === "agent" ? desktopTrailOf(m.meta) : []),
-    [m.author.type, m.meta],
-  );
+  // Step summaries, no picture: activity, so the person's setting hides them like the tool block.
+  const trailsShown = m.author.type === "agent" && showsActivity(org);
+  const browserTrail = useMemo(() => (trailsShown ? browserTrailOf(m.meta) : []), [trailsShown, m.meta]);
+  const desktopTrail = useMemo(() => (trailsShown ? desktopTrailOf(m.meta) : []), [trailsShown, m.meta]);
   const onCards = useMemo(
     (): ScreenKind[] => [
       ...(browserTrail.length > 0 ? (["browser"] as const) : []),

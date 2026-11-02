@@ -9127,6 +9127,7 @@ export const en: Translations = {
       /** Yours in this workspace, on every device: the tool summary under each agent reply, off by default. */
       activity: "Show what agents did under each reply",
       activityHelp: "The tools they used and how long it took. While they work, you still see what they're doing.",
+      activityFailed: "Couldn't save that. Try again.",
     },
     orgTitle: "Workspace",
     name: "Name",

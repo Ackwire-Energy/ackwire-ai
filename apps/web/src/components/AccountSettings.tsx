@@ -51,6 +51,7 @@ export function AccountSection() {
   const api = useApi();
   const plans = ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id);
   const showActivity = useSetShowActivity(org.id);
+  const toast = useToast();
   // Looking at your plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -91,7 +92,9 @@ export function AccountSection() {
             control={
               <Switch
                 checked={org.showActivity === true}
-                onCheckedChange={(on) => showActivity.mutate(on)}
+                onCheckedChange={(on) =>
+                  showActivity.mutate(on, { onError: () => toast.show(t("settings.account.activityFailed")) })
+                }
                 aria-label={t("settings.account.activity")}
                 aria-describedby="account-activity-help"
               />

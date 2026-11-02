@@ -100,7 +100,9 @@ describe("what agents did under each reply: the person's own setting, off by def
     // The cards that carry content or wait for a person aren't the tools' and stay in the row.
     const row = source("MessageRow.tsx");
     expect(row).toContain("<SecretCard");
-    expect(row).not.toContain("showsActivity");
+    // Where it browsed and its desktop are step summaries (no picture): activity, gated like the tools.
+    expect(row).toContain("isAgent && m.author.id && !m.local && showsActivity(org)");
+    expect(row.match(/showsActivity/g)?.length).toBe(2);
   });
 
   test("Você has the row and its page, and a secret request's card shows without its text", () => {
