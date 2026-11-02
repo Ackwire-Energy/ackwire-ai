@@ -15,6 +15,7 @@ import {
   typingIn,
   typingThrottle,
 } from "@agenteschat/client";
+import { createStreamsStore } from "@/realtime/context";
 
 const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "ada" };
 
@@ -561,5 +562,63 @@ describe("a run waiting for its computer", () => {
       },
     } as Message);
     expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+  });
+});
+
+describe("live memory cards", () => {
+  const update = { action: "proposed", itemId: "i1", text: "Prefere respostas curtas", requestedByUserId: "u1" };
+  const reply = {
+    id: "a1",
+    channelId: "c1",
+    threadId: "m1",
+    author: { type: "agent", id: "nova" },
+    body: "Anotado.",
+    mentionedAgentIds: [],
+    mentionedUserIds: [],
+    agentRunId: "r1",
+    meta: { memoryUpdates: [update] },
+    createdAt: "2026-11-02T10:00:00.000Z",
+  } as unknown as Message;
+
+  test("a big message's event comes without it: the card stays until the read that has the message", () => {
+    const store = createStreamsStore();
+    store.apply({
+      type: "memory.updated",
+      channelId: "c1",
+      threadId: "m1",
+      agentId: "nova",
+      runId: "r1",
+      update,
+    } as ChannelEvent);
+    // Another card of the same run, not on this message, stays.
+    store.apply({
+      type: "memory.updated",
+      channelId: "c1",
+      threadId: "m1",
+      agentId: "nova",
+      runId: "r1",
+      update: { ...update, itemId: "i2" },
+    } as ChannelEvent);
+    store.apply({ type: "message.created", channelId: "c1", messageId: "a1" } as ChannelEvent);
+    expect(store.get().memory.c1?.map((c) => c.key)).toEqual(["r1:i1", "r1:i2"]);
+    store.seed([reply]);
+    expect(store.get().memory.c1?.map((c) => c.key)).toEqual(["r1:i2"]);
+    const memory = store.get().memory;
+    store.seed([reply]);
+    expect(store.get().memory).toBe(memory);
+  });
+
+  test("an event that carries the message drops its cards at once", () => {
+    const store = createStreamsStore();
+    store.apply({
+      type: "memory.updated",
+      channelId: "c1",
+      threadId: "m1",
+      agentId: "nova",
+      runId: "r1",
+      update,
+    } as ChannelEvent);
+    store.apply({ type: "message.created", channelId: "c1", messageId: "a1", message: reply } as ChannelEvent);
+    expect(store.get().memory.c1).toEqual([]);
   });
 });
