@@ -223,6 +223,18 @@ describe("answering and opening", () => {
         }),
       ),
     ).toEqual({ to: "/org/$orgId/dm/person/$userId", params: { userId: "u" }, search: { m: "m" } });
+    // A reply in a thread of a DM is only in that thread: the thread opens at it, not the DM.
+    for (const kind of ["agent_reply", "dm"] as const)
+      expect(
+        openTarget(
+          notification({
+            id: "4",
+            kind,
+            actors: [{ type: "agent", id: "ada" }],
+            source: { dmId: "d", threadId: "r", messageId: "m" },
+          }),
+        ),
+      ).toEqual({ to: "/org/$orgId/threads/$threadId", params: { threadId: "r" }, search: { m: "m" } });
     expect(openTarget(notification({ id: "3", kind: "reaction", source: { channelId: "c", messageId: "m" } }))).toEqual(
       { to: "/org/$orgId/c/$channelId", params: { channelId: "c" }, search: { m: "m" } },
     );

@@ -352,10 +352,11 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // What a routine found opens the agent's message in its conversation (below); without one, the routine.
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return s.routineId ? { to: "/org/$orgId/routines", search: { open: s.routineId } } : { to: "/org/$orgId/routines" };
-  // An agent's answer or request in my DM with it opens that DM (a DM has no channel page of its own).
-  if (s.dmId && n.actors[0]?.type === "agent" && (n.kind === "agent_reply" || !s.threadId))
+  // An agent's answer or request in my DM with it opens that DM (a DM has no channel page of its own); one in a thread
+  // there opens the thread, the only place its message is.
+  if (s.dmId && n.actors[0]?.type === "agent" && !s.threadId)
     return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: n.actors[0].id }, ...at };
-  if (n.kind === "dm") {
+  if (n.kind === "dm" && !s.threadId) {
     const who = n.actors[0];
     if (who?.type === "agent") return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: who.id }, ...at };
     if (who) return { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id }, ...at };
