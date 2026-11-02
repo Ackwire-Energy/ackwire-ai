@@ -167,6 +167,7 @@ describe("Criar canal", () => {
       name: "vendas-sul",
       topic: "Leads e propostas",
       visibility: "private",
+      audienceRoleIds: [],
     });
     const created = state.channels.find((c) => c.name === "vendas-sul");
     expect(state.calls.find((c) => c.method === "chat.addMember")?.args).toEqual([
