@@ -32,7 +32,6 @@ import {
   listFormerAgents,
   moveAgentToGroup,
   NEW_AGENT_DEFAULTS,
-  NO_PERSON,
   NotFoundError,
   newAgentBrainMachines,
   oldHandlesByAgent,
@@ -95,10 +94,10 @@ const toAgent = (
   a: AgentRow,
   viewerId: string,
   seesCost: boolean,
-  budgetUsedPercent?: number,
-  brain?: AgentBrainSummary,
+  budgetUsedPercent: number | undefined,
+  brain: AgentBrainSummary | undefined,
   /** The viewer as the audience rule reads them (`speakerFor`, ADR 0085). */
-  talks: Speaker = NO_PERSON,
+  talks: Speaker,
 ) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
@@ -629,7 +628,9 @@ export function agentRoutes(deps: AppDeps) {
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
-      return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
+      const userId = c.get("user").id;
+      const [seesCost, talks] = await Promise.all([canViewCost(db, userId, orgId), speakerFor(db, orgId, userId)]);
+      return c.json(toAgent(agent, userId, seesCost, undefined, undefined, talks), 201);
     },
   );
 
@@ -682,7 +683,14 @@ export function agentRoutes(deps: AppDeps) {
       if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(
         {
-          agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)),
+          agent: toAgent(
+            made.agent,
+            userId,
+            await canViewCost(db, userId, orgId),
+            undefined,
+            undefined,
+            await speakerFor(db, orgId, userId),
+          ),
           proposal: made.proposal,
           ai: made.ai,
         },
