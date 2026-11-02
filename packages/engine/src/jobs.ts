@@ -647,15 +647,27 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "agent_run.execute": async (job, ctx) => {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
+      const lineSince = typeof job.payload.lineSince === "number" ? job.payload.lineSince : undefined;
       await queryTrace.run({ count: 0 }, () =>
-        executeRun(deps, String(job.payload.runId), { ...ctx, jobId: job.id, ...(wait ? { wait } : {}) }),
+        executeRun(deps, String(job.payload.runId), {
+          ...ctx,
+          jobId: job.id,
+          ...(wait ? { wait } : {}),
+          ...(lineSince ? { lineSince } : {}),
+        }),
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
     },
     // An agent's wake waiting for its agent to leave the computer's line (ADR 0032 "Calm wakes").
     [INBOX_JOB]: async (job) => {
-      const p = job.payload as { messageId: string; agentId: string; trigger: RunTrigger; look: number };
+      const p = job.payload as {
+        messageId: string;
+        agentId: string;
+        trigger: RunTrigger;
+        look: number;
+        since?: number;
+      };
       await deliverParked(deps.db, orgOf(job), p);
     },
     // Replies to an agent's message that woke several agents, reported to it once (ADR 0032 "Calm wakes").

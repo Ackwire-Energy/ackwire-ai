@@ -409,7 +409,7 @@ export async function mentionNeedsNothing(
       instructions: {
         agent: { handle: `@${t.handle}`, name: t.name, role: t.role },
         question:
-          "Does `message` need nothing from `agent`, so `agent` can ignore it? It needs nothing only when, toward `agent`, it just thanks, acknowledges, agrees or signs off, quotes or names it, reports to others what it did or couldn't do, says it won't call on it (again), tells a person to talk to it, or offers a person to involve it later. Anything it gives `agent` to do, answer, read or act on needs it, also when it hands back work `agent` asked for. `answering` is the message it replies to, when there is one.",
+          "Does `message` need nothing from `agent`, so `agent` can ignore it? It needs nothing only when, toward `agent`, it just thanks, acknowledges, agrees or signs off, quotes or names it, reports to others what `agent` did or couldn't do (not results or a verdict it hands to `agent`), says it won't call on `agent` (again), tells a person to talk to it, or offers a person to involve it later. Anything it gives `agent` to do, answer, read or act on needs it, also when it hands back work `agent` asked for. `answering` is the message it replies to, when there is one.",
       },
       criteria: {
         true: "Nothing for the agent: thanks, 'ok' or 👍, agreement or a sign-off, even addressed to it; or it only names the agent: what it said, did, couldn't do or can do ('as @agent said', '@agent already deployed', '@agent couldn't open the file, so I won't ask it again'), 'talk to @agent', or a plan or offer that waits for a person to decide ('if you agree, I'll open an issue for @agent', 'want me to ask @agent?').",

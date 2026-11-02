@@ -12,6 +12,12 @@ const { agentRuns, agents } = schema;
  */
 export const ROOM_ASK_SPACING_MS = 10_000;
 
+/**
+ * A run of the last rank waiting this long ranks with work a person asked for, so a steady stream of that work can't
+ * keep it in line until its wait for room runs out (`COMPUTER_BUSY_WAIT_MS`, 30 minutes).
+ */
+export const ROOM_RANK_AGE_MS = 10 * 60_000;
+
 const inLine = and(
   eq(agentRuns.status, "waiting_input"),
   sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'`,
@@ -20,10 +26,15 @@ const waitingForRoom = (machineId: string) => and(eq(agentRuns.waitingMachineId,
 const waitIdSql = sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`;
 const peopleSql = sql`coalesce((${agentRuns.transcript}->>'roomPeople')::boolean, false)`;
 const askedSql = sql`coalesce((${agentRuns.transcript}->>'roomAsked')::boolean, false)`;
-/** A run's rank in the line: 0 a person waits on it, 1 work a person asked for lately, 2 the rest. */
-const rankSql = sql<number>`(case when ${peopleSql} then 0 when ${askedSql} then 1 else 2 end)`;
+/**
+ * Its place in the line: since it started waiting for room, or, a wake that waited outside any run first, since then
+ * (`roomOrderSince`). The 30-minute deadline reads `roomWaitSince` alone.
+ */
+const sinceSql = sql`coalesce((${agentRuns.transcript}->>'roomOrderSince')::bigint, (${agentRuns.transcript}->>'roomWaitSince')::bigint, 0)`;
+/** A run's rank in the line: 0 a person waits on it, 1 work a person asked for lately (or waiting long), 2 the rest. */
+const rankSql = (now: number) =>
+  sql<number>`(case when ${peopleSql} then 0 when ${askedSql} or ${sinceSql} < ${now - ROOM_RANK_AGE_MS}::bigint then 1 else 2 end)`;
 export type RoomRank = 0 | 1 | 2;
-const sinceSql = sql`coalesce((${agentRuns.transcript}->>'roomWaitSince')::bigint, 0)`;
 
 /** The run first in line for room on this computer, with the wait its job must carry. */
 export async function roomHead(
@@ -38,7 +49,7 @@ export async function roomHead(
     })
     .from(agentRuns)
     .where(waitingForRoom(machineId))
-    .orderBy(rankSql, sinceSql, agentRuns.id)
+    .orderBy(rankSql(Date.now()), sinceSql, agentRuns.id)
     .limit(1);
   return head ?? null;
 }
@@ -91,6 +102,7 @@ export async function roomGate(
   place: { rank: RoomRank; since: number },
 ): Promise<{ retryAt: number } | null> {
   const now = Date.now();
+  const rank = place.rank === 2 && place.since < now - ROOM_RANK_AGE_MS ? 1 : place.rank;
   const behind = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`room:${machineId}`}))`);
     const [ahead] = await tx
@@ -100,12 +112,12 @@ export async function roomGate(
         and(
           waitingForRoom(machineId),
           sql`${agentRuns.id} <> ${run.id}`,
-          sql`(${rankSql}, ${sinceSql}, ${agentRuns.id}) < (${place.rank}::int, ${place.since}::bigint, ${run.id}::uuid)`,
+          sql`(${rankSql(now)}, ${sinceSql}, ${agentRuns.id}) < (${rank}::int, ${place.since}::bigint, ${run.id}::uuid)`,
         ),
       )
       .limit(1);
     if (ahead) return { retryAt: now + ROOM_ASK_SPACING_MS };
-    if (place.rank > 0) {
+    if (rank > 0) {
       const [last] = await tx
         .select({ at: sql<string>`max((${agentRuns.transcript}->'roomAsk'->>'at')::bigint)` })
         .from(agentRuns)
@@ -135,7 +147,7 @@ export async function roomGate(
 /** The best rank among this agent's runs in a computer's line, null when none is in line. */
 export async function agentLineRank(db: Executor, orgId: string, agentId: string): Promise<RoomRank | null> {
   const [row] = await db
-    .select({ rank: sql<number | null>`min(${rankSql})` })
+    .select({ rank: sql<number | null>`min(${rankSql(Date.now())})` })
     .from(agentRuns)
     .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.agentId, agentId), inLine));
   return row?.rank == null ? null : (Number(row.rank) as RoomRank);

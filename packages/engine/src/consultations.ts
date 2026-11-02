@@ -22,7 +22,7 @@ import { runAuthorityById } from "./authority";
 import { routineBriefOfRun } from "./background";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
-import { startOrJoinRun } from "./dispatch";
+import { INBOX_JOB, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm, openAgentDm } from "./dms";
 import { publishChannelEvent } from "./events";
 import { cutText } from "./format";
@@ -739,7 +739,7 @@ export interface HandOff {
   reportedAt: Date | null;
   /** Null: nobody started it (the stretch held it, or it waits for its agent in its computer's line: `parked`). */
   target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean; outage?: boolean } | null;
-  /** No run yet and its agent is in its computer's line: it waits outside any run (`StartRunOptions.park`). */
+  /** No run yet: it waits outside any run for its agent to leave its computer's line (`StartRunOptions.park`). */
   parked?: boolean;
 }
 
@@ -780,9 +780,10 @@ export async function handOffsFrom(
         c.reported_at, t.status as target_status, t.waiting_machine_id,
         exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on,
         (t.status = 'waiting_input' and t.transcript -> 'outage' is not null) as outage,
-        (c.target_run_id is null and exists (select 1 from agent_runs w where w.org_id = c.org_id
-          and w.agent_id = c.target_agent_id and w.status = 'waiting_input'
-          and w.transcript -> 'waitingForBrain' ->> 'code' = 'busy')) as parked
+        (c.target_run_id is null and exists (select 1 from outbox o where o.org_id = c.org_id
+          and o.kind = ${INBOX_JOB} and o.status in ('pending', 'processing')
+          and o.payload ->> 'messageId' = c.message_id::text
+          and o.payload ->> 'agentId' = c.target_agent_id::text)) as parked
       from agent_consultations c
       join agent_runs r on r.id = c.asker_run_id
       join channels ch on ch.id = r.channel_id
