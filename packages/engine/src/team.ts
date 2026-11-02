@@ -164,7 +164,11 @@ const CLOSEST_HANDLES = 3;
  * person behind the run can talk to (the ones `find_agent` lists).
  */
 /** `viaAgent`: the tool asks the agent for the person (ask_agent, tell_agent), so agents that take consultations count. */
-export async function noAgentText(ctx: ToolContext, handles: string[], options: { viaAgent?: boolean } = {}): Promise<string> {
+export async function noAgentText(
+  ctx: ToolContext,
+  handles: string[],
+  options: { viaAgent?: boolean } = {},
+): Promise<string> {
   const person = await personBehindCall(ctx);
   const [archived, team, talks] = await Promise.all([
     loadArchived(ctx.db, ctx.orgId),

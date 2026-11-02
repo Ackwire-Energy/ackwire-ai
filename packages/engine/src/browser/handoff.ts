@@ -21,12 +21,12 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { answersAgentsOnly } from "../consultations";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { formatDuration } from "../machine-tasks";
 import { computerDrivers, drivesComputer, getMachine, requireComputerDriver, servesDesktops } from "../machines";
-import { answersAgentsOnly } from "../consultations";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
 import {

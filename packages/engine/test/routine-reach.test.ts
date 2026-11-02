@@ -276,7 +276,19 @@ test("a routine's creator outside the consulted agent's audience: its approval s
         );
       return seen(req).includes("tool_result")
         ? { chunks: ["Fechado."] }
-        : { chunks: [], toolUses: [{ name: "github_close_pr", input: { repo: "acme/app", pr: 42, why: "The PR #42 was replaced by #57: closing it keeps the queue honest." } }] };
+        : {
+            chunks: [],
+            toolUses: [
+              {
+                name: "github_close_pr",
+                input: {
+                  repo: "acme/app",
+                  pr: 42,
+                  why: "The PR #42 was replaced by #57: closing it keeps the queue honest.",
+                },
+              },
+            ],
+          };
     },
   });
   const iris = await agentIn(f, "Iris", "iris");
