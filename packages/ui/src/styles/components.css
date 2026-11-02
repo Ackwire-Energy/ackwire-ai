@@ -6667,7 +6667,14 @@ html:not([data-pointer]) button.ac-tools__row:focus-visible {
 .ac-tools__label b {
   font-weight: 500;
 }
+/* The grey words after it (a tool's name, the start of another agent's answer) never grow the line: two lines at
+   most, as on the phone; the whole answer reads where the line opens. */
 .ac-tools__label small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   font-size: 12px;
   color: var(--faint);
 }
