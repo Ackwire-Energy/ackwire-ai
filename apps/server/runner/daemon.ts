@@ -58,7 +58,17 @@ import {
 } from "./access";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
-import { type AgentUser, AgentUsers, agentGid, denySchedulers, readAgentUsers, systemLauncher } from "./agent-users";
+import {
+  type AgentUser,
+  AgentUsers,
+  agentGid,
+  denySchedulers,
+  ensureGitCacheUser,
+  GIT_CACHE_DIR,
+  grantGitCache,
+  readAgentUsers,
+  systemLauncher,
+} from "./agent-users";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
@@ -84,6 +94,7 @@ import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
+import { systemGitCache } from "./git";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { tailLines } from "./logfile";
@@ -947,6 +958,7 @@ export class RunnerDaemon implements RequestObserver {
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
         account: (agentId) => this.agentAccount(agentId),
+        ...(this.opts.workers ? {} : { gitCache: rootGitCache() }),
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
         token: config.token,
@@ -969,6 +981,8 @@ export class RunnerDaemon implements RequestObserver {
       server: config.server,
       secretsDir,
       gitDir: path.join(home, "git"),
+      // Agents here share the runner's user, so they share one cache (system mode: root's, through each worker).
+      gitCache: path.join(home, "git-cache"),
       tasks,
       brains,
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
@@ -1994,4 +2008,17 @@ function outcomeResult(req: MachineRequest, outcome: RequestOutcome): "ok" | "fa
 /** A path as one word for a shell command line people copy. */
 function shellWord(p: string) {
   return /^[\w./~:-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`;
+}
+
+/** Root's shared git cache on a system-mode computer (ADR 0116 §4); its owner is made on the first clone. */
+function rootGitCache() {
+  let owner: { uid: number; gid: number } | null = null;
+  return systemGitCache({
+    root: GIT_CACHE_DIR,
+    owner: () => {
+      owner ??= ensureGitCacheUser();
+      return owner;
+    },
+    grant: (dir, uid) => grantGitCache(dir, uid),
+  });
 }

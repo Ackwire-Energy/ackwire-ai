@@ -30,7 +30,7 @@ import type { DesktopManager } from "./desktop";
 import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
-import { gitSync } from "./git";
+import { type CacheFill, type CloneSlots, gitSync } from "./git";
 import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
@@ -171,6 +171,11 @@ export interface HandlerContext {
   gitDir?: string;
   /** Tests: the git command (default `git` on the PATH). */
   gitCommand?: string;
+  /** `<runner home>/git-cache`: shared read-only mirrors for clones (ADR 0116); single-user runners only. */
+  gitCache?: string;
+  /** A system-mode worker: root's clone slots and shared cache (ADR 0116), so both are the computer's. */
+  cloneSlot?: CloneSlots;
+  cacheFill?: CacheFill;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
   /**
@@ -538,6 +543,9 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
           signal: scope.signal,
           ...(req.stream === true ? { output: scope.output } : {}),
           ...(ctx.gitCommand ? { gitCommand: ctx.gitCommand } : {}),
+          ...(ctx.gitCache ? { gitCache: ctx.gitCache } : {}),
+          ...(ctx.cloneSlot ? { cloneSlot: ctx.cloneSlot } : {}),
+          ...(ctx.cacheFill ? { cacheFill: ctx.cacheFill } : {}),
         },
         req,
       );

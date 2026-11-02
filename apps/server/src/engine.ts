@@ -426,7 +426,12 @@ export function buildEngine(o: EngineOptions) {
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
     prepareAgentCode(
-      { db, hub: machineHub, git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET } },
+      {
+        db,
+        hub: machineHub,
+        git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
+        github: githubApp ? { app: githubApp, http: o.github ?? { apiUrl: "https://api.github.com", fetch } } : null,
+      },
       turn,
       {
         signal,
