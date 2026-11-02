@@ -496,6 +496,7 @@ export function createSandboxToolSource(
       name: "run_code",
       description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; long work needs it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
       scope: SANDBOX_SCOPE,
+      readsOutside: true,
       sensitive: requireApproval,
       whyAsks: true,
       inputSchema: {
@@ -607,6 +608,7 @@ export function createSandboxToolSource(
       name: "read_file",
       description: "Read a text file from your computer's workspace.",
       scope: SANDBOX_SCOPE,
+      readsOutside: true,
       inputSchema: {
         type: "object",
         properties: { path: pathProp },
@@ -802,6 +804,7 @@ export function createSandboxToolSource(
       description:
         "Run a script of one of your skills (listed as script by load_skill) on your computer: the skill's files are copied to .skills/{name}/ and the script runs from the workspace with the arguments you give.",
       scope: SANDBOX_SCOPE,
+      readsOutside: true,
       sensitive: requireApproval,
       whyAsks: true,
       inputSchema: {
@@ -1012,6 +1015,7 @@ export function createSandboxToolSource(
       description:
         "One background task now: status, time so far, its last line, files it changed and, once ended, its result. Only when someone asks how it is going.",
       scope: SANDBOX_SCOPE,
+      readsOutside: true,
       inputSchema: {
         type: "object",
         properties: { task_id: taskIdProp },
