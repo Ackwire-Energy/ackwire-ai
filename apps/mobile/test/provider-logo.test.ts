@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrainLine } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { KEY_MARKS, PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
 import { keyStepHint, PROVIDERS } from "@agenteschat/client/lib/providers";
 import { resources } from "@agenteschat/i18n";
@@ -117,7 +116,7 @@ describe("the marks as the phone draws them", () => {
     expect(pt("onboarding.keyInvalid.openrouter")).toBe(
       "As chaves da OpenRouter começam com sk-or-v1-. Confira e cole de novo.",
     );
-    expect(pt("connectAi.key.create", providerGrammar(pt, "openrouter"))).toBe("Crie a sua chave de API da OpenRouter");
+    expect(pt("connectAi.key.create", { provider: "OpenRouter" })).toBe("Crie a sua chave de API OpenRouter");
   });
 
   test("an image mark has no shapes: ProviderLogo draws the phone's own copy of the web's file", async () => {

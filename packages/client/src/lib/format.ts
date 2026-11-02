@@ -1,4 +1,4 @@
-import { dayMonthOrder, formatMoneyUsd, relativeTime as intlRelativeTime } from "@agenteschat/i18n/format";
+import { dayMonthOrder, formatMoneyUsd } from "@agenteschat/i18n/format";
 import type { TFunction } from "i18next";
 
 /**
@@ -90,12 +90,16 @@ export function dayLabel(t: TFunction, locale: string, iso: string, now = new Da
 export const formatFullDate = (locale: string, iso: string) =>
   new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short" }).format(new Date(iso));
 
-/** "agora", "há 2 min", "há 3 h", "ontem", "12 out", in each language's words (Intl). */
-export function relativeTime(_t: TFunction, locale: string, iso: string, now = new Date()) {
+/** "agora", "há 2 min", "há 3 h", "ontem", "12 out". */
+export function relativeTime(t: TFunction, locale: string, iso: string, now = new Date()) {
+  const diff = now.getTime() - new Date(iso).getTime();
+  if (diff < 60_000) return t("common.now");
+  if (diff < 3_600_000) return t("format.minutesAgo", { count: Math.floor(diff / 60_000) });
   const days = daysBetween(iso, now);
-  if (days > 1) return formatShortDate(locale, iso);
+  if (days === 0) return t("format.hoursAgo", { count: Math.floor(diff / 3_600_000) });
+  // "ontem", "yesterday", "昨日": Intl's own word, lowercase where the language writes it so.
   if (days === 1) return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-1, "day");
-  return intlRelativeTime(locale, iso, now);
+  return formatShortDate(locale, iso);
 }
 
 /** "hoje 10:44", "ontem 18:02", "12 out" (run history, decisions). */
@@ -127,9 +131,7 @@ export function upcomingAt(t: TFunction, locale: string, iso: string, now = new 
   if (days <= 0) return t("format.todayAt", { time });
   if (days === 1) return t("format.tomorrowAt", { time });
   if (days < 7)
-    return new Intl.DateTimeFormat(locale, { weekday: "short", hour: "numeric", minute: "2-digit" }).format(
-      new Date(iso),
-    );
+    return `${new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(iso)).replace(/\.$/, "")} ${time}`;
   return formatShortDate(locale, iso);
 }
 

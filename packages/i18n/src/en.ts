@@ -4178,7 +4178,15 @@ export const en = {
       done: "Done",
       canceled: "Canceled",
     },
+    statusLower: {
+      todo: "to do",
+      in_progress: "in progress",
+      in_review: "in review",
+      done: "done",
+      canceled: "canceled",
+    },
     priority: { low: "Low", normal: "Normal", high: "High" },
+    priorityLower: { low: "low", normal: "normal", high: "high" },
     noAssignee: "No assignee",
     agentRole: "Agent · {{role}}",
     pr: "PR #{{number}}",
@@ -6519,6 +6527,7 @@ export const en = {
       planHint:
         "A plan: what's in and what's out, steps in order with who does them, risks and how to measure. The steps become tasks.",
     },
+    formatLower: { decision: "decision", plan: "plan" },
     synthesis: {
       eyebrow: "Synthesis",
       eyebrowPlan: "Plan",

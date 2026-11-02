@@ -32,7 +32,7 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   expect(t.email.sent).toEqual([]); // never inline in the request
   await t.drain();
   expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([
-    [["ana@example.com"], "Você recebeu um convite para um workspace no agentes.chat"],
+    [["ana@example.com"], "You're invited to a workspace on agentes.chat"],
   ]);
   expect(t.email.sent[0]?.text).toContain(url);
 
@@ -52,7 +52,7 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   await t.drain();
   expect(t.email.sent.at(-1)).toMatchObject({
     to: ["owner@example.com"],
-    subject: "Redefina sua senha do agentes.chat",
+    subject: "Reset your agentes.chat password",
   });
 });
 
@@ -98,14 +98,14 @@ test("at most 3 reset and 3 confirmation emails an hour to one address: more go 
   // The sign-up's confirmation was the first of three. (Links are stamped to the second: within one, they're one email.)
   for (let i = 0; i < 2; i++) expect((await confirm()).status).toBe(200);
   await t.drain();
-  expect(sent("Redefina sua senha do agentes.chat").length).toBe(3);
-  const confirmations = sent("Confirme seu e-mail no agentes.chat").length;
+  expect(sent("Reset your agentes.chat password").length).toBe(3);
+  const confirmations = sent("Confirm your email for agentes.chat").length;
   expect(confirmations).toBeGreaterThanOrEqual(1);
   // A new second would make a new link: the fourth is dropped all the same.
   await Bun.sleep(1000 - (Date.now() % 1000));
   expect((await confirm()).status).toBe(200);
   await t.drain();
-  expect(sent("Confirme seu e-mail no agentes.chat").length).toBe(confirmations);
+  expect(sent("Confirm your email for agentes.chat").length).toBe(confirmations);
 
   // Another address has its own count.
   await signUp(browser(t), "bia@example.com");
@@ -199,7 +199,7 @@ test("a server people outside can't reach attaches the pictures to each email", 
   await signUp(browser(t), "owner@example.com");
   await t.drain();
   const sent = t.email.sent.at(-1);
-  expect(sent?.subject).toBe("Confirme seu e-mail no agentes.chat");
+  expect(sent?.subject).toBe("Confirm your email for agentes.chat");
   expect(sent?.html).toContain('src="cid:logo-ink@agentes.chat"');
   expect(sent?.html).not.toContain(`${ORIGIN}/email/`);
   expect(sent?.inline?.map((p) => [p.cid, p.filename, p.contentType])).toEqual([

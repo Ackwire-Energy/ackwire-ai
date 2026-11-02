@@ -123,7 +123,7 @@ describe("Criar agente: steps", () => {
     expect(title()).toBe("Modelo e orçamento");
     expect(hint("Sobre Orçamento mensal")).toBe("Ao atingir o limite, a Iris para e avisa. Avisamos Walter aos 80%.");
     expect(screen().getByText(/^Vazio: o padrão do workspace/).textContent).toBe(
-      "Vazio: o padrão do workspace (US$ 50).",
+      "Vazio: o padrão do workspace (US$\u00a050).",
     );
   });
 
@@ -183,7 +183,7 @@ describe("Criar agente: steps", () => {
     );
     const gpt = screen().getByRole("button", { name: /^GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
-    expect(gpt.textContent).toContain("Precisa de uma chave da OpenAI");
+    expect(gpt.textContent).toContain("Precisa de uma chave de API OpenAI");
     await click(gpt);
     expect(gpt.getAttribute("aria-pressed")).toBe("false");
 
@@ -861,7 +861,7 @@ describe("Criar agente: what gets created", () => {
     await startAs("QA");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    expect(document.body.textContent).toContain("Vazio: o padrão do workspace (US$ 50).");
+    expect(document.body.textContent).toContain("Vazio: o padrão do workspace (US$\u00a050).");
     const field = screen().getByLabelText("Orçamento mensal (US$)") as HTMLInputElement;
     await typeIn(field, "0");
     await click(continueButton());
@@ -869,11 +869,11 @@ describe("Criar agente: what gets created", () => {
     expect(screen().getAllByText("Use um valor maior que zero.").length).toBeGreaterThan(0);
     await typeIn(field, "abc");
     expect(screen().getAllByText("Use um valor maior que zero.").length).toBeGreaterThan(0);
-    await click(screen().getByRole("button", { name: "US$ 30" }));
+    await click(screen().getByRole("button", { name: "US$\u00a030" }));
     // "Outro valor" stays empty: only an amount of its own goes there.
     expect(field.value).toBe("");
-    expect(screen().getByRole("button", { name: "US$ 30" }).getAttribute("aria-pressed")).toBe("true");
-    await click(screen().getByRole("button", { name: "Padrão do workspace (US$ 50)" }));
+    expect(screen().getByRole("button", { name: "US$\u00a030" }).getAttribute("aria-pressed")).toBe("true");
+    await click(screen().getByRole("button", { name: "Padrão do workspace (US$\u00a050)" }));
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);

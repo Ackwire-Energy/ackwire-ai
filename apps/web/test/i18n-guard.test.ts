@@ -47,6 +47,27 @@ describe("no hardcoded UI text", () => {
   });
 });
 
+describe("translated text stays as each language writes it (ADR 0121)", () => {
+  const ROOTS_ALL = [...ROOTS, join(REPO, "packages", "client", "src")];
+  test("no case change on t(…), and no two t(…) glued with a space", () => {
+    const offenders: string[] = [];
+    for (const root of ROOTS_ALL)
+      for (const f of sourceFiles(root, /\.tsx?$/)) {
+        const source = withoutComments(readFileSync(f, "utf8"));
+        const where = (i: number) => `${relative(REPO, f)}:${source.slice(0, i).split("\n").length}`;
+        const banned = [
+          // A lowercase or capitalized form is its own key ("roles.ownerLower"): only translators know it.
+          /\bt\((?:[^()]|\([^()]*\))*\)\.(?:toLowerCase|toUpperCase|toLocaleLowerCase|toLocaleUpperCase)\(/g,
+          /\b(?:capitalize|lowerFirst)\(t\(/g,
+          // Two sentences side by side: `common.joinSentences` ("{{a}} {{b}}", no space in Japanese and Chinese).
+          /`\$\{t\([^`]*\)\} \$\{t\(/g,
+        ];
+        for (const re of banned) for (const m of source.matchAll(re)) offenders.push(`${where(m.index ?? 0)} ${m[0]}`);
+      }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("a failed request in the person's words", () => {
   /** Where an error's own words are the point: Better Auth's refusal read into `AuthResult`, a framed page's script. */
   const OWN_WORDS = ["auth/better-auth.ts", "components/artifacts/HtmlFrame.tsx"];

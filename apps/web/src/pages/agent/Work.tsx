@@ -294,9 +294,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const effort =
     kind !== "model" && view
       ? t("agentPage.work.cell.effort", {
-          level: t(
-            `agentPage.work.brain.efforts.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`,
-          ).toLowerCase(),
+          level: t(`agentPage.work.brain.effortsLower.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`),
         })
       : null;
   const target = work.target;

@@ -87,7 +87,9 @@ describe("help links", () => {
     expect(helpUrl("memory", "en")).toBe("https://app.agentes.chat/help/memory?lang=en");
     expect(helpUrl("computers", "pt-BR", "folders")).toBe("https://app.agentes.chat/help/computers?lang=pt-BR#folders");
     expect(helpUrl("wiki", "en-GB")).toBe("https://app.agentes.chat/help/wiki?lang=en");
-    expect(helpUrl("wiki", "fr")).toBe("https://app.agentes.chat/help/wiki?lang=pt-BR");
+    // Any language of the app; the page shows in English where that language has none.
+    expect(helpUrl("wiki", "fr-CA")).toBe("https://app.agentes.chat/help/wiki?lang=fr");
+    expect(helpUrl("wiki", "xx")).toBe("https://app.agentes.chat/help/wiki?lang=en");
   });
 });
 

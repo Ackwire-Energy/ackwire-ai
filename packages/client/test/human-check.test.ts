@@ -144,10 +144,10 @@ test("the words: the check's refusals, and Better Auth's by status and code befo
   expect(authErrorText(t, { status: 403, code: "human_check_blocked", message: "x" })).toBe("errors.humanCheckBlocked");
   expect(authErrorText(t, { status: 429, message: "Too many requests" })).toBe("auth.tooManyTries");
   expect(authErrorText(t, { status: 403, code: "ACCOUNT_BLOCKED", message: "x" })).toBe("auth.accountBlocked");
-  // Its own words only for English readers, and never a 5xx's.
+  // Its own words (English, every language's fallback), never a 5xx's.
   const tEn = Object.assign((key: string) => key, { lng: "en" }) as unknown as typeof t;
   expect(authErrorText(tEn, { status: 400, message: "Password too short" })).toBe("Password too short");
-  expect(authErrorText(t, { status: 400, message: "Password too short" })).toBe("common.unknownError");
+  expect(authErrorText(t, { status: 400, message: "Password too short" })).toBe("Password too short");
   expect(authErrorText(tEn, { status: 500, message: "Internal Server Error" })).toBe("common.unknownError");
 });
 

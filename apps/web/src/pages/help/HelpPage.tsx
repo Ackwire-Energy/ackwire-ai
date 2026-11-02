@@ -1,5 +1,5 @@
 import { useAuthConfig } from "@agenteschat/client";
-import { type HelpBlock, helpDocument, helpInline, isHelpSlug } from "@agenteschat/i18n/help";
+import { HELP, type HelpBlock, helpDocument, helpInline, isHelpSlug } from "@agenteschat/i18n/help";
 import { isAppLocale } from "@agenteschat/i18n/locale";
 import { Logo, Select } from "@agenteschat/ui";
 import { Link, Navigate, useNavigate } from "@tanstack/react-router";
@@ -28,8 +28,10 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
     setLocale(code, i18n);
     void navigate({ to: "/help/$slug", params: { slug }, search: { lang: code }, replace: true });
   };
+  // The page's own language: English where `locale` has no translation of it yet.
+  const shown = isHelpSlug(slug) && HELP[locale][slug] ? locale : DEFAULT_LOCALE;
   return (
-    <div className="legal help" lang={locale}>
+    <div className="legal help" lang={shown}>
       <header className="legal__bar">
         <Link to="/" aria-label={t("legal.home")}>
           <Logo size={24} />

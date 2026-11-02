@@ -98,10 +98,10 @@ export function actionTextValues(
         v.fields = fieldWords("issueFields");
         if (fields.length === 1 && fields[0] === "status" && p.status) {
           v.context = "status";
-          v.status = t(`issues.status.${str(p.status)}`, { defaultValue: str(p.status) }).toLowerCase();
+          v.status = t(`issues.statusLower.${str(p.status)}`, { defaultValue: str(p.status) });
         } else if (fields.length === 1 && fields[0] === "priority" && p.priority) {
           v.context = "priority";
-          v.priority = t(`issues.priority.${str(p.priority)}`, { defaultValue: str(p.priority) }).toLowerCase();
+          v.priority = t(`issues.priorityLower.${str(p.priority)}`, { defaultValue: str(p.priority) });
         }
       }
       const assigned = a.kind === "issue.assigned" || fields.includes("assignee");

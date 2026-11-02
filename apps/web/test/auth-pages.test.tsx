@@ -255,13 +255,14 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
   });
 
-  test("a blocked account is told so; another refusal in the person's words, never the server's English", async () => {
+  test("a blocked account is told so; another refusal in the server's words when the app has none", async () => {
     for (const [signIn, says] of [
       [
         { ok: false, status: 403, message: "This account can't sign in.", code: "ACCOUNT_BLOCKED" },
         "Esta conta não pode entrar.",
       ],
-      [{ ok: false, status: 403, message: "Invalid origin" }, "Algo deu errado. Tente de novo."],
+      // A refusal the app has no words for: the server's own, English being every language's fallback.
+      [{ ok: false, status: 403, message: "Invalid origin" }, "Invalid origin"],
     ] as const) {
       const { api } = authApi(ACCOUNT);
       await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
@@ -1314,7 +1315,7 @@ describe("Onboarding", () => {
     const keys = screen().getByRole("region", { name: "Chave de API" });
     const makers = within(keys).getByRole("group", { name: "Provedor" });
     expect(within(makers).getByRole("button", { name: "Claude" }).getAttribute("aria-pressed")).toBe("true");
-    expect(keys.textContent).toContain("Crie a sua chave de API do Claude");
+    expect(keys.textContent).toContain("Crie a sua chave de API Claude");
     const site = within(keys).getByRole("link", { name: "Abrir platform.claude.com" });
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
     expect(site.className).toContain("ac-btn");

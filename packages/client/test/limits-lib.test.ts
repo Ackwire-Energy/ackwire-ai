@@ -47,10 +47,10 @@ describe("a workspace's limits in words (ADR 0079)", () => {
     expect(storage("storage.full", 50 * GB)).toBe('limits.storage.full {"limit":"50 GB"}');
     expect(storage("storage.daily_full", 10 * GB, "pt-BR")).toBe('limits.storage.dailyFull {"limit":"10 GB"}');
     expect(storage("storage.full", 1.5 * GB, "pt-BR")).toBe('limits.storage.full {"limit":"1,5 GB"}');
-    // Without its numbers: the server's own words for English readers, else nothing it can't say right.
+    // Without its numbers: the server's own words, in English for every language.
     const bare = new ApiError(409, "storage.full", "The workspace's file storage is full");
     expect(errorText(t, bare, "en")).toBe("The workspace's file storage is full");
-    expect(errorText(t, bare, "pt-BR")).toBe("common.unknownError");
+    expect(errorText(t, bare, "pt-BR")).toBe("The workspace's file storage is full");
   });
 
   test("the person an invitation is for reads whom to tell, never the numbers", () => {

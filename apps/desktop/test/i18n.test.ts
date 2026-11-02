@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { join, relative } from "node:path";
+import { LOCALES } from "@agenteschat/i18n/locale";
+import { checkLocale } from "@agenteschat/i18n/testing";
+import identical from "../../../packages/i18n/test/identical.json";
 import { leaves as entries } from "../../../packages/i18n/test/leaves";
 import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
 import { unplainLeaves } from "../../../packages/i18n/test/plain-marks";
 import { misplaced, staleLines } from "../../../packages/i18n/test/setups";
-import { createDesktopI18n, pickLocale, withDesktopKeys } from "../src/i18n";
+import { createDesktopI18n, DESKTOP_STRINGS, desktopStrings, pickLocale, withDesktopKeys } from "../src/i18n";
 import { desktopEn } from "../src/i18n/keys.en";
 import { desktopPtBR } from "../src/i18n/keys.pt-BR";
 
@@ -17,19 +20,16 @@ function leaves(tree: object, prefix = ""): string[] {
 function values(tree: object): string[] {
   return Object.values(tree).flatMap((v) => (v && typeof v === "object" ? values(v as object) : [String(v)]));
 }
-const vars = (s: string) => [...s.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort();
 
 describe("desktop strings", () => {
-  test("pt-BR and en have the same keys", () => {
-    expect(leaves(desktopEn).sort()).toEqual(leaves(desktopPtBR).sort());
-  });
-
-  test("the same placeholders in both languages", () => {
-    const get = (tree: object, path: string) =>
-      path.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], tree) as string;
-    for (const path of leaves(desktopPtBR)) {
-      expect({ path, vars: vars(get(desktopEn, path)) }).toEqual({ path, vars: vars(get(desktopPtBR, path)) });
+  test("every language against English: keys, plural forms, placeholders, tags (ADR 0121)", () => {
+    for (const { code, ready } of LOCALES.filter((l) => l.code !== "en")) {
+      const same = (identical.desktop as Record<string, string[]>)[code] ?? [];
+      const problems = checkLocale({ source: desktopEn, target: DESKTOP_STRINGS[code], code, ready, identical: same });
+      expect({ code, problems }).toEqual({ code, problems: [] });
     }
+    // A language with nothing yet reads English, its device names too.
+    expect(desktopStrings("ja").device.windows).toBe(desktopEn.device.windows);
   });
 
   test("no empty strings and no internal names in the UI", () => {
@@ -158,6 +158,6 @@ describe("desktop strings", () => {
   test("picks the Mac's language", () => {
     expect(pickLocale(["pt-PT"])).toBe("pt-BR");
     expect(pickLocale(["en-GB", "pt-BR"])).toBe("en");
-    expect(pickLocale(["fr-FR"])).toBe("pt-BR");
+    expect(pickLocale(["xx-XX"])).toBe("en");
   });
 });

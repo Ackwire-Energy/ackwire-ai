@@ -68,6 +68,7 @@
       "forum.track.roundShort",
       "issues.pr",
       "issues.priority.normal",
+      "issues.priorityLower.normal",
       "issues.statusLabel",
       "jev.title",
       "look.accessories.headset",
@@ -143,6 +144,8 @@
       "onboarding.stepNames.workspace",
       "orgLogo.label",
       "permissions.areas.org",
+      "presence.lower.offline",
+      "presence.lower.online",
       "presence.offline",
       "presence.online",
       "presence.until.m30",
@@ -189,6 +192,51 @@
       "wiki.import.stat.links",
       "wiki.legend.obsidian",
       "wiki.tags"
+    ]
+  },
+  "mobile-base": {
+    "pt-BR": ["push.ask.minutes"]
+  },
+  "mobile-features": {
+    "pt-BR": [
+      "browser.live.key.Enter",
+      "browser.live.key.Escape",
+      "browser.live.key.Tab",
+      "chart.item",
+      "chat.thread",
+      "chats.thread",
+      "drive.kind.diff",
+      "drive.type.diffs",
+      "files.type.pdf",
+      "invitePeople.ok",
+      "me.account.save",
+      "me.soundPixel",
+      "me.workspaces",
+      "mission.minutes",
+      "onb.logo",
+      "status.title",
+      "tabs.threads",
+      "threads.section.threads"
+    ]
+  },
+  "desktop": {
+    "pt-BR": [
+      "common.hours",
+      "common.minutes",
+      "device.mac",
+      "device.windows",
+      "link.chipTailnet",
+      "menu.zoom",
+      "orgCount",
+      "prefs.accounts.ok",
+      "prefs.accounts.org",
+      "prefs.activity.org",
+      "prefs.advanced.claude",
+      "prefs.folders.org",
+      "prefs.general.orgs",
+      "server.jev",
+      "tools.claudeName",
+      "tools.codexName"
     ]
   }
 }

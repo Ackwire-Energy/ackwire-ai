@@ -8,6 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { LEAVE_MS } from "@/pages/AuthorizePage";
 import { createFakeApi, type FakeState, fakeAppsOf, ORG_ID, seedState } from "./fake-api";
 import type { FakeApps } from "./fakes/apps";
+import { pick } from "./new-agent-flow";
 import { renderApp, settle } from "./render";
 
 const REQ = "0192f0a0-0000-7000-8000-000000000001";
@@ -57,7 +58,7 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
     expect(page().textContent).toContain("Entrando como Walter (walter@acme.test)");
     expect(within(page()).getByRole("button", { name: "Trocar de conta" })).toBeTruthy();
     // One workspace: its name, no picker.
-    expect(within(page()).queryByRole("combobox")).toBeNull();
+    expect(within(page()).queryByRole("combobox", { name: "Workspace" })).toBeNull();
     expect(page().textContent).toContain("Acme");
     expect(
       within(page())
@@ -331,8 +332,7 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
 
   test("the language switch changes this page only", async () => {
     await open((apps) => apps.addConsent(REQ));
-    const english = within(page()).getByRole("radio", { name: "English" });
-    await click(english);
+    await pick(within(page()).getByRole("combobox", { name: "Idioma" }), "English");
     await settle(6);
     expect(title().textContent).toBe("Claude wants to access your account");
     expect(within(page()).getByRole("button", { name: "Allow" })).toBeTruthy();

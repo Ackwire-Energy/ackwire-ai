@@ -434,17 +434,17 @@ describe("Configurações do workspace", () => {
     expect(plans.textContent).toContain("Claude Code · de Walter");
     expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
     expect(plans.textContent).toContain("Ada ≈ 30% · Atlas ≈ 11%");
-    expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$ 92,00 pela API");
+    expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$\u00a092,00 pela API");
     const api = screen().getByRole("region", { name: "API do workspace" });
     expect(api.textContent).toContain("23% do orçamento");
-    expect(api.textContent).toContain("US$ 11,50 de US$ 50,00 (padrão do workspace)");
+    expect(api.textContent).toContain("US$\u00a011,50 de US$\u00a050,00 (padrão do workspace)");
     expect(within(api).getByRole("meter", { name: "Orçamento usado de Atlas" }).getAttribute("aria-valuenow")).toBe(
       "23",
     );
     // Admins also see the API's spend by kind, and the default budget.
     const usage = screen().getByRole("region", { name: "Gastos da API por tipo" });
-    expect(usage.textContent).toContain("Agentes154 chamadasUS$ 15,40");
-    expect(usage.textContent).toContain("Roteador80 chamadasUS$ 0,50");
+    expect(usage.textContent).toContain("Agentes154 chamadasUS$\u00a015,40");
+    expect(usage.textContent).toContain("Roteador80 chamadasUS$\u00a00,50");
     const fallback = screen().getByRole("region", { name: "Orçamento padrão dos agentes" });
     const field = within(fallback).getByLabelText("Orçamento mensal por agente (US$)") as HTMLInputElement;
     expect(field.value).toBe("50");

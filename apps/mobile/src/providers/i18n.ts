@@ -4,40 +4,9 @@ import { fillPluralGaps, type LocaleStrings } from "@agenteschat/i18n/plurals";
 import { getLocales } from "expo-localization";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { featureKeysEn } from "@/features/i18n/keys.en";
-import { featureKeysPtBR } from "@/features/i18n/keys.pt-BR";
-import de from "@/features/i18n/locales/de.json";
-import es from "@/features/i18n/locales/es.json";
-import fr from "@/features/i18n/locales/fr.json";
-import id from "@/features/i18n/locales/id.json";
-import it from "@/features/i18n/locales/it.json";
-import ja from "@/features/i18n/locales/ja.json";
-import ko from "@/features/i18n/locales/ko.json";
-import nl from "@/features/i18n/locales/nl.json";
-import pl from "@/features/i18n/locales/pl.json";
-import ru from "@/features/i18n/locales/ru.json";
-import tr from "@/features/i18n/locales/tr.json";
-import zhHans from "@/features/i18n/locales/zh-Hans.json";
+import { FEATURES } from "@/features/i18n/locales";
 import { DEFAULT_LOCALE, pickLocale, withMobileKeys } from "@/i18n/merge";
 import { readValueSync, writeValue } from "@/lib/storage";
-
-/** The screens' strings per language. */
-const FEATURES: Record<AppLocale, LocaleStrings> = {
-  en: featureKeysEn,
-  "pt-BR": featureKeysPtBR,
-  es,
-  fr,
-  de,
-  it,
-  nl,
-  ja,
-  ko,
-  "zh-Hans": zhHans,
-  id,
-  tr,
-  pl,
-  ru,
-};
 
 /**
  * The shared strings, required only when the language is used: Metro bundles every file but runs one only on its

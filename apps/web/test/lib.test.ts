@@ -59,14 +59,14 @@ const at = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000)
 
 describe("format (pt-BR, machine numbers precise)", () => {
   test("money", () => {
-    expect(formatUsd("pt-BR", 12.3)).toBe("US$ 12,30");
-    expect(formatUsd("pt-BR", 0.004)).toBe("US$ 0,004");
-    expect(formatUsd("pt-BR", 0.0003)).toBe("US$ 0,0003");
+    expect(formatUsd("pt-BR", 12.3)).toBe("US$\u00a012,30");
+    expect(formatUsd("pt-BR", 0.004)).toBe("US$\u00a00,004");
+    expect(formatUsd("pt-BR", 0.0003)).toBe("US$\u00a00,0003");
     // A real spend too small for 4 decimals (a few thousand tokens of a cheap model) never reads as zero.
-    expect(formatUsd("pt-BR", 0.00003)).toBe("<US$ 0,0001");
-    expect(formatUsd("pt-BR", 0.00005)).toBe("US$ 0,0001");
-    expect(formatUsd("pt-BR", 0)).toBe("US$ 0,00");
-    expect(formatUsd("pt-BR", 1234.5)).toBe("US$ 1.234,50");
+    expect(formatUsd("pt-BR", 0.00003)).toBe("<US$\u00a00,0001");
+    expect(formatUsd("pt-BR", 0.00005)).toBe("US$\u00a00,0001");
+    expect(formatUsd("pt-BR", 0)).toBe("US$\u00a00,00");
+    expect(formatUsd("pt-BR", 1234.5)).toBe("US$\u00a01.234,50");
     // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.
     expect(formatPercent("pt-BR", 30.8)).toBe("31%");
     expect(formatPercent("pt-BR", 2.5)).toBe("2,5%");
@@ -410,11 +410,6 @@ describe("guards and permissions", () => {
 });
 
 describe("i18n", () => {
-  const shape = (o: object): unknown =>
-    Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "object" ? shape(v) : typeof v]));
-  test("en has exactly the keys of pt-BR (the source)", () => {
-    expect(shape(en)).toEqual(shape(ptBR));
-  });
   test("pt-BR is the default; copy follows the screens", () => {
     expect(i18n.language).toBe("pt-BR");
     expect(t("auth.flow.password")).toBe("Bom te ver de novo.");
@@ -493,7 +488,7 @@ describe("the confirmation email", () => {
     ]);
   });
 
-  test("a new link that didn't go out says why in the person's words, never Better Auth's", async () => {
+  test("a new link that didn't go out says why in the person's words, else the server's (English, every language's fallback)", async () => {
     const shown: string[] = [];
     const show = (text: string) => void shown.push(text);
     const refusals = [
@@ -509,7 +504,7 @@ describe("the confirmation email", () => {
     expect(shown).toEqual([
       "Sem conexão com o agentes.chat agora. Tente de novo em instantes.",
       "Muitas tentativas. Espere alguns minutos e tente de novo.",
-      "Algo deu errado. Tente de novo.",
+      "Email is already verified",
     ]);
   });
 

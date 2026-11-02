@@ -8,6 +8,7 @@ import {
   createOrganization,
   deleteAccount,
   EARLY_ACCESS_TOKEN,
+  type EmailLocale,
   earlyAccessEmail,
   enqueueWaitlistContacts,
   hasWorkspaceAllowance,
@@ -79,7 +80,7 @@ async function confirmed(userId: string) {
   return user?.emailVerified;
 }
 
-async function invite(email: string, now = T0, options: { resend?: boolean; locale?: "en" | "pt-BR" } = {}) {
+async function invite(email: string, now = T0, options: { resend?: boolean; locale?: EmailLocale } = {}) {
   const [result] = await inviteEarlyAccess(
     db,
     { emails: [email], resend: options.resend ?? true, locale: options.locale, publicUrl: APP },
@@ -249,7 +250,7 @@ describe("inviting", () => {
       {
         id: result?.invitationId ?? "",
         email: "ana@acme.com",
-        locale: "pt-BR",
+        locale: "en",
         tokenHash: sha256(access),
         createdAt: T0,
         sentAt: T0,
@@ -269,7 +270,7 @@ describe("inviting", () => {
         to: ["ana@acme.com"],
         template: {
           kind: "early_access",
-          locale: "pt-BR",
+          locale: "en",
           email: "ana@acme.com",
           url: `${APP}/signup?email=ana%40acme.com&access=${access}`,
           days: 14,
@@ -278,17 +279,17 @@ describe("inviting", () => {
     ]);
   });
 
-  test("the email's language: the invitation's, else the waiting list's, else the request's, else pt-BR", async () => {
+  test("the email's language: the invitation's, else the waiting list's, else the request's, else English", async () => {
     await importWaitlist(db, [{ email: "listed@acme.com", locale: "en" }], at(-DAY));
     await invite("listed@acme.com", T0, { locale: "pt-BR" });
     await invite("asked@acme.com", T0, { locale: "en" });
     await invite("plain@acme.com", T0);
-    await invite("plain@acme.com", at(3 * MIN), { locale: "en" });
+    await invite("plain@acme.com", at(3 * MIN), { locale: "ja" });
     expect((await sent()).map((s) => [s.to[0], s.template.locale])).toEqual([
       ["listed@acme.com", "en"],
       ["asked@acme.com", "en"],
-      ["plain@acme.com", "pt-BR"],
-      ["plain@acme.com", "pt-BR"],
+      ["plain@acme.com", "en"],
+      ["plain@acme.com", "en"],
     ]);
     expect((await row("listed@acme.com")).locale).toBe("en");
   });
@@ -594,7 +595,7 @@ describe("allowing an account that exists", () => {
     expect(results.map((r) => r.outcome)).toEqual(["invited", "allowed"]);
     // Bia's account has no language of its own: her waiting-list entry's.
     expect((await sent()).map((s) => [s.to[0], s.template.kind, s.template.locale])).toEqual([
-      ["ana@acme.com", "early_access", "pt-BR"],
+      ["ana@acme.com", "early_access", "en"],
       ["bia@acme.com", "early_access_allowed", "en"],
     ]);
     expect(await canCreateWorkspace(db, bia, CLOUD)).toBe(true);
@@ -614,7 +615,7 @@ describe("allowing an account that exists", () => {
       invitation: { id: invitationId, state: "signed_up", userId: ana, usedAt: at(MIN), sends: 2 },
     });
     expect((await sent()).map((s) => [s.template.kind, s.template.locale])).toEqual([
-      ["early_access", "pt-BR"],
+      ["early_access", "en"],
       ["early_access_allowed", "en"],
     ]);
     expect(await signupAdmission(db, "ana@acme.com", CLOSED, { access: link, now: at(2 * MIN) })).toBeNull();
@@ -676,7 +677,7 @@ describe("the waiting list", () => {
     ];
     expect(await importWaitlist(db, input, T0)).toEqual({ added: 4, confirmed: 1, unchanged: 2, invalid: [1, 8] });
     const rows = new Map((await db.select().from(waitlistEntries)).map((r) => [r.email, r]));
-    expect(rows.get("first@acme.com")).toMatchObject({ source: "import", locale: "pt-BR", createdAt: T0 });
+    expect(rows.get("first@acme.com")).toMatchObject({ source: "import", locale: "en", createdAt: T0 });
     expect(rows.get("second@acme.com")).toMatchObject({ source: "import", locale: "en", createdAt: at(2) });
     expect(rows.get("past@acme.com")?.createdAt).toEqual(new Date("2025-06-01T00:00:00.000Z"));
     expect(rows.get("future@acme.com")?.createdAt).toEqual(T0);
@@ -728,9 +729,9 @@ describe("the waiting list", () => {
     expect(earlyAccessEmail("two..dots@acme.com")).toBeNull();
     expect(await waitlistNext(db, 10)).toEqual([
       { email: "old@acme.com", locale: "en", joinedAt: day(1) },
-      { email: "member@acme.com", locale: "pt-BR", joinedAt: day(5) },
-      { email: "new@acme.com", locale: "pt-BR", joinedAt: day(6) },
-      { email: "newer@acme.com", locale: "pt-BR", joinedAt: day(7) },
+      { email: "member@acme.com", locale: "en", joinedAt: day(5) },
+      { email: "new@acme.com", locale: "en", joinedAt: day(6) },
+      { email: "newer@acme.com", locale: "en", joinedAt: day(7) },
     ]);
     // A page that ends with a refused address reads on to fill the limit.
     expect((await waitlistNext(db, 2)).map((e) => e.email)).toEqual(["old@acme.com", "member@acme.com"]);

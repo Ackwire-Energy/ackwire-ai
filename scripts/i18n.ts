@@ -247,7 +247,7 @@ function apply(code: AppLocale, file: string) {
       target: next,
       code,
       ready: false,
-      identical: (identical.app as Record<string, string[]>)[code] ?? [],
+      identical: (identical[name as keyof typeof identical] as Record<string, string[]>)[code] ?? [],
     }).filter((p) => touched.has(splitKey(p.split(":")[0] ?? "").base));
     for (const item of mine) {
       const max = MAX_CHARS[item.key];

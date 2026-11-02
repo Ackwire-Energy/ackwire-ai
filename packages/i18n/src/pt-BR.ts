@@ -4307,7 +4307,15 @@ export const ptBR = {
       done: "Feito",
       canceled: "Cancelada",
     },
+    statusLower: {
+      todo: "a fazer",
+      in_progress: "em andamento",
+      in_review: "em revisão",
+      done: "feito",
+      canceled: "cancelada",
+    },
     priority: { low: "Baixa", normal: "Normal", high: "Alta" },
+    priorityLower: { low: "baixa", normal: "normal", high: "alta" },
     noAssignee: "Sem responsável",
     agentRole: "Agente · {{role}}",
     pr: "PR #{{number}}",
@@ -6712,6 +6720,7 @@ export const ptBR = {
       planHint:
         "Um plano: o que entra e o que fica de fora, etapas em ordem com quem faz, riscos e como medir. As etapas viram tarefas.",
     },
+    formatLower: { decision: "decisão", plan: "plano" },
     synthesis: {
       eyebrow: "Síntese",
       eyebrowPlan: "Plano",

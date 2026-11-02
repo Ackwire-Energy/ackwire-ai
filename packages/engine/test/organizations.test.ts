@@ -14,12 +14,15 @@ import {
   isSignupAllowed,
   listMachineRequests,
   listMemberships,
+  myLocale,
   type Permission,
   previewInvitation,
   removeMember,
+  requestLocale,
   requirePermission,
   setBillingHold,
   setMemberRoles,
+  setMyLocale,
   setOrgStanding,
   sha256,
   unfinishedWorkspaces,
@@ -293,5 +296,23 @@ describe("creating a workspace while one is held", () => {
       .from(schema.organizationMembers)
       .where(eq(schema.organizationMembers.userId, ana.id));
     expect(owned).toHaveLength(1);
+  });
+});
+
+describe("the person's language (ADR 0121)", () => {
+  test("any language of the app, picked or detected; anything else refused", async () => {
+    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: null, localeAuto: true });
+    await setMyLocale(f.db, f.owner.id, "fr");
+    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "fr", localeAuto: false });
+    await setMyLocale(f.db, f.owner.id, "ja", true);
+    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "ja", localeAuto: true });
+    await expect(setMyLocale(f.db, f.owner.id, "xx" as "en")).rejects.toThrow();
+  });
+
+  test("Accept-Language: the most preferred language people can pick", () => {
+    expect(requestLocale("pt-PT,en;q=0.5")).toBe("pt-BR");
+    expect(requestLocale("en-GB,pt;q=0.9")).toBe("en");
+    expect(requestLocale("xx,en;q=0.5")).toBe("en");
+    expect(requestLocale("de;q=0,xx")).toBeNull();
   });
 });

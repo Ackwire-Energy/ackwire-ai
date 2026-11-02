@@ -83,13 +83,11 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(en, error)).toBe("common.unknownError");
   });
 
-  test("a 4xx the app doesn't know: its words for English readers, common.unknownError for everyone else", () => {
+  test("a 4xx the app doesn't know: the server's own words, English being every language's fallback", () => {
     const error = new ApiError(409, "thing.busy", "That thing is busy right now.");
     expect(errorText(en, error)).toBe("That thing is busy right now.");
-    expect(errorText(pt, error)).toBe("common.unknownError");
-    // The language given beats the one `t` was made in.
-    expect(errorText(pt, error, "en")).toBe("That thing is busy right now.");
-    expect(errorText(en, error, "pt-BR")).toBe("common.unknownError");
+    expect(errorText(pt, error)).toBe("That thing is busy right now.");
+    expect(errorText(en, error, "pt-BR")).toBe("That thing is busy right now.");
     // Codes the app knows, 413 and 403 say what they always said.
     expect(errorText(pt, new ApiError(403, "forbidden", "Nope"))).toBe("common.notAllowed");
     expect(errorText(pt, new ApiError(429, "rate_limited", "Slow down"))).toBe("common.tooMany");
@@ -111,7 +109,7 @@ describe("a failed request in the person's words (errorText)", () => {
       "Invalid origin",
     );
     expect(authErrorText(pt, { status: 403, code: "INVALID_ORIGIN", message: "Invalid origin" })).toBe(
-      "common.unknownError",
+      "Invalid origin",
     );
     expect(authErrorText(en, { status: 500, message: "Internal Server Error" })).toBe("common.unknownError");
     expect(authErrorText(pt, { status: 429, message: "Too many" })).toBe("auth.tooManyTries");

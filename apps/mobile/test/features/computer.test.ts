@@ -117,7 +117,7 @@ describe("the agent's computer on the phone: its words by edition", () => {
       expect(at(keys, "browser.profile")).toBeUndefined();
     }
     expect(at(resources["pt-BR"].translation, "agentComputer.button")).toBe("Computador");
-    expect(at(resources["pt-BR"].translation, "agentComputer.title")).toBe("Computador {{of}} {{name}}");
+    expect(at(resources["pt-BR"].translation, "agentComputer.title")).toBe("Computador do {{name}}");
   });
 });
 
