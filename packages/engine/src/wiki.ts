@@ -27,12 +27,11 @@ import { getMessage } from "./messages";
 import { can, type Membership, requireActiveMembership } from "./organizations";
 import { enqueueIndex, registerDocumentBuilder, registerReindexSource, type SearchDeps, searchVisible } from "./search";
 import {
-  agentVisibleWikiPageIds,
   pagesBySlug,
   parseWikiLinks,
   syncWikiLinks,
   visibleWikiPageIds,
-  wikiPageAgentVisibleSql,
+  wikiPageRunVisibleSql,
   wikiPageVisibleSql,
   wikiSlug,
 } from "./wiki-links";
@@ -57,10 +56,14 @@ const {
 
 type PageRow = typeof wikiPages.$inferSelect;
 
-/** Who writes: a person, or an agent on a person's request ("by Theo, at Walter's request"). */
+/**
+ * Who reads or writes: a person, or an agent for a person ("by Theo, at Walter's request"). An agent sees only what
+ * that person and whoever reads `channelId` see (`wikiPageRunVisibleSql`), so it can't hand a page to someone it was
+ * kept from; with nobody behind it, it sees no page limited to people.
+ */
 export type WikiActor =
   | { type: "person"; userId: string }
-  | { type: "agent"; agentId: string; requestedByUserId: string | null };
+  | { type: "agent"; agentId: string; requestedByUserId: string | null; channelId?: string | null };
 
 export interface WikiDeps {
   db: Database;
@@ -287,7 +290,23 @@ const agentEdits = (agentId: string, page: Pick<PageRow, "agentEditorsLimited" |
 
 /** The condition that keeps a person or an agent to the pages they see. */
 const visibleTo = (actor: WikiActor) =>
-  actor.type === "person" ? wikiPageVisibleSql(actor.userId) : wikiPageAgentVisibleSql(actor.agentId);
+  actor.type === "person"
+    ? wikiPageVisibleSql(actor.userId)
+    : wikiPageRunVisibleSql({
+        agentId: actor.agentId,
+        personId: actor.requestedByUserId,
+        channelId: actor.channelId ?? null,
+      });
+
+/** Of these page ids, the ones `actor` sees. */
+async function visibleIds(db: Executor, actor: WikiActor, ids: string[]) {
+  if (ids.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ id: wikiPages.id })
+    .from(wikiPages)
+    .where(and(inArray(wikiPages.id, [...new Set(ids)]), visibleTo(actor)));
+  return new Set(rows.map((r) => r.id));
+}
 
 const authorCols = (actor: WikiActor) =>
   actor.type === "person"
@@ -303,7 +322,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * A live page by id, slug or an earlier slug (or a deleted one with `deleted`), that `actor` sees: a restricted page
- * outside a person's audience is a plain `wiki.no_access`, and for an agent outside its list the page doesn't exist.
+ * outside a person's audience is a plain `wiki.no_access`, and for an agent that may not read it the page doesn't exist.
  */
 async function findPage(
   db: Executor,
@@ -314,7 +333,7 @@ async function findPage(
 ) {
   const row = await findAnyPage(db, orgId, ref, options);
   if (actor.type === "person" && !(await sees(db, actor.userId, row))) throw noAccess();
-  if (actor.type === "agent" && !agentSees(actor.agentId, row)) {
+  if (actor.type === "agent" && !(await visibleIds(db, actor, [row.id])).has(row.id)) {
     throw new NotFoundError("Page not found", "wiki.page_not_found");
   }
   return row;
@@ -874,9 +893,9 @@ async function resolveOwnLinks(db: Executor, actor: WikiActor, row: PageRow) {
     for (const [slug, p] of pages) if (p.restricted && !seen.has(p.id)) pages.delete(slug);
   }
   if (actor.type === "agent" && pages.size) {
-    const seen = await agentVisibleWikiPageIds(
+    const seen = await visibleIds(
       db,
-      actor.agentId,
+      actor,
       [...pages.values()].map((p) => p.id),
     );
     for (const [slug, p] of pages) if (!seen.has(p.id)) pages.delete(slug);
@@ -999,8 +1018,7 @@ export async function createWikiPage(
     const hidden =
       existing &&
       ((existing.restricted && who && !(await sees(tx, who, existing))) ||
-        (actor.type === "agent" &&
-          !(await agentVisibleWikiPageIds(tx, actor.agentId, [existing.id])).has(existing.id)));
+        (actor.type === "agent" && !(await visibleIds(tx, actor, [existing.id])).has(existing.id)));
     if (existing && existing.slug === wanted && !options.allowDuplicate && !hidden) {
       throw new ConflictError(`A page "${existing.title}" already exists`, "slug_taken", {
         title: existing.title,
@@ -2411,7 +2429,7 @@ export async function createPageFromSource(
  */
 export async function retrieveWikiForRun(
   deps: WikiDeps,
-  input: { orgId: string; agentId: string; text: string; budgetChars?: number; readers: WikiRunReaders },
+  input: { orgId: string; text: string; budgetChars?: number; reader: () => Promise<WikiActor> },
 ): Promise<{ text: string; pageIds: string[] }> {
   const { db } = deps;
   const hasAny = (await caches.contextPresence.getOrLoad(`${input.orgId}:wiki`, async () => {
@@ -2423,6 +2441,7 @@ export async function retrieveWikiForRun(
     return Boolean(row);
   })) as boolean;
   if (!hasAny || !input.text.trim()) return { text: "", pageIds: [] };
+  const actor = await input.reader();
   const linked = parseWikiLinks(input.text);
   const named = linked.length
     ? [
@@ -2439,21 +2458,10 @@ export async function retrieveWikiForRun(
     ? await db
         .select()
         .from(wikiPages)
-        .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt), wikiPageAgentVisibleSql(input.agentId)))
+        .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt), visibleTo(actor)))
     : [];
-  const found = await searchPages(
-    deps,
-    { type: "agent", agentId: input.agentId, requestedByUserId: null },
-    input.orgId,
-    input.text,
-    5,
-  ).catch(() => [] as PageRow[]);
+  const found = await searchPages(deps, actor, input.orgId, input.text, 5).catch(() => [] as PageRow[]);
   const budget = input.budgetChars ?? 6000;
-  const outside = await restrictedOutsiders(
-    db,
-    [...namedRows, ...found].filter((p) => p.restricted || p.agentsLimited).map((p) => p.id),
-    input.readers,
-  );
   const lines: string[] = [];
   const ids: string[] = [];
   let used = 0;
@@ -2466,14 +2474,9 @@ export async function retrieveWikiForRun(
     if (room < 120) break;
     const body = p.body.trim();
     const where = `${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}`;
-    // The person the run acts for doesn't see it: no text in the prompt, only the rule and where to read it.
-    const text = outside.person.has(p.id)
-      ? `- [[${p.title}]] (${where}): ${RESTRICTED_WIKI_RULE} Read it with read_wiki_page only when you need it to decide.`
-      : outside.some.has(p.id)
-        ? `## [[${p.title}]] (${where})\n${RESTRICTED_WIKI_RULE}\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
-        : full.has(p.id)
-          ? `## [[${p.title}]] (${where})\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
-          : `- [[${p.title}]] (${where}): ${cutText(body.replace(/\s+/g, " "), room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
+    const text = full.has(p.id)
+      ? `## [[${p.title}]] (${where})\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
+      : `- [[${p.title}]] (${where}): ${cutText(body.replace(/\s+/g, " "), room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
     lines.push(text);
     ids.push(p.id);
     used += text.length;
@@ -2481,86 +2484,16 @@ export async function retrieveWikiForRun(
   return { text: lines.join("\n\n"), pageIds: ids };
 }
 
-/** Who reads what a run writes: the person it acts for (null for nobody) and the channel it answers in. */
-export interface WikiRunReaders {
-  channelId: string | null;
-  person: () => Promise<string | null>;
-}
-
-/** Marks a limited page in an agent's context when someone in the conversation can't see it. */
-export const RESTRICTED_WIKI_RULE =
-  "Restricted page: someone in this conversation can't see it. Use it to decide; never quote or summarize it, and never reveal its title, its text or that it exists.";
-
-/**
- * Of these limited pages, the ones someone who reads the conversation doesn't see (`some`), and the ones the person
- * the run acts for doesn't see (`person`, a subset). The channel's readers are its members, people and agents (a forum
- * topic: the whole workspace). With neither a channel nor a person, nobody can be told, so every page counts as unseen
- * by someone.
- */
-export async function restrictedOutsiders(db: Executor, ids: string[], readers: WikiRunReaders) {
-  const out = { some: new Set<string>(), person: new Set<string>() };
-  if (ids.length === 0) return out;
-  const personId = await readers.person();
-  if (personId) {
-    const seen = await visibleWikiPageIds(db, personId, ids);
-    for (const id of ids) if (!seen.has(id)) out.person.add(id);
-  }
-  if (!readers.channelId && !personId) for (const id of ids) out.some.add(id);
-  if (readers.channelId) {
-    const rows = await db
-      .select({ id: wikiPages.id })
-      .from(wikiPages)
-      .where(
-        and(
-          inArray(wikiPages.id, ids),
-          sql`(exists (select 1 from ${channelMembers} where ${channelMembers.channelId} = ${readers.channelId}
-              and ${channelMembers.userId} is not null and not ${wikiPageVisibleSql(sql`${channelMembers.userId}`)})
-            or exists (select 1 from ${channelMembers} where ${channelMembers.channelId} = ${readers.channelId}
-              and ${channelMembers.agentId} is not null and not ${wikiPageAgentVisibleSql(sql`${channelMembers.agentId}`)})
-            or exists (select 1 from ${channels} join organization_members om on om.org_id = ${channels.orgId}
-              where ${channels.id} = ${readers.channelId} and ${channels.kind} = 'forum'
-              and not ${wikiPageVisibleSql(sql`om.user_id`)}))`,
-        ),
-      );
-    for (const r of rows) out.some.add(r.id);
-  }
-  for (const id of out.person) out.some.add(id);
-  return out;
-}
-
-/**
- * What a search over everything hands an agent, cleaned for the wiki: a page it doesn't read goes, and one someone in
- * the conversation can't see gives its rule instead of its title and text.
- */
-export async function wikiHitsForAgent<T extends { kind: string; sourceId: string; title: string; snippet: string }>(
+/** What a search over everything hands an agent: wiki hits only for pages this run may read. */
+export async function wikiHitsForAgent<T extends { kind: string; sourceId: string }>(
   db: Executor,
-  agentId: string,
+  actor: WikiActor,
   hits: T[],
-  readers: WikiRunReaders,
 ): Promise<T[]> {
   const ids = hits.filter((h) => h.kind === "wiki").map((h) => h.sourceId);
   if (ids.length === 0) return hits;
-  const rows = await db
-    .select({
-      id: wikiPages.id,
-      restricted: wikiPages.restricted,
-      agentsLimited: wikiPages.agentsLimited,
-      audienceAgentIds: wikiPages.audienceAgentIds,
-    })
-    .from(wikiPages)
-    .where(inArray(wikiPages.id, ids));
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const outside = await restrictedOutsiders(
-    db,
-    rows.filter((r) => r.restricted || r.agentsLimited).map((r) => r.id),
-    readers,
-  );
-  return hits.flatMap((h) => {
-    if (h.kind !== "wiki") return [h];
-    const page = byId.get(h.sourceId);
-    if (!page || !agentSees(agentId, page)) return [];
-    return [outside.some.has(page.id) ? { ...h, title: "", snippet: RESTRICTED_WIKI_RULE } : h];
-  });
+  const seen = await visibleIds(db, actor, ids);
+  return hits.filter((h) => h.kind !== "wiki" || seen.has(h.sourceId));
 }
 
 /** A page the run's message names, or its best match, goes in up to this much (ADR 0043). */

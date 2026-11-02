@@ -202,7 +202,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             // The server says who is below whom; here the "+" shows when there's anything to give.
             const gives = manage && (m.role !== "owner" || org.role === "owner") && orgRoles.some((r) => r.givable);
             return (
-              <div key={m.userId} className="ac-list__row">
+              <div key={m.userId} className="ac-list__row members-person">
                 <Avatar
                   size="sm"
                   name={m.name}
@@ -219,7 +219,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                     {m.email}
                   </span>
                 </span>
-                <span className="small muted" style={{ flex: "0 1 160px" }}>
+                <span className="small muted members-person__seen">
                   {m.online
                     ? t("members.activeNow")
                     : m.lastSeenAt

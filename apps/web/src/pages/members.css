@@ -88,6 +88,22 @@
   gap: 6px;
   min-width: 0;
 }
+/* A person: the name beside the face, when they were last here on the right, their roles under the name, on its edge. */
+.ac-list__row.members-person {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px var(--space-3);
+}
+.members-person__seen {
+  white-space: nowrap;
+}
+.members-person > .members-roles {
+  grid-column: 2 / -1;
+  justify-content: flex-start;
+}
+.members-person > .members-roles:empty {
+  display: none;
+}
 @media (max-width: 760px) {
   /* The state and the actions go under the words, on the words' edge. */
   .members-row__state,

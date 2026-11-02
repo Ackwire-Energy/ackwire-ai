@@ -7,7 +7,7 @@ import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
 import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
-import { personBehindCall } from "../requester";
+import { personBehindCall, wikiActorOfCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
@@ -68,7 +68,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       async execute(input, ctx) {
         const hits = await wikiHitsForAgent(
           ctx.db,
-          ctx.agentId,
+          await wikiActorOfCall(ctx),
           await searchVisible(deps, {
             orgId: ctx.orgId,
             text: str(input.query),
@@ -76,7 +76,6 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             kinds: Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined,
             limit: typeof input.limit === "number" ? input.limit : 8,
           }),
-          { channelId: ctx.channelId, person: () => personBehindCall(ctx) },
         );
         if (hits.length === 0) return { content: "No results." };
         const items = new Map(

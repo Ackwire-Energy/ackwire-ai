@@ -1,6 +1,7 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
 import { fedByRoutine, personOfMessage, type RunAuthority, runAuthority, runAuthorityById } from "./authority";
 import type { ToolContext } from "./tools/types";
+import type { WikiActor } from "./wiki";
 
 const { agentRuns } = schema;
 
@@ -56,4 +57,20 @@ export async function actingRoutineOfCall(ctx: Pick<ToolContext, "orgId" | "runI
 /** `routineCreatorOf` for a call's run. */
 export async function routineCreatorOfCall(ctx: Pick<ToolContext, "orgId" | "runId"> & { db: Executor }) {
   return (await actingRoutineOfCall(ctx))?.creatorUserId ?? null;
+}
+
+/**
+ * Whose wiki a run reads with (ADR 0023 addendum): the person behind it, or a routine's creator, whose reach it has.
+ * Nobody for the rest, and then no page limited to people.
+ */
+export const wikiPersonOf = (authority: RunAuthority): string | null =>
+  authority.personId ?? routineCreatorOf(authority);
+
+/** The agent of a tool call, as the wiki sees it (see `WikiActor`). */
+export async function wikiActorOfCall(
+  ctx: Pick<ToolContext, "orgId" | "runId" | "triggerMessageId" | "agentId" | "channelId"> & { db: Executor },
+): Promise<WikiActor> {
+  const person = await personBehindCall(ctx);
+  const requestedByUserId = person ?? (await routineCreatorOfCall(ctx));
+  return { type: "agent", agentId: ctx.agentId, requestedByUserId, channelId: ctx.channelId };
 }

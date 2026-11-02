@@ -9,7 +9,6 @@ import {
   importWikiPages,
   moveWikiPage,
   NotFoundError,
-  RESTRICTED_WIKI_RULE,
   removeMember,
   retrieveWikiForRun,
   searchWiki,
@@ -33,7 +32,6 @@ const person = (userId: string): WikiActor => ({ type: "person", userId });
 const agent = (agentId: string): WikiActor => ({ type: "agent", agentId, requestedByUserId: null });
 const wikiDeps = () => ({ db: f.db, pubsub: f.pubsub, search: f.context, artifacts: f.artifactDeps });
 const code = (e: unknown) => (e as { code?: string }).code;
-const noReaders = { channelId: null, person: async () => null };
 
 async function workspace() {
   f = await setup();
@@ -85,43 +83,45 @@ describe("wiki pages limited to some agents", () => {
     await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
     const off = await retrieveWikiForRun(deps, {
       orgId: f.org.id,
-      agentId: other.id,
       text: "resuma [[Margens]]",
-      readers: noReaders,
+      reader: async () => agent(other.id),
     });
     expect(off).toEqual({ text: "", pageIds: [] });
   });
 
-  test("search over everything drops it for an agent off the list", async () => {
-    const { deps, other, page } = await workspace();
-    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
-    const hit = { kind: "wiki", sourceId: page.id, title: "Margens", snippet: "40%" };
-    const message = { kind: "message", sourceId: "m", title: "", snippet: "oi" };
-    expect(await wikiHitsForAgent(f.db, other.id, [hit, message], noReaders)).toEqual([message]);
-    // Nobody to check with: the agent on the list gets the rule, never the text or the title.
-    const [kept] = await wikiHitsForAgent(f.db, f.agent.id, [hit], noReaders);
-    expect(kept?.snippet).toBe(RESTRICTED_WIKI_RULE);
-    expect(kept?.title).toBe("");
-    const seen = await wikiHitsForAgent(f.db, f.agent.id, [hit], {
-      channelId: null,
-      person: async () => f.owner.id,
+  test("search over everything drops what the run may not read", async () => {
+    const { deps, other, page, admin, bia } = await workspace();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", { roleIds: [admin], userIds: [] }, [f.agent.id]);
+    const hit = { kind: "wiki", sourceId: page.id };
+    const message = { kind: "message", sourceId: "m" };
+    const forPerson = (agentId: string, userId: string | null): WikiActor => ({
+      type: "agent",
+      agentId,
+      requestedByUserId: userId,
     });
-    expect(seen[0]?.snippet).toBe("40%");
+    expect(await wikiHitsForAgent(f.db, forPerson(f.agent.id, f.owner.id), [hit, message])).toEqual([hit, message]);
+    expect(await wikiHitsForAgent(f.db, forPerson(other.id, f.owner.id), [hit, message])).toEqual([message]);
+    expect(await wikiHitsForAgent(f.db, forPerson(f.agent.id, bia.id), [hit, message])).toEqual([message]);
+    expect(await wikiHitsForAgent(f.db, forPerson(f.agent.id, null), [hit, message])).toEqual([message]);
   });
 
-  test("an agent off the list in the channel counts as someone outside", async () => {
-    const { deps, other } = await workspace();
+  test("an agent off the list in the conversation keeps the page from every agent there", async () => {
+    const { deps, other, page } = await workspace();
     await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
     const ask = () =>
       retrieveWikiForRun(deps, {
         orgId: f.org.id,
-        agentId: f.agent.id,
         text: "resuma [[Margens]]",
-        readers: { channelId: f.general.id, person: async () => f.owner.id },
+        reader: async () => ({
+          type: "agent",
+          agentId: f.agent.id,
+          requestedByUserId: f.owner.id,
+          channelId: f.general.id,
+        }),
       });
-    expect((await ask()).text).not.toContain(RESTRICTED_WIKI_RULE);
+    expect((await ask()).pageIds).toContain(page.id);
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: other.id });
-    expect((await ask()).text).toContain(RESTRICTED_WIKI_RULE);
+    expect((await ask()).pageIds).not.toContain(page.id);
   });
 });
 

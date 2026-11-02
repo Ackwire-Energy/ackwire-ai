@@ -527,14 +527,13 @@ async function run(
       const visible = await agentSearchChannels(deps.db, mission.orgId, mission.agentId, mission.channelId);
       const hits = await wikiHitsForAgent(
         deps.db,
-        mission.agentId,
+        { type: "agent", agentId: mission.agentId, requestedByUserId: mission.ownerId, channelId: mission.channelId },
         await searchVisible(deps.search, {
           orgId: mission.orgId,
           text: str(args.query).slice(0, 500),
           visibleChannelIds: visible,
           limit: 6,
         }),
-        { channelId: mission.channelId, person: async () => null },
       );
       if (hits.length === 0) return "Nothing found.";
       return [

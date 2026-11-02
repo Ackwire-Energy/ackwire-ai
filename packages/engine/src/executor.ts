@@ -147,7 +147,7 @@ import {
   stripSentinel,
   visibleText,
 } from "./reply-policy";
-import { routineCreatorOf } from "./requester";
+import { routineCreatorOf, wikiPersonOf } from "./requester";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -1246,9 +1246,13 @@ async function executeRunInner(
             { db, search: contextDeps },
             {
               orgId: run.orgId,
-              agentId: agent.id,
               text: trigger?.body ?? "",
-              readers: { channelId: run.channelId, person: async () => (await runAuthority(db, run)).personId },
+              reader: async () => ({
+                type: "agent",
+                agentId: agent.id,
+                requestedByUserId: wikiPersonOf(await runAuthority(db, run)),
+                channelId: run.channelId,
+              }),
             },
           ).catch(() => ({ text: "", pageIds: [] as string[] }))
         : Promise.resolve({ text: "", pageIds: [] as string[] }),
