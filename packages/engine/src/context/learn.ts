@@ -6,8 +6,8 @@ import { agentBudgetState } from "../gateway";
 import { enqueue } from "../outbox";
 import { personBehindCall } from "../requester";
 import type { ToolContext } from "../tools/types";
-import { consolidateItem, type Evidence, looksLikeSecret, type NewContextItem } from "./items";
-import { changeSkillAsAgent, HOW_TO_CREATOR } from "./learned-skills";
+import { consolidateItem, type Evidence, howToSql, howToSubject, looksLikeSecret, type NewContextItem } from "./items";
+import { changeSkillAsAgent } from "./learned-skills";
 import { type ContextDeps, isTrustedMessage, judgeOf, memoryJudging, resolveSummaryModel } from "./summaries";
 
 const { agentRuns, agentRunSteps, agentLearningDays, agents, contextItems, messages, skills, users } = schema;
@@ -115,14 +115,7 @@ async function injectedHowTos(db: Database, run: EndedRun) {
   const rows = await db
     .select({ id: contextItems.id })
     .from(contextItems)
-    .where(
-      and(
-        eq(contextItems.orgId, run.orgId),
-        inArray(contextItems.id, ids),
-        eq(contextItems.kind, "note"),
-        eq(contextItems.createdByKind, HOW_TO_CREATOR),
-      ),
-    );
+    .where(and(eq(contextItems.orgId, run.orgId), inArray(contextItems.id, ids), howToSql()));
   return rows.map((r) => r.id);
 }
 
@@ -407,7 +400,8 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
       scopeId: scope === "own" ? agent.id : scope === "person" ? person : run.orgId,
       agentId: scope === "own" ? agent.id : null,
       title,
-      subject: item.kind === "how_to" ? `how to ${title}` : item.kind === "term" ? `term ${title}` : title || undefined,
+      subject:
+        item.kind === "how_to" ? howToSubject(title) : item.kind === "term" ? `term ${title}` : title || undefined,
       content: item.content.trim(),
       sourceIds: [...new Set(cited.messages.map((m) => m.id))],
       channelIds: [run.channelId],

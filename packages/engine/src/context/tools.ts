@@ -31,11 +31,13 @@ import {
   checkPermissionText,
   consolidateItem,
   getContextItems,
+  howToSql,
+  howToSubject,
+  isHowTo,
   supersede,
 } from "./items";
 import { kindFamily, overlap } from "./judgments";
 import { learnTrust } from "./learn";
-import { HOW_TO_CREATOR } from "./learned-skills";
 import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary, judgeOf, memoryJudging } from "./summaries";
 
@@ -155,7 +157,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               scopeId: ctx.agentId,
               agentId: ctx.agentId,
               title,
-              subject: `how to ${title}`,
+              subject: howToSubject(title),
               content: str(input.how).trim(),
               sourceIds: [ctx.triggerMessageId],
               // Where it was worked out: a public channel's reaches every run, a private one's stays there.
@@ -165,7 +167,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
                 { type: "self", ref: ctx.triggerMessageId, agentId: ctx.agentId, at: new Date().toISOString() },
               ],
               confidence: trust === "high" ? 0.8 : 0.5,
-              createdByKind: HOW_TO_CREATOR,
+              createdByKind: "agent",
               createdById: ctx.agentId,
             },
             { ...memoryJudging(deps), mayReplace: (old) => old.createdByKind !== "person" },
@@ -319,7 +321,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           await recordSave(ctx, res);
           if (res.action === "disputed")
             return {
-              content: `Saved as ${res.item.id}, beside memory ${res.previous?.id} ("${cutText(res.previous?.content ?? "", 200)}"), which a person wrote and says otherwise: yours is marked disputed until a person decides. Ask them which is right.`,
+              content: `Saved as ${res.item.id}, beside memory ${res.previous?.id} ("${cutText(res.previous?.content ?? "", 200)}"), which a person wrote and says otherwise: ${res.item.trust === "low" ? "yours is" : "both are"} marked disputed until a person decides. Ask them which is right.`,
             };
           return { content: `Saved (${res.action}) as ${res.item.id}.` };
         } catch (error) {
@@ -795,13 +797,7 @@ export async function retrieveForRun(
       .select()
       .from(contextItems)
       // How-tos come in only when the request matches them (`searched`), so they never crowd out rules people gave.
-      .where(
-        and(
-          base,
-          eq(contextItems.agentId, input.agentId),
-          sql`not (${contextItems.kind} = 'note' and ${contextItems.createdByKind} = ${HOW_TO_CREATOR})`,
-        ),
-      )
+      .where(and(base, eq(contextItems.agentId, input.agentId), sql`not ${howToSql()}`))
       .orderBy(desc(contextItems.verified), desc(freshness))
       .limit(15),
     db
@@ -860,9 +856,6 @@ export async function retrieveForRun(
   }
   return { text: lines.join("\n"), itemIds: [...seen] };
 }
-
-const isHowTo = (i: Pick<ContextItem, "kind" | "createdByKind">) =>
-  i.kind === "note" && i.createdByKind === HOW_TO_CREATOR;
 
 /** Memory in a run's prompt, at most (characters), pinned items aside. */
 export const MEMORY_BUDGET_CHARS = 3500;

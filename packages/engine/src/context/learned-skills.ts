@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, inArray, isNull, lt, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, inArray, isNull, lt, or, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAgentActions } from "../agent-actions";
 import { runCalls } from "../continuation";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
@@ -8,15 +8,19 @@ import { can, requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
 import { agentSkillByName, SKILL_NAME, type SkillRow, validateSkill, writeSkillBody } from "../skills";
 import type { ToolContext } from "../tools/types";
-import { type ContextItem, changesPermissions, insertContextItem, looksLikeSecret, mergeEvidence } from "./items";
+import {
+  type ContextItem,
+  changesPermissions,
+  howToSql,
+  insertContextItem,
+  looksLikeSecret,
+  mergeEvidence,
+} from "./items";
 import { overlap } from "./judgments";
 import { proposeSkillChange } from "./proposals";
 import { type ContextDeps, judgeOf, resolveSummaryModel } from "./summaries";
 
 const { skills, agentSkills, contextItems, contextUsage, outcomes, agentRuns, agentActions, routines } = schema;
-
-/** Who a how-to note (`save_how_to`, the learning job) is created by: the only notes an agent writes itself. */
-export const HOW_TO_CREATOR = "agent";
 
 /** A run's context for receipts: the run, where it ran and what started it. */
 type RunCtx = Pick<ToolContext, "orgId" | "agentId" | "runId" | "channelId" | "triggerMessageId">;
@@ -175,8 +179,7 @@ export async function promoteHowTos(deps: ContextDeps, orgId: string, skillAfter
     .where(
       and(
         eq(contextItems.orgId, orgId),
-        eq(contextItems.kind, "note"),
-        eq(contextItems.createdByKind, HOW_TO_CREATOR),
+        howToSql(),
         eq(contextItems.status, "active"),
         isNull(contextItems.supersededBy),
         sql`${contextItems.agentId} is not null`,
@@ -350,7 +353,7 @@ export async function shareAcrossAgents(deps: ContextDeps, orgId: string) {
         eq(contextItems.trust, "high"),
         eq(contextItems.disputed, false),
         sql`${contextItems.agentId} is not null`,
-        sql`(${contextItems.kind} = 'lesson' or (${contextItems.kind} = 'note' and ${contextItems.createdByKind} = ${HOW_TO_CREATOR}))`,
+        or(eq(contextItems.kind, "lesson"), howToSql()),
       ),
     );
   const groups = new Map<string, ContextItem[]>();

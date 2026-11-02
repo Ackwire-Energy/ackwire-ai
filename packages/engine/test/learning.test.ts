@@ -7,7 +7,9 @@ import {
   consolidateOrg,
   createAgent,
   drainOutbox,
+  editContextItem,
   insertMessage,
+  isHowTo,
   learnRun,
   learnTrust,
   memoriesFor,
@@ -187,7 +189,7 @@ describe("agents learn on their own (ADR 0120)", () => {
       "high",
       "agent",
     ]);
-    expect(howTo?.subjectKey).toBe("how list models northwind the to");
+    expect(howTo?.subjectKey).toBe("howto list models northwind the");
     expect(howTo?.evidence.map((e) => e.type)).toEqual(["self"]);
     expect((await receipts()).map((r) => [r.kind, r.targetId])).toEqual([["memory.saved", howTo?.id ?? ""]]);
     // Quiet: no memory mark on the person's message.
@@ -660,5 +662,20 @@ describe("learning guards", () => {
       ["person", "high", false],
       ["agent", "low", true],
     ]);
+  });
+
+  test("a how-to stays one when a person edits it; a plain note the agent found is not one", async () => {
+    f = await setup();
+    const { run } = await personRun();
+    await invoke(run, "save_how_to", { title: "List the Northwind models", how: `GET ${MODELS_URL} with the key` });
+    const [note] = await items();
+    if (!note) throw new Error("no note");
+    const edited = await editContextItem(f.db, f.owner.id, f.org.id, note.id, {
+      content: `GET ${MODELS_URL} with the key, page by page`,
+    });
+    expect([edited.createdByKind, isHowTo(edited)]).toEqual(["person", true]);
+    await invoke(run, "remember", { kind: "note", content: "The office plant is watered on Mondays.", basis: "found" });
+    const plain = (await items()).find((i) => i.content.startsWith("The office plant"));
+    expect([plain?.createdByKind, plain ? isHowTo(plain) : null]).toEqual(["agent", false]);
   });
 });

@@ -118,6 +118,17 @@ export function mergeEvidence(a: Evidence[], b: Evidence[]) {
 
 // ── Subjects and similarity ──────────────────────────────────────────────────
 
+/**
+ * The word a how-to's subject key carries (`howToSubject`). Edits keep the subject key, so a how-to stays one whoever
+ * edits it, and no other note becomes one by who wrote it.
+ */
+export const HOW_TO_WORD = "howto";
+export const howToSubject = (title: string) => `${HOW_TO_WORD} ${title}`;
+export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
+  i.kind === "note" && i.subjectKey.split(" ").includes(HOW_TO_WORD);
+export const howToSql = () =>
+  sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
+
 /** Subject key: lower case, accents and punctuation removed, words sorted. */
 export function normalizeSubject(subject: string) {
   return [
