@@ -24,12 +24,22 @@ describe("the floating date while the conversation scrolls", () => {
     expect(dayInView([])).toBeNull();
   });
 
+  test("the day it keeps stays the same string while rows of that day pass the top, so scrolling skips re-renders", () => {
+    const at = (createdAt: string) => [
+      { index: 0, item: { kind: "message", message: message({ id: createdAt, createdAt }) } },
+    ];
+    const prev = "2026-10-30T12:00:00.000Z";
+    expect(dayInView(at(new Date(new Date(prev).getTime() + 60_000).toISOString()), prev)).toBe(prev);
+    expect(dayInView(at("2026-10-27T12:00:00.000Z"), prev)).toBe("2026-10-27T12:00:00.000Z");
+    expect(dayInView([], prev)).toBeNull();
+  });
+
   test("it shows while the person drags or flings the list and fades a moment after it stops", () => {
     const screen = src("features/chat/ChatScreen.tsx");
     expect(screen).toMatch(/onScrollBeginDrag=\{\(\) => \{\s*dragging\.current = true;\s*showDay\(\);/);
     expect(screen).toContain("onMomentumScrollBegin={showDay}");
     expect(screen).toMatch(/onMomentumScrollEnd=\{\(\) => \{\s*releaseAtEnd\(\);\s*hideDay\(\);/);
-    expect(screen).toContain("setTopDay(dayInView(viewableItems))");
+    expect(screen).toContain("setTopDay((prev) => dayInView(viewableItems, prev))");
     // The person's locale: the shared day words ("Hoje", "Ontem", a weekday this week, else a date).
     expect(src("features/chat/DatePill.tsx")).toContain('dayLabel(t, i18n.language || "en", day)');
   });

@@ -1099,7 +1099,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const onViewable = useCallback<NonNullable<OnViewableItemsChanged<Row>>>(
     ({ viewableItems }) => {
       stickers.setOnScreen(stickerRowsOnScreen(viewableItems));
-      setTopDay(dayInView(viewableItems));
+      setTopDay((prev) => dayInView(viewableItems, prev));
     },
     [stickers],
   );
