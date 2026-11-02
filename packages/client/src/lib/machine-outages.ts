@@ -273,7 +273,8 @@ export function waitCardState(
 
 /**
  * One card per agent and computer: of the `brain_unavailable` messages, the ones a newer message of the same
- * agent about the same computer (in the same conversation) replaces. Ids to hide.
+ * agent about the same computer (in the same conversation) replaces, and the ones the agent moved past (it wrote
+ * anything later there: its answer). Ids to hide.
  */
 export function supersededBrainNotices(
   messages: readonly {
@@ -286,6 +287,12 @@ export function supersededBrainNotices(
 ): Set<string> {
   const newest = new Map<string, { id: string; at: number }>();
   const hide = new Set<string>();
+  const lastSaid = new Map<string, number>();
+  for (const m of messages) {
+    if (m.author.type !== "agent" || !m.author.id) continue;
+    const key = `${m.threadId ?? ""}|${m.author.id}`;
+    lastSaid.set(key, Math.max(lastSaid.get(key) ?? 0, Date.parse(m.createdAt)));
+  }
   for (const m of messages) {
     const info = brainUnavailableOf(m.meta);
     if (!info) continue;
@@ -293,6 +300,7 @@ export function supersededBrainNotices(
     if (!agent) continue;
     const key = `${m.threadId ?? ""}|${agent}|${info.machineId ?? info.brain}`;
     const at = Date.parse(m.createdAt);
+    if ((lastSaid.get(`${m.threadId ?? ""}|${agent}`) ?? 0) > at) hide.add(m.id);
     const prev = newest.get(key);
     if (!prev) newest.set(key, { id: m.id, at });
     else if (at >= prev.at) {

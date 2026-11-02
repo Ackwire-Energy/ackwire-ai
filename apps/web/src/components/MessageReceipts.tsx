@@ -104,6 +104,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   // "Tentar de novo" sends the words again as mine: never an agent's.
   const worded =
     status?.kind === "outage" ||
+    status?.kind === "queued" ||
+    status?.kind === "away" ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
@@ -241,7 +243,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   return (
     <div className="ac-receipt">
       {check}
-      {status?.kind === "outage" && (
+      {(status?.kind === "outage" || status?.kind === "queued" || status?.kind === "away") && (
         <span className="ac-receipt__words">
           <span>{statusText}</span>
         </span>
