@@ -5,6 +5,7 @@ import {
   type BrainEffort,
   CURSOR_PROTOCOL,
   isBrainEffort,
+  OPENCODE_PROTOCOL,
   type OwnPlanUsage,
   PLAN_KEYS_PROTOCOL,
   type PlanUsage,
@@ -19,7 +20,7 @@ import {
   isContextLimit,
   MODEL_CATALOG,
 } from "@agenteschat/providers";
-import { claudeCodeModel, isPlanModelId, planModel, planOf } from "@agenteschat/providers/plans";
+import { claudeCodeModel, isPlanModelId, OPENCODE_FREE_MODELS, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
@@ -61,7 +62,7 @@ import { closedRefusal } from "./standing";
  * resolves it per run (`brainFor`).
  */
 
-export const BRAIN_KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor"];
+export const BRAIN_KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode"];
 export const isBrainKind = (v: unknown): v is BrainKind =>
   typeof v === "string" && (BRAIN_KINDS as readonly string[]).includes(v);
 /** An effort as stored: a level, or `auto` (the judge picks it per run). */
@@ -86,7 +87,25 @@ export interface BrainModelOption {
    * when the CLI didn't say.
    */
   inPlan?: boolean;
+  /** OpenCode (ADR 0127): a model of OpenCode's free tier (no key, no cost). */
+  free?: boolean;
 }
+
+/**
+ * OpenCode's models: what its CLI listed on the agent's computer (`opencode models`, `provider/model`), else OpenCode's
+ * free tier; the free ones first. With none chosen its CLI's own default runs. Any other `provider/model` is accepted
+ * as typed (a key's paid models, which the computer's own CLI may not list).
+ */
+export const opencodeModels = (listed: readonly { id: string; label?: string; free?: boolean }[] = []) =>
+  [...(listed.length ? listed : OPENCODE_FREE_MODELS.map((m) => ({ ...m, free: true })))]
+    .sort((a, b) => Number(b.free === true) - Number(a.free === true))
+    .map(
+      (m): BrainModelOption => ({
+        value: m.id,
+        label: m.label || m.id.replace(/^opencode\//, ""),
+        ...(m.free ? { free: true } : {}),
+      }),
+    );
 
 /**
  * Cursor's models: what its CLI listed on the agent's computer (`agent models`), the plan's own first (its CLI's
@@ -134,12 +153,13 @@ function modelChoices(kind: BrainKind, machine?: { executors?: schema.MachineExe
   if (kind === "claude_code") return [...CLAUDE_CODE_MODELS];
   if (kind === "codex") return codexModels();
   if (kind === "cursor") return cursorModels(machine?.executors?.cursor?.models);
+  if (kind === "opencode") return opencodeModels(machine?.executors?.opencode?.models);
   return [];
 }
 
-/** What a computer brain runs with when nobody chose a model (Cursor: its CLI's own default, null). */
+/** What a computer brain runs with when nobody chose a model (Cursor, OpenCode: its CLI's own default, null). */
 export function defaultBrainModel(kind: BrainKind): string | null {
-  if (kind === "model" || kind === "cursor") return null;
+  if (kind === "model" || kind === "cursor" || kind === "opencode") return null;
   const options = brainModelOptions(kind);
   return (options.find((o) => o.recommended) ?? options[0])?.value ?? (kind === "codex" ? "gpt-6.1-sol" : "sonnet");
 }
@@ -177,6 +197,12 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
     });
   }
   if (!FREE_MODEL.test(v)) throw new ValidationError("That isn't a model name", "brain.invalid_model", { brain: kind });
+  // OpenCode runs `--model provider/model` (its runner refuses anything else).
+  if (kind === "opencode" && !/^[\w.-]{1,40}\/[\w.:-]{1,79}$/.test(v)) {
+    throw new ValidationError("OpenCode's models are provider/model, like opencode/big-pickle", "brain.invalid_model", {
+      brain: kind,
+    });
+  }
   return v;
 }
 
@@ -197,7 +223,7 @@ type MachineLike = Parameters<typeof machineExecutors>[0] & {
   id: string;
   name: string;
   /** Protocol 10: what the machine allows (the app's Ferramentas); absent on older runners. */
-  access?: { tools?: { claude?: boolean; codex?: boolean; cursor?: boolean } } | null;
+  access?: { tools?: { claude?: boolean; codex?: boolean; cursor?: boolean; opencode?: boolean } } | null;
 } & Parameters<typeof machineOnline>[0];
 
 /**
@@ -229,25 +255,29 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
     { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
     computer("claude_code", "claude"),
     computer("codex", "codex"),
-    cursorOption(machine),
+    cliOption(machine, "cursor"),
+    cliOption(machine, "opencode"),
   ];
 }
 
-/** Cursor (ADR 0114): runner protocol 36, its switch (or Codex's on a runner before it) and its CLI found there. */
-function cursorOption(machine: MachineLike | null): BrainOption {
+/**
+ * Cursor (ADR 0114, runner protocol 36) or OpenCode (ADR 0127, protocol 38): the runner's protocol, its switch (or
+ * Codex's on a runner before it) and its CLI found there.
+ */
+function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode"): BrainOption {
   const tools = machine?.access?.tools;
   let reason: BrainUnavailable | undefined;
   if (!machine) reason = "no_computer";
   else if (!machine.execAllowed) reason = "exec_off";
-  else if (machine.protocol < CURSOR_PROTOCOL) reason = "runner_old";
-  else if (tools && (tools.cursor ?? tools.codex) === false) reason = "tool_off";
-  else if (!machine.executors?.cursor) reason = "not_installed";
+  else if (machine.protocol < (kind === "cursor" ? CURSOR_PROTOCOL : OPENCODE_PROTOCOL)) reason = "runner_old";
+  else if (tools && (tools[kind] ?? tools.codex) === false) reason = "tool_off";
+  else if (!machine.executors?.[kind]) reason = "not_installed";
   return {
-    kind: "cursor",
+    kind,
     available: !reason,
     ...(reason ? { reason } : {}),
     experimental: true,
-    models: brainModelOptions("cursor", machine),
+    models: brainModelOptions(kind, machine),
     defaultModel: null,
   };
 }
@@ -1030,9 +1060,9 @@ export interface AiComputer {
    * A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's and a
    * coding plan's key.
    */
-  shares: { claude_code: boolean; codex: boolean; cursor: boolean; key: boolean };
+  shares: { claude_code: boolean; codex: boolean; cursor: boolean; opencode: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans), Codex (ChatGPT) and Cursor. */
-  brains: { claude_code: boolean; codex: boolean; cursor: boolean };
+  brains: { claude_code: boolean; codex: boolean; cursor: boolean; opencode: boolean };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the caller connected (it is theirs, and
    * the agents on it think with it when no account is picked). Claude Code when `claude auth status` said it is
@@ -1085,10 +1115,22 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           claude_code: sharesSignIns(m, "claude_code"),
           codex: sharesSignIns(m, "codex"),
           cursor: sharesSignIns(m, "cursor"),
+          opencode: sharesSignIns(m, "opencode"),
           key: sharesSignIns(m, "key"),
         },
-        brains: { claude_code: can("claude_code"), codex: can("codex"), cursor: can("cursor") },
-        own: m.pairedByUserId === userId ? ownSignIns(m.executors, can) : {},
+        brains: {
+          claude_code: can("claude_code"),
+          codex: can("codex"),
+          cursor: can("cursor"),
+          opencode: can("opencode"),
+        },
+        own:
+          m.pairedByUserId === userId
+            ? ownSignIns(m.executors, can)
+            : // OpenCode's free tier there thinks for anyone's agents (ADR 0127): nobody signs in on it.
+              m.pairedByUserId === null && can("opencode")
+              ? { opencode: {} }
+              : {},
       };
     }),
   };
@@ -1110,5 +1152,7 @@ function ownSignIns(
       ...(usage.claude_code ? { usage: usage.claude_code } : {}),
     };
   if (can("codex") && usage.codex) out.codex = { usage: usage.codex };
+  // Its own OpenCode always thinks: its own sign-ins, or the free tier with none.
+  if (can("opencode")) out.opencode = {};
   return out;
 }

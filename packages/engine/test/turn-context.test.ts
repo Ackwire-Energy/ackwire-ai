@@ -306,7 +306,7 @@ describe("# This turn", () => {
       .set({
         access: {
           folders: [{ path: "/Users/w/agentes/shared", agents: ["*"] }],
-          tools: { claude: true, codex: true, cursor: true, commands: true },
+          tools: { claude: true, codex: true, cursor: true, opencode: true, commands: true },
         },
       })
       .where(eq(schema.machines.id, paired.machineId));
@@ -321,6 +321,7 @@ describe("# This turn", () => {
       executors: {
         claude: { version: "2.1.300", loggedIn: true },
         cursor: { version: "2026.10.1" },
+        opencode: { version: "1.19.5" },
         detectedAt: new Date().toISOString(),
       },
     });
@@ -335,7 +336,11 @@ describe("# This turn", () => {
     };
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      brains: { claude_code: () => brain, cursor: () => ({ ...brain, kind: "cursor" }) },
+      brains: {
+        claude_code: () => brain,
+        cursor: () => ({ ...brain, kind: "cursor" }),
+        opencode: () => ({ ...brain, kind: "opencode" }),
+      },
       machines: { status: async (id) => status(id) },
     });
     const question = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -378,6 +383,13 @@ describe("# This turn", () => {
     expect(seen).toHaveLength(3);
     expect(seen[2]?.system).toContain("Only your own folder there");
     expect(seen[2]?.system).not.toContain("# Shared folder");
+    // Nor on OpenCode, whose permissions keep it inside the turn's folder (ADR 0127).
+    await f.db.update(schema.agents).set({ brain: "opencode" }).where(eq(schema.agents.id, f.agent.id));
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, handlers);
+    expect(seen).toHaveLength(4);
+    expect(seen[3]?.system).not.toContain("# Shared folder");
+    await f.db.update(schema.agents).set({ brain: "cursor" }).where(eq(schema.agents.id, f.agent.id));
 
     // System mode: the agents share the computer's CPUs and memory, of the size its runner reported, once its runner
     // has `agentes-runner computer` and caps no agent (an older one still does).
@@ -399,7 +411,7 @@ describe("# This turn", () => {
     expect(await ask(SHARED_COMPUTER_PROTOCOL)).toContain(
       '# Sharing "MacBook"\nAll the agents on "MacBook" share its 4 CPUs and most of its 8 GB',
     );
-    expect(seen).toHaveLength(5);
+    expect(seen).toHaveLength(6);
   });
 });
 

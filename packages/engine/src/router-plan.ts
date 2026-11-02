@@ -90,8 +90,14 @@ export async function planSignInsOf(
   const found: (PlanSignIn & { usedAt: number })[] = [];
   for (const r of lent) {
     // One per account: one made for all agents thinks for several of them (protocol 29).
-    // Cursor's CLI picks nobody (`brain.route` is Claude Code's and Codex's).
-    if (!r.ownerId || !isAccountKind(r.kind) || r.kind === "cursor" || found.some((s) => s.accountId === r.accountId))
+    // Cursor's and OpenCode's CLIs pick nobody (`brain.route` is Claude Code's and Codex's).
+    if (
+      !r.ownerId ||
+      !isAccountKind(r.kind) ||
+      r.kind === "cursor" ||
+      r.kind === "opencode" ||
+      found.some((s) => s.accountId === r.accountId)
+    )
       continue;
     found.push({
       machineId: r.machineId,

@@ -114,6 +114,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     ["claude_code", false, "no_computer"],
     ["codex", false, "no_computer"],
     ["cursor", false, "no_computer"],
+    ["opencode", false, "no_computer"],
   ]);
   expect(fresh.options.find((o) => o.kind === "codex")?.experimental).toBe(true);
   expect(fresh.options.find((o) => o.kind === "claude_code")?.models.map((m) => m.value)).toEqual([

@@ -259,7 +259,7 @@ export const Agent = z
     }),
     brain: z
       .object({
-        kind: z.enum(["model", "claude_code", "codex", "cursor"]),
+        kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode"]),
         model: z
           .string()
           .nullable()
@@ -583,7 +583,7 @@ export const Model = z
   .openapi("Model");
 
 /** ADR 0032: who thinks for an agent. */
-export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor"]).openapi("BrainKind");
+export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor", "opencode"]).openapi("BrainKind");
 
 export const BrainOption = z
   .object({
@@ -609,6 +609,10 @@ export const BrainOption = z
           .boolean()
           .optional()
           .openapi({ description: "Cursor: its CLI said the person's plan includes it (others cost API prices)." }),
+        free: z
+          .boolean()
+          .optional()
+          .openapi({ description: "OpenCode: a model of OpenCode's free tier (no key, no cost)." }),
       }),
     ),
     defaultModel: z.string().nullable(),

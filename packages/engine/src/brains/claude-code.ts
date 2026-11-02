@@ -162,7 +162,7 @@ const err = (code: string, message: string, retryable: boolean): BrainEvent => (
 export function accountUnavailable(
   status: { name?: string; protocol?: number } | null,
   account: BrainAccount | undefined,
-  kind: "claude_code" | "codex" | "cursor",
+  kind: "claude_code" | "codex" | "cursor" | "opencode",
 ): { code: string; message: string } | null {
   if (!account) return null;
   const name = BRAIN_PLAN_NAMES[kind];
@@ -239,13 +239,13 @@ export function claudeCodeAvailability(status: MachineStatus | null, account?: B
  */
 export function toolOff(
   status: Pick<MachineStatus, "name" | "execAllowed" | "access">,
-  tool: "claude" | "codex" | "cursor",
+  tool: "claude" | "codex" | "cursor" | "opencode",
 ): { code: string; message: string } | null {
   const tools = status.access?.tools;
   const name = tool === "claude" ? "Claude Code" : tool === "codex" ? "Codex" : "Cursor";
   if (tools) {
     // A runner before Cursor's switch (protocol 36) reports none: Cursor follows Codex's there, as on the runner.
-    return (tool === "cursor" ? (tools.cursor ?? tools.codex) : tools[tool]) === true
+    return (tool === "cursor" || tool === "opencode" ? (tools[tool] ?? tools.codex) : tools[tool]) === true
       ? null
       : {
           code: "tool_off",

@@ -12,6 +12,8 @@ import {
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
+  OPENCODE_KEY_PROVIDER,
+  OPENCODE_PROTOCOL,
   OWN_USAGE_ID,
   type OwnPlanUsage,
   PLAN_KEYS_PROTOCOL,
@@ -615,7 +617,11 @@ export async function syncMachineAccounts(
         // Signed in on the computer itself (the desktop app): its pairer's.
         const owner = machine.pairedByUserId;
         const provider =
-          isPlanId(a.provider) || (a.kind === "cursor" && a.provider === CURSOR_KEY_PROVIDER) ? a.provider : null;
+          isPlanId(a.provider) ||
+          (a.kind === "cursor" && a.provider === CURSOR_KEY_PROVIDER) ||
+          (a.kind === "opencode" && a.provider === OPENCODE_KEY_PROVIDER)
+            ? a.provider
+            : null;
         const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider };
         const same = await sameAccount(tx, candidate, a);
         if (same && (await duplicateOf(tx, candidate, a, a.shared === true))) {
@@ -744,10 +750,13 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
  */
 export function sharesSignIns(
   machine: Pick<MachineRow, "protocol" | "executors">,
-  which: "claude_code" | "codex" | "cursor" | "key",
+  which: "claude_code" | "codex" | "cursor" | "opencode" | "key",
 ): boolean {
   if (machine.protocol < SHARED_ACCOUNTS_PROTOCOL) return false;
-  return machine.executors?.mode !== "system" || (which !== "codex" && which !== "cursor" && SHARED_SIGN_INS[which]);
+  return (
+    machine.executors?.mode !== "system" ||
+    (which !== "codex" && which !== "cursor" && which !== "opencode" && SHARED_SIGN_INS[which])
+  );
 }
 
 /**
@@ -875,13 +884,16 @@ export async function getMachineAccounts(
 /** Where a person makes a Cursor API key (Cursor's dashboard, API Keys; cursor.com/docs/cli/reference/authentication). */
 export const CURSOR_KEYS_URL = "https://cursor.com/dashboard?tab=integrations";
 
+/** Where a person makes an OpenCode key (its console, API Keys; opencode.ai/docs/zen). */
+export const OPENCODE_KEYS_URL = "https://opencode.ai/console";
+
 export interface AccountLoginView {
   loginId: string;
   kind: AccountKind;
   /** The provider's page (Claude's sign-in, Codex's device page, or where a plan's key is made). */
   url: string;
-  /** A key account's coding plan, or `cursor` for a Cursor API key. */
-  provider?: PlanId | typeof CURSOR_KEY_PROVIDER;
+  /** A key account's coding plan, `cursor` for a Cursor API key, or `zen` for an OpenCode key. */
+  provider?: PlanId | typeof CURSOR_KEY_PROVIDER | typeof OPENCODE_KEY_PROVIDER;
   /** Claude Code: the key the browser seals the pasted code to (raw P-256, base64). */
   publicKey?: string;
   /** Codex: the one-time code to type on its page. */
@@ -918,13 +930,21 @@ export async function beginAccountLogin(
   /** A coding plan's key account on Claude Code (protocol 20): the key comes next, sealed like a code. */
   provider?: string,
 ): Promise<AccountLoginView> {
-  if (!isAccountKind(kind)) throw new ValidationError("Choose claude_code, codex or cursor", "account.invalid_kind");
+  if (!isAccountKind(kind)) {
+    throw new ValidationError("Choose claude_code, codex, cursor or opencode", "account.invalid_kind");
+  }
   if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
     throw new ValidationError("Use a plain email address, like ana@example.com", "account.invalid_email");
   }
-  const cursorKey = kind === "cursor" && provider === CURSOR_KEY_PROVIDER;
-  if (provider !== undefined && !cursorKey && (kind !== "claude_code" || !isPlanId(provider))) {
+  // A CLI's own API key: Cursor's (chosen), OpenCode's (its only sign-in).
+  const cliKey =
+    (kind === "cursor" && provider === CURSOR_KEY_PROVIDER) ||
+    (kind === "opencode" && provider === OPENCODE_KEY_PROVIDER);
+  if (provider !== undefined && !cliKey && (kind !== "claude_code" || !isPlanId(provider))) {
     throw new ValidationError("Choose one of the coding plans", "account.invalid_plan");
+  }
+  if (kind === "opencode" && !cliKey) {
+    throw new ValidationError("OpenCode signs in with its API key", "account.invalid_plan");
   }
   const plan = planOf(provider);
   const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
@@ -942,7 +962,13 @@ export async function beginAccountLogin(
   const protocol = await requireLive(
     deps,
     machine,
-    kind === "cursor" ? CURSOR_PROTOCOL : plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL,
+    kind === "cursor"
+      ? CURSOR_PROTOCOL
+      : kind === "opencode"
+        ? OPENCODE_PROTOCOL
+        : plan
+          ? PLAN_KEYS_PROTOCOL
+          : ACCOUNTS_PROTOCOL,
   );
   // Once for every agent of its owner there, where the runner can (protocol 29).
   const shared = protocol >= SHARED_ACCOUNTS_PROTOCOL && sharedSignIn(kind, provider);
@@ -958,7 +984,7 @@ export async function beginAccountLogin(
       label: defaultAccountLabel(kind, [], provider),
       status: "signing_in",
       createdBy: userId,
-      provider: plan || cursorKey ? provider : null,
+      provider: plan || cliKey ? provider : null,
     });
   }
   const fail = async () => {
@@ -974,7 +1000,7 @@ export async function beginAccountLogin(
       loginId,
       ...(again ? { again: true } : {}),
       ...(email ? { email } : {}),
-      ...(plan || cursorKey ? { provider } : {}),
+      ...(plan || cliKey ? { provider } : {}),
       ...(shared ? { shared: true } : {}),
     });
   } catch (error) {
@@ -993,15 +1019,17 @@ export async function beginAccountLogin(
     }
     return { loginId, kind, url: plan.site, provider, publicKey, expiresAt };
   }
-  if (cursorKey) {
-    // A Cursor API key: made in Cursor's dashboard, sealed to the computer like a plan's key.
+  if (cliKey) {
+    // A Cursor or OpenCode API key: made on its own site, sealed to the computer like a plan's key.
     if (!publicKey) {
       await fail();
       throw new ConflictError("The computer couldn't start the sign-in", "account.begin_failed", {
         name: machine.name,
       });
     }
-    return { loginId, kind, url: CURSOR_KEYS_URL, provider: CURSOR_KEY_PROVIDER, publicKey, expiresAt };
+    return kind === "opencode"
+      ? { loginId, kind, url: OPENCODE_KEYS_URL, provider: OPENCODE_KEY_PROVIDER, publicKey, expiresAt }
+      : { loginId, kind, url: CURSOR_KEYS_URL, provider: CURSOR_KEY_PROVIDER, publicKey, expiresAt };
   }
   // Only a provider page the person can open: never another scheme.
   let url: URL | null = null;

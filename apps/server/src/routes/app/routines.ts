@@ -280,7 +280,7 @@ const Routine = z
       .nullable()
       .openapi({ description: "Its run paused near a limit (ADR 0118); Continuar agora is `POST …/continue`." }),
     brain: z.object({
-      kind: z.enum(["model", "claude_code", "codex", "cursor"]),
+      kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode"]),
       machineName: z.string().nullable().openapi({ description: "The computer a computer brain runs on." }),
     }),
     health: z
