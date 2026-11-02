@@ -323,7 +323,7 @@ describe("the agent's AI", () => {
     ).toEqual([
       ["use", "Claude Team", "contato@estudio.example", null],
       ["also", "Claude Pessoal · Max", "Também usada por Atlas", null],
-      ["move", "ChatGPT Plus", "Em uso por Atlas · Mover para cá", null],
+      ["also", "ChatGPT Plus", "Também usada por Atlas", null],
       ["key", "Claude da Acme", "Claude · termina em 7f2a", "Pago por uso. Conta no orçamento da Ada."],
       ["locked", "Claude Max", "De João", null],
     ]);

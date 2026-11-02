@@ -1165,11 +1165,16 @@ describe("All agents: one plan for the team, a login per agent", () => {
     expect(head().classList.contains("ac-faceline")).toBe(true);
     expect(head().querySelector(".ai-panel__title > b")?.classList.contains("ac-captop")).toBe(true);
     expect(within(head()).getByText("Para")).toBeTruthy();
-    // ChatGPT signs in once per account: each agent, the first with no AI chosen.
+    // ChatGPT like Claude: all of them by default, one sign-in per agent.
     await click(tile("ChatGPT"));
     const chatgpt = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
-    expect(within(chatgpt).getByRole("combobox").textContent).toBe("Ada");
-    expect((await openFor(chatgpt)).map((o) => o.textContent)).toEqual(["Ada", "Atlas", "Lia"]);
+    expect(within(chatgpt).getByRole("combobox").textContent).toBe("Todos os agentes");
+    expect((await openFor(chatgpt)).map((o) => o.textContent)).toEqual([
+      "Todos os agentesAda, Atlas e Lia",
+      "Ada",
+      "Atlas",
+      "Lia",
+    ]);
     // The select ends the head's row: its list keeps the trigger's end edge, the panel's.
     expect(screen().getByRole("listbox").getAttribute("data-align")).toBe("end");
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
