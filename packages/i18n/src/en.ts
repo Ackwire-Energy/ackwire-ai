@@ -9173,6 +9173,10 @@ export const en: Translations = {
     account: {
       plans: "Your plans' limits",
       device: "On this device",
+      /** Yours in this workspace, on every device: the tool summary under each agent reply, off by default. */
+      activity: "Show what agents did under each reply",
+      activityHelp: "The tools they used and how long it took. While they work, you still see what they're doing.",
+      activityFailed: "Couldn't save that. Try again.",
     },
     orgTitle: "Workspace",
     name: "Name",
@@ -9822,7 +9826,8 @@ export const en: Translations = {
       action_connect_ai: "Connect an AI",
       agent_proposal: "Proposed a new agent: {{name}}",
       approval_request: "Approval request: {{title}}",
-      secret_request: "Secret request: {{name}}",
+      secret_request: "{{agent}} asked for a key: {{name}}",
+      secret_requestAnon: "Asked for a key: {{name}}",
       browser_handoff: "I need help in my browser.",
       desktop_handoff: "I need help on my computer.",
       browser_restarted: "{{agent}} restarted its browser. {{person}}'s control ended.",

@@ -460,6 +460,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
       setStart: (orgId, input) => request<StartChoice>(`${org(orgId)}/me/start`, { method: "PUT", json: input }),
+      setShowActivity: async (orgId, show) =>
+        (await request<{ show: boolean }>(`${org(orgId)}/me/activity`, { method: "PUT", json: { show } })).show,
       sidebarItems: async (orgId) => (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`)).items,
       setSidebarItem: async (orgId, item, place) =>
         (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PATCH", json: { item, place } }))

@@ -861,6 +861,11 @@ export const featureKeysPtBR = {
     startChannels: "Um canal",
     startHint: "Vale para este workspace, aqui e no computador, onde o início é a página Início.",
     startFailed: "Não deu para salvar. Tente de novo.",
+    activity: "Respostas dos agentes",
+    activityShow: "Mostrar o que os agentes fizeram em cada resposta",
+    activityHint:
+      "As ferramentas que usaram e quanto tempo levou, neste workspace, aqui e no computador. Enquanto trabalham, você continua vendo o que estão fazendo.",
+    activityFailed: "Não deu para salvar. Tente de novo.",
     langPt: "Português",
     langEn: "English",
     sounds: "Sons",

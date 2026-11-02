@@ -80,6 +80,7 @@ describe("permissions", () => {
         orgLogo: null,
         standing: { state: "active", reason: null, notice: "shown", deletionDueAt: null },
         start: { page: "home", channelId: null },
+        showActivity: false,
       },
     ]);
     const members = await f.db

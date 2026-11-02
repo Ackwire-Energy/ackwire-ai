@@ -138,6 +138,11 @@ export const organizationMembers = pgTable(
      * app's default (`sidebarItemsOf` in packages/engine/src/sidebar-items.ts).
      */
     sidebarItems: jsonb().$type<Record<string, string>>().notNull().default({}),
+    /**
+     * Whether the person sees the summary of what agents did under each reply ("Usou 4 ferramentas"); off, only the
+     * live step line while they work and the cards that carry content or wait for a person.
+     */
+    showActivity: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

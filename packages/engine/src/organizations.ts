@@ -88,6 +88,8 @@ export interface Membership {
   standing?: WorkspaceStanding;
   /** What opens when the app starts here (listMemberships). */
   start?: StartChoice;
+  /** Whether the person sees what agents did under each reply (listMemberships, `setShowActivity`). */
+  showActivity?: boolean;
 }
 
 /** What opens when the app starts in a workspace (ADR 0108), the person's own. */
@@ -140,6 +142,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       standing: STANDING_COLUMNS,
       startPage: organizationMembers.startPage,
       startChannelId: organizationMembers.startChannelId,
+      showActivity: organizationMembers.showActivity,
       ...ROLE_COLUMNS,
     })
     .from(organizationMembers)
@@ -761,6 +764,16 @@ export async function setStartPage(
     .set({ startPage: input.page, startChannelId: channelId })
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
   return { page: input.page, channelId };
+}
+
+/** Shows or hides, for the person in this workspace, what agents did under each reply. */
+export async function setShowActivity(db: Database, userId: string, orgId: string, show: boolean): Promise<boolean> {
+  await requirePermission(db, userId, orgId, "read");
+  await db
+    .update(organizationMembers)
+    .set({ showActivity: show })
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return show;
 }
 
 /** The languages of the app (`users.locale`): emails and pushes are written in it. */

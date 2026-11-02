@@ -1768,6 +1768,29 @@ export function useSetStart(orgId: string) {
   });
 }
 
+/** Shows or hides what agents did under each reply, for me in this workspace: the switch moves at once. */
+export function useSetShowActivity(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const put = (showActivity: boolean) =>
+    qc.setQueryData<Me | null>(keys.me, (me) =>
+      me ? { ...me, organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, showActivity } : o)) } : me,
+    );
+  return useMutation({
+    mutationFn: (show: boolean) => api.orgs.setShowActivity(orgId, show),
+    onMutate: async (show) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      put(show);
+      return { before };
+    },
+    onError: (_e, _show, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: put,
+  });
+}
+
 /** Your own row with a status change applied, as the server will answer it. */
 function withStatus(p: Person, input: StatusInput): Person {
   const presence = input.availability === undefined ? p.presence : AVAILABILITY_PRESENCE[input.availability];

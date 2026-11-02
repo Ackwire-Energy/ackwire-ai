@@ -9242,6 +9242,11 @@ export const ptBR = {
     account: {
       plans: "Limites dos seus planos",
       device: "Neste aparelho",
+      /** Yours in this workspace, on every device: the tool summary under each agent reply, off by default. */
+      activity: "Mostrar o que os agentes fizeram em cada resposta",
+      activityHelp:
+        "As ferramentas que usaram e quanto tempo levou. Enquanto trabalham, você continua vendo o que estão fazendo.",
+      activityFailed: "Não deu para salvar. Tente de novo.",
     },
     orgTitle: "Workspace",
     name: "Nome",
@@ -9903,7 +9908,8 @@ export const ptBR = {
       action_connect_ai: "Conectar uma IA",
       agent_proposal: "Propôs um novo agente: {{name}}",
       approval_request: "Pedido de aprovação: {{title}}",
-      secret_request: "Pedido de segredo: {{name}}",
+      secret_request: "{{agent}} pediu uma chave: {{name}}",
+      secret_requestAnon: "Pediu uma chave: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
       desktop_handoff: "Preciso de ajuda no meu computador.",
       browser_restarted: "{{agent}} reiniciou o navegador. O controle de {{person}} terminou.",

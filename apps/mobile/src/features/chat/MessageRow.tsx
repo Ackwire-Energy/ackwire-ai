@@ -28,7 +28,7 @@ import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
-import { splitCanceled } from "@agenteschat/client/lib/work";
+import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { memo, useEffect, useState } from "react";
@@ -147,6 +147,7 @@ export const MessageRow = memo(function MessageRow({
   const [reportOpen, setReportOpen] = useState(false);
   const qc = useQueryClient();
   const orgId = useOrgId();
+  const { org } = useOrg();
   const report = routine?.noticeId
     ? routineReportText(
         [
@@ -220,8 +221,9 @@ export const MessageRow = memo(function MessageRow({
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
   // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
+  // Step summaries, no picture: activity, so the person's setting hides them like the tool block.
   const trails =
-    isAgent && m.author.id && !m.local
+    isAgent && m.author.id && !m.local && showsActivity(org)
       ? {
           browser: browserTrailOf(meta),
           desktop: desktopTrailOf(meta),

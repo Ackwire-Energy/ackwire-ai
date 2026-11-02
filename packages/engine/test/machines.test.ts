@@ -1038,6 +1038,12 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       purpose: "publicar o pacote no npm",
       publicKey: row.publicKey,
     });
+    // Its text is for previews and notifications, a sentence that names who asked (the card names the key).
+    expect(card?.body).toBe(`${f.agent.name} asked for a key: NPM_TOKEN`);
+    expect((card?.meta as { bodyParams?: unknown } | undefined)?.bodyParams).toEqual({
+      agent: f.agent.name,
+      name: "NPM_TOKEN",
+    });
 
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };

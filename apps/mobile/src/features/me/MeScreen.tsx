@@ -125,6 +125,17 @@ export function MeScreen() {
     ...(org.org?.start !== undefined
       ? [{ icon: "home" as const, label: t("mobile.me.start"), value: startLabel, href: "/me/start" }]
       : []),
+    // Likewise: a server from before the choice sends no `showActivity`.
+    ...(org.org?.showActivity !== undefined
+      ? [
+          {
+            icon: "eye" as const,
+            label: t("mobile.me.activity"),
+            value: org.org.showActivity ? t("mobile.me.on") : t("mobile.me.off"),
+            href: "/me/activity",
+          },
+        ]
+      : []),
     {
       icon: "sound",
       label: t("mobile.me.sounds"),

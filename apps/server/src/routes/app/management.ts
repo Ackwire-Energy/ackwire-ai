@@ -42,6 +42,7 @@ import {
   setMySidebarItems,
   setMySidebarOrder,
   setMyStatus,
+  setShowActivity,
   setStartPage,
   sidebarPlaceAllowed,
   speakerFor,
@@ -498,6 +499,25 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json(await setStartPage(db, c.get("user").id, orgId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/activity",
+      tags: ["Members"],
+      security,
+      summary: "Show or hide what agents did under each reply in this organization",
+      description:
+        'Yours, on every device, off by default: on, each agent reply shows its tools ("Used 4 tools"); off, only the live step line while it works and the cards that carry content or wait for a person. `GET /me` sends it with each organization (`showActivity`).',
+      request: { params: OrgParams, body: body(z.object({ show: z.boolean() })) },
+      responses: { 200: json(z.object({ show: z.boolean() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const show = await setShowActivity(db, c.get("user").id, orgId, c.req.valid("json").show);
+      return c.json({ show }, 200);
     },
   );
 
