@@ -9,6 +9,7 @@ import {
   type AccountManagerOptions,
   accountEnv,
   agentAccountHome,
+  codexAuthOf,
   grantOf,
   lentAccounts,
   parseClaudeLoginUrl,
@@ -16,16 +17,24 @@ import {
   parseCodexLogin,
   parseCodexStatus,
   parseSetupToken,
+  placeCodexAuth,
   planKeyOf,
   Screen,
   stripAnsi,
   tokenOf,
+  watchCodexAuth,
 } from "../../runner/accounts";
 import { claudePlan } from "../../runner/executors";
 import { describeRequest, type HandlerContext, handleRequest } from "../../runner/handlers";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
-const FAKE_ENV = ["FAKE_ACCOUNT_MODE", "FAKE_ACCOUNT_LOG", "FAKE_ACCOUNT_CODE", "FAKE_CODEX_DELAY"];
+const FAKE_ENV = [
+  "FAKE_ACCOUNT_MODE",
+  "FAKE_ACCOUNT_LOG",
+  "FAKE_ACCOUNT_CODE",
+  "FAKE_CODEX_DELAY",
+  "FAKE_CODEX_REFRESHED",
+];
 const dirs: string[] = [];
 const managers: AccountManager[] = [];
 afterEach(async () => {
@@ -914,16 +923,98 @@ test.if(posix)(
     m.invalidate();
     expect((await m.list()).map((a) => a.shared)).toEqual([true, true]);
 
-    // ChatGPT's still thinks for one agent there.
+    // ChatGPT's for all agents too: root signs in, never lends it, and hands each turn its auth.json.
     const codex = LOGIN(77);
     await m.begin("codex", codex, false, undefined, undefined, true);
     await waitFor(() => m.status(codex).state !== "waiting", 5000);
-    expect(m.status(codex)).toEqual({ state: "done", account: { id: codex, kind: "codex", loggedIn: true } });
-    expect(await m.grant("codex", codex)).toBeNull();
+    expect(m.status(codex)).toEqual({
+      state: "done",
+      account: { id: codex, kind: "codex", loggedIn: true, shared: true },
+    });
+    const granted = await m.grant("codex", codex);
+    expect(granted?.kind).toBe("codex_auth");
+    expect(grantOf(granted)).toEqual(granted);
+    expect(await m.lendTo("codex", codex, 21001)).toBe(false);
     expect(runs().map((r) => r.args)).toEqual(["login --device-auth", "login status"]);
+    // One for one agent stays lent per turn, as before.
+    const single = LOGIN(79);
+    await m.begin("codex", single);
+    await waitFor(() => m.status(single).state !== "waiting", 5000);
+    expect(m.status(single).account?.shared).toBeUndefined();
+    expect(await m.grant("codex", single)).toBeNull();
   },
   20_000,
 );
+
+const codexAuth = (refresh: string, at: number, account = "acct-fake") =>
+  JSON.stringify({
+    auth_mode: "chatgpt",
+    tokens: { id_token: "i", access_token: "a", refresh_token: refresh, account_id: account },
+    last_refresh: new Date(at).toISOString(),
+  });
+
+test.if(posix)(
+  "system mode: a ChatGPT sign-in for all agents takes refreshed copies back, and one due for its refresh goes to one turn first",
+  async () => {
+    const DAY = 24 * 3600_000;
+    let clock = Date.parse("2026-11-02T12:00:00Z");
+    process.env.FAKE_CODEX_REFRESHED = new Date(clock - 9 * DAY).toISOString();
+    const { m, root } = setup({ lending: { chown: async () => {} }, now: () => clock });
+    const id = LOGIN(80);
+    await m.begin("codex", id, false, undefined, undefined, true);
+    await waitFor(() => m.status(id).state !== "waiting", 5000);
+    const stale = await m.grant("codex", id);
+    expect(stale?.kind).toBe("codex_auth");
+    // Due: a second turn waits for the first one's refreshed copy, and gets it.
+    let second: unknown = null;
+    const waiting = m.grant("codex", id).then((g) => {
+      second = g;
+    });
+    await Bun.sleep(50);
+    expect(second).toBeNull();
+    // Older, or another ChatGPT account: never kept.
+    expect(m.keepCodexAuth(id, codexAuth("old", clock - 10 * DAY))).toBe(false);
+    expect(m.keepCodexAuth(id, codexAuth("other", clock, "acct-someone-else"))).toBe(false);
+    expect(m.keepCodexAuth(id, "not json")).toBe(false);
+    expect(m.keepCodexAuth(id, codexAuth("fake-refresh-2", clock))).toBe(true);
+    await waiting;
+    expect(second).toEqual({ kind: "codex_auth", auth: codexAuth("fake-refresh-2", clock) });
+    const kept = JSON.parse(readFileSync(path.join(root, "codex", id, "auth.json"), "utf8"));
+    expect(kept.tokens.refresh_token).toBe("fake-refresh-2");
+    expect(statSync(path.join(root, "codex", id, "auth.json")).mode & 0o777).toBe(0o600);
+    // Fresh: turns at once all get it, nobody waits.
+    clock += DAY;
+    const both = await Promise.all([m.grant("codex", id), m.grant("codex", id)]);
+    expect(both.map((g) => g?.kind)).toEqual(["codex_auth", "codex_auth"]);
+    // A refreshed copy for an account made for one agent is never taken.
+    expect(m.keepCodexAuth(LOGIN(81), codexAuth("x", clock + DAY))).toBe(false);
+  },
+  20_000,
+);
+
+test("in an agent's worker: root's copy goes in unless the agent's is newer, and a refreshed one goes back", async () => {
+  const home = tempDir("codex-home-");
+  dirs.push(home);
+  const file = path.join(home, "auth.json");
+  placeCodexAuth(home, codexAuth("r1", 1000));
+  expect(JSON.parse(readFileSync(file, "utf8")).tokens.refresh_token).toBe("r1");
+  // This agent's Codex refreshed it already: root's older copy doesn't overwrite it.
+  writeFileSync(file, codexAuth("r2", 2000));
+  placeCodexAuth(home, codexAuth("r1", 1000));
+  expect(JSON.parse(readFileSync(file, "utf8")).tokens.refresh_token).toBe("r2");
+  placeCodexAuth(home, codexAuth("r3", 3000));
+  expect(JSON.parse(readFileSync(file, "utf8")).tokens.refresh_token).toBe("r3");
+  expect(codexAuthOf("{}")).toBeNull();
+
+  const sent: string[] = [];
+  const watch = watchCodexAuth(home, codexAuth("r3", 3000), (a) => sent.push(a), 10);
+  await Bun.sleep(30);
+  expect(sent).toEqual([]);
+  writeFileSync(file, codexAuth("r4", 4000));
+  await waitFor(() => sent.length > 0, 2000);
+  watch.stop();
+  expect(sent.map((a) => JSON.parse(a).tokens.refresh_token)).toEqual(["r4"]);
+});
 
 test.if(posix)("where every agent is the runner's own user, every account thinks for all of them", async () => {
   const { m, root } = setup();

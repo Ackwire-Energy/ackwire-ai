@@ -69,7 +69,7 @@ const Status = z.enum(["proposed", "active", "paused", "done", "canceled", "awai
 });
 const Executor = z
   .enum(["claude", "codex", "agent"])
-  .openapi({ description: "Who programs: Claude Code, Codex (experimental) or the agent itself with its own tools." });
+  .openapi({ description: "Who programs: Claude Code, Codex or the agent itself with its own tools." });
 const Role = z.enum(["owner", "decide", "comment", "none"]);
 const WorktreeState = z.enum(["none", "preparing", "ready", "failed", "removed"]).openapi({
   description:

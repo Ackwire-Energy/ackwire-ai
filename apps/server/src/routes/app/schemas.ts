@@ -607,7 +607,6 @@ export const BrainOption = z
       .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
       .optional()
       .openapi({ description: "Why it can't be chosen now (computer brains)." }),
-    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex and Cursor.' }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),

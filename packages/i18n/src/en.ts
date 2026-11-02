@@ -4758,7 +4758,7 @@ export const en = {
     executor: {
       claude: "Claude Code",
       claudeText: "Claude Code plans and codes on the computer. {{name}} follows and relays.",
-      codex: "Codex (experimental)",
+      codex: "Codex",
       codexText: "Codex codes on the computer. Still being tested.",
       agent: "{{name}} (the agent itself)",
       agentText: "{{name}} codes straight on the computer, with his own tools.",
@@ -5298,7 +5298,6 @@ export const en = {
         codexText: "Does it on the computer.",
         agentText: "{{name}} does it, with his own tools.",
         agentText_female: "{{name}} does it, with her own tools.",
-        testing: "Testing",
         locked: "It can't change once the mission has started.",
         open: "It can change until the mission starts.",
         saved: "Who does the work: {{name}}",
@@ -7251,7 +7250,6 @@ export const en = {
     cursorText: "Uses the Cursor plan of whoever connected the computer.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "In your Cursor plan", apiPrice: "Billed by Cursor at API prices" },
-    testing: "Testing",
     reasons: {
       no_computer: "Choose a connected computer under Computer to use it.",
       exec_off: "The computer was connected without permission to run programs.",

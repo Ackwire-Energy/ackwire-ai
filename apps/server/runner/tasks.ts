@@ -802,6 +802,8 @@ interface Watch {
 export class TaskManager {
   private journal: Journal = { tasks: [] };
   private readonly watches = new Map<string, Watch>();
+  /** A Codex task's ChatGPT sign-in root keeps: stop sending its refreshed copies back when the task ends. */
+  private readonly releases = new Map<string, () => void>();
   /** How each task this runner started was launched, for its retry (`retryOtherFlag`); in memory only, until it ends. */
   private readonly launches = new Map<string, { env: NodeJS.ProcessEnv; token?: string }>();
   private send: ((frame: RunnerFrame) => void) | null = null;
@@ -1027,6 +1029,7 @@ export class TaskManager {
     if (executor !== "shell" && !prompt.trim())
       throw new RunnerError("bad_request", `A ${executor} task needs a prompt`);
     const signIn = executor === "shell" ? null : await this.signIn(executor, req.account, grant);
+    if (signIn?.release) this.releases.set(taskId, signIn.release);
     const plan = executor === "claude" && signIn?.planKey ? planOf(signIn.planKey.provider) : undefined;
     const folder = await this.opts.agentFolder(agent);
     let cwd = folder;
@@ -1567,6 +1570,8 @@ export class TaskManager {
     }
     this.flushEvents(t, w, true);
     this.watches.delete(t.taskId);
+    this.releases.get(t.taskId)?.();
+    this.releases.delete(t.taskId);
     // Claude Code refused the session flag at once ("already in use", "No conversation found"): try the other one, once.
     if (exit && this.wrongSessionFlag(t, w, exit)) {
       void this.retryOtherFlag(t, w, exit);

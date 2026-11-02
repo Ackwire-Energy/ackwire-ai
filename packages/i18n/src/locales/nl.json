@@ -5010,7 +5010,7 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code plant en programmeert op de computer. {{name}} volgt het en geeft het door.",
-      "codex": "Codex (experimenteel)",
+      "codex": "Codex",
       "codexText": "Codex programmeert op de computer. Wordt nog getest.",
       "agent": "{{name}} (de agent zelf)",
       "agentText": "{{name}} programmeert direct op de computer, met zijn eigen tools.",
@@ -5572,7 +5572,6 @@
         "codexText": "Doet het op de computer.",
         "agentText": "{{name}} doet het, met zijn eigen tools.",
         "agentText_female": "{{name}} doet het, met haar eigen tools.",
-        "testing": "In test",
         "locked": "Dit kan niet meer veranderen zodra de missie is gestart.",
         "open": "Dit kan veranderen tot de missie start.",
         "saved": "Wie het werk doet: {{name}}",
@@ -7687,7 +7686,6 @@
       "inPlan": "In je Cursor-abonnement",
       "apiPrice": "Door Cursor gefactureerd tegen API-prijzen"
     },
-    "testing": "Testen",
     "reasons": {
       "no_computer": "Kies een gekoppelde computer bij Computer om dit te gebruiken.",
       "exec_off": "De computer is gekoppeld zonder toestemming om programma's uit te voeren.",

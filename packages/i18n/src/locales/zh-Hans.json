@@ -4837,7 +4837,7 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code 在电脑上规划和编写代码。{{name}} 跟进并转达。",
-      "codex": "Codex（实验性）",
+      "codex": "Codex",
       "codexText": "Codex 在电脑上编写代码。仍在测试中。",
       "agent": "{{name}}（智能体本身）",
       "agentText": "{{name}} 直接在电脑上用自己的工具编写代码。",
@@ -5344,7 +5344,6 @@
         "codexText": "在电脑上执行。",
         "agentText": "{{name}} 用自己的工具来做。",
         "agentText_female": "{{name}} 用自己的工具来做。",
-        "testing": "测试中",
         "locked": "专项任务开始后无法更改。",
         "open": "专项任务开始前可以更改。",
         "saved": "由谁来做：{{name}}",
@@ -7370,7 +7369,6 @@
       "inPlan": "包含在你的 Cursor 套餐中",
       "apiPrice": "由 Cursor 按 API 价格计费"
     },
-    "testing": "测试中",
     "reasons": {
       "no_computer": "在“电脑”中选择一台已连接的电脑即可使用。",
       "exec_off": "这台电脑连接时没有授予运行程序的权限。",

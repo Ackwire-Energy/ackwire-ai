@@ -4894,7 +4894,7 @@ export const ptBR = {
     executor: {
       claude: "Claude Code",
       claudeText: "O Claude Code planeja e programa no computador. {{name}} acompanha e repassa.",
-      codex: "Codex (experimental)",
+      codex: "Codex",
       codexText: "O Codex programa no computador. Ainda em teste.",
       agent: "{{name}} (o próprio agente)",
       agentText: "{{name}} programa direto no computador, com as próprias ferramentas.",
@@ -5444,7 +5444,6 @@ export const ptBR = {
         codexText: "Faz no computador.",
         agentText: "O {{name}} faz, com as próprias ferramentas.",
         agentText_female: "A {{name}} faz, com as próprias ferramentas.",
-        testing: "Em teste",
         locked: "Não dá para trocar depois que a missão começa.",
         open: "Dá para trocar até a missão começar.",
         saved: "Quem faz o trabalho: {{name}}",
@@ -7456,7 +7455,6 @@ export const ptBR = {
     cursorText: "Usa o plano do Cursor de quem conectou o computador.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "No seu plano do Cursor", apiPrice: "O Cursor cobra pelo preço da API" },
-    testing: "Em teste",
     reasons: {
       no_computer: "Escolha um computador conectado em Computador para usar.",
       exec_off: "O computador foi conectado sem permissão para rodar programas.",

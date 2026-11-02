@@ -479,7 +479,7 @@ describe("the agent's AI", () => {
     const claude: AgentBrain["options"][number] = {
       kind: "claude_code",
       available: true,
-      experimental: false,
+
       models: [
         { value: "opus", label: "Opus" },
         { value: "sonnet", label: "Sonnet", recommended: true },
@@ -553,7 +553,7 @@ describe("the agent's AI", () => {
 
   test("picking a model saves as the web does: Automático picks the effort too, a fixed one after it starts at Médio", () => {
     const options: AgentBrain["options"] = [
-      { kind: "claude_code", available: true, experimental: false, models: [], defaultModel: "sonnet" },
+      { kind: "claude_code", available: true, models: [], defaultModel: "sonnet" },
     ];
     const view = (effort: AgentBrain["effort"]) => ({ brain: "claude_code" as const, options, effort });
     expect(modelInput("auto", view(null))).toEqual({ model: "auto", effort: "auto" });
@@ -589,7 +589,7 @@ describe("the agent's AI", () => {
       {
         kind: "claude_code",
         available: true,
-        experimental: false,
+
         models: [
           { value: "opus", label: "Opus" },
           { value: "sonnet", label: "Sonnet", recommended: true },
@@ -710,7 +710,7 @@ describe("the agent's AI", () => {
     const claude: AgentBrain["options"][number] = {
       kind: "claude_code",
       available: true,
-      experimental: false,
+
       models: [
         { value: "opus", label: "Opus" },
         { value: "sonnet", label: "Sonnet", recommended: true },

@@ -169,7 +169,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
       "Chave de API",
       "Claude",
-      "ChatGPTEm teste",
+      "ChatGPT",
     ]);
     expect(rows.map((r) => r.querySelector(".ac-optrow__desc")?.textContent)).toEqual([
       "Pago por uso. Conta no orçamento da Ada.",
@@ -201,7 +201,6 @@ describe("Quem pensa (its dialog)", () => {
     const cursor = {
       kind: "cursor" as const,
       available: true,
-      experimental: true,
       models: [
         { value: "grok-5-code", label: "Grok 5 Code", inPlan: true },
         { value: "claude-opus-5-5", label: "Claude Opus 5.5" },
@@ -217,8 +216,8 @@ describe("Quem pensa (its dialog)", () => {
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
       "Chave de API",
       "Claude",
-      "ChatGPTEm teste",
-      "CursorEm teste",
+      "ChatGPT",
+      "Cursor",
     ]);
     expect(rows[3]?.querySelector(".ac-brand[data-mark='cursor']")).not.toBeNull();
     await act(async () => fireEvent.click(rows[3] as HTMLElement));
@@ -1435,7 +1434,7 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
       "Chave de API",
       "Claude",
-      "ChatGPTEm teste",
+      "ChatGPT",
       "OpenCode Go",
     ]);
     const opencode = card(d, /^OpenCode Go/);

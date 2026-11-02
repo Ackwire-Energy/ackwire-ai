@@ -3,7 +3,6 @@ import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node
 import path from "node:path";
 import { ASK_AGAIN, inBrowserProfile } from "@agenteschat/adapters/command-policy";
 import {
-  type AccountKind,
   type AgentScope,
   browserSetupOf,
   type FileEntry,
@@ -20,7 +19,7 @@ import {
   STEER_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
 import { realFoldersFor } from "./access";
-import type { AccountGrant, AccountManager } from "./accounts";
+import type { AccountFolders, AccountGrant, AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
@@ -196,10 +195,7 @@ export interface HandlerContext {
      * System mode, in a worker: the account folders lent to this agent (`accounts` is root's), and its own folder
      * for an account root keeps (`agentHome`, protocol 29).
      */
-    accounts?: {
-      accountDir(kind: AccountKind, id: string): string | null;
-      agentHome?(kind: AccountKind, id: string): string | null;
-    };
+    accounts?: AccountFolders;
     /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
     spawn?: Spawn;
   };
@@ -1021,6 +1017,7 @@ async function doCodexTurn(
           ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
           ...(codex.app ? { app: codex.app } : {}),
           ...(codex.spawn ? { spawn: codex.spawn } : {}),
+          ...(ctx.grant ? { grant: ctx.grant } : {}),
         },
         req as unknown as CodexBrainTurnRequest,
         { signal: scope.signal, emit },

@@ -69,7 +69,7 @@ export function ExecutorChip({
 }
 
 /**
- * "Quem programa": Claude Code, Codex (experimental) or the agent itself,
+ * "Quem programa": Claude Code, Codex or the agent itself,
  * only those its computer can run, each with one line on what it means and
  * its mark (`leading`).
  */

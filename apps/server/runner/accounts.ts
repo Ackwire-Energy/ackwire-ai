@@ -233,6 +233,8 @@ const LAST_OUTPUT_MS = 500;
 export type AccountGrant =
   | { kind: "token"; token: string }
   | { kind: "key"; provider: PlanId; key: string }
+  /** A ChatGPT sign-in for all agents: root's newest `auth.json`, refreshed copies coming back (`watchCodexAuth`). */
+  | { kind: "codex_auth"; auth: string }
   | { kind: "none" };
 
 /** A grant as the worker reads it off root's request frame; null when there is none or it isn't one. */
@@ -245,7 +247,87 @@ export function grantOf(v: unknown): AccountGrant | null {
   if (g?.kind === "key" && isPlanId(g.provider) && typeof g.key === "string" && g.key) {
     return { kind: "key", provider: g.provider, key: g.key };
   }
-  return null;
+  const auth = g?.kind === "codex_auth" ? codexAuthOf(g.auth) : null;
+  return auth ? { kind: "codex_auth", auth: auth.text } : null;
+}
+
+/** Codex keeps its ChatGPT sign-in here, in `CODEX_HOME`. */
+const CODEX_AUTH_FILE = "auth.json";
+const MAX_CODEX_AUTH_CHARS = 64_000;
+/** Codex refreshes a ChatGPT sign-in this old (its `TOKEN_REFRESH_INTERVAL`, 8 days; the access token lasts 10). */
+export const CODEX_REFRESH_AFTER_MS = 8 * 24 * 3600_000;
+/** How long a turn on a sign-in due for its refresh holds the others back, waiting for the refreshed copy. */
+export const CODEX_REFRESH_WAIT_MS = 60_000;
+
+export interface CodexAuth {
+  /** The whole file, as JSON. */
+  text: string;
+  /** Its `last_refresh` (0 when it has none). */
+  refreshedAt: number;
+  /** The ChatGPT account it signs in to (`tokens.account_id`). */
+  accountId: string;
+}
+
+/** A Codex `auth.json` (its text) that signs in to ChatGPT: tokens with a refresh token. Null for anything else. */
+export function codexAuthOf(text: unknown): CodexAuth | null {
+  if (typeof text !== "string" || text.length > MAX_CODEX_AUTH_CHARS) return null;
+  let o: unknown;
+  try {
+    o = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const tokens = (o as { tokens?: Record<string, unknown> } | null)?.tokens;
+  if (typeof tokens?.access_token !== "string" || typeof tokens.refresh_token !== "string" || !tokens.refresh_token) {
+    return null;
+  }
+  const at = Date.parse(String((o as { last_refresh?: unknown }).last_refresh ?? ""));
+  return {
+    text: JSON.stringify(o),
+    refreshedAt: Number.isFinite(at) ? at : 0,
+    accountId: typeof tokens.account_id === "string" ? tokens.account_id : "",
+  };
+}
+
+/** A folder's Codex sign-in; null when it has none. Never through a link or a pipe. */
+export function readCodexAuth(dir: string): CodexAuth | null {
+  const o = readSmallJson(path.join(dir, CODEX_AUTH_FILE), MAX_CODEX_AUTH_CHARS);
+  return o ? codexAuthOf(JSON.stringify(o)) : null;
+}
+
+/**
+ * In an agent's worker: root's copy of a sign-in for all agents goes into the agent's own Codex home, unless what is
+ * there is newer (a refresh this agent's Codex made, on its way back to root).
+ */
+export function placeCodexAuth(home: string, auth: string) {
+  const granted = codexAuthOf(auth);
+  if (!granted) return;
+  const here = readCodexAuth(home);
+  if (here && here.accountId === granted.accountId && here.refreshedAt >= granted.refreshedAt) return;
+  writeJson(path.join(home, CODEX_AUTH_FILE), JSON.parse(granted.text));
+}
+
+/**
+ * In an agent's worker, while a request runs on a sign-in root keeps: the agent's copy, each time its Codex
+ * refreshed it, goes back (`send`) so root hands the refreshed one to the next turn of any agent. A refresh rotates
+ * the refresh token, so the others need it soon. `stop` looks once more and stops looking.
+ */
+export function watchCodexAuth(home: string, granted: string, send: (auth: string) => void, everyMs = 2000) {
+  let last = codexAuthOf(granted)?.refreshedAt ?? 0;
+  const look = () => {
+    const now = readCodexAuth(home);
+    if (!now || now.refreshedAt <= last) return;
+    last = now.refreshedAt;
+    send(now.text);
+  };
+  const timer = setInterval(look, everyMs);
+  timer.unref?.();
+  return {
+    stop() {
+      clearInterval(timer);
+      look();
+    },
+  };
 }
 
 /** System mode: the account folders, outside root's home (its parents 711) so an agent's user reaches the one lent to it. */
@@ -304,6 +386,8 @@ export interface AccountFolders {
   accountDir(kind: AccountKind, id: string): string | null;
   /** System mode, in a worker (protocol 29): this agent's own folder for an account root keeps (`AccountGrant`). */
   agentHome?(kind: AccountKind, id: string): string | null;
+  /** System mode, in a worker: a refreshed ChatGPT sign-in root keeps goes back to root (`watchCodexAuth`). */
+  codexAuth?(id: string, auth: string): void;
 }
 
 /** What a CLI signs in with on an account: the folder that is its home, and what root handed over for it. */
@@ -313,6 +397,8 @@ export interface AccountSignIn {
   planKey?: { provider: PlanId; key: string };
   /** A token root keeps (protocol 29): on descriptor 3 only (`TOKEN_FD_ENV`), never in an env. */
   token?: string;
+  /** A ChatGPT sign-in root keeps: stops sending its refreshed copies back, once the turn or task ends. */
+  release?: () => void;
 }
 
 /** What a turn or task says when root has nothing to sign its account in with (signed out on the computer). */
@@ -332,9 +418,20 @@ export async function accountSignIn(
   if (grant?.kind === "none") return "signed_out";
   const home = grant ? folders?.agentHome?.(kind, id) : folders?.accountDir(kind, id);
   if (!home) return "missing";
+  let release: (() => void) | undefined;
+  if (grant?.kind === "codex_auth") {
+    placeCodexAuth(home, grant.auth);
+    const send = folders?.codexAuth?.bind(folders);
+    if (send) release = watchCodexAuth(home, grant.auth, (auth) => send(id, auth)).stop;
+  }
   const planKey =
     grant?.kind === "key" ? { provider: grant.provider, key: grant.key } : grant ? null : await planKeyOf(home);
-  return { home, ...(planKey ? { planKey } : {}), ...(grant?.kind === "token" ? { token: grant.token } : {}) };
+  return {
+    home,
+    ...(planKey ? { planKey } : {}),
+    ...(grant?.kind === "token" ? { token: grant.token } : {}),
+    ...(release ? { release } : {}),
+  };
 }
 
 /** The redaction of a CLI on an account also hides the key or token it got (an agent's shell could print a key). */
@@ -781,6 +878,8 @@ function runCli(command: string[], args: string[], env: NodeJS.ProcessEnv, timeo
 export interface AccountManagerOptions {
   /** `<runner home>/accounts`. */
   root: string;
+  /** Tests: the clock. */
+  now?: () => number;
   /** The organization this machine is paired with (a sealed code's AAD names it); unknown before pairing. */
   orgId?: () => string | undefined;
   /** How to start each CLI (tests: a fake script). Default `["claude"]` / `["codex"]`. */
@@ -862,6 +961,8 @@ export class AccountManager {
   private readonly probing = new Set<string>();
   private usageSent = 0;
   private usageTimer: ReturnType<typeof setTimeout> | null = null;
+  /** ChatGPT sign-ins for all agents a turn is refreshing now (`codexGrant`). */
+  private readonly refreshing = new Map<string, { at: number; done: Promise<void>; resolve: () => void }>();
 
   constructor(private readonly opts: AccountManagerOptions) {
     this.log = opts.log ?? (() => {});
@@ -928,7 +1029,7 @@ export class AccountManager {
    * the account to sign in to, as the CLI's login hint. `shared` (protocol 29,
    * system mode): a sign-in for every agent of its owner here, which root
    * keeps: Claude's through `claude setup-token` (no login hint there), a
-   * plan's key as it is. ChatGPT's still thinks for one agent there.
+   * plan's key as it is, ChatGPT's through `codex login` as root (`grant` hands its `auth.json` to each turn).
    */
   async begin(
     kind: AccountKind,
@@ -960,7 +1061,7 @@ export class AccountManager {
       );
     }
     // Elsewhere every folder thinks for all of its owner's agents anyway.
-    const forAll = this.opts.lending !== undefined && shared && kind === "claude_code";
+    const forAll = this.opts.lending !== undefined && shared && (kind === "claude_code" || kind === "codex");
     const dir = this.dirOf(kind, loginId);
     if (again) {
       if (!existsSync(dir) || existsSync(path.join(dir, SIGNING_IN))) {
@@ -1014,7 +1115,7 @@ export class AccountManager {
       again,
     };
     try {
-      if (forAll) this.spawnToken(login);
+      if (forAll && kind === "claude_code") this.spawnToken(login);
       else this.spawnLogin(login, email);
     } catch (err) {
       if (!again) await rm(dir, { recursive: true, force: true });
@@ -1377,6 +1478,11 @@ export class AccountManager {
         if (login.state !== "waiting") return;
         if (info.loggedIn) {
           await rm(path.join(login.dir, SIGNING_IN), { force: true }).catch(() => undefined);
+          // A ChatGPT sign-in for all agents: root's alone from now on (`grant`).
+          if (login.shared) {
+            await writeFile(this.marker(login.kind, login.id, "shared"), "", { mode: 0o600 });
+            info.shared = true;
+          }
           this.settle(login, "done");
           login.account = info;
           this.added(info);
@@ -1480,7 +1586,10 @@ export class AccountManager {
     if (cursorKey) {
       return { id, kind, loggedIn: !refused, provider: CURSOR_KEY_PROVIDER, keyHint: cursorKey.slice(-4), ...shared };
     }
-    if (this.isShared(kind, id)) return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
+    // A ChatGPT one for all agents holds only what root wrote there (`keepCodexAuth`): its CLI says, below.
+    if (this.isShared(kind, id) && kind !== "codex") {
+      return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
+    }
     if (refused || this.lentTo(kind, id) !== null) {
       const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
       return { id, kind, loggedIn: !refused, ...(kept ? { plan: kept } : {}), ...shared };
@@ -1658,10 +1767,53 @@ export class AccountManager {
     // Signing in again keeps what it has until the new one is kept: only a refusal, or nothing kept, is signed out.
     if (existsSync(this.marker(kind, id, "invalid"))) return { kind: "none" };
     const dir = this.dirOf(kind, id);
+    if (kind === "codex") return this.codexGrant(id, dir);
     const plan = await planKeyOf(dir);
     if (plan) return { kind: "key", provider: plan.provider, key: plan.key };
     const token = await tokenOf(dir);
     return token ? { kind: "token", token } : { kind: "none" };
+  }
+
+  /**
+   * Root's newest copy of a ChatGPT sign-in for all agents. Copies used at once are fine until one is due for its
+   * refresh, which rotates the refresh token and leaves the other copies' refresh refused: the first turn then takes
+   * it alone, and the others wait (at most `CODEX_REFRESH_WAIT_MS`) for its refreshed copy (`keepCodexAuth`).
+   */
+  private async codexGrant(id: string, dir: string): Promise<AccountGrant> {
+    const now = this.opts.now ?? Date.now;
+    let auth = readCodexAuth(dir);
+    if (auth && now() - auth.refreshedAt >= CODEX_REFRESH_AFTER_MS) {
+      const held = this.refreshing.get(id);
+      if (held && now() - held.at < CODEX_REFRESH_WAIT_MS) {
+        await Promise.race([held.done, sleep(Math.max(0, CODEX_REFRESH_WAIT_MS - (now() - held.at)))]);
+        auth = readCodexAuth(dir);
+      } else {
+        let resolve = () => {};
+        const done = new Promise<void>((r) => {
+          resolve = r;
+        });
+        this.refreshing.set(id, { at: now(), done, resolve });
+      }
+    }
+    return auth ? { kind: "codex_auth", auth: auth.text } : { kind: "none" };
+  }
+
+  /**
+   * A refreshed copy of a ChatGPT sign-in for all agents, from the worker of an agent whose turn thinks with it:
+   * kept when it is newer than root's and signs in to the same ChatGPT account. True when kept.
+   */
+  keepCodexAuth(id: string, text: unknown): boolean {
+    if (!isAccountId(id) || !this.isShared("codex", id)) return false;
+    const next = codexAuthOf(text);
+    const dir = this.dirOf("codex", id);
+    const now = readCodexAuth(dir);
+    if (!next || !now || next.accountId !== now.accountId || next.refreshedAt <= now.refreshedAt) return false;
+    writeJson(path.join(dir, CODEX_AUTH_FILE), JSON.parse(next.text));
+    const held = this.refreshing.get(id);
+    this.refreshing.delete(id);
+    held?.resolve();
+    this.log(`account ${id.slice(0, 8)} (codex, for all agents) refreshed`);
+    return true;
   }
 
   /**

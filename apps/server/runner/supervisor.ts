@@ -205,6 +205,8 @@ export type WorkerLinkFrame =
   | { type: "browser.traffic"; up: number; down: number }
   /** From the worker: a turn's plan usage (`rate_limit_event`, Codex's rate limits), for the account it thinks with. */
   | { type: "usage"; kind: "claude_code" | "codex" | "cursor"; account: string; info: unknown }
+  /** From the worker: its Codex refreshed the ChatGPT sign-in root keeps for all agents (`watchCodexAuth`). */
+  | { type: "codex.auth"; account: string; auth: string }
   /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */
@@ -280,6 +282,8 @@ export interface SupervisorOptions {
   grant?: (kind: "claude_code" | "codex" | "cursor", accountId: string) => Promise<AccountGrant | null>;
   /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
   usage?: (kind: "claude_code" | "codex" | "cursor", accountId: string, info: unknown) => void;
+  /** A refreshed ChatGPT sign-in root keeps for all agents (`AccountManager.keepCodexAuth`). */
+  codexAuth?: (accountId: string, auth: unknown) => void;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
   desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
   /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */
@@ -337,6 +341,8 @@ interface Worker {
   shows: Map<string, Show>;
   /** When it last said its agent's Chrome is in use on the agent's desktop. */
   browserLeaseAt: number;
+  /** The ChatGPT sign-ins root handed it (`codex_auth` grants): only theirs may come back refreshed. */
+  codexAuths: Set<string>;
   /** When it asked for its processes to be moved, in the last minute (`scope.enter`). */
   enters: number[];
   /** Its clone slots, by its id (`release` once it has one): a worker that stops gives them back. */
@@ -435,6 +441,7 @@ export class Supervisor {
           `[${w.user.user}] couldn't hand it its account: ${err instanceof Error ? err.message : String(err)}`,
         );
       grant = (await this.opts.grant?.(kind, account).catch(failed)) ?? null;
+      if (grant?.kind === "codex_auth") w.codexAuths.add(account);
       if (!grant) await this.opts.lend?.(kind, account, w.user.uid).catch(failed);
     }
     await this.ready(w, scope.signal);
@@ -748,6 +755,7 @@ export class Supervisor {
         installs: new Map(),
         shows: new Map(),
         browserLeaseAt: 0,
+        codexAuths: new Set(),
         enters: [],
         slots: new Map(),
       };
@@ -1148,6 +1156,11 @@ export class Supervisor {
           e.req.op === "brain.turn" && e.req.account === account && (e.req.kind === "codex") === (kind === "codex"),
       );
       if (account && ours) this.opts.usage?.(kind, account, f.info);
+      return;
+    }
+    if (f?.type === "codex.auth") {
+      const account = typeof f.account === "string" ? f.account : "";
+      if (w.codexAuths.has(account)) this.opts.codexAuth?.(account, f.auth);
       return;
     }
     if (f?.type !== "upload.chunk" && f?.type !== "upload.end") return;

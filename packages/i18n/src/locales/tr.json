@@ -4919,7 +4919,7 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code bilgisayarda planlar ve kod yazar. {{name}} takip eder ve aktarır.",
-      "codex": "Codex (deneysel)",
+      "codex": "Codex",
       "codexText": "Codex bilgisayarda kod yazar. Hâlâ test ediliyor.",
       "agent": "{{name}} (ajanın kendisi)",
       "agentText": "{{name}} kendi araçlarıyla doğrudan bilgisayarda kod yazar.",
@@ -5470,7 +5470,6 @@
         "codexText": "Bilgisayarda yapar.",
         "agentText": "{{name}} kendi araçlarıyla yapar.",
         "agentText_female": "{{name}} kendi araçlarıyla yapar.",
-        "testing": "Test aşamasında",
         "locked": "Misyon başladıktan sonra değiştirilemez.",
         "open": "Misyon başlayana kadar değiştirilebilir.",
         "saved": "İşi yapan: {{name}}",
@@ -7548,7 +7547,6 @@
       "inPlan": "Cursor planınıza dahil",
       "apiPrice": "Cursor tarafından API fiyatlarıyla faturalanır"
     },
-    "testing": "Test ediliyor",
     "reasons": {
       "no_computer": "Kullanmak için Bilgisayar bölümünden bağlı bir bilgisayar seçin.",
       "exec_off": "Bilgisayar, program çalıştırma izni olmadan bağlandı.",

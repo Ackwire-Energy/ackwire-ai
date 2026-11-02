@@ -3221,11 +3221,10 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     extraUsage: true,
     computer: { machineId: "machine_1", name: "MacBook", online: true },
     options: [
-      { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
+      { kind: "model", available: true, models: [], defaultModel: null },
       {
         kind: "claude_code",
         available: true,
-        experimental: false,
         models: [
           { value: "opus", label: "Opus", modelId: "claude-opus-5-5" },
           { value: "sonnet", label: "Sonnet", modelId: "claude-sonnet-5-5", recommended: true },
@@ -3236,7 +3235,6 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
       {
         kind: "codex",
         available: true,
-        experimental: true,
         models: [
           { value: "gpt-6-sol", label: "GPT-6 Sol", modelId: "gpt-6-sol", recommended: true },
           { value: "gpt-6-luna", label: "GPT-6 Luna", modelId: "gpt-6-luna" },

@@ -4406,7 +4406,7 @@ export interface PlanItem {
   note?: string;
 }
 
-/** Who programs a mission: Claude Code, Codex (experimental) or the agent itself with its own tools. */
+/** Who programs a mission: Claude Code, Codex or the agent itself with its own tools. */
 export type MissionExecutor = "claude" | "codex" | "agent";
 
 /**
@@ -4618,8 +4618,6 @@ export interface BrainOption {
   kind: BrainKind;
   available: boolean;
   reason?: BrainUnavailable;
-  /** "Em teste" (Codex). */
-  experimental: boolean;
   models: BrainModelOption[];
   defaultModel: string | null;
 }

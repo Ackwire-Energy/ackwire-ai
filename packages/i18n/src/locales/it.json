@@ -5158,7 +5158,7 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code pianifica e scrive codice sul computer. {{name}} segue e riferisce.",
-      "codex": "Codex (sperimentale)",
+      "codex": "Codex",
       "codexText": "Codex scrive codice sul computer. È ancora in prova.",
       "agent": "{{name}} (l'agente stesso)",
       "agentText": "{{name}} scrive codice direttamente sul computer, con i suoi strumenti.",
@@ -5764,7 +5764,6 @@
         "codexText": "Lo fa sul computer.",
         "agentText": "Lo fa {{name}}, con i suoi strumenti.",
         "agentText_female": "Lo fa {{name}}, con i suoi strumenti.",
-        "testing": "In prova",
         "locked": "Non si può cambiare una volta avviata la missione.",
         "open": "Si può cambiare finché la missione non parte.",
         "saved": "Chi fa il lavoro: {{name}}",
@@ -7966,7 +7965,6 @@
       "inPlan": "Nel tuo piano Cursor",
       "apiPrice": "Addebitato da Cursor a prezzi API"
     },
-    "testing": "Test in corso",
     "reasons": {
       "no_computer": "Scegli un computer collegato in Computer per usarlo.",
       "exec_off": "Il computer è stato collegato senza il permesso di eseguire programmi.",

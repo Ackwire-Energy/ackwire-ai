@@ -187,8 +187,6 @@ export interface BrainOption {
   kind: BrainKind;
   available: boolean;
   reason?: BrainUnavailable;
-  /** Codex is still being tested ("Em teste"). */
-  experimental: boolean;
   models: BrainModelOption[];
   defaultModel: string | null;
 }
@@ -220,13 +218,12 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
       kind,
       available: !reason,
       ...(reason ? { reason } : {}),
-      experimental: kind === "codex",
       models: brainModelOptions(kind),
       defaultModel: defaultBrainModel(kind),
     };
   };
   return [
-    { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
+    { kind: "model", available: true, models: [], defaultModel: null },
     computer("claude_code", "claude"),
     computer("codex", "codex"),
     cursorOption(machine),
@@ -246,7 +243,6 @@ function cursorOption(machine: MachineLike | null): BrainOption {
     kind: "cursor",
     available: !reason,
     ...(reason ? { reason } : {}),
-    experimental: true,
     models: brainModelOptions("cursor", machine),
     defaultModel: null,
   };

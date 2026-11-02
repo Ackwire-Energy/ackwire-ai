@@ -30,7 +30,7 @@ const MODELS = [
 const claudeCode: BrainOption = {
   kind: "claude_code",
   available: true,
-  experimental: false,
+
   models: [
     { value: "opus", label: "Opus" },
     { value: "sonnet", label: "Sonnet" },

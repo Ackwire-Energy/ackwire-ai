@@ -21,6 +21,7 @@ import {
   parseSecretBox,
   type RunnerAccountInfo,
   SHARED_ACCOUNTS_PROTOCOL,
+  SHARED_CODEX_PROTOCOL,
 } from "@agenteschat/adapters";
 import {
   and,
@@ -740,14 +741,16 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
 /**
  * Whether a new sign-in of that kind on the computer thinks for all of its owner's agents there (protocol 29):
  * every one where the agents are the runner's own user; where each is its own OS user (system mode), as
- * `SHARED_SIGN_INS` says (never ChatGPT's yet).
+ * `SHARED_SIGN_INS` says (ChatGPT's from protocol 38, never Cursor's yet).
  */
 export function sharesSignIns(
   machine: Pick<MachineRow, "protocol" | "executors">,
   which: "claude_code" | "codex" | "cursor" | "key",
 ): boolean {
   if (machine.protocol < SHARED_ACCOUNTS_PROTOCOL) return false;
-  return machine.executors?.mode !== "system" || (which !== "codex" && which !== "cursor" && SHARED_SIGN_INS[which]);
+  if (machine.executors?.mode !== "system") return true;
+  if (which === "cursor") return false;
+  return (which !== "codex" || machine.protocol >= SHARED_CODEX_PROTOCOL) && SHARED_SIGN_INS[which];
 }
 
 /**
@@ -944,8 +947,9 @@ export async function beginAccountLogin(
     machine,
     kind === "cursor" ? CURSOR_PROTOCOL : plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL,
   );
-  // Once for every agent of its owner there, where the runner can (protocol 29).
-  const shared = protocol >= SHARED_ACCOUNTS_PROTOCOL && sharedSignIn(kind, provider);
+  // Once for every agent of its owner there, where the runner can (protocol 29; ChatGPT's 38).
+  const shared =
+    protocol >= (kind === "codex" ? SHARED_CODEX_PROTOCOL : SHARED_ACCOUNTS_PROTOCOL) && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
   const loginId = again ? accountId : crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ACCOUNT_LOGIN_TTL_MS).toISOString();

@@ -403,7 +403,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const cursorOption = {
       kind: "cursor" as const,
       available: true,
-      experimental: true,
+
       models: [{ value: "grok-5-code", label: "Grok 5 Code", inPlan: true }],
       defaultModel: null,
     };
@@ -430,7 +430,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const cursorOption = {
       kind: "cursor" as const,
       available: true,
-      experimental: true,
+
       models: [],
       defaultModel: null,
     };
@@ -676,13 +676,13 @@ describe("Conectar uma IA: one picker, plans first", () => {
       computers: [{ ...MAC, keys: false, brains: { claude_code: true, codex: false } }],
       brain: {
         options: [
-          { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
-          { kind: "claude_code", available: true, experimental: false, models: [], defaultModel: "sonnet" },
+          { kind: "model", available: true, models: [], defaultModel: null },
+          { kind: "claude_code", available: true, models: [], defaultModel: "sonnet" },
           {
             kind: "codex",
             available: false,
             reason: "not_installed",
-            experimental: true,
+
             models: [],
             defaultModel: null,
           },

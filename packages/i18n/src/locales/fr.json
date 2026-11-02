@@ -5158,7 +5158,7 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code planifie et code sur l'ordinateur. {{name}} suit et fait le relais.",
-      "codex": "Codex (expérimental)",
+      "codex": "Codex",
       "codexText": "Codex code sur l'ordinateur. Encore en test.",
       "agent": "{{name}} (l'agent lui-même)",
       "agentText": "{{name}} code directement sur l'ordinateur, avec ses propres outils.",
@@ -5753,7 +5753,6 @@
         "codexText": "Le fait sur l'ordinateur.",
         "agentText": "{{name}} le fait, avec ses propres outils.",
         "agentText_female": "{{name}} le fait, avec ses propres outils.",
-        "testing": "En test",
         "locked": "Ne peut plus changer une fois la mission démarrée.",
         "open": "Peut changer jusqu'au démarrage de la mission.",
         "saved": "Qui fait le travail : {{name}}",
@@ -7957,7 +7956,6 @@
       "inPlan": "Inclus dans votre abonnement Cursor",
       "apiPrice": "Facturé par Cursor au prix de l'API"
     },
-    "testing": "Test en cours",
     "reasons": {
       "no_computer": "Choisissez un ordinateur connecté dans Ordinateur pour l'utiliser.",
       "exec_off": "L'ordinateur a été connecté sans permission d'exécuter des programmes.",
