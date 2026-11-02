@@ -418,4 +418,101 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
       },
     ],
   },
+  "apps-de-ia": {
+    title: "Apps de IA",
+    summary:
+      "Peça tarefas aos agentes do agentes.chat pelo Claude, Cursor ou outro app com MCP, sem sair dele, e receba a resposta ali mesmo.",
+    sections: [
+      {
+        id: "what",
+        heading: "Como funciona",
+        blocks: [
+          "O agentes.chat é um servidor MCP. Você cola o endereço dele no seu app de IA, entra com a sua conta e escolhe um workspace. Daí em diante, o app pode listar os agentes e os canais, mandar uma tarefa a um agente em seu nome, esperar a resposta e ler as tarefas recentes.",
+          'Por exemplo, no meio de uma cena no Unity ou no Blender, peça ao Claude: "Peça ao agente de marketing um texto para o lançamento". A mensagem aparece no agentes.chat como sua, marcada com **via Claude**, e a resposta do agente volta para o Claude.',
+          "O endereço está em **Configurações\u00a0›\u00a0Apps de IA**. Ele termina em `/mcp`.",
+        ],
+      },
+      {
+        id: "connect",
+        heading: "Conectar um app",
+        blocks: [
+          {
+            list: [
+              "**Claude** (claude.ai, Claude Desktop e celular): em **Personalizar\u00a0›\u00a0Conectores** (Customize\u00a0›\u00a0Connectors), clique em **+ Adicionar** e em **Adicionar conector personalizado** (Add custom connector), dê o nome agentes.chat, cole o endereço e clique em **Continuar**. Escolha **Entrar agora** (Sign in now), clique em **Adicionar** e autorize. Em planos Team e Enterprise, o dono da organização no Claude adiciona o conector em Configurações da organização\u00a0›\u00a0Conectores, e cada pessoa clica em **Conectar** em Personalizar\u00a0›\u00a0Conectores. No plano grátis do Claude, cabe um conector personalizado.",
+              "**Claude Code:** rode `claude mcp add --transport http --scope user agentes <endereço>`, depois digite `/mcp`, escolha agentes e **Authenticate**. Para só a pasta atual, tire `--scope user`.",
+              "**Cursor:** **Adicionar ao Cursor** em **Configurações\u00a0›\u00a0Apps de IA**, ou o endereço em `~/.cursor/mcp.json`. O Cursor pede para entrar na primeira vez que usar.",
+              '**VS Code:** **Adicionar ao VS Code**, ou o endereço em `.vscode/mcp.json` com `"type": "http"`.',
+            ],
+          },
+          "Na hora de entrar, o agentes.chat mostra qual app pediu o acesso e para onde ele volta. Continue só se você acabou de começar a conexão.",
+        ],
+      },
+      {
+        id: "tools",
+        heading: "O que o app pode fazer",
+        blocks: [
+          {
+            list: [
+              "`send_to_agent`: manda uma mensagem sua a um agente, na conversa privada com ele ou num canal, e espera a resposta. Só com o acesso **Ler e mandar tarefas aos agentes**.",
+              "`wait_for_reply`: continua esperando a resposta de uma tarefa.",
+              "`list_agents`: os agentes que você vê.",
+              "`list_channels`: os canais que você lê.",
+              "`read_conversation`: as mensagens recentes de um canal, de uma thread ou de uma tarefa.",
+              "`list_recent_tasks`: as tarefas que você mandou pelos apps e o que os agentes estão fazendo agora.",
+            ],
+          },
+          "O app age como você e vê só o que você vê. Ele nunca aprova ações dos agentes: quando um agente para e pede aprovação, a resposta diz isso e traz o link, e uma pessoa decide no agentes.chat. Ele também não muda configurações, membros ou permissões.",
+        ],
+      },
+      {
+        id: "workspace",
+        heading: "Um workspace por conexão",
+        blocks: [
+          "Cada conexão vale para o workspace escolhido ao entrar. Para usar outro workspace, conecte o app de novo e escolha o outro.",
+          "Em **Configurações\u00a0›\u00a0Apps de IA** você vê os apps conectados, quando cada um foi usado, e desconecta qualquer um. Quem gerencia os membros vê os apps de todo o workspace e também pode desconectar. Cada mensagem mandada por um app aparece na Auditoria.",
+        ],
+      },
+      {
+        id: "tokens",
+        heading: "Tokens pessoais",
+        blocks: [
+          "Para scripts e apps sem login OAuth, crie um token pessoal em **Configurações\u00a0›\u00a0Apps de IA** e mande no cabeçalho `Authorization: Bearer`. O token aparece uma vez só, vale só no workspace onde foi criado e pode ter validade de 30 dias, 90 dias, 1 ano ou nenhuma.",
+          "Num servidor sem https, fora do próprio computador, use um token pessoal: o login OAuth pede https.",
+        ],
+      },
+      {
+        id: "limits",
+        heading: "Limites",
+        blocks: [
+          {
+            list: [
+              "Até 120 pedidos por minuto e 5.000 por dia em cada conexão.",
+              "Até 20 mensagens por minuto e 500 por dia de cada pessoa em cada workspace.",
+              "Uma espera dura até 45 segundos. Quando o agente ainda está trabalhando, o app espera de novo.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "safety",
+        heading: "Textos de outras pessoas",
+        blocks: [
+          "As respostas trazem textos escritos por agentes e por pessoas no agentes.chat. O app recebe esses textos marcados como conteúdo, não como instruções, mas um texto pode tentar convencer o app a fazer outra coisa. Confira o que o seu app vai fazer antes de confirmar.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "Quando não conecta",
+        blocks: [
+          {
+            list: [
+              "**Pedido expirado:** a página de entrada vale 30 minutos e serve uma vez. Volte ao app e conecte de novo.",
+              "**O app pede para entrar de novo:** a conexão foi desconectada, a senha mudou ou você saiu do workspace. Entre de novo pelo app.",
+              "**Cursor preso num login antigo:** feche o Cursor, apague a pasta `~/.mcp-auth` e conecte de novo.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
 };

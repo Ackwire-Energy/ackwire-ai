@@ -1,4 +1,5 @@
 import type { Message } from "@agenteschat/client";
+import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { formatTime } from "@agenteschat/client/lib/format";
 import {
   consultationOfNotice,
@@ -10,7 +11,8 @@ import {
   skippedHandles,
 } from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
-import { cx, Icon, type IconName } from "@agenteschat/ui";
+import type { AppVia } from "@agenteschat/client/lib/via";
+import { cx, Icon, type IconName, ProviderLogo } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -222,6 +224,18 @@ export function RoutineTag({
         </button>
       )}
     </>
+  );
+}
+
+/** A person's message sent through a connected AI app (ADR 0113): "via Claude", with the app's mark when known. */
+export function AppViaTag({ via, person }: { via: AppVia; person: string }) {
+  const { t } = useTranslation();
+  const mark = via.brand ? APP_BRANDS[via.brand] : undefined;
+  return (
+    <span className="msg-reminder msg-via" title={t("apps.viaTip", { person, name: via.name })}>
+      {mark ? <ProviderLogo id={mark} size="xs" /> : <Icon name="link" size={14} />}
+      {t("apps.via", { name: via.name })}
+    </span>
   );
 }
 

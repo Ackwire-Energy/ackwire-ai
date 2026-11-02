@@ -86,6 +86,7 @@ import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
+import { createFakeApps, type FakeApps } from "./fakes/apps";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
 import type { MockContext } from "./fakes/context";
@@ -1011,6 +1012,7 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 
 /** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
 type FakedParts =
+  | "apps"
   | "wiki"
   | "forum"
   | "notifications"
@@ -2944,6 +2946,9 @@ export const fakeDatabasesOf = new WeakMap<ApiClient, FakeDatabases>();
 /** The agent browser fake behind each `createFakeApi` client (tests add settings and handoffs with it). */
 export const fakeBrowserOf = new WeakMap<ApiClient, FakeBrowser>();
 
+/** The AI apps fake behind each `createFakeApi` client (tests add consents and connect apps with it). */
+export const fakeAppsOf = new WeakMap<ApiClient, FakeApps>();
+
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
@@ -2980,10 +2985,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   );
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const apps = createFakeApps((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const artifacts = createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args }));
   state.drive = artifacts;
   const client: ApiClient = {
     ...http,
+    apps: apps.client,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
     machines: machines.client,
     forum: createFakeForum(ctx, (method, ...args) => state.calls.push({ method, args })),
@@ -3180,6 +3187,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   fakeMailOf.set(client, mail);
   fakeDatabasesOf.set(client, databases);
   fakeBrowserOf.set(client, browser);
+  fakeAppsOf.set(client, apps);
   return client;
 }
 

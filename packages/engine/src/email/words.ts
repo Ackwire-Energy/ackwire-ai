@@ -285,6 +285,15 @@ const en = {
     button: "Open the workspace",
     why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
   },
+  appConnected: {
+    subject: "An app was connected to your agentes.chat account",
+    preheader: "It can read and send tasks to agents as you in one workspace.",
+    headline: "An app was connected",
+    body: (app: string, org: string): Text => [{ b: app }, " now has access to your account in ", { b: org }, "."],
+    note: "Didn't connect it? Disconnect it now and change your password.",
+    button: "See connected apps",
+    why: (org: string) => `You got this email because an app was connected to your account in ${org} on agentes.chat.`,
+  },
   accountDeleted: {
     subject: "Your agentes.chat account was deleted",
     preheader: "It's signed out everywhere and can't sign in again.",
@@ -590,6 +599,15 @@ const ptBR: Words = {
     body: (by, org) => [{ b: by }, " restaurou ", { b: org }, ". Ele voltou a funcionar."],
     button: "Abrir o workspace",
     why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
+  },
+  appConnected: {
+    subject: "Um app foi conectado à sua conta do agentes.chat",
+    preheader: "Ele pode ler e mandar tarefas aos agentes em seu nome em um workspace.",
+    headline: "Um app foi conectado",
+    body: (app, org) => [{ b: app }, " agora tem acesso à sua conta na ", { b: org }, "."],
+    note: "Não foi você? Desconecte agora e troque sua senha.",
+    button: "Ver apps conectados",
+    why: (org) => `Você recebeu este e-mail porque um app foi conectado à sua conta na ${org} no agentes.chat.`,
   },
   accountDeleted: {
     subject: "Sua conta do agentes.chat foi apagada",

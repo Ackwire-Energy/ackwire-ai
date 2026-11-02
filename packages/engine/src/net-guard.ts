@@ -152,3 +152,97 @@ export async function publicHostAddress(
   if (addresses.some(isBlockedAddress)) return { ok: false, reason: "blocked" };
   return { ok: true, address: first };
 }
+
+/** What `fetchPublicJson` hands back: the body and its content type, never a redirect. */
+export interface PublicDocument {
+  body: Buffer;
+  contentType: string | undefined;
+}
+
+/**
+ * The `lookup` an https request connects through: always the one address checked before. Bun's client asks with
+ * `all: true` and sorts what comes back, so that form gets an array; the three-argument form throws
+ * "results.sort is not a function" there and fails every fetch.
+ */
+export function pinnedLookup(address: string, family: number) {
+  return (
+    _host: string,
+    options: { all?: boolean } | undefined,
+    callback: (error: Error | null, address: string | { address: string; family: number }[], family?: number) => void,
+  ) => {
+    if (options?.all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  };
+}
+
+/**
+ * GETs a document from a public https address someone else named (an OAuth app's metadata document): every
+ * address the name resolves to must be public, the socket connects to one of them (IPv4 first: one address is
+ * pinned with no fallback, and a server without IPv6 would hang on an AAAA one), no redirect is followed, and the
+ * time and the size are capped. Throws an Error whose message is a short reason.
+ */
+export async function fetchPublicDocument(
+  url: URL,
+  options: {
+    maxBytes: number;
+    timeoutMs: number;
+    resolve?: (host: string) => Promise<{ address: string; family: number }[]>;
+  },
+): Promise<PublicDocument> {
+  const { request } = await import("node:https");
+  if (url.protocol !== "https:" || url.username || url.password) throw new Error("not_https");
+  const host = url.hostname.toLowerCase();
+  if (!isPublicHostName(host)) throw new Error("host_forbidden");
+  const resolve = options.resolve ?? ((h: string) => lookup(h, { all: true, verbatim: true }));
+  const addresses = await resolve(host);
+  if (addresses.length === 0 || addresses.some((a) => isBlockedAddress(a.address)))
+    throw new Error("address_forbidden");
+  const pinned = addresses.find((a) => a.family === 4) ?? (addresses[0] as { address: string; family: number });
+  return new Promise<PublicDocument>((resolveDoc, reject) => {
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    };
+    const req = request(
+      {
+        protocol: "https:",
+        hostname: host,
+        port: url.port || 443,
+        path: `${url.pathname}${url.search}`,
+        method: "GET",
+        servername: host,
+        headers: { accept: "application/json", "user-agent": "agentes.chat" },
+        lookup: pinnedLookup(pinned.address, pinned.family) as never,
+      },
+      (res) => {
+        const status = res.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+          res.resume();
+          req.destroy(new Error(status >= 300 && status < 400 ? "redirect_forbidden" : "fetch_failed"));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        let total = 0;
+        res.on("data", (chunk: Buffer) => {
+          total += chunk.length;
+          if (total > options.maxBytes) req.destroy(new Error("too_large"));
+          else chunks.push(chunk);
+        });
+        res.on("end", () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          const type = res.headers["content-type"];
+          resolveDoc({ body: Buffer.concat(chunks), contentType: Array.isArray(type) ? type[0] : type });
+        });
+        res.on("error", fail);
+      },
+    );
+    const timer = setTimeout(() => req.destroy(new Error("timeout")), options.timeoutMs);
+    req.on("error", fail);
+    req.end();
+  });
+}

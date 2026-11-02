@@ -1582,6 +1582,17 @@ export function taskNotice(m: Pick<Message, "body" | "meta">, current = false): 
   return parts.join("\n");
 }
 
+/**
+ * A person's message sent from an AI app (ADR 0113, `meta.via`): the agent learns the person reads the reply there,
+ * maybe not in agentes.chat. "" for anything else.
+ */
+function viaLine(m: Message, who: string): string {
+  const via = m.authorType === "person" ? (m.meta?.via as { kind?: unknown; name?: unknown } | undefined) : undefined;
+  if (via?.kind !== "app" || typeof via.name !== "string") return "";
+  const app = via.name.replace(/[\p{Cc}\p{Cf}]/gu, "").slice(0, 64);
+  return `\n(sent by ${who} through ${app}, an app connected to agentes.chat; the reply is read there)`;
+}
+
 /** `meta.actionNotes` (undo/redo of the agent's changes) as one bracketed line each; "" when none. */
 function undoNotes(meta: Record<string, unknown> | undefined): string {
   const notes = Array.isArray(meta?.actionNotes) ? meta.actionNotes.filter((n) => typeof n === "string") : [];
@@ -1668,7 +1679,7 @@ export function toTurns(
     const notes = undoNotes(m.meta);
     // The agent's own sticker or GIF with no text (the silent one after its reply) has no turn of its own: below.
     if (!own || !media || said.trim()) {
-      const text = own ? body : `[${label}]: ${body}${notes ? `\n${notes}` : ""}`;
+      const text = own ? body : `[${label}]: ${body}${viaLine(m, who)}${notes ? `\n${notes}` : ""}`;
       const last = turns.at(-1);
       if (last && last.role === role) last.parts.push({ id: m.id, text });
       else turns.push({ role, parts: [{ id: m.id, text }] });

@@ -5664,6 +5664,88 @@ export interface AgentPlanUsage {
   current: PlanAccountUsage | null;
 }
 
+// ── AI apps (ADR 0113): this server as a remote MCP server ──
+
+/** What a connected app or a personal token may do: `write` reads and sends tasks, `read` only reads. */
+export type AppAccess = "read" | "write";
+
+/**
+ * How an app is shown, from the address its codes go back to: `verified` (its metadata document was fetched from
+ * `host`), `https` (a site that says its own name), `loopback` (a program on this computer), `app_scheme` (Cursor).
+ */
+export type AppDisplayKind = "verified" | "https" | "loopback" | "app_scheme";
+
+/** `GET /api/app/authorize/{req}`: what the consent page shows. */
+export interface AppConsent {
+  request: {
+    id: string;
+    expiresAt: string;
+    access: { requested: AppAccess[] };
+    client: {
+      displayKind: AppDisplayKind;
+      /** As the app calls itself: text, never markup. */
+      name: string;
+      host: string | null;
+      /** `claude`, `openai`, `cursor`, `vscode`: only from an address the app proved. */
+      brand: string | null;
+      /** Where the browser goes back to: a host, or `scheme://host`. */
+      returnsTo: string;
+      reservedNameWarning: boolean;
+    };
+  };
+  account: { name: string; email: string };
+  workspaces: { id: string; name: string; logo: string | null; paused: boolean; current: boolean }[];
+}
+
+export interface AppConsentDecision {
+  decision: "allow" | "deny";
+  orgId?: string;
+  access?: AppAccess;
+}
+
+export interface ConnectedApp {
+  id: string;
+  kind: "oauth";
+  displayKind: AppDisplayKind;
+  name: string;
+  host: string | null;
+  brand: string | null;
+  access: AppAccess;
+  /** Only in the whole workspace's list. */
+  person?: { id: string; name: string };
+  connectedAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface PersonalToken {
+  id: string;
+  name: string;
+  access: AppAccess;
+  createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  person?: { id: string; name: string };
+}
+
+/** `GET …/apps`: this server's `/mcp`, the connected apps and the personal tokens. */
+export interface AppsList {
+  serverUrl: string;
+  apps: ConnectedApp[];
+  tokens: PersonalToken[];
+}
+
+export interface PersonalTokenInput {
+  name: string;
+  access: AppAccess;
+  expiresInDays: 30 | 90 | 365 | null;
+}
+
+/** `POST …/tokens`: `secret` is shown once. */
+export interface CreatedPersonalToken {
+  token: { id: string; name: string; access: AppAccess; expiresAt: string | null };
+  secret: string;
+}
+
 /** Who has a shared browser profile now (ADR 0110): an agent's run or a person in control. */
 export type BrowserProfileHolder =
   | { type: "agent"; agentId: string; since: string }

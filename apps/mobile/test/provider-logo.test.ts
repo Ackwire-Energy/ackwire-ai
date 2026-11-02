@@ -124,7 +124,10 @@ describe("the marks as the phone draws them", () => {
     const images = Object.entries(PROVIDER_MARKS).flatMap(([id, mark]) =>
       "image" in mark ? [{ id, image: mark.image }] : [],
     );
-    expect(images).toEqual([{ id: "gemini", image: "/brands/gemini.png" }]);
+    expect(images).toEqual([
+      { id: "gemini", image: "/brands/gemini.png" },
+      { id: "vscode", image: "/brands/vscode.png" },
+    ]);
     const source = await Bun.file(new URL("../src/ui/ProviderLogo.tsx", import.meta.url).pathname).text();
     for (const { id, image } of images) {
       expect(markShapes(id, "dark", INK)).toEqual({ key: id, image: true, gradient: null, shapes: [] });

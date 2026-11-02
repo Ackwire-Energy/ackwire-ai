@@ -48,6 +48,7 @@ const TYPED = [
   "approverName",
   "reason",
   "byName",
+  "appName",
 ];
 const SENTINEL = "Zq9 evil.com";
 const withoutUrls = (s: string) => s.replace(/https?:\/\/\S+/g, "");
@@ -129,6 +130,7 @@ describe("every email, in both languages", () => {
       workspace_deleting: true,
       workspace_restored: true,
       account_deleted: true,
+      app_connected: true,
       autonomy_report: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));

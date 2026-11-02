@@ -33,9 +33,12 @@ import type {
   AiAccounts,
   AiStatus,
   ApiRule,
+  AppConsent,
+  AppConsentDecision,
   AppNotification,
   Approval,
   ApprovalRule,
+  AppsList,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -68,6 +71,7 @@ import type {
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
+  CreatedPersonalToken,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -175,6 +179,7 @@ import type {
   OrgRoles,
   OrgSettings,
   Person,
+  PersonalTokenInput,
   PhoneSignIn,
   PostMedia,
   Proposal,
@@ -1448,6 +1453,21 @@ export interface ApiClient {
   gifs?: {
     /** Free text (`q`), a category, or neither (what is trending), at the workspace's rating. */
     search(orgId: string, query: GifQuery): Promise<GifPage>;
+  };
+  /**
+   * AI apps (ADR 0113): the consent page an app's sign-in opens (`/autorizar?req=`), and Settings → AI apps. A
+   * consent answers once (409 `request_used`); 410 `request_expired` past its 30 minutes.
+   */
+  apps: {
+    consent(requestId: string): Promise<AppConsent>;
+    /** Where the browser goes next, back in the app (with `error=access_denied` on deny): go there once. */
+    decide(requestId: string, input: AppConsentDecision): Promise<{ redirectTo: string }>;
+    /** Yours here; `all`: everyone's, with `person` (needs `manage_members`). */
+    list(orgId: string, all?: boolean): Promise<AppsList>;
+    disconnect(orgId: string, grantId: string): Promise<void>;
+    /** 409 `token_limit` past 10 live tokens per person here. */
+    createToken(orgId: string, input: PersonalTokenInput): Promise<CreatedPersonalToken>;
+    revokeToken(orgId: string, grantId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

@@ -150,6 +150,7 @@ function AppStack() {
       <Stack.Screen name="settings/computers/agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/audit/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/audit/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/apps" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/media" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
