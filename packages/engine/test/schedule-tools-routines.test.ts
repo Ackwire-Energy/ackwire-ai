@@ -279,9 +279,17 @@ describe("schedule tools: routines", () => {
     expect(same.content).not.toContain("copy it with the button");
   });
 
-  test("an admin changing what a routine someone else created does is told to take it over, not that they can't manage it", async () => {
+  test("an admin changing what another agent's routine someone else created does is told to take it over, not that they can't manage it", async () => {
     f = await setup();
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo", role: "Ops", instructions: "Post updates.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
     const made = await (await tools(f, await runContext(f)))("create_routine", {
+      agent: "@theo",
       prompt: "Veja os PRs abertos.",
       schedule: "toda segunda às 9h",
     });
