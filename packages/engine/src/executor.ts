@@ -79,7 +79,7 @@ import {
 import { agentBrowserProfiles } from "./browser/profiles";
 import { browsersPrompt } from "./browser/tools";
 import { BROWSER_SCOPE } from "./browser/types";
-import { waitForBurst } from "./burst";
+import { typingLogFor, waitForBurst } from "./burst";
 import {
   canceledBy,
   isShutdown,
@@ -636,6 +636,10 @@ const CONTEXT_TOOLS: readonly string[] = [
 
 /** How long the first call waits for its pre-warm once the quiet window is over. */
 const PREWARM_WAIT_MS = 4000;
+/** How soon a quiet window that ends at once is told from one still running (no pre-warm then). */
+const PREWARM_PROBE_MS = 50;
+/** A pre-warm started less than this before the window ended isn't waited for (token-trim B10). */
+const PREWARM_MIN_LEAD_MS = 1000;
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
@@ -3077,13 +3081,25 @@ async function executeRunInner(
         })().catch(() => null);
         earlyCode = { plan, code };
       }
+      const waiting = waitForBurst(
+        db,
+        triggerMessage,
+        deps.quietMs,
+        signal,
+        deps.quietByTyping ? typingLogFor(deps.pubsub) : undefined,
+      );
+      // A window already over (the context took it) gets no pre-warm: it would only delay the first call.
+      const over = await Promise.race([waiting.then(() => true), Bun.sleep(PREWARM_PROBE_MS).then(() => false)]);
       const warming =
-        deps.prewarm && brain instanceof ModelBrain
+        !over && deps.prewarm && brain instanceof ModelBrain
           ? brain.prewarm(brainTurnOf(run, thinker, transcript, tools, triggerText, plan))
           : null;
-      await waitForBurst(db, triggerMessage, deps.quietMs, signal, deps.quietByTyping ? deps.pubsub : undefined);
-      // A pre-warm still reading the prompt: the first call waits for it rather than writing the same cache twice.
-      if (warming) await Promise.race([warming, Bun.sleep(PREWARM_WAIT_MS)]);
+      const warmedAt = Date.now();
+      await waiting;
+      // A pre-warm still reading the prompt: the first call waits for it rather than writing the same cache twice,
+      // unless it started too late to be near its end.
+      if (warming && Date.now() - warmedAt >= PREWARM_MIN_LEAD_MS)
+        await Promise.race([warming, Bun.sleep(PREWARM_WAIT_MS)]);
     }
     for (;;) {
       if (await isCanceled()) return stopCanceled("");

@@ -63,7 +63,7 @@ export class ModelBrain implements Brain {
   private request(turn: BrainTurn) {
     const { agent } = this.options;
     const { system, messages, notesAt } = this.options.conversation();
-    const laid = turnNotes(system, notesAt);
+    const laid = turnNotes(system, notesAt, messages);
     const specs: ToolSpec[] = turn.tools.map((t) => ({
       name: t.name,
       description: t.description,
@@ -76,7 +76,7 @@ export class ModelBrain implements Brain {
       agent,
       runId: turn.runId,
       system: laid.system,
-      messages,
+      messages: laid.messages ?? messages,
       ...(laid.notes ? { notes: laid.notes } : {}),
       tools: specs.length > 0 ? specs : undefined,
       // Only "Automático" sets an effort for the API; the API takes low, medium and high.

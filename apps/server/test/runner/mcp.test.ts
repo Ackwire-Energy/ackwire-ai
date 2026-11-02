@@ -646,7 +646,25 @@ test("MCP JSON-RPC with the bridge's list: tools/list is the run's; a name it la
   // Claude Code lists what agents reach for on their own; the rest wait behind its ToolSearch (token-trim B6).
   const meta = listed.result.tools.map((t) => (t as { _meta?: unknown })._meta);
   expect(meta).toEqual([undefined, undefined, { "anthropic/alwaysLoad": true }]);
-  for (const name of ["react", "ask_user", "remember", "follow_up", "work_in_background", "web_search", "find_tools"])
+  // What an API brain never loads on demand either (token-trim B3): learning, skills, the wiki, teammates.
+  for (const name of [
+    "react",
+    "ask_user",
+    "remember",
+    "update_memory",
+    "forget",
+    "save_how_to",
+    "update_skill",
+    "load_skill",
+    "read_wiki_page",
+    "search_wiki",
+    "ask_agent",
+    "tell_agent",
+    "follow_up",
+    "work_in_background",
+    "web_search",
+    "find_tools",
+  ])
     expect(ALWAYS_LOADED.has(name)).toBe(true);
   for (const name of ["send_sticker", "set_status", "github_get_pr"]) expect(ALWAYS_LOADED.has(name)).toBe(false);
   const ran = await handleMcpMessage(

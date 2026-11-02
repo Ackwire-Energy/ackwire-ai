@@ -5,6 +5,7 @@ import {
   type Presence,
   type PubSub,
   type RateLimiter,
+  typingTopic,
   type Unsubscribe,
   userTopic,
 } from "@agenteschat/adapters";
@@ -519,22 +520,23 @@ export function createRealtime(deps: RealtimeDeps) {
         const { channelId } = frame;
         if (frame.type === "typing") {
           // Only into channels this connection is subscribed to (already authorized); at most two every 2 s (the apps
-          // send one every 3 s, and one more on a new message's first keystroke).
+          // send one every 3 s, and one more when a new message starts).
           if (!ws.data.subscriptions.has(channelId)) return;
           const t = await deps.rateLimiter.consume(`typing:${ws.data.connectionId}:${channelId}`, {
             limit: 2,
             windowMs: 2000,
           });
           if (!t.allowed) return;
-          await deps.pubsub
-            .publish(channelTopic(channelId), {
-              type: "user.typing",
-              channelId,
-              threadId: frame.threadId,
-              userId: ws.data.user.id,
-              ttlMs: TYPING_TTL_MS,
-            })
-            .catch(() => {});
+          const typing = {
+            type: "user.typing",
+            channelId,
+            threadId: frame.threadId,
+            userId: ws.data.user.id,
+            ttlMs: TYPING_TTL_MS,
+          };
+          await Promise.all(
+            [channelTopic(channelId), typingTopic].map((topic) => deps.pubsub.publish(topic, typing).catch(() => {})),
+          );
           return;
         }
         if (frame.type === "unsubscribe") {

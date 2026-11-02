@@ -24,7 +24,7 @@ import {
   routerModelOf,
 } from "@agenteschat/providers";
 import { audienceSql } from "./audience";
-import { TYPING_GRACE_MS, typingWatch } from "./burst";
+import { TYPING_GRACE_MS, typesInApp, typingLogFor } from "./burst";
 import { caches } from "./cache";
 import { summarizeGrants } from "./capabilities";
 import { quotedLine } from "./context";
@@ -659,7 +659,7 @@ export interface RouterDeps {
   quietMs?: number;
   /** Where an agent's reaction to a person's social message shows live (`RoutingResult.social`). */
   pubsub?: PubSub;
-  /** The quiet window ends early when the person isn't typing (`typingWatch` on `pubsub`, token-trim B11). */
+  /** The quiet window ends early when the person isn't typing (`typingLogFor` on `pubsub`, token-trim B11). */
   quietByTyping?: boolean;
 }
 
@@ -846,24 +846,23 @@ export async function routeMessage(
   if (quietMs > 0) {
     const end = message.createdAt.getTime() + quietMs;
     // Token-trim B11: past a short grace, the rest of the window only while the person is typing here.
-    const watch =
-      deps.quietByTyping && deps.pubsub && message.authorUserId
-        ? typingWatch(deps.pubsub, {
-            channelId: message.channelId,
-            threadId: message.threadId ?? null,
-            userId: message.authorUserId,
-          })
+    const log =
+      deps.quietByTyping && deps.pubsub && message.authorUserId && typesInApp(message)
+        ? typingLogFor(deps.pubsub)
         : null;
-    try {
-      const grace = message.createdAt.getTime() + Math.min(TYPING_GRACE_MS, quietMs);
-      // ponytail: the wait holds a worker slot; a delayed job of its own if routing ever runs short of slots.
-      if (watch && grace > Date.now()) await Bun.sleep(grace - Date.now());
-      if (!watch || watch.typed()) {
-        const wait = end - Date.now();
-        if (wait > 0) await Bun.sleep(wait);
-      }
-    } finally {
-      watch?.stop();
+    const from = message.createdAt.getTime();
+    const typed = () =>
+      (log?.lastTyped({
+        channelId: message.channelId,
+        threadId: message.threadId ?? null,
+        userId: message.authorUserId as string,
+      }) ?? Number.NEGATIVE_INFINITY) >= from;
+    const grace = from + Math.min(TYPING_GRACE_MS, quietMs);
+    // ponytail: the wait holds a worker slot; a delayed job of its own if routing ever runs short of slots.
+    if (log && grace > Date.now()) await Bun.sleep(grace - Date.now());
+    if (!log || typed()) {
+      const wait = end - Date.now();
+      if (wait > 0) await Bun.sleep(wait);
     }
     if (await continuedSoon(db, message, quietMs)) return { runs: [], skipped: "continued" };
   }

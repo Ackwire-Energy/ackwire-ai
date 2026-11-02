@@ -41,7 +41,6 @@ import {
   type StreamsState,
   seedReceipt,
   staleProvisional,
-  startsMessage,
   stopTyping,
   type TypingState,
   typingThrottle,
@@ -421,7 +420,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const throttle = useMemo(() => typingThrottle(), []);
   const sendTyping = useCallback(
     (threadId: string | null, text?: string) => {
-      if (connection && throttle(Date.now(), startsMessage(text))) connection.sendTyping(channelId, threadId);
+      if (connection && throttle(Date.now(), text)) connection.sendTyping(channelId, threadId);
     },
     [connection, channelId, throttle],
   );

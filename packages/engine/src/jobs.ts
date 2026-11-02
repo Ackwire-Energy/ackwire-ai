@@ -17,6 +17,7 @@ import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
+import { typingLogFor } from "./burst";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -229,6 +230,8 @@ async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
 
 /** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
 export function createJobHandlers(deps: JobDeps): JobHandlers {
+  // Listening from now on, so typing sent while a run reads its context (before its quiet window) counts.
+  if (deps.quietByTyping || deps.router?.quietByTyping) typingLogFor(deps.pubsub);
   const routing = messageRouter(deps);
 
   // An agent's @mention wakes the other agent unless the judge is sure it needs nothing from it.

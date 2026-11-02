@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { channelTopic } from "@agenteschat/adapters";
+import { typingTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { createAnthropicProvider, type ModelRequest, systemText } from "@agenteschat/providers";
 import {
@@ -13,7 +13,7 @@ import {
   postPersonMessage,
   toTurns,
 } from "../src";
-import { TYPING_GRACE_MS, waitForBurst } from "../src/burst";
+import { TYPING_GRACE_MS, typingLogFor, waitForBurst } from "../src/burst";
 import { type Fixture, setup } from "./fixtures";
 
 /** Token-trim items B3, B5, B8–B11 (docs/backend-progress.md): the model reads less, or reads it from the cache. */
@@ -135,6 +135,31 @@ test("B8: the per-turn notes follow the history, and the next run reads this run
   expect((b.system as Record<string, unknown>[]).filter((s) => s.cache_control)).toHaveLength(1);
 });
 
+test("B8: in a turn of several messages, the cached text is unmarked; the current one is named in the notes", async () => {
+  f = await setup({ contextTools: true, react: true, reply: () => ({ chunks: ["Vou ver."] }) });
+  const post = (body: string) =>
+    postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+  await post("deploy falhou");
+  await post("@dev olha isso");
+  await drainOutbox(f.db, f.handlers);
+  await post("@dev e agora?");
+  await drainOutbox(f.db, f.handlers);
+  const [first, second] = agentCalls(f);
+  if (!first || !second) throw new Error("two calls expected");
+  const [a, b] = await Promise.all([anthropicBody(first), anthropicBody(second)]);
+  const turns = (body: Record<string, unknown>) =>
+    body.messages as { role: string; content: string | { text?: string; cache_control?: unknown }[] }[];
+  const cached = turns(a).at(-1)?.content as { text?: string; cache_control?: unknown }[];
+  expect(cached[0]?.text).toContain("deploy falhou\n\n[");
+  expect(cached[0]?.text).not.toContain("(current message)");
+  expect(cached.at(-1)?.text).toContain("## The current message");
+  expect(cached.at(-1)?.text).toContain("(current message) [");
+  expect(cached.at(-1)?.text).toContain("@dev olha isso");
+  // The next run reads that turn exactly as cached (no longer the last, so unmarked).
+  const again = turns(b)[0]?.content;
+  expect(typeof again === "string" ? again : again?.[0]?.text).toBe(cached[0]?.text as string);
+});
+
 test("B8: a cut history starts at an anchor that stays while the window slides", () => {
   const ids = Array.from(
     { length: 60 },
@@ -172,6 +197,27 @@ test("B9: long messages before the last eight read cut, with the id expand reope
   // In the last eight: whole.
   expect(text).not.toContain(`expand ${history[10]?.id}`);
   expect(text.split(long).length - 1).toBe(1);
+  // The cut moves at anchors, a few messages at a time: the cached history changes on few runs, not on every one.
+  const reports = Array.from(
+    { length: 40 },
+    (_, i) =>
+      ({
+        ...history[0],
+        id: `00000000-0000-7000-8000-${i.toString(16).padStart(12, "0")}`,
+        body: long,
+        createdAt: new Date(at + i * 1000),
+      }) as unknown as Message,
+  );
+  const cut = (k: number) => {
+    const seen = JSON.stringify(toTurns(reports.slice(0, k), "agent", names, reports[k - 1]?.id, { cutOld: true }));
+    return reports.slice(0, k).map((m) => seen.includes(`expand ${m.id} reopens`));
+  };
+  let moved = 0;
+  for (let k = 21; k <= 30; k++) {
+    const before = cut(k - 1);
+    if (cut(k).some((c, j) => j < k - 1 && c !== before[j])) moved++;
+  }
+  expect(moved).toBeLessThanOrEqual(3);
   // Without expand, nothing is cut.
   expect(JSON.stringify(toTurns(history, "agent", names, history.at(-1)?.id))).not.toContain("reopens it");
 
@@ -215,8 +261,24 @@ test("B10: during the quiet window the first call's prompt is pre-warmed: the sa
   expect(body.stream).toBe(false);
 });
 
+test("B10: no pre-warm when the quiet window is already over: it would only delay the first call", async () => {
+  f = await setup({
+    contextTools: true,
+    react: true,
+    quietMs: 300,
+    reply: (r) => (r.maxTokens === 0 ? { chunks: [], usage: { outputTokens: 0 } } : { chunks: ["Oi!"] }),
+  });
+  const handlers = createJobHandlers({ ...f.jobDeps, prewarm: true });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+  // The run starts after its window (a busy worker, a slow context).
+  await Bun.sleep(400);
+  await drainOutbox(f.db, handlers);
+  expect(f.provider.calls.map((c) => c.request.maxTokens > 0)).toEqual([true]);
+});
+
 test("B11: the quiet window ends early when the person isn't typing, and lasts while they are", async () => {
   f = await setup({ contextTools: true });
+  const log = typingLogFor(f.pubsub);
   const sent = async (body: string) => {
     const posted = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body,
@@ -225,22 +287,38 @@ test("B11: the quiet window ends early when the person isn't typing, and lasts w
     if (!m) throw new Error("not posted");
     return m;
   };
-  const alone = await sent("@dev oi");
-  await waitForBurst(f.db, alone, 2500, undefined, f.pubsub);
-  const quiet = Date.now() - alone.createdAt.getTime();
-  expect(quiet).toBeGreaterThanOrEqual(TYPING_GRACE_MS - 10);
-  expect(quiet).toBeLessThan(2300);
-
-  const typing = await sent("@dev oi");
-  setTimeout(() => {
-    void f.pubsub.publish(channelTopic(f.general.id), {
+  const typed = () =>
+    f.pubsub.publish(typingTopic, {
       type: "user.typing",
       channelId: f.general.id,
       threadId: null,
       userId: f.owner.id,
       ttlMs: 6000,
     });
-  }, 300);
-  await waitForBurst(f.db, typing, 2500, undefined, f.pubsub);
+  // Typing for the message itself, before it was sent, is no sign of another.
+  await typed();
+  await Bun.sleep(5);
+  const alone = await sent("@dev oi");
+  await waitForBurst(f.db, alone, 2500, undefined, log);
+  const quiet = Date.now() - alone.createdAt.getTime();
+  expect(quiet).toBeGreaterThanOrEqual(TYPING_GRACE_MS - 10);
+  expect(quiet).toBeLessThan(2300);
+
+  const typing = await sent("@dev oi");
+  setTimeout(() => void typed(), 300);
+  await waitForBurst(f.db, typing, 2500, undefined, log);
   expect(Date.now() - typing.createdAt.getTime()).toBeGreaterThanOrEqual(2490);
-});
+
+  // Typed while the run still read its context, before its wait started: still heard.
+  const early = await sent("@dev oi");
+  await Bun.sleep(300);
+  await typed();
+  await Bun.sleep(1100);
+  await waitForBurst(f.db, early, 2500, undefined, log);
+  expect(Date.now() - early.createdAt.getTime()).toBeGreaterThanOrEqual(2490);
+
+  // Sent through a connected AI app (ADR 0119): no typing ever comes from there, so the whole window.
+  const viaApp = await sent("@dev oi");
+  await waitForBurst(f.db, { ...viaApp, meta: { via: { kind: "app", name: "Claude" } } }, 2500, undefined, log);
+  expect(Date.now() - viaApp.createdAt.getTime()).toBeGreaterThanOrEqual(2490);
+}, 20_000);

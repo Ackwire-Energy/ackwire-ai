@@ -541,7 +541,9 @@ const READ_ONLY_TOOLS = new Set(["get_context"]);
 /**
  * Our tools Claude Code always lists (`_meta` "anthropic/alwaysLoad"); the rest wait behind its ToolSearch, named in
  * its list of deferred tools (token-trim B6). What an agent reaches for on its own, unasked: replying in its forms,
- * memory, following through, long work, the web (ours replace Claude Code's), and the way to everything else.
+ * memory and learning in the turn (ADR 0120), skills and the wiki, teammates, following through, long work, the web
+ * (ours replace Claude Code's), and the way to everything else. Mirrors the never-deferred list on `RARE_TOOLS`
+ * (packages/engine/src/tools/directory.ts).
  */
 export const ALWAYS_LOADED: ReadonlySet<string> = new Set([
   "react",
@@ -549,7 +551,16 @@ export const ALWAYS_LOADED: ReadonlySet<string> = new Set([
   "ask_choices",
   "request_approval",
   "remember",
+  "update_memory",
+  "forget",
+  "save_how_to",
   "search_context",
+  "load_skill",
+  "update_skill",
+  "read_wiki_page",
+  "search_wiki",
+  "ask_agent",
+  "tell_agent",
   "follow_up",
   "work_in_background",
   "post_update",

@@ -321,16 +321,58 @@ export function thisTurnParts(
 export function turnNotes(
   blocks: readonly SystemBlock[],
   at: number | undefined,
-): { system: SystemBlock[]; notes?: { at: number; text: string } } {
+  messages: readonly ModelMessage[] = [],
+): { system: SystemBlock[]; notes?: { at: number; text: string }; messages?: ModelMessage[] } {
   const system = blocks as readonly ContextBlock[];
   const notes = system.filter(isComputerTurnBlock);
   if (at === undefined || notes.length === 0) return { system: [...system] };
   const level = (text: string) => text.replace(/^# /, "## ");
   const fixed = notes.filter((b) => !b.found);
   const ordered = [...fixed.filter((b) => b.now), ...fixed.filter((b) => !b.now), ...notes.filter((b) => b.found)];
+  const current = unmarkCurrent(messages[at]);
   return {
     system: system.map((b) => (isComputerTurnBlock(b) ? { ...b, after: true } : b)),
-    notes: { at, text: ["# This turn", THIS_TURN_INTRO, ...ordered.map((b) => level(b.text))].join("\n\n") },
+    notes: {
+      at,
+      text: [
+        "# This turn",
+        THIS_TURN_INTRO,
+        ...(current ? [current.line] : []),
+        ...ordered.map((b) => level(b.text)),
+      ].join("\n\n"),
+    },
+    ...(current ? { messages: messages.map((m, i) => (i === at ? current.message : m)) } : {}),
+  };
+}
+
+const CURRENT_MARK = "(current message) ";
+const CURRENT_LINE_MAX = 300;
+
+/**
+ * The trigger's turn without its `(current message)` mark, and the mark as a line of the notes: the next run reads
+ * that turn unmarked (it is no longer the last), so the cached text must be unmarked already (token-trim B8). Null
+ * when the turn has no mark (it holds only the trigger).
+ */
+function unmarkCurrent(m: ModelMessage | undefined): { message: ModelMessage; line: string } | null {
+  if (m?.role !== "user") return null;
+  const texts =
+    typeof m.content === "string" ? [m.content] : m.content.flatMap((b) => (b.type === "text" ? [b.text] : []));
+  const marked = texts.find((t) => t.includes(CURRENT_MARK));
+  if (marked === undefined) return null;
+  const at = marked.indexOf(CURRENT_MARK);
+  const unmarked = marked.slice(0, at) + marked.slice(at + CURRENT_MARK.length);
+  // Its own part only: up to the next author's part, if one follows.
+  const part = unmarked.slice(at).split(/\n\n(?=\[)/)[0] ?? "";
+  const shown = part.length > CURRENT_LINE_MAX ? `${cutText(part, CURRENT_LINE_MAX).trimEnd()} …` : part;
+  return {
+    message: {
+      role: m.role,
+      content:
+        typeof m.content === "string"
+          ? unmarked
+          : m.content.map((b) => (b.type === "text" && b.text === marked ? { ...b, text: unmarked } : b)),
+    },
+    line: `## The current message\nOf the last messages above, this is the one to answer; the others are context:\n${CURRENT_MARK}${shown}`,
   };
 }
 
@@ -1822,11 +1864,10 @@ const ANCHOR_EVERY = 5;
  * As messages come and the window slides, it starts at the same message until that one leaves the window.
  */
 export function historyStart(ids: string[]): number {
-  const at = ids
-    .slice(0, HISTORY_ANCHOR_WINDOW)
-    .findIndex((id) => Number.parseInt(id.replace(/-/g, "").slice(-6), 16) % ANCHOR_EVERY === 0);
-  return Math.max(0, at);
+  return Math.max(0, ids.slice(0, HISTORY_ANCHOR_WINDOW).findIndex(isAnchor));
 }
+
+const isAnchor = (id: string) => Number.parseInt(id.replace(/-/g, "").slice(-6), 16) % ANCHOR_EVERY === 0;
 
 /** Messages at the end of the history always read whole. */
 export const KEEP_WHOLE = 8;
@@ -1852,8 +1893,16 @@ export function toTurns(
   const latestOwn = [...history]
     .reverse()
     .find((m) => m.authorAgentId === agentId && !m.meta?.notice && !taskNotice(m) && m.body.trim())?.id;
-  // Long messages before the last `KEEP_WHOLE` come cut short, with how to reopen them (token-trim B9).
-  const cutBefore = options.cutOld ? history.length - KEEP_WHOLE : 0;
+  // Long messages before the last `KEEP_WHOLE` come cut short, with how to reopen them (token-trim B9). The cut ends at
+  // an anchor, so it moves every few messages, not every run: the cached history changes once per move.
+  const end = options.cutOld ? history.length - KEEP_WHOLE : 0;
+  let cutBefore = end;
+  for (let i = end; i > Math.max(0, end - HISTORY_ANCHOR_WINDOW); i--) {
+    if (isAnchor(history[i]?.id ?? "")) {
+      cutBefore = i;
+      break;
+    }
+  }
   history.forEach((m, i) => {
     if (i < cutBefore && m.id !== currentId) cutIds.add(m.id);
   });

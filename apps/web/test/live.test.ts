@@ -11,7 +11,6 @@ import {
   receiptView,
   runsInChannel,
   seedReceipt,
-  startsMessage,
   stopTyping,
   TYPING_TTL_MS,
   typingIn,
@@ -89,9 +88,17 @@ describe("typing", () => {
   test("our own typing frames are throttled to one every 3 s", () => {
     const shouldSend = typingThrottle(3000);
     expect([0, 500, 2999, 3000, 3100, 6000].map((t) => shouldSend(t))).toEqual([true, false, false, true, false, true]);
-    // A new message's first keystroke goes at once, so a second message right after the first shows as typing.
-    expect(shouldSend(6500, startsMessage("p"))).toBe(true);
-    expect(shouldSend(6600, startsMessage("pr"))).toBe(false);
+    // A new message goes at once, so a second message right after the first shows as typing.
+    const send = typingThrottle(3000);
+    expect(send(0, "o")).toBe(true);
+    expect(send(500, "oi")).toBe(false);
+    // Sent (the field cleared without a change event), then a suggestion tapped: several characters at once.
+    expect(send(1500, "Preciso ")).toBe(true);
+    expect(send(1600, "Preciso d")).toBe(false);
+    expect(send(1700, "Precis")).toBe(false);
+    // Pasted into an emptied field.
+    expect(send(1800, "")).toBe(false);
+    expect(send(1900, "olha o relatório de ontem")).toBe(true);
   });
 });
 

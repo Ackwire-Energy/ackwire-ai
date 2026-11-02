@@ -50,18 +50,21 @@ export const typingIn = (
     .map(([id]) => id);
 
 /**
- * Returns a function that says whether to send a typing frame now: at most one every 3 s, but always on a message's
- * first keystroke (`startsMessage`), so a person writing a second message right after the first shows at once (the
- * server ends an agent's wait early when nobody is typing).
+ * Returns a function that says whether to send a typing frame now: at most one every 3 s, but always when the composer
+ * starts a new message, so a person writing a second message right after the first shows at once (the server ends an
+ * agent's wait early when nobody is typing). A new message: the text is neither a continuation of the last one seen
+ * nor cut from it (the field was sent and cleared, or emptied), whatever its length (a pasted text, a suggestion
+ * tapped, swipe typing).
  */
 export function typingThrottle(every = TYPING_SEND_EVERY_MS) {
   let last = Number.NEGATIVE_INFINITY;
-  return (now: number, first = false) => {
+  let seen = "";
+  return (now: number, text?: string) => {
+    const next = text?.trim() ?? "";
+    const first = next !== "" && (seen === "" || (!next.startsWith(seen) && !seen.startsWith(next)));
+    if (text !== undefined) seen = next;
     if (!first && now - last < every) return false;
     last = now;
     return true;
   };
 }
-
-/** The composer's text is a new message's first character. */
-export const startsMessage = (text?: string) => text !== undefined && text.trim().length === 1;

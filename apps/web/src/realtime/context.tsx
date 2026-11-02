@@ -67,7 +67,6 @@ import {
   type StreamsState,
   seedReceipt,
   staleProvisional,
-  startsMessage,
   stopTyping,
   type TypingState,
   touchRun,
@@ -899,7 +898,7 @@ export function useTypingSender(channelId: string, threadId?: string) {
   const { connection } = useRealtime();
   const throttle = useMemo(() => typingThrottle(), []);
   return (text?: string) => {
-    if (connection && throttle(Date.now(), startsMessage(text))) connection.sendTyping(channelId, threadId);
+    if (connection && throttle(Date.now(), text)) connection.sendTyping(channelId, threadId);
   };
 }
 
