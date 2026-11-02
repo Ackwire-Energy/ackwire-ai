@@ -7,7 +7,15 @@ import { leaves as entries } from "../../../packages/i18n/test/leaves";
 import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
 import { unplainLeaves } from "../../../packages/i18n/test/plain-marks";
 import { misplaced, staleLines } from "../../../packages/i18n/test/setups";
-import { createDesktopI18n, DESKTOP_STRINGS, desktopStrings, pickLocale, withDesktopKeys } from "../src/i18n";
+import {
+  createDesktopI18n,
+  DESKTOP_STRINGS,
+  desktopStrings,
+  loadDesktopI18n,
+  pickLocale,
+  switchDesktopLocale,
+  withDesktopKeys,
+} from "../src/i18n";
 import { desktopEn } from "../src/i18n/keys.en";
 import { desktopPtBR } from "../src/i18n/keys.pt-BR";
 
@@ -78,6 +86,24 @@ describe("desktop strings", () => {
     expect(pt.t("desktop.orgCount", { count: 2 })).toBe("2 workspaces");
     const en = createDesktopI18n("en");
     expect(en.t("desktop.tray.now")).toBe("Now");
+  });
+
+  test("the Mac lists only ready languages as the app's", async () => {
+    const plist = await Bun.file(join(import.meta.dir, "../src-tauri/Info.plist")).text();
+    const listed = plist.match(/<key>CFBundleLocalizations<\/key>\s*<array>([\s\S]*?)<\/array>/)?.[1] ?? "";
+    expect([...listed.matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1])).toEqual(
+      LOCALES.filter((l) => l.ready).map((l) => l.code),
+    );
+  });
+
+  test("a window loads only its language and English, and the next one when picked", async () => {
+    const i18n = await loadDesktopI18n("pt-BR", "windows");
+    expect(i18n.t("desktop.own.here")).toBe("Rodar o agentes.chat neste PC");
+    expect(Object.keys(i18n.store.data).sort()).toEqual(["en", "pt-BR"]);
+    switchDesktopLocale(i18n, "ja", "windows");
+    await new Promise<void>((done) => i18n.on("languageChanged", () => done()));
+    expect(Object.keys(i18n.store.data).sort()).toEqual(["en", "ja", "pt-BR"]);
+    expect(i18n.t("desktop.tray.now")).toBe("Now");
   });
 
   test("this computer's name fills {{device}} everywhere, by system and language", () => {

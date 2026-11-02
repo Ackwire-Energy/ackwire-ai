@@ -11,7 +11,7 @@ import { readPref } from "./hooks";
 import { createFakeHost, SCENARIOS, type Scenario } from "./host/fake";
 import { createTauriHost, inTauri } from "./host/tauri";
 import { type Host, WINDOW_NAMES, type WindowName } from "./host/types";
-import { createDesktopI18n, LOCALE_PREF, pickLocale, switchDesktopLocale, systemLocale } from "./i18n";
+import { LOCALE_PREF, loadDesktopI18n, pickLocale, switchDesktopLocale, systemLocale } from "./i18n";
 import { ToastProvider } from "./ui/Toast";
 import { baseName } from "./ui/time";
 import { WindowError, WindowView } from "./WindowView";
@@ -47,7 +47,7 @@ const fakeHost = inTauri()
 const host: Host = fakeHost ?? createTauriHost();
 
 // The browser's own language, or `?lang=` while designing.
-const i18n = createDesktopI18n(
+const i18n = await loadDesktopI18n(
   fakeHost && params.get("lang") ? pickLocale([params.get("lang")]) : systemLocale(),
   host.platform,
 );

@@ -9,6 +9,7 @@ import { leaves as entries } from "../../../packages/i18n/test/leaves";
 import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
 import { unplainLeaves } from "../../../packages/i18n/test/plain-marks";
 import { misplaced, staleLines } from "../../../packages/i18n/test/setups";
+import appConfig from "../app.config";
 import nativeEn from "../assets/locales/en.json";
 import nativePtBR from "../assets/locales/pt-BR.json";
 import { featureKeysEn } from "../src/features/i18n/keys.en";
@@ -44,9 +45,16 @@ test("every language against English: keys, plural forms, placeholders, tags (AD
   }
 });
 
-test("the iOS permission texts exist for every language, with English's keys", () => {
+test("the stores and the system list only ready languages, each with its iOS permission texts", () => {
+  const ready = LOCALES.filter((l) => l.ready).map((l) => l.code);
+  const config = appConfig({ config: {} } as never);
+  const localization = config.plugins?.find((p) => Array.isArray(p) && p[0] === "expo-localization") as
+    | [string, { supportedLocales: string[] }]
+    | undefined;
+  expect(localization?.[1].supportedLocales).toEqual(ready);
+  expect(Object.keys(config.locales ?? {})).toEqual(ready);
   const keys = (o: object) => leaves(o).sort();
-  for (const { code } of LOCALES)
+  for (const code of ready)
     expect(keys(JSON.parse(readFileSync(join(import.meta.dir, `../assets/locales/${code}.json`), "utf8")))).toEqual(
       keys(nativeEn),
     );

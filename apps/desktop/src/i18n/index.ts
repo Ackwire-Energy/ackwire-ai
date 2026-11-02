@@ -1,4 +1,5 @@
 import { resources as shared } from "@agenteschat/i18n";
+import { loadStrings } from "@agenteschat/i18n/load";
 import {
   type AppLocale,
   appLocale,
@@ -9,7 +10,7 @@ import {
 } from "@agenteschat/i18n/locale";
 import { fillPluralGaps, type LocaleStrings } from "@agenteschat/i18n/plurals";
 import { deepMerge } from "@agenteschat/i18n/tree";
-import i18next, { type i18n as I18n } from "i18next";
+import i18next, { type i18n as I18n, type InitOptions } from "i18next";
 import { initReactI18next } from "react-i18next";
 import type { Platform } from "../control/platform";
 import { type DesktopTranslations, desktopEn } from "./keys.en";
@@ -30,8 +31,8 @@ import zhHans from "./locales/zh-Hans.json";
 export type { AppLocale };
 export { DEFAULT_LOCALE };
 
-// ponytail: every language is in the bundle (the windows start synchronously); load them like the web's
-// `loadStrings` if the app's size starts to matter.
+// ponytail: the desktop's own strings (about 25 KB a language) are all in the bundle, for the cover page to read
+// synchronously; the shared ones (about 500 KB a language) load one language at a time (`loadDesktopI18n`).
 export const DESKTOP_STRINGS: Record<AppLocale, LocaleStrings> = {
   en: desktopEn,
   "pt-BR": desktopPtBR,
@@ -99,25 +100,61 @@ export function systemLocale(): AppLocale {
 export const deviceName = (lng: AppLocale, platform: Platform) => desktopStrings(lng).device[platform];
 
 /** `{{device}}` is filled in for every string, so callers never pass it. */
-export function createDesktopI18n(lng: AppLocale = systemLocale(), platform: Platform = "mac"): I18n {
+const options = (lng: AppLocale, platform: Platform): InitOptions => ({
+  lng,
+  fallbackLng: DEFAULT_LOCALE,
+  supportedLngs: LOCALE_CODES,
+  load: "currentOnly",
+  interpolation: { escapeValue: false, defaultVariables: { device: deviceName(lng, platform) } },
+  initAsync: false,
+  returnNull: false,
+});
+
+/** One language's shared strings, downloaded, with the desktop's own under `desktop`. */
+const bundleFor = (lng: AppLocale) =>
+  loadStrings[lng]().then((strings) => ({ ...strings, desktop: fillPluralGaps(lng, DESKTOP_STRINGS[lng]) }));
+
+/** The app's instance with only `lng` and English (every key's fallback) loaded; English if `lng` can't load. */
+export async function loadDesktopI18n(lng: AppLocale, platform: Platform): Promise<I18n> {
+  const [en, own] = await Promise.all([
+    bundleFor(DEFAULT_LOCALE),
+    lng === DEFAULT_LOCALE ? null : bundleFor(lng).catch(() => null),
+  ]);
+  const use = own ? lng : DEFAULT_LOCALE;
   const instance = i18next.createInstance();
   void instance.use(initReactI18next).init({
-    resources: withDesktopKeys(shared),
-    lng,
-    fallbackLng: DEFAULT_LOCALE,
-    supportedLngs: LOCALE_CODES,
-    load: "currentOnly",
-    interpolation: { escapeValue: false, defaultVariables: { device: deviceName(lng, platform) } },
-    initAsync: false,
-    returnNull: false,
+    ...options(use, platform),
+    resources: { [DEFAULT_LOCALE]: { translation: en }, ...(own ? { [lng]: { translation: own } } : {}) },
   });
   return instance;
 }
 
+/** An instance with every language loaded at once (tests). */
+export function createDesktopI18n(lng: AppLocale = systemLocale(), platform: Platform = "mac"): I18n {
+  const instance = i18next.createInstance();
+  void instance.use(initReactI18next).init({ ...options(lng, platform), resources: withDesktopKeys(shared) });
+  return instance;
+}
+
+/** The language picked last (a slower download of an earlier pick must not win). */
+let wanted: AppLocale | null = null;
+
 /** Shows `instance` in `lng`, with `{{device}}` in that language's words. */
 export function switchDesktopLocale(instance: I18n, lng: AppLocale, platform: Platform) {
-  const interpolation = instance.options.interpolation;
-  if (interpolation) interpolation.defaultVariables = { device: deviceName(lng, platform) };
-  void instance.changeLanguage(lng);
-  document.documentElement.lang = lng;
+  wanted = lng;
+  const apply = () => {
+    if (wanted !== lng) return;
+    const interpolation = instance.options.interpolation;
+    if (interpolation) interpolation.defaultVariables = { device: deviceName(lng, platform) };
+    void instance.changeLanguage(lng);
+    document.documentElement.lang = lng;
+  };
+  if (instance.hasResourceBundle(lng, "translation")) apply();
+  else
+    bundleFor(lng)
+      .then((strings) => {
+        instance.addResourceBundle(lng, "translation", strings);
+        apply();
+      })
+      .catch(() => {});
 }
