@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, count, type Database, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
+import { and, count, type Database, eq, inArray, isNotNull, isNull, lt, schema } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   type ChoiceQuestion,
@@ -293,14 +293,27 @@ export interface ChoicesView {
   answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
 }
 
+/**
+ * A claim whose message was never posted (the process died between the two steps) stops holding the card after this:
+ * the card opens again. Posting can wait on the judge, so it is far longer than a post takes.
+ */
+const UNPOSTED_CLAIM_MS = 5 * 60_000;
+const unposted = (artifactId: string) =>
+  and(
+    eq(choiceAnswers.artifactId, artifactId),
+    isNull(choiceAnswers.messageId),
+    lt(choiceAnswers.createdAt, new Date(Date.now() - UNPOSTED_CLAIM_MS)),
+  );
+
 async function loadChoicesView(db: Database, orgId: string, artifactId: string): Promise<ChoicesView> {
   const [row] = await db
     .select()
     .from(choiceAnswers)
     .where(and(eq(choiceAnswers.artifactId, artifactId), eq(choiceAnswers.orgId, orgId)));
+  const lost = row && !row.messageId && row.createdAt.getTime() < Date.now() - UNPOSTED_CLAIM_MS;
   return {
     id: artifactId,
-    answer: row
+    answer: row && !lost
       ? { userId: row.userId, picks: row.picks, messageId: row.messageId, at: row.createdAt.toISOString() }
       : null,
   };
@@ -339,6 +352,7 @@ export async function answerChoices(
   const picks = input.picks;
   if (picks.length !== questions.length || picks.some((p, i) => !Number.isInteger(p) || !questions[i]?.options[p]))
     throw new ValidationError("Pick one option for each question");
+  await deps.db.delete(choiceAnswers).where(unposted(artifactId));
   const [claimed] = await deps.db
     .insert(choiceAnswers)
     .values({ artifactId, orgId, userId, picks })

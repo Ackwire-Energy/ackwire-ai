@@ -102,6 +102,23 @@ test("the run a one-question pick starts reads the question it answers", async (
   expect(JSON.stringify(messages.at(-1)?.content)).toContain("Como sigo com o deploy? Fazer agora");
 });
 
+test("a claim whose message never went out (a crash in between) stops holding the card", async () => {
+  f = await setup({ blockTools: true, reply: agent });
+  const row = await asked();
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await f.db.insert(schema.choiceAnswers).values({
+    artifactId: row.id,
+    orgId: f.org.id,
+    userId: bia.id,
+    picks: [0],
+    createdAt: new Date(Date.now() - 10 * 60_000),
+  });
+  expect((await getChoices(f.artifactDeps, f.owner.id, f.org.id, row.id)).answer).toBeNull();
+  const { choices } = await answerChoices(deps(), f.owner.id, f.org.id, row.id, { picks: [1] });
+  expect(choices.answer?.userId).toBe(f.owner.id);
+  expect(choices.answer?.picks).toEqual([1]);
+});
+
 test("a pick must name one option of each question", async () => {
   f = await setup({ blockTools: true, reply: agent });
   const row = await asked();
