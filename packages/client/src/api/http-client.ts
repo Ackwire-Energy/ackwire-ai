@@ -62,6 +62,7 @@ import type {
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
+  CostlyDecision,
   CreatedPersonalToken,
   Credential,
   CustomConnectStart,
@@ -574,6 +575,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: {},
           },
         ),
+      decideCostly: (orgId, signalId, decision) =>
+        request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {
+          json: { decision },
+        }),
       proposalRoutine: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>

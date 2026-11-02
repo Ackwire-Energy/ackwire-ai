@@ -157,6 +157,20 @@ export function autoUpdateText(t: TFunction, params: Record<string, unknown>): s
   return `${head} ${say("work.autoUpdateNow", { now: lowerFirst(now) })}`;
 }
 
+/**
+ * The server's own status line for a working agent a person wrote to (ADR 0131 §2, `talker_status`): how long it has
+ * worked, what it does now, and that it reads them after this step.
+ */
+export function talkerStatusText(t: TFunction, params: Record<string, unknown>): string {
+  const say = loose(t);
+  const minutes = Number(params.minutes ?? 0);
+  const head = say("work.statusReply", { duration: workDuration(t, minutes * 60_000) });
+  const kind = typeof params.kind === "string" ? params.kind : null;
+  if (!kind) return head;
+  const now = say(`presence.agent.${kind}`, { subject: typeof params.subject === "string" ? params.subject : "" });
+  return `${head} ${say("work.autoUpdateNow", { now: lowerFirst(now) })}`;
+}
+
 /** A card's blocked badge (background work stopped on something, ADR 0121 §4): in its stage, not a column. */
 export function blockedText(
   t: TFunction,

@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { runAuthority } from "./authority";
+import { askStillOpen } from "./brakes";
 import { requireChannelAccess } from "./channels";
 import { handOffsFrom, sentOpen } from "./consultations";
 import { getChannelCached } from "./context";
@@ -390,7 +391,8 @@ export async function wakeFollowUp(deps: { db: Database; pubsub?: PubSub }, orgI
       .select()
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, refs.runId ?? "")));
-    const here = run ? await stillHere(tx, run) : false;
+    // It asked the person something and they haven't answered: their answer wakes it, not the clock (ADR 0131 §1).
+    const here = run ? (await stillHere(tx, run)) && !(await askStillOpen(tx, run)) : false;
     const settled = await settle(tx, line, here ? "done" : "canceled");
     if (!settled || !run || !here) return settled ? { line: settled, delivered: null } : null;
     const delivered = await deliverNoticeToRun(tx, run, {

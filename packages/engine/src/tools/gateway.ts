@@ -1,8 +1,9 @@
-import { PERMISSION_TOOL } from "@agenteschat/adapters";
+import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { coveringRules, type RememberedKind } from "../approval-rules";
 import { fedByRoutine, type RunAuthority, runAuthorityById, UUID } from "../authority";
+import { type CostKind, costlyGate, costlyKind, LONG_STEPS, unrequested } from "../brakes";
 import { countToolCall } from "../connector-usage";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { missingConnectors, type ServerCatalog } from "../connectors/listing";
@@ -43,7 +44,7 @@ import {
 } from "./scopes";
 import type { AheadOutcome, AheadRequest, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
-const { approvals, agents, routines } = schema;
+const { approvals, agents, agentRunSteps, routines } = schema;
 type AuditOutcome = schema.AuditOutcome;
 
 /** Merge, deploy and rollback always need a person, whatever a connector says. */
@@ -229,6 +230,22 @@ function promptOutcome(prompt: { poll: string | null }, output: ToolOutput): Aud
   return output.isError ? "failed" : undefined;
 }
 
+/**
+ * A costly step of a run (ADR 0131 §3): the call's own (`costlyKind`), or a long run's (`LONG_STEPS` calls already),
+ * counted only for runs the brakes apply to.
+ */
+async function costOf(ctx: ToolContext, name: string, input: Record<string, unknown>): Promise<CostKind | null> {
+  const own = costlyKind(name, input);
+  if (own) return own;
+  // Polling a held prompt is no new step.
+  if (name === PERMISSION_TOOL && typeof input.request_id === "string") return null;
+  const [row] = await ctx.db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(agentRunSteps)
+    .where(and(eq(agentRunSteps.runId, ctx.runId), eq(agentRunSteps.kind, "tool_call")));
+  return Number(row?.n ?? 0) > LONG_STEPS ? "long" : null;
+}
+
 /** Who is behind the call's run (ADR 0053). Null for a mission task's call: no run, the mission's own gates. */
 const authorityOf = (ctx: ToolContext): Promise<RunAuthority | null> =>
   ctx.runId ? runAuthorityById(ctx.db, ctx.orgId, ctx.runId) : Promise.resolve(null);
@@ -293,6 +310,8 @@ export function createToolGateway(deps: {
   now?: () => Date;
   /** What this server can connect: `find_tools` names each connector a search asks for that the agent lacks. */
   catalog?: ServerCatalog;
+  /** Live events (the autonomy brakes' proposal card, ADR 0131). */
+  pubsub?: PubSub;
 }) {
   const now = deps.now ?? (() => new Date());
 
@@ -869,6 +888,30 @@ export function createToolGateway(deps: {
       }
       if (whyMissing && !approvedBy && !ahead)
         return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
+      // Costly work nobody asked for directly (ADR 0131 §3): a person's go first, on every brain.
+      const isPrompt = tool.name === PERMISSION_TOOL && builtIn;
+      const cost = ctx.runId && unrequested(authority) ? await costOf(ctx, tool.name, call.input) : null;
+      if (cost) {
+        const refusal = await costlyGate(
+          { db: ctx.db, pubsub: deps.pubsub },
+          {
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            runId: ctx.runId,
+            channelId: ctx.channelId,
+            threadRootId: ctx.threadRootId,
+          },
+          authority,
+          cost,
+          toolCommand(call.name, call.input) ?? callTitle(tool, call.input) ?? tool.name,
+        );
+        if (refusal) {
+          const content = isPrompt
+            ? JSON.stringify({ behavior: "deny", message: refusal.message, code: "autonomy" })
+            : refusal.message;
+          return finish({ content, isError: !isPrompt, data: { code: refusal.code } }, "refused");
+        }
+      }
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 

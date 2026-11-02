@@ -7,7 +7,7 @@ import type {
   MessagePin,
   ReactionCount,
 } from "@agenteschat/client";
-import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
+import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -311,6 +311,7 @@ export const hidesBody = (m: Message) =>
       secretRequestOf(m.meta) ||
       agentProposalOf(m.meta) ||
       stretchCardOf(m.meta) ||
+      costlyProposalOf(m.meta) ||
       usagePauseCardOf(m.meta) ||
       m.meta?.missionStart ||
       m.meta?.threadStart ||

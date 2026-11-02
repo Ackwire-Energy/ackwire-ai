@@ -20,6 +20,7 @@ import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, speakerFor, viaAgent } from "./audience";
 import { runAuthorityById } from "./authority";
 import { routineBriefOfRun } from "./background";
+import { callableAgents, notCallableText } from "./brakes";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
 import { startOrJoinRun } from "./dispatch";
@@ -88,6 +89,9 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pu
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
   if (!target) return { refused: refuse(await noAgentText(ctx, [handle], { viaAgent: true })) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
+  // Who this agent may call at all (ADR 0131 §8): its own settings, before anyone's audience.
+  if (!(await callableAgents(db, ctx.orgId, ctx.agentId, [target.id])).has(target.id))
+    return { refused: refuse(notCallableText([`@${handle}`])) };
   const behind = await personBehindCall(ctx);
   const routine = behind ? null : await actingRoutineOfCall(ctx);
   const person = behind ?? routine?.creatorUserId ?? null;

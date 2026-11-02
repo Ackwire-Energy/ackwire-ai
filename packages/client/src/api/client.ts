@@ -73,6 +73,7 @@ import type {
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
+  CostlyDecision,
   CreatedPersonalToken,
   Credential,
   CustomConnectStart,
@@ -475,6 +476,8 @@ export interface ApiClient {
     proposalRoutine(orgId: string, messageId: string): Promise<AgentProposal>;
     /** Says no to it (who may create agents): the card stays, marked denied. */
     denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
+    /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
+    decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
     update(orgId: string, agentId: string, input: Partial<AgentInput>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */

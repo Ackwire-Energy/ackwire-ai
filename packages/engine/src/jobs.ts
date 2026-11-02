@@ -16,6 +16,7 @@ import type { ArtifactDeps } from "./artifacts";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
+import { brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import { crowdedAgents } from "./computer-queue";
 import type { ConnectorDeps } from "./connectors/connections";
@@ -26,6 +27,7 @@ import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { reportDroppedMentions } from "./continuation";
+import { publishDelivery } from "./delivery";
 import {
   deferMentionReport,
   deliverParked,
@@ -82,6 +84,7 @@ import {
 import { createJevRouterStrategy, jevCostNanoUsd, routeChain } from "./router-jev";
 import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
+import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
@@ -339,6 +342,41 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     };
   }
 
+  const brakeJudge = () => (deps.context ? judgeOf(deps.context) : null);
+
+  /**
+   * Of the agents an agent's message would wake or hand a note to, the ones its settings let it call (ADR 0131 §8);
+   * the run that wrote it hears once who was left out.
+   */
+  async function onlyCallable(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>, ids: string[]) {
+    if (!message.authorAgentId || ids.length === 0) return ids;
+    const ok = await callableAgents(deps.db, message.orgId, message.authorAgentId, ids);
+    const left = ids.filter((id) => !ok.has(id));
+    if (left.length > 0 && message.agentRunId) {
+      const [handles, [run]] = await Promise.all([
+        deps.db
+          .select({ handle: schema.agents.handle })
+          .from(schema.agents)
+          .where(and(eq(schema.agents.orgId, message.orgId), inArray(schema.agents.id, left))),
+        deps.db
+          .select()
+          .from(schema.agentRuns)
+          .where(and(eq(schema.agentRuns.orgId, message.orgId), eq(schema.agentRuns.id, message.agentRunId))),
+      ]);
+      if (run && !run.background) {
+        const delivered = await deps.db.transaction((tx) =>
+          deliverNoticeToRun(tx, run, {
+            kind: "wake_skipped",
+            text: notCallableText(handles.map((h) => `@${h.handle}`)),
+            refs: { runId: run.id, messageId: message.id },
+          }),
+        );
+        await publishDelivery(deps.pubsub, delivered).catch(() => {});
+      }
+    }
+    return ids.filter((id) => ok.has(id));
+  }
+
   /** The agents a run handed something to (`ask_agent`, `tell_agent`). */
   async function consultedBy(orgId: string, runId: string) {
     const c = schema.agentConsultations;
@@ -452,6 +490,22 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   };
 
   return {
+    // A wake the brakes deferred (its agent at its cap of unrequested work, or its computer full) looks again.
+    [LATER_JOB]: async (job) => {
+      const orgId = orgOf(job);
+      const message = await getMessage(deps.db, orgId, String(job.payload.messageId));
+      const agentId = String(job.payload.agentId);
+      if (!message) return;
+      const { wake } = await brakeWakes({ db: deps.db, pubsub: deps.pubsub, judge: null }, message, [agentId], {
+        look: Number(job.payload.look) || 0,
+      });
+      if (wake.length > 0)
+        await dispatchMentions(
+          deps.db,
+          { orgId, messageId: message.id },
+          { maxHops: deps.maxHops, onlyAgentIds: wake },
+        );
+    },
     "message.posted": async (job) => {
       const input = { orgId: orgOf(job), messageId: String(job.payload.messageId) };
       const message = await getMessage(deps.db, input.orgId, input.messageId);
@@ -540,13 +594,21 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           }
           const reportLater = await deferMentionReport(deps.db, message, allowed);
           if (reportLater) allowed = allowed.filter((id) => id !== reportLater);
+          // Only the agents its settings let it call (ADR 0131 §8), then the brakes on work nobody asked for.
+          allowed = await onlyCallable(message, allowed);
+          if (allowed.length > 0)
+            allowed = (await brakeWakes({ db: deps.db, pubsub: deps.pubsub, judge: brakeJudge() }, message, allowed))
+              .wake;
           const res = allowed.length
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
           const dropped = "dropped" in res ? (res.dropped ?? []) : [];
           // Never silent: who its mention didn't reach hears it as a note, or the people here read why not.
           const reach = await settleReach(deps, message, {
-            outside: handed.allowed.filter((id) => outside.includes(id)),
+            outside: await onlyCallable(
+              message,
+              handed.allowed.filter((id) => outside.includes(id)),
+            ),
             blocked: [
               ...new Set([...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused]),
             ],
@@ -571,7 +633,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         const reach = {
           outside:
             outside.length > 0
-              ? (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed
+              ? await onlyCallable(
+                  message,
+                  (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed,
+                )
               : [],
           blocked: refused,
         };

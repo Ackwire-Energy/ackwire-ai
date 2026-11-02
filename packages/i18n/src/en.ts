@@ -1700,6 +1700,49 @@ export const en = {
     remove: "Remove it",
     send: "Send anyway",
   },
+  /** An agent's proposal of costly work nobody asked for directly (ADR 0131): the card's buttons and who decided. */
+  costlyCard: {
+    go: "Go ahead",
+    always: "Always",
+    notNow: "Not now",
+    never: "Never",
+    waiting: "Waiting for the person responsible",
+    you: "You",
+    decided: {
+      go: "{{name}} said go ahead",
+      always: "{{name}} said always for this",
+      not_now: "{{name}} said not now",
+      never: "{{name}} said never for this",
+    },
+  },
+  /** Agent settings: what it may start that nobody asked for directly, and which agents it may call (ADR 0131). */
+  brakes: {
+    title: "Work nobody asked for",
+    subtitle: "What it starts on its own, from a routine, an alert or another agent. What a person asks is never held.",
+    costly: "Ask before costly work",
+    costlyHelp: "Before opening a pull request, installing packages or a long job, it asks the person responsible.",
+    costlyAsk: "Ask first",
+    costlyGo: "Just do it",
+    cost: { pr: "opening pull requests", install: "installing packages", long: "long jobs" },
+    rememberedGo: "Always: {{what}}",
+    rememberedNever: "Never: {{what}}",
+    forget: "Forget these answers",
+    atOnce: "Jobs at once",
+    atOnceHelp: "How many jobs nobody asked for it runs at the same time. The others wait their turn.",
+    prs: "Pull requests an hour",
+    prsHelp: "The most its own work opens in an hour.",
+    call: "Agents it may call",
+    callHelp: "Who it may mention or hand work to.",
+    callAll: "All",
+    callSome: "Only these",
+    callNone: "None",
+    project: "Project",
+    projectHelp: "Agents of different projects don't call each other.",
+    projectPlaceholder: "Mobile app",
+    otherProjects: "May call agents of other projects",
+    peopleNote: "These limits never hold what a person asks for.",
+    failed: "Couldn't save. Try again.",
+  },
   stretchCard: {
     continued: "{{name}} let them go on · {{time}}",
     continuedByYou: "You let them go on · {{time}}",
@@ -9939,6 +9982,8 @@ export const en = {
     stopFailed: "Couldn't stop it. Only who asked, the agent's owner or an admin can.",
     autoUpdate: "Still on it ({{duration}}).",
     autoUpdateNow: "Now: {{now}}.",
+    /** The server's own line when a person writes to a working agent and the quick reply can't be written (ADR 0131). */
+    statusReply: "Still on it ({{duration}}). I'll read your message after this step.",
     status: {
       one: "Working on: {{subject}}",
       oneUntitled: "Working in the background",
@@ -10319,6 +10364,16 @@ export const en = {
       agent: "With {{name}}",
     },
     body: {
+      /** The autonomy brakes (ADR 0131): an agent asks before costly work nobody asked for, the noise digest, a loop stop. */
+      autonomy_proposal: {
+        pr: "Nobody asked for this directly. May I open a pull request?",
+        install: "Nobody asked for this directly. May I install these packages?",
+        long: "This is taking many steps, and nobody asked for it directly. May I keep going?",
+      },
+      autonomy_digest_one: "{{count}} alert looked known or harmless, so I didn't work on it:",
+      autonomy_digest_other: "{{count}} alerts looked known or harmless, so I didn't work on them:",
+      autonomy_loop:
+        "I stopped working on this on my own. It came back {{count}} times in a day ({{title}}). Tell me how you want it handled.",
       mission_plan: "Plan for “{{title}}” on {{computer}}",
       mission_planNoComputer: "Plan for “{{title}}”",
       mission_decision: "Decision: {{question}}",

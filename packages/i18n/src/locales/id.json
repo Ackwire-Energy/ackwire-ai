@@ -1696,6 +1696,51 @@
     "remove": "Hapus",
     "send": "Tetap kirim"
   },
+  "costlyCard": {
+    "go": "Lanjutkan",
+    "always": "Selalu",
+    "notNow": "Jangan sekarang",
+    "never": "Tidak pernah",
+    "waiting": "Menunggu orang yang bertanggung jawab",
+    "you": "Anda",
+    "decided": {
+      "go": "{{name}} bilang lanjutkan",
+      "always": "{{name}} bilang selalu untuk ini",
+      "not_now": "{{name}} bilang jangan sekarang",
+      "never": "{{name}} bilang tidak pernah untuk ini"
+    }
+  },
+  "brakes": {
+    "title": "Pekerjaan yang tidak diminta siapa pun",
+    "subtitle": "Apa yang dimulainya sendiri, dari rutinitas, peringatan, atau agen lain. Yang diminta seseorang tidak pernah ditahan.",
+    "costly": "Tanya sebelum pekerjaan mahal",
+    "costlyHelp": "Sebelum membuka pull request, memasang paket, atau pekerjaan panjang, ia bertanya kepada orang yang bertanggung jawab.",
+    "costlyAsk": "Tanya dulu",
+    "costlyGo": "Langsung kerjakan",
+    "cost": {
+      "pr": "membuka pull request",
+      "install": "memasang paket",
+      "long": "pekerjaan panjang"
+    },
+    "rememberedGo": "Selalu: {{what}}",
+    "rememberedNever": "Tidak pernah: {{what}}",
+    "forget": "Lupakan jawaban ini",
+    "atOnce": "Pekerjaan sekaligus",
+    "atOnceHelp": "Berapa banyak pekerjaan yang tidak diminta siapa pun yang dikerjakannya bersamaan. Sisanya menunggu giliran.",
+    "prs": "Pull request per jam",
+    "prsHelp": "Paling banyak yang dibuka pekerjaannya sendiri dalam satu jam.",
+    "call": "Agen yang boleh dipanggil",
+    "callHelp": "Siapa yang boleh disebut atau diberi pekerjaan.",
+    "callAll": "Semua",
+    "callSome": "Hanya ini",
+    "callNone": "Tidak ada",
+    "project": "Proyek",
+    "projectHelp": "Agen dari proyek berbeda tidak saling memanggil.",
+    "projectPlaceholder": "Aplikasi seluler",
+    "otherProjects": "Boleh memanggil agen dari proyek lain",
+    "peopleNote": "Batas ini tidak pernah menahan apa yang diminta seseorang.",
+    "failed": "Tidak bisa menyimpan. Coba lagi."
+  },
   "stretchCard": {
     "continued": "{{name}} membiarkan mereka lanjut · {{time}}",
     "continuedByYou": "Kamu membiarkan mereka lanjut · {{time}}"
@@ -10251,6 +10296,7 @@
     "stopFailed": "Tidak bisa dihentikan. Hanya yang meminta, pemilik agen, atau admin yang bisa.",
     "autoUpdate": "Masih dikerjakan ({{duration}}).",
     "autoUpdateNow": "Sekarang: {{now}}.",
+    "statusReply": "Masih mengerjakannya ({{duration}}). Saya baca pesan Anda setelah langkah ini.",
     "status": {
       "one": "Sedang mengerjakan: {{subject}}",
       "oneUntitled": "Bekerja di latar belakang",
@@ -10604,6 +10650,13 @@
       "agent": "Bersama {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Tidak ada yang memintanya langsung. Boleh saya buka pull request?",
+        "install": "Tidak ada yang memintanya langsung. Boleh saya pasang paket ini?",
+        "long": "Ini butuh banyak langkah, dan tidak ada yang memintanya langsung. Boleh saya lanjutkan?"
+      },
+      "autonomy_digest_other": "{{count}} peringatan tampak sudah dikenal atau tidak berbahaya, jadi tidak saya kerjakan:",
+      "autonomy_loop": "Saya berhenti mengerjakan ini atas inisiatif sendiri. Ini muncul lagi {{count}} kali dalam sehari ({{title}}). Beri tahu saya bagaimana Anda ingin menanganinya.",
       "mission_plan": "Rencana untuk “{{title}}” di {{computer}}",
       "mission_planNoComputer": "Rencana untuk “{{title}}”",
       "mission_decision": "Keputusan: {{question}}",

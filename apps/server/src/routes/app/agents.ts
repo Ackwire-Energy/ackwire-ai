@@ -17,6 +17,7 @@ import {
   createCredential,
   createProposedAgent,
   createProposedRoutine,
+  decideCostlyProposal,
   deleteAgent,
   deleteAgentGroup,
   deleteCredential,
@@ -72,6 +73,7 @@ import {
   AgentAppearance,
   AgentAudience,
   AgentBrain,
+  AgentBrakes,
   AgentSetup,
   AgentSetupResult,
   BrainEffortSetting,
@@ -142,6 +144,9 @@ const AgentFields = z.object({
   mediaReplies: z.boolean().optional().openapi({
     description:
       "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows; off: never. Like the other fields, editing it needs `manage_agents`. Default on.",
+  }),
+  brakes: AgentBrakes.partial().optional().openapi({
+    description: "Its autonomy brakes (ADR 0131); the fields given change, the rest stay. Needs `manage_agents`.",
   }),
 });
 
@@ -617,7 +622,7 @@ export function agentRoutes(deps: AppDeps) {
       responses: { 201: json(Agent, "Created"), ...errors },
     }),
     async (c) => {
-      const { monthlyBudgetUsd, audience, appearance, proposal, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, proposal, brakes: _brakes, ...input } = c.req.valid("json");
       const orgId = c.req.valid("param").orgId;
       const make = () =>
         createAgent(
@@ -645,6 +650,34 @@ export function agentRoutes(deps: AppDeps) {
       const userId = c.get("user").id;
       const [seesCost, talks] = await Promise.all([canViewCost(db, userId, orgId), speakerFor(db, orgId, userId)]);
       return c.json(toAgent(agent, userId, seesCost, undefined, undefined, talks), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/autonomy-proposals/{signalId}",
+      tags,
+      security,
+      summary: "Decide an agent's proposal of costly work nobody asked for",
+      description:
+        "The proposal card (ADR 0131 §3): `go` for this run, `not_now`, or `always` / `never` remembered on the agent for this kind. The person it is for, the agent's owner or someone who manages agents. The run that asked hears it and wakes.",
+      request: {
+        params: OrgParams.extend({ signalId: z.uuid() }),
+        body: body(z.object({ decision: z.enum(["go", "not_now", "never", "always"]) })),
+      },
+      responses: { 200: json(z.object({ state: z.enum(["go", "not_now", "never", "always"]) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, signalId } = c.req.valid("param");
+      const out = await decideCostlyProposal(
+        { db, pubsub: adapters.pubsub },
+        c.get("user").id,
+        orgId,
+        signalId,
+        c.req.valid("json").decision,
+      );
+      return c.json(out, 200);
     },
   );
 
@@ -781,7 +814,16 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { monthlyBudgetUsd, audience, appearance, coordinator, acceptPlanTerms: _, ...input } = c.req.valid("json");
+      const {
+        monthlyBudgetUsd,
+        audience,
+        appearance,
+        coordinator,
+        acceptPlanTerms: _,
+        brakes,
+        ...rest
+      } = c.req.valid("json");
+      const input = { ...rest, ...(brakes ? { autonomyBrakes: brakes } : {}) };
       const actor = c.get("user").id;
       // The audience and the look can be changed by the agent's owner too, and who coordinates has its own call;
       // everything else needs an admin.

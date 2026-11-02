@@ -51,6 +51,7 @@ import {
 } from "@/ui";
 import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
+import { CostlyProposalCard } from "../ai/CostlyProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
 import { UsagePauseCard } from "../ai/UsagePauseCard";
@@ -554,6 +555,7 @@ export const MessageRow = memo(function MessageRow({
         {/* What waits for a person's click comes last, after the words and the tools. */}
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
+        {isAgent ? <CostlyProposalCard message={m} /> : null}
         {isAgent ? <UsagePauseCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
         {isAgent ? <InstructionProposals message={m} /> : null}

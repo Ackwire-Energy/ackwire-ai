@@ -97,6 +97,7 @@ const INCIDENTAL = new Set([
   "permission_change",
   "connector_tool_level",
   "agent_media",
+  "alert_triage",
 ]);
 
 export interface WorldOptions {

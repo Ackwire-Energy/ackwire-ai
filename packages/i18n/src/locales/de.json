@@ -1751,6 +1751,51 @@
     "remove": "Entfernen",
     "send": "Trotzdem senden"
   },
+  "costlyCard": {
+    "go": "Mach es",
+    "always": "Immer",
+    "notNow": "Jetzt nicht",
+    "never": "Nie",
+    "waiting": "Wartet auf die verantwortliche Person",
+    "you": "Du",
+    "decided": {
+      "go": "{{name}} hat zugestimmt",
+      "always": "{{name}} hat dafür immer gesagt",
+      "not_now": "{{name}} hat jetzt nicht gesagt",
+      "never": "{{name}} hat dafür nie gesagt"
+    }
+  },
+  "brakes": {
+    "title": "Arbeit, um die niemand gebeten hat",
+    "subtitle": "Was der Agent selbst beginnt, nach einer Routine, einem Alarm oder einem anderen Agenten. Was eine Person verlangt, wird nie aufgehalten.",
+    "costly": "Vor teurer Arbeit fragen",
+    "costlyHelp": "Bevor er einen Pull Request öffnet, Pakete installiert oder eine lange Aufgabe beginnt, fragt er die verantwortliche Person.",
+    "costlyAsk": "Erst fragen",
+    "costlyGo": "Einfach machen",
+    "cost": {
+      "pr": "Pull Requests öffnen",
+      "install": "Pakete installieren",
+      "long": "lange Aufgaben"
+    },
+    "rememberedGo": "Immer: {{what}}",
+    "rememberedNever": "Nie: {{what}}",
+    "forget": "Diese Antworten vergessen",
+    "atOnce": "Aufgaben gleichzeitig",
+    "atOnceHelp": "Wie viele Aufgaben, um die niemand gebeten hat, er gleichzeitig erledigt. Die anderen warten, bis sie dran sind.",
+    "prs": "Pull Requests pro Stunde",
+    "prsHelp": "Höchstens so viele öffnet seine eigene Arbeit in einer Stunde.",
+    "call": "Agenten, die er rufen darf",
+    "callHelp": "Wen er erwähnen oder wem er Arbeit übergeben darf.",
+    "callAll": "Alle",
+    "callSome": "Nur diese",
+    "callNone": "Keine",
+    "project": "Projekt",
+    "projectHelp": "Agenten verschiedener Projekte rufen einander nicht.",
+    "projectPlaceholder": "Mobile App",
+    "otherProjects": "Darf Agenten anderer Projekte rufen",
+    "peopleNote": "Diese Grenzen halten nie auf, worum eine Person bittet.",
+    "failed": "Konnte nicht gespeichert werden. Versuch es noch einmal."
+  },
   "stretchCard": {
     "continued": "{{name}} hat sie weitermachen lassen · {{time}}",
     "continuedByYou": "Du hast sie weitermachen lassen · {{time}}"
@@ -10574,6 +10619,7 @@
     "stopFailed": "Konnte nicht gestoppt werden. Das können nur, wer gefragt hat, der Inhaber des Agenten oder ein Admin.",
     "autoUpdate": "Noch dran ({{duration}}).",
     "autoUpdateNow": "Gerade: {{now}}.",
+    "statusReply": "Ich arbeite noch daran ({{duration}}). Ich lese deine Nachricht nach diesem Schritt.",
     "status": {
       "one": "Arbeitet an: {{subject}}",
       "oneUntitled": "Arbeitet im Hintergrund",
@@ -10935,6 +10981,14 @@
       "agent": "Mit {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Niemand hat direkt darum gebeten. Darf ich einen Pull Request öffnen?",
+        "install": "Niemand hat direkt darum gebeten. Darf ich diese Pakete installieren?",
+        "long": "Das braucht viele Schritte, und niemand hat direkt darum gebeten. Darf ich weitermachen?"
+      },
+      "autonomy_digest_one": "{{count}} Alarm wirkte bekannt oder harmlos, deshalb habe ich nicht daran gearbeitet:",
+      "autonomy_digest_other": "{{count}} Alarme wirkten bekannt oder harmlos, deshalb habe ich nicht daran gearbeitet:",
+      "autonomy_loop": "Ich habe aufgehört, von mir aus daran zu arbeiten. Es kam {{count}} Mal an einem Tag zurück ({{title}}). Sag mir, wie ich damit umgehen soll.",
       "mission_plan": "Plan für „{{title}}“ auf {{computer}}",
       "mission_planNoComputer": "Plan für „{{title}}“",
       "mission_decision": "Entscheidung: {{question}}",

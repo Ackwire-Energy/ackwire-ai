@@ -4,6 +4,7 @@ import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiStates } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo, type Speaker, speakerFor, speakerOf, viaAgent } from "./audience";
+import { mayCall } from "./autonomy-settings";
 import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
@@ -108,6 +109,7 @@ type Teammate = Pick<
   | "audienceRoleIds"
   | "consultable"
   | "brain"
+  | "autonomyBrakes"
 >;
 
 /** The org's active agents, oldest first (per-process cache; agent writes drop it). */
@@ -126,6 +128,7 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
         audienceRoleIds: agents.audienceRoleIds,
         consultable: agents.consultable,
         brain: agents.brain,
+        autonomyBrakes: agents.autonomyBrakes,
       })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
@@ -221,8 +224,8 @@ export async function renamedAgentsPrompt(db: Database, orgId: string, texts: st
 }
 
 /**
- * The org's other agents a run may ask for the person behind it (they talk to them, or take consultations), `skip`
- * left out: who "# Your team" lists.
+ * The org's other agents a run may ask for the person behind it (they talk to them, or take consultations) and its
+ * own settings let it call (ADR 0131 §8), `skip` left out: who "# Your team" lists.
  */
 export const teammatesFor = (
   team: Teammate[],
@@ -230,7 +233,16 @@ export const teammatesFor = (
   requester: string | null,
   skip: Set<string>,
   talks: Speaker,
-) => team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, viaAgent(talks)));
+) => {
+  const self = team.find((a) => a.id === selfId)?.autonomyBrakes;
+  return team.filter(
+    (a) =>
+      a.id !== selfId &&
+      !skip.has(a.id) &&
+      canTalkTo(a, requester, viaAgent(talks)) &&
+      mayCall(self, { id: a.id, autonomy: a.autonomyBrakes }),
+  );
+};
 
 /**
  * The teammates a run can reach, as `@handle (role)` (at most 10), for its general means (ADR 0109): those the

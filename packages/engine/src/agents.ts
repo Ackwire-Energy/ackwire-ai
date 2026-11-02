@@ -18,6 +18,7 @@ import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
 import { answersOthers, audienceOf } from "./audience";
 import { recordAudit } from "./audit";
+import { type AutonomySettings, autonomySettings } from "./autonomy-settings";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
@@ -82,6 +83,8 @@ export interface AgentInput {
   monthlyBudgetNanoUsd?: number | null;
   /** It may follow a light reply with a sticker or a GIF (ADR 0091), as often as the workspace allows. */
   mediaReplies?: boolean;
+  /** Its autonomy brakes (ADR 0131), stored as `autonomySettings` reads them. */
+  autonomyBrakes?: Partial<AutonomySettings>;
 }
 
 /** An agent's fields as the API takes them: its handle, model, key (of the model's provider), budget and owner. */
@@ -320,8 +323,19 @@ export async function updateAgent(
   options: { remember?: boolean } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "manage_agents");
-  const input =
+  const cleaned =
     patch.handle === undefined ? patch : { ...patch, handle: patch.handle.trim().replace(/^@/, "").toLowerCase() };
+  // Stored whole and normalized: what the brakes read is what the settings show.
+  const input =
+    cleaned.autonomyBrakes === undefined
+      ? cleaned
+      : {
+          ...cleaned,
+          autonomyBrakes: autonomySettings({
+            ...autonomySettings((await getAgent(db, orgId, agentId))?.autonomyBrakes),
+            ...cleaned.autonomyBrakes,
+          }),
+        };
   await validateAgentFields(db, orgId, input);
   const handle = input.handle;
   if (handle !== undefined) {
@@ -542,6 +556,8 @@ export const agentView = (a: Agent) => ({
   /** It may follow a light reply with a sticker or a GIF (ADR 0091). */
   mediaReplies: a.mediaReplies,
   coordinator: a.coordinator,
+  /** Its autonomy brakes (ADR 0131), with the defaults filled in. */
+  brakes: autonomySettings(a.autonomyBrakes),
   createdAt: a.createdAt,
 });
 
