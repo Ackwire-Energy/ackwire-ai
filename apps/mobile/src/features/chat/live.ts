@@ -249,6 +249,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "poll.updated":
       qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
       break;
+    case "choices.updated":
+      qc.setQueryData(keys.choices(orgId, event.choices.id), event.choices);
+      break;
     case "message.memories":
       // What an agent saved from a person's message: the memory mark under it.
       cacheMessageMemories(qc, orgId, channelId, event.messageId, event.memories);

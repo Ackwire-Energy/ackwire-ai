@@ -53,6 +53,7 @@ import type {
   ChannelCard,
   ChannelCategory,
   ChannelMember,
+  Choices,
   CodeSent,
   CommandApproval,
   ComposioUsage,
@@ -1023,6 +1024,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       poll: (orgId, id) => request<Poll>(`${org(orgId)}/polls/${enc(id)}`),
       vote: (orgId, id, options) =>
         request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),
+      choices: (orgId, id) => request<Choices>(`${org(orgId)}/choices/${enc(id)}`),
+      answerChoices: (orgId, id, picks, clientId) =>
+        request<{ choices: Choices; messageId: string }>(`${org(orgId)}/choices/${enc(id)}/answer`, {
+          json: { picks, clientId },
+        }),
       versions: async (orgId, id) =>
         (await request<{ versions: ArtifactVersion[] }>(`${org(orgId)}/artifacts/${enc(id)}/versions`)).versions,
       download: (orgId, id, version) =>

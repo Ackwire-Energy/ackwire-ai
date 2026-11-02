@@ -13,6 +13,7 @@ export const KIND_ICON = {
   file: "file",
   block: "page",
   poll: "check",
+  choices: "check",
 } as const satisfies Record<ArtifactKind, string>;
 
 export const isArtifactKind = (v: unknown): v is ArtifactKind => ARTIFACT_KINDS.includes(v as ArtifactKind);
@@ -155,9 +156,16 @@ export function fileName(title: string, content: ArtifactContent | { kind: Artif
       .replace(/[^\w]+/g, "-")
       .replace(/^-|-$/g, "")
       .toLowerCase() || "arquivo";
-  const ext = { document: "md", table, diff: "patch", diagram: "mmd", html: "html", block: "html", poll: "json" }[
-    content.kind
-  ];
+  const ext = {
+    document: "md",
+    table,
+    diff: "patch",
+    diagram: "mmd",
+    html: "html",
+    block: "html",
+    poll: "json",
+    choices: "json",
+  }[content.kind];
   return `${slug}.${ext}`;
 }
 

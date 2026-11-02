@@ -4,6 +4,7 @@ import { documentPreview, KIND_ICON, patchCounts } from "@agenteschat/client/lib
 import { Icon } from "@agenteschat/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ChoicesCard } from "@/components/blocks/ChoicesCard";
 import { LiveBlockCard } from "@/components/blocks/LiveBlock";
 import { PollCard } from "@/components/blocks/PollCard";
 import { useOrg } from "@/components/org-context";
@@ -49,6 +50,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   // What lives in the conversation isn't a file: the thing itself, not a card that opens it (ADR 0113).
   if (a.kind === "block") return <LiveBlockCard id={a.id} version={a.shownVersion} />;
   if (a.kind === "poll") return <PollCard id={a.id} version={a.shownVersion} />;
+  if (a.kind === "choices") return <ChoicesCard id={a.id} version={a.shownVersion} />;
   const open = () => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined);
   // The desktop app's right click: open, download, its link, and the trash for who may delete it.
   const onContextMenu = contextMenuHandler(() => [
@@ -214,6 +216,7 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
     case "file":
     case "block":
     case "poll":
+    case "choices":
       // Files render as tiles and blocks and votes as themselves (`ArtifactCard`), never inside a card.
       return null;
   }

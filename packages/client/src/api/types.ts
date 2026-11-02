@@ -1012,6 +1012,8 @@ export type ChannelEvent =
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: Poll }
+  /** A choice card was answered (ADR 0124). */
+  | { type: "choices.updated"; channelId: string; choices: Choices }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws. */
   | {
@@ -2492,7 +2494,7 @@ export interface StorageMigration {
 
 // ── Artifacts (expected: `…/artifacts`, events `artifact.created` / `artifact.updated`, `meta.artifacts`) ──
 
-export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html" | "file" | "block" | "poll";
+export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html" | "file" | "block" | "poll" | "choices";
 
 /**
  * An uploaded file as is (ADR 0025): metadata only; the bytes come from the
@@ -2527,7 +2529,20 @@ export type ArtifactContent =
   | { kind: "html"; html: string }
   | { kind: "block"; html: string; subtitle?: string }
   | { kind: "poll"; question: string; options: string[]; multiple: boolean }
+  | { kind: "choices"; questions: ChoiceQuestion[] }
   | ArtifactFileContent;
+
+/** One question of a choice card (ADR 0124): its options show as A, B, C… */
+export interface ChoiceQuestion {
+  question: string;
+  options: { label: string; description?: string }[];
+}
+
+/** A choice card's answer, once someone picked (`choices.updated`): the option of each question, in order. */
+export interface Choices {
+  id: string;
+  answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
+}
 
 /** One person's mark in a poll: a row per option they chose. */
 export interface PollVote {

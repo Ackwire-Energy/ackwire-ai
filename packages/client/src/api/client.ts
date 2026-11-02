@@ -64,6 +64,7 @@ import type {
   ChannelCard,
   ChannelCategory,
   ChannelMember,
+  Choices,
   CodeSent,
   CommandApproval,
   ComposioUsage,
@@ -1233,6 +1234,15 @@ export interface ApiClient {
     poll(orgId: string, id: string): Promise<Poll>;
     /** Replaces the viewer's marks in a vote; empty takes them back. */
     vote(orgId: string, id: string, options: number[]): Promise<Poll>;
+    /** A choice card's answer (ADR 0124). */
+    choices(orgId: string, id: string): Promise<Choices>;
+    /** Answers a choice card: one option per question, sent to its agent as the person's own message. */
+    answerChoices(
+      orgId: string,
+      id: string,
+      picks: number[],
+      clientId: string,
+    ): Promise<{ choices: Choices; messageId: string }>;
     versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
     /** Short-lived signed URL for the stored file. */
     download(orgId: string, id: string, version?: number): Promise<{ url: string; expiresAt: string }>;

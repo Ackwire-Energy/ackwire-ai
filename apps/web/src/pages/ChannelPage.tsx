@@ -94,6 +94,7 @@ import {
   runPosition,
   usageLine,
 } from "@agenteschat/client/lib/chat";
+import { choiceReplyLine } from "@agenteschat/client/lib/choices";
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
@@ -103,6 +104,7 @@ import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@
 import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
@@ -2697,7 +2699,7 @@ function LiveRunStatus({
 
 /**
  * Under a stopped answer: "Parado por você · Continuar", or "No limite de passos · Continuar" under the
- * reply of a run that reached its step limit. Continuar starts a new run of the same agent from where it
+ * reply of a run that reached its step limit, or just Continuar under the end of a long work its AI provider failed. Continuar starts a new run of the same agent from where it
  * stopped; it goes away for everyone once someone pressed it.
  */
 function StoppedLine({
@@ -2712,8 +2714,11 @@ function StoppedLine({
   byUserId: string | null | undefined;
   /** The server's line, for older messages without a person in the meta. */
   note?: string | null;
-  /** The run ended at its step limit, or because it got stuck (`meta.stepLimit`): nobody stopped it. */
-  limit?: "steps" | "stuck";
+  /**
+   * The run ended at its step limit, or because it got stuck (`meta.stepLimit`), or its long work failed on its AI
+   * provider (`meta.workEnd`, whose text already says so): nobody stopped it.
+   */
+  limit?: "steps" | "stuck" | "failed";
   /** Who may continue: the same people who may stop it. */
   owner: { agentId: string; channelId: string; threadId: string; triggerMessageId?: string | null } | null;
   /** The stopped reply, once it is saved (its meta says when it was continued). */
@@ -2727,7 +2732,9 @@ function StoppedLine({
   const continued = useWasContinued(runId, message);
   const stopper = byUserId ? dir.memberById.get(byUserId)?.name : undefined;
   const who = limit
-    ? t(limit === "stuck" ? "run.stuck" : "run.stepLimit")
+    ? limit === "failed"
+      ? null
+      : t(limit === "stuck" ? "run.stuck" : "run.stepLimit")
     : byUserId && byUserId === me.user.id
       ? t("run.stoppedByYou")
       : stopper
@@ -2735,15 +2742,16 @@ function StoppedLine({
         : byUserId || !note
           ? t("run.stopped")
           : note;
-  // Only a run a person stopped, or one at its step limit, picks up again.
+  // Only a run a person stopped, one at its step limit, or long work its provider cut off, picks up again.
   const can = Boolean(runId && (byUserId || limit) && owner && !continued && canStop(owner));
+  if (!who && !can) return null;
   return (
     <p className="ac-msg__activity run-canceled">
-      <PixelStop size={12} dim />
-      <span>{who}</span>
+      {who && <PixelStop size={12} dim />}
+      {who && <span>{who}</span>}
       {can && runId && (
         <>
-          <span aria-hidden="true">·</span>
+          {who && <span aria-hidden="true">·</span>}
           <button type="button" className="run-continue" disabled={cont.isPending} onClick={() => cont.mutate(runId)}>
             <Icon name="play" size={14} />
             {t("run.continueRun")}
@@ -3241,12 +3249,19 @@ export const TimelineMessage = memo(function TimelineMessage({
     () => splitCanceled(serverBody(t, m.body, m.meta, i18n.language), m.meta),
     [t, m.body, m.meta, i18n.language],
   );
-  const body = reminderBody(stopped.body, m.meta);
+  const said = reminderBody(stopped.body, m.meta);
+  // A long work's anchor once it's over: no promise left, and dimmed (its line says how it ended).
+  const body = m.longWork ? workAnchorBody(t, said, m.meta, m.longWork) : said;
+  const workOver = Boolean(m.longWork && workIsOver(m.longWork));
+  // The person's pick on a choice card (ADR 0124): one compact line.
+  const choiceReply = Boolean(m.meta?.choiceReply);
   // My own message with a code block or a table: the bubble takes the row's whole width.
   const wide = useMemo(() => own && hasWideBlock(body), [own, body]);
   // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
   const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
   const atLimit = ended ? (ended.stuck === true ? "stuck" : "steps") : undefined;
+  // A long work's end after its AI provider failed: Continuar under it as well.
+  const providerCut = m.author.type === "agent" && Boolean(workContinuable(m.meta));
 
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
@@ -3629,8 +3644,9 @@ export const TimelineMessage = memo(function TimelineMessage({
             !actionCard &&
             // A question's card already says it: its own text isn't repeated above.
             !(question && body.trim() === question.text.trim()) &&
+            !choiceReply &&
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
-              <MessageText>
+              <MessageText style={workOver ? { opacity: 0.6 } : undefined}>
                 <MessageBody
                   body={body}
                   resolveMention={dir.mentionName}
@@ -3641,13 +3657,19 @@ export const TimelineMessage = memo(function TimelineMessage({
                 />
               </MessageText>
             )}
+          {choiceReply && (
+            <p className="choice-reply">
+              <Icon name="check" size={14} />
+              <b>{choiceReplyLine(body)}</b>
+            </p>
+          )}
           {media && <ChatMedia media={media} />}
-          {(stopped.canceled || atLimit) && (
+          {(stopped.canceled || atLimit || providerCut) && (
             <StoppedLine
               runId={m.agentRunId}
               byUserId={stopped.byUserId}
               note={stopped.note}
-              limit={atLimit}
+              limit={providerCut ? "failed" : atLimit}
               owner={
                 m.author.type === "agent" && m.author.id
                   ? { agentId: m.author.id, channelId: m.channelId, threadId: m.threadId ?? m.id }

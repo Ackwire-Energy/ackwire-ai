@@ -2691,6 +2691,27 @@ export const useVote = (orgId: string, id: string) => {
   });
 };
 
+/** A choice card's answer (ADR 0124): it comes in over the socket too (`choices.updated`). */
+export const useChoices = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.choices(orgId, id ?? ""),
+    queryFn: () => api.artifacts.choices(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export const useAnswerChoices = (orgId: string, id: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (picks: number[]) => api.artifacts.answerChoices(orgId, id, picks, newClientId()),
+    onSuccess: (out) => qc.setQueryData(keys.choices(orgId, id), out.choices),
+    // The card says it itself, and says nothing when someone answered first.
+    meta: { silent: true },
+  });
+};
+
 export const useKeepBlock = (orgId: string, id: string) => {
   const api = useApi();
   const qc = useQueryClient();

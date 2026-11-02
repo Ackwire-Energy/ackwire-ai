@@ -104,6 +104,7 @@ const HERE = new Set([
   "ask_user",
   "show_block",
   "start_poll",
+  "ask_choices",
   "share_artifact",
   "suggest_forum_topic",
   "propose_mission",
