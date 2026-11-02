@@ -532,7 +532,9 @@
     "copied": "Kopyalandı",
     "retry": "Tekrar deneyin",
     "openTailscale": "Tailscale'i aç",
-    "otherServer": "Başka bir sunucu kullan"
+    "otherServer": "Başka bir sunucu kullan",
+    "stuck": "agentes.chat açılmadı. Yeniden dene ya da sayfayı olduğu gibi gör.",
+    "showAnyway": "Yine de göster"
   },
   "menu": {
     "about": "agentes.chat hakkında",
