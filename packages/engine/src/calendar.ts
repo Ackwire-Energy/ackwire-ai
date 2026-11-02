@@ -8,7 +8,7 @@ import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./
 import { getOrgSettings } from "./management";
 import { insertMessage, messageView } from "./messages";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
-import { routineSlots } from "./routines";
+import { routineSeer, routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
 import { replyThreadOf } from "./runs";
 
@@ -908,8 +908,9 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
     .from(routines)
     .where(and(eq(routines.orgId, orgId), eq(routines.active, true), eq(routines.triggerType, "schedule")));
   const routineRuns: { routineId: string; name: string; agentId: string; at: string; target: unknown }[] = [];
+  const sees = await routineSeer(db, orgId, userId);
   for (const r of routineRows) {
-    if (r.deletedAt) continue;
+    if (r.deletedAt || !sees(r)) continue;
     for (const at of routineSlots(r, from, to)) {
       routineRuns.push({ routineId: r.id, name: r.name, agentId: r.agentId, at: at.toISOString(), target: r.target });
     }
