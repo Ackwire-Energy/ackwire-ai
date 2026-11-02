@@ -146,8 +146,8 @@ import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalUser } 
 export const DEFAULT_LIMITS = {
   maxConcurrentTasks: 3,
   taskMaxSeconds: 4 * 3600,
-  brainIdleMinutes: 10,
-  brainMaxProcesses: 3,
+  brainIdleMinutes: 3,
+  brainMaxProcesses: 1,
 } as const;
 
 /** Bounds for `config.set` (the app's Preferences). */
@@ -987,6 +987,8 @@ export class RunnerDaemon implements RequestObserver {
       gitCache: path.join(home, "git-cache"),
       tasks,
       brains,
+      // System mode: root runs no turns; its agents' CLIs are their workers'.
+      reclaimBrains: supervisor ? () => supervisor.reclaimBrains() : () => brains.reclaimIdle(),
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
       // A config written later without the mode never turns a system session back into one that does agents' work.

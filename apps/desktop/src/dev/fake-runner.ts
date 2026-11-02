@@ -213,7 +213,7 @@ const SIGN_IN_POOL: (() => FakeOrgSeed)[] = [
   }),
 ];
 
-const DEFAULT_CONFIG = { maxConcurrentTasks: 3, taskMaxSeconds: 4 * 3600, brainIdleMinutes: 10, brainMaxProcesses: 3 };
+const DEFAULT_CONFIG = { maxConcurrentTasks: 3, taskMaxSeconds: 4 * 3600, brainIdleMinutes: 3, brainMaxProcesses: 1 };
 
 export class FakeRunner {
   private seed: FakeOrgSeed | null;

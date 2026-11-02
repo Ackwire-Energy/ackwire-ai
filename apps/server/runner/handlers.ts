@@ -60,6 +60,8 @@ export const TURNS_WITHOUT_MEMORY = 8;
 export const TURN_BYTES = 0.6e9;
 /** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
 export const TURN_SETTLE_MS = 30_000;
+/** How long a turn without room may wait while idle warm CLIs close for it, before `no_slot`. */
+export const RECLAIM_MS = 5_000;
 /**
  * Never refused for room nor at the ceiling: a brain turn holds its request for the whole turn, so a computer
  * full of agents' work would otherwise keep people from watching or taking control, or a person in control from
@@ -180,6 +182,11 @@ export interface HandlerContext {
   cacheFill?: CacheFill;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
+  /**
+   * A brain turn found no room: closes one idle warm CLI on this computer (each worker's, in system mode),
+   * least recently used first, never one mid-turn or holding the agent's work; false when none could close.
+   */
+  reclaimBrains?: () => Promise<boolean>;
   /**
    * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
    * scratch), how Codex starts our MCP server, and the live Codex runs the
@@ -1164,6 +1171,8 @@ export interface Admission {
   /** The memory available now (default: `/proc/meminfo`, as desktops read it; null: not known). */
   memAvailable?: () => number | null;
   now?: () => number;
+  /** Tests: `RECLAIM_MS`. */
+  reclaimMs?: number;
 }
 
 /**
@@ -1198,11 +1207,28 @@ export class RequestRunner {
   private admit(): boolean {
     const now = (this.admission.now ?? Date.now)();
     this.admitted = this.admitted.filter((at) => now - at < TURN_SETTLE_MS);
-    const free = (this.admission.memAvailable ?? hostMemAvailable)();
+    const free = this.memAvailable();
     const room =
       free === null ? this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= MIN_FREE_BYTES;
     if (room) this.admitted.push(now);
     return room;
+  }
+
+  private memAvailable() {
+    return (this.admission.memAvailable ?? hostMemAvailable)();
+  }
+
+  /**
+   * No room for a turn: idle warm CLIs close, one at a time, until there is, for up to `RECLAIM_MS`. Not where
+   * memory isn't known: room there is a count of turns, which closing idle CLIs doesn't change.
+   */
+  private async reclaim(close: () => Promise<boolean>): Promise<boolean> {
+    const until = Date.now() + (this.admission.reclaimMs ?? RECLAIM_MS);
+    while (Date.now() < until) {
+      if (!(await close())) return false;
+      if (this.admit()) return true;
+    }
+    return false;
   }
 
   get size() {
@@ -1220,15 +1246,33 @@ export class RequestRunner {
       this.reply(id, { ok: false, error: { code: "internal", message: "busy" } });
       return Promise.resolve();
     }
-    const turn = req.op === "brain.turn";
-    // A paused computer says so (the handler refuses new work), never that it is full.
-    if (turn && !this.ctx.paused?.() && !this.admit()) {
-      const message = "This computer is short of memory for more work right now";
-      this.reply(id, { ok: false, error: { code: "no_slot", message } });
-      return Promise.resolve();
-    }
-    if (turn) this.turns++;
     const controller = new AbortController();
+    // A paused computer says so (the handler refuses new work), never that it is full.
+    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit()) {
+      const close = this.ctx.reclaimBrains;
+      if (!close || this.memAvailable() === null) {
+        this.full(id);
+        return Promise.resolve();
+      }
+      // Held meanwhile: a duplicate id is refused, a cancel reaches it (the turn then ends at once as canceled).
+      this.inflight.set(id, controller);
+      return this.reclaim(close).then((room) => {
+        if (room && !this.closed) return this.run(id, req, controller);
+        this.inflight.delete(id);
+        this.full(id);
+      });
+    }
+    return this.run(id, req, controller);
+  }
+
+  private full(id: string) {
+    const message = "This computer is short of memory for more work right now";
+    this.reply(id, { ok: false, error: { code: "no_slot", message } });
+  }
+
+  private run(id: string, req: MachineRequest, controller: AbortController): Promise<void> {
+    const turn = req.op === "brain.turn";
+    if (turn) this.turns++;
     this.inflight.set(id, controller);
     // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`) and
     // what it waited on first (`(install 28.1 s, launch 1.4 s)`).

@@ -108,6 +108,8 @@ const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
 /** Clone slots one worker may hold or wait for at once. */
 const MAX_WORKER_SLOTS = 64;
+/** How long `reclaimBrains` waits for the workers (each waits up to `RECLAIM_EXIT_MS` for its CLI to exit). */
+const RECLAIM_REPLY_MS = 3_000;
 
 /** The broker is a child of the root runner home, never of an agent-owned home. */
 function secureSecretRoot(home: string, requireRoot = false): string {
@@ -193,6 +195,10 @@ export type WorkerLinkFrame =
     }
   /** From the worker: its agent's Chrome is in use on the agent's desktop (`BROWSER_LEASE_MS`). */
   | { type: "browser.desktop" }
+  /** To the worker: close its least recently used idle brain CLI (`BrainManager.reclaimIdle`). */
+  | { type: "brain.reclaim"; reclaimId: string }
+  /** From the worker: whether it closed one. */
+  | { type: "brain.reclaimed"; reclaimId: string; closed: boolean }
   /** To the worker: Browser was clicked on its agent's desktop (`BrowserManager.show`). */
   | { type: "browser.show"; showId: string; agent: AgentScope }
   /** From the worker: Chrome for Testing installs first. */
@@ -283,6 +289,8 @@ export interface SupervisorOptions {
   now?: () => number;
   /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
   showMs?: number;
+  /** Tests: `RECLAIM_REPLY_MS`. */
+  reclaimMs?: number;
   /** What root relayed, `relayed.json` (the live view of the agents' browsers is counted here). */
   relayed?: RelayCount;
   /** Tests: where processes are read (`/proc`), and how systemd is asked to move one. */
@@ -329,6 +337,8 @@ interface Worker {
   enters: number[];
   /** Its clone slots, by its id (`release` once it has one): a worker that stops gives them back. */
   slots: Map<string, { release?: () => void }>;
+  /** `brain.reclaim`s it hasn't answered, by this side's id: whether it closed a CLI. */
+  reclaims: Map<string, (closed: boolean) => void>;
 }
 
 interface Show {
@@ -552,6 +562,34 @@ export class Supervisor {
     if (w && this.online) this.send(w, frame);
   }
 
+  /**
+   * A brain turn found no room on the computer: each worker closes its least recently used idle CLI (never one
+   * mid-turn or holding its agent's work). True once any did; a worker that doesn't answer in time counts as none.
+   */
+  reclaimBrains(): Promise<boolean> {
+    const asked = [...this.workers.values()].filter((w) => w.ready);
+    if (asked.length === 0) return Promise.resolve(false);
+    const reclaimId = String(++this.seq);
+    return new Promise((resolve) => {
+      let left = asked.length;
+      let closed = false;
+      const done = () => {
+        clearTimeout(late);
+        for (const w of asked) w.reclaims.delete(reclaimId);
+        resolve(closed);
+      };
+      const late = setTimeout(done, this.opts.reclaimMs ?? RECLAIM_REPLY_MS);
+      for (const w of asked) {
+        w.reclaims.set(reclaimId, (c) => {
+          if (!w.reclaims.delete(reclaimId)) return;
+          closed ||= c;
+          if (--left === 0) done();
+        });
+        this.send(w, { type: "brain.reclaim", reclaimId });
+      }
+    });
+  }
+
   /** The computer's pause, access or limits, or who watches an agent's desktop, may have changed. */
   stateChanged() {
     for (const w of this.workers.values()) this.sendState(w);
@@ -648,6 +686,7 @@ export class Supervisor {
         browserLeaseAt: 0,
         enters: [],
         slots: new Map(),
+        reclaims: new Map(),
       };
       this.workers.set(user.id, w);
     }
@@ -999,6 +1038,10 @@ export class Supervisor {
         this.traffic.up += f.up;
         this.traffic.down += f.down;
       }
+      return;
+    }
+    if (f?.type === "brain.reclaimed") {
+      w.reclaims.get(typeof f.reclaimId === "string" ? f.reclaimId : "")?.(f.closed === true);
       return;
     }
     if (f?.type === "secret.installed") {

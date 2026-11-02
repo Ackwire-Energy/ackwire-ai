@@ -628,6 +628,55 @@ test("a cancel reaches only the worker that runs that request", async () => {
   expect(await errorCode(() => pending)).toBe("internal");
 });
 
+test("room for a turn: root asks every worker to close an idle CLI; one that did is enough, a silent one doesn't hold it", async () => {
+  const t = setup({ reclaimMs: 200 });
+  t.sup.boot();
+  t.sup.attach();
+  // No worker up: nothing to close.
+  expect(await t.sup.reclaimBrains()).toBe(false);
+  const runs = [ANA, BIA].map((a) => handleRequest(t.ctx, exec(a, "sleep 100"), scope().scope));
+  await waitFor(() => t.workers.length === 2);
+  for (const w of t.workers) w.hello();
+  const ana = t.last(ANA.id);
+  const bia = t.last(BIA.id);
+  const asked = t.sup.reclaimBrains();
+  await waitFor(() => ana.of("brain.reclaim").length === 1 && bia.of("brain.reclaim").length === 1);
+  const id = ana.of("brain.reclaim")[0]?.reclaimId;
+  expect(bia.of("brain.reclaim")[0]?.reclaimId).toBe(id);
+  // Another ask's answer, then each worker's own.
+  ana.send({ type: "brain.reclaimed", reclaimId: "nope", closed: true });
+  ana.send({ type: "brain.reclaimed", reclaimId: id, closed: false });
+  bia.send({ type: "brain.reclaimed", reclaimId: id, closed: true });
+  expect(await asked).toBe(true);
+  // Bia's worker says nothing: Ana's "none" ends it in time.
+  const silent = t.sup.reclaimBrains();
+  await waitFor(() => ana.of("brain.reclaim").length === 2);
+  ana.send({ type: "brain.reclaimed", reclaimId: ana.of("brain.reclaim")[1]?.reclaimId, closed: false });
+  expect(await silent).toBe(false);
+  for (const [w, q] of [
+    [ana, await requestOn(ana)],
+    [bia, await requestOn(bia)],
+  ] as const)
+    w.send({ type: "result", id: q.id, ok: true, data: execDone });
+  await Promise.all(runs);
+
+  // The worker's end: it closes one of its own and says whether it did.
+  const fromRoot = new PassThrough();
+  const toRoot = new PassThrough();
+  const link = new WorkerLink(fromRoot, toRoot);
+  const said: Record<string, unknown>[] = [];
+  readLines(
+    toRoot,
+    1 << 20,
+    (line) => said.push(JSON.parse(line)),
+    () => {},
+  );
+  link.onReclaim = async () => true;
+  fromRoot.write(`${JSON.stringify({ type: "brain.reclaim", reclaimId: "7" })}\n`);
+  await waitFor(() => said.length === 1);
+  expect(said[0]).toEqual({ type: "brain.reclaimed", reclaimId: "7", closed: true });
+});
+
 test("frames from a worker go up only when they are its agent's", async () => {
   const t = setup();
   t.sup.boot();

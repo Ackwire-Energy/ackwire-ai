@@ -452,3 +452,53 @@ test("a brain turn starts only while the computer has room; recent ones count un
   runner.close();
   await Promise.all(running);
 });
+
+test("no room for a turn: idle warm CLIs close first, one at a time, before no_slot; never where memory isn't known", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const sent: { id: string; ok: boolean; error?: { code: string } }[] = [];
+  let free: number | null = MIN_FREE_BYTES - 1;
+  /** Idle CLIs left, and what closing one gives back. */
+  let idle = 2;
+  let closes = 0;
+  const runner = new RequestRunner(
+    {
+      workspaceReal: ws,
+      exec: true,
+      token: "agm_x",
+      reclaimBrains: async () => {
+        closes++;
+        if (idle === 0) return false;
+        idle--;
+        if (free !== null) free += 0.2e9;
+        return true;
+      },
+    },
+    (f) => sent.push(f as unknown as (typeof sent)[number]),
+    () => {},
+    async () => ({}),
+    { memAvailable: () => free, now: () => 1_000_000 },
+  );
+  const turn = (id: string) => runner.start(id, { op: "brain.turn", runId: id } as unknown as MachineRequest);
+  const outcome = (id: string) => {
+    const f = sent.find((x) => x.id === id);
+    return f?.ok ? "ok" : f?.error?.code;
+  };
+
+  // One closed CLI is enough: the turn runs.
+  await turn("t1");
+  expect(outcome("t1")).toBe("ok");
+  expect(closes).toBe(1);
+  // Not enough left to close: refused once nothing more can close.
+  free = MIN_FREE_BYTES - 1e9;
+  await turn("t2");
+  expect(outcome("t2")).toBe("no_slot");
+  expect(closes).toBe(3);
+  // Memory not known: a count of turns, so nothing is closed for it.
+  free = null;
+  closes = 0;
+  await turn("t3");
+  expect(outcome("t3")).toBe("ok");
+  expect(closes).toBe(0);
+  runner.close();
+});

@@ -73,11 +73,16 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   `done` or `error`.
  * - Block 5: one process per (agent, session) stays alive between turns
  *   (stdin open), closed after `idleMs` without a turn, at most
- *   `maxProcesses` (the least recently used idle one is closed for a new
- *   one; with all busy the turn runs one-shot). A process that dies while
- *   idle is started again (resumed) on the next turn; one that dies mid-turn
- *   is replaced by a one-shot resume of the same turn. Turns of one session
- *   run one at a time (queued).
+ *   `maxProcesses` kept (the least recently used idle one is closed for a new
+ *   one). With all busy, a turn still gets its own process (live messages
+ *   reach it too), and the cap is restored as turns end, least recently used
+ *   idle first. A process that holds the agent's work (a task in the
+ *   background such as a dev server, or a turn of its own) is never closed as
+ *   idle, to make room, or for the cap: closing it would kill that work.
+ *   `reclaimIdle` closes one when the computer is short of memory for a turn.
+ *   A process that dies while idle is started again (resumed) on the next
+ *   turn; one that dies mid-turn is replaced by a one-shot resume of the same
+ *   turn. Turns of one session run one at a time (queued).
  * - ADR 0041: a turn with an `account` runs with `CLAUDE_CONFIG_DIR` set to
  *   that account's folder (its sessions live there too; a missing folder is
  *   `account_missing`, never another account), and `effort` is `--effort`.
@@ -110,8 +115,10 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   past that wait has its process killed (the next one resumes the session).
  */
 
-export const BRAIN_IDLE_MS = 10 * 60_000;
-export const BRAIN_MAX_PROCESSES = 3;
+export const BRAIN_IDLE_MS = 3 * 60_000;
+export const BRAIN_MAX_PROCESSES = 1;
+/** `reclaimIdle`: how long it waits for the closed process to exit (its memory is free only then). */
+export const RECLAIM_EXIT_MS = 2_000;
 /** Text deltas are sent at most this often (batched). */
 export const DELTA_FLUSH_MS = 50;
 /** A one-shot start that fails this fast with "wrong session flag" is retried once with the other flag. */
@@ -654,6 +661,8 @@ export class ClaudeProcess {
   ownTurnDue = false;
   /** Turns the CLI ran by itself and finished while no request listened (tests, logs). */
   ownTurns = 0;
+  /** Its tasks running in the background (a dev server, a watcher), whichever turn started them. */
+  private readonly backgroundTasks = new Set<string>();
   private ownTurnWaiters = new Set<() => void>();
   /** The turn in progress on this process (set by `runTurnOnProcess`): messages for it mid-turn. */
   turn: { steer(messages: SteerMessage[]): BrainSteerReply } | null = null;
@@ -693,6 +702,7 @@ export class ClaudeProcess {
       (rl as unknown as EventEmitter).on("line", (line: string) => {
         // Read whether a turn listens or not (the CLI may say it before the first turn's prompt).
         if (line.includes('"init"')) this.noteInit(line);
+        if (line.includes('"task_')) this.noteTask(line);
         if (this.lineHandler) this.lineHandler(line);
         else this.noteIdle(line);
       });
@@ -713,6 +723,22 @@ export class ClaudeProcess {
     } catch {
       // not a JSON line
     }
+  }
+
+  private noteTask(line: string) {
+    try {
+      const ev = JSON.parse(line) as Record<string, unknown>;
+      const t = ev.type === "system" ? taskOf(ev) : undefined;
+      if (t?.ended) this.backgroundTasks.delete(t.id);
+      else if (t?.backgrounded) this.backgroundTasks.add(t.id);
+    } catch {
+      // not a JSON line
+    }
+  }
+
+  /** Holds work of the agent's that closing it would kill: a task in the background, or a turn of its own. */
+  get holdsWork() {
+    return !this.exited && (this.backgroundTasks.size > 0 || this.onItsOwn);
   }
 
   /** A line no request listens to: a turn the CLI started by itself begins (or ends). */
@@ -1361,10 +1387,10 @@ export class BrainManager {
     }
     const keepAlive = req.keepAlive !== false;
     if (!live && keepAlive) {
-      if (this.size >= (this.opts.maxProcesses ?? BRAIN_MAX_PROCESSES)) this.evictIdle();
-      if (this.size < (this.opts.maxProcesses ?? BRAIN_MAX_PROCESSES)) {
-        live = this.spawn(key, session, cwd, req, ctx, sig, true, this.resumeFor(cwd, session, req, ctx));
-      }
+      if (this.size >= this.max) this.closeIdle(this.lruIdle());
+      // Over the cap when every process is busy or holds work: the turn still gets its own (the agent works on
+      // several conversations at once); `trim` closes the extra as turns end.
+      live = this.spawn(key, session, cwd, req, ctx, sig, true, this.resumeFor(cwd, session, req, ctx));
     }
     if (live) {
       const out = await this.onLive(live, req, ctx);
@@ -1491,6 +1517,7 @@ export class BrainManager {
         if (this.left(live)) this.drop(live);
         else this.armIdle(live);
       }
+      this.trim();
     }
   }
 
@@ -1660,22 +1687,62 @@ export class BrainManager {
   private armIdle(live: Live) {
     if (live.idleTimer) clearTimeout(live.idleTimer);
     live.idleTimer = setTimeout(() => {
-      if (!live.busy) {
-        this.log(`brain process ${live.key.split(":")[1]?.slice(0, 8) ?? ""} idle; closing`);
-        this.drop(live);
-      }
+      if (live.busy) return;
+      // Its dev server or watcher would die with it: looked at again later.
+      if (live.proc.holdsWork) return this.armIdle(live);
+      this.log(`brain process ${live.key.split(":")[1]?.slice(0, 8) ?? ""} idle; closing`);
+      this.drop(live);
     }, this.opts.idleMs ?? BRAIN_IDLE_MS);
     live.idleTimer.unref?.();
   }
 
-  /** Closes the least recently used idle process, if any. */
-  private evictIdle() {
+  private get max() {
+    return this.opts.maxProcesses ?? BRAIN_MAX_PROCESSES;
+  }
+
+  /** The least recently used process between turns that holds no work of the agent's. */
+  private lruIdle(): Live | undefined {
     let lru: Live | undefined;
     for (const l of this.live.values()) {
-      if (l.busy || !l.persistent) continue;
+      if (l.busy || !l.persistent || l.proc.holdsWork) continue;
       if (!lru || l.lastUsed < lru.lastUsed) lru = l;
     }
-    if (lru) this.drop(lru);
+    return lru;
+  }
+
+  private closeIdle(l: Live | undefined, why = "for another conversation") {
+    if (!l) return;
+    this.log(`brain process ${l.key.split(":")[1]?.slice(0, 8) ?? ""} idle; closing ${why}`);
+    this.drop(l);
+  }
+
+  /** Back within the cap once turns end: the least recently used idle processes close first. */
+  private trim() {
+    while (this.size > this.max) {
+      const l = this.lruIdle();
+      if (!l) return;
+      this.closeIdle(l, "(over the cap)");
+    }
+  }
+
+  /**
+   * The computer is short of memory for a turn: closes the least recently used idle process that holds no
+   * work (its session resumes on its next turn) and resolves once it exited (at most `RECLAIM_EXIT_MS`);
+   * false when there is none.
+   */
+  async reclaimIdle(): Promise<boolean> {
+    const l = this.lruIdle();
+    if (!l) return false;
+    this.closeIdle(l, "to make room for a turn");
+    await new Promise<void>((resolve) => {
+      const late = setTimeout(resolve, RECLAIM_EXIT_MS);
+      late.unref?.();
+      l.proc.onExit(() => {
+        clearTimeout(late);
+        resolve();
+      });
+    });
+    return true;
   }
 
   private drop(live: Live) {
