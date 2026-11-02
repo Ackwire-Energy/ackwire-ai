@@ -1716,6 +1716,10 @@ export const en = {
     forbidden: "Only who asked, the agent's owner or an admin can continue now",
     resumed: "{{agent}} picked the work back up",
     ended: "This work ended before it picked up",
+    canceled: "Canceled. It won't run when the limit is back.",
+    dontRun: "Don't run it",
+    dontRunHint: "Cancel it: nothing runs when the limit is back",
+    dontRunForbidden: "Only who asked, the agent's owner or an admin can cancel it",
     extraTitle: "Long work may use paid extra usage",
     extraHint:
       "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets.",
@@ -4558,6 +4562,8 @@ export const en = {
       usagePausedUnknown: "Paused until the plan resets (plan limit)",
       usagePausedBudget: "Paused until {{until}} (budget limit)",
       usagePausedBudgetUnknown: "Paused until the budget renews (budget limit)",
+      waitingPlan: "Waiting for the {{plan}} plan · runs at {{until}}",
+      waitingPlanUnknown: "Waiting for the {{plan}} plan to reset",
     },
     pausedReason: {
       creator_left: "Paused: whoever created it left the workspace",
@@ -4609,6 +4615,8 @@ export const en = {
       waiting: "Waiting for someone to answer",
       waitingApproval: "Waiting for your approval",
       waitingComputer: "Waiting for the computer",
+      waitingPlan: "Waiting for the plan to reset",
+      waitingBudget: "Waiting for the budget to renew",
       reported: "Told what it found",
       silent: "Nothing new, stayed quiet",
       failed: "Didn't work",
@@ -4667,6 +4675,10 @@ export const en = {
     /** A run paused near its plan's or budget's limit (state `usage_paused`). */
     usagePause: {
       line: "It picks up by itself when the limit resets. Nothing is posted in the conversation.",
+      lineLimit: "It runs by itself when the limit is back. Nothing is posted in the conversation.",
+      dontRun: "Don't run it",
+      dontRunName: "Don't run {{name}} when the limit is back",
+      canceledToast: "Canceled. It won't run when the limit is back.",
       continuedToast: "Run continuing.",
       forbidden: "Only who created the routine, the agent's owner or an admin can continue it now",
       extra_off:
@@ -10343,6 +10355,7 @@ export const en = {
       plan_limit_wait: "The {{plan}} plan hit its limit. I'll answer {{when}}, when it resets.",
       plan_limit_wait_unknown: "The {{plan}} plan hit its limit. I'll answer as soon as it resets.",
       budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
+      usage_wait_canceled: "Canceled. It won't run when the limit is back.",
       usage_paused: "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}",
       usage_paused_budget: "{{agent}} paused this work · monthly budget at {{percent}}%",
       work_auto_moved:

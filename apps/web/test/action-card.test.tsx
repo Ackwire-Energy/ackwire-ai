@@ -177,3 +177,81 @@ describe("a stretch's pause card (ADR 0089)", () => {
     expect(within(done).queryByRole("button", { name: "Continuar" })).toBeNull();
   });
 });
+
+describe("what waits on a plan's limit: Não rodar", () => {
+  /** Atlas's "I'll answer when the plan resets" in #eng, naming the run it holds. */
+  const note = (id: string, usageWait: Record<string, unknown>, minute = 0): Message => ({
+    ...card(id, {}, minute),
+    body: "The Claude plan hit its limit: server text",
+    meta: {
+      bodyCode: "plan_limit_wait_unknown",
+      bodyParams: { plan: "Claude" },
+      usageWait: { code: "plan_limit", runId: `r-${id}`, forUserId: "u-joao", ...usageWait },
+    },
+  });
+
+  test("under the note for who may: it cancels the run; once canceled the note says so and offers nothing", async () => {
+    const state = seedState();
+    state.messages.push(note("w-open", {}), note("w-done", { canceled: true }, 1));
+    await open(state);
+    const rows = screen().getAllByRole("article");
+    const open_ = rows.find(
+      (a) => a.textContent?.includes("Respondo assim que ele renovar") && !a.textContent.includes("Cancelado"),
+    ) as HTMLElement;
+    await click(within(open_).getByRole("button", { name: "Não rodar" }));
+    expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-w-open")).toBe(true);
+    const done = rows.find((a) =>
+      a.textContent?.includes("Cancelado. Não vai rodar quando o limite voltar."),
+    ) as HTMLElement;
+    expect(done).toBeTruthy();
+    expect(within(done).queryByRole("button", { name: "Não rodar" })).toBeNull();
+  });
+
+  test("a member who didn't ask and doesn't own the agent sees it greyed", async () => {
+    const state = seedState();
+    const org = state.me.organizations[0];
+    if (org) org.role = "member";
+    state.messages.push(note("w-theirs", {}));
+    await open(state);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
+    expect((within(row).getByRole("button", { name: "Não rodar" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test("a long-work pause's card: Não rodar beside Continuar agora; canceled, it says so", async () => {
+    const state = seedState();
+    const usageCard = (id: string, over: Record<string, unknown>, minute = 0): Message => ({
+      ...card(id, {}, minute),
+      body: "Atlas paused this work: server text",
+      meta: {
+        bodyCode: "usage_paused",
+        bodyParams: { agent: "Atlas", plan: "Claude", percent: "96", window: "five_hour" },
+        actionCard: {
+          kind: "usage_paused",
+          state: "paused",
+          runId: `r-${id}`,
+          waitId: "w1",
+          agentId: ATLAS_ID,
+          forUserId: "u-walter",
+          source: "plan",
+          percent: 96,
+          window: "five_hour",
+          plan: "Claude",
+          continuedByUserId: null,
+          continuedAt: null,
+          ...over,
+        },
+      },
+    });
+    state.messages.push(usageCard("u-open", {}), usageCard("u-done", { state: "canceled" }, 1));
+    await open(state);
+    const cards = screen()
+      .getAllByRole("article")
+      .filter((a) => a.querySelector(".waitcard"));
+    const paused = cards.find((a) => within(a).queryByRole("button", { name: "Continuar agora" })) as HTMLElement;
+    await click(within(paused).getByRole("button", { name: "Não rodar" }));
+    expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-u-open")).toBe(true);
+    expect(cards.some((a) => a.textContent?.includes("Cancelado. Não vai rodar quando o limite voltar."))).toBe(true);
+  });
+});

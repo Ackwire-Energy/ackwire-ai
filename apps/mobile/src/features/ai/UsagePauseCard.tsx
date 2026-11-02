@@ -1,7 +1,7 @@
 import { type Message, useApi } from "@agenteschat/client";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { mayContinueUsage, usagePauseCardOf, usagePauseText } from "@agenteschat/client/lib/usage-pause";
+import { mayContinueUsage, usagePauseCardOf, usagePauseText, usageWaitOf } from "@agenteschat/client/lib/usage-pause";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -9,6 +9,61 @@ import { useOrg } from "@/providers/org";
 import { Button, Icon, Text, useTheme } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
+
+/**
+ * "Don't run it" on what waits for a plan's or budget's limit (the web's): cancels the run, so nothing runs when the
+ * limit is back. Greyed for anyone but the person behind it, the agent's owner and admins.
+ */
+function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const { orgId } = useOrg();
+  const failed = useFailed();
+  const [pending, setPending] = useState(false);
+  if (!runId) return null;
+  const go = async () => {
+    setPending(true);
+    try {
+      await api.agents.cancelRun(orgId, runId);
+    } catch (error) {
+      failed(error);
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon="stop"
+        label={t("usageCard.dontRun")}
+        disabled={pending || !may}
+        onPress={() => void go()}
+      />
+      {!may ? (
+        <Text variant="footnote" tone="faint">
+          {t("usageCard.dontRunForbidden")}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+/** Under an agent's "I'll answer when the plan resets" (the web's): "Don't run it" while the run still waits. */
+export function UsageWaitCancel({ message: m }: { message: Message }) {
+  const { org } = useOrg();
+  const dir = useDirectory();
+  const meId = useMeId();
+  const wait = m.author.type === "agent" ? usageWaitOf(m.meta) : null;
+  if (!wait || wait.canceled) return null;
+  const owner = dir.agentById.get(m.author.id ?? "")?.ownerUserId;
+  return (
+    <View style={styles.acts}>
+      <DontRunButton runId={wait.runId} may={mayContinueUsage(wait, meId, owner, can(org, "manage_agents"))} />
+    </View>
+  );
+}
 
 /**
  * The web's card of long work paused near its plan's or budget's limit (ADR 0118), in place of its text: when it
@@ -57,7 +112,7 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
             ? t("stretchCard.continuedByYou", { time })
             : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })}
         </Text>
-      ) : card.state === "resumed" || card.state === "ended" ? (
+      ) : card.state === "resumed" || card.state === "ended" || card.state === "canceled" ? (
         <Text variant="footnote" tone="faint">
           {t(`usageCard.${card.state}`, { agent: name })}
         </Text>
@@ -73,6 +128,7 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
             disabled={pending || !may}
             onPress={() => void go()}
           />
+          <DontRunButton runId={card.runId} may={may} />
           {!may ? (
             <Text variant="footnote" tone="faint">
               {t("usageCard.forbidden")}
@@ -88,4 +144,5 @@ const styles = StyleSheet.create({
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
+  acts: { marginTop: 8, gap: 6, alignItems: "flex-start" },
 });

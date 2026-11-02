@@ -8,7 +8,9 @@ import { usageWhen } from "./plan-usage";
  */
 export interface UsagePauseCard {
   kind: "usage_paused";
-  state: "paused" | "continued" | "resumed" | "ended";
+  state: "paused" | "continued" | "resumed" | "ended" | "canceled";
+  /** The paused run: "Don't run it" cancels it. */
+  runId: string | null;
   agentId: string;
   /** The person behind the work: with the agent's owner and admins, who may press Continuar agora. */
   forUserId: string | null;
@@ -28,7 +30,11 @@ export function usagePauseCardOf(meta: Record<string, unknown> | null | undefine
   if (raw?.kind !== "usage_paused" || typeof raw.agentId !== "string" || typeof raw.percent !== "number") return null;
   return {
     kind: "usage_paused",
-    state: raw.state === "continued" || raw.state === "resumed" || raw.state === "ended" ? raw.state : "paused",
+    state:
+      raw.state === "continued" || raw.state === "resumed" || raw.state === "ended" || raw.state === "canceled"
+        ? raw.state
+        : "paused",
+    runId: str(raw.runId),
     agentId: raw.agentId,
     forUserId: str(raw.forUserId),
     source: raw.source === "budget" ? "budget" : "plan",
@@ -69,10 +75,30 @@ export function usagePauseText(t: TFunction, locale: string, card: UsagePauseCar
   return { title, line };
 }
 
-/** Continuar agora is for the person behind the work, the agent's owner or an admin; everyone else sees it greyed. */
+/**
+ * Continuar agora and "Don't run it" are for the person behind the work, the agent's owner or an admin (the server's
+ * `mayStopRun`); everyone else sees them greyed.
+ */
 export const mayContinueUsage = (
-  card: UsagePauseCard,
+  card: Pick<UsagePauseCard, "forUserId">,
   meId: string | null,
   ownerId: string | null | undefined,
   admin: boolean,
 ) => admin || (meId !== null && (card.forUserId === meId || ownerId === meId));
+
+export interface UsageWait {
+  runId: string;
+  forUserId: string | null;
+  canceled: boolean;
+}
+
+/**
+ * An agent's note that it waits on its plan or budget (`meta.usageWait`: "I'll answer at 9:00"), with the run it holds:
+ * "Don't run it" cancels that run. Null: no such note, or one written before notes named their run.
+ */
+export function usageWaitOf(meta: Record<string, unknown> | null | undefined): UsageWait | null {
+  const raw = meta?.usageWait as Record<string, unknown> | undefined;
+  const runId = str(raw?.runId);
+  if (!runId || usagePauseCardOf(meta)) return null;
+  return { runId, forUserId: str(raw?.forUserId), canceled: raw?.canceled === true };
+}

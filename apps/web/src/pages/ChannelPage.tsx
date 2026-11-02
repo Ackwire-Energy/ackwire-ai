@@ -129,6 +129,7 @@ import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { usageWaitOf } from "@agenteschat/client/lib/usage-pause";
 import { appVia } from "@agenteschat/client/lib/via";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import {
@@ -304,6 +305,7 @@ import {
   ThreadStartLine,
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
+import { UsageWaitCancel } from "@/components/UsagePauseCard";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
@@ -3325,6 +3327,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const noAi = m.author.type === "agent" && noAiCardOf(meta) !== null;
   // An agent's card whose button opens the app's own dialog, filled in ("Conectar uma IA para Ada").
   const actionCard = m.author.type === "agent" && actionCardOf(meta) !== null;
+  // "I'll answer when the plan resets": "Don't run it" while that run still waits.
+  const usageWait = m.author.type === "agent" ? usageWaitOf(meta) : null;
   const card =
     approvalId ||
     waitNotice ||
@@ -3734,6 +3738,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
           {noAi && <NoAiCard message={m} />}
           {actionCard && <ActionCard message={m} />}
+          {usageWait && !usageWait.canceled && <UsageWaitCancel message={m} wait={usageWait} />}
           {question && <QuestionCard question={question} />}
           {secretRequest && <SecretCard request={secretRequest} />}
           {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}

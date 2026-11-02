@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { actionCardOf } from "../src/lib/action-cards";
 import { serverBody } from "../src/lib/message-body";
-import { mayContinueUsage, usagePauseCardOf, usagePauseText } from "../src/lib/usage-pause";
+import { mayContinueUsage, usagePauseCardOf, usagePauseText, usageWaitOf } from "../src/lib/usage-pause";
 
 /** Says the key and its values, so a test reads which words were picked. */
 const t = ((key: string, values: Record<string, unknown> = {}) => {
@@ -58,4 +58,22 @@ test("the card's note, shown as text elsewhere, names its window in the reader's
     bodyParams: { agent: "Ada", plan: "Claude", percent: "96", window: "five_hour" },
   });
   expect(body).toContain('"window":"usageCard.window.five_hour');
+});
+
+test("a run waiting on its limit can be canceled: its note names the run, and says so once canceled", () => {
+  const note = {
+    bodyCode: "plan_limit_wait",
+    bodyParams: { plan: "Claude" },
+    usageWait: { code: "plan_limit", runId: "r1", forUserId: "bia" },
+  };
+  expect(usageWaitOf(note)).toEqual({ runId: "r1", forUserId: "bia", canceled: false });
+  // An older note names no run: nothing to cancel from it. A card is canceled from the card.
+  expect(usageWaitOf({ usageWait: { code: "plan_limit" } })).toBeNull();
+  expect(usageWaitOf(meta())).toBeNull();
+  expect(usagePauseCardOf(meta({ state: "canceled" }))?.state).toBe("canceled");
+  expect(usagePauseCardOf(meta())?.runId).toBe("r1");
+  expect(serverBody(t, "x", note, "en")).not.toContain("usage_wait_canceled");
+  const canceled = { ...note, usageWait: { ...note.usageWait, canceled: true } };
+  expect(usageWaitOf(canceled)?.canceled).toBe(true);
+  expect(serverBody(t, "x", canceled, "en")).toContain("chat.body.usage_wait_canceled");
 });
