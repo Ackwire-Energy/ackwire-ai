@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { runAuthority } from "./authority";
-import { askStillOpen } from "./brakes";
+import { askStillOpen, unrequested } from "./brakes";
 import { requireChannelAccess } from "./channels";
 import { handOffsFrom, sentOpen } from "./consultations";
 import { getChannelCached } from "./context";
@@ -37,6 +37,8 @@ export const CANCEL_FOLLOW_UP_TOOL = "cancel_follow_up";
 /** The outbox job that wakes the agent at a follow-up's time. */
 export const FOLLOW_UP_JOB = "agent.follow_up";
 /** How far ahead one goes, how many one run sets, how many wait at once in one conversation. */
+/** How often a follow-up held by an unanswered question looks again. */
+export const ASK_HOLD_MS = 10 * 60_000;
 export const FOLLOW_UP_LIMITS = { maxMinutes: 24 * 60, perRun: 2, perConversation: 3 } as const;
 
 export type FollowUpState = "pending" | "done" | "canceled";
@@ -391,8 +393,25 @@ export async function wakeFollowUp(deps: { db: Database; pubsub?: PubSub }, orgI
       .select()
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, refs.runId ?? "")));
-    // It asked the person something and they haven't answered: their answer wakes it, not the clock (ADR 0131 §1).
-    const here = run ? (await stillHere(tx, run)) && !(await askStillOpen(tx, run)) : false;
+    let here = run ? await stillHere(tx, run) : false;
+    // Work nobody asked for that asked the person something they haven't answered waits for their answer, not the
+    // clock (ADR 0131 §1): the line stays pending and looks again later; a day past its time it is canceled. What a
+    // person asked for comes back at its time.
+    if (here && run && unrequested(await runAuthority(tx, run)) && (await askStillOpen(tx, run))) {
+      const due = Date.parse(refs.at ?? "") || line.createdAt.getTime();
+      if (Date.now() < due + FOLLOW_UP_LIMITS.maxMinutes * 60_000) {
+        await enqueue(tx, {
+          orgId,
+          kind: FOLLOW_UP_JOB,
+          payload: { messageId: line.id },
+          dedupeKey: `${FOLLOW_UP_JOB}:${line.id}:${Date.now()}`,
+          runAt: new Date(Date.now() + ASK_HOLD_MS),
+          maxAttempts: 4,
+        });
+        return null;
+      }
+      here = false;
+    }
     const settled = await settle(tx, line, here ? "done" : "canceled");
     if (!settled || !run || !here) return settled ? { line: settled, delivered: null } : null;
     const delivered = await deliverNoticeToRun(tx, run, {

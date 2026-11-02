@@ -12,6 +12,7 @@ import {
   DIGEST_AFTER_MS,
   decideCostlyProposal,
   endsAsking,
+  FOLLOW_UP_JOB,
   getMessage,
   insertMessage,
   type Judge,
@@ -26,6 +27,7 @@ import {
   type ToolDefinition,
   teammatesFor,
   updateAgent,
+  wakeFollowUp,
 } from "../src";
 import { decideTurnEnd, type TurnEnd } from "../src/continuation";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -162,6 +164,36 @@ describe("asking means waiting (§1)", () => {
     });
     expect(await askStillOpen(f.db, thread)).toBe(false);
   });
+});
+
+test("§1: a follow-up of work nobody asked for, whose question is open, waits and looks again; it isn't canceled", async () => {
+  f = await setup();
+  const trigger = await alert(f.agent.id, "Benchmark noturno ficou 30% mais lento");
+  const run = await working(f.agent.id, trigger.id, "done");
+  await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "agent", agentId: f.agent.id, runId: run.id, hop: 2 },
+    body: "Posso instalar o hyperfine e rodar nos 40 arquivos. Quer que eu faça?",
+  });
+  const line = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 2 },
+    body: "Rodar o benchmark",
+    meta: {
+      notice: {
+        kind: "follow_up",
+        text: "Rodar o benchmark",
+        refs: { runId: run.id, at: new Date().toISOString(), about: "", state: "pending" },
+      },
+    },
+  });
+  expect(await wakeFollowUp(f, f.org.id, line.id)).toBeNull();
+  const kept = await getMessage(f.db, f.org.id, line.id);
+  expect((kept?.meta.notice as { refs?: { state?: string } }).refs?.state).toBe("pending");
+  expect((await jobsOf(FOLLOW_UP_JOB)).map((j) => j.payload)).toEqual([{ messageId: line.id }]);
+  expect((await f.db.select().from(agentRuns)).length).toBe(1);
 });
 
 describe("costly work nobody asked for needs a go (§3)", () => {
