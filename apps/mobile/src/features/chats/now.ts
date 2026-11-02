@@ -47,7 +47,7 @@ export function agentRowState(
 export interface FinishedItem {
   key: string;
   agentId: string;
-  kind: "run" | "mission" | "routine";
+  kind: "run" | "mission" | "routine" | "work";
   /** What it was (the run's label, the mission's or routine's name); null when unknown. */
   what: string | null;
   /** When it finished (its answer's time, the inbox item's). */

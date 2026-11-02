@@ -7,13 +7,18 @@ import { formatTime } from "./format";
  * counterpart on the phone), the card's block and the agent's status line. Plain text, never cut: lines wrap.
  */
 
+/** `t` with keys built at run time (a state's, a code's): the typed `t` of the web only takes literal keys. */
+type Say = (key: string, options?: Record<string, unknown>) => string;
+const loose = (t: TFunction) => t as unknown as Say;
+
 /** Minutes as people say them: "12 min", "1 h 20 min". */
 export function workDuration(t: TFunction, ms: number): string {
+  const say = loose(t);
   const minutes = Math.max(1, Math.round(ms / 60_000));
-  if (minutes < 60) return t("work.duration.minutes", { count: minutes });
+  if (minutes < 60) return say("work.duration.minutes", { count: minutes });
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m ? t("work.duration.hoursMinutes", { h, m }) : t("work.duration.hours", { count: h });
+  return m ? say("work.duration.hoursMinutes", { h, m }) : say("work.duration.hours", { count: h });
 }
 
 export type WorkTone = "working" | "waiting" | "queued" | "done" | "failed" | "stopped";
@@ -48,10 +53,11 @@ export interface WorkLineContext {
 
 /** The line under a work's anchor, in the reader's language. */
 export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLineView {
+  const say = loose(t);
   const now = c.now ?? new Date();
   const since = Date.parse(w.startedAt);
   const mine = Boolean(c.meId && w.requestedByUserId === c.meId);
-  const task = w.issue ? { ...w.issue, label: t("work.task", { number: w.issue.number }) } : null;
+  const task = w.issue ? { ...w.issue, label: say("work.task", { number: w.issue.number }) } : null;
   const over = w.status === "done" || w.status === "failed" || w.status === "canceled";
   const stop = !over && c.canStop && w.runId ? { runId: w.runId } : null;
   const base = { task, stop, threadId: w.threadId, update: w.lastUpdate?.text ?? null };
@@ -60,22 +66,24 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
     return {
       ...base,
       tone: "done",
-      text: t("work.line.done", { duration: took }),
-      result: w.resultMessageId ? { messageId: w.resultMessageId, label: t("work.result") } : null,
+      text: say("work.line.done", { duration: took }),
+      result: w.resultMessageId ? { messageId: w.resultMessageId, label: say("work.result") } : null,
     };
   if (w.status === "failed")
     return {
       ...base,
       tone: "failed",
-      text: t("work.line.failed"),
-      result: w.resultMessageId ? { messageId: w.resultMessageId, label: t("work.whatHappened") } : null,
+      text: say("work.line.failed"),
+      result: w.resultMessageId ? { messageId: w.resultMessageId, label: say("work.whatHappened") } : null,
     };
   if (w.status === "canceled") {
     const name = w.canceledByUserId ? c.nameOf?.(w.canceledByUserId) : null;
     return {
       ...base,
       tone: "stopped",
-      text: name ? t("work.line.canceled", { name, duration: took }) : t("work.line.canceledAnon", { duration: took }),
+      text: name
+        ? say("work.line.canceled", { name, duration: took })
+        : say("work.line.canceledAnon", { duration: took }),
       result: null,
     };
   }
@@ -83,7 +91,7 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
     return {
       ...base,
       tone: "queued",
-      text: t("work.line.queued", { agent: c.agentName, position: w.queuePosition ?? 1 }),
+      text: say("work.line.queued", { agent: c.agentName, position: w.queuePosition ?? 1 }),
       result: null,
     };
   const waits: Partial<Record<NonNullable<WorkView["state"]>, string>> = {
@@ -96,16 +104,18 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
       ...base,
       tone: "waiting",
       text: w.pausedUntil
-        ? t("work.line.pausedUntil", { time: formatTime(c.locale, w.pausedUntil) })
-        : t("work.line.paused"),
+        ? say("work.line.pausedUntil", { time: formatTime(c.locale, w.pausedUntil) })
+        : say("work.line.paused"),
       result: null,
     };
   const wait = w.state ? waits[w.state] : undefined;
-  if (wait) return { ...base, tone: "waiting", text: t(wait), result: null };
+  if (wait) return { ...base, tone: "waiting", text: say(wait), result: null };
   const next = w.nextUpdateAt ? Date.parse(w.nextUpdateAt) - now.getTime() : null;
-  const parts = [t("work.line.working", { duration: workDuration(t, now.getTime() - since) })];
+  const parts = [say("work.line.working", { duration: workDuration(t, now.getTime() - since) })];
   if (next !== null)
-    parts.push(next > 60_000 ? t("work.line.next", { minutes: Math.round(next / 60_000) }) : t("work.line.nextSoon"));
+    parts.push(
+      next > 60_000 ? say("work.line.next", { minutes: Math.round(next / 60_000) }) : say("work.line.nextSoon"),
+    );
   return { ...base, tone: "working", text: parts.join(" · "), result: null };
 }
 
@@ -117,31 +127,33 @@ export function workPlanProgress(w: Pick<WorkView, "plan">) {
 
 /** The agent's status line on background work: "Trabalhando em: X · 20 min", "Em 2 trabalhos: A e B"… */
 export function workStatusText(t: TFunction, line: AgentStatusLine, now = new Date()): string {
+  const say = loose(t);
   const count = line.count ?? 1;
   const duration = line.since ? workDuration(t, now.getTime() - Date.parse(line.since)) : null;
   if (count === 1 && line.wait) {
     const key = `work.status.wait.${line.wait}`;
-    return line.subject ? t(`${key}Titled`, { subject: line.subject }) : t(key);
+    return line.subject ? say(`${key}Titled`, { subject: line.subject }) : say(key);
   }
   if (count === 1) {
-    const head = line.subject ? t("work.status.one", { subject: line.subject }) : t("work.status.oneUntitled");
+    const head = line.subject ? say("work.status.one", { subject: line.subject }) : say("work.status.oneUntitled");
     return duration ? `${head} · ${duration}` : head;
   }
   if (count === 2 && line.subject && line.second)
-    return t("work.status.two", { first: line.subject, second: line.second });
+    return say("work.status.two", { first: line.subject, second: line.second });
   return line.subject
-    ? t("work.status.many", { count, subject: line.subject, more: count - 1 })
-    : t("work.status.manyUntitled", { count });
+    ? say("work.status.many", { count, subject: line.subject, more: count - 1 })
+    : say("work.status.manyUntitled", { count });
 }
 
 /** The server's own update of a silent work ("Ainda trabalhando nisso (22 min). Agora: rodando os testes."). */
 export function autoUpdateText(t: TFunction, params: Record<string, unknown>): string {
+  const say = loose(t);
   const minutes = Number(params.minutes ?? 0);
-  const head = t("work.autoUpdate", { duration: workDuration(t, minutes * 60_000) });
+  const head = say("work.autoUpdate", { duration: workDuration(t, minutes * 60_000) });
   const kind = typeof params.kind === "string" ? params.kind : null;
   if (!kind) return head;
-  const now = t(`presence.agent.${kind}`, { subject: typeof params.subject === "string" ? params.subject : "" });
-  return `${head} ${t("work.autoUpdateNow", { now: now.charAt(0).toLocaleLowerCase() + now.slice(1) })}`;
+  const now = say(`presence.agent.${kind}`, { subject: typeof params.subject === "string" ? params.subject : "" });
+  return `${head} ${say("work.autoUpdateNow", { now: now.charAt(0).toLocaleLowerCase() + now.slice(1) })}`;
 }
 
 /** A card's blocked badge (background work stopped on something, ADR 0121 §4): in its stage, not a column. */
@@ -149,12 +161,13 @@ export function blockedText(
   t: TFunction,
   blocked: { reason: string; text?: string } | null | undefined,
 ): string | null {
+  const say = loose(t);
   if (!blocked) return null;
   if (blocked.reason === "failed") {
     const code = blocked.text?.replace(/^run\./, "");
-    const why = code ? t(`agentPage.activity.errors.${code}`, { defaultValue: "" }) : "";
-    return why ? t("work.blocked.failedWhy", { why: why.replace(/\.$/, "") }) : t("work.blocked.failed");
+    const why: string = code ? say(`agentPage.activity.errors.${code}`, { defaultValue: "" }) : "";
+    return why ? say("work.blocked.failedWhy", { why: why.replace(/\.$/, "") }) : say("work.blocked.failed");
   }
   const known = ["waiting_approval", "waiting_input", "waiting_computer", "paused"];
-  return t(`work.blocked.${known.includes(blocked.reason) ? blocked.reason : "waiting_approval"}`);
+  return say(`work.blocked.${known.includes(blocked.reason) ? blocked.reason : "waiting_approval"}`);
 }

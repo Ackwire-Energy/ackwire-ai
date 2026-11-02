@@ -93,6 +93,7 @@ import { SecretCard } from "./SecretCard";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
+import { MessageWorkLine } from "./WorkLine";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
@@ -513,6 +514,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <ReachLines message={m} /> : null}
+        {isAgent && m.longWork ? <MessageWorkLine message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {trails && m.author.id && trails.browser.length > 0 ? (
           <TrailCard
