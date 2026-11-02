@@ -445,7 +445,13 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
     const slug = fix.slug.trim().toLowerCase();
     if (!loaded.includes(slug)) continue;
     try {
-      const change = await changeSkillAsAgent({ db, pubsub: deps.pubsub, judge: judgeOf(deps) }, ctx, slug, fix.body);
+      const change = await changeSkillAsAgent(
+        { db, pubsub: deps.pubsub, judge: judgeOf(deps) },
+        ctx,
+        slug,
+        fix.body,
+        runTrust.trust,
+      );
       out.skills.push({ slug, action: change.action });
     } catch {
       out.skills.push({ slug, action: "refused" });

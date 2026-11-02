@@ -23,19 +23,23 @@ type RunCtx = Pick<ToolContext, "orgId" | "agentId" | "runId" | "channelId" | "t
 
 export type SkillChange =
   | { action: "updated"; skill: SkillRow }
-  | { action: "proposed"; proposalId: string }
+  /** `outside`: its own skill, but the run read outside content, so a person decides. */
+  | { action: "proposed"; proposalId: string; outside?: true }
   | { action: "unchanged" };
 
 /**
  * An agent changes a skill it loaded in this run (ADR 0120): its own agent-made, unlocked skill gets a new version
  * with a `skill.updated` receipt (Undo); a skill a person made or installed gets a proposal a person accepts.
  * Read before write: only a skill this run loaded with `load_skill`. Credentials and permission rules never go in.
+ * `trust` is the run's (`learnTrust`): after outside content (the web, mail, a connected app) even its own skill only
+ * gets a proposal, since skills load as trusted instructions and can be shared with other agents.
  */
 export async function changeSkillAsAgent(
   deps: { db: Database; pubsub?: PubSub; judge?: Judge },
   ctx: RunCtx & { db: Database },
   slug: string,
   body: string,
+  trust: "high" | "low",
 ): Promise<SkillChange> {
   const name = slug.trim().toLowerCase();
   const text = body.trim();
@@ -54,10 +58,13 @@ export async function changeSkillAsAgent(
   if (!skill) throw new NotFoundError(`No skill named ${name} is enabled for you.`);
   if (await changesPermissions(deps.judge, ctx.orgId, text))
     throw new ValidationError("A skill can't change permissions or approvals.");
-  if (skill.origin === "agent") {
+  const own = skill.origin === "agent";
+  if (own) {
     if (skill.ownerAgentId !== ctx.agentId) throw new ForbiddenError("That skill belongs to another agent.");
     if (skill.locked) throw new ForbiddenError("A person locked this skill; it can't be changed.");
     if (skill.body === text) return { action: "unchanged" };
+  }
+  if (own && trust === "high") {
     const next = await ctx.db.transaction(async (tx) => {
       const db = tx as unknown as Database;
       const row = await writeSkillBody(db, skill, text);
@@ -78,7 +85,10 @@ export async function changeSkillAsAgent(
     { db: ctx.db, pubsub: deps.pubsub },
     { orgId: ctx.orgId, agentId: ctx.agentId, skill, body: text },
   );
-  return proposal ? { action: "proposed", proposalId: proposal.id } : { action: "unchanged" };
+  if (!proposal) return { action: "unchanged" };
+  return own
+    ? { action: "proposed", proposalId: proposal.id, outside: true }
+    : { action: "proposed", proposalId: proposal.id };
 }
 
 /**

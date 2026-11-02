@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { eq, schema, sql } from "@agenteschat/db";
+import { learnTrust } from "./context/learn";
 import { changeSkillAsAgent } from "./context/learned-skills";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
@@ -111,9 +112,14 @@ export function createSkillToolSource(deps: SkillDeps & { pubsub?: PubSub; judge
             ctx,
             str(input.name),
             str(input.body),
+            (await learnTrust(ctx)).trust,
           );
           if (change.action === "updated")
             return { content: `Updated ${change.skill.name} (v${change.skill.version}).` };
+          if (change.action === "proposed" && change.outside)
+            return {
+              content: `This turn read outside content (the web, mail or a connected app), so the fix is proposal ${change.proposalId}: someone who manages agents accepts it. Use your fix in this turn.`,
+            };
           if (change.action === "proposed")
             return {
               content: `A person made this skill, so the fix is proposal ${change.proposalId}: someone who manages agents accepts it. Use your fix in this turn.`,
