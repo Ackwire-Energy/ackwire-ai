@@ -51,9 +51,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       connection = c;
       offs.push(c.onStatus((status) => setState({ connection: c, status })));
       offs.push(c.onReconnect(() => void queryClient.invalidateQueries()));
-      // Taken out of the workspace: said plainly, then `me` without it opens another one (or the first run).
+      // Taken out of the workspace: said plainly (not when it was their own doing, `membership_ended`), then `me` without it opens another one (or the first run).
       offs.push(
         c.onError((code) => {
+          if (code === "membership_ended") void queryClient.invalidateQueries({ queryKey: keys.me });
           if (code !== "membership_revoked") return;
           const name = queryClient.getQueryData<Me>(keys.me)?.organizations.find((o) => o.id === orgId)?.name ?? "";
           Alert.alert(i18n.t("members.remove.goneTitle", { org: name }), i18n.t("members.remove.goneText"));

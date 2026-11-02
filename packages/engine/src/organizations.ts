@@ -1052,7 +1052,8 @@ export async function removeMember(
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);
   }
   // Their open WebSocket connections lose every subscription now, not on reconnect.
-  await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
+  const quiet = actorId === targetUserId ? { quiet: true as const } : {};
+  await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId, ...quiet });
   await announceMembers(options.pubsub, orgId);
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
   // Loaded here: the routine engine builds on this module.
@@ -1154,7 +1155,7 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
   }
   // Their open WebSocket connections lose every subscription now.
   for (const org of [...plan.closes, ...plan.leaves]) {
-    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId });
+    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId, quiet: true });
   }
   for (const org of plan.leaves) await announceMembers(options.pubsub, org.id);
   for (const one of closed) await afterClosing({ ...options, db }, one);

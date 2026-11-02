@@ -619,8 +619,11 @@ export async function publishRouted(
  * instead of waiting for a reconnect (docs/adr/0010-realtime.md).
  */
 export type OrgEvent =
-  /** `userId` left or was removed: from one channel (`channelId`), or from the whole organization. */
-  | { type: "membership.revoked"; orgId: string; userId: string; channelId?: string }
+  /**
+   * `userId` left or was removed: from one channel (`channelId`), or from the whole organization. `quiet` when it
+   * wasn't someone else taking them out (they left, deleted their account, or were blocked): their apps say nothing.
+   */
+  | { type: "membership.revoked"; orgId: string; userId: string; channelId?: string; quiet?: true }
   /** The channel is gone for everyone. */
   | { type: "channel.archived"; orgId: string; channelId: string }
   /** Something every member of the org may see (org-wide issues, calendar): forwarded as `scope: "org"`. */
