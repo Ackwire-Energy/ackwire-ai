@@ -57,6 +57,7 @@ import type {
   CodeSent,
   CommandApproval,
   ComposioUsage,
+  ComputerQueue,
   ComputerSetup,
   ComputerTarget,
   Connection,
@@ -893,6 +894,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await nullOn(404, () => request<DesktopRelease>("/api/desktop/latest", { query: { target, arch } }))) ??
         (await nullOn(404, () => cloud<DesktopRelease>("/api/desktop/latest", { query: { target, arch } }))),
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
+      queue: (orgId, machineId) => request<ComputerQueue>(`${org(orgId)}/machines/${enc(machineId)}/queue`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
       beginAccountLogin: (orgId, machineId, kind, options = {}) =>

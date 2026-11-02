@@ -20,6 +20,7 @@ const MACHINE_EVENTS = new Set([
   "machine.access",
   "machine.deleted",
   "machine.agents_moved",
+  "computer.queue",
 ]);
 const isMachineEvent = (type: string) => MACHINE_EVENTS.has(type);
 
@@ -89,6 +90,10 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   };
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;
+  if (e.type === "computer.queue") {
+    void qc.invalidateQueries({ queryKey: keys.machineQueue(orgId, machineId) });
+    return true;
+  }
   const list = keys.machines(orgId);
   // Who waits for an offline computer changes when one comes back, goes away or its agents move.
   if (e.type === "machine.status" || e.type === "machine.deleted" || e.type === "machine.agents_moved") {

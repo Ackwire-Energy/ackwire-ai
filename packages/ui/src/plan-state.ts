@@ -13,6 +13,16 @@ export interface PlanMeterWindow {
   part?: number;
   /** Words under the bar: whose use it is. */
   note?: string;
+  /** The bar split by agent: each one's estimated part of `usedPercent` in its colours, the rest plain. */
+  segments?: readonly MeterSegment[];
+}
+
+/** One agent's piece of a bar, in its colours (`light` in the dark theme). */
+export interface MeterSegment {
+  key: string;
+  value: number;
+  light: string;
+  deep: string;
 }
 
 export interface PlanMeterUsage {
@@ -225,4 +235,11 @@ export function planBinding(
     }
   }
   return top;
+}
+
+/** When the windows renew, on one line: "renova 9 nov às 07:00", or each after its short name when there are more. */
+export function renewals(rows: readonly PlanMeterWindow[], text: PlanMeterText, now = Date.now()) {
+  const due = rows.flatMap((w) => (w.resetsAt && !passed(w.resetsAt, now) ? [{ w, at: w.resetsAt }] : []));
+  if (due.length <= 1) return due[0] ? text.resets(due[0].at) : null;
+  return due.map(({ w, at }) => `${text.short(w)} ${text.resets(at)}`).join(" · ");
 }

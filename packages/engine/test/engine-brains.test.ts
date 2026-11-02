@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { ACCOUNTS_PROTOCOL, channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { ACCOUNTS_PROTOCOL, channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -14,7 +14,6 @@ import {
   brainSessionId,
   type ChannelEvent,
   COMPUTER_BUSY_RETRY_MS,
-  COMPUTER_BUSY_WAIT_MS,
   COMPUTER_QUEUE_NOTE_MS,
   COMPUTER_REACT_NOTE,
   COMPUTER_TOOLS_NOTE,
@@ -22,6 +21,7 @@ import {
   clearPlanLimits,
   computerBrainUnavailable,
   computerMediaNote,
+  computerQueue,
   createAgent,
   createAgentRuns,
   createChannel,
@@ -2467,7 +2467,7 @@ test("no room on the computer: nothing in the chat, the person's message says it
   expect(run?.transcript).not.toHaveProperty("roomWaitSince");
 });
 
-test("no room for the whole wait: the run fails with computer_busy, a reason the apps say in each language", async () => {
+test("no room for over 30 minutes: the run never fails, it keeps its place and asks again (long work wakes through turns)", async () => {
   f = await setup();
   await computerAgent(f);
   await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
@@ -2479,34 +2479,32 @@ test("no room for the whole wait: the run fails with computer_busy, a reason the
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const finished: Record<string, unknown>[] = [];
-  f.pubsub.subscribe(channelTopic(f.general.id), (e) => {
-    if (e.type === "run.finished") finished.push(e as Record<string, unknown>);
-  });
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
   let [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_input");
 
-  // Its first refusal was longer ago than the wait allows.
   const t = run?.transcript as { roomWaitSince?: number };
-  expect(typeof t.roomWaitSince).toBe("number");
+  const since = Date.now() - 31 * 60_000;
   await f.db
     .update(schema.agentRuns)
-    .set({ transcript: { ...t, roomWaitSince: Date.now() - COMPUTER_BUSY_WAIT_MS } })
+    .set({ transcript: { ...t, roomWaitSince: since } })
     .where(eq(schema.agentRuns.id, run?.id ?? ""));
-  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000) });
+  // Exactly when its look is due: the look it queues next is due 15 s after it ran, later than this.
+  const due = (await f.db.select().from(schema.outbox))
+    .filter((j) => j.kind === "agent_run.execute" && j.status === "pending")
+    .reduce((max, j) => Math.max(max, j.nextAttemptAt.getTime()), 0);
+  await drainOutbox(f.db, handlers, { now: new Date(due) });
 
   [run] = await f.db.select().from(schema.agentRuns);
-  expect(run?.status).toBe("failed");
-  expect(run?.error).toBe("computer_busy");
+  expect(run?.status).toBe("waiting_input");
+  expect(run?.error).toBeNull();
+  expect((run?.transcript as { roomWaitSince?: number } | undefined)?.roomWaitSince).toBe(since);
   expect(seen.length).toBe(2);
-  expect(finished.at(-1)).toMatchObject({ status: "failed", error: "computer_busy", errorCode: "run.computer_busy" });
-  // Nothing left asking.
   const pending = (await f.db.select().from(schema.outbox)).filter(
     (j) => j.kind === "agent_run.execute" && j.status === "pending",
   );
-  expect(pending).toEqual([]);
+  expect(pending.length).toBe(1);
 });
 
 test("no room on the computer and a model key: the model brain answers, as for any computer that can't", async () => {
@@ -2566,6 +2564,64 @@ const personMessage = (fx: Fixture, body: string, threadId?: string) =>
 
 const runById = async (fx: Fixture, id: string) =>
   (await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, id)))[0];
+
+/** Each `computer.queue` broadcast, with the line as an app that refetched on it read it. */
+function queueReads(fx: Fixture) {
+  const reads: Promise<Awaited<ReturnType<typeof computerQueue>>>[] = [];
+  fx.pubsub.subscribe(orgTopic(fx.org.id), (e) => {
+    const event = (e as { event?: { type?: string; machineId?: string } }).event;
+    if (event?.type === "computer.queue" && event.machineId)
+      reads.push(computerQueue(fx.db, fx.owner.id, fx.org.id, event.machineId));
+  });
+  return reads;
+}
+
+test("the line is told only when it changes: admitted once its ask is saved, a refused re-ask says nothing", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let room = false;
+  const reads = queueReads(f);
+  // Each turn waits for the reads its events started: what an app refetching at once would see.
+  const { brain } = scriptedComputerBrain(async function* (): AsyncGenerator<BrainEvent> {
+    await Promise.all(reads);
+    if (!room) {
+      yield { type: "error", code: "busy", message: "The computer is busy.", retryable: true };
+      return;
+    }
+    yield { type: "text_delta", text: "Pronto." };
+    await Bun.sleep(0);
+    await Promise.all(reads);
+    yield { type: "done", text: "Pronto." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  const id = run?.id ?? "";
+  // Admitted, then refused: it joined the line (one event, read after its ask was saved: working).
+  expect((await Promise.all(reads)).map((q) => [q.working.map((w) => w.runId), q.waiting.map((w) => w.runId)])).toEqual(
+    [
+      [[id], []],
+      [[], [id]],
+    ],
+  );
+
+  // The head asks again and is refused again: nothing changed, nothing is sent.
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000) });
+  expect(reads).toHaveLength(2);
+
+  // Room at last: told when its turn is taken, and again when the run is done.
+  room = true;
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 2 * COMPUTER_BUSY_RETRY_MS + 2_000) });
+  const all = await Promise.all(reads);
+  expect(all[2]?.working.map((w) => w.runId)).toEqual([id]);
+  expect(all.at(-1)).toMatchObject({ machineId, working: [], waiting: [] });
+});
 
 test("still in line after ten minutes: one note in the agent's words, and no other from it there", async () => {
   f = await setup();

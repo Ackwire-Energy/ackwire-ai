@@ -13,6 +13,7 @@
  * - `POST   …/machines/{id}/access/reduce` `{ removeFolder?, disableTool? }` → the new access
  * - `GET    /api/desktop/latest?target=&arch=` → the release, or 404 (`null`)
  * - `GET    …/machines/outages` → `{ outages, targets }` (offline computers agents wait for)
+ * - `GET    …/machines/{id}/queue` → the computer's line (`setQueue()`; nothing working or waiting by default)
  * - `POST   …/machines/{id}/move-agents` `{ agentIds, target }` → `{ moved, skipped, resumed, stillWaiting }`
  * - `POST   …/machines/{id}/account-logins` `{ kind }` → 201 `{ loginId, kind, url, publicKey? | userCode?, expiresAt }`
  * - `POST   …/account-logins/{loginId}/code` `{ box }` → 204; `GET …/account-logins/{loginId}` → `{ state, account? }`
@@ -29,6 +30,7 @@ import type {
   AccountLoginStatus,
   AiAccounts,
   ApiClient,
+  ComputerQueue,
   ComputerSetup,
   DesktopRelease,
   DeviceRequest,
@@ -60,6 +62,8 @@ export interface FakeMachines {
   setRelease(release: DesktopRelease | null): void;
   /** Offline computers and where their agents could go. */
   setOutages(outages: MachineOutages): void;
+  /** A computer's line (`queue`); unset: nothing working or waiting on it. */
+  setQueue(queue: ComputerQueue): void;
   /** What `moveAgents` answers (default: every agent moved, nothing else). */
   setMoveResult(result: MoveAgentsResult | null): void;
   /** The server's own computer in the organization; `null` (default): it has none. */
@@ -85,6 +89,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   const devices = new Map<string, DeviceRequest>();
   let release: DesktopRelease | null = null;
   let outages: MachineOutages = { outages: [], targets: [] };
+  const queues = new Map<string, ComputerQueue>();
   let moveResult: MoveAgentsResult | null = null;
   let host: HostComputer | null = null;
   const PAIR: ComputerSetup = {
@@ -218,6 +223,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       },
       // Read on every workspace page (the notice): not logged, so tests' call lists stay as they were.
       outages: async () => clone(outages),
+      // Read wherever an agent's line shows: not logged either.
+      queue: async (_orgId, machineId) =>
+        clone(queues.get(machineId) ?? { machineId, name: find(machineId).name, working: [], waiting: [] }),
       moveAgents: async (orgId, machineId, input) => {
         log("machines.moveAgents", orgId, machineId, input);
         return clone(moveResult ?? { moved: input.agentIds, skipped: [], resumed: 0, stillWaiting: 0 });
@@ -307,6 +315,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     all: () => clone(machines),
     setOutages: (next) => {
       outages = clone(next);
+    },
+    setQueue: (next) => {
+      queues.set(next.machineId, clone(next));
     },
     setMoveResult: (next) => {
       moveResult = next;

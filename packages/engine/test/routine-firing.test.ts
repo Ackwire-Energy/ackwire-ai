@@ -201,6 +201,27 @@ describe("one run at a time", () => {
     expect((await notificationsOf(f, "routine_stalled"))[0]?.doneAt).not.toBeNull();
   });
 
+  test("in line for room on a full computer: it keeps its place, the next slot gives way and nobody hears of a stall", async () => {
+    f = await setup();
+    const routine = await channelRoutine(f);
+    const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Acme Mac" }).returning();
+    const first = await fire(f, routine.id, minutesFromNow(-180), "schedule");
+    await f.db
+      .update(schema.agentRuns)
+      .set({
+        status: "waiting_input",
+        waitingMachineId: machine?.id,
+        transcript: { messages: [], waitingForBrain: { code: "busy", waitId: "w1" }, roomWaitSince: Date.now() },
+      })
+      .where(eq(schema.agentRuns.id, first.agentRunId ?? ""));
+
+    const second = await fire(f, routine.id, minutesFromNow(-120), "schedule");
+    expect(second).toMatchObject({ status: "skipped", code: "previous_waiting" });
+    expect(await routineRunRow(f, first.id)).toMatchObject({ status: "started" });
+    expect((await agentRunRow(f, first.agentRunId)).status).toBe("waiting_input");
+    expect(await notificationsOf(f, "routine_stalled")).toEqual([]);
+  });
+
   test("a computer online that can't take the turn (an old runner, its plan's limit) notifies once, not every slot", async () => {
     f = await setup();
     const routine = await channelRoutine(f);

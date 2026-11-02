@@ -1483,6 +1483,7 @@
     "outage_other": "{{names}}：AI 服务商出现故障 · 会自动重试",
     "queued_other": "{{names}} 正在排队等待电脑",
     "away_other": "{{names}} 正在等待电脑",
+    "queuedNext": "{{names}} 正在电脑的队列中 · 下一个",
     "nobody": "没有智能体会回答",
     "status": {
       "seen": "已看到",
@@ -7428,6 +7429,67 @@
       "noneText": "不运行程序，也不保存文件"
     }
   },
+  "queue": {
+    "button_other": "电脑 · {{count}} 个等待中",
+    "buttonIdle": "电脑",
+    "see": "查看队列",
+    "label": "{{name}} 的队列",
+    "full": "已满",
+    "fullNext": "已满 · 下一个约 {{n}} 分钟后开始",
+    "free": "没有排队",
+    "workingNow": "正在工作 · {{n}}",
+    "inLine": "排队中 · {{n}}",
+    "allStarted": "全部约 {{n}} 分钟内开始",
+    "nothingWorking": "现在没有在运行的任务",
+    "rule": "人优先。一起被提及的智能体逐个开始。",
+    "youFirst": "你优先",
+    "startsIn": "约 {{n}} 分钟后开始",
+    "startsAfter": "{{after}} 完成后开始",
+    "left": "还剩约 {{n}} 分钟",
+    "who": "{{name}}",
+    "away": "离开 {{time}}",
+    "purpose": {
+      "you": "正在回复你",
+      "person": "正在回复 {{name}}",
+      "someone": "正在回复某人",
+      "agent": "应 {{name}} 的请求",
+      "someAgent": "应某个智能体的请求",
+      "routine": "例行任务",
+      "work": "长时间工作"
+    },
+    "where": {
+      "yourDm": "你的私信",
+      "dm": "与 {{name}} 的私信",
+      "thread": "#{{name}} 中的一个话题",
+      "private": "私密对话"
+    },
+    "live": {
+      "nextEta": "正在等待电脑。下一个就是它，约 {{n}} 分钟后",
+      "nextAfter": "正在等待电脑。{{after}} 完成后就轮到它",
+      "next": "正在等待电脑。下一个就是它",
+      "behind": "排队中，第 {{nth}}。在 {{names}} 之后",
+      "position": "排队中，第 {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}",
+      "two": "{{n}}",
+      "few": "{{n}}",
+      "other": "{{n}}"
+    },
+    "fan": {
+      "called_other": "已呼叫 {{count}} 个智能体",
+      "answered_other": "{{count}} 个已回复",
+      "working_other": "{{count}} 个工作中",
+      "inLine_other": "{{count}} 个排队中",
+      "failed_other": "{{count}} 个未回复",
+      "chip": {
+        "answered": "已回复",
+        "working": "工作中",
+        "inLine": "排队中",
+        "failed": "未回复"
+      }
+    }
+  },
   "access": {
     "matrixTitle": "智能体权限",
     "matrixHint": "敏感操作（合并、部署、分享、付款）在任何级别下都需要审批。如需逐个工具设置，请打开连接器的“工具”。",
@@ -10277,13 +10339,14 @@
   "usageViews": {
     "signedOut": "已退出登录",
     "whose": "{{name}} 的",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "再次使用此账号后会显示限额。",
     "unused": "没有智能体使用此账号。",
     "usesNow": "正在使用",
     "monthTokens": "本月 {{tokens}} 个 token",
     "tokens": "{{tokens}} 个 token",
     "equivalent": "按 API 计约 {{amount}}",
+    "thisMonth": "本月",
+    "moreAgents_other": "+{{count}} 个智能体",
     "paid": "已支付 {{amount}}",
     "budgetShare": "预算的 {{percent}}",
     "estimate": "套餐只显示整个账号的用量。每个智能体的部分是根据各自的花费估算的。",
@@ -10810,9 +10873,9 @@
       "issue_work_start": "请完成任务 #{{number}}。",
       "issue_taken": "接手了任务 #{{number}}。",
       "done": "完成。",
-      "stretch_paused_runs_other": "{{agents}} 停下来向你确认 · 自你提出请求以来已自主执行 {{steps}} 步",
-      "stretch_paused_spend_other": "{{agents}} 停下来向你确认 · 在没有你参与的情况下，每个都已在这上面用掉本月预算的 {{percent}}%",
-      "stretch_paused_spend_cost_other": "{{agents}} 停下来向你确认 · 在没有你参与的情况下，每个都已在这上面用掉 {{amount}}（本月预算的 {{percent}}%）",
+      "stretch_paused_runs_other": "{{agents}} 暂停下来，先向你确认再继续",
+      "stretch_paused_spend_other": "{{agents}} 暂停下来向你确认 · 每个已用掉本月预算的 {{percent}}%",
+      "stretch_paused_spend_cost_other": "{{agents}} 暂停下来向你确认 · 每个已用掉 {{amount}}（本月预算的 {{percent}}%）",
       "memory": {
         "proposed": "已创建提议：{{text}}",
         "forgot": "记忆已更新：忘记了“{{text}}”。",

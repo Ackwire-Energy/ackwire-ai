@@ -209,6 +209,8 @@ export async function makeWayForRun(deps: FiringDeps, routine: RoutineRow, run: 
       });
       continue;
     }
+    // In line for room on an online computer: it keeps its place and this slot gives way.
+    if (ar.status === "waiting_input" && usageWait?.code === "busy") return blocked("previous_waiting");
     if (ar.status === "waiting_input" && ar.waitingMachineId) {
       await endWithRun(deps, rr, ar, { status: "superseded", code: "waiting_computer" });
       await stalled(deps, routine.id, routine.orgId, ar.waitingMachineId);

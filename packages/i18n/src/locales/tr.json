@@ -1541,6 +1541,7 @@
     "queued_other": "{{names}} bilgisayar için sırada",
     "away_one": "{{names}} bilgisayarı bekliyor",
     "away_other": "{{names}} bilgisayarı bekliyor",
+    "queuedNext": "{{names}} bilgisayar sırasında · sıradaki",
     "nobody": "Hiçbir ajan yanıtlamayacak",
     "status": {
       "seen": "Gördü",
@@ -7605,6 +7606,73 @@
       "noneText": "Program çalıştırmaz ve dosya tutmaz"
     }
   },
+  "queue": {
+    "button_one": "Bilgisayar · {{count}} bekliyor",
+    "button_other": "Bilgisayar · {{count}} bekliyor",
+    "buttonIdle": "Bilgisayar",
+    "see": "Sırayı gör",
+    "label": "{{name}} sırası",
+    "full": "Dolu",
+    "fullNext": "Dolu · sıradaki yaklaşık {{n}} dk sonra başlar",
+    "free": "Sırada kimse yok",
+    "workingNow": "Şu an çalışıyor · {{n}}",
+    "inLine": "Sırada · {{n}}",
+    "allStarted": "hepsi ~{{n}} dk içinde başlar",
+    "nothingWorking": "Şu an çalışan bir şey yok",
+    "rule": "Önce insanlar. Birlikte anılan ajanlar tek tek başlar.",
+    "youFirst": "Önce sen",
+    "startsIn": "~{{n}} dk sonra başlar",
+    "startsAfter": "{{after}} bitince başlar",
+    "left": "~{{n}} dk kaldı",
+    "who": "{{name}}",
+    "away": "{{time}} uzakta",
+    "purpose": {
+      "you": "sana yanıt veriyor",
+      "person": "{{name}} adlı kişiye yanıt veriyor",
+      "someone": "bir kişiye yanıt veriyor",
+      "agent": "{{name}} istedi",
+      "someAgent": "bir ajan istedi",
+      "routine": "bir rutin",
+      "work": "uzun iş"
+    },
+    "where": {
+      "yourDm": "DM'in",
+      "dm": "{{name}} ile DM",
+      "thread": "#{{name}} içinde bir konu",
+      "private": "özel bir konuşma"
+    },
+    "live": {
+      "nextEta": "Bilgisayarı bekliyor. Sıradaki o, yaklaşık {{n}} dk sonra",
+      "nextAfter": "Bilgisayarı bekliyor. {{after}} bitince sıradaki o",
+      "next": "Bilgisayarı bekliyor. Sıradaki o",
+      "behind": "Sırada, {{nth}}. {{names}} sonrasında",
+      "position": "Sırada, {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}.",
+      "two": "{{n}}.",
+      "few": "{{n}}.",
+      "other": "{{n}}."
+    },
+    "fan": {
+      "called_one": "{{count}} ajan çağrıldı",
+      "called_other": "{{count}} ajan çağrıldı",
+      "answered_one": "{{count}} yanıtladı",
+      "answered_other": "{{count}} yanıtladı",
+      "working_one": "{{count}} çalışıyor",
+      "working_other": "{{count}} çalışıyor",
+      "inLine_one": "{{count}} sırada",
+      "inLine_other": "{{count}} sırada",
+      "failed_one": "{{count}} yanıtlamadı",
+      "failed_other": "{{count}} yanıtlamadı",
+      "chip": {
+        "answered": "yanıtladı",
+        "working": "çalışıyor",
+        "inLine": "sırada",
+        "failed": "yanıtlamadı"
+      }
+    }
+  },
   "access": {
     "matrixTitle": "Ajan erişimi",
     "matrixHint": "Hassas işlemler (birleştirme, dağıtım, paylaşım, ödeme) hangi düzeyde olursa olsun her zaman onay ister. Araç araç ayarlamak için bağlayıcının Araçlar bölümünü açın.",
@@ -10527,13 +10595,15 @@
   "usageViews": {
     "signedOut": "Oturum kapatıldı",
     "whose": "{{name}} hesabı",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "Sınır, bu hesap yeniden kullanıldıktan sonra görünür.",
     "unused": "Bu hesabı kullanan ajan yok.",
     "usesNow": "şu anda kullanıyor",
     "monthTokens": "Bu ay {{tokens}} token",
     "tokens": "{{tokens}} token",
     "equivalent": "API üzerinden ≈ {{amount}}",
+    "thisMonth": "Bu ay",
+    "moreAgents_one": "+{{count}} ajan",
+    "moreAgents_other": "+{{count}} ajan",
     "paid": "{{amount}} ödendi",
     "budgetShare": "Bütçenin {{percent}} kadarı",
     "estimate": "Planlar yalnızca hesabın tamamının ne kadar kullandığını söyler. Her ajanın payı, her birinin harcadığına göre bir tahmindir.",
@@ -11056,12 +11126,12 @@
       "issue_work_start": "Lütfen #{{number}} görevini yap.",
       "issue_taken": "#{{number}} görevini aldım.",
       "done": "Bitti.",
-      "stretch_paused_runs_one": "{{agents}} size danışmak için durdu · isteğinizden beri sizsiz {{steps}} adım",
-      "stretch_paused_runs_other": "{{agents}} size danışmak için durdu · isteğinizden beri kendi başlarına {{steps}} adım",
-      "stretch_paused_spend_one": "{{agents}} size danışmak için durdu · bunun için sizsiz aylık bütçenin %{{percent}} kadarını kullandı",
-      "stretch_paused_spend_other": "{{agents}} size danışmak için durdu · her biri bunun için sizsiz aylık bütçenin %{{percent}} kadarını kullandı",
-      "stretch_paused_spend_cost_one": "{{agents}} size danışmak için durdu · bunun için sizsiz {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
-      "stretch_paused_spend_cost_other": "{{agents}} size danışmak için durdu · her biri bunun için sizsiz {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
+      "stretch_paused_runs_one": "{{agents}} devam etmeden önce size danışmak için durdu",
+      "stretch_paused_runs_other": "{{agents}} devam etmeden önce size danışmak için durdu",
+      "stretch_paused_spend_one": "{{agents}} size danışmak için durdu · aylık bütçenin %{{percent}} kadarını kullandı",
+      "stretch_paused_spend_other": "{{agents}} size danışmak için durdu · her biri aylık bütçenin %{{percent}} kadarını kullandı",
+      "stretch_paused_spend_cost_one": "{{agents}} size danışmak için durdu · {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
+      "stretch_paused_spend_cost_other": "{{agents}} size danışmak için durdu · her biri {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
       "memory": {
         "proposed": "Öneri oluşturuldu: {{text}}",
         "forgot": "Bellek güncellendi: \"{{text}}\" unutuldu.",

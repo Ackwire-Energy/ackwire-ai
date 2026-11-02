@@ -1515,6 +1515,8 @@ export const ptBR = {
     queued_other: "{{names}} estão na fila do computador",
     away_one: "{{names}} aguarda o computador",
     away_other: "{{names}} aguardam o computador",
+    queuedNext: "{{names}} está na fila do computador · é o próximo",
+    queuedNext_female: "{{names}} está na fila do computador · é a próxima",
     nobody: "Nenhum agente vai responder",
     status: {
       seen: "Viu",
@@ -7518,6 +7520,77 @@ export const ptBR = {
       noneText: "Não roda programas nem guarda arquivos",
     },
   },
+  queue: {
+    button_one: "Computador · {{count}} aguardando",
+    button_other: "Computador · {{count}} aguardando",
+    buttonIdle: "Computador",
+    see: "Ver fila",
+    label: "Fila de {{name}}",
+    full: "Cheio",
+    fullNext: "Cheio · o próximo começa em cerca de {{n}} min",
+    free: "Ninguém na fila",
+    workingNow: "Trabalhando agora · {{n}}",
+    inLine: "Na fila · {{n}}",
+    allStarted: "todos começam em ~{{n}} min",
+    nothingWorking: "Nada rodando agora",
+    rule: "Pessoas vão primeiro. Agentes chamados juntos começam um de cada vez.",
+    youFirst: "Você vai primeiro",
+    startsIn: "começa em ~{{n}} min",
+    startsAfter: "começa quando {{after}} terminar",
+    left: "faltam ~{{n}} min",
+    who: "o {{name}}",
+    who_female: "a {{name}}",
+    away: "Fora há {{time}}",
+    purpose: {
+      you: "respondendo você",
+      person: "respondendo {{name}}",
+      someone: "respondendo uma pessoa",
+      agent: "a pedido de {{name}}",
+      someAgent: "a pedido de um agente",
+      routine: "uma rotina",
+      work: "trabalho longo",
+    },
+    where: {
+      yourDm: "sua DM",
+      dm: "DM com {{name}}",
+      thread: "uma thread em #{{name}}",
+      private: "uma conversa privada",
+    },
+    live: {
+      nextEta: "Aguardando o computador. É o próximo, em cerca de {{n}} min",
+      nextEta_female: "Aguardando o computador. É a próxima, em cerca de {{n}} min",
+      nextAfter: "Aguardando o computador. É o próximo quando {{after}} terminar",
+      nextAfter_female: "Aguardando o computador. É a próxima quando {{after}} terminar",
+      next: "Aguardando o computador. É o próximo",
+      next_female: "Aguardando o computador. É a próxima",
+      behind: "Na fila, {{nth}}. Depois de {{names}}",
+      position: "Na fila, {{nth}}",
+    },
+    nth: {
+      one: "{{n}}º",
+      two: "{{n}}º",
+      few: "{{n}}º",
+      other: "{{n}}º",
+    },
+    fan: {
+      called_one: "{{count}} agente chamado",
+      called_other: "{{count}} agentes chamados",
+      answered_one: "{{count}} respondeu",
+      answered_other: "{{count}} responderam",
+      working_one: "{{count}} trabalhando",
+      working_other: "{{count}} trabalhando",
+      inLine_one: "{{count}} na fila",
+      inLine_other: "{{count}} na fila",
+      failed_one: "{{count}} não respondeu",
+      failed_other: "{{count}} não responderam",
+      chip: {
+        answered: "respondeu",
+        working: "trabalhando",
+        inLine: "na fila",
+        failed: "não respondeu",
+      },
+    },
+  },
   access: {
     matrixTitle: "Acesso dos agentes",
     matrixHint:
@@ -10155,13 +10228,15 @@ export const ptBR = {
   usageViews: {
     signedOut: "Saiu da conta",
     whose: "de {{name}}",
-    part: "{{name}} ≈ {{percent}}",
     noWindows: "O limite aparece depois do próximo uso desta conta.",
     unused: "Nenhum agente usa esta conta.",
     usesNow: "usa agora",
     monthTokens: "{{tokens}} tokens este mês",
     tokens: "{{tokens}} tokens",
     equivalent: "≈ {{amount}} pela API",
+    thisMonth: "Este mês",
+    moreAgents_one: "+{{count}} agente",
+    moreAgents_other: "+{{count}} agentes",
     paid: "{{amount}} pagos",
     budgetShare: "{{percent}} do orçamento",
     /** The plan accounts' ⓘ. */
@@ -10742,19 +10817,18 @@ export const ptBR = {
       issue_taken: "Peguei a tarefa #{{number}}.",
       done: "Pronto.",
       /**
-       * A stretch's pause card (ADR 0089): `agents` their names, `count` how many, `steps` the steps agents may start on
-       * their own; `percent` the share of each one's monthly budget, and with `_cost` it in money (`amount`).
+       * A stretch's pause card (ADR 0089): `agents` their names, `count` how many; `percent` the share of each one's
+       * monthly budget, and with `_cost` it in money (`amount`).
        */
-      stretch_paused_runs_one: "{{agents}} parou para te consultar · {{steps}} passos sem você desde o seu pedido",
-      stretch_paused_runs_other: "{{agents}} pararam para te consultar · {{steps}} passos sozinhos desde o seu pedido",
-      stretch_paused_spend_one:
-        "{{agents}} parou para te consultar · usou {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_runs_one: "{{agents}} parou para checar com você antes de continuar",
+      stretch_paused_runs_other: "{{agents}} pararam para checar com você antes de continuar",
+      stretch_paused_spend_one: "{{agents}} parou para checar com você · usou {{percent}}% do orçamento do mês",
       stretch_paused_spend_other:
-        "{{agents}} pararam para te consultar · usaram {{percent}}% do orçamento do mês nisso sem você",
+        "{{agents}} pararam para checar com você · cada um usou {{percent}}% do orçamento do mês",
       stretch_paused_spend_cost_one:
-        "{{agents}} parou para te consultar · usou {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
+        "{{agents}} parou para checar com você · usou {{amount}} ({{percent}}% do orçamento do mês)",
       stretch_paused_spend_cost_other:
-        "{{agents}} pararam para te consultar · usaram {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
+        "{{agents}} pararam para checar com você · cada um usou {{amount}} ({{percent}}% do orçamento do mês)",
       memory: {
         proposed: "Proposta criada: {{text}}",
         forgot: 'Memória atualizada: esqueci "{{text}}".',

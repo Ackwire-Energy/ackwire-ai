@@ -229,6 +229,7 @@ import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelM
 import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
+import { QueueButton, QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -252,7 +253,7 @@ import { InviteOfferRow, useInviteOffer } from "@/components/invite/InviteDialog
 import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
-import { WaitingCard } from "@/components/MachineOutages";
+import { AwayPill, WaitingCard } from "@/components/MachineOutages";
 import { useMediaTabs } from "@/components/MediaPicker";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MemoryMarks } from "@/components/MemoryMark";
@@ -744,6 +745,7 @@ function ChannelView({
   );
   // What the channel suggests or picks for me goes to an agent that answers me (`canTalk`: who manages agents can't
   // talk to a locked one either), one people can read: a handle that is an id only when every agent's is.
+  const queueMachine = useAgentsMachineId(useMemo(() => channelAgents.map((a) => a.id), [channelAgents]));
   const talkable = channelAgents.filter(canTalk);
   const suggestedAgent = talkable.find((a) => !isIdHandle(a.handle)) ?? talkable[0];
   const channelPeople = useMemo(
@@ -1777,6 +1779,7 @@ function ChannelView({
                   {subtitle && <span className="channel__topic">{subtitle}</span>}
                 </div>
                 <div className="channel__acts ac-acts">
+                  <QueueButton machineId={queueMachine} />
                   <ChannelMembersStack
                     channelId={channel.id}
                     people={channelPeople}
@@ -2453,6 +2456,9 @@ const Timeline = memo(function Timeline({
         />
       ),
     );
+    // Its agents in line for their computer: each one's turn right after it, where "thinking" shows otherwise.
+    if ((m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local)
+      rows.push(<QueueWaitTurns key={`queue-${item.key}`} message={m} />);
   }
   drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
@@ -3535,7 +3541,9 @@ export const TimelineMessage = memo(function TimelineMessage({
                   </span>
                 ),
               }
-            : undefined
+            : waitNotice
+              ? { label: <AwayPill notice={waitNotice} agentId={m.author.id ?? null} /> }
+              : undefined
       }
       aside={
         receipted || seenSlot ? (

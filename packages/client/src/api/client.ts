@@ -69,6 +69,7 @@ import type {
   CodeSent,
   CommandApproval,
   ComposioUsage,
+  ComputerQueue,
   ComputerSetup,
   ComputerTarget,
   Connection,
@@ -755,6 +756,8 @@ export interface ApiClient {
     desktopLatest(target: string, arch: string): Promise<DesktopRelease | null>;
     /** Offline computers that agents wait for, and where they could move. */
     outages(orgId: string): Promise<MachineOutages>;
+    /** A computer's line: the turns working on it and the runs waiting for room, in order. */
+    queue(orgId: string, machineId: string): Promise<ComputerQueue>;
     /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
     moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
     /**

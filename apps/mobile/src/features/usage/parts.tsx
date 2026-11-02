@@ -1,13 +1,27 @@
 import type { PlanAccountInfo } from "@agenteschat/client";
-import { accountName, brandOf, type MeterWindow, planMeterText } from "@agenteschat/client/lib/plan-usage";
+import {
+  accountName,
+  brandOf,
+  type MeterSegment,
+  type MeterWindow,
+  planMeterText,
+} from "@agenteschat/client/lib/plan-usage";
 import { planName } from "@agenteschat/client/lib/plans";
 import { mixHex } from "@agenteschat/ui/agent/engine";
-import { PLAN_ALMOST, PLAN_TONE, planLevel, planLine, planState, planWindows } from "@agenteschat/ui/plan-state";
+import {
+  PLAN_ALMOST,
+  PLAN_TONE,
+  planLevel,
+  planLine,
+  planState,
+  planWindows,
+  renewals,
+} from "@agenteschat/ui/plan-state";
 import { Canvas, createPicture, Picture, Skia } from "@shopify/react-native-skia";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Icon, type IconName, ProviderLogo, Text } from "@/ui";
+import { Icon, type IconName, ProviderLogo, Text, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /*
@@ -20,24 +34,28 @@ type MeterUsage = { windows: readonly MeterWindow[]; limited?: boolean; at: stri
 
 /**
  * The bar (`.ac-meter`): a tint track, the value, an estimated part in full tone over it, the "almost" mark. Ink unless
- * a plan's level gives it a `color` (a 6-digit hex: its part's tint adds an alpha to it).
+ * a plan's level gives it a `color` (a 6-digit hex: its part's tint adds an alpha to it). `segments`: the value split
+ * from the left by agent, each in its colour (its light tone in the dark theme), a hairline of track between them.
  */
 export function Meter({
   value,
   part,
+  segments,
   label,
   mark,
   color,
 }: {
   value: number;
   part?: number;
+  segments?: readonly MeterSegment[];
   label: string;
   mark?: number;
   color?: string;
 }) {
-  const c = useColors();
+  const { colors: c, scheme } = useTheme();
   const tone = color ?? c.ink;
-  const parts = part !== undefined;
+  const split = segments && segments.length > 0 ? segments : null;
+  const parts = part !== undefined || split !== null;
   return (
     <View
       accessible
@@ -47,7 +65,19 @@ export function Meter({
       style={[styles.track, { backgroundColor: c.plate }]}
     >
       <View style={[styles.bar, { width: `${Math.min(100, value)}%`, backgroundColor: parts ? `${tone}4d` : tone }]} />
-      {parts ? <View style={[styles.bar, { width: `${Math.min(100, part)}%`, backgroundColor: tone }]} /> : null}
+      {part !== undefined ? (
+        <View style={[styles.bar, { width: `${Math.min(100, part)}%`, backgroundColor: tone }]} />
+      ) : null}
+      {split ? (
+        <View style={styles.segs}>
+          {split.map((g) => (
+            <View
+              key={g.key}
+              style={{ width: `${Math.min(100, g.value)}%`, backgroundColor: scheme === "dark" ? g.light : g.deep }}
+            />
+          ))}
+        </View>
+      ) : null}
       {mark !== undefined ? <View style={[styles.mark, { left: `${mark}%`, backgroundColor: c.raised }]} /> : null}
     </View>
   );
@@ -62,7 +92,18 @@ export function Meter({
  * after `label`), one bar for the fullest, and only near the limit when it renews; nothing while no window is known,
  * unless the plan already refused a request ("No limite").
  */
-export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage; compact?: boolean; label?: string }) {
+export function PlanMeter({
+  usage,
+  compact = false,
+  label,
+  children,
+}: {
+  usage: MeterUsage;
+  compact?: boolean;
+  label?: string;
+  /** An account's agents: between the bars and when they renew, which then shows once under them. */
+  children?: ReactNode;
+}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const text = planMeterText(t, i18n.language);
@@ -94,6 +135,7 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
   const { state, until, used } = planState(usage, now);
   const headline = state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
   const passed = (iso: string | undefined) => iso !== undefined && Date.parse(iso) <= now;
+  const renews = children ? renewals(rows, text, now) : null;
   return (
     <View style={styles.meter}>
       {headline ? (
@@ -123,13 +165,14 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
               mark={PLAN_ALMOST}
               color={tone}
               {...(w.part !== undefined && fresh ? { part: w.part } : {})}
+              {...(w.segments && fresh ? { segments: w.segments } : {})}
             />
             {w.note && fresh ? (
               <Text variant="caption" tone="muted">
                 {w.note}
               </Text>
             ) : null}
-            {w.resetsAt && fresh ? (
+            {w.resetsAt && fresh && !children ? (
               <Text variant="caption" tone="muted">
                 {text.resets(w.resetsAt)}
               </Text>
@@ -137,6 +180,12 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
           </View>
         );
       })}
+      {children}
+      {children && renews ? (
+        <Text variant="caption" tone="muted">
+          {renews}
+        </Text>
+      ) : null}
       <Text variant="caption" tone="muted">
         {text.updated(usage.at)}
       </Text>
@@ -327,6 +376,7 @@ const styles = StyleSheet.create({
   track: { height: 6, borderRadius: 3, overflow: "hidden" },
   bar: { position: "absolute", top: 0, bottom: 0, left: 0, borderRadius: 3 },
   mark: { position: "absolute", top: 0, bottom: 0, width: 2, marginLeft: -1 },
+  segs: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, flexDirection: "row", gap: 1 },
   meter: { gap: 10 },
   meterCompact: { gap: 4 },
   window: { gap: 4 },
