@@ -16,6 +16,7 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { Button, Card, Icon, type IconName, InkOrbit, ProviderLogo, Row, Text, useReducedMotion, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { Note, OpenPage } from "../ai/parts";
+import { QueueWaitRows } from "../queue/parts";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -86,7 +87,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         }}
       />,
     );
-  return (
+  const plain = (
     <Animated.View
       key={line.mark}
       entering={reduced ? undefined : FadeIn.duration(200)}
@@ -129,6 +130,12 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         />
       ) : null}
     </Animated.View>
+  );
+  // In line for the computer: the agent's waiting row says where, once the line knows its turn.
+  return line.words?.key === "receipts.queued" ? (
+    <QueueWaitRows channelId={m.channelId} receipt={receipt} agents={line.words.agents} fallback={plain} />
+  ) : (
+    plain
   );
 });
 

@@ -59,7 +59,7 @@ import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
 import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
-import { BrainWait } from "../outages/WaitCard";
+import { AwayPill, BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useMyHandle, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -447,6 +447,7 @@ export const MessageRow = memo(function MessageRow({
             <Text variant="footnote" tone="faint">
               {when.time(m.createdAt)}
             </Text>
+            {brainWait ? <AwayPill message={m} /> : null}
             {m.pinned ? <PinMark /> : null}
             {receipt && !m.local ? (
               <View style={styles.whoMark}>
