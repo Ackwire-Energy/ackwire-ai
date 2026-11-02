@@ -4,7 +4,7 @@
 - Date: 2026-11-02
 - Supersedes: ADR 0045 (background work, proposed and never built). Takes only ideas from the unmerged draft on `feat/agents-find-a-way` (ADR 0099 § Background work).
 - Extends: ADR 0008 (runs), 0032 (brains), 0084 (agent status), 0089 (stretches), 0095 (hand-offs), 0097 (`decideTurnEnd`), 0112 (steering), 0114 (Cursor), 0118 (usage pause)
-- Code: `packages/engine/src/works.ts` (move, updates, check-in job, queue, end, reconcile, views), `work-tools.ts` (the four tools), `executor.ts` (adoption, safety net, queue park, job yield, report home, wait/end hooks), `messages.ts` / `dispatch.ts` / `run-scope.ts` (`workKeepsThread`), `brains/select.ts` (`sessionFor`, `mayFallBack`), `agent-status.ts` (`work` line), `working.ts`, `recovery.ts` (`activeRunsIn`), `issues.ts` (`linkIssueToWork`, `setWorkIssueState`, `shareIssueWithEveryone`, `blocked`, `backgroundWork`), `notification-producers.ts`, `cancel.ts`, `continue-run.ts`, `context.ts` (prompt line, "# Your background work here"), `context/learn.ts`, `usage-pause.ts`, `notices.ts`, `events.ts` (`agent.work`); server `routes/app/issues.ts` (`POST …/issues/{id}/share`), `schemas.ts` (`WorkView`), `workers.ts` (sweep), `engine.ts`; client `lib/long-work.ts`; ui `components/WorkLine.tsx`; web `components/BackgroundWork.tsx`; phone `features/chat/WorkLine.tsx`; migration `0172_background_work.sql`; env `AGENT_WORK_MAX_PER_ORG`
+- Code: `packages/engine/src/works.ts` (move, updates, check-in job, queue, end, reconcile, views), `work-tools.ts` (the four tools), `executor.ts` (adoption, safety net, queue park, job yield, report home, wait/end hooks), `messages.ts` / `dispatch.ts` / `run-scope.ts` (`workKeepsThread`), `brains/select.ts` (`sessionFor`, `mayFallBack`), `agent-status.ts` (`work` line), `working.ts`, `recovery.ts` (`activeRunsIn`), `issues.ts` (`linkIssueToWork`, `setWorkIssueState`, `shareIssueWithEveryone`, `blocked`, `backgroundWork`), `notification-producers.ts`, `cancel.ts`, `continue-run.ts`, `context.ts` (prompt line, "# Your background work here"), `context/learn.ts`, `usage-pause.ts`, `notices.ts`, `events.ts` (`agent.work`); server `routes/app/issues.ts` (`POST …/issues/{id}/share`), `schemas.ts` (`WorkView`), `workers.ts` (sweep), `engine.ts`; client `lib/long-work.ts`; ui `components/WorkLine.tsx`; web `components/BackgroundWork.tsx`; phone `features/chat/WorkLine.tsx`; migration `0174_background_work.sql`; env `AGENT_WORK_MAX_PER_ORG`
 
 ## Context
 
@@ -86,7 +86,7 @@ Every update is an `issue_activity` event `work_update`. The plan (`[{ id, text,
 
 ### 8. Data
 
-Migration `0172_background_work.sql`: `agent_works` (with `org_id`, `anchor_message_id` unique, partial indexes on live and queued), `agent_runs.work_id` (FK, set null on delete; partial index), `issues.blocked`. The work's current run is its newest run with that `work_id`.
+Migration `0174_background_work.sql`: `agent_works` (with `org_id`, `anchor_message_id` unique, partial indexes on live and queued), `agent_runs.work_id` (FK, set null on delete; partial index), `issues.blocked`. The work's current run is its newest run with that `work_id`.
 
 ### 9. Tests
 

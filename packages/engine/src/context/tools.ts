@@ -21,12 +21,13 @@ import { cutText } from "../format";
 import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
 import { personWords, runReadOutsideById, UNASKED_DESTINATION, unaskedDestination } from "../outside";
-import { personBehindCall } from "../requester";
+import { personBehindCall, wikiActorOfCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { untrustedBlock } from "../untrusted";
+import { wikiHitsForAgent } from "../wiki";
 import {
   type ConsolidateResult,
   type ContextItem,
@@ -100,7 +101,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             visibleChannelIds: channels,
             kinds,
             limit: typeof input.limit === "number" ? input.limit : 8,
-          }),
+          }).then(async (found) => wikiHitsForAgent(ctx.db, await wikiActorOfCall(ctx), found)),
           kinds ? [] : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, channels, str(input.query)),
         ]);
         if (hits.length === 0 && steps.length === 0) return { content: "No results." };

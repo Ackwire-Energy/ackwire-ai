@@ -121,7 +121,7 @@ export const extraIcons = {
   /** Memory, proposals: back link. */
   chevronLeft: [["path", { d: "M12 5 7 10l5 5" }]],
   /** Receipts: an agent answered (two checks, same stroke as `check`). */
-  checks: [["path", { d: "m2.5 10.5 3 3 6-7M9 13l.5.5 6-7" }]],
+  checks: [["path", { d: "m2 10.5 3 3 6-7M10 12.5l1 1 7-8" }]],
   /** Feedback on an agent reply: helpful. Not in the screens yet; drawn on the same grid. */
   thumbUp: [["path", { d: "M7 9v8H4V9zM7 9l3-6a2 2 0 0 1 2 2v3h4a1.6 1.6 0 0 1 1.6 1.9l-1.2 6A2 2 0 0 1 14.4 17H7" }]],
   /** Feedback on an agent reply: not helpful. */

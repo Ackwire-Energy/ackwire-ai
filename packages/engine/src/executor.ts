@@ -164,7 +164,7 @@ import {
   stripSentinel,
   visibleText,
 } from "./reply-policy";
-import { routineCreatorOf } from "./requester";
+import { routineCreatorOf, wikiPersonOf } from "./requester";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -248,6 +248,7 @@ import {
   usageWaitPlace,
 } from "./usage-pause";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
+import { RESTRICTED_HERE, sendHeldToDm } from "./wiki-dm";
 import { withWikiLinks } from "./wiki-links";
 import { movedNote, queuedNote, workStartsNote } from "./work-tools";
 import {
@@ -1420,12 +1421,16 @@ async function executeRunInner(
             { db, search: contextDeps },
             {
               orgId: run.orgId,
-              agentId: agent.id,
               text: trigger?.body ?? "",
-              readers: { channelId: run.channelId, person: personBehind },
+              reader: async () => ({
+                type: "agent",
+                agentId: agent.id,
+                requestedByUserId: wikiPersonOf(await runAuthority(db, run)),
+                channelId: run.channelId,
+              }),
             },
-          ).catch(() => ({ text: "", pageIds: [] as string[] }))
-        : Promise.resolve({ text: "", pageIds: [] as string[] }),
+          ).catch(() => ({ text: "", pageIds: [] as string[], held: false }))
+        : Promise.resolve({ text: "", pageIds: [] as string[], held: false }),
     ]);
     const issueId = context.issueId;
     if (issueId) later(() => linkRunToIssue({ db, pubsub: deps.pubsub }, run, issueId));
@@ -1447,6 +1452,19 @@ async function executeRunInner(
       });
       const ids = memory.itemIds;
       later(() => recordContextUse(db, run.orgId, run.id, ids));
+    }
+    if (wikiPages.held) {
+      const held = await sendHeldToDm(
+        { db, pubsub: deps.pubsub },
+        {
+          orgId: run.orgId,
+          agentId: agent.id,
+          channelId: run.channelId,
+          runId: run.id,
+          triggerMessageId: run.triggerMessageId,
+        },
+      ).catch(() => false);
+      if (held) system.push({ turn: true, found: true, text: `# Restricted content\n${RESTRICTED_HERE}` });
     }
     if (wikiPages.text) {
       const pageIds = wikiPages.pageIds;

@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  BLOCK_MANUAL,
   buildRunContext,
   closePoll,
   createArtifact,
@@ -73,6 +74,12 @@ test("a block goes to the trash only once it is in the Drive", async () => {
 });
 
 describe("the prompt", () => {
+  test("the manual gives an agent our look: the parts, its tones, and no colors of its own", () => {
+    for (const part of ["<ac-card", "<ac-result", "<ac-actions", "--s1", "--on-s"])
+      expect(BLOCK_MANUAL).toContain(part);
+    expect(BLOCK_MANUAL).toContain("Never write a color");
+  });
+
   test("says when to show a block only where the tools are, and never in a routine's run", async () => {
     f = await setup();
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });

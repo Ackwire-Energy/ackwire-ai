@@ -196,7 +196,7 @@ describe("message action bars", () => {
     // The part a message doesn't use is left empty, which the kit hides and reads: the bar stands left of a check
     // only where there is one, and a grouped row with a line under its text centres the bar above that line.
     for (const id of ["j1", "j2"]) expect(row(id).querySelector(".ac-msg__foot")?.childNodes.length).toBe(0);
-    for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__aside")?.childNodes.length).toBe(0);
+    for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__aside")?.childNodes.length ?? 0).toBe(0);
     // The bar's place is the kit's (components.test.tsx): no stylesheet of the app moves it, and a row's side padding
     // is set through `--msg-inline`, which the bar reads to stand left of the check.
     const src = join(import.meta.dir, "../src");

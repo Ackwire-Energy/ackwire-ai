@@ -296,12 +296,22 @@ describe("a row's buttons on hover or focus", () => {
     expect(link.querySelector(".sidebar__unread")?.textContent).toBe("2");
   });
 
-  test("an agent: its settings for its owner and the admins", async () => {
+  test("an agent: its settings for its owner and the admins, in the panel and never the full page", async () => {
     const { router } = await go();
     const ada = within(nav()).getByRole("link", { name: /^Ada/ }).parentElement as HTMLElement;
     await click(within(ada).getByRole("button", { name: "Configurações de Ada" }));
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
-    expect(router.state.location.search).toMatchObject({ tab: "settings" });
+    await settle(4);
+    // Beside the conversation on screen, which stays.
+    expect(document.querySelector("aside.thread-panel--wide")).not.toBeNull();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    cleanup();
+    // With no conversation on screen: beside the agent's own.
+    const away = await go(undefined, "threads");
+    const row = within(nav()).getByRole("link", { name: /^Ada/ }).parentElement as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Configurações de Ada" }));
+    await settle(8);
+    expect(away.router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
+    expect(document.querySelector("aside.thread-panel--wide")).not.toBeNull();
     cleanup();
     await go(asMember());
     expect(within(nav()).queryByRole("button", { name: "Configurações de Ada" })).toBeNull();

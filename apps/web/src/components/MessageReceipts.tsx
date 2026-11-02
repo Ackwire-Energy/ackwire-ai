@@ -61,9 +61,9 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
 
 /**
  * A person's message's receipt (and an agent's that mentions agents: whom it handed work to, and "Só mencionado"
- * with "Chamar um agente" for one it only mentioned, ADR 0089): a small muted mark at the end of its first line
- * (`part="check"`), never a line of its own, so it never changes the message's height or the room before the next one. Clicking or focusing it opens a
- * popover with each agent and its status, and who picked them. While the author's own plan picks, the mark is the
+ * with "Chamar um agente" for one it only mentioned, ADR 0089): a small muted mark at the end of its first line, or of
+ * the time's line under my own turn (`part="check"`), never a line of its own, so it never changes the message's
+ * height or the room before the next one. Clicking or focusing it opens a popover with each agent and its status, and who picked them. While the author's own plan picks, the mark is the
  * clock, and "Chamar um agente" is in its popover. A message sent into a task at work wears what became of it there
  * instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words only for what
  * you can act on ("Nenhum agente vai responder", a failure, no AI connected) or what nobody can (the AI provider is
@@ -304,10 +304,9 @@ export function MessageReceipts({
 }
 
 /**
- * "Visto" in a DM between people, in the receipt's place at the end of the first line of each of my messages: a slot
- * the size of the check that every one of them keeps, so the face of who read my latest message comes and goes
- * without rewrapping a line. The face is a button whose popover says who read it, and the slot is a live region, so
- * screen readers hear it as it shows.
+ * "Visto" in a DM between people, in the receipt's place at the end of a turn's time line. The face is a button whose
+ * popover says who read it, and its slot is a live region that is there before it, so screen readers hear it as it
+ * shows.
  */
 export function SeenMark({ personId }: { personId?: string }) {
   const { t } = useTranslation();

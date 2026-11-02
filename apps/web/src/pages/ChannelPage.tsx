@@ -311,6 +311,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
+import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { useDocumentTitle } from "@/lib/desktop";
@@ -664,6 +665,16 @@ function ChannelView({
     setConsultId(null);
     setProfile({ agentId, tab });
   }, []);
+  // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
+  useEffect(() => {
+    if (chrome?.panel) return;
+    const open = () => {
+      const ask = takeAgentPanel();
+      if (ask) openAgentPanel(ask.agentId, ask.tab);
+    };
+    open();
+    return onAgentPanel(open);
+  }, [chrome?.panel, openAgentPanel]);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
   // `/summary` and `/plan`: a card only I see, under the conversation.
@@ -2219,7 +2230,7 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
-  /** A DM with this person: my rows keep the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turns' time lines keep the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** The agents' questions to other agents: inside the replies that asked, and how their answers draw. */
   consultGroups: ConsultGroups;
@@ -3125,7 +3136,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   seenLive?: LiveRun;
   /** The last message of its run here: it carries the run's browser card while a take over holds it. */
   lastOfRun?: boolean;
-  /** A DM with this person: my row keeps the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turn's time line keeps the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** My latest message, which they read: their face in that slot. */
   seen?: boolean;

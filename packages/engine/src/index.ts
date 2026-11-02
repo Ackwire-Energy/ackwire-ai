@@ -242,6 +242,7 @@ export * from "./web-push";
 export * from "./web-tools";
 export * from "./webhooks";
 export * from "./wiki";
+export * from "./wiki-dm";
 export * from "./wiki-links";
 export * from "./wiki-tools";
 export * from "./withdraw-request-tool";
