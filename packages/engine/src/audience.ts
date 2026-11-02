@@ -194,26 +194,33 @@ export async function setAgentAudience(
     throw new ForbiddenError("Only the agent's owner or an admin can change who talks to it");
   }
   if (!AUDIENCE_MODES.includes(audience.mode)) throw new ValidationError("Unknown audience mode");
-  let userIds = audience.mode === "people" ? [...new Set(audience.userIds)] : [];
-  if (userIds.length > 500) throw new ValidationError("At most 500 people");
-  if (userIds.length > 0) {
-    const members = await db
-      .select({ userId: organizationMembers.userId })
-      .from(organizationMembers)
-      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds)));
-    // Someone no longer in the workspace drops out rather than failing the save: the apps' list may still hold them.
-    const known = new Set(members.map((m) => m.userId));
-    userIds = userIds.filter((id) => known.has(id));
-  }
-  if (audience.mode === "people" && userIds.length === 0 && !agent.ownerUserId) {
-    throw new ValidationError("Pick at least one person");
-  }
-  planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds });
-  const [updated] = await db
-    .update(agents)
-    .set({ audienceMode: audience.mode, audienceUserIds: userIds, updatedAt: new Date() })
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
-    .returning();
+  const requested = audience.mode === "people" ? [...new Set(audience.userIds)] : [];
+  if (requested.length > 500) throw new ValidationError("At most 500 people");
+  // One transaction holding FOR SHARE on the member rows it read: a removeMember (which deletes the member row,
+  // then takes the id off agents' lists) either waits for this save or is seen by it, never overwritten by it.
+  const updated = await db.transaction(async (tx) => {
+    let userIds = requested;
+    if (userIds.length > 0) {
+      const members = await tx
+        .select({ userId: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds)))
+        .for("share");
+      // Someone no longer in the workspace drops out rather than failing the save: the apps' list may still hold them.
+      const known = new Set(members.map((m) => m.userId));
+      userIds = userIds.filter((id) => known.has(id));
+    }
+    if (audience.mode === "people" && userIds.length === 0 && !agent.ownerUserId) {
+      throw new ValidationError("Pick at least one person");
+    }
+    planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds });
+    const [updated] = await tx
+      .update(agents)
+      .set({ audienceMode: audience.mode, audienceUserIds: userIds, updatedAt: new Date() })
+      .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
+      .returning();
+    return updated;
+  });
   if (!updated) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
