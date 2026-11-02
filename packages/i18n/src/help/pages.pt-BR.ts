@@ -421,7 +421,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
   "apps-de-ia": {
     title: "Apps de IA",
     summary:
-      "Peça tarefas aos agentes do agentes.chat pelo Claude, ChatGPT, Cursor ou outro app com MCP, sem sair dele, e receba a resposta ali mesmo.",
+      "Peça tarefas aos agentes do agentes.chat pelo Claude, Cursor ou outro app com MCP, sem sair dele, e receba a resposta ali mesmo.",
     sections: [
       {
         id: "what",
@@ -438,12 +438,10 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         blocks: [
           {
             list: [
-              "**Claude** (claude.ai, Claude Desktop e celular): Configurações\u00a0›\u00a0Conectores, **Adicionar conector personalizado**, cole o endereço e clique em **Conectar**. Em planos Team e Enterprise, um administrador do Claude adiciona o conector primeiro.",
-              "**Claude Code:** rode `claude mcp add --transport http agentes <endereço>`, depois digite `/mcp`, escolha agentes e **Authenticate**. Acrescente `--scope user` para usar em todos os projetos.",
-              "**ChatGPT** (planos pagos): em chatgpt.com/plugins, clique em **+** e em **Adicionar servidor MCP personalizado**, e cole o endereço.",
+              "**Claude** (claude.ai, Claude Desktop e celular): em **Personalizar\u00a0›\u00a0Conectores** (Customize\u00a0›\u00a0Connectors), clique em **+ Adicionar** e em **Adicionar conector personalizado** (Add custom connector), dê o nome agentes.chat, cole o endereço e clique em **Continuar**. Escolha **Entrar agora** (Sign in now), clique em **Adicionar** e autorize. Em planos Team e Enterprise, o dono da organização no Claude adiciona o conector em Configurações da organização\u00a0›\u00a0Conectores, e cada pessoa clica em **Conectar** em Personalizar\u00a0›\u00a0Conectores. No plano grátis do Claude, cabe um conector personalizado.",
+              "**Claude Code:** rode `claude mcp add --transport http --scope user agentes <endereço>`, depois digite `/mcp`, escolha agentes e **Authenticate**. Para só a pasta atual, tire `--scope user`.",
               "**Cursor:** **Adicionar ao Cursor** em **Configurações\u00a0›\u00a0Apps de IA**, ou o endereço em `~/.cursor/mcp.json`. O Cursor pede para entrar na primeira vez que usar.",
               '**VS Code:** **Adicionar ao VS Code**, ou o endereço em `.vscode/mcp.json` com `"type": "http"`.',
-              "**Codex:** rode `codex mcp add agentes --url <endereço>` e depois `codex mcp login agentes`.",
             ],
           },
           "Na hora de entrar, o agentes.chat mostra qual app pediu o acesso e para onde ele volta. Continue só se você acabou de começar a conexão.",

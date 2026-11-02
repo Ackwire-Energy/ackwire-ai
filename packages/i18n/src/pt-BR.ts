@@ -9030,7 +9030,7 @@ export const ptBR = {
         claude_code: "No terminal",
         chatgpt: "chatgpt.com",
         cursor: "O editor",
-        other: "VS Code, Codex e mais",
+        other: "VS Code e mais",
       },
       waiting: "Esperando o app se conectar",
       connected: "Conectado: {{name}}",
@@ -9040,16 +9040,19 @@ export const ptBR = {
       done: "Concluir",
       claude: {
         lead: "claude.ai, Claude Desktop e celular: um conector serve para todos.",
-        step1: "Abra Configurações\u00a0›\u00a0Conectores no claude.ai ou no Claude Desktop.",
-        step2: "Clique em Adicionar conector personalizado, dê o nome agentes.chat e cole o endereço.",
-        step3: "Clique em Conectar e autorize na página que abrir.",
+        step1:
+          "Abra Personalizar\u00a0›\u00a0Conectores (Customize\u00a0›\u00a0Connectors) no claude.ai ou no Claude Desktop.",
+        step2:
+          "Clique em + Adicionar e em Adicionar conector personalizado (Add custom connector), dê o nome agentes.chat, cole o endereço e clique em Continuar.",
+        step3: "Escolha Entrar agora (Sign in now), clique em Adicionar e autorize na página que abrir.",
         phone: "Ele aparece no celular depois de adicionado no computador.",
-        team: "Em planos Team e Enterprise, um administrador do Claude adiciona o conector primeiro.",
+        team: "Em planos Team e Enterprise, o dono da organização no Claude adiciona o conector em Configurações da organização\u00a0›\u00a0Conectores. Depois cada pessoa clica em Conectar em Personalizar\u00a0›\u00a0Conectores.",
+        free: "No plano grátis do Claude, cabe um conector personalizado.",
       },
       claudeCode: {
         step1: "Rode no terminal:",
         step2: "No Claude Code, digite <code>/mcp</code>, escolha agentes e Authenticate.",
-        scope: "Para usar em todos os projetos, acrescente <code>--scope user</code>.",
+        scope: "Ele fica disponível em todas as pastas. Para só a pasta atual, tire <code>--scope user</code>.",
       },
       chatgpt: {
         step1: "Abra chatgpt.com/plugins.",

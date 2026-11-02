@@ -417,7 +417,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
   "apps-de-ia": {
     title: "AI apps",
     summary:
-      "Ask agentes.chat's agents for tasks from Claude, ChatGPT, Cursor or another MCP app, without leaving it, and get the answer right there.",
+      "Ask agentes.chat's agents for tasks from Claude, Cursor or another MCP app, without leaving it, and get the answer right there.",
     sections: [
       {
         id: "what",
@@ -434,12 +434,10 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         blocks: [
           {
             list: [
-              "**Claude** (claude.ai, Claude Desktop and phone): Settings\u00a0›\u00a0Connectors, **Add custom connector**, paste the address and click **Connect**. On Team and Enterprise plans, a Claude admin adds the connector first.",
-              "**Claude Code:** run `claude mcp add --transport http agentes <address>`, then type `/mcp`, pick agentes and **Authenticate**. Add `--scope user` to use it in every project.",
-              "**ChatGPT** (paid plans): on chatgpt.com/plugins, click **+** and **Add custom MCP server**, and paste the address.",
+              "**Claude** (claude.ai, Claude Desktop and phone): in **Customize\u00a0›\u00a0Connectors**, click **+ Add**, then **Add custom connector**, name it agentes.chat, paste the address and click **Continue**. Choose **Sign in now**, click **Add** and authorize. On Team and Enterprise plans, the Claude organization's Owner adds the connector in Organization settings\u00a0›\u00a0Connectors, and each person clicks **Connect** in Customize\u00a0›\u00a0Connectors. Claude's free plan has room for one custom connector.",
+              "**Claude Code:** run `claude mcp add --transport http --scope user agentes <address>`, then type `/mcp`, pick agentes and **Authenticate**. For the current folder only, drop `--scope user`.",
               "**Cursor:** **Add to Cursor** in **Settings\u00a0›\u00a0AI apps**, or the address in `~/.cursor/mcp.json`. Cursor asks you to sign in the first time you use it.",
               '**VS Code:** **Add to VS Code**, or the address in `.vscode/mcp.json` with `"type": "http"`.',
-              "**Codex:** run `codex mcp add agentes --url <address>`, then `codex mcp login agentes`.",
             ],
           },
           "When you sign in, agentes.chat shows which app asked for access and where it returns to. Continue only if you just started the connection.",

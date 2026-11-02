@@ -524,6 +524,7 @@ function ClientSteps({
         </Steps>
         <SettingNote icon="phone">{t("apps.dialog.claude.phone")}</SettingNote>
         <SettingNote icon="members">{t("apps.dialog.claude.team")}</SettingNote>
+        <SettingNote icon="info">{t("apps.dialog.claude.free")}</SettingNote>
       </>
     );
   }

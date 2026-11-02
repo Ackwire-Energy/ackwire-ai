@@ -80,7 +80,9 @@ const t = createI18n("pt-BR").t;
 describe("the client facts: one command, link or file per app, with this server's address", () => {
   const url = "https://agentes.example/mcp";
   test("commands and files", () => {
-    expect(claudeCodeCommand(url)).toBe("claude mcp add --transport http agentes https://agentes.example/mcp");
+    expect(claudeCodeCommand(url)).toBe(
+      "claude mcp add --transport http --scope user agentes https://agentes.example/mcp",
+    );
     expect(codexCommands(url)).toBe("codex mcp add agentes --url https://agentes.example/mcp\ncodex mcp login agentes");
     expect(JSON.parse(cursorConfig(url))).toEqual({ mcpServers: { agentes: { url } } });
     expect(JSON.parse(vscodeConfig(url))).toEqual({ servers: { agentes: { type: "http", url } } });
@@ -216,17 +218,16 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     const cards = dialog()
       .getAllByRole("button")
       .filter((b) => b.classList.contains("apps-client"));
+    // ChatGPT and Codex wait for their QA gates (ADR 0113).
     expect(cards.map((c) => c.querySelector(".apps-client__name")?.textContent)).toEqual([
       "Claude",
       "Claude Code",
-      "ChatGPT",
       "Cursor",
       "Outro app",
     ]);
     expect(cards.map((c) => c.querySelector(".ac-brand")?.getAttribute("data-mark") ?? null)).toEqual([
       "claude",
       "claude",
-      "openai",
       "cursor",
       null,
     ]);
@@ -241,9 +242,11 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
 
     await click(dialog().getByRole("button", { name: /^Claude claude\.ai/ }));
     const open = dialog().getByRole("link", { name: "Abrir o Claude" });
-    expect(open.getAttribute("href")).toBe("https://claude.ai/settings/connectors");
+    expect(open.getAttribute("href")).toBe("https://claude.ai/customize/connectors");
     expect(open.getAttribute("target")).toBe("_blank");
+    expect(screen().getByRole("dialog").textContent).toContain("Personalizar\u00a0›\u00a0Conectores");
     expect(screen().getByRole("dialog").textContent).toContain("Adicionar conector personalizado");
+    expect(screen().getByRole("dialog").textContent).toContain("Entrar agora");
     expect(screen().getByRole("dialog").textContent).toContain(SERVER_URL);
     await click(dialog().getByRole("button", { name: "Voltar para os apps" }));
 
@@ -258,8 +261,9 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     expect(dialog().getByRole("link", { name: "Adicionar ao VS Code" }).getAttribute("href")).toBe(
       vscodeInstallLink(SERVER_URL),
     );
-    await pickTab(dialog().getByRole("tab", { name: "Codex" }));
-    expect(screen().getByRole("dialog").textContent).toContain("codex mcp login agentes");
+    expect(dialog().queryByRole("tab", { name: "Codex" })).toBeNull();
+    await pickTab(dialog().getByRole("tab", { name: "Qualquer app com MCP" }));
+    expect(screen().getByRole("dialog").textContent).toContain("Cole o endereço no app.");
   });
 
   test("the new app shows in the dialog once its sign-in is done; Concluir lists it, with its access and its times", async () => {
