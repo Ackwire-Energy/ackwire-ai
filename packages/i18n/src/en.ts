@@ -9905,13 +9905,17 @@ export const en = {
   usageViews: {
     signedOut: "Signed out",
     whose: "{{name}}'s",
-    part: "{{name}} ≈ {{percent}}",
     noWindows: "The limit shows up after this account is used again.",
     unused: "No agent uses this account.",
     usesNow: "uses it now",
     monthTokens: "{{tokens}} tokens this month",
     tokens: "{{tokens}} tokens",
     equivalent: "≈ {{amount}} through the API",
+    /** The column of each agent's tokens in an account's list. */
+    thisMonth: "This month",
+    /** The row an account's list folds the rest of its agents into: how many (`percent`, their share, sits beside it). */
+    moreAgents_one: "+{{count}} agent",
+    moreAgents_other: "+{{count}} agents",
     paid: "{{amount}} paid",
     budgetShare: "{{percent}} of the budget",
     estimate:
@@ -10459,17 +10463,14 @@ export const en = {
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
       done: "Done.",
-      stretch_paused_runs_one: "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
-      stretch_paused_runs_other:
-        "{{agents}} stopped to check with you · {{steps}} steps on their own since your request",
-      stretch_paused_spend_one:
-        "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
-      stretch_paused_spend_other:
-        "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you",
+      stretch_paused_runs_one: "{{agents}} paused to check with you before going on",
+      stretch_paused_runs_other: "{{agents}} paused to check with you before going on",
+      stretch_paused_spend_one: "{{agents}} paused to check with you · used {{percent}}% of the month's budget",
+      stretch_paused_spend_other: "{{agents}} paused to check with you · each used {{percent}}% of the month's budget",
       stretch_paused_spend_cost_one:
-        "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
+        "{{agents}} paused to check with you · used {{amount}} ({{percent}}% of the month's budget)",
       stretch_paused_spend_cost_other:
-        "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you",
+        "{{agents}} paused to check with you · each used {{amount}} ({{percent}}% of the month's budget)",
       memory: {
         proposed: "Proposal created: {{text}}",
         forgot: 'Memory updated: forgot "{{text}}".',

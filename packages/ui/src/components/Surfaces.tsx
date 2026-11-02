@@ -1,6 +1,14 @@
-import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useEffect, useState } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type HTMLAttributes,
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
+import type { MeterSegment } from "../plan-state";
 import { InfoHint } from "./InfoHint";
 import { SkyGlow } from "./PixelSky";
 import { ProviderLogo } from "./ProviderLogo";
@@ -179,6 +187,7 @@ export function Meter({
   label,
   marks,
   part,
+  segments,
 }: {
   value: number;
   max: number;
@@ -187,14 +196,17 @@ export function Meter({
   marks?: number[];
   /** A part of `value` in full ink, the rest of the bar lighter (one agent's share of a plan's use). */
   part?: number;
+  /** `value` split into pieces from the left, each in its own colours (every agent's share); the rest lighter. */
+  segments?: readonly MeterSegment[];
 }) {
   const exact = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const pct = Math.round(exact);
   const partPct = part !== undefined && max > 0 ? Math.min(pct, Math.round((part / max) * 100)) : null;
+  const split = segments && segments.length > 0 && max > 0 ? segments : null;
   return (
     // biome-ignore lint/a11y/useSemanticElements: the native <meter> has a native look we never show
     <div
-      className={cx("ac-meter", partPct !== null && "ac-meter--parts")}
+      className={cx("ac-meter", (partPct !== null || split) && "ac-meter--parts")}
       role="meter"
       aria-label={label}
       aria-valuemin={0}
@@ -205,6 +217,23 @@ export function Meter({
       <div className="ac-meter__bar" style={exact > 0 ? { width: `${pct}%`, minWidth: 6 } : { width: 0 }} />
       {partPct !== null && part !== undefined && part > 0 && (
         <div className="ac-meter__part" style={{ width: `${partPct}%`, minWidth: 6 }} />
+      )}
+      {split && (
+        <div className="ac-meter__segs">
+          {split.map((s) => (
+            <i
+              key={s.key}
+              className="ac-meter__seg"
+              style={
+                {
+                  width: `${Math.min(100, (s.value * 100) / max)}%`,
+                  "--seg-deep": s.deep,
+                  "--seg-light": s.light,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </div>
       )}
       {marks?.map((m) => (
         <span key={m} className="ac-meter__mark" style={{ left: `${m}%` }} aria-hidden="true" />

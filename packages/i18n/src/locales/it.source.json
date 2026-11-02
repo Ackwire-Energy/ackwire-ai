@@ -25546,9 +25546,6 @@
   "usageViews.whose": {
     "value": "{{name}}'s"
   },
-  "usageViews.part": {
-    "value": "{{name}} ≈ {{percent}}"
-  },
   "usageViews.noWindows": {
     "value": "The limit shows up after this account is used again."
   },
@@ -25566,6 +25563,15 @@
   },
   "usageViews.equivalent": {
     "value": "≈ {{amount}} through the API"
+  },
+  "usageViews.thisMonth": {
+    "value": "This month"
+  },
+  "usageViews.moreAgents": {
+    "value": {
+      "one": "+{{count}} agent",
+      "other": "+{{count}} agents"
+    }
   },
   "usageViews.paid": {
     "value": "{{amount}} paid"
@@ -26960,20 +26966,20 @@
   },
   "chat.body.stretch_paused_runs": {
     "value": {
-      "one": "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
-      "other": "{{agents}} stopped to check with you · {{steps}} steps on their own since your request"
+      "one": "{{agents}} paused to check with you before going on",
+      "other": "{{agents}} paused to check with you before going on"
     }
   },
   "chat.body.stretch_paused_spend": {
     "value": {
-      "one": "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
-      "other": "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you"
+      "one": "{{agents}} paused to check with you · used {{percent}}% of the month's budget",
+      "other": "{{agents}} paused to check with you · each used {{percent}}% of the month's budget"
     }
   },
   "chat.body.stretch_paused_spend_cost": {
     "value": {
-      "one": "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
-      "other": "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you"
+      "one": "{{agents}} paused to check with you · used {{amount}} ({{percent}}% of the month's budget)",
+      "other": "{{agents}} paused to check with you · each used {{amount}} ({{percent}}% of the month's budget)"
     }
   },
   "chat.body.memory.proposed": {

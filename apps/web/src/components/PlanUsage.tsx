@@ -3,15 +3,16 @@ import { useApi, useModels, usePlanUsage } from "@agenteschat/client";
 import { formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { planName } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf } from "@agenteschat/client/lib/providers";
-import { Card, CardHeader, Icon, Meter, PlanMeter, ProviderLogo } from "@agenteschat/ui";
+import { agentGradient, Card, CardHeader, Icon, Meter, PlanMeter, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { accountName, brandOf, noWindowsText, partedUsage, planMeterText } from "@/lib/plan-usage";
+import { accountName, accountShares, brandOf, noWindowsText, planMeterText, splitUsage } from "@/lib/plan-usage";
 import "./plan-usage.css";
 
 /*
@@ -102,50 +103,84 @@ export function PlanUsageCards() {
   );
 }
 
+/**
+ * A plan account: its bars split by agent in their colours, then one list of its agents (share of the window the bar
+ * splits, tokens this month), when it renews and how old the numbers are, and the month's total.
+ */
 function AccountBlock({ account, money }: { account: PlanAccountUsage; money: boolean }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const nameOf = (a: { agentId: string; name: string }) => dir.agentById.get(a.agentId)?.name ?? a.name;
+  const text = planMeterText(t, i18n.language);
+  const shares = accountShares(account);
+  const list = shares.shown.length > 0 && (
+    <AgentShares shares={shares} window={shares.window ? text.window(shares.window) : null} />
+  );
   return (
     <div className="plan-block">
       <AccountHead account={account} />
       {account.usage ? (
-        <PlanMeter
-          usage={partedUsage(account.usage, (parts) =>
-            parts
-              .map((p) => t("usageViews.part", { name: nameOf(p), percent: formatPercent(i18n.language, p.percent) }))
-              .join(" · "),
-          )}
-          text={planMeterText(t, i18n.language)}
-        />
+        <PlanMeter usage={splitUsage(account.usage, (id) => agentGradient(colorOf(dir.agentById.get(id))))} text={text}>
+          {list}
+        </PlanMeter>
       ) : (
-        <p className="plan-empty">{noWindowsText(t, account)}</p>
+        <>
+          <p className="plan-empty">{noWindowsText(t, account)}</p>
+          {list}
+        </>
       )}
       {account.agents.length > 0 && (
-        <div className="plan-block__foot">
-          <span className="plan-legend">
-            {account.agents.map((a) => (
-              <Link
-                key={a.agentId}
-                className="plan-legend__agent"
-                to="/org/$orgId/agents/$agentId"
-                params={{ orgId: org.id, agentId: a.agentId }}
-                search={{ tab: "usage" }}
-              >
-                <AgentAvatar agentId={a.agentId} size="xs" name={nameOf(a)} />
-                <b>{nameOf(a)}</b>
-                {a.tokens > 0 ? formatTokensShort(t, i18n.language, a.tokens) : t("usageViews.usesNow")}
-              </Link>
-            ))}
-          </span>
-          <span className="plan-block__month">
-            {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
-            {money && typeof account.equivalentUsd === "number" && (
-              <> · {t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}</>
-            )}
-          </span>
-        </div>
+        <span className="plan-block__month">
+          {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
+          {money && typeof account.equivalentUsd === "number" && (
+            <> · {t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}</>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** The account's agents, biggest share first; past the first few, one row that opens the rest in place. */
+function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShares>; window: string | null }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const [open, setOpen] = useState(false);
+  const percent = (share: number) => (window ? formatPercent(i18n.language, share) : "");
+  const tokens = (n: number) => (n > 0 ? formatTokensShort(t, i18n.language, n) : t("usageViews.usesNow"));
+  return (
+    <div className="plan-shares">
+      <div className="plan-shares__head">
+        <span />
+        <span />
+        <span>{window}</span>
+        <span>{t("usageViews.thisMonth")}</span>
+      </div>
+      {(open ? [...shares.shown, ...shares.rest] : shares.shown).map((a) => {
+        const name = dir.agentById.get(a.agentId)?.name ?? a.name;
+        return (
+          <Link
+            key={a.agentId}
+            className="plan-shares__row"
+            to="/org/$orgId/agents/$agentId"
+            params={{ orgId: org.id, agentId: a.agentId }}
+            search={{ tab: "usage" }}
+          >
+            <AgentAvatar agentId={a.agentId} size="xs" name={name} />
+            <b>{name}</b>
+            <span>{percent(a.share)}</span>
+            <span>{tokens(a.tokens)}</span>
+          </Link>
+        );
+      })}
+      {!open && shares.rest.length > 0 && (
+        <button type="button" className="plan-shares__row" aria-expanded={false} onClick={() => setOpen(true)}>
+          <span />
+          <b>{t("usageViews.moreAgents", { count: shares.rest.length })}</b>
+          <span>{percent(shares.restShare)}</span>
+          <span>{tokens(shares.restTokens)}</span>
+        </button>
       )}
     </div>
   );

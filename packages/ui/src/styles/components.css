@@ -2202,6 +2202,22 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   background: var(--meter-fill, var(--ink));
   border-radius: var(--radius-full);
 }
+/* The bar split by agent: each one's piece in its color from the left, a hairline of track between them; what no
+   agent's estimate covers stays the lighter bar under them. In the dark theme each takes its light tone. */
+.ac-meter__segs {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 1px;
+}
+.ac-meter__seg {
+  flex: none;
+  min-width: 2px;
+  background: var(--seg-deep);
+}
+[data-theme="dark"] .ac-meter__seg {
+  background: var(--seg-light);
+}
 
 /*
  * Plan usage: a bar per window, ink until it nears its limit (`planLevel`): amber from 80%, red from 90% and at the

@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { AgentBrainLine, AiAccounts, AiComputer, AiStatus, PlanUsage } from "../src/api/types";
-import { ownPlanLines, planMeterText, usageShown, workspaceUsesApi } from "../src/lib/plan-usage";
+import type { AgentBrainLine, AiAccounts, AiComputer, AiStatus, PlanAccountUsage, PlanUsage } from "../src/api/types";
+import {
+  accountShares,
+  ownPlanLines,
+  planMeterText,
+  splitUsage,
+  usageShown,
+  workspaceUsesApi,
+} from "../src/lib/plan-usage";
 
 const usage = (windows: PlanUsage["windows"]): PlanUsage => ({
   windows,
@@ -227,5 +234,80 @@ describe("your plans with their limits (Sua conta, the profile menu near a limit
     // The same account signed in on both computers.
     const both = { computers: [], accounts: [claude, { ...claude, id: "a2", machineId: "m2", computer: "iMac" }] };
     expect(names(both, [])).toEqual(["Claude · Max on MacBook", "Claude · Max on iMac"]);
+  });
+});
+
+describe("a plan account's agents in one list, its bar split by agent (Contas dos planos)", () => {
+  const NOW = Date.parse("2026-11-02T12:00:00.000Z");
+  const crew = ["ada", "rio", "nova", "lia", "theo", "bia", "caio"];
+  const account = (over: Partial<PlanAccountUsage> = {}): Pick<PlanAccountUsage, "usage" | "agents"> => ({
+    usage: {
+      source: "turn",
+      at: "2026-11-02T11:59:00.000Z",
+      windows: [
+        {
+          kind: "five_hour",
+          usedPercent: 9,
+          resetsAt: "2026-11-02T14:00:00.000Z",
+          agents: [{ agentId: "bia", name: "Bia", percent: 9 }],
+        },
+        {
+          kind: "seven_day",
+          usedPercent: 20,
+          resetsAt: "2026-11-09T10:00:00.000Z",
+          agents: crew.map((id, i) => ({ agentId: id, name: id, percent: 7 - i })),
+        },
+      ],
+    },
+    agents: crew.map((id, i) => ({ agentId: id, name: id, tokens: (i + 1) * 1000, now: false })),
+    ...over,
+  });
+
+  test("the week's shares, biggest first; past five the rest fold with their share and tokens", () => {
+    const shares = accountShares(account(), NOW);
+    expect(shares.window?.kind).toBe("seven_day");
+    expect(shares.shown.map((r) => [r.agentId, r.share])).toEqual([
+      ["ada", 7],
+      ["rio", 6],
+      ["nova", 5],
+      ["lia", 4],
+      ["theo", 3],
+    ]);
+    expect(shares.rest.map((r) => r.agentId)).toEqual(["bia", "caio"]);
+    expect([shares.restShare, shares.restTokens]).toEqual([3, 13_000]);
+  });
+
+  test("one agent over five shows as itself; no week, the first window with parts; renewed, no shares", () => {
+    const six = account({ agents: account().agents.slice(0, 6) });
+    six.usage?.windows[1]?.agents?.splice(6);
+    expect(accountShares(six, NOW)).toMatchObject({ rest: [], restShare: 0 });
+    expect(accountShares(six, NOW).shown).toHaveLength(6);
+    const hours = account();
+    hours.usage?.windows.splice(1);
+    expect(
+      accountShares(hours, NOW)
+        .shown.map((r) => [r.agentId, r.share])
+        .slice(0, 2),
+    ).toEqual([
+      ["bia", 9],
+      ["caio", 0],
+    ]);
+    const renewed = accountShares(account(), Date.parse("2026-11-10T00:00:00.000Z"));
+    expect(renewed.window).toBeNull();
+    expect(accountShares({ usage: null, agents: account().agents }, NOW)).toMatchObject({ window: null });
+    // By tokens while no window says shares.
+    expect(accountShares({ usage: null, agents: account().agents }, NOW).shown[0]?.agentId).toBe("caio");
+  });
+
+  test("each window's bar split by agent, in that agent's colours; a window without parts stays plain", () => {
+    const base = account().usage;
+    if (!base) throw new Error("no usage");
+    const split = splitUsage(
+      { ...base, windows: [...base.windows, { kind: "monthly", usedPercent: 3, agents: null }] },
+      (id) => [`#light-${id}`, `#deep-${id}`],
+    );
+    expect(split.windows[0]?.segments).toEqual([{ key: "bia", value: 9, light: "#light-bia", deep: "#deep-bia" }]);
+    expect(split.windows[1]?.segments?.map((g) => g.key)).toEqual(crew);
+    expect(split.windows[2]).toEqual({ kind: "monthly", usedPercent: 3 });
   });
 });

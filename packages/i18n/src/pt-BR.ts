@@ -10113,13 +10113,15 @@ export const ptBR = {
   usageViews: {
     signedOut: "Saiu da conta",
     whose: "de {{name}}",
-    part: "{{name}} ≈ {{percent}}",
     noWindows: "O limite aparece depois do próximo uso desta conta.",
     unused: "Nenhum agente usa esta conta.",
     usesNow: "usa agora",
     monthTokens: "{{tokens}} tokens este mês",
     tokens: "{{tokens}} tokens",
     equivalent: "≈ {{amount}} pela API",
+    thisMonth: "Este mês",
+    moreAgents_one: "+{{count}} agente",
+    moreAgents_other: "+{{count}} agentes",
     paid: "{{amount}} pagos",
     budgetShare: "{{percent}} do orçamento",
     /** The plan accounts' ⓘ. */
@@ -10697,19 +10699,18 @@ export const ptBR = {
       issue_taken: "Peguei a tarefa #{{number}}.",
       done: "Pronto.",
       /**
-       * A stretch's pause card (ADR 0089): `agents` their names, `count` how many, `steps` the steps agents may start on
-       * their own; `percent` the share of each one's monthly budget, and with `_cost` it in money (`amount`).
+       * A stretch's pause card (ADR 0089): `agents` their names, `count` how many; `percent` the share of each one's
+       * monthly budget, and with `_cost` it in money (`amount`).
        */
-      stretch_paused_runs_one: "{{agents}} parou para te consultar · {{steps}} passos sem você desde o seu pedido",
-      stretch_paused_runs_other: "{{agents}} pararam para te consultar · {{steps}} passos sozinhos desde o seu pedido",
-      stretch_paused_spend_one:
-        "{{agents}} parou para te consultar · usou {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_runs_one: "{{agents}} parou para checar com você antes de continuar",
+      stretch_paused_runs_other: "{{agents}} pararam para checar com você antes de continuar",
+      stretch_paused_spend_one: "{{agents}} parou para checar com você · usou {{percent}}% do orçamento do mês",
       stretch_paused_spend_other:
-        "{{agents}} pararam para te consultar · usaram {{percent}}% do orçamento do mês nisso sem você",
+        "{{agents}} pararam para checar com você · cada um usou {{percent}}% do orçamento do mês",
       stretch_paused_spend_cost_one:
-        "{{agents}} parou para te consultar · usou {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
+        "{{agents}} parou para checar com você · usou {{amount}} ({{percent}}% do orçamento do mês)",
       stretch_paused_spend_cost_other:
-        "{{agents}} pararam para te consultar · usaram {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
+        "{{agents}} pararam para checar com você · cada um usou {{amount}} ({{percent}}% do orçamento do mês)",
       memory: {
         proposed: "Proposta criada: {{text}}",
         forgot: 'Memória atualizada: esqueci "{{text}}".',

@@ -269,19 +269,17 @@ export const stretchCardOf = (meta: Record<string, unknown> | null | undefined):
     : null;
 };
 
-/** One card per stretch and conversation: its writers take turns. */
-const lockCard = (tx: Executor, stretchId: string, channelId: string, threadId: string | null) =>
-  tx.execute(
-    sql`select pg_advisory_xact_lock(hashtext(${`stretch-card:${stretchId}:${channelId}:${threadId ?? ""}`}))`,
-  );
+/** One card per stretch: its writers take turns. */
+const lockCard = (tx: Executor, stretchId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`stretch-card:${stretchId}`}))`);
 
 /** The card's English text (what agents read, and the fallback) and its code for the apps. */
 function cardText(card: StretchCard, names: string[]) {
   const who = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "The agents");
   const body =
     card.reason === "runs"
-      ? `${who} stopped to check with you: ${card.limit} steps on ${names.length > 1 ? "their" : "its"} own since your request.`
-      : `${who} stopped to check with you: used ${card.limit}% of the month's budget on this without you.`;
+      ? `${who} paused to check with you before going on.`
+      : `${who} paused to check with you. ${names.length > 1 ? "Each" : "It"} used ${card.limit}% of the month's budget.`;
   return {
     body,
     meta: {
@@ -290,7 +288,7 @@ function cardText(card: StretchCard, names: string[]) {
       bodyParams: {
         agents: names.join(", "),
         count: names.length,
-        ...(card.reason === "runs" ? { steps: card.limit } : { percent: card.limit }),
+        ...(card.reason === "spend" ? { percent: card.limit } : {}),
       },
     },
   };
@@ -315,9 +313,11 @@ async function accountableFor(db: Database, orgId: string, messageId: string, st
 }
 
 /**
- * Job `stretch.paused`: the conversation's card for the held wake-up, written as the agent the work stopped at (so
- * the person behind it hears of it, `notifyMessage`), or the card already waiting there for this stretch with this
- * wake-up added.
+ * Job `stretch.paused`: the stretch's card for the held wake-up, written as the agent the work stopped at (so the
+ * person behind it hears of it, `notifyMessage`), or the card already waiting for this stretch with this wake-up
+ * added. One card per stretch, wherever it waits: the ways a wake-up is held place it differently (the held
+ * message's conversation, the refused run's reply thread, a long work's own thread, a routine's report), so one
+ * stretch held in two of them would otherwise show the same agents' pause twice.
  */
 export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, orgId: string, hold: StretchHold) {
   const { db } = deps;
@@ -326,15 +326,17 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
   const entry = { agentId: hold.agentId, messageId: hold.messageId, trigger: hold.trigger };
   const stopped = hold.stoppedAgentId ?? hold.agentId;
   const card = await db.transaction(async (tx) => {
-    await lockCard(tx, hold.stretchId, hold.channelId, hold.threadId);
+    await lockCard(tx, hold.stretchId);
+    // Where it can wait: this hold's channel, or one the stretch's runs work in (by their index, not the meta).
     const [open] = await tx
       .select()
       .from(messages)
       .where(
         and(
           eq(messages.orgId, orgId),
-          eq(messages.channelId, hold.channelId),
-          hold.threadId ? eq(messages.threadId, hold.threadId) : isNull(messages.threadId),
+          sql`(${messages.channelId} = ${hold.channelId}::uuid or ${messages.channelId} in (
+            select distinct ${agentRuns.channelId} from ${agentRuns}
+            where ${agentRuns.orgId} = ${orgId}::uuid and ${agentRuns.stretchId} = ${hold.stretchId}::uuid))`,
           gt(messages.createdAt, new Date(Date.now() - 7 * 86_400_000)),
           isNull(messages.deletedAt),
           sql`${messages.meta}->'actionCard'->>'kind' = 'stretch_paused'`,
@@ -446,7 +448,7 @@ export async function continueStretch(
     throw new ForbiddenError("Only who asked, the agents' owners or an admin can do this", "run.answer_forbidden");
   const stretchId = Bun.randomUUIDv7();
   const done = await db.transaction(async (tx) => {
-    await lockCard(tx, card.stretchId, message.channelId, message.threadId);
+    await lockCard(tx, card.stretchId);
     // What it holds now: a wake-up held after the caller read the card may have joined it since.
     const now = stretchCardOf((await getMessage(tx, message.orgId, message.id))?.meta);
     if (now?.state !== "paused") return null;
