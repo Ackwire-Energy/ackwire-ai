@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   customType,
+  date,
   foreignKey,
   index,
   integer,
@@ -168,6 +169,7 @@ export const proposalTargetEnum = pgEnum("proposal_target", [
   "org_context",
   "agent_role",
   "agent_access",
+  "skill",
 ]);
 export const proposalStatusEnum = pgEnum("proposal_status", ["pending", "accepted", "rejected", "stale"]);
 
@@ -271,6 +273,20 @@ export const messageReactions = pgTable(
     index().on(t.orgId, t.messageId),
     check("message_reactions_one_reactor", sql`(${t.userId} is null) <> (${t.agentId} is null)`),
   ],
+);
+
+/** `context.learn` jobs per agent and day (UTC), against `LEARN_MAX_PER_AGENT_DAY` (ADR 0120). */
+export const agentLearningDays = pgTable(
+  "agent_learning_days",
+  {
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    day: date().notNull(),
+    jobs: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.agentId, t.day] }), index().on(t.orgId)],
 );
 
 /** Reflection bookkeeping per thread: bounded runs, never twice over the same messages. */

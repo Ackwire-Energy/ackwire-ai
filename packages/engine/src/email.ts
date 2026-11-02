@@ -188,6 +188,8 @@ export type EmailTemplate =
     }
   /** An owner restored a workspace that was being deleted, one email per member. */
   | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
+  /** An AI app or a personal token got access to the person's account in a workspace (ADR 0119), to that person. */
+  | { kind: "app_connected"; locale: EmailLocale; appName: string; orgName: string; url: string }
   /**
    * The account `email` was deleted. `orgNames`: the workspaces only they were in, which closed with it and go for
    * good at `dueAt` (ISO, shown in `timeZone`). `support`: whom to write to if it wasn't them (`SUPPORT_EMAIL`), else
@@ -680,6 +682,17 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.preheader,
         c.headline,
         [{ p: c.body(inertText(t.byName) || w.someone, org) }, { button: c.button, url: t.url }],
+        c.why(org),
+      );
+    }
+    case "app_connected": {
+      const c = w.appConnected;
+      const org = inertText(t.orgName);
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [{ p: c.body(inertText(t.appName), org) }, { note: c.note }, { button: c.button, url: t.url }],
         c.why(org),
       );
     }

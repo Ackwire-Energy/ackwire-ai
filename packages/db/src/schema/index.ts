@@ -1,4 +1,5 @@
 export * from "./agents";
+export * from "./apps";
 export * from "./auth";
 export * from "./browser";
 export * from "./chat";

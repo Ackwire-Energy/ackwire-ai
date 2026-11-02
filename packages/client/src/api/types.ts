@@ -1526,6 +1526,14 @@ export interface Memory {
   supersedes: string | null;
   /** Set when a person edited it ("Editado por você · agora"). */
   editedByUserId: string | null;
+  /** What the agent learned itself ("Aprendizados"); older servers leave it out. */
+  learned?: boolean;
+  /** A how-to it worked out. */
+  howTo?: boolean;
+  /** Another memory says otherwise, until a person decides. */
+  disputed?: boolean;
+  /** Where it was learned. */
+  channelId?: string | null;
   updatedAt: string;
   /** `about: "me"` only: the viewer's message it came from ("Você disse hoje, nesta conversa"). */
   from?: { messageId: string; channelId: string; threadId: string | null; dm: boolean; at: string } | null;
@@ -1551,7 +1559,8 @@ export interface Proposal {
     | { type: "agent_instructions"; agentId: string }
     | { type: "org_context" }
     | { type: "agent_role"; agentId: string }
-    | { type: "agent_access"; agentId: string };
+    | { type: "agent_access"; agentId: string }
+    | { type: "skill"; agentId: string; skillId: string; name: string };
   /** `agent_access`: each app turned on or off. */
   access?: ProposalAccessLine[] | null;
   title: string;
@@ -2109,12 +2118,14 @@ export const AGENT_ACTION_KINDS = [
   "wiki.page_edited",
   "thread.renamed",
   "thread.closed",
+  "skill.created",
+  "skill.updated",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread";
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
   id: string;
   /** Issues. */
   number?: number;
@@ -2764,7 +2775,7 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * or an answer), `usage_paused` (its run paused near its plan's or budget's limit: `usagePause`), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
  * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
 export type RoutineState =
@@ -2773,6 +2784,7 @@ export type RoutineState =
   | "running"
   | "waiting_computer"
   | "waiting_person"
+  | "usage_paused"
   | "failing"
   | "needs_webhook";
 
@@ -2805,6 +2817,12 @@ export interface Routine {
   state: RoutineState;
   /** Its run waits for this computer since `since` (state `waiting_computer`). */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
+  /**
+   * Its run paused near its plan's or budget's limit (state `usage_paused`, ADR 0118): it picks up at `resetsAt`
+   * (null: not known yet). `extraOff`: the agent's long work may not use paid extra usage, so Continuar agora is
+   * refused. Who may press it: `canManage`.
+   */
+  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -3075,6 +3093,13 @@ export interface Skill {
   /** Turned on for agents created from now on. */
   defaultForNewAgents: boolean;
   metadata: Record<string, unknown>;
+  /** `agent`: made from an agent's own how-tos (older servers leave it out). */
+  origin?: "person" | "agent";
+  ownerAgentId?: string | null;
+  /** Agents can't change it; never archived for disuse. */
+  locked?: boolean;
+  useCount?: number;
+  lastUsedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3139,6 +3164,18 @@ export interface SkillPatch {
   description?: string;
   body?: string;
   defaultForNewAgents?: boolean;
+  /** Freeze it: agents can't change it. */
+  locked?: boolean;
+}
+
+/** A skill an agent made from its own how-tos (ADR 0120), archived ones too. */
+export interface LearnedSkill extends Skill {
+  body: string;
+  archived: boolean;
+  /** The viewer may lock it and undo its changes (who manages agents, or the agent's owner). */
+  canChange: boolean;
+  /** It has a change of its own to undo (Desfazer última mudança). */
+  canRevert: boolean;
 }
 
 // ── Agent computer and Run code settings: apps/server/src/routes/app/sandboxes.ts ──
@@ -4462,6 +4499,8 @@ export interface AgentBrain {
   effectiveModel: string | null;
   /** If the computer isn't available, answer through the API (counts against the budget). */
   fallback: boolean;
+  /** Long work may go on into the plan's paid extra usage where the provider reports it on (ADR 0118). */
+  extraUsage: boolean;
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
@@ -4579,6 +4618,8 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
+  /** Off: long work pauses at 95% of the plan even with its paid extra usage on. */
+  extraUsage?: boolean;
   /**
    * "Atende outras pessoas" turned off: false lets in whoever its "who can talk" list allows (everyone with no list).
    */
@@ -5705,6 +5746,88 @@ export interface AgentPlanUsage {
   /** Every day of the month so far: tokens per source key. */
   days: { date: string; tokens: Record<string, number> }[];
   current: PlanAccountUsage | null;
+}
+
+// ── AI apps (ADR 0119): this server as a remote MCP server ──
+
+/** What a connected app or a personal token may do: `write` reads and sends tasks, `read` only reads. */
+export type AppAccess = "read" | "write";
+
+/**
+ * How an app is shown, from the address its codes go back to: `verified` (its metadata document was fetched from
+ * `host`), `https` (a site that says its own name), `loopback` (a program on this computer), `app_scheme` (Cursor).
+ */
+export type AppDisplayKind = "verified" | "https" | "loopback" | "app_scheme";
+
+/** `GET /api/app/authorize/{req}`: what the consent page shows. */
+export interface AppConsent {
+  request: {
+    id: string;
+    expiresAt: string;
+    access: { requested: AppAccess[] };
+    client: {
+      displayKind: AppDisplayKind;
+      /** As the app calls itself: text, never markup. */
+      name: string;
+      host: string | null;
+      /** `claude`, `openai`, `cursor`, `vscode`: only from an address the app proved. */
+      brand: string | null;
+      /** Where the browser goes back to: a host, or `scheme://host`. */
+      returnsTo: string;
+      reservedNameWarning: boolean;
+    };
+  };
+  account: { name: string; email: string };
+  workspaces: { id: string; name: string; logo: string | null; paused: boolean; current: boolean }[];
+}
+
+export interface AppConsentDecision {
+  decision: "allow" | "deny";
+  orgId?: string;
+  access?: AppAccess;
+}
+
+export interface ConnectedApp {
+  id: string;
+  kind: "oauth";
+  displayKind: AppDisplayKind;
+  name: string;
+  host: string | null;
+  brand: string | null;
+  access: AppAccess;
+  /** Only in the whole workspace's list. */
+  person?: { id: string; name: string };
+  connectedAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface PersonalToken {
+  id: string;
+  name: string;
+  access: AppAccess;
+  createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  person?: { id: string; name: string };
+}
+
+/** `GET …/apps`: this server's `/mcp`, the connected apps and the personal tokens. */
+export interface AppsList {
+  serverUrl: string;
+  apps: ConnectedApp[];
+  tokens: PersonalToken[];
+}
+
+export interface PersonalTokenInput {
+  name: string;
+  access: AppAccess;
+  expiresInDays: 30 | 90 | 365 | null;
+}
+
+/** `POST …/tokens`: `secret` is shown once. */
+export interface CreatedPersonalToken {
+  token: { id: string; name: string; access: AppAccess; expiresAt: string | null };
+  secret: string;
 }
 
 /** Who has a shared browser profile now (ADR 0110): an agent's run or a person in control. */

@@ -1,6 +1,12 @@
 import type { Routine } from "@agenteschat/client";
-import { whenAt } from "@agenteschat/client/lib/format";
-import { pausedFix, type RoutineFix, routineStateWords, runPixels } from "@agenteschat/client/lib/routine-view";
+import {
+  pausedFix,
+  type RoutineFix,
+  routineStateTime,
+  routineStateWords,
+  runPixels,
+  usageContinueBlock,
+} from "@agenteschat/client/lib/routine-view";
 import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,8 +45,7 @@ export function StateChip({ routine: r }: { routine: Routine }) {
   const say = useSay();
   const dir = useDirectory();
   const names = useNamesComputers();
-  const since = r.waitingFor ? whenAt(t, i18n.language, r.waitingFor.since) : "";
-  const state = routineStateWords(r, since, names);
+  const state = routineStateWords(r, routineStateTime(t, i18n.language, r), names);
   if (r.state === "running")
     return (
       <Chip
@@ -49,6 +54,42 @@ export function StateChip({ routine: r }: { routine: Routine }) {
       />
     );
   return <Chip label={say(state)} icon={STATE_ICON[state.icon]} />;
+}
+
+/**
+ * A run paused near its plan's or budget's limit (the web's note): it picks up by itself, and Continuar agora lets
+ * it go on now for its creator, the agent's owner and admins. Everyone else sees the button greyed with the reason.
+ */
+export function UsagePausedNote({
+  routine: r,
+  controls,
+}: {
+  routine: Routine;
+  controls: ReturnType<typeof useRoutineControls>;
+}) {
+  const { t } = useTranslation();
+  const blocked = usageContinueBlock(r);
+  return (
+    <View style={styles.usagePause}>
+      <Text variant="footnote" tone="muted">
+        {t("routines.usagePause.line")}
+      </Text>
+      <Button
+        size="sm"
+        variant="primary"
+        icon="play"
+        label={t("usageCard.continue")}
+        disabled={blocked !== null}
+        loading={controls.action.isPending}
+        onPress={controls.continueUsage}
+      />
+      {blocked ? (
+        <Text variant="footnote" tone="muted">
+          {t(`routines.usagePause.${blocked}`)}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 /** The one-tap fix of a paused routine ("Adicionar agente ao canal", "Assumir rotina", "Retomar"). */
@@ -110,6 +151,8 @@ export const RoutineRow = memo(function RoutineRow({
   // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
   const needsLook = !done && routineStateWords(r).tone === "waiting";
   const fix = r.canManage && needsLook ? pausedFix(r) : null;
+  // Paused near its plan's limit: said quietly (it picks up by itself), with no fix.
+  const showState = needsLook || r.state === "usage_paused";
   const delivery =
     r.target.type === "conversation"
       ? t("routines.deliversIn", { agent, place: targetLabel(r.target) })
@@ -142,7 +185,7 @@ export const RoutineRow = memo(function RoutineRow({
               {delivery}
             </Text>
           </View>
-          {isReminder(r) || trouble || needsLook ? (
+          {isReminder(r) || trouble || showState ? (
             <View style={styles.chips}>
               {isReminder(r) ? <Chip icon="bell" label={t("routines.reminder")} /> : null}
               {trouble ? (
@@ -151,7 +194,7 @@ export const RoutineRow = memo(function RoutineRow({
                   label={trouble === "error" ? t("mail.routine.error") : t("mail.routine.needsReconnect")}
                 />
               ) : null}
-              {needsLook ? <StateChip routine={r} /> : null}
+              {showState ? <StateChip routine={r} /> : null}
               {fix && fix !== "resume" ? <FixButton fix={fix} controls={controls} /> : null}
             </View>
           ) : null}
@@ -193,6 +236,7 @@ export const RoutineRow = memo(function RoutineRow({
 const styles = StyleSheet.create({
   row: { paddingVertical: 12, paddingHorizontal: SIDE, gap: 8 },
   done: { opacity: 0.7 },
+  usagePause: { gap: 8, paddingTop: 16, paddingHorizontal: 4, alignItems: "flex-start" },
   divider: { position: "absolute", top: 0, right: 0, left: SIDE + AVATAR + GAP, height: StyleSheet.hairlineWidth },
   top: { flexDirection: "row", alignItems: "flex-start", gap: GAP },
   main: { flex: 1, minWidth: 0, gap: 3, paddingTop: 1 },

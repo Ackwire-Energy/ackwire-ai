@@ -697,9 +697,31 @@ describe("agent page: memory and proposals", () => {
         .getAllByRole("radio")
         // The count is a separate chip (CountChip): no text space between label and number.
         .map((r) => r.textContent?.replace(/(\D)(\d+)$/, "$1 $2")),
-    ).toEqual(["Fatos e decisões 4", "Lições 2", "Arquivados 1"]);
+    ).toEqual(["Fatos e decisões 4", "Lições 2", "Aprendizados", "Arquivados 1"]);
     await type(screen().getByRole("searchbox", { name: "Buscar" }), "zzz-nada");
     expect(document.body.textContent).toContain("Nada encontrado com “zzz-nada”.");
+  });
+
+  test("what it learned: its own saves with where and how sure, and Esquecer archives one", async () => {
+    const state = seedState();
+    const mine = state.memories.find((m) => m.agentId === ADA_ID && !m.archived);
+    if (!mine) throw new Error("no memory");
+    Object.assign(mine, {
+      learned: true,
+      howTo: true,
+      lowTrust: false,
+      verified: false,
+      text: "GET the models with the key.",
+    });
+    await go("?tab=memory", state);
+    await click(
+      within(screen().getByRole("radiogroup", { name: "Tipo" })).getByRole("radio", { name: /Aprendizados/ }),
+    );
+    const row = screen().getByText("GET the models with the key.").closest("li") as HTMLElement;
+    expect(row.textContent).toContain("Como fazer");
+    expect(row.textContent).toContain("Não verificado");
+    await click(within(row).getByRole("button", { name: "Esquecer" }));
+    expect(state.memories.find((m) => m.id === mine.id)?.archived).toBe(true);
   });
 });
 

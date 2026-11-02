@@ -84,9 +84,10 @@ export function Tabs<V extends string>({
   );
 }
 
+/** Its layout is in the stylesheet: an inline `display` would beat the `hidden` Radix puts on an inactive panel. */
 export function TabPanel({ value, children }: { value: string; children: ReactNode }) {
   return (
-    <RTabs.Content value={value} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <RTabs.Content value={value} className="ac-tabpanel">
       {children}
     </RTabs.Content>
   );

@@ -162,6 +162,8 @@ export function cursorTurnArgs(input: {
     "--workspace",
     input.cwd,
     "--trust",
+    // The CLI would otherwise download its own updates into each agent's home (CURSOR_CONFIG_DIR) on a turn.
+    "--disable-auto-update",
     ...(input.approveMcps ? ["--approve-mcps"] : []),
     ...(input.profile === "plan" ? ["--mode", "ask"] : ["--force", "--sandbox", "enabled"]),
     ...(input.model ? ["--model", input.model] : []),

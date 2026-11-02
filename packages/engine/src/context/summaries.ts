@@ -21,6 +21,8 @@ export interface ContextDeps {
   cheapModels?: Record<string, string>;
   pubsub?: PubSub;
   reflect?: { maxPerThread?: number; everyMessages?: number; idleMinutes?: number };
+  /** Learning from runs (ADR 0120): `LEARN_MAX_PER_AGENT_DAY`, `LEARN_MIN_TOOL_CALLS`, `LEARN_SKILL_AFTER`. */
+  learn?: { maxPerAgentDay?: number; minToolCalls?: number; skillAfter?: number };
   /** Semantic yes/no and choice judgments (judge.ts); default: the org's cheap model. Tests pass a fake. */
   judge?: Judge;
   /** Reads schedules and moments people write (schedule-reader.ts); default: the org's cheap model. Tests pass a fake. */

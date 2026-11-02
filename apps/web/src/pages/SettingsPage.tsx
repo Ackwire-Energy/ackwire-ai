@@ -60,6 +60,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AccountSection } from "@/components/AccountSettings";
+import { AiAppsSection } from "@/components/AiApps";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
@@ -186,6 +187,7 @@ export function SettingsPage({
         )}
         {current === "account" && <AccountSection />}
         {current === "notifications" && <NoticePrefsSection />}
+        {current === "apps" && <AiAppsSection />}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
         {current === "roles" && <RolesSection />}

@@ -752,6 +752,12 @@ export function createMockPlanning(
         const r = await findRoutine(orgId, id);
         return clone(r);
       },
+      continueUsage: async (orgId, id) => {
+        record("routines.continueUsage", id);
+        const r = await findRoutine(orgId, id);
+        if (r.state === "usage_paused") Object.assign(r, { state: "running", usagePause: null });
+        return clone(r);
+      },
       runs: async (orgId, id) => {
         await findRoutine(orgId, id);
         return clone((await store(orgId)).runs.get(id) ?? []);

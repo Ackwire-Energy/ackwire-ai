@@ -681,8 +681,9 @@ describe("ask_agent", () => {
     f = await setup({
       askAgent: true,
       // Its first reply promises to pass the answer on (unkept), the relay is done.
-      judge: (kind, _id, state, _question, request) => {
-        if (kind !== "follow_through") return undefined;
+      // One verdict per judged turn: the same call also asks what the turn taught (ADR 0120).
+      judge: (kind, id, state, _question, request) => {
+        if (kind !== "follow_through" || id !== "verdict") return undefined;
         judged++;
         return request.agentId === f.agent.id && !String(state.reply).startsWith("Relaying") ? "continue" : "done";
       },

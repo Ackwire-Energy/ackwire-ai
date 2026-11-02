@@ -7,6 +7,7 @@ import {
   eq,
   inArray,
   isNull,
+  ne,
   or,
   schema,
   sql,
@@ -117,6 +118,17 @@ export function mergeEvidence(a: Evidence[], b: Evidence[]) {
 
 // ── Subjects and similarity ──────────────────────────────────────────────────
 
+/**
+ * The word a how-to's subject key carries (`howToSubject`). Edits keep the subject key, so a how-to stays one whoever
+ * edits it, and no other note becomes one by who wrote it.
+ */
+export const HOW_TO_WORD = "howto";
+export const howToSubject = (title: string) => `${HOW_TO_WORD} ${title}`;
+export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
+  i.kind === "note" && i.subjectKey.split(" ").includes(HOW_TO_WORD);
+export const howToSql = () =>
+  sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
+
 /** Subject key: lower case, accents and punctuation removed, words sorted. */
 export function normalizeSubject(subject: string) {
   return [
@@ -152,7 +164,8 @@ export const SAME_ITEM_SIMILARITY = 0.8;
 export interface NewContextItem {
   orgId: string;
   kind: ContextKind;
-  scopeType: "thread" | "channel" | "org" | "agent" | "entity";
+  /** `person`: a person's preference (`scopeId` their user id), read only in runs they are behind (ADR 0120). */
+  scopeType: "thread" | "channel" | "org" | "agent" | "entity" | "person";
   scopeId?: string | null;
   agentId?: string | null;
   subject?: string;
@@ -192,8 +205,9 @@ export async function insertContextItem(tx: Executor, input: NewContextItem): Pr
       channelIds: [...new Set(input.channelIds ?? [])],
       trust: input.trust ?? "high",
       // Anything backed only by agent claims stays unverified (no evidence at all: job output, verified by construction).
-      // A note is the agent's own reminder, not a claim about the world.
-      verified: input.kind === "note" || evidence.length === 0 ? true : isVerified(evidence),
+      // A note is the agent's own reminder, not a claim about the world. Low trust never verifies (ADR 0120).
+      verified:
+        input.trust === "low" ? false : input.kind === "note" || evidence.length === 0 ? true : isVerified(evidence),
       evidence,
       confidence: Math.min(1, Math.max(0, input.confidence ?? 0.7)),
       pinned: input.pinned ?? false,
@@ -230,7 +244,8 @@ export type ConsolidateResult = {
    * `outweighed`: it contradicts an item with stronger evidence, so that one stays current
    * (`item`) and the new one is kept only as history (`previous`) (ADR 0028).
    */
-  action: "created" | "merged" | "superseded" | "outweighed";
+  /** `disputed`: it contradicts an item it may not replace (`mayReplace`); both stay, marked disputed. */
+  action: "created" | "merged" | "superseded" | "outweighed" | "disputed";
   item: ContextItem;
   previous?: ContextItem;
 };
@@ -243,6 +258,11 @@ export type ConsolidateResult = {
 export interface MemoryJudging {
   judge?: Judge;
   semantic?: boolean;
+  /**
+   * Whether this write may supersede `old`. No: the new item is kept beside it, both `disputed` until a person
+   * decides (the background learning job never silently replaces what a person wrote, ADR 0120).
+   */
+  mayReplace?: (old: ContextItem) => boolean;
 }
 
 /**
@@ -264,7 +284,7 @@ export async function consolidateItem(
   if (judge && judging.semantic) {
     const plan = await planConsolidation(db, judge, input);
     if (plan) {
-      const done = await db.transaction((tx) => applyPlan(tx, input, plan));
+      const done = await db.transaction((tx) => applyPlan(tx, input, plan, judging.mayReplace));
       if (done) return done;
     }
   }
@@ -293,24 +313,42 @@ export async function consolidateItem(
     if (similarity(old.content, input.content) >= SAME_ITEM_SIMILARITY) {
       return { action: "merged", item: await mergeInto(tx, old, input) };
     }
+    if (judging.mayReplace && !judging.mayReplace(old)) return keepBeside(tx, old, input);
     const item = await supersede(tx, old, { ...input, subject: input.subject ?? old.subjectKey });
     return { action: "superseded", item, previous: old };
   });
+}
+
+/**
+ * A write that may not replace `old`: both stay current, linked and disputed, until a person decides. A low-trust
+ * write (read from a page, mail or a connected app) never weakens `old`: only the new one is disputed.
+ */
+async function keepBeside(tx: Executor, old: ContextItem, input: NewContextItem): Promise<ConsolidateResult> {
+  const item = await insertContextItem(tx, {
+    ...input,
+    subject: input.subject ?? old.subjectKey,
+    relatedIds: [old.id],
+    disputed: true,
+  });
+  if (input.trust !== "low") await tx.update(contextItems).set({ disputed: true }).where(eq(contextItems.id, old.id));
+  await linkBack(tx, [old.id], item.id);
+  return { action: "disputed", item, previous: old };
 }
 
 /** The same item again: evidence united, recurrence +1, confidence max; low trust is sticky. */
 async function mergeInto(tx: Executor, old: ContextItem, input: NewContextItem) {
   checkContent(input.content);
   const evidence = mergeEvidence(old.evidence, input.evidence ?? []);
+  const low = old.trust === "low" || input.trust === "low";
   const [merged] = await tx
     .update(contextItems)
     .set({
       evidence,
-      verified: old.kind === "note" || evidence.length === 0 ? old.verified : isVerified(evidence),
+      verified: low ? false : old.kind === "note" || evidence.length === 0 ? old.verified : isVerified(evidence),
       recurrence: old.recurrence + 1,
       confidence: Math.max(old.confidence, input.confidence ?? 0),
       // Low trust is sticky: one untrusted source taints the item.
-      trust: old.trust === "low" || input.trust === "low" ? "low" : "high",
+      trust: low ? "low" : "high",
       sourceIds: [...new Set([...old.sourceIds, ...(input.sourceIds ?? [])])],
       channelIds: [...new Set([...old.channelIds, ...(input.channelIds ?? [])])],
       updatedAt: new Date(),
@@ -339,7 +377,12 @@ async function linkBack(tx: Executor, ids: string[], itemId: string) {
  * if it changed meanwhile (archived, superseded), returns null and the caller
  * falls back to words.
  */
-async function applyPlan(tx: Executor, input: NewContextItem, plan: Plan): Promise<ConsolidateResult | null> {
+async function applyPlan(
+  tx: Executor,
+  input: NewContextItem,
+  plan: Plan,
+  mayReplace?: MemoryJudging["mayReplace"],
+): Promise<ConsolidateResult | null> {
   if (plan.action === "create") {
     const item = await insertContextItem(tx, { ...input, relatedIds: plan.related });
     await linkBack(tx, plan.related, item.id);
@@ -354,6 +397,8 @@ async function applyPlan(tx: Executor, input: NewContextItem, plan: Plan): Promi
     .for("update");
   if (!target) return null;
   if (plan.action === "merge") return { action: "merged", item: await mergeInto(tx, target, input) };
+  if (mayReplace && !mayReplace(target) && (plan.action === "supersede" || plan.winner === "new"))
+    return keepBeside(tx, target, input);
   if (plan.action === "supersede") {
     const item = await supersede(tx, target, { ...input, subject: input.subject ?? target.subjectKey });
     return { action: "superseded", item, previous: target };
@@ -379,9 +424,16 @@ export async function listContextItems(
   db: Database,
   actorId: string,
   orgId: string,
-  filter: { agentId?: string; kinds?: ContextKind[]; includeArchived?: boolean; limit?: number } = {},
+  filter: {
+    agentId?: string;
+    kinds?: ContextKind[];
+    includeArchived?: boolean;
+    limit?: number;
+    /** Who wrote them (`agent`, `job`, `person`): "What it learned" lists the agent's and the jobs' (ADR 0120). */
+    createdBy?: ("agent" | "job" | "person")[];
+  } = {},
 ) {
-  await requirePermission(db, actorId, orgId, "read");
+  const membership = await requirePermission(db, actorId, orgId, "read");
   const visible = await userVisibleChannels(db, orgId, actorId);
   return db
     .select()
@@ -389,6 +441,11 @@ export async function listContextItems(
     .where(
       and(
         eq(contextItems.orgId, orgId),
+        // A person's preferences: theirs, and who reviews memory.
+        can(membership, "review_memory")
+          ? undefined
+          : or(ne(contextItems.scopeType, "person"), eq(contextItems.scopeId, actorId)),
+        filter.createdBy?.length ? inArray(contextItems.createdByKind, filter.createdBy) : undefined,
         filter.agentId ? eq(contextItems.agentId, filter.agentId) : undefined,
         filter.kinds?.length ? inArray(contextItems.kind, filter.kinds) : undefined,
         filter.includeArchived ? undefined : eq(contextItems.status, "active"),

@@ -20,6 +20,7 @@ export const HELP_PAGES = {
   approvals: "both",
   "who-answers": "both",
   jev: "selfhost",
+  "apps-de-ia": "both",
 } as const;
 
 export type HelpSlug = keyof typeof HELP_PAGES;

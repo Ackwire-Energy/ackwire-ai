@@ -28,7 +28,12 @@ export async function enqueueRunJob(
 ): Promise<{ run: typeof agentRuns.$inferSelect | null; steered: string | null }> {
   const threadRootId = message.threadId ?? message.id;
   const [active] = await tx
-    .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
+    .select({
+      id: agentRuns.id,
+      orgId: agentRuns.orgId,
+      status: agentRuns.status,
+      waitCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+    })
     .from(agentRuns)
     .where(
       and(
@@ -44,7 +49,10 @@ export async function enqueueRunJob(
     .limit(1);
   // Queued only while that run is still active; one that just ended, or one held by a decision (an
   // approval, the mission's own: `holdsMessages`), and the notice starts a run.
-  if (active && !(await holdsMessages(tx, active)) && (await queueOnRun(tx, active.id, message.id)))
+  // Paused near a usage limit (ADR 0118), the mission's work reads its notices when it picks up: a run of their own
+  // would be more of the same long work, paused at once.
+  const usagePaused = active?.status === "waiting_input" && active.waitCode === "usage_pause";
+  if (active && (usagePaused || !(await holdsMessages(tx, active))) && (await queueOnRun(tx, active.id, message.id)))
     return { run: null, steered: active.id };
   const [run] = await tx
     .insert(agentRuns)

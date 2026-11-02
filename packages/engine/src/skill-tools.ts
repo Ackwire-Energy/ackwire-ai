@@ -1,4 +1,9 @@
+import type { PubSub } from "@agenteschat/adapters";
+import { eq, schema, sql } from "@agenteschat/db";
+import { learnTrust } from "./context/learn";
+import { changeSkillAsAgent } from "./context/learned-skills";
 import { cutText } from "./format";
+import type { Judge } from "./judge";
 import { agentSkillByName, SKILL_LIMITS, type SkillDeps, skillFilesOf, skillFileText } from "./skills";
 import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -14,7 +19,7 @@ const failed = (error: unknown): ToolOutput => ({
  * `read_skill_file` one of its text files. Only skills enabled for the agent;
  * scripts are never shown: `run_skill_script` (sandbox tools, ADR 0021) runs them.
  */
-export function createSkillToolSource(deps: SkillDeps): ToolSource {
+export function createSkillToolSource(deps: SkillDeps & { pubsub?: PubSub; judge?: Judge }): ToolSource {
   const tools: ToolDefinition[] = [
     {
       name: "load_skill",
@@ -31,6 +36,11 @@ export function createSkillToolSource(deps: SkillDeps): ToolSource {
         try {
           const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, str(input.name));
           if (!skill) return { content: `No skill named ${str(input.name)} is enabled for you.`, isError: true };
+          // Use keeps an agent-made skill from being archived for disuse (ADR 0120).
+          await ctx.db
+            .update(schema.skills)
+            .set({ useCount: sql`${schema.skills.useCount} + 1`, lastUsedAt: new Date() })
+            .where(eq(schema.skills.id, skill.id));
           const files = await skillFilesOf(ctx.db, skill);
           const list = files.length
             ? files
@@ -75,6 +85,46 @@ export function createSkillToolSource(deps: SkillDeps): ToolSource {
               ? `${cutText(text, SKILL_LIMITS.fileReadChars)}\n[truncated]`
               : text;
           return { content: `${skill.name}/${str(input.path)}:\n${shown}` };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "update_skill",
+      description:
+        "Fix one of your skills you loaded in this turn when it was wrong or missing a step: the full new body (Markdown, steps first, then pitfalls). Your own skills change at once (with Undo); a skill a person made becomes a proposal they accept. Never credentials.",
+      scope: "skills:read",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", minLength: 1, maxLength: 64 },
+          body: { type: "string", minLength: 10, maxLength: 50_000 },
+        },
+        required: ["name", "body"],
+        additionalProperties: false,
+      },
+      describe: (input) => ({ title: `Fix the skill ${str(input.name)}` }),
+      async execute(input, ctx) {
+        try {
+          const change = await changeSkillAsAgent(
+            { db: ctx.db, pubsub: deps.pubsub, judge: deps.judge },
+            ctx,
+            str(input.name),
+            str(input.body),
+            (await learnTrust(ctx)).trust,
+          );
+          if (change.action === "updated")
+            return { content: `Updated ${change.skill.name} (v${change.skill.version}).` };
+          if (change.action === "proposed" && change.outside)
+            return {
+              content: `This turn read outside content (the web, mail or a connected app), so the fix is proposal ${change.proposalId}: someone who manages agents accepts it. Use your fix in this turn.`,
+            };
+          if (change.action === "proposed")
+            return {
+              content: `A person made this skill, so the fix is proposal ${change.proposalId}: someone who manages agents accepts it. Use your fix in this turn.`,
+            };
+          return { content: "Nothing changed: the body is the same." };
         } catch (error) {
           return failed(error);
         }

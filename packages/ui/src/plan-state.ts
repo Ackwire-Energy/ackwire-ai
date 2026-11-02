@@ -164,3 +164,65 @@ export function limitOffers<A extends OfferAccount>(
     .map((o) => ({ account: o.account, used: o.plan?.used ?? null }))
     .sort((a, b) => (a.used ?? 101) - (b.used ?? 101));
 }
+
+/** From here long work pauses until the window resets (ADR 0118); replies to people go on until the limit. */
+export const PLAN_PAUSE = 95;
+/** From here an agent is told where its plan stands, so it can say a long task may pause. */
+export const PLAN_NOTICE = 90;
+
+/** The label the runner gives a Claude plan's paid extra usage (`get_usage` `extra_usage`, `rate_limit_event` `overage`). */
+export const EXTRA_USAGE_LABEL = "Extra usage";
+
+/** How long each window lasts: a reading with no reset counts for no longer than that. */
+const WINDOW_MS: Partial<Record<string, number>> = {
+  five_hour: 5 * 3600_000,
+  seven_day: 7 * 86_400_000,
+  seven_day_opus: 7 * 86_400_000,
+  seven_day_sonnet: 7 * 86_400_000,
+  monthly: 31 * 86_400_000,
+  // A model's own week.
+  other: 7 * 86_400_000,
+};
+
+/** The paid extra usage the account has turned on with the provider (only Claude's plans report it). */
+export const extraUsageOn = (usage: { windows: readonly PlanMeterWindow[] } | null | undefined) =>
+  usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL) ?? false;
+
+/** Extra usage that is on and still has room under its own cap: what long work may go on into. */
+export const extraUsageLeft = (usage: { windows: readonly PlanMeterWindow[] } | null | undefined) =>
+  usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL && w.usedPercent < PLAN_PAUSE) ??
+  false;
+
+/** `other` windows that are no model's own week. */
+const NOT_A_MODEL = new Set([EXTRA_USAGE_LABEL, "OAuth apps"]);
+
+/**
+ * The window that binds long work on a run with `model`: the most used of the windows that apply to it and still
+ * count now. A model's own week counts only for that model; extra usage and OAuth apps never count.
+ * A window whose reset passed reads 0, and one with no reset stops counting once its length passed since the
+ * reading. Null: nothing known, which never pauses anything.
+ */
+export function planBinding(
+  usage: (PlanMeterUsage & { at: string }) | null | undefined,
+  options: { model?: string | null; now?: number } = {},
+): { kind: string; used: number; resetsAt?: string } | null {
+  if (!usage) return null;
+  const now = options.now ?? Date.now();
+  const model = (options.model ?? "").toLowerCase();
+  const read = Date.parse(usage.at);
+  let top: { kind: string; used: number; resetsAt?: string } | null = null;
+  for (const w of usage.windows) {
+    // A model's own week (Claude's `model_scoped`, stored as `other` with the model's name) counts for that model.
+    if (w.kind === "other" && (!w.label || NOT_A_MODEL.has(w.label) || !model.includes(w.label.toLowerCase())))
+      continue;
+    if (w.kind === "seven_day_opus" && !model.includes("opus")) continue;
+    if (w.kind === "seven_day_sonnet" && !model.includes("sonnet")) continue;
+    const length = WINDOW_MS[w.kind] ?? 0;
+    const live = w.resetsAt ? Date.parse(w.resetsAt) > now : Number.isFinite(read) && now - read < length;
+    if (!live) continue;
+    if (!top || w.usedPercent > top.used) {
+      top = { kind: w.kind, used: w.usedPercent, ...(w.resetsAt ? { resetsAt: w.resetsAt } : {}) };
+    }
+  }
+  return top;
+}

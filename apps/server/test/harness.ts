@@ -31,6 +31,7 @@ import {
   drainOutbox,
   type EmailArt,
   type FakeScheduleAnswers,
+  type FetchAppDocument,
   type McpConnect,
   type ResolveHost,
   type ToolSource,
@@ -108,6 +109,8 @@ export async function createTestServer(
      * Absent: `gifs` serves them, and a saved key is kept unchecked (tests never reach the network).
      */
     giphyFetch?: typeof fetch;
+    /** AI apps (ADR 0119): a fake fetch of apps' metadata documents (CIMD); absent = none answers. */
+    appsFetchDocument?: FetchAppDocument;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -189,6 +192,11 @@ export async function createTestServer(
     version: "test",
     modules: [],
     pingDatabase: async () => {},
+    appsFetchDocument:
+      options.appsFetchDocument ??
+      (async () => {
+        throw new Error("no network in tests");
+      }),
     services: {
       db,
       auth,
