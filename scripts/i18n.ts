@@ -1,14 +1,16 @@
 /**
  * The translation tools (ADR 0121):
  *   bun run i18n:missing <code> [--file app|mobile-base|mobile-features|desktop] [--group <top-level key>]
- *       writes i18n-work/<code>.todo.json: every English string the language has no translation of, with its
- *       pt-BR text, the note written above it, its placeholders and tags, the plural forms the language needs and
- *       whether it has a feminine variant.
+ *       writes i18n-work/<code>.todo.json: every English string the language has no translation of, or whose English
+ *       changed since it was translated (`outdated`: the English then and the translation to redo), with its pt-BR
+ *       text, the note written above it, its placeholders and tags, the plural forms the language needs and whether
+ *       it has a feminine variant.
  *   bun run i18n:apply <code> <file.json>
  *       merges translated items ({ file, key, value, female? }) into the language's JSON files, in English's key
- *       order, after `checkLocale` passes for every key they touch.
+ *       order, after `checkLocale` passes for every key they touch, and keeps the English each was translated from in
+ *       `<code>.source.json` beside them.
  *   bun run i18n:status
- *       a table per language and surface: the share of keys done and the plural forms missing.
+ *       a table per language and surface: the share of keys done, the plural forms missing and the outdated keys.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -133,6 +135,31 @@ const read = (file: string): LocaleStrings => {
   }
 };
 
+/** Where a language's file keeps the English each key was translated from ("es.json" → "es.source.json"). */
+export const sourcesPath = (target: string) => target.replace(/\.json$/, ".source.json");
+
+type Source = { value: Forms; female?: Forms };
+
+/**
+ * The keys `target` has whose English changed since they were translated (or whose English then is unknown), with
+ * the English then.
+ */
+export function outdatedKeys(
+  source: LocaleStrings,
+  target: LocaleStrings,
+  sources: Record<string, Source>,
+): Map<string, Source | undefined> {
+  const now = grouped(source);
+  const out = new Map<string, Source | undefined>();
+  for (const key of new Set(flatten(target).map(([k]) => splitKey(k).base))) {
+    const current = now.get(key);
+    if (current && JSON.stringify(current) !== JSON.stringify(sources[key])) out.set(key, sources[key]);
+  }
+  return out;
+}
+
+const readSources = (target: string) => read(sourcesPath(target)) as unknown as Record<string, Source>;
+
 const textsOf = (f: Forms | undefined) => (f === undefined ? [] : typeof f === "string" ? [f] : Object.values(f));
 
 function missing(code: AppLocale, only: { file?: string; group?: string }) {
@@ -145,7 +172,9 @@ function missing(code: AppLocale, only: { file?: string; group?: string }) {
     const ptNotes = notesOf(readFileSync(join(ROOT, s.ptFile), "utf8"));
     const source = grouped(s.en);
     const pt = grouped(s.ptBR);
-    for (const key of missingKeys(s.en, target)) {
+    const outdated = outdatedKeys(s.en, target, readSources(s.target(code)));
+    const current = grouped(target);
+    for (const key of [...missingKeys(s.en, target), ...outdated.keys()]) {
       if (only.group && !key.startsWith(`${only.group}.`)) continue;
       const entry = source.get(key);
       if (!entry) continue;
@@ -161,6 +190,9 @@ function missing(code: AppLocale, only: { file?: string; group?: string }) {
         ...(entry.female ? { enFemale: entry.female } : {}),
         ...(ptEntry ? { ptBR: ptEntry.value, ...(ptEntry.female ? { ptBRFemale: ptEntry.female } : {}) } : {}),
         ...(note ? { note } : {}),
+        ...(outdated.has(key)
+          ? { outdated: { enBefore: outdated.get(key)?.value ?? null, translation: current.get(key) } }
+          : {}),
         vars,
         tags,
         ...(typeof entry.value === "object" ? { plural: categories } : {}),
@@ -254,7 +286,18 @@ function apply(code: AppLocale, file: string) {
       if (max && textsOf(item.value).some((t) => t.length > max)) problems.push(`${item.key}: over ${max} characters`);
     }
     problems.push(...found.map((p) => `${name} ${p}`));
-    writes.push([s.target(code), ordered(s.en, next)]);
+    const tree = ordered(s.en, next);
+    writes.push([s.target(code), tree]);
+    // The English each key now stands for: its own when written here, else what it was translated from.
+    const was = readSources(s.target(code));
+    const now = grouped(s.en);
+    const sources = Object.fromEntries(
+      [...new Set(flatten(tree).map(([k]) => splitKey(k).base))].flatMap((k) => {
+        const from = touched.has(k) ? now.get(k) : was[k];
+        return from ? [[k, from]] : [];
+      }),
+    );
+    writes.push([sourcesPath(s.target(code)), sources as unknown as LocaleStrings]);
   }
   if (problems.length > 0) {
     console.error(problems.join("\n"));
@@ -272,7 +315,9 @@ function status() {
       const total = new Set(flatten(s.en).map(([k]) => splitKey(k).base)).size;
       const done = total - missingKeys(s.en, target).length;
       const plurals = checkLocale({ source: s.en, target, code, ready: false }).filter((p) => / form$/.test(p)).length;
-      return `${Math.floor((done / total) * 100)}%${plurals ? ` (${plurals} plural)` : ""}`;
+      const stale = code === "pt-BR" ? 0 : outdatedKeys(s.en, target, readSources(s.target(code))).size;
+      const notes = [plurals ? `${plurals} plural` : "", stale ? `${stale} outdated` : ""].filter(Boolean).join(", ");
+      return `${Math.floor((done / total) * 100)}%${notes ? ` (${notes})` : ""}`;
     });
     const leaves = (o: object): number =>
       Object.values(o).reduce<number>(
