@@ -408,7 +408,7 @@ function Profile({ id }: { id: string }) {
                         <Row
                           key={m.id}
                           leading={<Tile icon="brain" />}
-                          title={m.text}
+                          title={m.summary ?? m.text}
                           subtitle={originText(m)}
                           chevron={editable}
                           {...(editable ? { onPress: () => fix(m) } : {})}

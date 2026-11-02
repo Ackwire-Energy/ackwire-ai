@@ -10,7 +10,15 @@ import { runReadOutsideById } from "../outside";
 import { personBehindCall } from "../requester";
 import { addRunStep } from "../runs";
 import type { ToolContext } from "../tools/types";
-import { consolidateItem, type Evidence, howToSql, howToSubject, looksLikeSecret, type NewContextItem } from "./items";
+import {
+  consolidateItem,
+  type Evidence,
+  howToSql,
+  howToSubject,
+  isPlaybook,
+  looksLikeSecret,
+  type NewContextItem,
+} from "./items";
 import { changeSkillAsAgent } from "./learned-skills";
 import { type ContextDeps, isTrustedMessage, judgeOf, memoryJudging, resolveSummaryModel } from "./summaries";
 
@@ -208,7 +216,9 @@ async function jobsToday(db: Executor, agentId: string) {
 
 const LEARN_SYSTEM = [
   "You keep the memory of an AI agent that works in a team of people and agents. Read one finished turn of its work and extract what is worth keeping for next time, as JSON.",
-  "Kinds: how_to (a way it worked out and will reuse: the exact address, command, parameters, script path; steps first), preference (how a person wants things done), fact (a lasting fact about the company, its people or its systems), decision, lesson (what to do differently, or keep doing), term (a word or name the team uses, and what it means).",
+  "Kinds: how_to (a way it worked out and will reuse: the exact address, command, parameters, script path; steps first), preference (how a person wants things done), fact (a lasting fact about the company, its business or its people), decision, lesson (what to do differently, or keep doing), term (a word or name the team uses, and what it means).",
+  "How its systems work (where code lives, which file does what, how a tool behaves) is a how_to or a lesson, never a fact.",
+  'title: one plain line a person who doesn\'t code understands, in the language the people in the conversation write, with no paths, code or ids ("Como gravar senhas no Supabase sem expô-las"); content holds the technical detail.',
   "Scope: own (only this agent), team (how the team works), workspace (everyone should know), person (one person's own preference: give their name as it appears in the messages in about_person).",
   "Ground everything: cite refs (m1… messages, s1… tool calls) for each item. Never infer traits, roles, moods or preferences. A one-off request is not a standing preference. If unsure, leave it out.",
   'Write each item as a statement of fact ("Ana prefers reports in Portuguese"), never as an order ("Always write in Portuguese").',
@@ -297,7 +307,8 @@ const ACTIVE = ["queued", "running", "waiting_approval", "waiting_input"] as con
  * what to keep. Code decides the rest: refs must exist, trust comes from the run (`learnTrust`) and from the refs,
  * scopes beyond the agent's own need high trust (a person's also a message of theirs), and it only adds: an item a
  * person wrote is never replaced (both stay, disputed). Bounded per agent and day, skipped while the agent works
- * in the same conversation. Posts nothing; each save is a quiet receipt with Undo.
+ * in the same conversation. Posts nothing; what matters to people is a quiet receipt with Undo, the agent's playbook
+ * none (`isPlaybook`).
  */
 export async function learnRun(deps: ContextDeps, input: { orgId: string; runId: string }): Promise<LearnResult> {
   const { db } = deps;
@@ -511,15 +522,19 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
     try {
       const res = await consolidateItem(db, base, judging);
       out.saved.push({ id: res.item.id, action: res.action, trust: res.item.trust, scopeType: res.item.scopeType });
-      if (res.action === "created" || res.action === "superseded" || res.action === "disputed")
+      // The agent's playbook stays out of the chat (`isPlaybook`); what matters to people is one plain line.
+      if (
+        (res.action === "created" || res.action === "superseded" || res.action === "disputed") &&
+        !isPlaybook(res.item)
+      )
         await recordAgentActions(db, ctx, [
           {
             kind: "memory.saved",
             target: { type: "memory", id: res.item.id },
             params: {
-              text: cutText(res.item.content, 500),
+              text: cutText(res.item.title || res.item.content, 500),
               ...(res.previous && res.action === "superseded"
-                ? { previousText: cutText(res.previous.content, 500) }
+                ? { previousText: cutText(res.previous.title || res.previous.content, 500) }
                 : {}),
             },
             before: res.previous && res.action === "superseded" ? { itemId: res.previous.id } : null,

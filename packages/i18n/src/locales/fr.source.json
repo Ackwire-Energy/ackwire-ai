@@ -8100,6 +8100,15 @@
   "agentPage.memory.saved": {
     "value": "Saved. It counts as verified now."
   },
+  "agentPage.memory.playbook": {
+    "value": "How {{name}} works"
+  },
+  "agentPage.memory.playbookNote": {
+    "value": "Ways of working it keeps for itself. They don't show in the chat; what it doesn't use again leaves on its own and stays in Archived."
+  },
+  "agentPage.memory.details": {
+    "value": "Technical details"
+  },
   "agentPage.memory.skills": {
     "value": "Skills it made"
   },
@@ -20789,6 +20798,9 @@
   "connectors.toolChanges.description": {
     "value": "Text"
   },
+  "connectors.toolChanges.input": {
+    "value": "Input"
+  },
   "connectors.toolChanges.field.added": {
     "value": "new"
   },
@@ -20804,14 +20816,11 @@
   "connectors.toolChanges.removed": {
     "value": "Removed"
   },
-  "connectors.toolChanges.acceptOne": {
-    "value": "Accept {{tool}}"
-  },
-  "connectors.toolChanges.input": {
-    "value": "Input"
-  },
   "connectors.toolChanges.accept": {
     "value": "Accept"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.accepted": {
     "value": "{{tool}} updated."

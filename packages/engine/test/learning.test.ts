@@ -3,6 +3,7 @@ import { createFakeErrorReporter } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { ProviderError, systemText } from "@agenteschat/providers";
 import {
+  addChannelMember,
   addRunStep,
   afterTurnDone,
   agentMadeSkills,
@@ -12,13 +13,17 @@ import {
   editContextItem,
   insertMessage,
   isHowTo,
+  isPlaybook,
+  LEARNED_EXPIRE_DAYS,
   learnRun,
   learnTrust,
+  listAgentMemoryRows,
   memoriesFor,
   normalizeSubject,
   postPersonMessage,
   recordContextUse,
   retrieveForRun,
+  SKILL_MIN_SPREAD,
   setSkillLocked,
   shareAcrossAgents,
   type ToolContext,
@@ -201,8 +206,8 @@ describe("agents learn on their own (ADR 0120)", () => {
     ]);
     expect(howTo?.subjectKey).toBe("howto list models northwind the");
     expect(howTo?.evidence.map((e) => e.type)).toEqual(["self"]);
-    expect((await receipts()).map((r) => [r.kind, r.targetId])).toEqual([["memory.saved", howTo?.id ?? ""]]);
-    // Quiet: no memory mark on the person's message.
+    // Its own how-to is its playbook: no receipt in the chat and no memory mark on the person's message.
+    expect(await receipts()).toEqual([]);
     const marks = await memoriesFor(f.db, f.org.id, [{ id: msg.id, channelId: f.general.id, authorType: "person" }]);
     expect(marks.get(msg.id) ?? []).toEqual([]);
   });
@@ -964,5 +969,164 @@ describe("learning guards", () => {
     learnOutput = new ProviderError("429 rate limited", true, 429);
     await expect(learnRun({ ...f.context, errors }, { orgId: f.org.id, runId: again.id })).rejects.toThrow("429");
     expect(errors.reports.length).toBe(1);
+  });
+});
+
+describe("quiet learning (ADR 0120 addendum)", () => {
+  test("its own how-tos and lessons leave no receipt; a fact for people is one line, its plain title", async () => {
+    f = await setup();
+    const { run } = await personRun();
+    await invoke(run, "save_how_to", {
+      title: "Listar os modelos da Northwind",
+      how: `GET ${MODELS_URL} with the bearer key`,
+    });
+    await invoke(run, "remember", {
+      kind: "fact",
+      title: "O escritório fecha às 18h",
+      content: "Office hours end at 18:00 (handbook, section 4).",
+      basis: "found",
+    });
+    const saved = await items();
+    const howTo = saved.find((i) => i.kind === "note");
+    const fact = saved.find((i) => i.kind === "fact");
+    expect([howTo && isPlaybook(howTo), fact && isPlaybook(fact)]).toEqual([true, false]);
+    const rows = await receipts();
+    expect(rows.map((r) => [r.kind, r.targetId, r.params.text])).toEqual([
+      ["memory.saved", fact?.id ?? "", "O escritório fecha às 18h"],
+    ]);
+
+    // The learning job: its own lesson stays quiet too.
+    learnOutput = {
+      items: [
+        {
+          kind: "lesson",
+          scope: "own",
+          about_person: "",
+          title: "Conferir a chave antes de chamar a API",
+          content: "Check NORTHWIND_KEY is set before calling /v1/models; a missing key answers 401.",
+          refs: ["m1"],
+        },
+      ],
+      skill_fixes: [],
+    };
+    const { run: next } = await personRun("@dev and the models?");
+    const out = await learnRun(f.context, { orgId: f.org.id, runId: next.id });
+    expect(out.saved).toHaveLength(1);
+    expect((await receipts()).length).toBe(1);
+  });
+
+  test("a low-trust note, lesson or fact never used again is archived after the expiry; anything else stays", async () => {
+    expect(LEARNED_EXPIRE_DAYS).toBe(14);
+    f = await setup();
+    const day = 86_400_000;
+    const item = (content: string, over: Partial<typeof schema.contextItems.$inferInsert> = {}) => ({
+      orgId: f.org.id,
+      kind: "lesson" as const,
+      scopeType: "agent",
+      scopeId: f.agent.id,
+      agentId: f.agent.id,
+      subjectKey: content.toLowerCase(),
+      content,
+      channelIds: [f.general.id],
+      trust: "low" as const,
+      verified: false,
+      createdByKind: "agent",
+      createdAt: new Date(Date.now() - (LEARNED_EXPIRE_DAYS + 1) * day),
+      ...over,
+    });
+    await f.db
+      .insert(schema.contextItems)
+      .values([
+        item("fleeting lesson"),
+        item("fleeting fact", { kind: "fact" }),
+        item("fresh lesson", { createdAt: new Date(Date.now() - (LEARNED_EXPIRE_DAYS - 1) * day) }),
+        item("used lesson", { useCount: 1 }),
+        item("trusted lesson", { trust: "high" }),
+        item("a person's lesson", { createdByKind: "person" }),
+        item("pinned lesson", { pinned: true }),
+        item("its preference", { kind: "preference" }),
+      ]);
+    const res = await consolidateOrg(f.context, f.org.id);
+    expect(res.expired).toBe(2);
+    const status = Object.fromEntries((await items()).map((i) => [i.content, i.status]));
+    expect(status).toEqual({
+      "fleeting lesson": "archived",
+      "fleeting fact": "archived",
+      "fresh lesson": "active",
+      "used lesson": "active",
+      "trusted lesson": "active",
+      "a person's lesson": "active",
+      "pinned lesson": "active",
+      "its preference": "active",
+    });
+  });
+
+  test("a how-to reused in one conversation on one day stays a note; a use in a second one makes it a skill", async () => {
+    expect(SKILL_MIN_SPREAD).toBe(2);
+    f = await setup();
+    const { run, msg } = await personRun();
+    await invoke(run, "save_how_to", { title: "List the Northwind models", how: `GET ${MODELS_URL} with the key` });
+    const [note] = await items();
+    if (!note) throw new Error("no note");
+    const use = async (threadRootId: string) => {
+      const { run: used } = await personRun("@dev the northwind models again");
+      await f.db.update(schema.agentRuns).set({ threadRootId }).where(eq(schema.agentRuns.id, used.id));
+      await addRunStep(f.db, used, "context", { memoryItems: [note.id] });
+      await recordContextUse(f.db, f.org.id, used.id, [note.id]);
+      await afterTurnDone(f.context, { ...used, threadRootId }, { judged: true, signal: "none" });
+    };
+    for (let i = 0; i < 3; i++) await use(msg.id);
+    await consolidateOrg(f.context, f.org.id);
+    expect(await f.db.select().from(schema.skills)).toEqual([]);
+    expect((await items())[0]?.status).toBe("active");
+
+    const { msg: other } = await personRun("@dev another conversation");
+    await use(other.id);
+    await consolidateOrg(f.context, f.org.id);
+    expect((await f.db.select().from(schema.skills)).map((s) => s.ownerAgentId)).toEqual([f.agent.id]);
+  });
+
+  test("nobody is asked to confirm its technical lessons; its playbook is listed only for its owner and admins", async () => {
+    f = await setup();
+    await f.db.insert(schema.contextItems).values([
+      {
+        orgId: f.org.id,
+        kind: "lesson",
+        scopeType: "agent",
+        scopeId: f.agent.id,
+        agentId: f.agent.id,
+        subjectKey: "deploy order",
+        title: "Publicar o banco antes do site",
+        content: "Run supabase db push before vercel deploy; the other order breaks the preview.",
+        channelIds: [],
+        trust: "high",
+        verified: true,
+        confidence: 0.9,
+        relevance: 0.9,
+        recurrence: 3,
+        createdByKind: "agent",
+      },
+      {
+        orgId: f.org.id,
+        kind: "fact",
+        scopeType: "agent",
+        scopeId: f.agent.id,
+        agentId: f.agent.id,
+        subjectKey: "office hours",
+        content: "The office closes at 18:00.",
+        channelIds: [],
+        createdByKind: "agent",
+      },
+    ]);
+    const res = await consolidateOrg(f.context, f.org.id);
+    expect(res.proposals).toBe(0);
+    expect(await f.db.select().from(schema.contextProposals)).toEqual([]);
+
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+    const seen = async (userId: string) =>
+      (await listAgentMemoryRows(f.db, userId, f.org.id, f.agent.id)).items.map((i) => i.kind).sort();
+    expect(await seen(f.owner.id)).toEqual(["fact", "lesson"]);
+    expect(await seen(bia.id)).toEqual(["fact"]);
   });
 });

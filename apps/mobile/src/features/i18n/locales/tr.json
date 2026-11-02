@@ -1141,6 +1141,7 @@
     "uses_other": "{{count}} kez kullanıldı",
     "confirmed": "Bir kişi tarafından onaylandı",
     "unconfirmed": "Henüz onaylanmadı",
+    "details": "Teknik ayrıntılar",
     "before": "Önceki hali: {{text}}",
     "fix": "Düzelt",
     "forgetTitle": "Bu bellek kaydı unutulsun mu?",

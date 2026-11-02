@@ -127,6 +127,12 @@ export const HOW_TO_WORD = "howto";
 export const howToSubject = (title: string) => `${HOW_TO_WORD} ${title}`;
 export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
   i.kind === "note" && i.subjectKey.split(" ").includes(HOW_TO_WORD);
+/**
+ * The agent's playbook (ADR 0120 addendum): how-tos, lessons and notes it wrote for its own work. Quiet in the chat
+ * (no receipt), never a proposal for a person to confirm, its technical text only for the agent's owner and admins.
+ */
+export const isPlaybook = (i: Pick<ContextItem, "kind" | "agentId" | "scopeType" | "createdByKind">) =>
+  !!i.agentId && i.scopeType === "agent" && i.createdByKind === "agent" && (i.kind === "note" || i.kind === "lesson");
 export const howToSql = () =>
   sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
 
@@ -472,9 +478,9 @@ export const itemVisibleIn = (item: Pick<ContextItem, "channelIds">, visible: re
  * as `listContextItems`, so an item learned in a DM or private channel stays there.
  */
 export async function listAgentMemoryRows(db: Database, actorId: string, orgId: string, agentId: string) {
-  await requirePermission(db, actorId, orgId, "read");
-  const visible = await userVisibleChannels(db, orgId, actorId);
-  const items = await db
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const [visible, agent] = await Promise.all([userVisibleChannels(db, orgId, actorId), getAgent(db, orgId, agentId)]);
+  const rows = await db
     .select()
     .from(contextItems)
     .where(
@@ -484,8 +490,13 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
         arrayContained(contextItems.channelIds, visible),
       ),
     );
-  return { items, visible };
+  const playbook = !!agent && readsPlaybook(agent, actorId, membership);
+  return { items: rows.filter((i) => playbook || !isPlaybook(i)), visible };
 }
+
+/** Who reads an agent's playbook (`isPlaybook`): its owner and who manages agents. */
+const readsPlaybook = (agent: { ownerUserId: string | null }, actorId: string, membership: Parameters<typeof can>[0]) =>
+  agent.ownerUserId === actorId || can(membership, "manage_agents");
 
 /**
  * What all the agents know, for a map of the workspace's memory: the current items of agents still here, under the
@@ -509,7 +520,13 @@ export async function listOrgMemoryRows(db: Database, actorId: string, orgId: st
     .orderBy(desc(contextItems.updatedAt))
     .limit(limit);
   // An agent's memory is part of how it works: only for who sees its details.
-  const items = rows.filter((r) => seesAgentDetails(r.agent, actorId, membership)).map((r) => r.item);
+  const items = rows
+    .filter(
+      (r) =>
+        seesAgentDetails(r.agent, actorId, membership) &&
+        (!isPlaybook(r.item) || readsPlaybook(r.agent, actorId, membership)),
+    )
+    .map((r) => r.item);
   return { items, visible };
 }
 

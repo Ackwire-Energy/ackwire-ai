@@ -37,6 +37,7 @@ import {
   howToSql,
   howToSubject,
   isHowTo,
+  isPlaybook,
   supersede,
 } from "./items";
 import { kindFamily, overlap } from "./judgments";
@@ -140,7 +141,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             type: "string",
             minLength: 3,
             maxLength: 120,
-            description: "What it does, e.g. 'List the models of the Acme API'",
+            description:
+              "One plain line a person who doesn't code understands, in the language of the conversation, no paths, code or ids, e.g. 'Listar os modelos da API da Acme'. The technical detail goes in how.",
           },
           how: { type: "string", minLength: 10, maxLength: 1500 },
         },
@@ -263,14 +265,19 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "remember",
       description:
-        'Save what you learned, on your own, as you go: when a person corrects you, states how they want things done (even in passing), or you learn a lasting fact about the company, its people or its systems. Cite what grounds it (basis: person_said when a person in this conversation said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true so you follow it in every conversation (word it without private details from this one). Never credentials, where secrets are kept, or rules about permissions or approvals.',
+        'Save what you learned, on your own, as you go: when a person corrects you, states how they want things done (even in passing), or you learn a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person in this conversation said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true so you follow it in every conversation (word it without private details from this one). Never credentials, where secrets are kept, or rules about permissions or approvals.',
       scope: "memory:write",
       inputSchema: {
         type: "object",
         properties: {
           content: { type: "string", minLength: 3, maxLength: 2000 },
           kind: { type: "string", enum: ["fact", "preference", "decision", "note"] },
-          title: { type: "string", maxLength: 200 },
+          title: {
+            type: "string",
+            maxLength: 200,
+            description:
+              "One plain line a person who doesn't code understands, in the language of the conversation (shown first; content holds the detail).",
+          },
           everywhere: { type: "boolean" },
           basis: { type: "string", enum: ["person_said", "found"] },
         },
@@ -387,15 +394,16 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               createdByKind: requester ? "person" : (item.createdByKind as "agent" | "job"),
               createdById: requester ?? ctx.agentId,
             });
-            await recordAgentActions(tx, ctx, [
-              {
-                kind: "memory.updated",
-                target: { type: "memory", id: row.id },
-                params: { text: cutText(row.content, 500), previousText: cutText(item.content, 500) },
-                before: { itemId: item.id },
-                after: { itemId: row.id },
-              },
-            ]);
+            if (!isPlaybook(row))
+              await recordAgentActions(tx, ctx, [
+                {
+                  kind: "memory.updated",
+                  target: { type: "memory", id: row.id },
+                  params: { text: cutText(row.content, 500), previousText: cutText(item.content, 500) },
+                  before: { itemId: item.id },
+                  after: { itemId: row.id },
+                },
+              ]);
             return row;
           });
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: next.id }).catch(() => {});
@@ -426,15 +434,16 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             .update(contextItems)
             .set({ status: "archived", updatedAt: new Date() })
             .where(eq(contextItems.id, item.id));
-          await recordAgentActions(tx, ctx, [
-            {
-              kind: "memory.forgotten",
-              target: { type: "memory", id: item.id },
-              params: { text: cutText(item.content, 500) },
-              before: { itemId: item.id },
-              after: { itemId: item.id },
-            },
-          ]);
+          if (requester || !isPlaybook(item))
+            await recordAgentActions(tx, ctx, [
+              {
+                kind: "memory.forgotten",
+                target: { type: "memory", id: item.id },
+                params: { text: cutText(item.content, 500) },
+                before: { itemId: item.id },
+                after: { itemId: item.id },
+              },
+            ]);
         });
         await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: item.id }).catch(() => {});
         await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, item).catch(() => {});
@@ -618,17 +627,21 @@ async function triggerAuthor(ctx: ToolContext) {
 const personMayRead = (item: ContextItem | undefined, person: string | null, agentId: string) =>
   !item || ((!item.agentId || item.agentId === agentId) && (item.scopeType !== "person" || item.scopeId === person));
 
-/** A new memory, or a new version of one: a receipt with Undo. The same thing again (merged) has nothing to undo. */
+/**
+ * A new memory, or a new version of one: a receipt with Undo, its line the plain summary (the title). The same thing
+ * again (merged) has nothing to undo; the agent's playbook has no receipt (`isPlaybook`), it lives in the Memory tab.
+ */
 async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
   if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return;
+  if (isPlaybook(res.item)) return;
   const replaced = res.action === "superseded" ? res.previous : undefined;
   await recordAgentActions(ctx.db, ctx, [
     {
       kind: "memory.saved",
       target: { type: "memory", id: res.item.id },
       params: {
-        text: cutText(res.item.content, 500),
-        ...(replaced ? { previousText: cutText(replaced.content, 500) } : {}),
+        text: cutText(res.item.title || res.item.content, 500),
+        ...(replaced ? { previousText: cutText(replaced.title || replaced.content, 500) } : {}),
       },
       before: replaced ? { itemId: replaced.id } : null,
       after: { itemId: res.item.id },

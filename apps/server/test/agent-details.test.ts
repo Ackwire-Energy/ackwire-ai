@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { schema } from "@agenteschat/db";
 import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -146,4 +147,49 @@ test("what the agents know of the workspace is only for who configures it", asyn
   expect(((await (await owner(org)).json()) as { context: string }).context).toBe("Acme builds rockets.");
   // Changing it stays admins'.
   expect((await bia(`${org}/settings`, { method: "PATCH", json: { context: "x" } })).status).toBe(403);
+});
+
+test("an agent's playbook comes with its plain summary, only for its owner and admins", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const org = `/api/app/organizations/${orgId}`;
+  const made = await owner(`${org}/agents`, {
+    json: { name: "Ana", handle: "ana", instructions: "Answer support questions." },
+  });
+  const ana = (await made.json()) as { id: string };
+  const item = (kind: "note" | "fact", title: string, content: string) => ({
+    orgId,
+    kind,
+    scopeType: "agent",
+    scopeId: ana.id,
+    agentId: ana.id,
+    subjectKey: title.toLowerCase(),
+    title,
+    content,
+    channelIds: [],
+    createdByKind: "agent",
+  });
+  await t.db
+    .insert(schema.contextItems)
+    .values([
+      item("note", "Como gravar senhas sem expô-las", "supabase secrets set KEY=…; read it with Deno.env.get"),
+      item("fact", "", "The office closes at 18:00."),
+    ]);
+  type Mem = { text: string; summary: string | null; playbook: boolean };
+  const list = async (b: typeof owner) =>
+    ((await (await b(`${org}/agents/${ana.id}/memories`)).json()) as { memories: Mem[] }).memories
+      .map((m) => ({ text: m.text, summary: m.summary, playbook: m.playbook }))
+      .sort((a, b) => a.text.localeCompare(b.text));
+  expect(await list(owner)).toEqual([
+    {
+      text: "supabase secrets set KEY=…; read it with Deno.env.get",
+      summary: "Como gravar senhas sem expô-las",
+      playbook: true,
+    },
+    { text: "The office closes at 18:00.", summary: null, playbook: false },
+  ]);
+  expect(await list(bia)).toEqual([{ text: "The office closes at 18:00.", summary: null, playbook: false }]);
 });

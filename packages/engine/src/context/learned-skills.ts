@@ -146,6 +146,11 @@ export async function revertSkillChange(db: Database, actorId: string, orgId: st
 const PROMOTE_MIN_RELEVANCE = 0.5;
 /** How-tos of the same agent this alike (`overlap` of subjects) go into the same skill. */
 const SAME_PROCEDURE = 0.5;
+/**
+ * A how-to becomes a skill only once used in finished runs of at least this many conversations, or on this many
+ * days: one long conversation that keeps carrying it is not reuse (ADR 0120 addendum).
+ */
+export const SKILL_MIN_SPREAD = 2;
 /** Agent-made skills unused this long are archived (restorable), never deleted. */
 export const SKILL_ARCHIVE_AFTER_DAYS = 30;
 
@@ -167,8 +172,9 @@ const SKILL_SCHEMA = {
 /**
  * How-tos reused enough become a skill of their agent (ADR 0120): a note with `recurrence` (plus 2 per positive
  * outcome of a run that used it) at least `skillAfter`, high trust, not disputed, relevant, and no negative outcome
- * of a run that used it (that one is marked disputed instead). One summary-model call per promoted cluster; the
- * skill is the agent's alone (people share it in Skills), its notes archived (restorable).
+ * of a run that used it (that one is marked disputed instead), used in finished runs across `SKILL_MIN_SPREAD`
+ * conversations or days. One summary-model call per promoted cluster; the skill is the agent's alone (people share it
+ * in Skills), its notes archived (restorable).
  */
 export async function promoteHowTos(deps: ContextDeps, orgId: string, skillAfter: number) {
   const { db } = deps;
@@ -185,17 +191,26 @@ export async function promoteHowTos(deps: ContextDeps, orgId: string, skillAfter
       ),
     );
   if (notes.length === 0) return 0;
+  const ids = sql.join(
+    notes.map((n) => sql`${n.id}::uuid`),
+    sql`, `,
+  );
   const tally = rowsOf<{ item_id: string; positive: number; negative: number }>(
     await db.execute(sql`select u.item_id,
         count(*) filter (where o.polarity = 'positive')::int as positive,
         count(*) filter (where o.polarity = 'negative')::int as negative
       from ${contextUsage} u join ${outcomes} o on o.run_id = u.run_id and o.org_id = u.org_id
-      where u.org_id = ${orgId}::uuid and u.item_id in (${sql.join(
-        notes.map((n) => sql`${n.id}::uuid`),
-        sql`, `,
-      )})
+      where u.org_id = ${orgId}::uuid and u.item_id in (${ids})
       group by u.item_id`),
   );
+  const spread = rowsOf<{ item_id: string; n: number }>(
+    await db.execute(sql`select u.item_id,
+        greatest(count(distinct (r.channel_id, r.thread_root_id)), count(distinct (r.created_at at time zone 'utc')::date))::int as n
+      from ${contextUsage} u join ${agentRuns} r on r.id = u.run_id and r.org_id = u.org_id
+      where u.org_id = ${orgId}::uuid and r.status = 'done' and u.item_id in (${ids})
+      group by u.item_id`),
+  );
+  const spreadOf = new Map(spread.map((r) => [r.item_id, r.n]));
   const byItem = new Map(tally.map((t) => [t.item_id, t]));
   const negative = notes.filter((n) => (byItem.get(n.id)?.negative ?? 0) > 0 && !n.disputed);
   if (negative.length > 0)
@@ -214,6 +229,7 @@ export async function promoteHowTos(deps: ContextDeps, orgId: string, skillAfter
     if (done.has(note.id) || note.trust !== "high" || note.disputed || note.relevance < PROMOTE_MIN_RELEVANCE) continue;
     const t = byItem.get(note.id);
     if ((t?.negative ?? 0) > 0 || note.recurrence + 2 * (t?.positive ?? 0) < skillAfter) continue;
+    if ((spreadOf.get(note.id) ?? 0) < SKILL_MIN_SPREAD) continue;
     const cluster = notes.filter(
       (n) =>
         !done.has(n.id) &&

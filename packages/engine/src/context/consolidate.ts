@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNull, lt, lte, or, schema, sql } from "@agenteschat/db";
 import { enqueue } from "../outbox";
 import {
   type ContextItem,
+  isPlaybook,
   isVerified,
   mergeEvidence,
   type NewContextItem,
@@ -21,6 +22,12 @@ const { contextItems, messages, threadReflections, channels } = schema;
 export const DECAY = { factor: 0.95, unusedDays: 7, archiveBelow: 0.1, archiveAfterDays: 30 };
 
 /**
+ * A low-trust note, lesson or fact an agent saved on its own and never used again this long after is archived
+ * (restorable in the Memory tab): a fleeting lesson doesn't stay (ADR 0120 addendum).
+ */
+export const LEARNED_EXPIRE_DAYS = 14;
+
+/**
  * Periodic job `context.consolidate` per organization:
  * 1. dedupe near-identical active items in the same scope (the older keeps
  *    the evidence of both; the newer is archived, pointing at it);
@@ -32,8 +39,9 @@ export const DECAY = { factor: 0.95, unusedDays: 7, archiveBelow: 0.1, archiveAf
  *    never decay; archived ones stay reachable through `expand`);
  * 3. refresh last week's period summaries of busy channels;
  * 4. propose promotions for items that became strong enough;
- * 5. what agents learned (ADR 0120): how-tos reused enough become skills, what two agents learned alike becomes the
- *    team's, agent-made skills unused for a month are archived.
+ * 5. what agents learned (ADR 0120): low-trust lessons never reused in `LEARNED_EXPIRE_DAYS` are archived, how-tos
+ *    reused enough become skills, what two agents learned alike becomes the team's, agent-made skills unused for a
+ *    month are archived.
  */
 export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new Date()) {
   const { db } = deps;
@@ -118,7 +126,25 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
       ),
     )
     .returning({ id: contextItems.id });
-  for (const s of stale)
+  const fleeting = await db
+    .update(contextItems)
+    .set({ status: "archived", updatedAt: now })
+    .where(
+      and(
+        eq(contextItems.orgId, orgId),
+        eq(contextItems.status, "active"),
+        eq(contextItems.pinned, false),
+        eq(contextItems.trust, "low"),
+        eq(contextItems.createdByKind, "agent"),
+        sql`${contextItems.agentId} is not null`,
+        inArray(contextItems.kind, ["note", "lesson", "fact"]),
+        eq(contextItems.useCount, 0),
+        lte(contextItems.recurrence, 1),
+        lt(contextItems.createdAt, new Date(now.getTime() - LEARNED_EXPIRE_DAYS * 86_400_000)),
+      ),
+    )
+    .returning({ id: contextItems.id });
+  for (const s of [...stale, ...fleeting])
     await enqueue(db, { orgId, kind: "search.index", payload: { kind: "context_item", sourceId: s.id } });
 
   // Last week's summary per channel that was busy (≥ 30 messages).
@@ -153,11 +179,21 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
         inArray(contextItems.kind, ["lesson", "preference", "decision", "fact"]),
       ),
     );
-  for (const item of candidates) if (await proposeFromItem(deps, item)) proposals++;
+  // Nobody is asked to confirm the agent's own technical lessons (its playbook).
+  for (const item of candidates) if (!isPlaybook(item) && (await proposeFromItem(deps, item))) proposals++;
   const skills = await promoteHowTos(deps, orgId, learnConfig(deps).skillAfter).catch(() => 0);
   const shared = await shareAcrossAgents(deps, orgId).catch(() => 0);
   const skillsArchived = await decayAgentSkills(deps, orgId, now).catch(() => 0);
-  return { merged, archived: stale.length, proposals, linked: judged.linked, skills, shared, skillsArchived };
+  return {
+    merged,
+    archived: stale.length,
+    expired: fleeting.length,
+    proposals,
+    linked: judged.linked,
+    skills,
+    shared,
+    skillsArchived,
+  };
 }
 
 /** Items re-judged per org and run, and how far back "recent" goes (a missed day is caught up). */

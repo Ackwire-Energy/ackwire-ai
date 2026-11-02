@@ -1571,6 +1571,10 @@ export interface Memory {
   learned?: boolean;
   /** A how-to it worked out. */
   howTo?: boolean;
+  /** One plain line to show first; `text` holds the detail. */
+  summary?: string | null;
+  /** Its own how-tos, lessons and notes ("Como ela trabalha"): no receipt in the chat. */
+  playbook?: boolean;
   /** Another memory says otherwise, until a person decides. */
   disputed?: boolean;
   /** Where it was learned. */
