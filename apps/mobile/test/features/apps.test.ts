@@ -111,10 +111,10 @@ describe("Apps de IA on the phone (ADR 0119)", () => {
     expect(ready?.available && ready.prompt).toStartWith("Conecte https://app.agentes.chat/mcp e, para cada agente");
   });
 
-  test("the consent picks the widest access the app asked for", () => {
+  test("the consent picks write when asked, never manage: that one is opt-in", () => {
     const consent = (requested: ("read" | "write" | "manage")[]) =>
       ({ request: { access: { requested } } }) as Parameters<typeof requestedAccess>[0];
-    expect(requestedAccess(consent(["read", "write", "manage"]))).toBe("manage");
+    expect(requestedAccess(consent(["read", "write", "manage"]))).toBe("write");
     expect(requestedAccess(consent(["read", "write"]))).toBe("write");
     expect(requestedAccess(consent(["read"]))).toBe("read");
   });

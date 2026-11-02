@@ -53,9 +53,12 @@ export function appName(name: string): { short: string; full: string | null } {
   return { short: `${chars.slice(0, APP_NAME_CHARS).join("").trimEnd()}…`, full: name.trim() };
 }
 
-/** The access a consent pre-selects: the widest the app asked for. */
+/**
+ * The access a consent pre-selects: `write` when asked, else `read`. Never `manage`, even when asked (every client
+ * asks for it by default): creating and editing agents is something the person opts into.
+ */
 export const requestedAccess = (consent: AppConsent): AppAccess =>
-  (["manage", "write"] as const).find((a) => consent.request.access.requested.includes(a)) ?? "read";
+  consent.request.access.requested.includes("write") ? "write" : "read";
 
 /** What an app's creations are counted by, in the order its notice names them. */
 const CREATED_KINDS = ["agent", "routine", "skill", "memory", "channel"] as const;
