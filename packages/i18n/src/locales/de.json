@@ -4451,7 +4451,19 @@
       "intro": "Wer sie übernimmt, Person oder Agent, erscheint mit dem Fortschritt auf dem Board.",
       "criteriaFound_one": "{{count}} Akzeptanzkriterium",
       "criteriaFound_other": "{{count}} Akzeptanzkriterien",
-      "agentStarts": "{{name}} beginnt, sobald die Aufgabe erstellt ist. Alles Sensible fragt nach deiner Freigabe."
+      "agentStarts": "{{name}} beginnt, sobald die Aufgabe erstellt ist. Alles Sensible fragt nach deiner Freigabe.",
+      "agentStartsAll": "{{name}} beginnt, sobald die Aufgabe erstellt ist, mit der Beschreibung, den Kriterien und den Anhängen. Alles Sensible fragt nach deiner Freigabe.",
+      "titleShort": "Titel der Aufgabe",
+      "quickPlaceholder": "Beschreib, was gebraucht wird. Screenshots einfügen, Dateien hineinziehen. Zeilen, die mit „-“ beginnen, werden zu Akzeptanzkriterien.",
+      "pasteHint": "Füg einen Screenshot mit {{keys}} ein oder zieh Dateien hierher.",
+      "expand": "Vollständiges Formular öffnen",
+      "collapse": "Zurück zum schnellen Formular",
+      "another": "Noch eine erstellen",
+      "addCriterion": "Kriterium hinzufügen",
+      "removeCriterion": "Kriterium entfernen",
+      "drop": "Loslassen, um es an die Aufgabe anzuhängen",
+      "dropText": "Fotos, Videos, PDFs, Tabellen… bis zu {{max}} MB pro Datei.",
+      "createHint": "{{keys}} erstellt die Aufgabe"
     },
     "back": "Aufgaben",
     "notFound": "Diese Aufgabe gibt es nicht, oder du hast keinen Zugriff.",
@@ -4474,6 +4486,8 @@
     "asked": "Anfrage gesendet. {{name}} postet den Fortschritt hier. Eure Unterhaltung bleibt in deiner Direktnachricht.",
     "activity": "Aktivität",
     "noActivity": "Noch nichts.",
+    "discussion": "Diskussion",
+    "noComments": "Noch keine Kommentare.",
     "comment": "Aufgabe kommentieren",
     "commentPlaceholder": "Kommentar · mit @ rufst du einen Agent",
     "send": "Kommentieren",
@@ -4489,6 +4503,26 @@
     "noLinks": "Noch nichts verknüpft.",
     "openConversation": "Unterhaltung ansehen",
     "labels": "Labels",
+    "tabs": {
+      "label": "Bereiche der Aufgabe",
+      "details": "Übersicht",
+      "files": "Anhänge",
+      "history": "Verlauf"
+    },
+    "files": {
+      "title": "Anhänge",
+      "add": "Dateien hinzufügen",
+      "addHint": "oder hierher ziehen",
+      "grid": "Raster",
+      "empty": "Noch keine Anhänge. Zieh Dateien hierher oder füg einen Screenshot ein.",
+      "fromCreation": "Beim Erstellen · {{when}}",
+      "fromComment": "Kommentar von {{name}} · {{when}}",
+      "linked": "Verknüpft von {{name}}"
+    },
+    "history": {
+      "commented": "hat kommentiert",
+      "commentedFiles": "hat mit Anhängen kommentiert"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "hat die Hintergrundarbeit gestoppt",

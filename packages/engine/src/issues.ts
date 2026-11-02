@@ -534,13 +534,20 @@ export async function createIssue(
   deps: IssueDeps,
   actor: IssueActor,
   orgId: string,
-  input: IssueInput & { source?: IssueSource; channelId?: string | null; parentIssueId?: string | null },
+  input: IssueInput & {
+    source?: IssueSource;
+    channelId?: string | null;
+    parentIssueId?: string | null;
+    /** Drive files uploaded from the new-issue box: linked to the issue and kept on its "created" event. */
+    attachmentIds?: string[];
+  },
 ): Promise<IssueView> {
   const { db } = deps;
   const membership = await requireOrgMember(db, actor, orgId);
   if (membership && !can(membership, "post")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, 300);
   if (!title) throw new ValidationError("title is required");
+  const files = await ownFiles(db, actor, orgId, input.attachmentIds);
   if (input.priority && !PRIORITIES.includes(input.priority)) throw new ValidationError("invalid priority");
   await checkAssignee(db, orgId, input.assignee);
   const criteria = (input.criteria ?? [])
@@ -581,12 +588,19 @@ export async function createIssue(
         source: source as unknown as Record<string, unknown>,
         channelId: input.channelId ?? null,
         parentIssueId: input.parentIssueId ?? null,
+        ...(files.length ? { artifactIds: files.map((f) => f.id) } : {}),
         createdByType: author.type,
         createdById: author.id,
       })
       .returning();
     if (!issue) throw new Error("issue insert returned nothing");
-    await addActivity(tx, issue, { kind: "event", author, text: "created the issue", event: "created" });
+    await addActivity(tx, issue, {
+      kind: "event",
+      author,
+      text: "created the issue",
+      event: "created",
+      ...(files.length ? { data: { attachments: files } } : {}),
+    });
     await enqueueIndex(tx, { orgId, kind: "issue", sourceId: issue.id });
     if (issue.description.includes("[[")) {
       await syncWikiLinks(tx, orgId, { type: "issue", id: issue.id, channelId: issue.channelId }, issue.description);
@@ -972,6 +986,30 @@ export async function listIssueActivity(db: Database, actor: IssueActor, orgId: 
   return rows.map(activityView);
 }
 
+
+/**
+ * Files attached from a box (new issue, comment): at most 10, in the org, not in the trash and uploaded by
+ * this author, so an id alone can't pull someone else's file into an issue.
+ */
+async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachmentIds: string[] | undefined) {
+  const ids = [...new Set(attachmentIds ?? [])].slice(0, 10);
+  if (ids.length === 0) return [];
+  const files = await db
+    .select({ id: artifacts.id, title: artifacts.title })
+    .from(artifacts)
+    .where(
+      and(
+        eq(artifacts.orgId, orgId),
+        inArray(artifacts.id, ids),
+        isNull(artifacts.deletedAt),
+        eq(artifacts.createdByType, actorOf(actor).type),
+        eq(artifacts.createdById, actorOf(actor).id),
+      ),
+    );
+  if (files.length !== ids.length) throw new ValidationError("An attached file does not exist");
+  // In the order they were attached.
+  return ids.flatMap((id) => files.filter((f) => f.id === id));
+}
 /**
  * A comment by a person or an agent (agents report progress this way). It may
  * carry Drive files (uploaded from the comment box): they show on the comment
@@ -986,25 +1024,9 @@ export async function commentIssue(
   options: { attachmentIds?: string[] } = {},
 ) {
   const body = text.trim().slice(0, 20_000);
-  const ids = [...new Set(options.attachmentIds ?? [])].slice(0, 10);
-  if (!body && ids.length === 0) throw new ValidationError("Comment is empty");
+  if (!body && (options.attachmentIds ?? []).length === 0) throw new ValidationError("Comment is empty");
   const issue = await findVisible(deps.db, actor, orgId, { id: issueId });
-  const files = ids.length
-    ? await deps.db
-        .select({ id: artifacts.id, title: artifacts.title })
-        .from(artifacts)
-        // Only files this author uploaded (from the comment box): an id alone can't pull in someone else's file.
-        .where(
-          and(
-            eq(artifacts.orgId, orgId),
-            inArray(artifacts.id, ids),
-            isNull(artifacts.deletedAt),
-            eq(artifacts.createdByType, actorOf(actor).type),
-            eq(artifacts.createdById, actorOf(actor).id),
-          ),
-        )
-    : [];
-  if (files.length !== ids.length) throw new ValidationError("An attached file does not exist");
+  const files = await ownFiles(deps.db, actor, orgId, options.attachmentIds);
   const row = await deps.db.transaction(async (tx) => {
     const a = await addActivity(tx, issue, {
       kind: "comment",

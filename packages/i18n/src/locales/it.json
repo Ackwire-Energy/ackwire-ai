@@ -4640,7 +4640,19 @@
       "criteriaFound_many": "{{count}} criteri di accettazione",
       "criteriaFound_other": "{{count}} criteri di accettazione",
       "agentStarts": "{{name}} inizia appena l'attività viene creata. Tutto ciò che è sensibile chiede la tua approvazione.",
-      "agentStarts_female": "{{name}} inizia appena l'attività viene creata. Tutto ciò che è sensibile chiede la tua approvazione."
+      "agentStarts_female": "{{name}} inizia appena l'attività viene creata. Tutto ciò che è sensibile chiede la tua approvazione.",
+      "agentStartsAll": "{{name}} inizia appena l'attività viene creata, con la descrizione, i criteri e gli allegati. Tutto ciò che è sensibile chiede la tua approvazione.",
+      "titleShort": "Titolo dell'attività",
+      "quickPlaceholder": "Descrivi cosa serve. Incolla screenshot, trascina file. Le righe che iniziano con “-” diventano criteri di accettazione.",
+      "pasteHint": "Incolla uno screenshot con {{keys}} o trascina qui i file.",
+      "expand": "Apri il modulo completo",
+      "collapse": "Torna al modulo rapido",
+      "another": "Creane un'altra",
+      "addCriterion": "Aggiungi un criterio",
+      "removeCriterion": "Togli il criterio",
+      "drop": "Rilascia per allegare all'attività",
+      "dropText": "Foto, video, PDF, fogli di calcolo… fino a {{max}} MB ciascuno.",
+      "createHint": "{{keys}} crea l'attività"
     },
     "back": "Attività",
     "notFound": "Questa attività non esiste o non hai accesso.",
@@ -4666,6 +4678,8 @@
     "asked_female": "Richiesta inviata. {{name}} pubblica qui i progressi. La tua conversazione resta nel tuo messaggio diretto.",
     "activity": "Attività recenti",
     "noActivity": "Ancora niente.",
+    "discussion": "Discussione",
+    "noComments": "Ancora nessun commento.",
     "comment": "Commenta l'attività",
     "commentPlaceholder": "Commenta · usa @ per chiamare un agente",
     "send": "Commenta",
@@ -4681,6 +4695,26 @@
     "noLinks": "Ancora niente di collegato.",
     "openConversation": "Vedi conversazione",
     "labels": "Etichette",
+    "tabs": {
+      "label": "Sezioni dell'attività",
+      "details": "Dettagli",
+      "files": "Allegati",
+      "history": "Cronologia"
+    },
+    "files": {
+      "title": "Allegati",
+      "add": "Aggiungi file",
+      "addHint": "o trascinali qui",
+      "grid": "Griglia",
+      "empty": "Ancora nessun allegato. Trascina qui i file o incolla uno screenshot.",
+      "fromCreation": "Alla creazione · {{when}}",
+      "fromComment": "Commento di {{name}} · {{when}}",
+      "linked": "Collegato da {{name}}"
+    },
+    "history": {
+      "commented": "ha commentato",
+      "commentedFiles": "ha commentato con allegati"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "ha fermato il lavoro in background",

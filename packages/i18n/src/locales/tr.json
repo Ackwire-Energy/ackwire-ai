@@ -4414,7 +4414,19 @@
       "intro": "Onu alan, kişi ya da ajan, ilerlemesiyle birlikte panoda görünür.",
       "criteriaFound_one": "{{count}} kabul kriteri",
       "criteriaFound_other": "{{count}} kabul kriteri",
-      "agentStarts": "{{name}} görev oluşturulur oluşturulmaz başlar. Hassas olan her şey onayınızı ister."
+      "agentStarts": "{{name}} görev oluşturulur oluşturulmaz başlar. Hassas olan her şey onayınızı ister.",
+      "agentStartsAll": "{{name}} görev oluşturulur oluşturulmaz açıklama, kriterler ve eklerle başlar. Hassas olan her şey onayınızı ister.",
+      "titleShort": "Görevin başlığı",
+      "quickPlaceholder": "Neye ihtiyaç olduğunu yazın. Ekran görüntüsü yapıştırın, dosya sürükleyin. “-” ile başlayan satırlar kabul kriteri olur.",
+      "pasteHint": "{{keys}} ile bir ekran görüntüsü yapıştırın ya da dosyaları buraya sürükleyin.",
+      "expand": "Tam formu aç",
+      "collapse": "Hızlı forma dön",
+      "another": "Bir tane daha oluştur",
+      "addCriterion": "Kriter ekle",
+      "removeCriterion": "Kriteri kaldır",
+      "drop": "Göreve eklemek için bırakın",
+      "dropText": "Fotoğraf, video, PDF, tablo… dosya başına en fazla {{max}} MB.",
+      "createHint": "{{keys}} görevi oluşturur"
     },
     "back": "Görevler",
     "notFound": "Bu görev yok ya da erişiminiz yok.",
@@ -4437,6 +4449,8 @@
     "asked": "İstek gönderildi. {{name}} ilerlemeyi buraya yazar. Konuşmanız doğrudan mesajınızda kalır.",
     "activity": "Etkinlik",
     "noActivity": "Henüz bir şey yok.",
+    "discussion": "Tartışma",
+    "noComments": "Henüz yorum yok.",
     "comment": "Göreve yorum yap",
     "commentPlaceholder": "Yorum · bir ajanı çağırmak için @ kullanın",
     "send": "Yorum yap",
@@ -4452,6 +4466,26 @@
     "noLinks": "Henüz bağlantılı bir şey yok.",
     "openConversation": "Konuşmayı gör",
     "labels": "Etiketler",
+    "tabs": {
+      "label": "Görevin bölümleri",
+      "details": "Ayrıntılar",
+      "files": "Ekler",
+      "history": "Geçmiş"
+    },
+    "files": {
+      "title": "Ekler",
+      "add": "Dosya ekle",
+      "addHint": "ya da buraya sürükleyin",
+      "grid": "Izgara",
+      "empty": "Henüz ek yok. Dosyaları buraya sürükleyin ya da bir ekran görüntüsü yapıştırın.",
+      "fromCreation": "Oluşturulurken · {{when}}",
+      "fromComment": "{{name}} yorumu · {{when}}",
+      "linked": "{{name}} bağladı"
+    },
+    "history": {
+      "commented": "yorum yaptı",
+      "commentedFiles": "eklerle yorum yaptı"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "arka plandaki çalışmayı durdurdu",

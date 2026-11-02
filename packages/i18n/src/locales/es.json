@@ -4583,7 +4583,19 @@
       "criteriaFound_many": "{{count}} criterios de aceptación",
       "criteriaFound_other": "{{count}} criterios de aceptación",
       "agentStarts": "{{name}} empieza en cuanto se crea la tarea. Todo lo sensible pide tu aprobación.",
-      "agentStarts_female": "{{name}} empieza en cuanto se crea la tarea. Todo lo sensible pide tu aprobación."
+      "agentStarts_female": "{{name}} empieza en cuanto se crea la tarea. Todo lo sensible pide tu aprobación.",
+      "agentStartsAll": "{{name}} empieza en cuanto se crea la tarea, con la descripción, los criterios y los adjuntos. Todo lo sensible pide tu aprobación.",
+      "titleShort": "Título de la tarea",
+      "quickPlaceholder": "Describe lo que hace falta. Pega capturas, arrastra archivos. Las líneas que empiezan con “-” se convierten en criterios de aceptación.",
+      "pasteHint": "Pega una captura con {{keys}} o arrastra archivos aquí.",
+      "expand": "Abrir el formulario completo",
+      "collapse": "Volver al formulario rápido",
+      "another": "Crear otra",
+      "addCriterion": "Agregar un criterio",
+      "removeCriterion": "Quitar el criterio",
+      "drop": "Suelta para adjuntar a la tarea",
+      "dropText": "Fotos, videos, PDF, hojas de cálculo… hasta {{max}} MB cada uno.",
+      "createHint": "{{keys}} crea la tarea"
     },
     "back": "Tareas",
     "notFound": "Esta tarea no existe o no tienes acceso.",
@@ -4609,6 +4621,8 @@
     "asked_female": "Pedido enviado. {{name}} publica el avance aquí. Tu conversación se queda en tu mensaje directo.",
     "activity": "Actividad",
     "noActivity": "Nada todavía.",
+    "discussion": "Conversación",
+    "noComments": "Todavía no hay comentarios.",
     "comment": "Comentar la tarea",
     "commentPlaceholder": "Comenta · usa @ para llamar a un agente",
     "send": "Comentar",
@@ -4624,6 +4638,26 @@
     "noLinks": "Todavía no hay nada vinculado.",
     "openConversation": "Ver conversación",
     "labels": "Etiquetas",
+    "tabs": {
+      "label": "Partes de la tarea",
+      "details": "Detalles",
+      "files": "Adjuntos",
+      "history": "Historial"
+    },
+    "files": {
+      "title": "Adjuntos",
+      "add": "Agregar archivos",
+      "addHint": "o arrástralos aquí",
+      "grid": "Cuadrícula",
+      "empty": "Todavía no hay adjuntos. Arrastra archivos aquí o pega una captura.",
+      "fromCreation": "Al crearla · {{when}}",
+      "fromComment": "Comentario de {{name}} · {{when}}",
+      "linked": "Vinculado por {{name}}"
+    },
+    "history": {
+      "commented": "comentó",
+      "commentedFiles": "comentó con adjuntos"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "detuvo el trabajo en segundo plano",

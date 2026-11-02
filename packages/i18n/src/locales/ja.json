@@ -4289,7 +4289,19 @@
       "created": "タスク #{{number}}を作成しました。",
       "intro": "担当する人やエージェントは、進捗とともにボードに表示されます。",
       "criteriaFound_other": "受け入れ条件{{count}}件",
-      "agentStarts": "タスクが作成されると、{{name}}がすぐに始めます。重要な操作はあなたの承認を求めます。"
+      "agentStarts": "タスクが作成されると、{{name}}がすぐに始めます。重要な操作はあなたの承認を求めます。",
+      "agentStartsAll": "タスクが作成されると、{{name}}が説明、受け入れ条件、添付ファイルを受け取ってすぐに始めます。重要な操作はあなたの承認を求めます。",
+      "titleShort": "タスクのタイトル",
+      "quickPlaceholder": "必要なことを書いてください。スクリーンショットの貼り付けやファイルのドロップもできます。「-」で始まる行は受け入れ条件になります。",
+      "pasteHint": "{{keys}}でスクリーンショットを貼り付けるか、ここにファイルをドロップしてください。",
+      "expand": "詳しいフォームを開く",
+      "collapse": "かんたんフォームに戻る",
+      "another": "続けて作成",
+      "addCriterion": "条件を追加",
+      "removeCriterion": "条件を削除",
+      "drop": "ドロップしてタスクに添付",
+      "dropText": "写真、動画、PDF、スプレッドシートなど。1ファイル{{max}} MBまで。",
+      "createHint": "{{keys}}でタスクを作成"
     },
     "back": "タスク",
     "notFound": "このタスクは存在しないか、アクセス権がありません。",
@@ -4312,6 +4324,8 @@
     "asked": "依頼を送りました。{{name}}がここに進捗を投稿します。あなたとのやり取りはDMに残ります。",
     "activity": "アクティビティ",
     "noActivity": "まだ何もありません。",
+    "discussion": "ディスカッション",
+    "noComments": "まだコメントはありません。",
     "comment": "タスクにコメント",
     "commentPlaceholder": "コメント · @でエージェントを呼べます",
     "send": "コメント",
@@ -4327,6 +4341,26 @@
     "noLinks": "リンクされたものはまだありません。",
     "openConversation": "会話を見る",
     "labels": "ラベル",
+    "tabs": {
+      "label": "タスクのセクション",
+      "details": "詳細",
+      "files": "添付ファイル",
+      "history": "履歴"
+    },
+    "files": {
+      "title": "添付ファイル",
+      "add": "ファイルを追加",
+      "addHint": "またはここにドロップ",
+      "grid": "グリッド",
+      "empty": "まだ添付ファイルはありません。ここにファイルをドロップするか、スクリーンショットを貼り付けてください。",
+      "fromCreation": "作成時 · {{when}}",
+      "fromComment": "{{name}}のコメント · {{when}}",
+      "linked": "{{name}}がリンク"
+    },
+    "history": {
+      "commented": "がコメントしました",
+      "commentedFiles": "が添付ファイル付きでコメントしました"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "バックグラウンドの作業を停止しました",

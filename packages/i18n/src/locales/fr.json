@@ -4637,7 +4637,19 @@
       "criteriaFound_many": "{{count}} critères d'acceptation",
       "criteriaFound_other": "{{count}} critères d'acceptation",
       "agentStarts": "{{name}} commence dès que la tâche est créée. Tout ce qui est sensible demande votre approbation.",
-      "agentStarts_female": "{{name}} commence dès que la tâche est créée. Tout ce qui est sensible demande votre approbation."
+      "agentStarts_female": "{{name}} commence dès que la tâche est créée. Tout ce qui est sensible demande votre approbation.",
+      "agentStartsAll": "{{name}} commence dès que la tâche est créée, avec la description, les critères et les pièces jointes. Tout ce qui est sensible demande votre approbation.",
+      "titleShort": "Titre de la tâche",
+      "quickPlaceholder": "Décrivez le besoin. Collez des captures, glissez des fichiers. Les lignes commençant par « - » deviennent des critères d'acceptation.",
+      "pasteHint": "Collez une capture avec {{keys}} ou glissez des fichiers ici.",
+      "expand": "Ouvrir le formulaire complet",
+      "collapse": "Revenir au formulaire rapide",
+      "another": "En créer une autre",
+      "addCriterion": "Ajouter un critère",
+      "removeCriterion": "Retirer le critère",
+      "drop": "Déposez pour joindre à la tâche",
+      "dropText": "Photos, vidéos, PDF, tableurs… jusqu'à {{max}} Mo chacun.",
+      "createHint": "{{keys}} crée la tâche"
     },
     "back": "Tâches",
     "notFound": "Cette tâche n'existe pas ou vous n'y avez pas accès.",
@@ -4663,6 +4675,8 @@
     "asked_female": "Demande envoyée. {{name}} publie l'avancement ici. Votre conversation reste dans votre message direct.",
     "activity": "Activité",
     "noActivity": "Rien pour l'instant.",
+    "discussion": "Discussion",
+    "noComments": "Aucun commentaire pour l'instant.",
     "comment": "Commenter la tâche",
     "commentPlaceholder": "Commentaire · utilisez @ pour appeler un agent",
     "send": "Commenter",
@@ -4678,6 +4692,26 @@
     "noLinks": "Rien de lié pour l'instant.",
     "openConversation": "Voir la conversation",
     "labels": "Étiquettes",
+    "tabs": {
+      "label": "Parties de la tâche",
+      "details": "Détails",
+      "files": "Pièces jointes",
+      "history": "Historique"
+    },
+    "files": {
+      "title": "Pièces jointes",
+      "add": "Ajouter des fichiers",
+      "addHint": "ou glissez-les ici",
+      "grid": "Grille",
+      "empty": "Aucune pièce jointe pour l'instant. Glissez des fichiers ici ou collez une capture.",
+      "fromCreation": "À la création · {{when}}",
+      "fromComment": "Commentaire de {{name}} · {{when}}",
+      "linked": "Lié par {{name}}"
+    },
+    "history": {
+      "commented": "a commenté",
+      "commentedFiles": "a commenté avec des pièces jointes"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "a arrêté le travail en arrière-plan",

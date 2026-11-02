@@ -2771,6 +2771,8 @@ export interface IssueInput {
   priority?: IssuePriority;
   dueDate?: string | null;
   labels?: string[];
+  /** Drive files uploaded from the new-issue box (only on create): linked to the issue. */
+  attachmentIds?: string[];
 }
 
 export type IssuePatch = Partial<

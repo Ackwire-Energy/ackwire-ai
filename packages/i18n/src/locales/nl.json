@@ -4502,7 +4502,19 @@
       "criteriaFound_one": "{{count}} acceptatiecriterium",
       "criteriaFound_other": "{{count}} acceptatiecriteria",
       "agentStarts": "{{name}} begint zodra de taak is gemaakt. Alles wat gevoelig is, vraagt om jouw goedkeuring.",
-      "agentStarts_female": "{{name}} begint zodra de taak is gemaakt. Alles wat gevoelig is, vraagt om jouw goedkeuring."
+      "agentStarts_female": "{{name}} begint zodra de taak is gemaakt. Alles wat gevoelig is, vraagt om jouw goedkeuring.",
+      "agentStartsAll": "{{name}} begint zodra de taak is gemaakt, met de beschrijving, de criteria en de bijlagen. Alles wat gevoelig is, vraagt om jouw goedkeuring.",
+      "titleShort": "Titel van de taak",
+      "quickPlaceholder": "Beschrijf wat er nodig is. Plak screenshots, sleep bestanden. Regels die met “-” beginnen, worden acceptatiecriteria.",
+      "pasteHint": "Plak een screenshot met {{keys}} of sleep bestanden hierheen.",
+      "expand": "Volledig formulier openen",
+      "collapse": "Terug naar het snelle formulier",
+      "another": "Nog een maken",
+      "addCriterion": "Criterium toevoegen",
+      "removeCriterion": "Criterium weghalen",
+      "drop": "Loslaten om aan de taak toe te voegen",
+      "dropText": "Foto's, video's, pdf's, spreadsheets… tot {{max}} MB per bestand.",
+      "createHint": "{{keys}} maakt de taak"
     },
     "back": "Taken",
     "notFound": "Deze taak bestaat niet of je hebt geen toegang.",
@@ -4528,6 +4540,8 @@
     "asked_female": "Verzoek verstuurd. {{name}} plaatst de voortgang hier. Jullie gesprek blijft in je DM.",
     "activity": "Activiteit",
     "noActivity": "Nog niets.",
+    "discussion": "Gesprek",
+    "noComments": "Nog geen reacties.",
     "comment": "Reageren op de taak",
     "commentPlaceholder": "Reageer · gebruik @ om een agent te roepen",
     "send": "Reageren",
@@ -4543,6 +4557,26 @@
     "noLinks": "Nog niets gekoppeld.",
     "openConversation": "Gesprek bekijken",
     "labels": "Labels",
+    "tabs": {
+      "label": "Onderdelen van de taak",
+      "details": "Gegevens",
+      "files": "Bijlagen",
+      "history": "Geschiedenis"
+    },
+    "files": {
+      "title": "Bijlagen",
+      "add": "Bestanden toevoegen",
+      "addHint": "of sleep ze hierheen",
+      "grid": "Raster",
+      "empty": "Nog geen bijlagen. Sleep bestanden hierheen of plak een screenshot.",
+      "fromCreation": "Bij het maken · {{when}}",
+      "fromComment": "Reactie van {{name}} · {{when}}",
+      "linked": "Gekoppeld door {{name}}"
+    },
+    "history": {
+      "commented": "reageerde",
+      "commentedFiles": "reageerde met bijlagen"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "heeft het werk op de achtergrond gestopt",

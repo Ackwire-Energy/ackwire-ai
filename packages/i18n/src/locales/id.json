@@ -4322,7 +4322,19 @@
       "intro": "Siapa pun yang mengambilnya, orang atau agen, tampil di papan beserta progresnya.",
       "criteriaFound_other": "{{count}} kriteria penerimaan",
       "agentStarts": "{{name}} langsung mulai begitu tugas dibuat. Apa pun yang sensitif akan meminta persetujuanmu.",
-      "agentStarts_female": "{{name}} langsung mulai begitu tugas dibuat. Apa pun yang sensitif akan meminta persetujuanmu."
+      "agentStarts_female": "{{name}} langsung mulai begitu tugas dibuat. Apa pun yang sensitif akan meminta persetujuanmu.",
+      "agentStartsAll": "{{name}} langsung mulai begitu tugas dibuat, dengan deskripsi, kriteria, dan lampirannya. Apa pun yang sensitif akan meminta persetujuanmu.",
+      "titleShort": "Judul tugas",
+      "quickPlaceholder": "Jelaskan apa yang dibutuhkan. Tempel tangkapan layar, seret file. Baris yang diawali “-” menjadi kriteria penerimaan.",
+      "pasteHint": "Tempel tangkapan layar dengan {{keys}} atau seret file ke sini.",
+      "expand": "Buka formulir lengkap",
+      "collapse": "Kembali ke formulir cepat",
+      "another": "Buat satu lagi",
+      "addCriterion": "Tambah kriteria",
+      "removeCriterion": "Hapus kriteria",
+      "drop": "Lepas untuk melampirkan ke tugas",
+      "dropText": "Foto, video, PDF, spreadsheet… maksimal {{max}} MB per file.",
+      "createHint": "{{keys}} membuat tugas"
     },
     "back": "Tugas",
     "notFound": "Tugas ini tidak ada atau kamu tidak punya akses.",
@@ -4348,6 +4360,8 @@
     "asked_female": "Permintaan terkirim. {{name}} memposting progresnya di sini. Percakapanmu tetap di pesan langsungmu.",
     "activity": "Aktivitas",
     "noActivity": "Belum ada apa-apa.",
+    "discussion": "Diskusi",
+    "noComments": "Belum ada komentar.",
     "comment": "Komentari tugas",
     "commentPlaceholder": "Komentar · pakai @ untuk memanggil agen",
     "send": "Kirim komentar",
@@ -4363,6 +4377,26 @@
     "noLinks": "Belum ada yang ditautkan.",
     "openConversation": "Lihat percakapan",
     "labels": "Label",
+    "tabs": {
+      "label": "Bagian tugas",
+      "details": "Rincian",
+      "files": "Lampiran",
+      "history": "Riwayat"
+    },
+    "files": {
+      "title": "Lampiran",
+      "add": "Tambah file",
+      "addHint": "atau seret ke sini",
+      "grid": "Kisi",
+      "empty": "Belum ada lampiran. Seret file ke sini atau tempel tangkapan layar.",
+      "fromCreation": "Saat dibuat · {{when}}",
+      "fromComment": "Komentar {{name}} · {{when}}",
+      "linked": "Ditautkan oleh {{name}}"
+    },
+    "history": {
+      "commented": "berkomentar",
+      "commentedFiles": "berkomentar dengan lampiran"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "menghentikan pekerjaan di latar belakang",

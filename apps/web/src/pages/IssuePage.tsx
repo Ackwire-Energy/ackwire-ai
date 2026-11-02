@@ -1,4 +1,4 @@
-import type { Issue, IssuePriority } from "@agenteschat/client";
+import type { Issue, IssueActivity, IssuePriority } from "@agenteschat/client";
 import {
   keys,
   useChannels,
@@ -33,6 +33,8 @@ import {
   Message,
   MessageText,
   Select,
+  TabPanel,
+  Tabs,
   WorkSweep,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -42,9 +44,10 @@ import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
-import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
+import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { IssueWorkBlock } from "@/components/BackgroundWork";
 import { IssueForumCard, NewTopicDialog } from "@/components/Forum";
+import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
 import { useEmojiLabels } from "@/components/Reactions";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
@@ -162,6 +165,12 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
   const color = useAssigneeColor();
   const done = i.criteria.filter((c) => c.done).length;
   const from = useIssueSource(i);
+  const activity = useIssueActivity(org.id, i.id);
+  const list = activity.data ?? [];
+  const [tab, setTab] = useState<"details" | "files" | "history">("details");
+  const files = useIssueFileEntries(i, list);
+  // The files it was created with show under the description (prints, logs): the rest are in "Anexos".
+  const createdFiles = list.find((a) => a.event === "created")?.attachments ?? [];
   const main = (
     <>
       {variant === "page" && (
@@ -174,54 +183,79 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
         </header>
       )}
       {variant === "dialog" && <Details issue={i} />}
-      <WorkBox issue={i} />
-      <IssueWorkBlock issue={i} />
-      {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
-      <DetailsSection title={t("issues.description")}>
-        {i.description ? (
-          <div className="issue-description">
-            <Markdown source={i.description} variant="message" wikiLink={wikiLink} />
-          </div>
-        ) : (
-          <p className="small muted">{t("issues.noDescription")}</p>
-        )}
-      </DetailsSection>
-      <DetailsSection
-        title={t("issues.criteria")}
-        actions={
-          i.criteria.length > 0 ? (
-            <span className="issue-details__count tabular">
-              {t("issues.criteriaCount", { done, total: i.criteria.length })}
-            </span>
-          ) : undefined
-        }
+      <Tabs
+        value={tab}
+        onValueChange={setTab}
+        label={t("issues.tabs.label")}
+        items={[
+          { value: "details", label: t("issues.tabs.details") },
+          { value: "files", label: t("issues.tabs.files"), count: files.length || undefined },
+          { value: "history", label: t("issues.tabs.history") },
+        ]}
       >
-        {i.criteria.length === 0 && <p className="small muted">{t("issues.noCriteria")}</p>}
-        {i.criteria.length > 0 && <CriteriaPixels done={i.criteria.map((c) => c.done)} color={color(i)} />}
-        {i.criteria.map((c) => (
-          <div key={c.id} className="issue-criterion" data-done={c.done || undefined}>
-            <Checkbox
-              id={`crit-${c.id}`}
-              checked={c.done}
-              onCheckedChange={(v) => action.mutate({ type: "criterion", id: i.id, criterionId: c.id, done: v })}
-            />
-            <label htmlFor={`crit-${c.id}`}>{c.text}</label>
-            {c.done && c.doneBy?.type === "agent" && (
-              <span className="issue-criterion__by" title={t("issues.checkedBy", { name: actors.name(c.doneBy) })}>
-                <ActorAvatar actor={c.doneBy} name={actors.name(c.doneBy)} size="xs" />
-                {actors.name(c.doneBy)}
-              </span>
+        <TabPanel value="details">
+          <WorkBox issue={i} />
+          {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
+          <DetailsSection title={t("issues.description")}>
+            {i.description ? (
+              <div className="issue-description">
+                <Markdown source={i.description} variant="message" wikiLink={wikiLink} />
+              </div>
+            ) : (
+              createdFiles.length === 0 && <p className="small muted">{t("issues.noDescription")}</p>
             )}
-          </div>
-        ))}
-      </DetailsSection>
-      <IssueForum issue={i} />
-      {variant === "dialog" && (
-        <DetailsSection title={t("issues.links")}>
-          <Links issue={i} bare />
-        </DetailsSection>
-      )}
-      <Activity issue={i} />
+            {createdFiles.length > 0 && (
+              <div className="artifact-cards issue-description__files">
+                {createdFiles.map((f) => (
+                  <ArtifactCard key={f.id} artifact={{ id: f.id }} />
+                ))}
+              </div>
+            )}
+          </DetailsSection>
+          <DetailsSection
+            title={t("issues.criteria")}
+            actions={
+              i.criteria.length > 0 ? (
+                <span className="issue-details__count tabular">
+                  {t("issues.criteriaCount", { done, total: i.criteria.length })}
+                </span>
+              ) : undefined
+            }
+          >
+            {i.criteria.length === 0 && <p className="small muted">{t("issues.noCriteria")}</p>}
+            {i.criteria.length > 0 && <CriteriaPixels done={i.criteria.map((c) => c.done)} color={color(i)} />}
+            {i.criteria.map((c) => (
+              <div key={c.id} className="issue-criterion" data-done={c.done || undefined}>
+                <Checkbox
+                  id={`crit-${c.id}`}
+                  checked={c.done}
+                  onCheckedChange={(v) => action.mutate({ type: "criterion", id: i.id, criterionId: c.id, done: v })}
+                />
+                <label htmlFor={`crit-${c.id}`}>{c.text}</label>
+                {c.done && c.doneBy?.type === "agent" && (
+                  <span className="issue-criterion__by" title={t("issues.checkedBy", { name: actors.name(c.doneBy) })}>
+                    <ActorAvatar actor={c.doneBy} name={actors.name(c.doneBy)} size="xs" />
+                    {actors.name(c.doneBy)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </DetailsSection>
+          <IssueForum issue={i} />
+          {variant === "dialog" && (
+            <DetailsSection title={t("issues.links")}>
+              <Links issue={i} bare />
+            </DetailsSection>
+          )}
+          <Discussion issue={i} activity={list} loaded={activity.isSuccess} />
+        </TabPanel>
+        <TabPanel value="files">
+          <IssueFiles issue={i} activity={list} />
+        </TabPanel>
+        <TabPanel value="history">
+          <History activity={list} loaded={activity.isSuccess} />
+        </TabPanel>
+      </Tabs>
     </>
   );
   if (variant === "dialog") return main;
@@ -475,16 +509,18 @@ function AskAgent({ issue }: { issue: Issue }) {
   );
 }
 
-function Activity({ issue }: { issue: Issue }) {
+/**
+ * "Discussão": the box on top and the comments under it, newest first. Comments carry their files the way chat
+ * messages do (a print as its thumbnail, a click opens it; other files as a card); a print pastes into the box.
+ */
+function Discussion({ issue, activity, loaded }: { issue: Issue; activity: IssueActivity[]; loaded: boolean }) {
   const { t, i18n } = useTranslation();
-  const { org, me } = useOrg();
-  const activity = useIssueActivity(org.id, issue.id);
+  const { org } = useOrg();
   const action = useIssueAction(org.id);
   const actors = useActors();
   const [text, setText] = useState("");
   const mentionSearch = useMentionSearch();
   const wikiLink = useWikiLinkRenderer();
-  const viewer = useArtifactViewer();
   const wikiPages = useWikiTree(org.id);
   const box = useRef<HTMLTextAreaElement>(null);
   // The same box as the chat: formatting, emoji, wiki links and files (to the issue's channel Drive).
@@ -499,66 +535,9 @@ function Activity({ issue }: { issue: Issue }) {
     }),
     [t],
   );
-  const list = activity.data ?? [];
+  const comments = activity.filter((a) => a.kind === "comment").reverse();
   return (
-    <DetailsSection title={t("issues.activity")}>
-      {activity.isSuccess && list.length === 0 && <p className="small muted">{t("issues.noActivity")}</p>}
-      {list.map((a) =>
-        a.kind === "event" ? (
-          <div key={a.id} className="issue-event small muted">
-            <Icon
-              name={a.event === "agent_asked" ? "agent" : a.textCode?.startsWith("forum_") ? "message" : "waiting"}
-              size={16}
-            />
-            <span>
-              <b className="issue-event__who">{actors.name(a.author)}</b> {issueEventText(t, a)}
-              {a.auto && (
-                <Chip icon="repeat" className="issue-event__auto" title={t("issues.autoHint")}>
-                  {t("issues.auto")}
-                </Chip>
-              )}{" "}
-              · {whenAt(t, i18n.language, a.createdAt)}
-              {/* Asked an agent to implement it: the work conversation is in the asker's DM (only they open it). */}
-              {a.event === "agent_asked" && a.textParams?.threadId && a.author.id === me.user.id && (
-                <>
-                  {" · "}
-                  <Link
-                    to="/org/$orgId/threads/$threadId"
-                    params={{ orgId: org.id, threadId: a.textParams.threadId }}
-                    className="ac-link"
-                  >
-                    {t("issues.openConversation")}
-                  </Link>
-                </>
-              )}
-            </span>
-          </div>
-        ) : (
-          <Message
-            key={a.id}
-            agent={a.author.type === "agent"}
-            avatar={<ActorAvatar actor={a.author} name={actors.name(a.author)} />}
-            author={actors.name(a.author)}
-            time={<time dateTime={a.createdAt}>{whenAt(t, i18n.language, a.createdAt)}</time>}
-          >
-            {a.text && (
-              <MessageText>
-                <Markdown source={a.text} variant="message" wikiLink={wikiLink} />
-              </MessageText>
-            )}
-            {a.attachments && a.attachments.length > 0 && (
-              <span className="issue-comment__files">
-                {a.attachments.map((f) => (
-                  <button key={f.id} type="button" className="issue-link" onClick={() => viewer.open(f.id)}>
-                    <Icon name="attach" size={16} />
-                    {f.title}
-                  </button>
-                ))}
-              </span>
-            )}
-          </Message>
-        ),
-      )}
+    <DetailsSection title={t("issues.discussion")} count={comments.length || undefined}>
       <Composer
         value={text}
         onChange={setText}
@@ -603,7 +582,83 @@ function Activity({ issue }: { issue: Issue }) {
           );
         }}
       />
+      {loaded && comments.length === 0 && <p className="small muted">{t("issues.noComments")}</p>}
+      {comments.map((a) => (
+      <Message
+        key={a.id}
+        agent={a.author.type === "agent"}
+        avatar={<ActorAvatar actor={a.author} name={actors.name(a.author)} />}
+        author={actors.name(a.author)}
+        time={<time dateTime={a.createdAt}>{whenAt(t, i18n.language, a.createdAt)}</time>}
+      >
+        {a.text && (
+          <MessageText>
+            <Markdown source={a.text} variant="message" wikiLink={wikiLink} />
+          </MessageText>
+        )}
+        {a.attachments && a.attachments.length > 0 && (
+          <div className="artifact-cards">
+            {a.attachments.map((f) => (
+              <ArtifactCard key={f.id} artifact={{ id: f.id }} />
+            ))}
+          </div>
+        )}
+      </Message>
+      ))}
     </DetailsSection>
+  );
+}
+
+/** "Histórico": what happened to the task, oldest first: its events and a line for each comment. */
+function History({ activity, loaded }: { activity: IssueActivity[]; loaded: boolean }) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const actors = useActors();
+  return (
+    <section className="issue-history" aria-label={t("issues.tabs.history")}>
+      {loaded && activity.length === 0 && <p className="small muted">{t("issues.noActivity")}</p>}
+      {activity.map((a) =>
+        a.kind === "event" ? (
+      <div key={a.id} className="issue-event small muted">
+        <Icon
+          name={a.event === "agent_asked" ? "agent" : a.textCode?.startsWith("forum_") ? "message" : "waiting"}
+          size={16}
+        />
+        <span>
+          <b className="issue-event__who">{actors.name(a.author)}</b> {issueEventText(t, a)}
+          {a.auto && (
+            <Chip icon="repeat" className="issue-event__auto" title={t("issues.autoHint")}>
+              {t("issues.auto")}
+            </Chip>
+          )}{" "}
+          · {whenAt(t, i18n.language, a.createdAt)}
+          {/* Asked an agent to implement it: the work conversation is in the asker's DM (only they open it). */}
+          {a.event === "agent_asked" && a.textParams?.threadId && a.author.id === me.user.id && (
+            <>
+              {" · "}
+              <Link
+                to="/org/$orgId/threads/$threadId"
+                params={{ orgId: org.id, threadId: a.textParams.threadId }}
+                className="ac-link"
+              >
+                {t("issues.openConversation")}
+              </Link>
+            </>
+          )}
+        </span>
+      </div>
+        ) : (
+          <div key={a.id} className="issue-event small muted">
+            <Icon name="message" size={16} />
+            <span>
+              <b className="issue-event__who">{actors.name(a.author)}</b>{" "}
+              {t(a.attachments?.length ? "issues.event.commentedFiles" : "issues.event.commented")} ·{" "}
+              {whenAt(t, i18n.language, a.createdAt)}
+            </span>
+          </div>
+        ),
+      )}
+    </section>
   );
 }
 
@@ -685,16 +740,15 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
   );
 }
 
-/** Pull requests, files and labels. `bare`: inside a section that already says "Links". */
+/** Pull requests and labels (files are in "Anexos"). `bare`: inside a section that already says "Links". */
 function Links({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
   const { t } = useTranslation();
   const actors = useActors();
-  const viewer = useArtifactViewer();
   return (
     <>
       <div className="issue-aside__item">
         {!bare && <span className="ac-field__label">{t("issues.links")}</span>}
-        {i.pullRequests.length + i.artifacts.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
+        {i.pullRequests.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
         {i.pullRequests.map((pr) => (
           <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">
             <Icon name="pullRequest" size={16} />
@@ -702,12 +756,6 @@ function Links({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
               ? t("issues.prBy", { number: pr.number, name: actors.name(pr.openedBy) })
               : t("issues.pr", { number: pr.number })}
           </a>
-        ))}
-        {i.artifacts.map((a) => (
-          <button key={a.id} type="button" className="issue-link" onClick={() => viewer.open(a.id)}>
-            <Icon name="drive" size={16} />
-            {t("issues.artifactBy", { title: a.title, name: actors.name(a.createdBy) })}
-          </button>
         ))}
       </div>
       {i.labels.length > 0 && (

@@ -5,13 +5,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chip, Composer, Icon, type IconName, SectionHeader, Text, useToast } from "@/ui";
 import { MessageText } from "../chat/MessageText";
+import { MessageFiles } from "../files/MessageFiles";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { ActionList, successHaptic } from "../shared/parts";
@@ -60,19 +60,10 @@ export function IssueActivityFeed({ issue }: { issue: Issue }) {
                 </Text>
               </Text>
               {a.text ? <MessageText body={a.text} /> : null}
-              {(a.attachments ?? []).map((f) => (
-                <Pressable
-                  key={f.id}
-                  accessibilityRole="button"
-                  onPress={() => router.push({ pathname: "/file/[id]", params: { id: f.id } })}
-                  style={[styles.file, { backgroundColor: c.sunken }]}
-                >
-                  <Icon name="file" size={15} color={c.muted} />
-                  <Text variant="subhead" tone="ink2" numberOfLines={1} style={styles.fileName}>
-                    {f.title}
-                  </Text>
-                </Pressable>
-              ))}
+              {a.attachments?.length ? (
+                // The chat's files: a print at its own shape (tap opens the viewer), other files as a card.
+                <MessageFiles files={a.attachments.map((f) => ({ id: f.id, title: f.title, deleted: false }))} />
+              ) : null}
             </View>
           </View>
         ),
@@ -165,18 +156,6 @@ const styles = StyleSheet.create({
   none: { paddingHorizontal: 20 },
   event: { flexDirection: "row", alignItems: "flex-start", gap: 9, paddingHorizontal: 20, paddingVertical: 6 },
   comment: { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingVertical: 9 },
-  file: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 6,
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    maxWidth: "100%",
-  },
-  fileName: { flexShrink: 1 },
   dock: { position: "absolute", left: 0, right: 0, bottom: 0 },
   box: { paddingHorizontal: 12, paddingTop: 16 },
 });
