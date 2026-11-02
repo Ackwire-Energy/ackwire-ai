@@ -1752,6 +1752,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           capabilities: ["drive", "issues"],
           busy: false,
           canTalk: true,
+          ...(a.seesDetails === false ? { capabilities: [], canTalk: false, seesDetails: false } : {}),
         })),
         people: state.members
           .filter((m) => state.agents.some((a) => a.ownerUserId === m.userId))
@@ -1768,12 +1769,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             a.ownerUserId === me ||
             (mode === "people" && (a.audience?.userIds ?? []).includes(me));
           const { monthlyBudgetUsd, ...rest } = a;
+          // Same rule as the backend: how it works only for who it answers, its owner and admins.
+          const seesDetails = canTalk || seesCost();
           return {
             ...rest,
             ...(seesCost() ? { monthlyBudgetUsd } : {}),
+            ...(seesDetails ? {} : { instructions: "" }),
             budgetUsedPercent: percentOf(a),
             audienceMode: mode,
             canTalk,
+            seesDetails,
           };
         }),
       create: async (orgId, input) => {

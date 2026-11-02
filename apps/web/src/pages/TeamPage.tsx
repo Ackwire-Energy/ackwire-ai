@@ -1,5 +1,6 @@
 import type { FormerAgent, Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
 import { useAiStatus, useCatalog, useFormerAgents, useTeam } from "@agenteschat/client";
+import { seesDetails } from "@agenteschat/client/lib/audience";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -33,6 +34,7 @@ import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useTheme } from "@/lib/theme";
+import { AskAccessButton } from "./agent/PublicCard";
 import "./team.css";
 
 /*
@@ -470,8 +472,9 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
   const aiStatus = useAiStatus(org.id);
   const ai = aiStateOf(aiStatus.data, agent.id);
   const dir = useDirectory(org.id);
-  // The same plain words as its page's "What it does", from the instructions every member can read.
+  // The same plain words as its page's "What it does", from its instructions (empty for who doesn't see them).
   const summary = excerpt(dir.agentById.get(agent.id)?.instructions ?? "", SUMMARY_MAX, 1);
+  const details = seesDetails(agent);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
   const g = agentGrammar(agent.name);
@@ -524,27 +527,37 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
           <p className="team-card__call">{summary}</p>
         </div>
       )}
-      <div className="team-card__sec">
-        <span className="team-card__eyebrow">{t("team.canDo", g)}</span>
-        <div className="team-card__chips">
-          {caps.length === 0 && <Chip icon="message">{t("team.onlyChat")}</Chip>}
-          {caps.map((k) => {
-            if (!isCap(k))
+      {!details && (
+        <p className="team-card__call small muted">{t("profile.detailsHidden", agentGrammar(agent.name))}</p>
+      )}
+      {details && (
+        <div className="team-card__sec">
+          <span className="team-card__eyebrow">{t("team.canDo", g)}</span>
+          <div className="team-card__chips">
+            {caps.length === 0 && <Chip icon="message">{t("team.onlyChat")}</Chip>}
+            {caps.map((k) => {
+              if (!isCap(k))
+                return (
+                  <Chip key={k} icon="plug">
+                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                  </Chip>
+                );
+              const service = serviceOf(k);
               return (
-                <Chip key={k} icon="plug">
-                  {k.charAt(0).toUpperCase() + k.slice(1)}
+                <Chip
+                  key={k}
+                  icon={CAPS[k]}
+                  lead={service && <ConnectorIcon def={service} label={t(`team.cap.${k}`)} />}
+                >
+                  {t(`team.cap.${k}`)}
                 </Chip>
               );
-            const service = serviceOf(k);
-            return (
-              <Chip key={k} icon={CAPS[k]} lead={service && <ConnectorIcon def={service} label={t(`team.cap.${k}`)} />}>
-                {t(`team.cap.${k}`)}
-              </Chip>
-            );
-          })}
+            })}
+          </div>
         </div>
-      </div>
+      )}
       <div className="team-card__acts">
+        {!details && <AskAccessButton agent={agent} />}
         {agent.canTalk && (
           <Button asChild variant="primary" size="sm" icon="message">
             <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
@@ -552,9 +565,9 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
             </Link>
           </Button>
         )}
-        <Button asChild size="sm" icon="edit">
+        <Button asChild size="sm" icon={details ? "edit" : "agent"}>
           <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-            {t("team.edit")}
+            {details ? t("team.edit") : t("profile.viewProfile")}
           </Link>
         </Button>
       </div>

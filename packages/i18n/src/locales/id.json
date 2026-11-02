@@ -2007,7 +2007,10 @@
     "can": "Bisa",
     "budgetUsed": "{{percent}} anggaran terpakai bulan ini",
     "spendLabel": "Anggaran terpakai bulan ini",
-    "former": "Sudah tidak ada di ruang kerja ini"
+    "former": "Sudah tidak ada di ruang kerja ini",
+    "askAccess": "Minta akses",
+    "detailsHiddenTitle": "Cara kerjanya",
+    "detailsHidden": "Hanya orang yang dilayani {{name}}, penanggung jawabnya, dan admin yang bisa melihat instruksi, alat, memori, dan pemakaiannya."
   },
   "presence": {
     "online": "Online",

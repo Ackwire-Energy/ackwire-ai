@@ -514,11 +514,10 @@ describe("Configurações do workspace", () => {
     expect(line()?.textContent).toBe("Os agentes só respondem quando mencionados.");
   });
 
-  test("members see settings read-only, without the workspace's keys or money (their own plans, usage in percentages)", async () => {
+  test("members see only their own settings: no Geral, roles, GIFs or usage, and never the workspace's keys", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
-    expect(document.body.textContent).toContain("Só admins mudam as configurações.");
     // The sub-nav only lists what a member can open (each link's words, after its icon or my face).
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     expect(
@@ -530,17 +529,15 @@ describe("Configurações do workspace", () => {
       "Notificações",
       // Each person connects their own AI apps (ADR 0119).
       "Apps de IA",
-      "Geral",
+      // The people, where a member who may not invite suggests someone (ADR 0090).
       "Membros e convites",
-      // Every member reads what each role allows (ADR 0085).
-      "Papéis e permissões",
-      // Every member reads the workspace's GIF and sticker switches (ADR 0091).
-      "GIFs e figurinhas",
       "Conectores",
       "Computadores",
-      "Orçamento e uso",
       "Contas de IA",
     ]);
+    // Settings opens on their account: what the agents know of the workspace is not theirs to read.
+    expect(screen().queryByLabelText("O que os agentes sabem da Acme")).toBeNull();
+    expect(document.body.textContent).not.toContain("Acme builds rockets");
     cleanup();
     await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();
@@ -550,19 +547,14 @@ describe("Configurações do workspace", () => {
     expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
     cleanup();
-    // Orçamento e uso: the plans and the API in tokens and percentages, never money.
-    await go(state, "settings/usage");
-    const plans = screen().getByRole("region", { name: "Contas dos planos" });
-    expect(within(plans).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("62");
-    expect(screen().getByRole("region", { name: "API do workspace" }).textContent).toContain("23% do orçamento");
-    expect(screen().queryByRole("region", { name: "Gastos da API por tipo" })).toBeNull();
-    expect(screen().queryByRole("region", { name: "Orçamento padrão dos agentes" })).toBeNull();
-    expect(document.body.textContent).not.toContain("US$");
-    cleanup();
-    // A section they can't open falls back to Geral.
-    await go(state, "settings/storage");
-    expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
-    expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
+    // A section they can't open (the workspace's usage, its storage) falls back to their account.
+    for (const gone of ["settings/usage", "settings/storage", "settings/general", "settings/roles"]) {
+      await go(state, gone);
+      expect(screen().queryByRole("region", { name: "Contas dos planos" })).toBeNull();
+      expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
+      expect(screen().queryByRole("heading", { level: 2, name: "Geral" })).toBeNull();
+      cleanup();
+    }
   });
 
   test("Plano e cobrança: only where a billing service runs, for owners and admins, opened there signed in", async () => {
@@ -590,7 +582,7 @@ describe("Configurações do workspace", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state, "settings/billing");
     expect(nav().queryByRole("link", { name: "Plano e cobrança" })).toBeNull();
-    expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
+    expect(screen().getByRole("heading", { level: 2, name: "Sua conta" })).toBeTruthy();
   });
 
   test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {

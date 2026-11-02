@@ -2056,7 +2056,10 @@
     "can": "Yapabilir",
     "budgetUsed": "Bu ay bütçenin {{percent}} kadarı kullanıldı",
     "spendLabel": "Bu ay kullanılan bütçe",
-    "former": "Artık bu çalışma alanında değil"
+    "former": "Artık bu çalışma alanında değil",
+    "askAccess": "Erişim iste",
+    "detailsHiddenTitle": "Nasıl çalışır",
+    "detailsHidden": "{{name}} adlı ajanın talimatlarını, araçlarını, hafızasını ve kullanımını yalnızca yanıt verdiği kişiler, sorumlusu ve yöneticiler görür."
   },
   "presence": {
     "online": "Çevrimiçi",

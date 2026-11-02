@@ -94,39 +94,27 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     ]);
   });
 
-  test("each section opens with its permission (ADR 0085); members, the ones the web gives everyone", () => {
+  test("each section opens with its permission (ADR 0085); a member keeps only their own and what they use", () => {
     const as = (role: "owner" | "member", permissions: string[]) => ({ id: "o", name: "Acme", role, permissions });
     const ids = (permissions: string[]) => visibleSections(as("member", permissions)).map((s) => s.id);
-    const all = ["read", "invite_people", "view_audit", "manage_agents", "configure", "create_agents"];
+    const all = ["read", "invite_people", "view_audit", "view_usage", "manage_agents", "configure", "create_agents"];
     expect(visibleSections(as("owner", all)).length).toBe(SETTINGS_SECTIONS.length);
-    // Membros is everyone's, as on the web: a member who may not invite suggests someone there (ADR 0090).
-    expect(ids(["read", "post"])).toEqual([
+    // No Geral (what the agents know of the workspace), GIFs or Uso: those are the workspace's, for admins.
+    expect(ids(["read", "post"])).toEqual(["apps", "members", "connectors", "computers", "keys"]);
+    expect(ids(["read", "manage_agents"])).toEqual([
       "apps",
-      "general",
       "members",
-      "media",
-      "connectors",
-      "computers",
-      "usage",
-      "keys",
-    ]);
-    const agents = ids(["read", "manage_agents"]);
-    expect(agents).toEqual([
-      "apps",
-      "general",
-      "members",
-      "media",
       "access",
       "connectors",
       "skills",
       "computers",
-      "usage",
       "keys",
     ]);
+    expect(ids(["read", "configure"])).toEqual(expect.arrayContaining(["general", "media", "storage"]));
+    expect(ids(["read", "view_usage"])).toContain("usage");
     expect(ids(["read", "view_audit"])).toContain("audit");
     expect(ids(["read", "create_agents"])).toContain("import");
-    expect(ids(["read", "configure"])).toContain("storage");
-    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["apps", "general", "media", "connectors", "usage"]);
+    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["apps", "connectors"]);
   });
 
   test("each section opens a screen the app has", () => {

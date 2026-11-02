@@ -2135,7 +2135,10 @@
     "can": "Può",
     "budgetUsed": "{{percent}} del budget usato questo mese",
     "spendLabel": "Budget usato questo mese",
-    "former": "Non fa più parte di questo spazio di lavoro"
+    "former": "Non fa più parte di questo spazio di lavoro",
+    "askAccess": "Chiedi l'accesso",
+    "detailsHiddenTitle": "Come lavora",
+    "detailsHidden": "Istruzioni, strumenti, memoria e utilizzo di {{name}} li vedono solo le persone a cui risponde, il responsabile e gli admin."
   },
   "presence": {
     "online": "Online",

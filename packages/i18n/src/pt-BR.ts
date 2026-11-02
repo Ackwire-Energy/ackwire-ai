@@ -2043,6 +2043,12 @@ export const ptBR = {
     budgetUsed: "{{percent}} do orçamento usado este mês",
     spendLabel: "Orçamento usado no mês",
     former: "Não faz mais parte deste workspace",
+    askAccess: "Pedir acesso",
+    detailsHiddenTitle: "Como trabalha",
+    detailsHidden:
+      "Instruções, ferramentas, memória e uso de {{name}} ficam só para quem conversa com ele, o responsável e os admins.",
+    detailsHidden_female:
+      "Instruções, ferramentas, memória e uso de {{name}} ficam só para quem conversa com ela, o responsável e os admins.",
   },
   presence: {
     online: "Online",

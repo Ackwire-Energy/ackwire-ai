@@ -60,20 +60,27 @@ export interface SettingsEntry {
 export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   // AI apps (ADR 0119): each person's own connections in this workspace; connecting one happens on the web.
   { id: "apps", group: "you", icon: "share", href: "/settings/apps", allowed: () => true },
-  { id: "general", group: "org", icon: "home", href: "/settings/general", allowed: () => true },
+  // The workspace itself (its name, zone, what every agent knows of it): who configures it.
+  {
+    id: "general",
+    group: "org",
+    icon: "home",
+    href: "/settings/general",
+    allowed: (o) => can(o, "configure"),
+  },
   // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
   // What agents did and people changed: who may see the audit (it shows everyone's work).
   { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
-  // GIFs and stickers in chat (ADR 0091): everyone reads them, who configures the workspace changes them.
-  { id: "media", group: "org", icon: "sticker", href: "/settings/media", allowed: () => true },
+  // GIFs and stickers in chat (ADR 0091): who configures the workspace.
+  { id: "media", group: "org", icon: "sticker", href: "/settings/media", allowed: (o) => can(o, "configure") },
   { id: "access", group: "agents", icon: "agent", href: "/settings/access", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", group: "agents", icon: "bolt", href: "/connectors", allowed: () => true },
   { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
   // Every member sees the computers and connects one (ADR 0025).
   { id: "computers", group: "agents", icon: "laptop", href: "/settings/computers", allowed: (o) => can(o, "read") },
-  // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
-  { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: () => true },
+  // The workspace's spend and every agent's use: who may see usage.
+  { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: (o) => can(o, "view_usage") },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", group: "costs", icon: "brain", href: "/ai-accounts", allowed: (o) => can(o, "read") },
   { id: "storage", group: "costs", icon: "drive", href: "/settings/storage", allowed: (o) => can(o, "configure") },

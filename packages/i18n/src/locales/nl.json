@@ -2069,7 +2069,10 @@
     "can": "Kan",
     "budgetUsed": "{{percent}} van het budget gebruikt deze maand",
     "spendLabel": "Budget gebruikt deze maand",
-    "former": "Niet meer in deze werkruimte"
+    "former": "Niet meer in deze werkruimte",
+    "askAccess": "Toegang vragen",
+    "detailsHiddenTitle": "Hoe het werkt",
+    "detailsHidden": "Alleen de mensen aan wie {{name}} antwoordt, de verantwoordelijke en admins zien de instructies, tools, het geheugen en het gebruik."
   },
   "presence": {
     "online": "Online",

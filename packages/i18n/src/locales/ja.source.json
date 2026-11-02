@@ -5026,6 +5026,15 @@
   "profile.former": {
     "value": "No longer in this workspace"
   },
+  "profile.askAccess": {
+    "value": "Ask for access"
+  },
+  "profile.detailsHiddenTitle": {
+    "value": "How it works"
+  },
+  "profile.detailsHidden": {
+    "value": "Only the people {{name}} answers, its owner and admins see its instructions, tools, memory and usage."
+  },
   "presence.online": {
     "value": "Online"
   },
