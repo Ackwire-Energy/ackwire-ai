@@ -103,7 +103,7 @@ describe("desktop strings", () => {
     switchDesktopLocale(i18n, "ja", "windows");
     await new Promise<void>((done) => i18n.on("languageChanged", () => done()));
     expect(Object.keys(i18n.store.data).sort()).toEqual(["en", "ja", "pt-BR"]);
-    expect(i18n.t("desktop.tray.now")).toBe("Now");
+    expect(i18n.t("desktop.tray.now")).toBe("現在");
   });
 
   test("this computer's name fills {{device}} everywhere, by system and language", () => {

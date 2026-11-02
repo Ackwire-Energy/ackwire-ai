@@ -13,11 +13,24 @@
   <array>
     <string>en</string>
     <string>pt-BR</string>
+    <string>es</string>
+    <string>fr</string>
+    <string>de</string>
+    <string>it</string>
+    <string>nl</string>
+    <string>ja</string>
+    <string>ko</string>
+    <string>zh-Hans</string>
+    <string>id</string>
+    <string>tr</string>
+    <string>pl</string>
+    <string>ru</string>
   </array>
   <key>CFBundleAllowMixedLocalizations</key>
   <true/>
-  <!-- Files downloaded from the site get the quarantine mark, as from a browser: the Mac checks them. -->
-  <key>LSFileQuarantineEnabled</key>
-  <true/>
+  <!-- No LSFileQuarantineEnabled: it marks every file made by the app's child processes too (the runner and
+       the agents' commands), so each binary an agent builds and runs (a Swift package's manifest, a compiled
+       tool) was stopped by Gatekeeper with a dialog. Downloads from the site get the mark one by one instead
+       (main_window.rs `quarantine`). -->
 </dict>
 </plist>

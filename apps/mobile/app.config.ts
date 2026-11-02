@@ -83,13 +83,30 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   locales: {
     en: "./assets/locales/en.json",
     "pt-BR": "./assets/locales/pt-BR.json",
+    es: "./assets/locales/es.json",
+    fr: "./assets/locales/fr.json",
+    de: "./assets/locales/de.json",
+    it: "./assets/locales/it.json",
+    nl: "./assets/locales/nl.json",
+    ja: "./assets/locales/ja.json",
+    ko: "./assets/locales/ko.json",
+    "zh-Hans": "./assets/locales/zh-Hans.json",
+    id: "./assets/locales/id.json",
+    tr: "./assets/locales/tr.json",
+    pl: "./assets/locales/pl.json",
+    ru: "./assets/locales/ru.json",
   },
   plugins: [
     ["expo-router", { redirects: LEGACY_REDIRECTS }],
     ["expo-screen-orientation", { initialOrientation: "PORTRAIT_UP" }],
     "expo-secure-store",
     // Every ready language, so Android 13+ and iOS offer it as the app's own language.
-    ["expo-localization", { supportedLocales: ["en", "pt-BR"] }],
+    [
+      "expo-localization",
+      {
+        supportedLocales: ["en", "pt-BR", "es", "fr", "de", "it", "nl", "ja", "ko", "zh-Hans", "id", "tr", "pl", "ru"],
+      },
+    ],
     "expo-web-browser",
     "expo-apple-authentication",
     [

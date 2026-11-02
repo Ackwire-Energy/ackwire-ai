@@ -12,8 +12,17 @@ describe("appLocale", () => {
   });
 
   test("only languages people can pick, unless `all`", () => {
-    const notReady = LOCALES.filter((l) => !l.ready).map((l) => l.code);
-    for (const code of notReady) expect(appLocale([code])).toBeNull();
+    // Every language is ready today: switch one off to test the gate.
+    const ja = LOCALES.find((l) => l.code === "ja") as { ready: boolean };
+    ja.ready = false;
+    try {
+      expect(appLocale(["ja"])).toBeNull();
+      expect(appLocale(["ja-JP"], true)).toBe("ja");
+      expect(appLocale(["ja-JP", "en"])).toBe("en");
+    } finally {
+      ja.ready = true;
+    }
+    expect(appLocale(["ja-JP", "en"])).toBe("ja");
     expect(appLocale(["es-MX"], true)).toBe("es");
     expect(appLocale(["fr-CA"], true)).toBe("fr");
     expect(appLocale(["zh-CN"], true)).toBe("zh-Hans");
@@ -22,7 +31,6 @@ describe("appLocale", () => {
     expect(appLocale(["zh-TW"], true)).toBe("zh-Hans");
     expect(appLocale(["in"], true)).toBe("id");
     expect(appLocale(["in-ID"], true)).toBe("id");
-    expect(appLocale(["ja-JP", "en"])).toBe(LOCALES.find((l) => l.code === "ja")?.ready ? "ja" : "en");
   });
 });
 

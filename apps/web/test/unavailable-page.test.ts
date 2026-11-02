@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { LOCALE_CODES } from "@agenteschat/i18n/locale";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -153,26 +154,37 @@ const PT = {
 };
 
 describe("the page Caddy serves while the app is down", () => {
-  test("in pt-BR unless the app's choice, the landing's cookie or the browser says English", () => {
+  test("in the app's choice, else the landing's cookie, else the browser's first known language, else English", () => {
     const words = (page: ReturnType<typeof open>) => ({
       title: page.doc.title,
       heading: page.text("title"),
       text: page.text("text"),
       retry: page.text("retry"),
     });
-    const pt = open({ languages: [] });
+    const pt = open({ languages: ["pt-BR"] });
     expect(pt.html.lang).toBe("pt-BR");
     expect(words(pt)).toEqual({ title: PT.title, heading: PT.title, text: PT.text, retry: PT.retry });
-    expect(open({ languages: ["fr-FR", "de"] }).html.lang).toBe("pt-BR");
-
     const en = open({ locale: "en", languages: ["pt-BR"] });
     expect(en.html.lang).toBe("en");
     expect(words(en)).toEqual({ title: EN.title, heading: EN.title, text: EN.text, retry: EN.retry });
-    expect(open({ cookie: "theme=x; agentes_locale=en", languages: ["pt-BR"] }).html.lang).toBe("en");
-    expect(open({ languages: ["fr-FR", "en-GB", "pt-BR"] }).html.lang).toBe("en");
-    // In that order: the app's choice, then the cookie, then the browser.
-    expect(open({ locale: "pt-BR", cookie: "agentes_locale=en", languages: ["en"] }).html.lang).toBe("pt-BR");
+    expect(open({ languages: ["sv-SE"] }).html.lang).toBe("en");
+
+    // Each of the twelve: picked in the app, from the cookie, from the browser.
+    const ja = open({ locale: "ja", languages: ["pt-BR"] });
+    expect(ja.html.lang).toBe("ja");
+    expect(ja.doc.title).toBe("agentes.chat はまもなく戻ります");
+    expect(ja.text("retry")).toBe("今すぐ試す");
+    const fr = open({ cookie: "theme=x; agentes_locale=fr", languages: ["pt-BR"] });
+    expect(fr.html.lang).toBe("fr");
+    expect(fr.text("title")).toBe("agentes.chat revient tout de suite");
+    expect(open({ languages: ["sv-SE", "fr-FR", "en"] }).html.lang).toBe("fr");
+    expect(open({ languages: ["zh-TW"] }).html.lang).toBe("zh-Hans");
+    expect(open({ languages: ["in-ID"] }).html.lang).toBe("id");
     expect(open({ cookie: "agentes_locale=pt", languages: ["en-US"] }).html.lang).toBe("pt-BR");
+
+    // In that order: the app's choice, then the cookie, then the browser. "auto" skips the cookie.
+    expect(open({ locale: "pt-BR", cookie: "agentes_locale=en", languages: ["en"] }).html.lang).toBe("pt-BR");
+    expect(open({ locale: "auto", cookie: "agentes_locale=de", languages: ["ru"] }).html.lang).toBe("ru");
     expect(open({ cookie: "agentes_locale=english", languages: ["pt"] }).html.lang).toBe("pt-BR");
   });
 
@@ -327,8 +339,13 @@ describe("the page Caddy serves while the app is down", () => {
     expect(PAGE).toContain('<noscript><meta http-equiv="refresh" content="30"></noscript>');
   });
 
-  test("both languages are in it: the markup in English, the script in Portuguese", () => {
+  test("every language of the app is in it: the markup in English, the script in the other 13", () => {
     for (const words of [EN, PT]) for (const line of Object.values(words)) expect(PAGE).toContain(line);
+    const script = PAGE.slice(PAGE.indexOf("const WORDS"));
+    for (const code of LOCALE_CODES.filter((c) => c !== "en")) {
+      const line = new RegExp(`\\n\\s*"?${code}"?: \\[("[^"]+", ){3}"[^"]+"\\],`).test(script);
+      expect([code, line]).toEqual([code, true]);
+    }
   });
 
   test("its colors are the design system's, in both themes", () => {

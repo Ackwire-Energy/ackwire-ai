@@ -18,5 +18,7 @@ test("a pt-BR `key_female` reads through `t`; English and a language without it 
   expect(t("pt-BR")("chat.joined.tip", agentGrammar("Ada"))).toContain("a Ada");
   expect(t("pt-BR")("chat.joined.tip", agentGrammar("Theo"))).toContain("o Theo");
   expect(t("en")("noAi.agent", agentGrammar("Ada"))).toBe("Ada won't reply because she has no AI connected.");
-  expect(t("ja")("noAi.agent", agentGrammar("Theo"))).toBe("Theo won't reply because he has no AI connected.");
+  // ko has no `_female` form: Ada reads its base key.
+  const ko = (resources.ko.translation as { noAi: { agent: string } }).noAi.agent;
+  expect(t("ko")("noAi.agent", agentGrammar("Ada"))).toBe(ko.replace("{{name}}", "Ada"));
 });

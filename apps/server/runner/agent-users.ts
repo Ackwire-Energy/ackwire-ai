@@ -12,6 +12,7 @@ import {
   agentTmp,
   type RunCommand,
   runSync,
+  scopeOomPolicy,
   systemdBooted,
 } from "./service";
 import { joinShared, SHARED_BIN_ENV, SHARED_LINK, type SharedSpec } from "./shared-folder";
@@ -281,11 +282,18 @@ export function denySchedulers(user: string, etc = "/etc") {
  * hold), with its own temporary folders (`AGENT_RAM`, `PRIVATE_TMP`), or with
  * runuser alone where systemd isn't PID 1 (a container). Absolute paths: root
  * never looks these up on a PATH. `--collect`: a scope the OOM killer ended
- * doesn't stay behind as a failed unit. sh, unshare and sh each become the next
- * program (no fork), so runuser still passes SIGTERM on; with slave
- * propagation, what the computer unmounts leaves the agent's namespace too.
+ * doesn't stay behind as a failed unit. `OOMPolicy=continue` (`oomPolicy`): a
+ * process the kernel stops for memory takes only itself, so the command it ran
+ * fails where its caller can tell, and the agent's other work goes on. sh,
+ * unshare and sh each become the next program (no fork), so runuser still
+ * passes SIGTERM on; with slave propagation, what the computer unmounts leaves
+ * the agent's namespace too.
  */
-export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launcher {
+export function systemLauncher(
+  u: AgentUser,
+  systemd = systemdBooted(),
+  oomPolicy = systemd && scopeOomPolicy(),
+): Launcher {
   const home = agentHome(u.user);
   const runuser = ["/usr/sbin/runuser", "-u", u.user, "--"];
   const env = {
@@ -306,6 +314,7 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
       "--quiet",
       "--scope",
       "--collect",
+      ...(oomPolicy ? ["--property=OOMPolicy=continue"] : []),
       `--slice=${agentSlice(u.uid)}`,
       "--",
       "/bin/sh",
