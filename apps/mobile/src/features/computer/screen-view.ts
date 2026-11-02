@@ -28,6 +28,14 @@ const FOLLOW_MARGIN = 0.2;
 /** Trackpad points a two-finger swipe takes per notch of the wheel. */
 export const WHEEL_STEP = 18;
 
+/** Points the cursor crosses on the screen per trackpad point, aiming and traveling: the pad is smaller than the view. */
+const AIM_GAIN = 0.8;
+const TRAVEL_GAIN = 2.8;
+
+/** Finger speeds, in points per millisecond, up to which a move still aims and from which it travels flat out. */
+const AIM_SPEED = 0.1;
+const TRAVEL_SPEED = 1.2;
+
 export const clamp = (v: number, min: number, max: number) => {
   "worklet";
   return Math.max(min, Math.min(max, v));
@@ -83,7 +91,8 @@ export const toDesktop = (p: Point, camera: Point, s: number, desk: Size): Point
  */
 export const cursorGain = (speed: number, s: number) => {
   "worklet";
-  return (1.1 + (2.3 * Math.min(speed, 1.6)) / 1.6) * (0.4 / s);
+  const fast = clamp((speed - AIM_SPEED) / (TRAVEL_SPEED - AIM_SPEED), 0, 1);
+  return (AIM_GAIN + (TRAVEL_GAIN - AIM_GAIN) * fast) / s;
 };
 
 /** The camera moved just enough to keep the cursor inside the view's margin. */

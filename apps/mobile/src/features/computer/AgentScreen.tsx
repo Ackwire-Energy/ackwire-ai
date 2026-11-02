@@ -93,6 +93,8 @@ const PAD_HEIGHT = 224;
 const DOT_GAP = 9;
 /** How long a press holds before it drags. */
 const HOLD_MS = 320;
+/** Points a finger goes before the trackpad follows it: enough that a tap's small roll doesn't move the cursor. */
+const SWIPE_START = 3;
 const CAMERA = { duration: 260 };
 
 /** Everything the camera and the cursor share across the gestures, on the UI thread. */
@@ -629,6 +631,7 @@ function Trackpad({
 
   const swipe = usePanGesture({
     maxPointers: 1,
+    minDistance: SWIPE_START,
     onBegin: (e) => {
       "worklet";
       touch(e.x, e.y);
@@ -689,6 +692,7 @@ function Trackpad({
   const scroll = usePanGesture({
     minPointers: 2,
     maxPointers: 2,
+    minDistance: SWIPE_START,
     onBegin: () => {
       "worklet";
       wheel.value = 0;
