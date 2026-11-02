@@ -242,13 +242,13 @@ export const ANALYTICS_ROWS_MAX = 500;
 export const ANALYTICS_LIST_MAX = 200;
 const DAY_MS = 86_400_000;
 
-/** The dates of a read, checked: real UTC days, `from` not after `to`, at most `ANALYTICS_MAX_DAYS` of them. */
-export function analyticsRange(from: string, to: string) {
+/** The dates of a read, checked: real UTC days, `from` not after `to`, at most `maxDays` of them. */
+export function analyticsRange(from: string, to: string, maxDays = ANALYTICS_MAX_DAYS) {
   const start = utcDayMs(from);
   const end = utcDayMs(to);
-  if (start === null || end === null || start > end || (end - start) / DAY_MS + 1 > ANALYTICS_MAX_DAYS) {
+  if (start === null || end === null || start > end || (end - start) / DAY_MS + 1 > maxDays) {
     throw new ValidationError(
-      `from and to are UTC days (YYYY-MM-DD), from not after to, at most ${ANALYTICS_MAX_DAYS} days`,
+      `from and to are UTC days (YYYY-MM-DD), from not after to, at most ${maxDays} days`,
       "analytics.range",
     );
   }

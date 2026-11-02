@@ -3224,6 +3224,12 @@ async function executeRunInner(
             ...(deps.planLimitGraceMs !== undefined ? { limitGraceMs: deps.planLimitGraceMs } : {}),
             onExecuted: (call) => executedNow.push(call),
             onSteerRead: (uuids) => live.read(uuids),
+            // The end of a wait for room, for the operator's analytics (`work-analytics.ts`): the turn's own first
+            // step can come minutes later.
+            onTaken: () => {
+              if (transcript.roomWaitSince !== undefined)
+                later(() => addRunStep(db, run, "context", { roomFound: true }));
+            },
           },
           // Before anything reads the inbox again (the next step, a failure's redispatch): what the turn
           // was handed and never confirmed reading goes back there.
@@ -4179,11 +4185,14 @@ async function thinkOnce(
     onExecuted?(call: { id: string; name: string; input: unknown; result?: ToolResult }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
+    /** The brain's first event that isn't an error: a computer had room for the turn. */
+    onTaken?(): void;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
   const toolCalls: BrainStep["toolCalls"] = [];
   let executedCount = 0;
+  let taken = false;
   let usage: { input: number; output: number; source: "api" | "plan"; model?: string } | null = null;
   /** The plan said `limit`: the turn is read on until `deadline`, for the answer the brain may still finish. */
   let limit: { resetsAt?: string; deadline: number } | null = null;
@@ -4213,6 +4222,10 @@ async function thinkOnce(
       break;
     }
     const event: BrainEvent = next.value;
+    if (!taken && event.type !== "error") {
+      taken = true;
+      hooks.onTaken?.();
+    }
     if (event.type === "text_delta") onDelta(event.text);
     else if (event.type === "tool_call") {
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.

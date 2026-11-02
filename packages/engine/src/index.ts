@@ -248,6 +248,7 @@ export * from "./wiki-dm";
 export * from "./wiki-links";
 export * from "./wiki-tools";
 export * from "./withdraw-request-tool";
+export * from "./work-analytics";
 export * from "./work-tools";
 export * from "./working";
 export * from "./works";
