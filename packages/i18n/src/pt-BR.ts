@@ -1744,6 +1744,10 @@ export const ptBR = {
     forbidden: "Só quem pediu, o dono do agente ou um admin pode continuar agora",
     resumed: "{{agent}} retomou o trabalho",
     ended: "Este trabalho terminou antes de retomar",
+    canceled: "Cancelado. Não vai rodar quando o limite voltar.",
+    dontRun: "Não rodar",
+    dontRunHint: "Cancelar: nada roda quando o limite voltar",
+    dontRunForbidden: "Só quem pediu, o dono do agente ou um admin pode cancelar",
     extraTitle: "Trabalho longo pode usar o uso extra pago",
     extraHint:
       "Com o uso extra ligado no plano, o trabalho longo segue depois de 95%. Desligado, ele pausa em 95% e retoma quando o plano renovar.",
@@ -4693,6 +4697,8 @@ export const ptBR = {
       usagePausedUnknown: "Pausada até o plano renovar (limite do plano)",
       usagePausedBudget: "Pausada até {{until}} (limite do orçamento)",
       usagePausedBudgetUnknown: "Pausada até o orçamento renovar (limite do orçamento)",
+      waitingPlan: "Esperando o plano do {{plan}} · roda às {{until}}",
+      waitingPlanUnknown: "Esperando o plano do {{plan}} renovar",
     },
     pausedReason: {
       creator_left: "Pausada: quem criou saiu do workspace",
@@ -4744,6 +4750,8 @@ export const ptBR = {
       waiting: "Esperando alguém responder",
       waitingApproval: "Esperando sua aprovação",
       waitingComputer: "Esperando o computador",
+      waitingPlan: "Esperando o plano renovar",
+      waitingBudget: "Esperando o orçamento renovar",
       reported: "Contou o que achou",
       silent: "Nada novo, ficou quieta",
       failed: "Não deu certo",
@@ -4802,6 +4810,10 @@ export const ptBR = {
     /** A run paused near its plan's or budget's limit (state `usage_paused`). */
     usagePause: {
       line: "Retoma sozinha quando o limite renovar. Nada é postado na conversa.",
+      lineLimit: "Roda sozinha quando o limite voltar. Nada é postado na conversa.",
+      dontRun: "Não rodar",
+      dontRunName: "Não rodar {{name}} quando o limite voltar",
+      canceledToast: "Cancelado. Não vai rodar quando o limite voltar.",
       continuedToast: "Execução continuando.",
       forbidden: "Só quem criou a rotina, o dono do agente ou um admin pode continuar agora",
       extra_off:
@@ -10590,6 +10602,7 @@ export const ptBR = {
       plan_limit_wait: "O plano do {{plan}} chegou ao limite. Respondo {{when}}, quando ele renovar.",
       plan_limit_wait_unknown: "O plano do {{plan}} chegou ao limite. Respondo assim que ele renovar.",
       budget_wait: "Meu orçamento do mês acabou. Continuo {{when}}, ou antes se um admin aumentar o limite.",
+      usage_wait_canceled: "Cancelado. Não vai rodar quando o limite voltar.",
       usage_paused: "{{agent}} pausou este trabalho · plano do {{plan}} em {{percent}}% {{window}}",
       usage_paused_budget: "{{agent}} pausou este trabalho · orçamento do mês em {{percent}}%",
       work_auto_moved:

@@ -22,8 +22,15 @@ export interface Words {
 export const isRunAtWork = (status: RoutineRunStatus) =>
   status === "queued" || status === "running" || status === "waiting";
 
-/** Parar, not "Rodar agora": a run working now, or one paused near its plan's limit (it picks up again by itself). */
+/** Parar, not "Rodar agora": a run working now, or one waiting on its plan or budget (it picks up again by itself). */
 export const isStoppable = (r: Pick<Routine, "state">) => r.state === "running" || r.state === "usage_paused";
+
+/** Parar's words: a run waiting on its limit hasn't started its work, so stopping it is "Don't run it". */
+export const stopWordsKey = (r: Pick<Routine, "state">) =>
+  r.state === "usage_paused" ? "routines.usagePause.dontRun" : "routines.stop";
+
+/** Continuar agora is offered only for a pause near the limit, never at the limit itself (nothing is left to use). */
+export const usageContinueOffered = (r: Pick<Routine, "usagePause">) => r.usagePause?.limit !== true;
 
 /**
  * A run as the pixel strip and the calendar draw it: told people (`ok`), nothing new (`silent`),
@@ -116,6 +123,8 @@ export function runOutcome(
 ): Words {
   if (run.status === "waiting") {
     if (run.code === "waiting_computer") return { key: "routines.outcome.waitingComputer", values: {} };
+    if (run.code === "waiting_plan") return { key: "routines.outcome.waitingPlan", values: {} };
+    if (run.code === "waiting_budget") return { key: "routines.outcome.waitingBudget", values: {} };
     return { key: run.approvalId ? "routines.outcome.waitingApproval" : "routines.outcome.waiting", values: {} };
   }
   const fallback = `routines.outcome.${run.status}`;
@@ -199,8 +208,8 @@ export function routineStateTime(
 }
 
 /**
- * Milliseconds until the earliest reset among routines paused near a limit, so the list is read again then (the
- * server says the next state once `resetsAt` passes). False: nothing to wait for.
+ * Milliseconds until the earliest reset among routines waiting on a limit, so the list is read again then; a reset
+ * already past (its run picks up within a minute or two) is read again every 30 s. False: nothing to wait for.
  */
 export function usagePauseRefetchMs(
   list: readonly Pick<Routine, "state" | "usagePause">[] | undefined,
@@ -210,7 +219,8 @@ export function usagePauseRefetchMs(
     .map((r) => (r.state === "usage_paused" && r.usagePause?.resetsAt ? Date.parse(r.usagePause.resetsAt) : Number.NaN))
     .filter((at) => Number.isFinite(at));
   if (resets.length === 0) return false as const;
-  return Math.max(Math.min(...resets) - now, 0) + 1000;
+  const next = Math.min(...resets) - now;
+  return next > 0 ? next + 1000 : 30_000;
 }
 
 /**
@@ -270,8 +280,16 @@ export function routineStateWords(
     }
     case "waiting_person":
       return { key: "routines.state.waitingPerson", values: {}, icon: "waiting", tone: "waiting" };
-    // Quiet: it picks up by itself at the reset (`since` is that time here, `clockAt`).
+    // Quiet: it picks up by itself at the reset (`since` is that time here, `clockAt`). On a plan with a name: "Waiting
+    // for the Claude plan · runs at 9:00".
     case "usage_paused":
+      if (r.usagePause?.source !== "budget" && r.usagePause?.plan)
+        return {
+          key: since ? "routines.state.waitingPlan" : "routines.state.waitingPlanUnknown",
+          values: { plan: r.usagePause.plan, until: since },
+          icon: "pause",
+          tone: "neutral",
+        };
       return {
         key: `routines.state.${r.usagePause?.source === "budget" ? "usagePausedBudget" : "usagePaused"}${since ? "" : "Unknown"}`,
         values: { until: since },

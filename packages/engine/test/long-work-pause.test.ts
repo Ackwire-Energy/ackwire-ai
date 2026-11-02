@@ -481,7 +481,7 @@ test("a routine's paused slot: its people hear it, and Rodar agora runs it now",
   expect(paused?.status).not.toBe("waiting_input");
 });
 
-test("Continuar agora on the card of a run canceled while paused: the card says the work ended", async () => {
+test("a run canceled while paused: its card says it won't run, and Continuar agora on it starts nothing", async () => {
   f = await setup({ contextTools: true, budgetNanoUsd: BUDGET, reply: stepper(12) });
   await spend(f, 96);
   await post(f, "@dev analisa os pedidos");
@@ -490,10 +490,11 @@ test("Continuar agora on the card of a run canceled while paused: the card says 
   const [card] = await cards(f);
   if (!card || !paused) throw new Error("no card");
   await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, paused.id);
+  const state = async () => ((await cards(f))[0]?.meta.actionCard as { state?: string } | undefined)?.state;
+  expect(await state()).toBe("canceled");
   const deps = { db: f.db, pubsub: f.pubsub, gateway: f.gateway };
   expect(await answerNow(deps, f.owner.id, f.org.id, card.id)).toEqual({ runs: [] });
-  const [after] = await cards(f);
-  expect((after?.meta.actionCard as { state?: string } | undefined)?.state).toBe("ended");
+  expect(await state()).toBe("canceled");
 });
 
 // ── Rotinas: a routine's paused slot ─────────────────────────────────────────
@@ -512,7 +513,14 @@ test("Rotinas shows a routine's paused slot until its reset; Continuar agora for
   const id = routine?.id ?? "";
   const view = await getRoutineView(f.db, f.owner.id, f.org.id, id);
   expect(view.state).toBe("usage_paused");
-  expect(view.usagePause).toEqual({ source: "plan", resetsAt, extraOff: false, extraUsedUp: false });
+  expect(view.usagePause).toEqual({
+    source: "plan",
+    resetsAt,
+    limit: false,
+    plan: "Claude",
+    extraOff: false,
+    extraUsedUp: false,
+  });
 
   // Someone who isn't its creator, the agent's owner or an admin sees it, and can't continue it.
   const bia = await addMember(f.db, f.org.id, "member", "bia");

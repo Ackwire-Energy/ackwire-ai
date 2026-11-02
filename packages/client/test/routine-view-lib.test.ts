@@ -18,7 +18,9 @@ import {
   runPixelStatus,
   runPixels,
   runsPerDay,
+  stopWordsKey,
   usageContinueBlock,
+  usageContinueOffered,
   usageParts,
   usagePauseRefetchMs,
   whereItRuns,
@@ -145,6 +147,40 @@ describe("a routine's state and its one-tap fix", () => {
     ).toBe("extra_used_up");
   });
 
+  test("waiting at the plan's own limit: it says which plan and when it runs; Don't run it, no Continuar", () => {
+    const now = new Date(2026, 10, 2, 8, 35);
+    const resetsAt = new Date(2026, 10, 2, 9, 0).toISOString();
+    const t = ((key: string) => key) as unknown as TFunction;
+    const waiting = state({
+      state: "usage_paused",
+      usagePause: { source: "plan", resetsAt, limit: true, plan: "Claude", extraOff: false },
+    });
+    const until = routineStateTime(t, "pt-BR", waiting, now);
+    expect(routineStateWords(waiting, until)).toEqual({
+      key: "routines.state.waitingPlan",
+      values: { plan: "Claude", until: "09:00" },
+      icon: "pause",
+      tone: "neutral",
+    });
+    const unknown = state({
+      state: "usage_paused",
+      usagePause: { source: "plan", resetsAt: null, limit: true, plan: "ChatGPT", extraOff: false },
+    });
+    expect(routineStateWords(unknown, "")).toMatchObject({
+      key: "routines.state.waitingPlanUnknown",
+      values: { plan: "ChatGPT", until: "" },
+    });
+    expect(usageContinueOffered(waiting)).toBe(false);
+    expect(
+      usageContinueOffered(state({ state: "usage_paused", usagePause: { source: "plan", resetsAt, extraOff: false } })),
+    ).toBe(true);
+    expect(stopWordsKey(waiting)).toBe("routines.usagePause.dontRun");
+    expect(stopWordsKey({ state: "running" })).toBe("routines.stop");
+    // Its run in the timeline: waiting on the plan, not "working now".
+    expect(runOutcome(run({ status: "waiting", code: "waiting_plan" })).key).toBe("routines.outcome.waitingPlan");
+    expect(runOutcome(run({ status: "waiting", code: "waiting_budget" })).key).toBe("routines.outcome.waitingBudget");
+  });
+
   test("a run paused near its limit is stopped with Parar, and the list is read again at its reset", () => {
     expect(isStoppable({ state: "usage_paused" })).toBe(true);
     expect(isStoppable({ state: "running" })).toBe(true);
@@ -163,9 +199,9 @@ describe("a routine's state and its one-tap fix", () => {
         now,
       ),
     ).toBe(3_600_000 + 1000);
-    // Already past: read again in a second.
+    // Already past: its run picks up within minutes, read again every 30 s (not every second).
     expect(usagePauseRefetchMs([{ state: "usage_paused", usagePause: pause("2026-11-01T10:00:00.000Z") }], now)).toBe(
-      1000,
+      30_000,
     );
   });
 

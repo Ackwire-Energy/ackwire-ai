@@ -20,6 +20,7 @@ import {
   runErrorDetail,
   transitionRun,
 } from "./runs";
+import { USAGE_WAIT_CODES } from "./usage-pause";
 
 const { agentRuns, agentRunSteps, outbox, channels, approvals, secretRequests } = schema;
 
@@ -117,6 +118,35 @@ export async function recoverStaleRuns(
       kind: "agent_run.execute",
       payload: { runId: run.id },
       dedupeKey: `agent_run.execute:${run.id}:requeue:${now.getTime()}`,
+      maxAttempts: 4,
+    });
+    out.requeued.push(run.id);
+  }
+  // Waiting on its plan or budget past its time with no job left to wake it (that job failed or was lost): it would
+  // wait forever, and Rotinas and the agent's status would say so. Woken now; still limited, it parks again.
+  const overdue = await db
+    .select({
+      id: agentRuns.id,
+      orgId: agentRuns.orgId,
+      waitId: sql<string>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+    })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.status, "waiting_input"),
+        inArray(sql<string>`${agentRuns.transcript}->'waitingForBrain'->>'code'`, [...USAGE_WAIT_CODES]),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'waitId' is not null`,
+        sql`(${agentRuns.transcript}->'waitingForBrain'->>'until')::timestamptz < ${cutoff.toISOString()}::timestamptz`,
+        sql`not ${liveJob}`,
+      ),
+    )
+    .limit(100);
+  for (const run of overdue) {
+    await enqueue(db, {
+      orgId: run.orgId,
+      kind: "agent_run.execute",
+      payload: { runId: run.id, wait: run.waitId },
+      dedupeKey: `agent_run.execute:${run.id}:overdue:${run.waitId}:${now.getTime()}`,
       maxAttempts: 4,
     });
     out.requeued.push(run.id);
