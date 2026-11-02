@@ -285,7 +285,8 @@ export async function runCalls(db: Database, run: { id: string; orgId: string })
       call.result = {
         content: String(data.content ?? ""),
         isError: data.isError === true,
-        external: data.external === true,
+        // `data.data.outside`: the gateway's mark for any outside read, which survives `shown` dropping the envelope.
+        external: data.external === true || (data.data as { outside?: unknown } | undefined)?.outside === true,
       };
       call.safety = data.isError === true && isSafetyCode((data.data as { code?: unknown } | undefined)?.code);
       calls.set(id, call);
@@ -297,7 +298,7 @@ export async function runCalls(db: Database, run: { id: string; orgId: string })
 export interface RunCall {
   name: string;
   input: unknown;
-  /** `external`: an outside tool's answer (an MCP server), recorded without its envelope. */
+  /** `external`: an answer read from outside (an MCP server, a screen), recorded without its envelope. */
   result?: { content: string; isError?: boolean; external?: boolean };
   /** Refused for safety (`SAFETY_CODES`): final for that data. */
   safety?: boolean;

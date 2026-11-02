@@ -4,6 +4,7 @@ import { callLine, type LearnSignal, type RunCall, runCalls } from "../continuat
 import { cutText, cutTextEnd } from "../format";
 import { agentBudgetState } from "../gateway";
 import { enqueue } from "../outbox";
+import { runReadOutsideById } from "../outside";
 import { personBehindCall } from "../requester";
 import { addRunStep } from "../runs";
 import type { ToolContext } from "../tools/types";
@@ -34,15 +35,17 @@ export const readsOutside = (c: RunCall) =>
 
 /**
  * How far what a run learns is trusted (ADR 0120): high only with a person behind it (`personBehindCall`) and no
- * outside content read so far (the web, a page, mail, a connected app). Everything else stays low: data, never
- * shared, never promoted.
+ * outside content read so far (the web, a page, mail, a connected app, a computer brain's own fetches, a screen, or
+ * a conversation relaying any of these: `runReadOutside`, ADR 0117). Everything else stays low: data, never shared,
+ * never promoted.
  */
 export async function learnTrust(ctx: Pick<ToolContext, "orgId" | "runId" | "triggerMessageId"> & { db: Database }) {
-  const [person, calls] = await Promise.all([
+  const [person, calls, relayed] = await Promise.all([
     personBehindCall(ctx),
     ctx.runId ? runCalls(ctx.db, { id: ctx.runId, orgId: ctx.orgId }) : Promise.resolve([] as RunCall[]),
+    ctx.runId ? runReadOutsideById(ctx.db, ctx.orgId, ctx.runId) : Promise.resolve(false),
   ]);
-  const outside = calls.some(readsOutside);
+  const outside = relayed || calls.some(readsOutside);
   return { trust: person && !outside ? ("high" as const) : ("low" as const), person, outside };
 }
 
