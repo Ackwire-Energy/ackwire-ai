@@ -1542,6 +1542,7 @@
     "queued_other": "{{names}} stehen in der Warteschlange des Computers",
     "away_one": "{{names}} wartet auf den Computer",
     "away_other": "{{names}} warten auf den Computer",
+    "queuedNext": "{{names}} steht in der Warteschlange des Computers · als Nächstes dran",
     "nobody": "Kein Agent wird antworten",
     "status": {
       "seen": "Gesehen",
@@ -7622,6 +7623,73 @@
       "label": "Computer",
       "none": "Kein Computer",
       "noneText": "Führt keine Programme aus und speichert keine Dateien"
+    }
+  },
+  "queue": {
+    "button_one": "Computer · {{count}} wartet",
+    "button_other": "Computer · {{count}} warten",
+    "buttonIdle": "Computer",
+    "see": "Warteschlange ansehen",
+    "label": "Warteschlange für {{name}}",
+    "full": "Voll",
+    "fullNext": "Voll · der Nächste startet in etwa {{n}} Min.",
+    "free": "Niemand wartet",
+    "workingNow": "Arbeitet gerade · {{n}}",
+    "inLine": "In der Warteschlange · {{n}}",
+    "allStarted": "alle gestartet in ~{{n}} Min.",
+    "nothingWorking": "Gerade läuft nichts",
+    "rule": "Menschen zuerst. Zusammen erwähnte Agenten starten nacheinander.",
+    "youFirst": "Du bist zuerst dran",
+    "startsIn": "startet in ~{{n}} Min.",
+    "startsAfter": "startet, sobald {{after}} fertig ist",
+    "left": "noch ~{{n}} Min.",
+    "who": "{{name}}",
+    "away": "Weg seit {{time}}",
+    "purpose": {
+      "you": "antwortet dir",
+      "person": "antwortet {{name}}",
+      "someone": "antwortet einer Person",
+      "agent": "im Auftrag von {{name}}",
+      "someAgent": "im Auftrag eines Agenten",
+      "routine": "eine Routine",
+      "work": "lange Arbeit"
+    },
+    "where": {
+      "yourDm": "deine DM",
+      "dm": "DM mit {{name}}",
+      "thread": "ein Thread in #{{name}}",
+      "private": "eine private Unterhaltung"
+    },
+    "live": {
+      "nextEta": "Wartet auf den Computer. Als Nächstes dran, in etwa {{n}} Min.",
+      "nextAfter": "Wartet auf den Computer. Als Nächstes dran, sobald {{after}} fertig ist",
+      "next": "Wartet auf den Computer. Als Nächstes dran",
+      "behind": "In der Warteschlange, {{nth}}. Nach {{names}}",
+      "position": "In der Warteschlange, {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}.",
+      "two": "{{n}}.",
+      "few": "{{n}}.",
+      "other": "{{n}}."
+    },
+    "fan": {
+      "called_one": "{{count}} Agent gerufen",
+      "called_other": "{{count}} Agenten gerufen",
+      "answered_one": "{{count}} hat geantwortet",
+      "answered_other": "{{count}} haben geantwortet",
+      "working_one": "{{count}} arbeitet",
+      "working_other": "{{count}} arbeiten",
+      "inLine_one": "{{count}} wartet",
+      "inLine_other": "{{count}} warten",
+      "failed_one": "{{count}} hat nicht geantwortet",
+      "failed_other": "{{count}} haben nicht geantwortet",
+      "chip": {
+        "answered": "hat geantwortet",
+        "working": "arbeitet",
+        "inLine": "wartet",
+        "failed": "nicht geantwortet"
+      }
     }
   },
   "access": {

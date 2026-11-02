@@ -1545,6 +1545,7 @@
     "queued_other": "{{names}} staan in de rij voor de computer",
     "away_one": "{{names}} wacht op de computer",
     "away_other": "{{names}} wachten op de computer",
+    "queuedNext": "{{names}} staat in de wachtrij van de computer · is de volgende",
     "nobody": "Geen agent gaat antwoorden",
     "status": {
       "seen": "Gezien",
@@ -7705,6 +7706,73 @@
       "label": "Computer",
       "none": "Geen computer",
       "noneText": "Voert geen programma's uit en bewaart geen bestanden"
+    }
+  },
+  "queue": {
+    "button_one": "Computer · {{count}} wacht",
+    "button_other": "Computer · {{count}} wachten",
+    "buttonIdle": "Computer",
+    "see": "Wachtrij bekijken",
+    "label": "Wachtrij van {{name}}",
+    "full": "Vol",
+    "fullNext": "Vol · de volgende start over ongeveer {{n}} min",
+    "free": "Niemand in de wachtrij",
+    "workingNow": "Nu bezig · {{n}}",
+    "inLine": "In de wachtrij · {{n}}",
+    "allStarted": "allemaal gestart over ~{{n}} min",
+    "nothingWorking": "Er draait nu niets",
+    "rule": "Mensen gaan voor. Agenten die samen genoemd worden starten een voor een.",
+    "youFirst": "Jij bent eerst",
+    "startsIn": "start over ~{{n}} min",
+    "startsAfter": "start zodra {{after}} klaar is",
+    "left": "nog ~{{n}} min",
+    "who": "{{name}}",
+    "away": "Weg sinds {{time}}",
+    "purpose": {
+      "you": "antwoordt jou",
+      "person": "antwoordt {{name}}",
+      "someone": "antwoordt een persoon",
+      "agent": "gevraagd door {{name}}",
+      "someAgent": "gevraagd door een agent",
+      "routine": "een routine",
+      "work": "lang werk"
+    },
+    "where": {
+      "yourDm": "je DM",
+      "dm": "DM met {{name}}",
+      "thread": "een thread in #{{name}}",
+      "private": "een privégesprek"
+    },
+    "live": {
+      "nextEta": "Wacht op de computer. Is de volgende, over ongeveer {{n}} min",
+      "nextAfter": "Wacht op de computer. Is de volgende zodra {{after}} klaar is",
+      "next": "Wacht op de computer. Is de volgende",
+      "behind": "In de wachtrij, {{nth}}. Na {{names}}",
+      "position": "In de wachtrij, {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}e",
+      "two": "{{n}}e",
+      "few": "{{n}}e",
+      "other": "{{n}}e"
+    },
+    "fan": {
+      "called_one": "{{count}} agent geroepen",
+      "called_other": "{{count}} agenten geroepen",
+      "answered_one": "{{count}} heeft geantwoord",
+      "answered_other": "{{count}} hebben geantwoord",
+      "working_one": "{{count}} bezig",
+      "working_other": "{{count}} bezig",
+      "inLine_one": "{{count}} in de wachtrij",
+      "inLine_other": "{{count}} in de wachtrij",
+      "failed_one": "{{count}} heeft niet geantwoord",
+      "failed_other": "{{count}} hebben niet geantwoord",
+      "chip": {
+        "answered": "geantwoord",
+        "working": "bezig",
+        "inLine": "in de wachtrij",
+        "failed": "niet geantwoord"
+      }
     }
   },
   "access": {

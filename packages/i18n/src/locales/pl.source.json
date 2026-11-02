@@ -3835,6 +3835,9 @@
       "other": "{{names}} are waiting for the computer"
     }
   },
+  "receipts.queuedNext": {
+    "value": "{{names}} is in line for the computer · next"
+  },
   "receipts.nobody": {
     "value": "No agent will answer"
   },
@@ -18621,6 +18624,165 @@
   },
   "computer.target.noneText": {
     "value": "Doesn't run programs or keep files"
+  },
+  "queue.button": {
+    "value": {
+      "one": "Computer · {{count}} waiting",
+      "other": "Computer · {{count}} waiting"
+    }
+  },
+  "queue.buttonIdle": {
+    "value": "Computer"
+  },
+  "queue.see": {
+    "value": "See queue"
+  },
+  "queue.label": {
+    "value": "Line for {{name}}"
+  },
+  "queue.full": {
+    "value": "Full"
+  },
+  "queue.fullNext": {
+    "value": "Full · next starts in about {{n}} min"
+  },
+  "queue.free": {
+    "value": "Nobody in line"
+  },
+  "queue.workingNow": {
+    "value": "Working now · {{n}}"
+  },
+  "queue.inLine": {
+    "value": "In line · {{n}}"
+  },
+  "queue.allStarted": {
+    "value": "all started in ~{{n}} min"
+  },
+  "queue.nothingWorking": {
+    "value": "Nothing running right now"
+  },
+  "queue.rule": {
+    "value": "People go first. Agents mentioned together start one at a time."
+  },
+  "queue.youFirst": {
+    "value": "You go first"
+  },
+  "queue.startsIn": {
+    "value": "starts ~{{n}} min"
+  },
+  "queue.startsAfter": {
+    "value": "starts once {{after}} finishes"
+  },
+  "queue.left": {
+    "value": "~{{n}} min left"
+  },
+  "queue.who": {
+    "value": "{{name}}"
+  },
+  "queue.away": {
+    "value": "Away {{time}}"
+  },
+  "queue.purpose.you": {
+    "value": "answering you"
+  },
+  "queue.purpose.person": {
+    "value": "answering {{name}}"
+  },
+  "queue.purpose.someone": {
+    "value": "answering a person"
+  },
+  "queue.purpose.agent": {
+    "value": "asked by {{name}}"
+  },
+  "queue.purpose.someAgent": {
+    "value": "asked by an agent"
+  },
+  "queue.purpose.routine": {
+    "value": "a routine"
+  },
+  "queue.purpose.work": {
+    "value": "long work"
+  },
+  "queue.where.yourDm": {
+    "value": "your DM"
+  },
+  "queue.where.dm": {
+    "value": "DM with {{name}}"
+  },
+  "queue.where.thread": {
+    "value": "a thread in #{{name}}"
+  },
+  "queue.where.private": {
+    "value": "a private conversation"
+  },
+  "queue.live.nextEta": {
+    "value": "Waiting for the computer. Next up, in about {{n}} min"
+  },
+  "queue.live.nextAfter": {
+    "value": "Waiting for the computer. Next up, once {{after}} finishes"
+  },
+  "queue.live.next": {
+    "value": "Waiting for the computer. Next up"
+  },
+  "queue.live.behind": {
+    "value": "In line, {{nth}}. After {{names}}"
+  },
+  "queue.live.position": {
+    "value": "In line, {{nth}}"
+  },
+  "queue.nth.one": {
+    "value": "{{n}}st"
+  },
+  "queue.nth.two": {
+    "value": "{{n}}nd"
+  },
+  "queue.nth.few": {
+    "value": "{{n}}rd"
+  },
+  "queue.nth.other": {
+    "value": "{{n}}th"
+  },
+  "queue.fan.called": {
+    "value": {
+      "one": "{{count}} agent called",
+      "other": "{{count}} agents called"
+    }
+  },
+  "queue.fan.answered": {
+    "value": {
+      "one": "{{count}} answered",
+      "other": "{{count}} answered"
+    }
+  },
+  "queue.fan.working": {
+    "value": {
+      "one": "{{count}} working",
+      "other": "{{count}} working"
+    }
+  },
+  "queue.fan.inLine": {
+    "value": {
+      "one": "{{count}} in line",
+      "other": "{{count}} in line"
+    }
+  },
+  "queue.fan.failed": {
+    "value": {
+      "one": "{{count}} didn't answer",
+      "other": "{{count}} didn't answer"
+    }
+  },
+  "queue.fan.chip.answered": {
+    "value": "answered"
+  },
+  "queue.fan.chip.working": {
+    "value": "working"
+  },
+  "queue.fan.chip.inLine": {
+    "value": "in line"
+  },
+  "queue.fan.chip.failed": {
+    "value": "didn't answer"
   },
   "access.matrixTitle": {
     "value": "Agent access"

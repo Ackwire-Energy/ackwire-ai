@@ -1604,6 +1604,7 @@
     "queued_other": "{{names}} sono in coda per il computer",
     "away_one": "{{names}} attende il computer",
     "away_other": "{{names}} attendono il computer",
+    "queuedNext": "{{names}} è in coda per il computer · è il prossimo",
     "nobody": "Nessun agente risponderà",
     "status": {
       "seen": "Visto",
@@ -7984,6 +7985,73 @@
       "label": "Computer",
       "none": "Nessun computer",
       "noneText": "Non esegue programmi e non conserva file"
+    }
+  },
+  "queue": {
+    "button_one": "Computer · {{count}} in attesa",
+    "button_other": "Computer · {{count}} in attesa",
+    "buttonIdle": "Computer",
+    "see": "Vedi la coda",
+    "label": "Coda di {{name}}",
+    "full": "Pieno",
+    "fullNext": "Pieno · il prossimo inizia tra circa {{n}} min",
+    "free": "Nessuno in coda",
+    "workingNow": "Al lavoro ora · {{n}}",
+    "inLine": "In coda · {{n}}",
+    "allStarted": "tutti avviati tra ~{{n}} min",
+    "nothingWorking": "Niente in esecuzione ora",
+    "rule": "Le persone passano per prime. Gli agenti menzionati insieme partono uno alla volta.",
+    "youFirst": "Tu passi per primo",
+    "startsIn": "inizia tra ~{{n}} min",
+    "startsAfter": "inizia quando {{after}} finisce",
+    "left": "mancano ~{{n}} min",
+    "who": "{{name}}",
+    "away": "Via da {{time}}",
+    "purpose": {
+      "you": "ti sta rispondendo",
+      "person": "risponde a {{name}}",
+      "someone": "risponde a una persona",
+      "agent": "su richiesta di {{name}}",
+      "someAgent": "su richiesta di un agente",
+      "routine": "una routine",
+      "work": "lavoro lungo"
+    },
+    "where": {
+      "yourDm": "il tuo DM",
+      "dm": "DM con {{name}}",
+      "thread": "un thread in #{{name}}",
+      "private": "una conversazione privata"
+    },
+    "live": {
+      "nextEta": "In attesa del computer. È il prossimo, tra circa {{n}} min",
+      "nextAfter": "In attesa del computer. È il prossimo quando {{after}} finisce",
+      "next": "In attesa del computer. È il prossimo",
+      "behind": "In coda, {{nth}}. Dopo {{names}}",
+      "position": "In coda, {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}º",
+      "two": "{{n}}º",
+      "few": "{{n}}º",
+      "other": "{{n}}º"
+    },
+    "fan": {
+      "called_one": "{{count}} agente chiamato",
+      "called_other": "{{count}} agenti chiamati",
+      "answered_one": "{{count}} ha risposto",
+      "answered_other": "{{count}} hanno risposto",
+      "working_one": "{{count}} al lavoro",
+      "working_other": "{{count}} al lavoro",
+      "inLine_one": "{{count}} in coda",
+      "inLine_other": "{{count}} in coda",
+      "failed_one": "{{count}} non ha risposto",
+      "failed_other": "{{count}} non hanno risposto",
+      "chip": {
+        "answered": "ha risposto",
+        "working": "al lavoro",
+        "inLine": "in coda",
+        "failed": "non ha risposto"
+      }
     }
   },
   "access": {

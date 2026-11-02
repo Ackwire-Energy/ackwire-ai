@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, gte, inArray, schema, sql } from
 import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
 import { personOfMessage } from "./authority";
+import { lineMachineOf, publishQueueChanged } from "./computer-queue";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
@@ -246,9 +247,11 @@ export async function stopRun(
   const error = actor.type === "person" ? `canceled_by:${actor.id}` : actor.reason;
   let run = start;
   let previous: RunStatus = run.status;
+  let line: string | null = null;
   for (let attempt = 0; ; attempt++) {
     if (isTerminal(run.status)) throw new ConflictError("This task already ended", "run_finished");
     previous = run.status;
+    line = lineMachineOf(run);
     const status = run.status;
     let closedSecrets: SecretRequestRow[] = [];
     let closedQuestions: AgentQuestionRow[] = [];
@@ -332,6 +335,7 @@ export async function stopRun(
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
   // Its line ends with the run (ADR 0084 §11).
   await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
+  if (line) await publishQueueChanged(deps.pubsub, run.orgId, line);
   if (previous !== "running" && run.background) {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });

@@ -3485,6 +3485,50 @@ export type OutageTarget = {
   reasonOff: "offline" | "paused" | null;
 };
 
+/** What a turn on a computer is for, never its content. Ids are null when the author is gone. */
+export type QueuePurpose =
+  | { kind: "person"; userId: string | null }
+  | { kind: "agent"; agentId: string | null }
+  | { kind: "routine" }
+  | { kind: "work" };
+
+export interface QueueWhere {
+  channelId: string;
+  threadId: string | null;
+}
+
+export interface QueueWorking {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  startedAt: string;
+  /** An estimate (the agent's typical turn), never exact; null with no basis. */
+  estimatedEndAt: string | null;
+}
+
+export interface QueueWaiting {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  /** A person waits on it: it goes first. */
+  people: boolean;
+  /** 1 = next. */
+  position: number;
+  estimatedStartAt: string | null;
+  /** Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line. */
+  after: string[];
+}
+
+/** `GET …/machines/{machineId}/queue`: a computer's line; `computer.queue` org events say it changed. */
+export interface ComputerQueue {
+  machineId: string;
+  name: string;
+  working: QueueWorking[];
+  waiting: QueueWaiting[];
+}
+
 /** `GET …/machines/outages`. */
 export interface MachineOutages {
   outages: MachineOutage[];

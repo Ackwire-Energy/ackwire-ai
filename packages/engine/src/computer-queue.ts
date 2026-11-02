@@ -1,7 +1,14 @@
-import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
+import type { PubSub } from "@agenteschat/adapters";
+import { and, type Database, type Executor, eq, rowsOf, schema, sql } from "@agenteschat/db";
+import { TtlCache } from "./cache";
+import { NotFoundError } from "./errors";
+import { publishOrgEvent } from "./events";
+import { getMachine } from "./machines";
+import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { replyThreadOf } from "./runs";
 
-const { agentRuns } = schema;
+const { agentRuns, messages } = schema;
 
 /**
  * The line for a shared computer's room (ADR 0032, "Calm waits"). The runner admits a turn only while its memory
@@ -40,19 +47,23 @@ export async function roomHead(
 
 /**
  * A person's message went into this run waiting in line: a person waits on it now, so it goes to the front and looks
- * again at once (the same job as a steered message's).
+ * again at once (the same job as a steered message's). The job tells the line's viewers (`line`), after this commits.
  */
 export async function frontOfLine(db: Executor, run: { id: string; orgId: string }, messageId: string) {
   const [row] = await db
     .update(agentRuns)
     .set({ transcript: sql`jsonb_set(${agentRuns.transcript}, '{roomPeople}', 'true'::jsonb)` })
     .where(and(eq(agentRuns.id, run.id), inLine))
-    .returning({ waitId: waitIdSql });
+    .returning({ waitId: waitIdSql, machineId: agentRuns.waitingMachineId });
   if (!row) return;
   await enqueue(db, {
     orgId: run.orgId,
     kind: "agent_run.execute",
-    payload: { runId: run.id, ...(row.waitId ? { wait: row.waitId } : {}) },
+    payload: {
+      runId: run.id,
+      ...(row.waitId ? { wait: row.waitId } : {}),
+      ...(row.machineId ? { line: row.machineId } : {}),
+    },
     dedupeKey: `agent_run.execute:${run.id}:steer:${messageId}`,
     maxAttempts: 4,
   });
@@ -128,4 +139,259 @@ export async function roomGate(
   });
   if (!behind) await kickRoomQueue(db, machineId, new Date(now + ROOM_ASK_SPACING_MS));
   return behind;
+}
+
+/** The computer whose line shows this run: the one it is working on, or the one it waits in line for. */
+export function lineMachineOf(run: { transcript: unknown; waitingMachineId: string | null }): string | null {
+  const t = run.transcript as { roomAsk?: { machineId?: string }; waitingForBrain?: { code?: string } } | null;
+  if (t?.waitingForBrain?.code === "busy" && run.waitingMachineId) return run.waitingMachineId;
+  return t?.roomAsk?.machineId ?? null;
+}
+
+/** Tells every open app of the workspace that this computer's line changed, so whoever shows it reads it again. */
+export async function publishQueueChanged(pubsub: PubSub | undefined, orgId: string, machineId: string) {
+  await publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "computer.queue", machineId } });
+}
+
+/**
+ * What a turn on the computer is for, in structured words and never its content: answering a person, asked by
+ * another agent, a routine's run, or long work (ADR 0121). The ids are null when the author is gone.
+ */
+export type QueuePurpose =
+  | { kind: "person"; userId: string | null }
+  | { kind: "agent"; agentId: string | null }
+  | { kind: "routine" }
+  | { kind: "work" };
+
+export interface QueueWhere {
+  channelId: string;
+  threadId: string | null;
+}
+
+export interface QueueWorking {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  /** When this turn asked the computer (ISO). */
+  startedAt: string;
+  /** Its start plus the agent's typical computer turn, never sooner than 30 s from now; null with no basis. */
+  estimatedEndAt: string | null;
+}
+
+export interface QueueWaiting {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  /** A person waits on it: it goes first. */
+  people: boolean;
+  /** 1 = next. */
+  position: number;
+  estimatedStartAt: string | null;
+  /** Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line. */
+  after: string[];
+}
+
+export interface ComputerQueue {
+  machineId: string;
+  name: string;
+  working: QueueWorking[];
+  waiting: QueueWaiting[];
+}
+
+/** A running turn's estimated end is never sooner than this from now: an estimate never reads as "any second". */
+export const QUEUE_END_FLOOR_MS = 30_000;
+/** How many of an agent's latest finished computer turns its typical duration is read from. */
+const TYPICAL_TURNS = 20;
+
+/** Median computer-turn durations (ms): per agent, and the org's as the fallback. */
+export interface TypicalTurns {
+  byAgent: Record<string, number>;
+  org: number | null;
+}
+
+/**
+ * When each running turn should end and each waiting one start, by simulating the computer's slots: each running
+ * turn frees one at its expected end, the line takes them in order (the soonest free slot first), and an agent's turn
+ * starts at least `ROOM_ASK_SPACING_MS` after the previous ask. A slot with no basis (an agent with no history in an
+ * org with none) frees at an unknown time, and so does every turn after it. Pure, for a fixed clock.
+ */
+export function estimateQueue(
+  now: number,
+  working: readonly { agentId: string; startedAt: number }[],
+  waiting: readonly { agentId: string; people: boolean }[],
+  typical: TypicalTurns,
+): { ends: (number | null)[]; starts: (number | null)[]; after: string[][] } {
+  const typicalOf = (agentId: string) => typical.byAgent[agentId] ?? typical.org;
+  const ends = working.map((w) => {
+    const d = typicalOf(w.agentId);
+    return d === null ? null : Math.max(w.startedAt + d, now + QUEUE_END_FLOOR_MS);
+  });
+  // Unknown ends go last, the longest running of them first.
+  const slots = working.map((w, i) => ({
+    agentId: w.agentId,
+    end: ends[i] ?? Number.POSITIVE_INFINITY,
+    since: w.startedAt,
+  }));
+  let lastAsk = working.reduce((max, w) => Math.max(max, w.startedAt), Number.NEGATIVE_INFINITY);
+  const starts: (number | null)[] = [];
+  const after: string[][] = [];
+  waiting.forEach((w, i) => {
+    after.push(i === 0 ? [] : [...new Set(waiting.slice(0, i).map((a) => a.agentId))]);
+    if (slots.length === 0) {
+      starts.push(null);
+      return;
+    }
+    slots.sort((a, b) => a.end - b.end || a.since - b.since);
+    const slot = slots[0] as (typeof slots)[number];
+    if (i === 0) after[0] = [slot.agentId];
+    if (!Number.isFinite(slot.end)) {
+      starts.push(null);
+      slots[0] = { agentId: w.agentId, end: Number.POSITIVE_INFINITY, since: Number.POSITIVE_INFINITY };
+      return;
+    }
+    let start = Math.max(slot.end, now);
+    if (!w.people) start = Math.max(start, lastAsk + ROOM_ASK_SPACING_MS);
+    lastAsk = start;
+    starts.push(start);
+    const d = typicalOf(w.agentId);
+    slots[0] = { agentId: w.agentId, end: d === null ? Number.POSITIVE_INFINITY : start + d, since: start };
+  });
+  return { ends, starts, after };
+}
+
+// ponytail: per-process cache, a minute stale at most; the read touches at most 300 finished runs' transcripts.
+const typicalCache = new TtlCache<TypicalTurns>(60_000, 1000);
+
+/**
+ * The median of each agent's latest `TYPICAL_TURNS` finished computer turns, from its ask (`roomAsk.at`) to the
+ * run's end, and the org's median over those, from the last 14 days.
+ */
+export async function typicalTurns(db: Database, orgId: string): Promise<TypicalTurns> {
+  return typicalCache.getOrLoad(orgId, async () => {
+    const rows = rowsOf<{ agent_id: string | null; ms: string | number | null }>(
+      await db.execute(sql`
+        with recent as (
+          select agent_id, finished_at, transcript from agent_runs
+          where org_id = ${orgId}::uuid and status = 'done' and brain is not null and brain <> 'model'
+            and finished_at > now() - interval '14 days'
+          order by finished_at desc
+          limit 300
+        ), turns as (
+          select agent_id,
+            extract(epoch from finished_at) * 1000 - (transcript->'roomAsk'->>'at')::bigint as ms,
+            row_number() over (partition by agent_id order by finished_at desc) as n
+          from recent
+          where transcript ? 'roomAsk'
+        )
+        select agent_id, percentile_cont(0.5) within group (order by ms) as ms
+        from turns where n <= ${TYPICAL_TURNS} and ms > 0
+        group by rollup(agent_id)`),
+    );
+    const out: TypicalTurns = { byAgent: {}, org: null };
+    for (const r of rows) {
+      if (r.ms === null) continue;
+      if (r.agent_id === null) out.org = Number(r.ms);
+      else out.byAgent[r.agent_id] = Number(r.ms);
+    }
+    return out;
+  });
+}
+
+const purposeOf = (r: {
+  workId: string | null;
+  background: boolean;
+  authorType: string | null;
+  authorUserId: string | null;
+  authorAgentId: string | null;
+  viaRoutine: unknown;
+}): QueuePurpose =>
+  r.workId
+    ? { kind: "work" }
+    : r.background || (r.authorType === "person" && r.viaRoutine)
+      ? { kind: "routine" }
+      : r.authorType === "agent"
+        ? { kind: "agent", agentId: r.authorAgentId }
+        : { kind: "person", userId: r.authorUserId };
+
+/**
+ * A computer's line as every member of the workspace sees it: the turns working on it now and the runs waiting for
+ * room, in the order the engine admits them (`roomHead`), with estimates. Only the org's own computers.
+ */
+export async function computerQueue(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  machineId: string,
+  now = Date.now(),
+): Promise<ComputerQueue> {
+  await requirePermission(db, actorId, orgId, "read");
+  const machine = await getMachine(db, orgId, machineId);
+  if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
+  const cols = {
+    runId: agentRuns.id,
+    agentId: agentRuns.agentId,
+    channelId: agentRuns.channelId,
+    threadRootId: agentRuns.threadRootId,
+    triggerMessageId: agentRuns.triggerMessageId,
+    workId: agentRuns.workId,
+    background: agentRuns.background,
+    authorType: messages.authorType,
+    authorUserId: messages.authorUserId,
+    authorAgentId: messages.authorAgentId,
+    viaRoutine: sql<unknown>`${messages.meta}->'routine'`,
+  };
+  const trigger = and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.triggerMessageId));
+  const askAt = sql<string>`(${agentRuns.transcript}->'roomAsk'->>'at')::bigint`;
+  const [workingRows, waitingRows, typical] = await Promise.all([
+    db
+      .select({ ...cols, askAt })
+      .from(agentRuns)
+      .leftJoin(messages, trigger)
+      .where(
+        and(
+          eq(agentRuns.orgId, orgId),
+          eq(agentRuns.status, "running"),
+          sql`${agentRuns.transcript}->'roomAsk'->>'machineId' = ${machineId}`,
+        ),
+      )
+      .orderBy(askAt),
+    db
+      .select({ ...cols, people: sql<boolean>`${peopleSql}` })
+      .from(agentRuns)
+      .leftJoin(messages, trigger)
+      .where(and(eq(agentRuns.orgId, orgId), waitingForRoom(machineId)))
+      .orderBy(sql`${peopleSql} desc`, sinceSql, agentRuns.id),
+    typicalTurns(db, orgId),
+  ]);
+  const working = workingRows.map((r) => ({ ...r, startedAt: Number(r.askAt) }));
+  const est = estimateQueue(now, working, waitingRows, typical);
+  const iso = (ms: number | null | undefined) => (ms == null ? null : new Date(ms).toISOString());
+  const where = (r: { channelId: string; threadRootId: string; triggerMessageId: string }) => ({
+    channelId: r.channelId,
+    threadId: replyThreadOf(r),
+  });
+  return {
+    machineId,
+    name: machine.name,
+    working: working.map((r, i) => ({
+      runId: r.runId,
+      agentId: r.agentId,
+      purpose: purposeOf(r),
+      where: where(r),
+      startedAt: new Date(r.startedAt).toISOString(),
+      estimatedEndAt: iso(est.ends[i]),
+    })),
+    waiting: waitingRows.map((r, i) => ({
+      runId: r.runId,
+      agentId: r.agentId,
+      purpose: purposeOf(r),
+      where: where(r),
+      people: Boolean(r.people),
+      position: i + 1,
+      estimatedStartAt: iso(est.starts[i]),
+      after: est.after[i] ?? [],
+    })),
+  };
 }

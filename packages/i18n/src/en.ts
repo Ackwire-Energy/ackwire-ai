@@ -1516,6 +1516,8 @@ export const en = {
     queued_other: "{{names}} are in line for the computer",
     away_one: "{{names}} is waiting for the computer",
     away_other: "{{names}} are waiting for the computer",
+    /** One agent first in the computer's line. */
+    queuedNext: "{{names}} is in line for the computer · next",
     nobody: "No agent will answer",
     status: {
       seen: "Saw it",
@@ -7270,6 +7272,84 @@ export const en = {
       label: "Computer",
       none: "No computer",
       noneText: "Doesn't run programs or keep files",
+    },
+  },
+  /** A shared computer's line: who works on it now, who waits, and estimates (never exact: "~"). */
+  queue: {
+    /** The conversation header's button. */
+    button_one: "Computer · {{count}} waiting",
+    button_other: "Computer · {{count}} waiting",
+    buttonIdle: "Computer",
+    see: "See queue",
+    /** The dialog's label for screen readers; the visible title is the computer's name. */
+    label: "Line for {{name}}",
+    full: "Full",
+    fullNext: "Full · next starts in about {{n}} min",
+    free: "Nobody in line",
+    workingNow: "Working now · {{n}}",
+    inLine: "In line · {{n}}",
+    allStarted: "all started in ~{{n}} min",
+    nothingWorking: "Nothing running right now",
+    rule: "People go first. Agents mentioned together start one at a time.",
+    youFirst: "You go first",
+    startsIn: "starts ~{{n}} min",
+    /** {{after}} is `queue.who`: the agent's name, with an article where the language needs one. */
+    startsAfter: "starts once {{after}} finishes",
+    left: "~{{n}} min left",
+    /** An agent's name inside a sentence ("once Ada finishes"). Keep {{name}}; add an article only if your language needs one. */
+    who: "{{name}}",
+    /** The outage card's pill beside the time, {{time}} like "3 min". */
+    away: "Away {{time}}",
+    /** What a turn is for: the row reads "Theo · answering you · your DM · 9 min". */
+    purpose: {
+      you: "answering you",
+      person: "answering {{name}}",
+      someone: "answering a person",
+      agent: "asked by {{name}}",
+      someAgent: "asked by an agent",
+      routine: "a routine",
+      work: "long work",
+    },
+    where: {
+      yourDm: "your DM",
+      dm: "DM with {{name}}",
+      thread: "a thread in #{{name}}",
+      private: "a private conversation",
+    },
+    /** The waiting agent's live row, where "thinking" shows otherwise. */
+    live: {
+      nextEta: "Waiting for the computer. Next up, in about {{n}} min",
+      nextAfter: "Waiting for the computer. Next up, once {{after}} finishes",
+      next: "Waiting for the computer. Next up",
+      /** {{nth}} is the place in line (`queue.nth`), {{names}} the agents ahead. */
+      behind: "In line, {{nth}}. After {{names}}",
+      position: "In line, {{nth}}",
+    },
+    /** Places in line by the language's ordinal rule (one: 1st, 21st; two: 2nd; few: 3rd; other: 4th). Same text in each when your language has one form. */
+    nth: {
+      one: "{{n}}st",
+      two: "{{n}}nd",
+      few: "{{n}}rd",
+      other: "{{n}}th",
+    },
+    /** The strip under a message that called several agents. */
+    fan: {
+      called_one: "{{count}} agent called",
+      called_other: "{{count}} agents called",
+      answered_one: "{{count}} answered",
+      answered_other: "{{count}} answered",
+      working_one: "{{count}} working",
+      working_other: "{{count}} working",
+      inLine_one: "{{count}} in line",
+      inLine_other: "{{count}} in line",
+      failed_one: "{{count}} didn't answer",
+      failed_other: "{{count}} didn't answer",
+      chip: {
+        answered: "answered",
+        working: "working",
+        inLine: "in line",
+        failed: "didn't answer",
+      },
     },
   },
   access: {

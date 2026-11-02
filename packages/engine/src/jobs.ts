@@ -17,6 +17,7 @@ import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
+import { publishQueueChanged } from "./computer-queue";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -623,6 +624,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "agent_run.execute": async (job, ctx) => {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
+      // It went to the front of its computer's line (`frontOfLine`): told here, once its move is committed.
+      if (typeof job.payload.line === "string")
+        await publishQueueChanged(deps.pubsub, orgOf(job), job.payload.line).catch(() => {});
       await queryTrace.run({ count: 0 }, () =>
         executeRun(deps, String(job.payload.runId), { ...ctx, jobId: job.id, ...(wait ? { wait } : {}) }),
       );

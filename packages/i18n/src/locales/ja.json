@@ -1481,6 +1481,7 @@
     "outage_other": "{{names}}: AIプロバイダーが停止中 · 自動で再試行します",
     "queued_other": "{{names}}がコンピューターの順番待ちです",
     "away_other": "{{names}}がコンピューターを待っています",
+    "queuedNext": "{{names}}はコンピューターの待ち行列にいます · 次の番",
     "nobody": "回答するエージェントはいません",
     "status": {
       "seen": "確認済み",
@@ -7306,6 +7307,67 @@
       "label": "コンピューター",
       "none": "コンピューターなし",
       "noneText": "プログラムの実行やファイルの保存はしません"
+    }
+  },
+  "queue": {
+    "button_other": "コンピューター · {{count}}件待機中",
+    "buttonIdle": "コンピューター",
+    "see": "待ち行列を見る",
+    "label": "{{name}}の待ち行列",
+    "full": "満杯",
+    "fullNext": "満杯 · 次は約{{n}}分後に開始",
+    "free": "待っている人はいません",
+    "workingNow": "作業中 · {{n}}",
+    "inLine": "待機中 · {{n}}",
+    "allStarted": "全員が約{{n}}分以内に開始",
+    "nothingWorking": "今は何も実行されていません",
+    "rule": "人が優先です。一緒にメンションされたエージェントは1つずつ開始します。",
+    "youFirst": "あなたが先です",
+    "startsIn": "約{{n}}分後に開始",
+    "startsAfter": "{{after}}が終わると開始",
+    "left": "残り約{{n}}分",
+    "who": "{{name}}",
+    "away": "{{time}}離脱中",
+    "purpose": {
+      "you": "あなたに回答中",
+      "person": "{{name}}に回答中",
+      "someone": "ある人に回答中",
+      "agent": "{{name}}からの依頼",
+      "someAgent": "エージェントからの依頼",
+      "routine": "ルーティン",
+      "work": "長い作業"
+    },
+    "where": {
+      "yourDm": "あなたのDM",
+      "dm": "{{name}}とのDM",
+      "thread": "#{{name}}のスレッド",
+      "private": "非公開の会話"
+    },
+    "live": {
+      "nextEta": "コンピューター待ち。次の番です。約{{n}}分後",
+      "nextAfter": "コンピューター待ち。{{after}}が終わると次の番です",
+      "next": "コンピューター待ち。次の番です",
+      "behind": "待ち行列の{{nth}}。{{names}}の後",
+      "position": "待ち行列の{{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}番目",
+      "two": "{{n}}番目",
+      "few": "{{n}}番目",
+      "other": "{{n}}番目"
+    },
+    "fan": {
+      "called_other": "{{count}}体のエージェントを呼び出し",
+      "answered_other": "{{count}}体が回答",
+      "working_other": "{{count}}体が作業中",
+      "inLine_other": "{{count}}体が待機中",
+      "failed_other": "{{count}}体が未回答",
+      "chip": {
+        "answered": "回答済み",
+        "working": "作業中",
+        "inLine": "待機中",
+        "failed": "未回答"
+      }
     }
   },
   "access": {

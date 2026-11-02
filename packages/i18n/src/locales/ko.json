@@ -1481,6 +1481,7 @@
     "outage_other": "{{names}}: AI 제공업체 장애 · 자동으로 다시 시도해요",
     "queued_other": "{{names}}이(가) 컴퓨터 차례를 기다리는 중이에요",
     "away_other": "{{names}}이(가) 컴퓨터를 기다리는 중이에요",
+    "queuedNext": "{{names}}이(가) 컴퓨터 대기열에 있음 · 다음 차례",
     "nobody": "답할 에이전트가 없어요",
     "status": {
       "seen": "확인함",
@@ -7299,6 +7300,67 @@
       "label": "컴퓨터",
       "none": "컴퓨터 없음",
       "noneText": "프로그램을 실행하거나 파일을 보관하지 않아요"
+    }
+  },
+  "queue": {
+    "button_other": "컴퓨터 · {{count}}개 대기 중",
+    "buttonIdle": "컴퓨터",
+    "see": "대기열 보기",
+    "label": "{{name}} 대기열",
+    "full": "가득 참",
+    "fullNext": "가득 참 · 다음 차례는 약 {{n}}분 후 시작",
+    "free": "대기 중인 항목 없음",
+    "workingNow": "지금 작업 중 · {{n}}",
+    "inLine": "대기 중 · {{n}}",
+    "allStarted": "모두 약 {{n}}분 안에 시작",
+    "nothingWorking": "지금 실행 중인 작업 없음",
+    "rule": "사람이 먼저입니다. 함께 멘션된 에이전트는 하나씩 시작합니다.",
+    "youFirst": "내 차례가 먼저",
+    "startsIn": "약 {{n}}분 후 시작",
+    "startsAfter": "{{after}} 작업이 끝나면 시작",
+    "left": "약 {{n}}분 남음",
+    "who": "{{name}}",
+    "away": "{{time}}째 연결 끊김",
+    "purpose": {
+      "you": "나에게 답하는 중",
+      "person": "{{name}}에게 답하는 중",
+      "someone": "사람에게 답하는 중",
+      "agent": "{{name}}의 요청",
+      "someAgent": "에이전트의 요청",
+      "routine": "루틴",
+      "work": "긴 작업"
+    },
+    "where": {
+      "yourDm": "내 DM",
+      "dm": "{{name}}과의 DM",
+      "thread": "#{{name}}의 스레드",
+      "private": "비공개 대화"
+    },
+    "live": {
+      "nextEta": "컴퓨터를 기다리는 중. 다음 차례, 약 {{n}}분 후",
+      "nextAfter": "컴퓨터를 기다리는 중. {{after}} 작업이 끝나면 다음 차례",
+      "next": "컴퓨터를 기다리는 중. 다음 차례",
+      "behind": "대기열 {{nth}}. {{names}} 다음",
+      "position": "대기열 {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}번째",
+      "two": "{{n}}번째",
+      "few": "{{n}}번째",
+      "other": "{{n}}번째"
+    },
+    "fan": {
+      "called_other": "에이전트 {{count}}개 호출",
+      "answered_other": "{{count}}개 답변",
+      "working_other": "{{count}}개 작업 중",
+      "inLine_other": "{{count}}개 대기 중",
+      "failed_other": "{{count}}개 답변 못 함",
+      "chip": {
+        "answered": "답변함",
+        "working": "작업 중",
+        "inLine": "대기 중",
+        "failed": "답변 못 함"
+      }
     }
   },
   "access": {

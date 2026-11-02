@@ -1481,6 +1481,7 @@
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
     "queued_other": "{{names}} sedang antre untuk komputer",
     "away_other": "{{names}} menunggu komputer",
+    "queuedNext": "{{names}} mengantre untuk komputer · berikutnya",
     "nobody": "Tidak ada agen yang akan menjawab",
     "status": {
       "seen": "Sudah melihat",
@@ -7373,6 +7374,67 @@
       "label": "Komputer",
       "none": "Tanpa komputer",
       "noneText": "Tidak menjalankan program atau menyimpan file"
+    }
+  },
+  "queue": {
+    "button_other": "Komputer · {{count}} menunggu",
+    "buttonIdle": "Komputer",
+    "see": "Lihat antrean",
+    "label": "Antrean {{name}}",
+    "full": "Penuh",
+    "fullNext": "Penuh · berikutnya mulai sekitar {{n}} mnt lagi",
+    "free": "Tidak ada yang mengantre",
+    "workingNow": "Sedang bekerja · {{n}}",
+    "inLine": "Dalam antrean · {{n}}",
+    "allStarted": "semua mulai dalam ~{{n}} mnt",
+    "nothingWorking": "Tidak ada yang berjalan sekarang",
+    "rule": "Orang didahulukan. Agen yang disebut bersamaan mulai satu per satu.",
+    "youFirst": "Kamu duluan",
+    "startsIn": "mulai ~{{n}} mnt lagi",
+    "startsAfter": "mulai setelah {{after}} selesai",
+    "left": "sisa ~{{n}} mnt",
+    "who": "{{name}}",
+    "away": "Pergi {{time}}",
+    "purpose": {
+      "you": "menjawab kamu",
+      "person": "menjawab {{name}}",
+      "someone": "menjawab seseorang",
+      "agent": "diminta {{name}}",
+      "someAgent": "diminta agen",
+      "routine": "rutinitas",
+      "work": "kerja panjang"
+    },
+    "where": {
+      "yourDm": "DM kamu",
+      "dm": "DM dengan {{name}}",
+      "thread": "thread di #{{name}}",
+      "private": "percakapan pribadi"
+    },
+    "live": {
+      "nextEta": "Menunggu komputer. Giliran berikutnya, sekitar {{n}} mnt lagi",
+      "nextAfter": "Menunggu komputer. Giliran berikutnya setelah {{after}} selesai",
+      "next": "Menunggu komputer. Giliran berikutnya",
+      "behind": "Dalam antrean, ke-{{nth}}. Setelah {{names}}",
+      "position": "Dalam antrean, ke-{{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}",
+      "two": "{{n}}",
+      "few": "{{n}}",
+      "other": "{{n}}"
+    },
+    "fan": {
+      "called_other": "{{count}} agen dipanggil",
+      "answered_other": "{{count}} menjawab",
+      "working_other": "{{count}} bekerja",
+      "inLine_other": "{{count}} mengantre",
+      "failed_other": "{{count}} tidak menjawab",
+      "chip": {
+        "answered": "menjawab",
+        "working": "bekerja",
+        "inLine": "mengantre",
+        "failed": "tidak menjawab"
+      }
     }
   },
   "access": {
