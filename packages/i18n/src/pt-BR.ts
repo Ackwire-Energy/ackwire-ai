@@ -9128,6 +9128,7 @@ export const ptBR = {
         app_scheme: "Volta para o app Cursor neste computador",
       },
       reservedName: "Este nome não foi confirmado. Confira o endereço acima.",
+      reservedNameLoopback: "Este nome não foi confirmado. Nada prova que este programa é mesmo {{name}}.",
       signedInAs: "Entrando como {{name}} ({{email}})",
       switchAccount: "Trocar de conta",
       workspace: "Workspace",

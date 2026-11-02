@@ -257,7 +257,14 @@ function ConsentForm({
             )}
           </span>
         </div>
-        {client.reservedNameWarning && <Alert>{t("apps.consent.reservedName")}</Alert>}
+        {client.reservedNameWarning && (
+          // A program on this computer has no address above to check: the title says only "neste computador".
+          <Alert>
+            {t(client.displayKind === "loopback" ? "apps.consent.reservedNameLoopback" : "apps.consent.reservedName", {
+              name: name.short,
+            })}
+          </Alert>
+        )}
         <p className="consent__account small muted">
           <span>{t("apps.consent.signedInAs", consent.account)}</span>
           <button
@@ -359,9 +366,12 @@ function ConsentForm({
         {client.displayKind === "loopback" && <Alert tone="neutral">{t("apps.consent.loopbackWarning")}</Alert>}
         <div className="apps-field" style={{ gap: 4 }}>
           <span className="small">{t("apps.consent.startedNow")}</span>
-          <span className="consent__returns small muted">
-            {t("apps.consent.returnsTo", { place: visibleText(client.returnsTo) })}
-          </span>
+          {/* Cursor's raw scheme: the line under the title already says where in friendly words. */}
+          {client.displayKind !== "app_scheme" && (
+            <span className="consent__returns small muted">
+              {t("apps.consent.returnsTo", { place: visibleText(client.returnsTo) })}
+            </span>
+          )}
         </div>
         <div className="consent__actions">
           <Button type="button" disabled={busy} onClick={() => onDecide({ decision: "deny" }, app)}>

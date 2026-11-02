@@ -168,6 +168,10 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0113)", () => {
     expect(page().textContent).toContain("Qualquer programa neste computador pode receber este acesso.");
     expect(page().querySelector(".consent__app .ac-brand svg")).not.toBeNull();
     expect(page().textContent).toContain("Volta para localhost:33418\\u{200b}");
+    // No address above to check: the warning says what is unproven instead.
+    expect(within(page()).getByRole("alert").textContent).toBe(
+      "Este nome não foi confirmado. Nada prova que este programa é mesmo Claude Code.",
+    );
   });
 
   test("Cursor's own scheme: Cursor, its mark, and back to the app on this computer", async () => {
@@ -183,7 +187,9 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0113)", () => {
     expect(title().textContent).toBe("Cursor quer acessar sua conta");
     expect(page().textContent).toContain("Volta para o app Cursor neste computador");
     expect(page().querySelector(".consent__app .ac-brand")?.getAttribute("data-mark")).toBe("cursor");
-    expect(page().textContent).toContain("Volta para cursor://anysphere.cursor-mcp");
+    // Said once, in words: the raw scheme never shows.
+    expect(page().textContent?.match(/Volta para/g)).toHaveLength(1);
+    expect(page().textContent).not.toContain("cursor://");
   });
 
   test("an app that asks only to read: no sending to choose", async () => {

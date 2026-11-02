@@ -3560,7 +3560,9 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   --skeleton: var(--surface-sunken);
   --skeleton-shine: color-mix(in srgb, var(--surface-sunken) 45%, var(--surface-raised));
 }
-[data-theme="dark"] {
+/* Resolved again on the skeleton itself, so inside a card or dialog (the elevation context) it is a step above it. */
+[data-theme="dark"],
+[data-theme="dark"] .ac-skeleton {
   --skeleton: var(--surface-raised);
   --skeleton-shine: color-mix(in srgb, var(--surface-raised) 60%, var(--line));
 }

@@ -9057,6 +9057,7 @@ export const en: Translations = {
         app_scheme: "Returns to the Cursor app on this computer",
       },
       reservedName: "This name wasn't confirmed. Check the address above.",
+      reservedNameLoopback: "This name wasn't confirmed. Nothing proves this program is really {{name}}.",
       signedInAs: "Signed in as {{name}} ({{email}})",
       switchAccount: "Switch account",
       workspace: "Workspace",
