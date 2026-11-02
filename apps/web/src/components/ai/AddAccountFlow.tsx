@@ -9,7 +9,7 @@ import {
   loginReadPasses,
   otherThanHint,
 } from "@agenteschat/client/lib/machines";
-import { CURSOR_KEY_PLAN, type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
+import { type PlanId, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -207,8 +207,7 @@ function AddAccountFlow({
   const codeId = useId();
   // Cursor: its sign-in, or (chosen under it) its API key, which goes like a coding plan's key.
   const [cursorKey, setCursorKey] = useState(false);
-  const plan = planOf(provider) ?? (kind === "cursor" && cursorKey ? CURSOR_KEY_PLAN : undefined);
-  const keyProvider = planOf(provider) ? provider : plan ? "cursor" : undefined;
+  const { plan, provider: keyProvider } = signInKey(provider, kind, cursorKey);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);

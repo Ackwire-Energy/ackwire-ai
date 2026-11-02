@@ -67,6 +67,16 @@ export const CURSOR_KEY_PLAN: Pick<CodingPlan, "label" | "name" | "maker" | "sit
   placeholder: "key_",
 };
 
+/**
+ * The key step an account sign-in shows, if any: a coding plan's (its `provider`), or Cursor's API key when chosen
+ * under Cursor's sign-in; and the `provider` the sign-in starts with.
+ */
+export function signInKey(provider: string | undefined, kind: string, cursorKey: boolean) {
+  const coding = planOf(provider);
+  if (coding) return { plan: coding as typeof CURSOR_KEY_PLAN, provider };
+  return kind === "cursor" && cursorKey ? { plan: CURSOR_KEY_PLAN, provider: "cursor" } : { plan: undefined, provider: undefined };
+}
+
 export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
 
 /** Team and enterprise seats are one person's each, not a personal subscription. */
