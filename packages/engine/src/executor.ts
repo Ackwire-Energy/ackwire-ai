@@ -31,6 +31,7 @@ import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
+import { agentsDmReads } from "./agents-dm-reads";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
 import { fedByRoutine, personOfMessage, runAuthority } from "./authority";
@@ -1451,9 +1452,13 @@ async function executeRunInner(
     const system: ContextBlock[] = [...context.system];
     if (contextDeps && context.stats.truncated) {
       // Long thread: the summary stands in for what didn't fit.
-      const summary = await ensureThreadSummary(contextDeps, run.orgId, run.threadRootId, { force: true }).catch(
+      const found = await ensureThreadSummary(contextDeps, run.orgId, run.threadRootId, { force: true }).catch(
         () => null,
       );
+      const dm = found
+        ? await agentsDmReads(db, run.orgId, run.channelId, await personBehind().catch(() => null))
+        : null;
+      const summary = found && (!dm || (await dm.item(found))) ? found : null;
       if (summary)
         system.push({ text: `# Earlier in this thread (summary)\n${itemLabel(summary)} ${summary.content}` });
     }

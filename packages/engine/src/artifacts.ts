@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, or, rowsOf, schema, sql } from "@agenteschat/db";
+import { type AgentsDmReads, agentsDmReads } from "./agents-dm-reads";
 import { recordAudit } from "./audit";
+import { runAuthorityById } from "./authority";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -438,10 +440,35 @@ async function personReadableChannels(db: Database, userId: string, orgId: strin
   return rows.map((r) => r.id);
 }
 
-async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "channelId">) {
+/** The person behind an agent's run (`authority.ts`), or null: whose conversations it may also read files of. */
+async function personOfActor(db: Database, orgId: string, actor: Extract<ArtifactActor, { type: "agent" }>) {
+  return actor.runId ? (await runAuthorityById(db, orgId, actor.runId)).personId : null;
+}
+
+/** Whether every version of an artifact in the agents' DM was made by a run for the same person (`agentsDmReads`). */
+async function madeForSamePerson(db: Database, dm: AgentsDmReads, artifactId: string) {
+  const rows = await db
+    .select({ runId: artifactVersions.runId })
+    .from(artifactVersions)
+    .where(eq(artifactVersions.artifactId, artifactId));
+  const results = await Promise.all(rows.map((v) => (v.runId ? dm.ofRun(v.runId) : false)));
+  return rows.length > 0 && results.every(Boolean);
+}
+
+/**
+ * An agent reads the files of its run's conversation, of public channels it is in, of the conversations it shares
+ * with the person behind the run (as `listArtifacts` lists them) and org-wide ones. In the agents' DM, only those
+ * made for the same person.
+ */
+async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "id" | "channelId">) {
   if (actor.type === "person") return personCanRead(db, actor.userId, orgId, a);
   if (!a.channelId) return true;
-  return (await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId);
+  const person = await personOfActor(db, orgId, actor);
+  if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId)) {
+    return person !== null && (await requesterSharedChannels(db, orgId, actor.agentId, person)).includes(a.channelId);
+  }
+  const dm = await agentsDmReads(db, orgId, a.channelId, person);
+  return !dm || madeForSamePerson(db, dm, a.id);
 }
 
 async function requireMember(db: Database, actor: ArtifactActor, orgId: string) {
@@ -950,7 +977,9 @@ export async function listArtifacts(
 ): Promise<ArtifactView[]> {
   await requireMember(db, actor, orgId);
   let visible: string[];
+  let dm: AgentsDmReads | null = null;
   if (actor.type === "agent") {
+    dm = await agentsDmReads(db, orgId, actor.channelId, await personOfActor(db, orgId, actor));
     visible = await agentSearchChannels(db, orgId, actor.agentId, actor.channelId);
     if (filters.requesterUserId) {
       const shared = await requesterSharedChannels(db, orgId, actor.agentId, filters.requesterUserId);
@@ -985,7 +1014,12 @@ export async function listArtifacts(
     )
     .orderBy(desc(artifacts.updatedAt))
     .limit(Math.min(200, filters.limit ?? 100));
-  return rows.map((a) => view(a, actor.type === "person" && editableKind(a.kind)));
+  const fromDm = dm
+    ? await Promise.all(rows.map((a) => a.channelId !== dm.channelId || madeForSamePerson(db, dm, a.id)))
+    : null;
+  return rows
+    .filter((_, i) => fromDm?.[i] !== false)
+    .map((a) => view(a, actor.type === "person" && editableKind(a.kind)));
 }
 
 /**

@@ -1273,8 +1273,13 @@ export async function routineSeer(
  * The org's routines for an agent's read tool (`list_routines` with `agent`):
  * no person check here, the caller is an agent of the org and filters what it
  * may show (audiences, private conversations). Optionally one agent's only.
+ * With `viewerId` (the person behind the run), prompts and run records as that person sees them in Settings › Rotinas.
  */
-export async function listOrgRoutines(db: Database, orgId: string, options: { agentId?: string } = {}) {
+export async function listOrgRoutines(
+  db: Database,
+  orgId: string,
+  options: { agentId?: string; viewerId?: string | null } = {},
+) {
   const rows = await db
     .select()
     .from(routines)
@@ -1286,7 +1291,7 @@ export async function listOrgRoutines(db: Database, orgId: string, options: { ag
       ),
     )
     .orderBy(routines.createdAt);
-  return views(db, rows, null);
+  return views(db, rows, options.viewerId ?? null);
 }
 
 async function loadRoutine(db: Database, orgId: string, id: string, options: { deleted?: boolean } = {}) {
