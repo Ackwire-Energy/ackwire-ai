@@ -399,6 +399,17 @@ describe("one item is worked once, noise waits for a digest, repeats stop (ยง4โ€
     expect(updated?.pendingMessageIds?.length).toBe(1);
   });
 
+  test("a burst of one alert starts one run: a wake whose run is still starting counts as open work", async () => {
+    f = await setup();
+    const ada = await agentOf("Ada", "ada");
+    const body = "Sentry: TypeError em checkout https://sentry.example.com/issues/42/";
+    const burst = await Promise.all([1, 2, 3].map(() => alert(f.agent.id, body)));
+    const outs = await Promise.all(burst.map((m) => brakeWakes({ db: f.db, judge: fakeJudge(0) }, m, [ada.id])));
+    expect(outs.filter((o) => o.wake.length > 0)).toHaveLength(1);
+    expect(outs.filter((o) => o.held.get(ada.id) === "linked")).toHaveLength(2);
+    expect(await signalsOf("wake")).toHaveLength(1);
+  });
+
   test(`${LOOP_MAX} tries at one item in a day: it stops and a person hears it once`, async () => {
     f = await setup();
     const ada = await agentOf("Ada", "ada");

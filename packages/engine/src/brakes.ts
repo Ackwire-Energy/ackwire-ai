@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PubSub } from "@agenteschat/adapters";
 import { PERMISSION_TOOL } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { accountablePerson, messageRoot, type RunAuthority } from "./authority";
 import {
   AUTONOMY_DEFAULTS,
@@ -520,6 +520,9 @@ export async function brakeWakes(
   return { wake: agentIds.filter((id) => !held.has(id)), held };
 }
 
+/** A wake recorded this recently whose run doesn't exist yet counts as open work on its item (it is starting). */
+const STARTING_MS = 5 * 60_000;
+
 async function brakeOne(
   deps: { db: Database; pubsub?: PubSub },
   message: Message,
@@ -531,84 +534,120 @@ async function brakeOne(
 ): Promise<BrakeOutcome | null> {
   const { db } = deps;
   const orgId = message.orgId;
-  const record = (kind: string, extra: { runId?: string | null; doneAt?: Date } = {}) =>
-    db.insert(autonomySignals).values({
-      orgId,
-      agentId,
-      kind,
-      signature: sig?.key ?? null,
-      title: sig?.title ?? cutText(unmention(message.body), 200),
-      channelId: message.channelId,
-      messageId: message.id,
-      runId: extra.runId ?? null,
-      ...(extra.doneAt ? { doneAt: extra.doneAt } : {}),
-    });
+  const record = (tx: Executor, kind: string, extra: { runId?: string | null; doneAt?: Date } = {}) =>
+    tx
+      .insert(autonomySignals)
+      .values({
+        orgId,
+        agentId,
+        kind,
+        signature: sig?.key ?? null,
+        title: sig?.title ?? cutText(unmention(message.body), 200),
+        channelId: message.channelId,
+        messageId: message.id,
+        runId: extra.runId ?? null,
+        ...(extra.doneAt ? { doneAt: extra.doneAt } : {}),
+      })
+      .returning({ id: autonomySignals.id });
+  // The item's wake, claimed under a lock with the checks so two reports of one item at once start one run; it
+  // becomes what the rest decides.
+  let claim: string | null = null;
   if (sig?.alert) {
-    // §4: open work on the same item (a run still at it) takes the new report instead of a second run.
-    const [open] = await db
-      .select({ run: agentRuns })
-      .from(autonomySignals)
-      .innerJoin(
-        agentRuns,
-        and(eq(agentRuns.triggerMessageId, autonomySignals.messageId), eq(agentRuns.agentId, autonomySignals.agentId)),
-      )
-      .where(
-        and(
-          eq(autonomySignals.orgId, orgId),
-          eq(autonomySignals.agentId, agentId),
-          eq(autonomySignals.signature, sig.key),
-          eq(autonomySignals.kind, "wake"),
-          inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
-        ),
-      )
-      .orderBy(desc(autonomySignals.createdAt))
-      .limit(1);
-    if (open) {
-      await record("linked", { runId: open.run.id, doneAt: new Date() });
-      const delivered = await db.transaction((tx) =>
-        deliverNoticeToRun(tx, open.run, {
-          kind: "agent_note",
-          text: `The same item was reported again (${sig.title}). You are already on it in this run: don't start it over; include it in your report.`,
-          refs: { runId: open.run.id, messageId: message.id },
-        }),
-      );
-      await publishDelivery(deps.pubsub, delivered);
+    const key = sig.key;
+    const checked = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`autonomy:${agentId}:${key}`}))`);
+      // §4: open work on the same item (a run still at it, or one just starting) takes the new report.
+      const [open] = await tx
+        .select({ run: agentRuns })
+        .from(autonomySignals)
+        .leftJoin(
+          agentRuns,
+          and(
+            eq(agentRuns.triggerMessageId, autonomySignals.messageId),
+            eq(agentRuns.agentId, autonomySignals.agentId),
+          ),
+        )
+        .where(
+          and(
+            eq(autonomySignals.orgId, orgId),
+            eq(autonomySignals.agentId, agentId),
+            eq(autonomySignals.signature, key),
+            eq(autonomySignals.kind, "wake"),
+            or(
+              inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
+              and(isNull(agentRuns.id), gt(autonomySignals.createdAt, new Date(Date.now() - STARTING_MS))),
+            ),
+          ),
+        )
+        .orderBy(desc(autonomySignals.createdAt))
+        .limit(1);
+      if (open) {
+        await record(tx, "linked", { runId: open.run?.id ?? null, doneAt: new Date() });
+        return { linked: open.run };
+      }
+      // §6: tried too often lately: stop, and tell a person once per window.
+      const [tries] = await tx
+        .select({
+          n: sql<number>`count(*)::int`,
+          stopped: sql<number>`count(*) filter (where ${autonomySignals.kind} = 'loop')::int`,
+        })
+        .from(autonomySignals)
+        .where(
+          and(
+            eq(autonomySignals.orgId, orgId),
+            eq(autonomySignals.agentId, agentId),
+            eq(autonomySignals.signature, key),
+            inArray(autonomySignals.kind, ["wake", "loop"]),
+            gt(autonomySignals.createdAt, new Date(Date.now() - LOOP_WINDOW_MS)),
+          ),
+        );
+      if (Number(tries?.n ?? 0) - Number(tries?.stopped ?? 0) >= LOOP_MAX) {
+        await record(tx, "loop", { doneAt: new Date() });
+        return { loop: Number(tries?.stopped ?? 0) === 0 };
+      }
+      const [row] = await record(tx, "wake");
+      return { claim: row?.id ?? null };
+    });
+    if ("linked" in checked) {
+      const run = checked.linked;
+      if (run) {
+        const delivered = await db.transaction((tx) =>
+          deliverNoticeToRun(tx, run, {
+            kind: "agent_note",
+            text: `The same item was reported again (${sig.title}). You are already on it in this run: don't start it over; include it in your report.`,
+            refs: { runId: run.id, messageId: message.id },
+          }),
+        );
+        await publishDelivery(deps.pubsub, delivered);
+      }
       return "linked";
     }
-    // §6: tried too often lately: stop, and tell a person once.
-    const [tries] = await db
-      .select({
-        n: sql<number>`count(*)::int`,
-        stopped: sql<number>`count(*) filter (where ${autonomySignals.kind} = 'loop')::int`,
-      })
-      .from(autonomySignals)
-      .where(
-        and(
-          eq(autonomySignals.orgId, orgId),
-          eq(autonomySignals.agentId, agentId),
-          eq(autonomySignals.signature, sig.key),
-          inArray(autonomySignals.kind, ["wake", "loop"]),
-          gt(autonomySignals.createdAt, new Date(Date.now() - LOOP_WINDOW_MS)),
-        ),
-      );
-    if (Number(tries?.n ?? 0) - Number(tries?.stopped ?? 0) >= LOOP_MAX) {
-      const first = Number(tries?.stopped ?? 0) === 0;
-      await record("loop", { doneAt: new Date() });
-      if (first) await postLoopStop(deps, message, agentId, sig.title);
+    if ("loop" in checked) {
+      if (checked.loop) await postLoopStop(deps, message, agentId, sig.title);
       return "loop";
     }
+    claim = checked.claim;
   }
+  const unclaim = async (kind: string | null) => {
+    if (!claim) return;
+    if (kind) await db.update(autonomySignals).set({ kind }).where(eq(autonomySignals.id, claim));
+    else await db.delete(autonomySignals).where(eq(autonomySignals.id, claim));
+    claim = null;
+  };
   // §5: noise goes to the next digest, not to work.
-  if ((await triage()) === "noise") {
-    await record("digest");
+  if ((await triage().catch(() => "work" as const)) === "noise") {
+    if (claim) await unclaim("digest");
+    else await record(db, "digest");
     return "digest";
   }
   // §7: at its cap of unrequested runs, or its computer already has turns waiting: later.
   if (crowded || (await unrequestedAtCap(db, orgId, agentId))) {
     if (look >= LATER_LOOKS) {
-      await record("digest");
+      if (claim) await unclaim("digest");
+      else await record(db, "digest");
       return "digest";
     }
+    await unclaim(null);
     await enqueue(db, {
       orgId,
       kind: LATER_JOB,
@@ -616,10 +655,10 @@ async function brakeOne(
       dedupeKey: `${LATER_JOB}:${message.id}:${agentId}:${look + 1}`,
       runAt: new Date(Date.now() + LATER_LOOK_MS),
     });
-    if (look === 0) await record("later", { doneAt: new Date() });
+    if (look === 0) await record(db, "later", { doneAt: new Date() });
     return "later";
   }
-  await record("wake");
+  if (!claim) await record(db, "wake");
   return null;
 }
 
