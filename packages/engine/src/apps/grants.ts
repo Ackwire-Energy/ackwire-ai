@@ -6,7 +6,16 @@ import { can, getMembership, requireActiveMembership } from "../organizations";
 import { workRefusal } from "../standing";
 import { queueReceipt } from "./oauth";
 import { revokeAppGrants, revokeMemberApps } from "./revoke";
-import { ACCESS_TOKEN_PREFIX, APP_LIMITS, type AppScope, PERSONAL_TOKEN_PREFIX, randomBase62 } from "./urls";
+import {
+  ACCESS_TOKEN_PREFIX,
+  APP_LIMITS,
+  type AppAccess,
+  type AppScope,
+  appAccessOf,
+  appScopesFor,
+  PERSONAL_TOKEN_PREFIX,
+  randomBase62,
+} from "./urls";
 
 const { appGrants, appTokens, appSends, oauthAppRequests, oauthAppClients, users, organizations } = schema;
 
@@ -104,8 +113,6 @@ export async function touchGrant(db: Database, grantId: string) {
     );
 }
 
-const accessOf = (scopes: string[]): "read" | "write" => (scopes.includes("write") ? "write" : "read");
-
 export interface AppsList {
   apps: {
     id: string;
@@ -114,7 +121,7 @@ export interface AppsList {
     name: string;
     host: string | null;
     brand: string | null;
-    access: "read" | "write";
+    access: AppAccess;
     person?: { id: string; name: string };
     connectedAt: string;
     lastUsedAt: string | null;
@@ -122,7 +129,7 @@ export interface AppsList {
   tokens: {
     id: string;
     name: string;
-    access: "read" | "write";
+    access: AppAccess;
     createdAt: string;
     expiresAt: string | null;
     lastUsedAt: string | null;
@@ -171,7 +178,7 @@ export async function listApps(
         name: r.grant.displayName,
         host: r.grant.displayHost,
         brand: r.grant.brand,
-        access: accessOf(r.grant.scopes),
+        access: appAccessOf(r.grant.scopes),
         ...person(r),
         connectedAt: r.grant.consentedAt.toISOString(),
         lastUsedAt: iso(r.grant.lastUsedAt),
@@ -181,7 +188,7 @@ export async function listApps(
       .map((r) => ({
         id: r.grant.id,
         name: r.grant.displayName,
-        access: accessOf(r.grant.scopes),
+        access: appAccessOf(r.grant.scopes),
         createdAt: r.grant.createdAt.toISOString(),
         expiresAt: iso(r.expiresAt),
         lastUsedAt: iso(r.grant.lastUsedAt),
@@ -224,7 +231,7 @@ export async function createPersonalToken(
   publicUrl: string,
   userId: string,
   orgId: string,
-  input: { name: string; access: "read" | "write"; expiresInDays: (typeof TOKEN_EXPIRY_DAYS)[number] | null },
+  input: { name: string; access: AppAccess; expiresInDays: (typeof TOKEN_EXPIRY_DAYS)[number] | null },
 ) {
   const membership = await requireActiveMembership(db, userId, orgId);
   if (workRefusal(membership.standing)) throw new ConflictError("This workspace is paused", "workspace_paused");
@@ -252,7 +259,7 @@ export async function createPersonalToken(
       { limit: APP_LIMITS.personalTokensPerWorkspace },
     );
   const secret = `${PERSONAL_TOKEN_PREFIX}${randomBase62(43)}`;
-  const scopes: AppScope[] = input.access === "read" ? ["read"] : ["read", "write"];
+  const scopes = appScopesFor(input.access);
   const expiresAt = input.expiresInDays ? new Date(Date.now() + input.expiresInDays * 86_400_000) : null;
   const grant = await db.transaction(async (tx) => {
     const [grant] = await tx

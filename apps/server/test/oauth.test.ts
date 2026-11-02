@@ -57,7 +57,7 @@ describe("discovery", () => {
       expect(await res.json()).toEqual({
         resource: `${ORIGIN}/mcp`,
         authorization_servers: [ORIGIN],
-        scopes_supported: ["read", "write"],
+        scopes_supported: ["read", "write", "manage"],
         bearer_methods_supported: ["header"],
         resource_name: "agentes.chat",
         resource_documentation: `${ORIGIN}/help/apps-de-ia`,
@@ -76,7 +76,7 @@ describe("discovery", () => {
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
       revocation_endpoint_auth_methods_supported: ["none"],
-      scopes_supported: ["read", "write"],
+      scopes_supported: ["read", "write", "manage"],
       client_id_metadata_document_supported: true,
       authorization_response_iss_parameter_supported: true,
     });
@@ -328,13 +328,14 @@ describe("authorize", () => {
     );
   });
 
-  test("offline_access and unknown scopes are dropped; none asked means both", async () => {
+  test("offline_access and unknown scopes are dropped; none asked means all", async () => {
     const { json } = await register([LOOPBACK]);
     const id = String(json.client_id);
     for (const [scope, want] of [
       ["read offline_access admin", ["read"]],
-      [undefined, ["read", "write"]],
+      [undefined, ["read", "write", "manage"]],
       ["write", ["read", "write"]],
+      ["manage", ["read", "write", "manage"]],
     ] as const) {
       const { location } = await authorize(t, { ...baseParams(id), scope });
       const [row] = await t.db

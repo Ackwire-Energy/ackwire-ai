@@ -33,6 +33,7 @@ import {
 import { loadConfig } from "@agenteschat/config";
 import { createDatabase, type Database, ensureMessagePartitions, eq, schema } from "@agenteschat/db";
 import {
+  APP_SCOPES,
   addChannelMember,
   appsUrls,
   createAgent,
@@ -210,7 +211,7 @@ async function appsSmoke() {
     headers: { "content-type": "application/json" },
     body: "{}",
   });
-  const want = `Bearer resource_metadata="${urls.resourceMetadata}", scope="read write"`;
+  const want = `Bearer resource_metadata="${urls.resourceMetadata}", scope="${APP_SCOPES.join(" ")}"`;
   if (res.status !== 401 || res.headers.get("www-authenticate") !== want)
     throw new Error(`/mcp answered ${res.status} with ${res.headers.get("www-authenticate")}, not 401 with ${want}`);
   step(`apps: ${urls.resource} answers its challenge`);

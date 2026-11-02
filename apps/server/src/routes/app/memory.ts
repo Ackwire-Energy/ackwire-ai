@@ -31,8 +31,11 @@ const Memory = z
     source: z.string().openapi({ example: "Learned in #eng · Oct 12" }),
     origin: z
       .object({
-        by: z.enum(["person", "agent", "lesson", "recorded"]),
-        name: z.string().nullable().openapi({ description: "The person who wrote it (`by: person`)." }),
+        by: z.enum(["person", "app", "agent", "lesson", "recorded"]),
+        name: z
+          .string()
+          .nullable()
+          .openapi({ description: "The person who wrote it (`by: person`) or sent it through an AI app (`by: app`)." }),
         channel: z.string().nullable().openapi({ description: "Channel name, without `#`." }),
         at: z.string(),
       })
@@ -108,7 +111,7 @@ const Proposal = z
         where: z.string(),
         what: z.string(),
         channelId: z.string().nullable().optional(),
-        type: z.enum(["outcome", "human", "agent", "self"]).optional().openapi({
+        type: z.enum(["outcome", "human", "agent", "app", "self"]).optional().openapi({
           description: "Where the evidence came from; the app translates it (`where` is the English text).",
         }),
       }),
@@ -184,9 +187,12 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
     const channel = i.channelIds[0] ? (channelName.get(i.channelIds[0]) ?? null) : null;
     const where = i.channelIds[0] ? ` in #${channel ?? "channel"}` : "";
     const name = i.createdByKind === "person" ? (names.get(i.createdById ?? "") ?? null) : null;
+    const viaApp = i.evidence.some((e) => e.type === "app") && !i.evidence.some((e) => e.type === "human");
     const by =
       i.createdByKind === "person"
-        ? ("person" as const)
+        ? viaApp
+          ? ("app" as const)
+          : ("person" as const)
         : i.createdByKind === "agent"
           ? ("agent" as const)
           : i.kind === "lesson"
@@ -194,6 +200,7 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
             : ("recorded" as const);
     const how = {
       person: `Written by ${name ?? "a person"}`,
+      app: `Sent by ${name ?? "a person"} through an AI app`,
       agent: "Noted by the agent",
       lesson: "Learned",
       recorded: "Recorded",
@@ -213,7 +220,7 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
       verified: i.verified,
       supersedes: previous.get(i.id) ?? null,
       editedByUserId: i.createdByKind === "person" ? i.createdById : null,
-      learned: i.createdByKind !== "person" || i.sourceIds.length > 0,
+      learned: i.createdByKind !== "person" || i.sourceIds.length > 0 || viaApp,
       howTo: isHowTo(i),
       disputed: i.disputed,
       channelId: i.channelIds[0] ?? null,
@@ -314,6 +321,7 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
     outcome: "Observed outcome",
     human: "A person",
     agent: "Another agent",
+    app: "Sent through an AI app",
     self: "The agent itself",
   };
   return rows.map((r) => {

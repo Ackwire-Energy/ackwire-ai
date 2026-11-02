@@ -31,7 +31,7 @@ test("space, not lines, sets the sidebar's parts apart: 14px over each one with 
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__scroll', "gap")).toBe("4px");
 });
 
-test("an agent's role sits under its name, up to two lines, with the face at the top and gone in the rail", () => {
+test("an agent's role sits under its name, up to two lines, beside a face as tall as both, and gone in the rail", () => {
   const role = ".sidebar__item-role";
   expect([value(role, "-webkit-line-clamp"), value(role, "font-size"), value(role, "color")]).toEqual([
     "2",
@@ -42,10 +42,21 @@ test("an agent's role sits under its name, up to two lines, with the face at the
     "column",
     "0",
   ]);
+  // The face spans the name's line and a one-line role's, and sits centred on them (no rule tops it any more).
+  const face = '.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm';
+  // The rail's 40px tile keeps its smaller face, with room for the presence badge and the unread count.
+  expect(value(".sidebar__item > .ac-avatar--sm", "height")).toBe("28px");
+  const px = (v: string | undefined) => Number.parseFloat(v ?? "");
+  expect(px(value(face, "height"))).toBe(
+    px(value('.sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label', "line-height")) +
+      px(value(role, "line-height")),
+  );
+  expect(value(face, "width")).toBe(value(face, "height"));
   const twoLines = '.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role)';
-  expect(value(twoLines, "align-items")).toBe("flex-start");
-  // A 30px row's 4px above the face, so the list keeps even gaps.
-  expect(value(twoLines, "padding-block")).toBe("4px");
+  expect(declarations(css, twoLines)).toEqual([]);
+  expect(value(".sidebar__item", "align-items")).toBe("center");
+  // 3px over and under every face, a name alone (a DM) or a name and a role, so the list keeps even gaps.
+  expect(value('.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar)', "padding-block")).toBe("3px");
   expect(value('.sidebar[data-rail="true"] .sidebar__item-text', "display")).toBe("contents");
   expect(value('.sidebar[data-rail="true"] .sidebar__item-role', "display")).toBe("none");
 });
@@ -57,8 +68,9 @@ test("a row's hover buttons get their own room instead of covering the name and 
   expect(value(`${open} > .sidebar__item`, "padding-right")).toBe("var(--acts-room, 32px)");
   expect(value('.sidebar__row[data-acts="2"]', "--acts-room")).toBe("56px");
   expect(value(".sidebar__row-acts", "opacity")).toBe("0");
-  const twoLines = ".sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-acts";
-  expect([value(twoLines, "top"), value(twoLines, "translate")]).toEqual(["4px", "none"]);
+  // Centred on the row, as the face is, on a two-line row too.
+  expect([value(".sidebar__row-acts", "top"), value(".sidebar__row-acts", "translate")]).toEqual(["50%", "0 -50%"]);
+  expect(declarations(css, ".sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-acts")).toEqual([]);
   expect(value('.sidebar[data-rail="true"] .sidebar__row-acts', "display")).toBe("none");
 });
 
@@ -72,4 +84,12 @@ test("Equipe on the Agentes header shows like the header's +, and stays in sight
 test("a row's hidden hover buttons don't catch the pointer, so a drag over a row's end lands before or after it", () => {
   const shown = '.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__row-acts';
   expect([value(".sidebar__row-acts", "pointer-events"), value(shown, "pointer-events")]).toEqual(["none", "auto"]);
+});
+
+test("over a row's hover button the row keeps its plate, and the button lights its ink only, no square of its own", () => {
+  const row = '.sidebar__row:hover > .sidebar__item:not([data-status="active"], .sidebar__item--unshown)';
+  expect(value(row, "background")).toBe(value(".sidebar__item:hover", "background"));
+  expect(value(".sidebar__row-acts .ac-btn--ghost", "color")).toBe("var(--ink-muted)");
+  const lit = '.sidebar__row-acts .ac-btn--ghost:is(:hover, [data-state="open"])';
+  expect([value(lit, "background"), value(lit, "color")]).toEqual(["transparent", "var(--ink)"]);
 });

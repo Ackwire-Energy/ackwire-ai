@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/client";
 import { approvalCardItems, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
@@ -184,6 +185,12 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
         <Icon name="drive" size={16} />
       </span>
     );
+  if (n.kind === "app_created")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="agent" size={16} />
+      </span>
+    );
   if (n.kind !== "org_standing") return null;
   const status = n.latest.statusTo;
   return (
@@ -347,6 +354,7 @@ export function Headline({
   );
   const own = workspaceHeadline(n);
   if (own) return t(own, { name: n.source.label });
+  if (n.kind === "app_created") return appCreatedLine(t, n);
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });
@@ -719,7 +727,7 @@ function Row({
   const joiner = n.kind === "invitation_accepted" ? joinerOf(t, dir, n) : undefined;
   const name = joiner ?? nameOf(t, dir, first);
   const own = workspaceHeadline(n);
-  const label = own ? t(own, { name: n.source.label }) : name;
+  const label = own ? t(own, { name: n.source.label }) : n.kind === "app_created" ? appCreatedLine(t, n) : name;
   const reaction = n.kind === "reaction";
   const group = n.actors.length > 1;
   const other = n.actors.find((a, i) => i > 0 && (a.id !== first?.id || a.type !== first?.type));

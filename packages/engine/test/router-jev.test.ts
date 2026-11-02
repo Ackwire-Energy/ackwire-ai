@@ -131,6 +131,8 @@ function fakeJev(
         choice?: Record<string, number>;
         everyone?: number;
         to?: Record<string, number>;
+        /** The `social` Choice's pick and confidence. */
+        social?: { choice: string; confidence: number };
       }
     | Error,
 ) {
@@ -162,6 +164,8 @@ function fakeJev(
       const [choice] = Object.entries(to).sort((a, b) => b[1] - a[1])[0] ?? ["none"];
       answers.addressee = { type: "choice", choice, probabilities: to, confidence: 0.8 };
     }
+    if (body.questions.social && r.social)
+      answers.social = { type: "choice", ...r.social, probabilities: { [r.social.choice]: r.social.confidence } };
     return Response.json({ model: "jev-1.14.0", answers, usage: { input_tokens: 1200, output_tokens: 30 } });
   }) as unknown as typeof fetch;
   return { fetcher, requests };
@@ -171,6 +175,37 @@ const post = (fx: Fixture, body: string, threadId?: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body, threadId });
 
 describe("Jev's questions", () => {
+  const socialOf = async (social: { choice: string; confidence: number } | undefined, needs = 0.05) => {
+    const jev = fakeJev(() => ({ nouls: {}, needs, ...(social ? { social } : {}) }));
+    const decided = await createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher }).decide(
+      {
+        orgId: "o",
+        channel: { id: "c", name: "geral", topic: "" },
+        message: { id: "m", author: "ana", body: "boa noite pessoal" },
+        thread: [],
+        candidates: [cand("dev"), cand("qa")],
+        authorUserId: "u",
+      },
+    );
+    return { decided, jev };
+  };
+
+  test("a clear pick from the set reacts; an unsure one, none or a choice outside the set doesn't", async () => {
+    expect((await socialOf({ choice: "🌙", confidence: 0.9 })).decided.social).toEqual({ react: true, emoji: "🌙" });
+    expect((await socialOf({ choice: "🌙", confidence: 0.3 })).decided.social).toEqual({ react: false, emoji: "🌙" });
+    expect((await socialOf({ choice: "none", confidence: 0.9 })).decided.social).toEqual({ react: false, emoji: "" });
+    expect((await socialOf({ choice: "🖕", confidence: 0.9 })).decided.social).toEqual({ react: false, emoji: "" });
+    expect((await socialOf(undefined)).decided.social).toBeUndefined();
+  });
+
+  test("insisting that nobody answered is a yes to 'should any agent reply?'", async () => {
+    const { jev } = await socialOf(undefined);
+    const questions = jev.requests[0]?.body.questions as { needs_agent: { instructions: string } };
+    expect(questions.needs_agent.instructions).toContain(
+      'Also yes when the person insists or complains that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first)',
+    );
+  });
+
   test("name a message to the room in both languages, for every agent and for each one", async () => {
     const jev = fakeJev(() => ({ nouls: {}, needs: 0.9 }));
     await createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher }).decide({
@@ -887,6 +922,7 @@ describe("Jev strategy end to end", () => {
       "best_agent",
       "for_everyone",
       "needs_agent",
+      "social",
     ]);
     expect(JSON.stringify(req?.body.state)).toContain("is the deploy green?");
     expect(f.provider.calls).toHaveLength(1); // only the agent's reply: no LLM router call
@@ -1283,5 +1319,40 @@ describe("a message for the agents always gets one (R5)", () => {
     const coordinated = await room({ coordinator: true });
     const toTheo = await coordinated.talk([], "alguém viu o relatório?", down);
     expect(toTheo).toMatchObject({ selected: [coordinated.theo.id], decidedBy: { step: "rule", rule: "coordinator" } });
+  });
+});
+
+describe("Jev on a social message", () => {
+  test("end to end: 'boa noite pessoal' gets one 🌙 and no run; 'alô???' after it gets one agent's answer", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Boa noite! Tô aqui."] }) });
+    const qa = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "QA", handle: "qa" },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: qa.id });
+    const jev = fakeJev((state) =>
+      JSON.stringify(state.latest_message).includes("alô???")
+        ? { nouls: { "@dev": 0.3, "@qa": 0.2 }, needs: 0.7, best: "dev", social: { choice: "none", confidence: 0.9 } }
+        : { nouls: { "@dev": 0.05, "@qa": 0.05 }, needs: 0.05, social: { choice: "🌙", confidence: 0.9 } },
+    );
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "k", fetch: jev.fetcher } },
+    });
+    const night = await post(f, "boa noite pessoal");
+    await drainOutbox(f.db, handlers);
+    const reactions = await f.db.select().from(schema.messageReactions);
+    expect(reactions.map((r) => [r.messageId, r.reaction])).toEqual([[night.id, "🌙"]]);
+    expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
+
+    const insist = await post(f, "alô???");
+    await drainOutbox(f.db, handlers);
+    expect((await f.db.select().from(schema.messageReactions)).filter((r) => r.messageId === insist.id)).toEqual([]);
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.map((r) => [r.agentId, r.triggerMessageId])).toEqual([[f.agent.id, insist.id]]);
+    expect(f.provider.calls).toHaveLength(1); // only the agent's answer: Jev decided both, no LLM router call
   });
 });

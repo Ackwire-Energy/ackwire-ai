@@ -65,7 +65,7 @@ const Item = z
     content: z.string(),
     trust: z.enum(["high", "low"]).openapi({ description: "`low` = came from outside the team (webhooks, tools)." }),
     verified: z.boolean().openapi({ description: "Backed by an outcome or a person (agent claims alone are not)." }),
-    evidence: z.array(z.object({ type: z.enum(["outcome", "human", "agent", "self"]), ref: z.string() })),
+    evidence: z.array(z.object({ type: z.enum(["outcome", "human", "agent", "app", "self"]), ref: z.string() })),
     confidence: z.number(),
     relevance: z.number(),
     recurrence: z.number(),

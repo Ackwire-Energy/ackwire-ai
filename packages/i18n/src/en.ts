@@ -661,6 +661,21 @@ export const en: Translations = {
       title: "Already using agents in another app?",
       lead: "They come with their instructions, skills, routines and memory.",
       sourcesLabel: "Where the agents come from",
+      aiApp: {
+        title: "From your AI app (most reliable)",
+        lead: "Your AI app creates here each agent, instruction, skill and routine you have in it.",
+        connect: "Connect the app to this address:",
+        howTo: "How to connect, app by app",
+        allow: "On the permission page, pick Create and edit agents, routines and skills.",
+        paste: "Then paste this request into the app:",
+        prompt:
+          "Connect {{url}} and, for every agent, instruction, skill and routine you have, create the equivalent in agentes.chat. First list what already exists there so nothing is duplicated.",
+        promptLabel: "Request for your AI app",
+        copy: "Copy the request",
+        copied: "Now paste it into your AI app.",
+        private:
+          "From your AI app: not available on this server, because apps like Claude and ChatGPT only connect to a public https address.",
+      },
       otherName: "Another app",
       agenteschatName: "agentes.chat",
       where: {
@@ -3309,6 +3324,7 @@ export const en: Translations = {
     editHelp: "The previous version stays in the history. {{source}}",
     origin: {
       person: "Written by {{name}}",
+      app: "Sent by {{name}} through an AI app",
       agent: "Noted by the agent",
       lesson: "Learned",
       recorded: "Recorded",
@@ -3378,6 +3394,7 @@ export const en: Translations = {
       human: "A person",
       agent: "Another agent",
       self: "The agent itself",
+      app: "Sent through an AI app",
     },
   },
   newAgent: {
@@ -4591,7 +4608,10 @@ export const en: Translations = {
       line: "It picks up by itself when the limit resets. Nothing is posted in the conversation.",
       continuedToast: "Run continuing.",
       forbidden: "Only who created the routine, the agent's owner or an admin can continue it now",
-      extra_off: "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now",
+      extra_off:
+        "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset",
+      extra_used_up:
+        "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset",
     },
     pausedRunningToast: "Routine paused. The run in progress stopped too.",
     deleteBodyRunning:
@@ -8778,7 +8798,9 @@ export const en: Translations = {
       agentNotInChannel: "Add the agent to the conversation first.",
       webhookPaused: "Turn the routine on to test it.",
       continueExtraOff:
-        "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now.",
+        "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset.",
+      continueExtraUsedUp:
+        "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset.",
     },
     run: {
       notContinuable: "This answer can't be continued anymore.",
@@ -9114,8 +9136,22 @@ export const en: Translations = {
     connected: "Connected",
     onThisComputer: "on this computer",
     access: {
+      manage: "Creates agents, routines and skills",
       write: "Reads and sends tasks",
       read: "Read only",
+    },
+    created: {
+      notice: "{{app}} created {{what}} through the app",
+      agent_one: "{{count}} agent",
+      agent_other: "{{count}} agents",
+      routine_one: "{{count}} routine",
+      routine_other: "{{count}} routines",
+      skill_one: "{{count}} skill",
+      skill_other: "{{count}} skills",
+      memory_one: "{{count}} memory",
+      memory_other: "{{count}} memories",
+      channel_one: "{{count}} channel",
+      channel_other: "{{count}} channels",
     },
     connectedAt: "Connected {{when}}",
     usedAt: "Used {{when}}",
@@ -9252,12 +9288,15 @@ export const en: Translations = {
       access: "Access",
       write: "Read and send tasks to agents",
       writeHelp: "Sends messages as you and reads the replies.",
+      manage: "Create and edit agents, routines and skills",
+      manageHelp: "Also creates agents, routines, skills and memories for you, with your permissions.",
       read: "Read only",
       readHelp: "Sees agents, channels and replies, without sending anything.",
       can: "Can",
       canSee: "See the agents and channels you see.",
       canSend: "Send messages as you, marked via {{app}}.",
       canRead: "Read the replies and what agents are doing.",
+      canManage: "Create and edit agents, routines and skills as you. You get a notice of what it creates.",
       never: "Never",
       neverApprove: "Approve agents' actions. Approvals stay with people in agentes.chat.",
       neverSettings: "Change settings, members or permissions.",

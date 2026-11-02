@@ -1509,7 +1509,7 @@ export interface Memory {
   /** "Written by Walter in #eng · Oct 12" (the server's English; `origin` has the parts). */
   source: string;
   origin?: {
-    by: "person" | "agent" | "lesson" | "recorded";
+    by: "person" | "app" | "agent" | "lesson" | "recorded";
     name: string | null;
     channel: string | null;
     at: string;
@@ -1570,7 +1570,7 @@ export interface Proposal {
     where: string;
     what: string;
     channelId?: string | null;
-    type?: "outcome" | "human" | "agent" | "self";
+    type?: "outcome" | "human" | "agent" | "app" | "self";
   }[];
   /** `agent_role`: the role then and the one proposed; `agent_access`: both empty. */
   before: string;
@@ -2819,10 +2819,11 @@ export interface Routine {
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /**
    * Its run paused near its plan's or budget's limit (state `usage_paused`, ADR 0118): it picks up at `resetsAt`
-   * (null: not known yet). `extraOff`: the agent's long work may not use paid extra usage, so Continuar agora is
-   * refused. Who may press it: `canManage`.
+   * (null: not known yet). `extraOff`: the plan's window is used up and the agent's long work may not use paid
+   * extra usage, so Continuar agora is refused; `extraUsedUp`: the same with the switch on but no extra usage left.
+   * Who may press it: `canManage`.
    */
-  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean } | null;
+  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp?: boolean } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -5096,7 +5097,12 @@ export type NotificationKind =
    */
   | "connector_tool_changed"
   /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
-  | "computer_disk_full";
+  | "computer_disk_full"
+  /**
+   * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
+   * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
+   */
+  | "app_created";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5173,6 +5179,8 @@ export interface NotificationLatest {
   /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
   diskUse?: number;
   diskFreeGb?: number;
+  /** `app_created`: how many of each kind (`agent`, `routine`, `skill`, `memory`, `channel`). */
+  created?: Record<string, number>;
 }
 
 export interface AppNotification {
@@ -5750,8 +5758,11 @@ export interface AgentPlanUsage {
 
 // ── AI apps (ADR 0119): this server as a remote MCP server ──
 
-/** What a connected app or a personal token may do: `write` reads and sends tasks, `read` only reads. */
-export type AppAccess = "read" | "write";
+/**
+ * What a connected app or a personal token may do: `read` only reads, `write` also sends tasks, `manage` also creates
+ * and edits agents, routines and skills.
+ */
+export type AppAccess = "read" | "write" | "manage";
 
 /**
  * How an app is shown, from the address its codes go back to: `verified` (its metadata document was fetched from
@@ -5814,6 +5825,8 @@ export interface PersonalToken {
 /** `GET …/apps`: this server's `/mcp`, the connected apps and the personal tokens. */
 export interface AppsList {
   serverUrl: string;
+  /** Apps that call from their own servers (claude.ai, ChatGPT) can reach it: https on a public name. */
+  serverPublic: boolean;
   apps: ConnectedApp[];
   tokens: PersonalToken[];
 }

@@ -103,7 +103,7 @@ import {
   thisTurnText,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
-import { afterTurnDone } from "./context/learn";
+import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { fitContextWindow } from "./context-budget";
@@ -138,6 +138,7 @@ import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
+import { type Judge, judgeCallOf } from "./judge";
 import { answerNoTurn, listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
@@ -229,10 +230,12 @@ import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from 
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import {
   budgetUsedPercent,
+  continuesPastPlan,
   isLongWork,
   ladderDelay,
   nextMonthStart,
   overrideHolds,
+  type PlanReadingRef,
   planName,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
@@ -442,6 +445,8 @@ export interface Transcript {
     source?: "plan" | "budget";
     /** When the limit resets, when known (Rotinas says "Pausada até…"; `until` is later by the stagger). */
     resetsAt?: string;
+    /** A plan pause's: where its plan was read. */
+    reading?: PlanReadingRef;
   };
   /**
    * Long work paused near a limit (ADR 0118): `paused` once it was (it stays long work), `cardId` its card,
@@ -945,6 +950,15 @@ async function executeRunInner(
     const judged = d.verdict === "done";
     const signal = learned;
     later(() => afterTurnDone(context, run, { judged, signal }));
+  };
+  const reportJudgeLearn = (judge: Judge, error: unknown) => {
+    if (deps.context && agent)
+      reportLearnFailure(deps.context, "judge_learn_question", error, {
+        ...learnTags(agent),
+        judge: judge.name,
+        ...judgeCallOf(error),
+        run_id: run.id,
+      });
   };
   /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
   const takeSteering = () => takeInbox(db, run.id);
@@ -2478,6 +2492,16 @@ async function executeRunInner(
       waitKey: key,
       until: runAt.toISOString(),
       ...(u.pause ? { source: u.pause.source, ...(resetsAt ? { resetsAt } : {}) } : {}),
+      // Continuar agora reads this plan's window again (`pauseContinuesPastPlan`).
+      ...(u.pause?.source === "plan"
+        ? {
+            reading: {
+              machineId,
+              ...(plan.account?.id ? { accountId: plan.account.id } : {}),
+              model: plan.model ?? null,
+            },
+          }
+        : {}),
     };
     await addRunStep(db, run, "error", {
       reason: "usage_wait",
@@ -2575,10 +2599,17 @@ async function executeRunInner(
    * person), not more of the mission's work: read once.
    */
   let missionWork: boolean | null = null;
-  /** Long work at the pause line, unless Continuar agora let it go on or it may use the plan's extra usage. */
+  /**
+   * Long work at the pause line, unless it may use the plan's extra usage or Continuar agora let it go on: then up
+   * to the plan's own allowance, past it only into extra usage (`continuesPastPlan`).
+   */
   const longWorkPause = async () => {
     const t = transcript as Transcript;
-    if (forum || overrideHolds(t.usagePause?.override)) return null;
+    if (forum) return null;
+    if (overrideHolds(t.usagePause?.override)) {
+      const now = await usageReading();
+      return now && continuesPastPlan(now) ? now : null;
+    }
     if (run.background && byHand === null) byHand = await routineRunByHand(db, run.id).catch(() => false);
     if (plan.missionId && missionWork === null)
       missionWork = !(await personOfMessage(db, run.orgId, run.triggerMessageId).catch(() => null));
@@ -3254,6 +3285,7 @@ async function executeRunInner(
                   onLearn: (signal) => {
                     learned = signal;
                   },
+                  onLearnFailed: (error) => reportJudgeLearn(judge, error),
                 })
             : null,
           evidence: judging.evidence,
@@ -3408,6 +3440,7 @@ async function executeRunInner(
                 onLearn: (signal) => {
                   learned = signal;
                 },
+                onLearnFailed: (error) => reportJudgeLearn(judge, error),
               })
           : null,
         evidence: judging.evidence,

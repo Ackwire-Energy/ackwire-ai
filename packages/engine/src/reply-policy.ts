@@ -26,7 +26,7 @@ export const ANSWER_NUDGE = "You were addressed directly; answer the person.";
 
 /** The prompt block of runs that may pass. */
 export const WHY_YOU_WERE_CALLED =
-  "# Why you were called\nNobody called you by name; you were brought in because you might have something to add. If you don't, or another agent already answered, call pass: staying quiet in a room is normal. A thanks, an ok or people talking among themselves asks nothing of you: pass at once, without looking anything up and without re-checking an answer already given. Speak only when the message asks something in your area that nobody has answered yet.";
+  '# Why you were called\nNobody called you by name; you were brought in because you might have something to add. If you don\'t, or another agent already answered, call pass: staying quiet in a room is normal. A thanks, an ok or people talking among themselves asks nothing of you: pass at once, without looking anything up and without re-checking an answer already given. Speak only when the message asks something in your area that nobody has answered yet. A greeting, or someone asking whether anyone is there because nobody answered ("alô???"), gets one short friendly line back, nothing more.';
 
 /** The prompt block of a run another agent's @mention woke (`byAnotherAgent`): it may pass too. */
 export const WHY_AN_AGENT_CALLED =

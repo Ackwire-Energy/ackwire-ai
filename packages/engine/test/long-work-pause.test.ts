@@ -512,7 +512,7 @@ test("Rotinas shows a routine's paused slot until its reset; Continuar agora for
   const id = routine?.id ?? "";
   const view = await getRoutineView(f.db, f.owner.id, f.org.id, id);
   expect(view.state).toBe("usage_paused");
-  expect(view.usagePause).toEqual({ source: "plan", resetsAt, extraOff: false });
+  expect(view.usagePause).toEqual({ source: "plan", resetsAt, extraOff: false, extraUsedUp: false });
 
   // Someone who isn't its creator, the agent's owner or an admin sees it, and can't continue it.
   const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -541,26 +541,133 @@ test("Rotinas shows a routine's paused slot until its reset; Continuar agora for
   expect(audit).toHaveLength(1);
 });
 
-test("Continuar agora on a routine whose agent keeps long work off paid extra usage is refused with the reason", async () => {
-  f = await setup();
-  const machineId = await computerAgent(f, { brainExtraUsage: false });
-  await storeOwnUsage(
-    f,
-    machineId,
+/**
+ * A slot of a routine paused at `percent` of its plan, on an agent whose long work keeps off paid extra usage (or,
+ * with `extraUsage`, may use it but the plan's extra usage window is at `extraUsed`; null: the plan reports none).
+ */
+async function pausedExtraOff(
+  percent: number,
+  { extraUsage = false, extraUsed = 10 as number | null }: { extraUsage?: boolean; extraUsed?: number | null } = {},
+) {
+  const machineId = await computerAgent(f, { brainExtraUsage: extraUsage });
+  const usage = (used: number) =>
     reading([
-      { kind: "five_hour", usedPercent: 97, resetsAt: iso(3600_000) },
-      { kind: "other", label: "Extra usage", usedPercent: 10 },
-    ]),
-  );
+      { kind: "five_hour", usedPercent: used, resetsAt: iso(3600_000) },
+      ...(extraUsed === null ? [] : [{ kind: "other", label: "Extra usage", usedPercent: extraUsed }]),
+    ]);
+  await storeOwnUsage(f, machineId, usage(percent));
   const { brain, seen } = scripted(() => [{ type: "done", text: "ok" }]);
   const handlers = handlersWith(f, brain);
   await scheduledSlot(f);
   await drainOutbox(f.db, handlers);
   const [routine] = await f.db.select().from(schema.routines);
-  const id = routine?.id ?? "";
+  return {
+    id: routine?.id ?? "",
+    seen,
+    handlers,
+    setUsage: (used: number) => storeOwnUsage(f, machineId, usage(used)),
+  };
+}
+
+test("with extra usage off, Continuar agora goes on up to the plan's own allowance and is refused past it, on Rotinas and the card alike", async () => {
+  f = await setup();
+  const { id, seen, handlers, setUsage } = await pausedExtraOff(97);
+  expect(seen).toHaveLength(0);
+  expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).usagePause?.extraOff).toBe(false);
+
+  // The plan's window is used up meanwhile: going on would be paid extra usage, which this agent's switch keeps off.
+  await setUsage(100);
   expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).usagePause?.extraOff).toBe(true);
   const refused = await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id).catch((e) => e);
   expect((refused as { code?: string }).code).toBe("routine.continue_extra_off");
+  expect((refused as Error).message).toContain("used up");
+  // The chat card's Continuar agora follows the same rule.
+  const [run] = await runs(f);
+  if (!run) throw new Error("no run");
+  const wait = (run.transcript as { waitingForBrain?: { waitId: string } }).waitingForBrain;
+  const card = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "agent", agentId: f.agent.id, runId: run.id, hop: 0 },
+    body: "Pausei o trabalho longo perto do limite do plano.",
+    meta: {
+      actionCard: {
+        kind: "usage_paused",
+        state: "paused",
+        runId: run.id,
+        waitId: wait?.waitId,
+        agentId: f.agent.id,
+        forUserId: f.owner.id,
+        source: "plan",
+        percent: 97,
+        plan: "Claude",
+        continuedByUserId: null,
+        continuedAt: null,
+      },
+    },
+  });
+  const deps = { db: f.db, pubsub: f.pubsub, gateway: f.gateway };
+  const onCard = await answerNow(deps, f.owner.id, f.org.id, card.id).catch((e) => e);
+  expect((onCard as { code?: string }).code).toBe("run.continue_extra_off");
+
+  // Back under the plan's allowance: it goes on.
+  await setUsage(97);
+  expect(await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id)).toEqual({ continued: true });
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(1);
+});
+
+test("with the extra-usage switch on but no extra usage left, Continuar agora past the plan is refused for that reason, not the switch", async () => {
+  f = await setup();
+  const { id, setUsage } = await pausedExtraOff(97, { extraUsage: true, extraUsed: null });
+  expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).state).toBe("usage_paused");
+  await setUsage(100);
+  const view = await getRoutineView(f.db, f.owner.id, f.org.id, id);
+  expect([view.usagePause?.extraOff, view.usagePause?.extraUsedUp]).toEqual([false, true]);
+  const refused = await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id).catch((e) => e);
+  expect((refused as { code?: string }).code).toBe("routine.continue_extra_used_up");
+  expect((refused as Error).message).not.toContain("turn that on");
+  const [run] = await runs(f);
+  if (!run) throw new Error("no run");
+  expect(await usageCardCode(run.id)).toBe("run.continue_extra_used_up");
+});
+
+/** The code Continuar agora on a usage-pause card for `runId` is refused with, through the chat's answer-now. */
+async function usageCardCode(runId: string) {
+  const [run] = (await runs(f)).filter((r) => r.id === runId);
+  const wait = (run?.transcript as { waitingForBrain?: { waitId: string } } | undefined)?.waitingForBrain;
+  const card = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "agent", agentId: f.agent.id, runId, hop: 0 },
+    body: "Pausei o trabalho longo perto do limite do plano.",
+    meta: {
+      actionCard: {
+        kind: "usage_paused",
+        state: "paused",
+        runId,
+        waitId: wait?.waitId,
+        agentId: f.agent.id,
+        forUserId: f.owner.id,
+        source: "plan",
+        percent: 97,
+        plan: "Claude",
+        continuedByUserId: null,
+        continuedAt: null,
+      },
+    },
+  });
+  const refused = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id)
+    .then(() => null)
+    .catch((e: unknown) => e);
+  return (refused as { code?: string } | null)?.code ?? null;
+}
+
+test("a run continued with extra usage off stops again at the plan's own allowance", async () => {
+  f = await setup();
+  const { id, seen, handlers, setUsage } = await pausedExtraOff(96);
+  expect(await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id)).toEqual({ continued: true });
+  await setUsage(100);
   await drainOutbox(f.db, handlers);
   expect(seen).toHaveLength(0);
   expect((await runs(f)).at(-1)?.status).toBe("waiting_input");

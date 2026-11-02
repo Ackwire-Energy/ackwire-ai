@@ -1,4 +1,7 @@
 import type { Actor, CalendarRange, RoutineTarget } from "../api/types";
+import { uses12h } from "./format";
+
+export { uses12h };
 
 /** Pixels per hour in the day/week grid. */
 export const HOUR_PX = 44;
@@ -454,15 +457,6 @@ export function upcomingItems(items: CalItem[], now: Date, n = 5) {
       return true;
     })
     .slice(0, n);
-}
-
-/** Whether the locale writes 12-hour times ("1 PM") rather than 24-hour ("13:00"). */
-export function uses12h(locale: string) {
-  try {
-    return new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hour12 === true;
-  } catch {
-    return false;
-  }
 }
 
 /** The grid's hour label: "1 AM" … "12 PM" in 12-hour locales, "01:00" … "23:00" otherwise. */
