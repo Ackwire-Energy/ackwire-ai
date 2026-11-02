@@ -9,13 +9,28 @@ import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
-const open = async (state = seedState()) => {
-  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+const open = async (state = seedState(), api = createFakeApi(state)) => {
+  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
   await settle(5);
   const socket = r.sockets.last();
   await act(async () => socket.open());
   await settle(2);
   return { ...r, socket, state };
+};
+/**
+ * The reply moved under João's post and that thread opened beside the channel: a thread view has no panel of its
+ * own, so the card there opens in place (in the channel it opens the two agents' conversation in the panel).
+ */
+const openInThread = async (state: ReturnType<typeof seedState>) => {
+  const reply = state.messages.at(-1) as (typeof state.messages)[number];
+  reply.threadId = "m-1";
+  const api = createFakeApi(state);
+  await state.openThread?.(ORG_ID, "m-1", reply.createdAt);
+  const r = await open(state, api);
+  const channel = screen().getByRole("region", { name: /Mensagens/ });
+  await act(async () => fireEvent.click(within(channel).getByRole("button", { name: /1 resposta/ })));
+  await settle(6);
+  return { ...r, thread: screen().getByRole("complementary", { name: "Thread" }) };
 };
 const push = (socket: { push: (f: unknown) => void }, event: Record<string, unknown>, channelId = ENG_ID) =>
   act(async () => socket.push({ type: "event", channelId, event: { channelId, ...event } }));
@@ -46,8 +61,28 @@ function withReply(meta: Record<string, unknown>, body = "Já subi o fix em stag
 }
 
 describe("the consultation card (meta.consulted)", () => {
-  test("answered: one line 'Atlas respondeu' with a preview; opens to the question, the answer and who saw it", async () => {
+  test("in a channel: one line that opens the two agents' conversation in the panel (a toggle, not a disclosure), never in place", async () => {
     await open(
+      withReply({
+        consulted: [
+          { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
+        ],
+      }),
+    );
+    const card = rowWith("Já subi o fix").querySelector(".ac-consult") as HTMLElement;
+    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
+    expect(head.getAttribute("aria-expanded")).toBeNull();
+    expect(head.getAttribute("aria-pressed")).toBe("false");
+    expect(card.querySelector(".ac-consult__pv")?.textContent).toBe(
+      "Staging sobe sozinho quando o PR entra. Hoje use a fila reserva.",
+    );
+    await act(async () => fireEvent.click(head));
+    await settle(3);
+    expect(card.querySelector(".ac-consult__body")).toBeNull();
+  });
+
+  test("answered, in a thread: one line 'Atlas respondeu' with a preview; opens to the question, the answer and who saw it", async () => {
+    await openInThread(
       withReply({
         consulted: [
           { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
@@ -82,7 +117,7 @@ describe("the consultation card (meta.consulted)", () => {
   });
 
   test("expired: calm, a clock icon, 'O Atlas não respondeu a tempo' / 'Esperou 15 min'; opened, the question", async () => {
-    await open(
+    await openInThread(
       withReply(
         {
           consulted: [{ agentId: ATLAS_ID, consultationId: "k2", status: "expired", question: QUESTION, answer: null }],
@@ -159,8 +194,8 @@ describe("what came of work handed off (a `consult_reply` notice with `kind` `no
   };
 
   test("its card says what Ada wrote, not what she asked", async () => {
-    await open(withResult("answered", "Passei a pasta; o Diogo abriu."));
-    const card = document.querySelector(".ac-consult") as HTMLElement;
+    const { thread } = await openInThread(withResult("answered", "Passei a pasta; o Diogo abriu."));
+    const card = thread.querySelector(".ac-consult") as HTMLElement;
     const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
     await act(async () => fireEvent.click(head));
     const body = card.querySelector(".ac-consult__body") as HTMLElement;

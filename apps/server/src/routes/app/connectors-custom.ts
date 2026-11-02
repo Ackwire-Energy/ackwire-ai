@@ -66,6 +66,10 @@ const CustomServer = z
     events: z.array(z.enum(CONNECTOR_EVENTS)).openapi({
       description: "What routines can wait on from it (ADR 0130): `millionsend.email.received`.",
     }),
+    toolsError: z.string().nullable().openapi({
+      description:
+        "Why its tools couldn't be read the last time they were listed (short); null when they were. The apps say it with Tentar de novo (`…/refresh`).",
+    }),
     tools: z.array(
       z.object({
         name: z.string(),
@@ -155,6 +159,7 @@ export function customConnectorRoutes(deps: AppDeps) {
     composio,
     judge: deps.extras?.context?.judge,
     blobs: adapters.platformBlobs,
+    log: deps.log,
   };
 
   // A server's icon, for the org's members.

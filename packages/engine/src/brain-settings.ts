@@ -21,7 +21,7 @@ import {
 } from "@agenteschat/providers";
 import { claudeCodeModel, isPlanModelId, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
-import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
+import { type AgentAudience, answersOthers, audienceOf, dropMailIfWidened, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -631,6 +631,9 @@ export async function setAgentBrain(
         }
         throw error;
       });
+    if (row && audience) {
+      await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(row), userId);
+    }
     return { row, released };
   });
   caches.agents.delete(`${orgId}:${agentId}`);

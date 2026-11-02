@@ -39,6 +39,8 @@ import {
   recoverStaleRuns,
   releaseJobs,
   sweepEndedInboxes,
+  sweepExpiredVoice,
+  type VoiceDeps,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
 import { isExpectedError } from "./http/errors";
@@ -76,6 +78,8 @@ export interface WorkerDeps {
   context?: ContextDeps;
   /** Drive files (purging deleted ones after 30 days). */
   artifacts?: ArtifactDeps;
+  /** Voice recordings (deleting them past their retention, ADR 0100). */
+  voice?: VoiceDeps;
   /** Approval reminder emails. */
   approvalDigest?: { publicUrl: string; afterHours: number };
   /** People's mailboxes (ADR 0038): IMAP polling for routines, and Composio account checks. */
@@ -110,6 +114,7 @@ export const WORKER_INTERVALS_MS = {
   inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
+  voiceExpiry: 24 * 3600_000,
   /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
   mailPoll: 30_000,
   /** Composio accounts' state: mailboxes (expired → "Reconnect") and connectors marked to reconnect (working again → active). */
@@ -251,6 +256,14 @@ export function startWorkers(deps: WorkerDeps) {
     every("artifactPurge", WORKER_INTERVALS_MS.artifactPurge, async () => {
       const purged = await purgeDeletedArtifacts(files);
       if (purged > 0) log.info("deleted files purged", { versions: purged });
+    });
+  }
+
+  const voice = deps.voice;
+  if (voice) {
+    every("voiceExpiry", WORKER_INTERVALS_MS.voiceExpiry, async () => {
+      const { swept, failed } = await sweepExpiredVoice(voice);
+      if (swept + failed > 0) log.info("expired voice recordings deleted", { swept, failed });
     });
   }
 

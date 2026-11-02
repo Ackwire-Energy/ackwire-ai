@@ -43,6 +43,7 @@ export * from "./s3-fake";
 export * from "./sandbox";
 export * from "./search";
 export * from "./secret-box";
+export * from "./speech";
 export * from "./standard-webhooks";
 export * from "./web-push";
 

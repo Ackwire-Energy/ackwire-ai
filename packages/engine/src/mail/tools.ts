@@ -7,12 +7,16 @@ import {
   type OutgoingMail,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
+import { getAgent } from "../agents";
+import { namesLabel, namesOf } from "../approvals";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
+import { canTalkTo, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
-import { fedByRoutine, runAuthorityById } from "../authority";
+import { accountablePerson, fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
 import { mailboxConnector } from "../connector-usage";
 import { cutText } from "../format";
 import { recordOperatorEvent } from "../operator-events";
+import { routineCreatorOf } from "../requester";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {
@@ -97,13 +101,41 @@ const MESSAGE_ID = { type: "string", minLength: 1, maxLength: 500, description: 
 const utcDayStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
 /**
- * Whether a routine's reading feeds this run (`fedByRoutine`): then a send always asks a person, whatever the
- * mailbox policy says, since what it read (inbound mail included) can't approve its own sends (ADR 0038).
- * Any other run, a person behind it or not, follows the mailbox policy.
+ * Who decides an action in a person's own mailbox: that person (ADR 0038). Asked by them, admins may decide it too;
+ * asked by anyone else (or nobody), only they do: an email in their name is theirs to approve. Once they left the
+ * workspace nobody could, so the usual rule (the agent's owner, admins) applies.
  */
-async function unwatched(ctx: ToolContext) {
-  if (!ctx.runId) return false;
-  return fedByRoutine(await runAuthorityById(ctx.db, ctx.orgId, ctx.runId));
+async function mailboxApprovers(db: Database, orgId: string, ownerId: string, requestedBy: string | null) {
+  const [member] = await db
+    .select({ id: schema.organizationMembers.userId })
+    .from(schema.organizationMembers)
+    .where(and(eq(schema.organizationMembers.orgId, orgId), eq(schema.organizationMembers.userId, ownerId)));
+  if (!member) return { ok: true as const, approvers: null };
+  const own = requestedBy === ownerId;
+  return {
+    ok: true as const,
+    approvers: {
+      userIds: [ownerId],
+      label: namesLabel(await namesOf(db, [ownerId])),
+      requestedBy: own ? null : requestedBy,
+      requesterDecides: false,
+      ...(own ? {} : { required: true }),
+    },
+  };
+}
+
+/**
+ * Whether the person behind a run may use a person's own mailbox through this agent: its owner, or someone the agent
+ * answers directly, as its owner gave it access for (a consultation by someone outside its audience doesn't count).
+ * Nobody behind the run (an agent's own work, a watch): nobody's reach widens.
+ */
+async function mailboxUserCheck(ctx: ToolContext, authority: RunAuthority | null) {
+  // A routine's run answers for its creator, as the gateway asks them (`routineCreatorOf`).
+  const person = authority ? (accountablePerson(authority) ?? routineCreatorOf(authority)) : null;
+  const agent = person ? await getAgent(ctx.db, ctx.orgId, ctx.agentId) : null;
+  const direct = !person || (!!agent && canTalkTo(agent, person, await speakerFor(ctx.db, ctx.orgId, person)));
+  return (account: Pick<MailAccountRow, "createdByUserId">) =>
+    direct || !account.createdByUserId || account.createdByUserId === person;
 }
 
 /** Why a message is outside what the agent may read; null = inside. */
@@ -266,6 +298,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
 
   function toolsFor(account: MailAccountRow, slug: string, policy: MailPolicy, askToSend: boolean): ToolDefinition[] {
     const label = `[Email ${account.address}]`;
+    const owner = account.createdByUserId;
     const own = [...new Set([...mailboxAddresses(account), ...(policy.fromAddress ? [policy.fromAddress] : [])])];
     /** The agent's own address, when a person pinned one: the only From it may use. */
     const pinned = policy.fromAddress;
@@ -309,6 +342,9 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         sensitive:
           effect === "delete" || (effect === "send" && askToSend) || account.askActions.includes(actionOf(verb)),
         ...(effect === "read" ? { readsOutside: true as const } : {}),
+        ...(owner
+          ? { approvers: (_input, ctx, requestedBy) => mailboxApprovers(ctx.db, ctx.orgId, owner, requestedBy) }
+          : {}),
         ...extra,
       };
     };
@@ -878,7 +914,10 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       const accounts = await orgMailAccounts(ctx.db, ctx.orgId);
       if (accounts.length === 0) return [];
       const slugs = mailSlugs(accounts.filter((a) => a.address));
-      const usable = accounts.filter((a) => a.status === "active" && connectorFor(deps, a.via));
+      const active = accounts.filter((a) => a.status === "active" && connectorFor(deps, a.via));
+      if (active.length === 0) return [];
+      const authority = ctx.runId ? await runAuthorityById(ctx.db, ctx.orgId, ctx.runId) : null;
+      const usable = active.filter(await mailboxUserCheck(ctx, authority));
       if (usable.length === 0) return [];
       const policies = await agentMailPolicies(
         ctx.db,
@@ -886,7 +925,9 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         ctx.agentId,
         usable.map((a) => a.id),
       );
-      const tainted = await unwatched(ctx);
+      // A routine's reading feeds this run (`fedByRoutine`): a send always asks a person, whatever the mailbox policy
+      // says, since what it read (inbound mail included) can't approve its own sends (ADR 0038).
+      const tainted = fedByRoutine(authority);
       return usable.flatMap((a) => {
         const policy = policies.get(a.id);
         if (!policy) return [];

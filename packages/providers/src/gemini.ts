@@ -12,6 +12,7 @@ import {
   ProviderError,
   promptChars,
   type StopReason,
+  stableToolsFirst,
   systemText,
 } from "./types";
 
@@ -233,9 +234,12 @@ function toBody(request: ModelRequest) {
     input: toInput(request.messages),
     ...(request.tools && request.tools.length > 0
       ? {
-          tools: [...request.tools]
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.inputSchema })),
+          tools: stableToolsFirst(request.tools).map((t) => ({
+            type: "function",
+            name: t.name,
+            description: t.description,
+            parameters: t.inputSchema,
+          })),
         }
       : {}),
     generation_config: {

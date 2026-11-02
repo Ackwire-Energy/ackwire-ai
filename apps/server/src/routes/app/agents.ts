@@ -797,7 +797,14 @@ export function agentRoutes(deps: AppDeps) {
         Object.values(input).some((v) => v !== undefined) ||
         monthlyBudgetUsd !== undefined;
       let agent = other
-        ? await updateAgent(db, actor, orgId, agentId, { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) })
+        ? await updateAgent(
+            db,
+            actor,
+            orgId,
+            agentId,
+            { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
+            { pubsub: adapters.pubsub },
+          )
         : null;
       if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);

@@ -10,9 +10,11 @@ import type {
   ResolveHost,
   RouterDeps,
   SandboxDeps,
+  SpeechSettings,
   StorageDeps,
   StreamBroker,
   Talker,
+  VoiceDeps,
 } from "@agenteschat/engine";
 import type { AppleTokenRevoker } from "../../auth";
 
@@ -58,4 +60,7 @@ export interface AppExtras {
    * servers) = those routes answer 404.
    */
   gifKey?: GifKey;
+  /** Speech engines and what voice messages need (ADR 0100); absent: no voice messages. */
+  speech?: SpeechSettings;
+  voice?: VoiceDeps;
 }

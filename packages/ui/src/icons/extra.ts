@@ -259,6 +259,13 @@ export const extraIcons = {
     ["rect", { x: "5.5", y: "4.5", width: "3", height: "11", rx: "1" }],
     ["rect", { x: "11.5", y: "4.5", width: "3", height: "11", rx: "1" }],
   ],
+  /** Voice messages: record. */
+  mic: [
+    ["rect", { x: "7.5", y: "3", width: "5", height: "9", rx: "2.5" }],
+    ["path", { d: "M4.8 9.8a5.2 5.2 0 0 0 10.4 0M10 15v2.5" }],
+  ],
+  /** A voice message's words, opened on demand. */
+  note: [["path", { d: "M4.5 6h11M4.5 10h11M4.5 14h6.5" }]],
   /** An uploaded file of any type (Drive). */
   file: [["path", { d: "M6 3h6l3.5 3.5V17H6zM12 3v3.5h3.5" }]],
   /** An image file. */

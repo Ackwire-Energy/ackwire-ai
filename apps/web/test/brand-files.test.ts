@@ -39,7 +39,7 @@ describe("the brand files the app serves", () => {
 
   test("each AI maker's image mark is a file here, 128 px square", async () => {
     const images = Object.values(PROVIDER_MARKS).flatMap((mark) => ("image" in mark ? [mark.image] : []));
-    expect(images).toEqual(["/brands/gemini.png", "/brands/vscode.png"]);
+    expect(images).toEqual(["/brands/soniox.png", "/brands/gemini.png", "/brands/vscode.png"]);
     for (const image of images) {
       const png = new DataView(await Bun.file(new URL(`../public${image}`, import.meta.url).pathname).arrayBuffer());
       // The PNG signature, then the header's width and height.

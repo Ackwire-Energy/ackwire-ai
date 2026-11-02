@@ -50,6 +50,7 @@ import {
   ownSignInListed,
   ownSignInName,
   ownSignInReady,
+  ownSignInTitle,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
@@ -94,11 +95,11 @@ import {
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
-  BrainLogo,
   BrainPortrait,
   Button,
   Checkbox,
   ComputerPortrait,
+  cx,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -1101,7 +1102,20 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     settings.data?.defaultCredentialId ?? null,
     apiProviderOf(model, all),
   );
-  const accountIcon = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
+  // Each account by its own face, never the plan's mark again (the card above shows it, and the model's picker
+  // wears it): people for a sign-in the agents there share, a person for one login.
+  const sharedIcon = (
+    <span className="newag__ib">
+      <Icon name="members" size={16} />
+    </span>
+  );
+  const loginIcon = (
+    <span className="newag__ib">
+      <Icon name="person" size={16} />
+    </span>
+  );
+  // The computer's own sign-in says its plan under its name, as "Seus planos" titles it ("Claude · Max").
+  const ownPlan = accountKind ? (row?.own?.[accountKind]?.plan ?? null) : null;
   const shownModel = brainModelChoice(kind, plan, planModel ?? option?.defaultModel ?? "");
   const accountOptions: SelectOption[] = [
     ...(ownListed
@@ -1109,7 +1123,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           {
             value: HERE,
             label: ownSignInName(t, view.ownSignIn && view.canUsePlans, computerName),
-            leading: accountIcon,
+            description: accountKind && ownPlan ? ownSignInTitle(t, { kind: accountKind, plan: ownPlan }) : undefined,
+            leading: sharedIcon,
           },
         ]
       : []),
@@ -1119,6 +1134,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...accountChoices(accounts, [account, view.account]).map((c) => ({
       value: c.also ? `${ALSO}${c.login.id}` : c.login.id,
       ...accountOption(t, i18n.language, c, agent.name),
+      leading: c.login.shared === true ? sharedIcon : loginIcon,
     })),
     {
       value: ADD,
@@ -1149,27 +1165,32 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         : null;
   const accountField = accountsOn && accountKind && (
     <BrainField label={t("agentPage.work.brain.account")}>
-      {!lockedHere && (
-        <Select
-          className="agp-brainsel"
-          aria-label={t("agentPage.work.brain.account")}
-          // Nothing chosen yet, where the computer's own sign-in can't think: it starts at "Adicionar conta".
-          value={account ?? (ownListed ? HERE : "")}
-          placeholder={view.canManageAccounts ? t("agentPage.work.brain.addAccount") : undefined}
-          disabled={!view.canUsePlans}
-          onValueChange={(v) => {
-            if (v === ADD) return setAdding(true);
-            const also = v.startsWith(ALSO) ? accounts.find((a) => `${ALSO}${a.id}` === v) : undefined;
-            if (also) return setAdding(also);
-            setArrived(null);
-            setAccount(v === HERE ? null : v);
-          }}
-          options={shownAccounts}
-          renderValue={pickerValue}
-        />
+      {/* The account and its plan's usage in one outline: the meters hang under its picker, they are that account's. */}
+      {(!lockedHere || usage) && (
+        <div className={cx("agp-acct", usage && !lockedHere && "agp-acct--use")}>
+          {!lockedHere && (
+            <Select
+              className="agp-brainsel"
+              aria-label={t("agentPage.work.brain.account")}
+              // Nothing chosen yet, where the computer's own sign-in can't think: it starts at "Adicionar conta".
+              value={account ?? (ownListed ? HERE : "")}
+              placeholder={view.canManageAccounts ? t("agentPage.work.brain.addAccount") : undefined}
+              disabled={!view.canUsePlans}
+              onValueChange={(v) => {
+                if (v === ADD) return setAdding(true);
+                const also = v.startsWith(ALSO) ? accounts.find((a) => `${ALSO}${a.id}` === v) : undefined;
+                if (also) return setAdding(also);
+                setArrived(null);
+                setAccount(v === HERE ? null : v);
+              }}
+              options={shownAccounts}
+              renderValue={pickerValue}
+            />
+          )}
+          {usage && <PlanMeter usage={usage} text={meterText} />}
+        </div>
       )}
       {accountNote && <SettingNote icon={signedOut ? "alert" : "lock"}>{accountNote}</SettingNote>}
-      {usage && <PlanMeter usage={usage} text={meterText} />}
       {usage && extraUsageOn(usage) && (
         <div className="agp-advswitch">
           <SwitchLabel htmlFor={extraId} label={t("usageCard.extraTitle")} hint={t("usageCard.extraHint")} />
@@ -1442,7 +1463,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         )}
       </DialogBody>
       <Footer
-        disabled={unchanged || needsAccount || adding !== false || (kind !== "model" && !home)}
+        // Moving onto a plan needs a computer that runs it now. Its own settings (model, account, effort) save while
+        // none does: the server checks the computer only when the brain changes, and the agent waits for it anyway.
+        disabled={unchanged || needsAccount || adding !== false || (kind !== "model" && !home && card !== savedCard)}
         busy={busy}
         primary={t("agentPage.work.use")}
         onClose={onClose}
