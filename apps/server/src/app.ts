@@ -105,7 +105,7 @@ export interface AppOptions {
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
- * - `/api/hooks/*`        public: a webhook routine's own address (POST, ADR 0106)
+ * - `/api/hooks/*`        public: a webhook routine's own address (its chosen methods, ADR 0106)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
  * - `/api/oauth/*`        public: the OAuth 2.1 authorization server for AI apps (ADR 0119)
  * - `/mcp`                AI apps' MCP endpoint, bearer tokens only (ADR 0119); `/.well-known/oauth-*` its discovery

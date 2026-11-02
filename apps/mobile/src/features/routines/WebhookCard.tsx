@@ -1,7 +1,9 @@
 import {
+  ROUTINE_HOOK_METHODS,
   type Routine,
   type RoutineHookCall,
   type RoutineRun,
+  useRoutineAction,
   useRoutineHook,
   useRoutineHookAction,
 } from "@agenteschat/client";
@@ -51,6 +53,7 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
   const failed = useFailed();
   const hook = useRoutineHook(orgId, r.id);
   const action = useRoutineHookAction(orgId, r.id);
+  const save = useRoutineAction(orgId);
   const [secret, setSecret] = useState<string | null>(null);
   const data = hook.data;
   if (!data) {
@@ -77,6 +80,16 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
       },
       onError: failed,
     });
+  // The methods the address answers: at least one stays on.
+  const toggleMethod = (m: (typeof ROUTINE_HOOK_METHODS)[number]) => {
+    const on = !data.methods.includes(m);
+    const next = ROUTINE_HOOK_METHODS.filter((x) => (x === m ? on : data.methods.includes(x)));
+    if (next.length === 0) return;
+    save.mutate(
+      { type: "update", id: r.id, patch: { trigger: { type: "webhook", methods: next } } },
+      { onError: failed },
+    );
+  };
   const ask = (what: keyof typeof QUESTIONS) =>
     confirmAction({
       title: t(QUESTIONS[what].title),
@@ -130,9 +143,27 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
         </>
       ) : null}
 
+      <GroupedHeader>{t("routines.webhook.methods")}</GroupedHeader>
+      <GroupedList>
+        {ROUTINE_HOOK_METHODS.map((m) => (
+          <GroupedRow
+            key={m}
+            label={m}
+            checked={data.methods.includes(m)}
+            disabled={save.isPending || (data.methods.length === 1 && data.methods.includes(m))}
+            onPress={() => toggleMethod(m)}
+          />
+        ))}
+      </GroupedList>
+      <GroupedFooter>{t("routines.webhook.methodsHelp")}</GroupedFooter>
+
       <GroupedHeader>{t("routines.webhook.example")}</GroupedHeader>
       <CommandBlock
-        command={hookCurl(data.url, data.signed ? (secret ?? t("routines.webhook.secretPlaceholder")) : null)}
+        command={hookCurl(
+          data.url,
+          data.signed ? (secret ?? t("routines.webhook.secretPlaceholder")) : null,
+          data.methods,
+        )}
         copiedTitle={t("routines.webhook.exampleCopied")}
       />
       <View style={styles.gap} />

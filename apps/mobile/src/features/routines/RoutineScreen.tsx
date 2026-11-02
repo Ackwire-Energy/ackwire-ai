@@ -343,7 +343,10 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                 </Text>
               ) : r.trigger.type === "webhook" ? (
                 <Text variant="footnote" tone="muted">
-                  {t("routines.webhook.every")}
+                  {t("common.joinSentences", {
+                    a: t("routines.webhook.every"),
+                    b: t("routines.webhook.methodsLine", { methods: (r.trigger.methods ?? ["POST"]).join(", ") }),
+                  })}
                 </Text>
               ) : r.trigger.type === "event" ? (
                 <Text variant="footnote" tone="muted">

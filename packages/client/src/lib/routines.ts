@@ -56,17 +56,20 @@ export const isRefusedHookCall = (outcome: RoutineHookOutcome) =>
  * A call to try a routine's address from a terminal. With `secret` (the signing secret, or a placeholder for it),
  * the body is signed the way a sending service signs it: its HMAC-SHA256 in `X-Agentes-Signature`.
  */
-export function hookCurl(url: string, secret: string | null) {
+export function hookCurl(url: string, secret: string | null, methods: readonly string[] = ["POST"]) {
+  const method = methods.includes("POST") ? "POST" : (methods.find((m) => m !== "GET") ?? "GET");
+  const sign = (data: string) => `SIG=$(printf '%s' ${data} | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')`;
+  const signature = `  -H "X-Agentes-Signature: sha256=$SIG"`;
+  // A GET's data is its query string; a signature then covers its empty body.
+  if (method === "GET") {
+    const get = `curl '${url}?text=hello'`;
+    return secret === null ? get : [`SECRET='${secret}'`, sign("''"), `${get} \\`, signature].join("\n");
+  }
   const body = `{"text":"hello"}`;
-  const post = (signature: string[], data: string) =>
-    [`curl -X POST '${url}' \\`, `  -H 'Content-Type: application/json' \\`, ...signature, `  -d ${data}`].join("\n");
-  if (secret === null) return post([], `'${body}'`);
-  return [
-    `SECRET='${secret}'`,
-    `BODY='${body}'`,
-    `SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')`,
-    post([`  -H "X-Agentes-Signature: sha256=$SIG" \\`], '"$BODY"'),
-  ].join("\n");
+  const send = (sig: string[], data: string) =>
+    [`curl -X ${method} '${url}' \\`, `  -H 'Content-Type: application/json' \\`, ...sig, `  -d ${data}`].join("\n");
+  if (secret === null) return send([], `'${body}'`);
+  return [`SECRET='${secret}'`, `BODY='${body}'`, sign('"$BODY"'), send([`${signature} \\`], '"$BODY"')].join("\n");
 }
 
 /** Zones people pick most often, around the world; the select also keeps whatever zone a routine already has. */

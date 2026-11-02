@@ -9,6 +9,7 @@ import {
   actionTimeLeft,
   canUndoAction,
   formatTimeLeft,
+  hookToCopy,
   undoableNow,
 } from "../src/lib/actions";
 
@@ -40,6 +41,24 @@ describe("receipts", () => {
     expect(actionTimeLeft(action(), now)).toBe(240_000);
     expect(formatTimeLeft(238_000)).toBe("3:58");
     expect(actionTimeLeft(action({ undoableUntil: "2026-10-18T11:00:00Z" }), now)).toBe(0);
+  });
+
+  test("a webhook routine the agent made offers its address to who asked or manages routines; nothing else does", () => {
+    const made = action({
+      kind: "routine.created",
+      target: { type: "routine", id: "rt1", title: "Avisar" },
+      params: { name: "Avisar", trigger: "webhook" },
+    });
+    expect(hookToCopy(made, { userId: "u1", managesRoutines: false })).toBe("rt1");
+    expect(hookToCopy(made, { userId: "u2", managesRoutines: true })).toBe("rt1");
+    expect(hookToCopy(made, { userId: "u2", managesRoutines: false })).toBeNull();
+    expect(
+      hookToCopy({ ...made, undoneAt: "2026-10-18T11:59:30Z" }, { userId: "u1", managesRoutines: true }),
+    ).toBeNull();
+    expect(
+      hookToCopy({ ...made, params: { name: "Avisar", trigger: "schedule" } }, { userId: "u1", managesRoutines: true }),
+    ).toBeNull();
+    expect(hookToCopy(action(), { userId: "u1", managesRoutines: true })).toBeNull();
   });
 
   test("who sees the buttons", () => {

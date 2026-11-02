@@ -665,6 +665,13 @@ export async function publishOrgEvent(pubsub: PubSub | undefined, event: OrgEven
   }
 }
 
+/**
+ * A routine's runs changed (one was queued, started or ended): the apps that show its runs fetch them again. Only its
+ * id goes out; what each person may see of it stays behind the routines' own endpoints.
+ */
+export const publishRoutineRuns = (pubsub: PubSub | undefined, orgId: string, routineId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "routine.runs", orgId, routineId } });
+
 /** An event for one person (forwarded to every connection they have open in that organization). */
 export type UserEvent = { type: string; [key: string]: unknown };
 

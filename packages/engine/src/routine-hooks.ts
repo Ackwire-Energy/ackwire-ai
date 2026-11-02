@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { KeyWrapper, RateLimiter } from "@agenteschat/adapters";
+import type { KeyWrapper, PubSub, RateLimiter } from "@agenteschat/adapters";
 import {
   and,
   type Database,
@@ -17,6 +17,7 @@ import {
 import { recordAudit } from "./audit";
 import { openSecret, randomToken, routineHookToken, sealSecret, sha256 } from "./crypto";
 import { ConflictError, TooManyError } from "./errors";
+import { publishRoutineRuns } from "./events";
 import { cutText } from "./format";
 import { oneLine } from "./mail/text";
 import { type EventMerge, queueEventRun, type RoutineEventPayload } from "./routine-events";
@@ -47,6 +48,20 @@ export interface RoutineHookDeps {
   /** The first seals a new signing secret; any of them opens one. */
   keyWrappers: KeyWrapper[];
   rateLimiter: RateLimiter;
+  /** Tells the apps a call queued a run (`publishRoutineRuns`). */
+  pubsub?: PubSub;
+}
+
+/** The HTTP methods a routine's address can answer; it answers POST unless its managers choose others. */
+export const HOOK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+export type HookMethod = (typeof HOOK_METHODS)[number];
+export const DEFAULT_HOOK_METHODS: HookMethod[] = ["POST"];
+
+/** The methods chosen, known and in `HOOK_METHODS` order; none known is the default. */
+export function hookMethodsOf(raw: readonly string[] | null | undefined): HookMethod[] {
+  const wanted = new Set((raw ?? []).map((m) => m.toUpperCase()));
+  const methods = HOOK_METHODS.filter((m) => wanted.has(m));
+  return methods.length > 0 ? methods : [...DEFAULT_HOOK_METHODS];
 }
 
 /** The largest body an address takes (JSON, a form or text). */
@@ -106,17 +121,22 @@ function newKey(hooks: RoutineHookConfig) {
 
 /**
  * Gives a webhook routine its address when it has none. A routine keeps its address while its trigger changes, so
- * turning it back into a webhook routine (or undoing a change) brings the same one back.
+ * turning it back into a webhook routine (or undoing a change) brings the same one back. `methods`: the ones it
+ * answers from now on (left out, what it had).
  */
 export async function ensureRoutineHook(
   db: Executor,
   hooks: RoutineHookConfig,
   routine: { id: string; orgId: string },
+  methods?: readonly string[],
 ) {
-  await db
+  const chosen = methods ? { methods: hookMethodsOf(methods) } : {};
+  const insert = db
     .insert(routineHooks)
-    .values({ routineId: routine.id, orgId: routine.orgId, ...newKey(hooks) })
-    .onConflictDoNothing();
+    .values({ routineId: routine.id, orgId: routine.orgId, ...newKey(hooks), ...chosen });
+  await (methods
+    ? insert.onConflictDoUpdate({ target: routineHooks.routineId, set: { ...chosen, updatedAt: new Date() } })
+    : insert.onConflictDoNothing());
 }
 
 /** The key, its token's hash and whether calls must be signed, for each of these routines that has an address. */
@@ -130,10 +150,16 @@ export async function routineHookKeys(db: Executor, routineIds: string[]) {
             keyId: routineHooks.keyId,
             tokenHash: routineHooks.tokenHash,
             secret: routineHooks.secretCiphertext,
+            methods: routineHooks.methods,
           })
           .from(routineHooks)
           .where(inArray(routineHooks.routineId, routineIds));
-  return new Map(rows.map(({ secret, ...r }) => [r.routineId, { ...r, signed: secret !== null }]));
+  return new Map(
+    rows.map(({ secret, methods, ...r }) => [
+      r.routineId,
+      { ...r, signed: secret !== null, methods: hookMethodsOf(methods) },
+    ]),
+  );
 }
 
 type RoutineRef = { id: string; orgId: string; name: string };
@@ -158,6 +184,7 @@ export interface RoutineHookCallView {
 export interface RoutineHookView {
   url: string;
   signed: boolean;
+  methods: HookMethod[];
   calls: RoutineHookCallView[];
 }
 
@@ -184,6 +211,7 @@ export async function routineHookView(
   return {
     url: await liveHookUrl(deps.db, deps.hooks, row),
     signed: row.secretCiphertext !== null,
+    methods: hookMethodsOf(row.methods),
     calls: calls.map((c) => ({
       id: c.id,
       at: c.createdAt.toISOString(),
@@ -272,20 +300,33 @@ export async function sendRoutineHookTest(deps: RoutineHookDeps, routine: Routin
 /** How the public endpoint answers. */
 export type HookAnswer =
   | { status: 202; runId: string | null; duplicate: boolean }
-  | { status: 401 | 404 | 413 | 429; code: "invalid_signature" | "not_found" | "too_large" | "rate_limited" };
+  | { status: 401 | 404 | 413 | 429; code: "invalid_signature" | "not_found" | "too_large" | "rate_limited" }
+  /** A method the address doesn't answer: `allow` lists the ones it does. */
+  | { status: 405; code: "method_not_allowed"; allow: HookMethod[] };
 
 /**
- * `POST /api/hooks/{token}`. Unknown, malformed, a routine turned off or deleted, or a workspace that is closed:
- * 404. Then the routine's limit (429), the body (`read` gives null past `maxBytes`: 413), the signature when it has a
+ * A call to `/api/hooks/{token}`. Unknown, malformed, a routine turned off or deleted, or a workspace that is closed:
+ * 404. A method the routine doesn't answer: 405. Then the routine's limit (429), the body (`read` gives null past `maxBytes`: 413), the signature when it has a
  * secret (401), a repeat of an `Idempotency-Key` or `X-GitHub-Delivery` within 24 hours (202 with the first call's
  * run), else the call joins the routine's next run (202). No model runs here: the run goes through the outbox.
  */
 export async function receiveRoutineHook(
   deps: RoutineHookDeps,
-  input: { token: string; headers: Headers; read: (maxBytes: number) => Promise<Uint8Array | null> },
+  input: {
+    token: string;
+    headers: Headers;
+    read: (maxBytes: number) => Promise<Uint8Array | null>;
+    /** Default POST. */
+    method?: string;
+    /** The query string's fields: a GET call's data. */
+    query?: Record<string, string>;
+  },
 ): Promise<HookAnswer> {
   const hook = TOKEN.test(input.token) ? await liveHook(deps.db, sha256(input.token)) : null;
   if (!hook) return { status: 404, code: "not_found" };
+  const method = (input.method ?? "POST").toUpperCase();
+  const allow = hookMethodsOf(hook.methods);
+  if (!allow.includes(method as HookMethod)) return { status: 405, code: "method_not_allowed", allow };
   if (!(await underLimit(deps, hook))) return { status: 429, code: "rate_limited" };
   const body = await input.read(HOOK_MAX_BYTES);
   if (!body) {
@@ -298,7 +339,16 @@ export async function receiveRoutineHook(
     await logCall(deps.db, hook, { outcome: "bad_signature", status: 401, bytes: body.byteLength });
     return { status: 401, code: "invalid_signature" };
   }
-  return accept(deps, hook, { headers: input.headers, body, test: false, token: input.token });
+  const answer = await accept(deps, hook, {
+    headers: input.headers,
+    body,
+    test: false,
+    token: input.token,
+    method,
+    ...(method === "GET" ? { query: input.query ?? {} } : {}),
+  });
+  if (!answer.duplicate) await publishRoutineRuns(deps.pubsub, hook.orgId, hook.routineId);
+  return answer;
 }
 
 async function liveHook(db: Database, tokenHash: string) {
@@ -422,6 +472,8 @@ interface HookCall {
   /** Not text: nothing of it is kept. */
   binary?: true;
   test?: true;
+  /** Absent: POST (calls kept before methods could be chosen). */
+  method?: string;
 }
 
 const NO_CALLS = { type: WEBHOOK_EVENT, calls: [], extra: 0, summary: "" };
@@ -432,6 +484,9 @@ interface CallInput {
   body: Uint8Array;
   test: boolean;
   token?: string;
+  method?: string;
+  /** A GET call's query string: its data, kept as its body. */
+  query?: Record<string, string>;
 }
 
 function callOf(call: CallInput): HookCall {
@@ -440,7 +495,8 @@ function callOf(call: CallInput): HookCall {
   let text: string | null;
   try {
     // A NUL can't be stored in jsonb.
-    text = hide(new TextDecoder("utf-8", { fatal: true }).decode(call.body).replaceAll("\u0000", ""));
+    const raw = call.query ? JSON.stringify(call.query) : new TextDecoder("utf-8", { fatal: true }).decode(call.body);
+    text = hide(raw.replaceAll("\u0000", ""));
   } catch {
     text = null;
   }
@@ -457,6 +513,7 @@ function callOf(call: CallInput): HookCall {
     ...(text !== null && text.length > BODY_CHARS ? { cut: true as const } : {}),
     ...(text === null ? { binary: true as const } : {}),
     ...(call.test ? { test: true as const } : {}),
+    ...(call.method && call.method !== "POST" ? { method: call.method } : {}),
   };
 }
 
@@ -498,7 +555,8 @@ export function webhookEventText(event: Record<string, unknown>): string {
       const body = c.binary ? "(binary content, not kept)" : readableBody(c);
       const shown = cutText(body, share);
       return [
-        calls.length > 1 ? `call ${i + 1} of ${calls.length}, at ${c.at}` : `call at ${c.at}`,
+        `${c.method ?? "POST"} ${calls.length > 1 ? `call ${i + 1} of ${calls.length}, at ${c.at}` : `call at ${c.at}`}`,
+        ...(c.method === "GET" ? ["(its query string's fields, as JSON)"] : []),
         ...(c.test ? ["(a sample sent with Testar on the routine's page, not a real event)"] : []),
         ...Object.entries(c.headers).map(([k, v]) => `${k}: ${v}`),
         `size: ${c.bytes} bytes${c.cut ? ` (only the first ${BODY_CHARS} characters were kept)` : ""}`,
@@ -511,7 +569,7 @@ export function webhookEventText(event: Record<string, unknown>): string {
     .join("\n\n");
   const lead = testOnlyEvent(event)
     ? "A person pressed Testar on this routine's page: the call below is a sample, not a real event, so don't act on it: change nothing and reach no one for it. Report what you would do with a real call like it, and say it was a test."
-    : `What was POSTed to this routine's webhook address${
+    : `What was ${calls.every((c) => !c.method) ? "POSTed" : "sent"} to this routine's webhook address${
         calls.length > 1
           ? ` (${calls.length} calls, oldest first${extra > 0 ? `, ${extra} earlier ones not shown` : ""})`
           : ""

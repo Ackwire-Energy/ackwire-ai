@@ -1956,6 +1956,7 @@
       "updated": "Ho corretto la skill <b>{{name}}</b>"
     },
     "other": "Ho fatto una modifica",
+    "copyWebhook": "Copia indirizzo del webhook",
     "issueFields": {
       "title": "il titolo",
       "description": "la descrizione",
@@ -4718,6 +4719,9 @@
       "every": "Si avvia a ogni chiamata. Le chiamate che arrivano insieme diventano un'unica esecuzione.",
       "newNote": "La routine riceve un indirizzo tutto suo. Ogni POST a quell'indirizzo avvia l'agente con ciò che è stato inviato. L'indirizzo compare nella pagina della routine dopo il salvataggio.",
       "hidden": "Solo chi può modificare la routine vede il suo indirizzo.",
+      "methods": "Metodi accettati",
+      "methodsHelp": "L’indirizzo risponde solo ai metodi selezionati. Con GET, i parametri della query dell’URL sono i dati della chiamata.",
+      "methodsLine": "Accetta {{methods}}.",
       "address": "Indirizzo",
       "addressHelp": "Chiunque abbia l'indirizzo può avviare l'agente. Custodiscilo come una password e creane uno nuovo se finisce in giro.",
       "copied": "Indirizzo copiato.",

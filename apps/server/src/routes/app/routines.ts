@@ -8,6 +8,7 @@ import {
   describeWhen,
   duplicateRoutine,
   getRoutineView,
+  HOOK_METHODS,
   HOOK_OUTCOMES,
   listMyReminders,
   listRoutineRuns,
@@ -55,6 +56,7 @@ import {
 
 const tags = ["Routines"];
 const Event = z.enum(ROUTINE_EVENTS);
+const HookMethodSchema = z.enum(HOOK_METHODS);
 /** New mail in a mailbox folder (ADR 0038): `from` takes addresses or `@domains`. */
 const MailFilterSchema = z
   .object({
@@ -230,9 +232,11 @@ const Routine = z
       z.object({
         type: z.literal("webhook"),
         url: z.string().nullable().openapi({
-          description: "Its address (`POST` to start it); null unless you may manage the routine.",
+          description:
+            "Its address (called with one of `methods` to start it); null unless you may manage the routine.",
         }),
         signed: z.boolean().openapi({ description: "Calls must carry an HMAC-SHA256 signature of the body." }),
+        methods: z.array(HookMethodSchema).openapi({ description: "The HTTP methods its address answers." }),
       }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
@@ -363,7 +367,12 @@ const TriggerInput = z.union([
     })
     .openapi({ description: "New mail in a mailbox the agent can read; `folder` default the inbox." }),
   z
-    .object({ type: z.literal("webhook") })
+    .object({
+      type: z.literal("webhook"),
+      methods: z.array(HookMethodSchema).min(1).max(HOOK_METHODS.length).optional().openapi({
+        description: "The HTTP methods its address answers (default POST; left out on a change, what it had).",
+      }),
+    })
     .openapi({ description: "A call to an address of its own (`GET …/hook` gives it to who manages the routine)." }),
 ]);
 
@@ -385,6 +394,7 @@ const Hook = z
   .object({
     url: z.string(),
     signed: z.boolean(),
+    methods: z.array(HookMethodSchema),
     calls: z.array(HookCall).openapi({ description: "The latest calls, newest first (at most 20)." }),
   })
   .openapi("RoutineHook");

@@ -1959,6 +1959,7 @@
       "updated": "J'ai corrigé la compétence <b>{{name}}</b>"
     },
     "other": "A fait une modification",
+    "copyWebhook": "Copier l’adresse du webhook",
     "issueFields": {
       "title": "le titre",
       "description": "la description",
@@ -4715,6 +4716,9 @@
       "every": "S'exécute à chaque appel. Les appels qui arrivent ensemble ne font qu'une exécution.",
       "newNote": "La routine reçoit sa propre adresse. Chaque POST vers elle lance l'agent avec ce qui a été envoyé. L'adresse apparaît sur la page de la routine une fois enregistrée.",
       "hidden": "Seules les personnes qui peuvent modifier la routine voient son adresse.",
+      "methods": "Méthodes acceptées",
+      "methodsHelp": "L’adresse ne répond qu’aux méthodes cochées. Avec GET, les paramètres de l’URL sont les données de l’appel.",
+      "methodsLine": "Accepte {{methods}}.",
       "address": "Adresse",
       "addressHelp": "Toute personne qui a l'adresse peut lancer l'agent. Gardez-la comme un mot de passe et créez-en une nouvelle si elle fuite.",
       "copied": "Adresse copiée.",

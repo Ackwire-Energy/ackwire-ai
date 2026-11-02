@@ -44,6 +44,19 @@ export function canUndoAction(
   return a.requestedByUserId === viewer.userId || viewer.managesAgents || viewer.ownsAgent;
 }
 
+/**
+ * The webhook routine whose address a receipt offers to copy ("Copiar endereço do webhook"): one the agent created,
+ * for the person it worked for or whoever manages routines (the server checks it again). Null for any other receipt.
+ */
+export function hookToCopy(
+  a: Pick<AgentAction, "kind" | "params" | "target" | "requestedByUserId" | "undoneAt">,
+  viewer: { userId: string | null; managesRoutines: boolean },
+): string | null {
+  if (a.kind !== "routine.created" || a.params.trigger !== "webhook" || a.target.type !== "routine" || a.undoneAt)
+    return null;
+  return a.requestedByUserId === viewer.userId || viewer.managesRoutines ? a.target.id : null;
+}
+
 /** The receipts Desfazer tudo would undo now (shown when a message has more than one change). */
 export const undoableNow = (list: AgentAction[], now = Date.now()) =>
   list.filter((a) => actionPhase(a, now) === "undo");

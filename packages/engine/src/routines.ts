@@ -28,7 +28,7 @@ import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { nextCronTime, zonedTimeForward } from "./cron";
 import { openDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishMessageCreated, publishUserEvent } from "./events";
+import { publishMessageCreated, publishRoutineRuns, publishUserEvent } from "./events";
 import { createForumTopic } from "./forum";
 import { releaseRoutineEmails } from "./mail/inbound";
 import {
@@ -56,7 +56,9 @@ import {
 import { enqueueRoutineJob, queueEventRun, startGatheredRun } from "./routine-events";
 import { claimRoutineRun, haltRoutineRuns, makeWayForRun, skipRoutineRun, unclaimRoutineRun } from "./routine-firing";
 import {
+  DEFAULT_HOOK_METHODS,
   ensureRoutineHook,
+  type HookMethod,
   liveHookUrl,
   type RoutineHookConfig,
   routineHookKeys,
@@ -191,7 +193,7 @@ export type RoutineTrigger =
    * A call to its own address (ADR 0106), stored as the event `webhook.received` plus a `routine_hooks` row. `url`
    * only for who may manage it (null for everyone else and for agents); `signed`: calls must carry a signature.
    */
-  | { type: "webhook"; url: string | null; signed: boolean };
+  | { type: "webhook"; url: string | null; signed: boolean; methods: HookMethod[] };
 
 /**
  * A routine run as Rotinas shows it (ADR 0053 §5): the open ledger states read with its agent run
@@ -335,8 +337,11 @@ export type RoutineTriggerInput =
   | { type: "once"; at: string; timezone?: string }
   /** New mail in a mailbox the routine's agent can read; `folder` default the inbox. */
   | { type: "email"; accountId: string; folder?: string; filter?: MailFilter }
-  /** A call to an address of its own (made with it, kept while its trigger changes). */
-  | { type: "webhook" };
+  /**
+   * A call to an address of its own (made with it, kept while its trigger changes). `methods`: the HTTP methods it
+   * answers (default POST; left out on a change, what it had).
+   */
+  | { type: "webhook"; methods?: string[] };
 
 export interface RoutineDeps {
   db: Database;
@@ -377,10 +382,15 @@ export function routineSlots(r: Pick<RoutineRow, "rule" | "cron" | "timezone">, 
 function triggerOf(
   r: RoutineRow,
   watch?: MailWatchRow,
-  hook?: { url: string | null; signed: boolean },
+  hook?: { url: string | null; signed: boolean; methods: HookMethod[] },
 ): RoutineTrigger {
   if (r.triggerType === "event" && r.event === WEBHOOK_EVENT) {
-    return { type: "webhook", url: hook?.url ?? null, signed: hook?.signed ?? false };
+    return {
+      type: "webhook",
+      url: hook?.url ?? null,
+      signed: hook?.signed ?? false,
+      methods: hook?.methods ?? [...DEFAULT_HOOK_METHODS],
+    };
   }
   if (r.triggerType === "event" && r.event === "email.received" && watch) {
     return {
@@ -906,7 +916,11 @@ async function views(
       agentId: r.agentId,
       prompt: right.reads || right.publicPrompt ? r.prompt : null,
       target: targetOf(r),
-      trigger: triggerOf(r, watches.get(r.id), hookKey && { url: hookUrls.get(r.id) ?? null, signed: hookKey.signed }),
+      trigger: triggerOf(
+        r,
+        watches.get(r.id),
+        hookKey && { url: hookUrls.get(r.id) ?? null, signed: hookKey.signed, methods: hookKey.methods },
+      ),
       active: r.active,
       nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
       createdAt: r.createdAt.toISOString(),
@@ -1228,7 +1242,7 @@ export async function createRoutine(
     .returning();
   if (!row) throw new Error("routine insert returned nothing");
   if (input.trigger.type === "email") await syncMailWatch(deps, row, emailWatch(input.trigger));
-  if (hooks) await ensureRoutineHook(db, hooks, row);
+  if (hooks && input.trigger.type === "webhook") await ensureRoutineHook(db, hooks, row, input.trigger.methods);
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -1469,7 +1483,7 @@ export async function updateRoutine(
     if (mailTrigger && patch.active === true && !current.active) await resetMailWatchState(db, row.id);
     await syncMailWatch(deps, row, mailTrigger);
   }
-  if (hooks) await ensureRoutineHook(db, hooks, row);
+  if (hooks && patch.trigger?.type === "webhook") await ensureRoutineHook(db, hooks, row, patch.trigger.methods);
   // Pausing also stops its work in progress (§6.7); resuming clears why it paused itself.
   if (patch.active === false && current.active) {
     await haltRoutineRuns(deps, orgId, row.id, { code: "paused", byUserId: actorId });
@@ -1638,6 +1652,7 @@ export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: s
   const routine = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, routine.agentId);
   await queueRoutineRun(deps, routine, new Date(), "manual");
+  await publishRoutineRuns(deps.pubsub, orgId, routine.id);
   const [view] = await views(deps.db, [routine], actorId, deps.hooks);
   return view as RoutineView;
 }
@@ -1960,6 +1975,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   });
   // Stopped while it was being started: nothing ran.
   if (!started) return;
+  await publishRoutineRuns(deps.pubsub, routine.orgId, routine.id);
   await ran();
 }
 

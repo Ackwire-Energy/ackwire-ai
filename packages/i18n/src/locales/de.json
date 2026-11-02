@@ -1895,6 +1895,7 @@
       "updated": "Skill <b>{{name}}</b> korrigiert"
     },
     "other": "Eine Änderung vorgenommen",
+    "copyWebhook": "Webhook-Adresse kopieren",
     "issueFields": {
       "title": "den Titel",
       "description": "die Beschreibung",
@@ -4526,6 +4527,9 @@
       "every": "Läuft bei jedem Aufruf. Aufrufe, die gleichzeitig ankommen, werden zu einer Ausführung.",
       "newNote": "Die Routine bekommt eine eigene Adresse. Jeder POST dorthin startet den Agenten mit dem, was gesendet wurde. Die Adresse erscheint auf der Seite der Routine, sobald sie gespeichert ist.",
       "hidden": "Nur wer die Routine ändern darf, sieht ihre Adresse.",
+      "methods": "Akzeptierte Methoden",
+      "methodsHelp": "Die Adresse antwortet nur auf die markierten Methoden. Bei GET sind die Query-Parameter der URL die Daten des Aufrufs.",
+      "methodsLine": "Akzeptiert {{methods}}.",
       "address": "Adresse",
       "addressHelp": "Wer die Adresse hat, kann den Agenten starten. Behandle sie wie ein Passwort und erstelle eine neue, falls sie bekannt wird.",
       "copied": "Adresse kopiert.",

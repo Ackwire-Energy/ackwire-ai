@@ -1842,6 +1842,7 @@
       "updated": "Memperbaiki skill <b>{{name}}</b>"
     },
     "other": "Membuat perubahan",
+    "copyWebhook": "Salin alamat webhook",
     "issueFields": {
       "title": "judul",
       "description": "deskripsi",
@@ -4402,6 +4403,9 @@
       "every": "Berjalan di setiap panggilan. Panggilan yang datang bersamaan menjadi satu proses.",
       "newNote": "Rutinitas ini mendapat alamatnya sendiri. Setiap POST ke alamat itu memulai agen dengan data yang dikirim. Alamatnya muncul di halaman rutinitas setelah disimpan.",
       "hidden": "Hanya yang bisa mengubah rutinitas ini yang melihat alamatnya.",
+      "methods": "Metode yang diterima",
+      "methodsHelp": "Alamat ini hanya menjawab metode yang dicentang. Dengan GET, parameter kueri URL menjadi data panggilan.",
+      "methodsLine": "Menerima {{methods}}.",
       "address": "Alamat",
       "addressHelp": "Siapa pun yang punya alamat ini bisa memulai agen. Jaga seperti kata sandi dan buat yang baru kalau bocor.",
       "copied": "Alamat disalin.",

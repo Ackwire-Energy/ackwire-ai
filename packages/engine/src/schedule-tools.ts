@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
-import { currentHandles } from "./agents";
+import { agentsByHandle, currentHandles } from "./agents";
 import { cancelAheadApproval, cancelableAhead } from "./approvals";
 import { canTalkTo, speakerFor } from "./audience";
 import { runAuthorityById } from "./authority";
@@ -9,8 +9,10 @@ import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
 import { schedulesOf } from "./context/summaries";
 import { isAgentOnlyDm } from "./dms";
+import { ForbiddenError } from "./errors";
 import { cutText } from "./format";
 import { ROUTINE_REPORT, routineReportOf } from "./routine-brief";
+import { HOOK_METHODS } from "./routine-hooks";
 import {
   cancelReminder,
   createReminder,
@@ -122,7 +124,12 @@ const sameText = (a: string, b: string) =>
  * if any: asking twice (an interrupted run asked again, a repeated message)
  * must not schedule the same job twice.
  */
-async function sameRoutine(ctx: ToolContext, conv: { channelId: string; threadId: string | null }, prompt: string) {
+async function sameRoutine(
+  ctx: ToolContext,
+  agentId: string,
+  conv: { channelId: string; threadId: string | null },
+  prompt: string,
+) {
   const { routines } = schema;
   const rows = await ctx.db
     .select({
@@ -137,7 +144,7 @@ async function sameRoutine(ctx: ToolContext, conv: { channelId: string; threadId
     .where(
       and(
         eq(routines.orgId, ctx.orgId),
-        eq(routines.agentId, ctx.agentId),
+        eq(routines.agentId, agentId),
         eq(routines.active, true),
         isNull(routines.deletedAt),
         sql`${routines.target}->>'channelId' = ${conv.channelId}`,
@@ -187,7 +194,8 @@ function whenText(t: RoutineTrigger) {
   if (t.type === "once") return `once, ${t.description}`;
   if (t.type === "event") return `when ${EVENT_WORDS[t.event]}`;
   // Never the address itself: it is a secret, shown only in Routines.
-  if (t.type === "webhook") return `when ${EVENT_WORDS["webhook.received"]}${t.signed ? " (signed calls only)" : ""}`;
+  if (t.type === "webhook")
+    return `when ${EVENT_WORDS["webhook.received"]} with ${t.methods.join(" or ")}${t.signed ? " (signed calls only)" : ""}`;
   const from = t.filter.from?.length ? ` from ${t.filter.from.join(", ")}` : "";
   const subject = t.filter.subject ? ` with "${t.filter.subject}" in the subject` : "";
   return `when new mail arrives in ${t.folder}${from}${subject}`;
@@ -214,7 +222,7 @@ function whenParams(t: RoutineTrigger): AgentActionParams {
     case "email":
       return { trigger: "email", folder: t.folder };
     case "webhook":
-      return { trigger: "webhook" };
+      return { trigger: "webhook", methods: [...t.methods] };
   }
 }
 
@@ -372,7 +380,10 @@ async function mailboxOf(ctx: ToolContext, raw: string) {
 
 /** A tool's `trigger` (an email filter, a webhook or an event) as the routine's trigger. */
 async function triggerOf(ctx: ToolContext, raw: Record<string, unknown>): Promise<RoutineTriggerInput> {
-  if (raw.type === "webhook") return { type: "webhook" };
+  if (raw.type === "webhook") {
+    const methods = Array.isArray(raw.methods) ? raw.methods.filter((m): m is string => typeof m === "string") : [];
+    return { type: "webhook", ...(methods.length > 0 ? { methods } : {}) };
+  }
   if (raw.type === "email") {
     const from = Array.isArray(raw.from) ? raw.from.filter((v): v is string => typeof v === "string") : [];
     return {
@@ -391,11 +402,14 @@ async function triggerOf(ctx: ToolContext, raw: Record<string, unknown>): Promis
   return { type: "event", event };
 }
 
-/** One of this agent's routines (by id), or why not. */
-async function ownRoutine(ctx: ToolContext, id: string) {
+/**
+ * One of this agent's routines (by id), or why not. `anyAgent`: another agent's too (changing it is checked against
+ * the person who asked, as in the app).
+ */
+async function ownRoutine(ctx: ToolContext, id: string, anyAgent = false) {
   const row = await routineRow(ctx.db, ctx.orgId, id);
   if (!row || row.deletedAt) return { row: null, error: `You have no routine ${id}. Use list_routines.` };
-  if (row.agentId !== ctx.agentId) {
+  if (row.agentId !== ctx.agentId && !anyAgent) {
     return {
       row: null,
       error: `Routine ${id} is another agent's: only that agent changes it, when a person asks it. Don't ask it to on the person's behalf if the person already asked it directly.`,
@@ -403,6 +417,36 @@ async function ownRoutine(ctx: ToolContext, id: string) {
   }
   return { row, error: "" };
 }
+
+/**
+ * The agent that does a routine: the one named in `agent` (a handle) when the person wants that agent to do the
+ * work, else this one. Null with the reason when no such agent is here.
+ */
+async function performerOf(ctx: ToolContext, raw: unknown): Promise<{ id: string; handle: string } | ToolOutput> {
+  const written = str(raw).trim();
+  if (!written) return { id: ctx.agentId, handle: "" };
+  const found = await agentsByHandle(ctx.db, ctx.orgId, [written]);
+  const row = found.rowOf(written);
+  if (!row) return { content: await noAgentText(ctx, found.handles), isError: true };
+  return { id: row.id, handle: row.id === ctx.agentId ? "" : row.handle };
+}
+
+/** Whether this agent is in that conversation (a routine reports only where its agent is). */
+async function inConversation(ctx: ToolContext, agentId: string, channelId: string) {
+  const { channelMembers } = schema;
+  const [row] = await ctx.db
+    .select({ id: channelMembers.id })
+    .from(channelMembers)
+    .where(and(eq(channelMembers.channelId, channelId), eq(channelMembers.agentId, agentId)))
+    .limit(1);
+  return Boolean(row);
+}
+
+/** Why the person may not set up or change another agent's routine, and what to offer instead. */
+const notTheirs = (handle: string, error: unknown): ToolOutput => ({
+  content: `Not done: the person who asked can't manage @${handle}'s routines (${error instanceof Error ? error.message : String(error)}). Only an admin, @${handle}'s owner or, for an existing routine, who created it can. Tell the person that plainly and offer another way: a routine on you that asks @${handle} each run, or asking an admin or @${handle}'s owner to set it up.`,
+  isError: true,
+});
 
 export const SCHEDULE_INPUT = {
   type: "string",
@@ -415,7 +459,7 @@ export const SCHEDULE_INPUT = {
 const TRIGGER_SCHEMA = {
   type: "object",
   description:
-    'Instead of a schedule: run when something happens. `type: "email"` with `mailbox` (its address; left out, the only one you can read), `folder` (default the inbox) and optional filters `from` (addresses or @domains), `subject` and `text` (words). `type: "webhook"`: the routine gets an address of its own that another service calls (POST) to start it, with what it sends as the run\'s data. `type: "event"` with `event`.',
+    'Instead of a schedule: run when something happens. `type: "email"` with `mailbox` (its address; left out, the only one you can read), `folder` (default the inbox) and optional filters `from` (addresses or @domains), `subject` and `text` (words). `type: "webhook"`: the routine gets an address of its own that another service calls to start it, with what it sends as the run\'s data; `methods` the HTTP methods it answers (default POST; with GET the query string is the data). `type: "event"` with `event`.',
   properties: {
     type: { type: "string", enum: ["email", "webhook", "event"] },
     event: {
@@ -428,6 +472,12 @@ const TRIGGER_SCHEMA = {
     from: { type: "array", items: { type: "string", maxLength: 320 }, maxItems: 50 },
     subject: { type: "string", maxLength: 200 },
     text: { type: "string", maxLength: 200 },
+    methods: {
+      type: "array",
+      items: { type: "string", enum: HOOK_METHODS },
+      minItems: 1,
+      maxItems: HOOK_METHODS.length,
+    },
   },
   required: ["type"],
   additionalProperties: false,
@@ -438,9 +488,12 @@ export const REPORT_SCHEMA = {
   description: '"when_new" (default): only when there is something new; "always": a report every run.',
 };
 
-/** A webhook routine's address is a secret the agent never sees: the person copies it from the routine's page. */
+/**
+ * A webhook routine's address is a secret the agent never sees: who manages the routine copies it from the line the
+ * chat shows under the reply ("Copiar endereço do webhook") or from the routine's page.
+ */
 const WEBHOOK_HINT =
-  " Its webhook address is secret and only on the routine's page: never write an address in the chat. Tell the person to open the routine in Routines to copy it (and to turn on signed calls there if the sending service can sign them).";
+  " Its webhook address is secret: never write an address in the chat. Tell the person to copy it with the button on the routine's line under your reply (only who manages the routine sees it), or from the routine in Routines, where they can also turn on signed calls.";
 
 /** The routine in one line for the agent to confirm. */
 const summaryOf = async (ctx: ToolContext, r: RoutineView) => {
@@ -521,7 +574,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people. It can do what you can (search the web, use your computer and browser, tell or ask other agents, post where the person can); changes in connected apps still ask a person first. That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again; "when another service calls it" or "by webhook" is a webhook trigger. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
+        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people. It can do what you can (search the web, use your computer and browser, tell or ask other agents, post where the person can); changes in connected apps still ask a person first. That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks. Choose who performs it: when the person wants a specific other agent to do the work ("faz o @theo postar…", "have @theo send…"), set `agent` to that agent, so the routine is its own work, never yours relaying the ask each run. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again; "when another service calls it" or "by webhook" is a webhook trigger. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -532,6 +585,12 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           title: { type: "string", maxLength: 120 },
           channel: { type: "string", maxLength: 100, description: "Report in this channel instead of here" },
           report: REPORT_SCHEMA,
+          agent: {
+            type: "string",
+            maxLength: 40,
+            description:
+              "The agent that does it (its handle, e.g. @theo) when it isn't you; it reports in a direct message with the person when it isn't in this conversation and no `channel` is set",
+          },
         },
         required: ["prompt"],
         additionalProperties: false,
@@ -553,12 +612,16 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             : { type: "schedule", phrase: str(input.schedule) };
           const never = await neverFires(ctx, trigger, "Not created");
           if (never) return never;
+          const performer = await performerOf(ctx, input.agent);
+          if ("content" in performer) return performer;
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
           const conv =
             channel && channel.target.channelId !== ctx.channelId
               ? { channelId: channel.target.channelId, threadId: null }
               : await conversationOf(ctx);
-          const existing = await sameRoutine(ctx, conv, str(input.prompt));
+          // Another agent that isn't in this conversation reports to the person directly.
+          const direct = !channel && performer.handle && !(await inConversation(ctx, performer.id, conv.channelId));
+          const existing = await sameRoutine(ctx, performer.id, conv, str(input.prompt));
           if (existing) {
             const next = existing.nextRunAt ? describeWhen(existing.nextRunAt, existing.timezone ?? "UTC") : "";
             return {
@@ -568,15 +631,20 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           }
           const routine = await createRoutine(routineDeps(ctx), requester, ctx.orgId, {
             name: str(input.title) || undefined,
-            agentId: ctx.agentId,
+            agentId: performer.id,
             prompt: str(input.prompt),
-            target:
-              channel && channel.target.channelId !== ctx.channelId
+            target: direct
+              ? { type: "dm" }
+              : channel && channel.target.channelId !== ctx.channelId
                 ? channel.target
                 : { type: "conversation", ...conv, reminder: false },
             trigger,
             report: routineReportOf(input.report),
+          }).catch((error) => {
+            if (performer.handle && error instanceof ForbiddenError) return notTheirs(performer.handle, error);
+            throw error;
           });
+          if ("content" in routine) return routine;
           // Recorded right after (reading the schedule may call a model: no transaction held around it).
           const row = await routineRow(ctx.db, ctx.orgId, routine.id);
           if (row) {
@@ -595,8 +663,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               },
             ]);
           }
+          const by = performer.handle ? ` on @${performer.handle} (it does the work itself, each run)` : "";
           return {
-            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.${needsText(routine)}${
+            content: `Created routine ${routine.id}${by} ${await summaryOf(ctx, routine)}. Confirm it to the person.${needsText(routine)}${
               routine.trigger.type === "webhook" ? WEBHOOK_HINT : ""
             }`,
             data: { routine: { id: routine.id } },
@@ -696,7 +765,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "update_routine",
       description:
-        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
+        'Change a routine (id from list_routines) when the person asks: yours, or another agent\'s when the person may manage it. `title` renames it, `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter, a webhook with the HTTP `methods` it answers, or an event instead of a schedule), `report` when it speaks, `active` pauses or resumes it, `agent` hands it to another agent that should do the work. Only who created it, the agent\'s owner or an admin can change it; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -709,6 +778,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           title: { type: "string", minLength: 1, maxLength: 120 },
           report: REPORT_SCHEMA,
           active: { type: "boolean" },
+          agent: { type: "string", maxLength: 40, description: "Hand it to this agent (its handle)" },
         },
         required: ["id"],
         additionalProperties: false,
@@ -718,8 +788,10 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
           const id = str(input.id);
-          const own = await ownRoutine(ctx, id);
+          const own = await ownRoutine(ctx, id, true);
           if (!own.row) return { content: own.error, isError: true };
+          const performer = await performerOf(ctx, input.agent);
+          if ("content" in performer) return performer;
           const rawTrigger = input.trigger as Record<string, unknown> | undefined;
           if (rawTrigger && str(input.schedule)) {
             return { content: "Give either `schedule` or `trigger`, not both.", isError: true };
@@ -732,14 +804,29 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const never = trigger ? await neverFires(ctx, trigger, "Not changed") : null;
           if (never) return never;
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
+          const owner = own.row.agentId;
           const routine = await updateRoutine(routineDeps(ctx), requester, ctx.orgId, id, {
+            ...(str(input.agent).trim() && performer.id !== owner ? { agentId: performer.id } : {}),
             ...(channel ? { target: channel.target } : {}),
             ...(str(input.prompt) ? { prompt: str(input.prompt) } : {}),
             ...(str(input.title) ? { name: str(input.title) } : {}),
             ...(trigger ? { trigger } : {}),
             ...(input.report !== undefined ? { report: routineReportOf(input.report) } : {}),
             ...(typeof input.active === "boolean" ? { active: input.active } : {}),
+          }).catch(async (error) => {
+            if (!(error instanceof ForbiddenError)) throw error;
+            const [other] =
+              owner === ctx.agentId
+                ? []
+                : await ctx.db
+                    .select({ handle: schema.agents.handle })
+                    .from(schema.agents)
+                    .where(and(eq(schema.agents.orgId, ctx.orgId), eq(schema.agents.id, owner)));
+            const handle = other?.handle || performer.handle;
+            if (handle) return notTheirs(handle, error);
+            throw error;
           });
+          if ("content" in routine) return routine;
           const afterRow = await routineRow(ctx.db, ctx.orgId, id);
           if (afterRow) {
             const was = routineSnapshot(own.row);

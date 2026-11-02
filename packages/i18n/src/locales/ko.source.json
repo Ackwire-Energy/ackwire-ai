@@ -4565,6 +4565,9 @@
   "agentActions.other": {
     "value": "Made a change"
   },
+  "agentActions.copyWebhook": {
+    "value": "Copy webhook address"
+  },
   "agentActions.issueFields.title": {
     "value": "the title"
   },
@@ -10970,6 +10973,15 @@
   },
   "routines.webhook.hidden": {
     "value": "Only who can change the routine sees its address."
+  },
+  "routines.webhook.methods": {
+    "value": "Accepted methods"
+  },
+  "routines.webhook.methodsHelp": {
+    "value": "The address answers only the methods checked. With GET, the URL's query parameters are the call's data."
+  },
+  "routines.webhook.methodsLine": {
+    "value": "Accepts {{methods}}."
   },
   "routines.webhook.address": {
     "value": "Address"
@@ -20789,6 +20801,9 @@
   "connectors.toolChanges.description": {
     "value": "Text"
   },
+  "connectors.toolChanges.input": {
+    "value": "Input"
+  },
   "connectors.toolChanges.field.added": {
     "value": "new"
   },
@@ -20804,14 +20819,11 @@
   "connectors.toolChanges.removed": {
     "value": "Removed"
   },
-  "connectors.toolChanges.acceptOne": {
-    "value": "Accept {{tool}}"
-  },
-  "connectors.toolChanges.input": {
-    "value": "Input"
-  },
   "connectors.toolChanges.accept": {
     "value": "Accept"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.accepted": {
     "value": "{{tool}} updated."

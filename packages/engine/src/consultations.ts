@@ -434,7 +434,10 @@ async function mentionNoteOpen(db: Executor, ctx: Pick<ToolContext, "orgId" | "r
 /** The agents already in the chain of consultations a run answers, for a note sent from outside a tool call. */
 export const chainOfRun = (db: Executor, orgId: string, runId: string) => chainOf(db, { orgId, runId });
 
-/** A note with the same text to the same agent within this long is dropped (a loop, or a routine's repeats). */
+/**
+ * A note with the same text to the same agent within this long is dropped (a loop). A routine's run is a new event
+ * each time: its notes are compared only with that run's own.
+ */
 export const NOTE_DEDUPE_MS = 3600_000;
 
 /** A note's text as compared for repeats: case, accents, spacing and trailing punctuation don't count. */
@@ -448,16 +451,21 @@ export const normalizeNote = (text: string) =>
     .trim();
 
 /**
- * Whether this agent already sent this note (normalized) in this agents' DM within `NOTE_DEDUPE_MS`. One that
- * couldn't be finished or was never worked on doesn't count: its result says to hand it again.
+ * Whether this agent already sent this note (normalized) in this agents' DM within `NOTE_DEDUPE_MS` (from a routine's
+ * run: within that run). One that couldn't be finished or was never worked on doesn't count: its result says to hand
+ * it again.
  */
 async function sameNoteSent(
   tx: Executor,
-  ctx: Pick<ToolContext, "orgId" | "agentId">,
+  ctx: Pick<ToolContext, "orgId" | "agentId" | "runId">,
   channelId: string,
   body: string,
 ): Promise<boolean> {
   const since = new Date(Date.now() - NOTE_DEDUPE_MS);
+  const [sender] = await tx
+    .select({ background: agentRuns.background })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.orgId, ctx.orgId), eq(agentRuns.id, ctx.runId)));
   const recent = await tx
     .select({ id: messages.id, body: messages.body })
     .from(messages)
@@ -468,6 +476,7 @@ async function sameNoteSent(
         eq(messages.authorAgentId, ctx.agentId),
         gte(messages.createdAt, since),
         sql`${messages.meta} ? 'agentNote'`,
+        sender?.background ? sql`${messages.meta} -> 'agentNote' ->> 'runId' = ${ctx.runId}` : undefined,
       ),
     )
     .orderBy(desc(messages.createdAt))

@@ -40,7 +40,7 @@ async function webhookRoutine() {
 
 /** A call from another service: no cookie, no Origin. */
 const call = (url: string, body: string, headers: Record<string, string> = {}, method = "POST") =>
-  t.app.request(new URL(url).pathname, {
+  t.app.request(new URL(url).pathname + new URL(url).search, {
     method,
     headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.7", ...headers },
     ...(method === "POST" ? { body } : {}),
@@ -161,4 +161,32 @@ test("a call that fails on our side is logged without the routine's address", as
   const token = routine.trigger.url.split("/api/hooks/")[1] ?? "";
   expect(lines.join("\n")).toContain('"path":"/api/hooks/…"');
   expect(lines.join("\n")).not.toContain(token);
+});
+
+test("the methods it answers are chosen on the routine: GET passes its query string, others get 405 with Allow", async () => {
+  const { api, routine } = await webhookRoutine();
+  const changed = await api(`/routines/${routine.id}`, {
+    method: "PATCH",
+    json: { trigger: { type: "webhook", methods: ["GET", "PUT"] } },
+  });
+  expect(changed.status).toBe(200);
+  expect(((await changed.json()) as { trigger: { methods: string[] } }).trigger.methods).toEqual(["GET", "PUT"]);
+  const url = routine.trigger.url;
+  const post = await call(url, "{}");
+  expect(post.status).toBe(405);
+  expect(post.headers.get("allow")).toBe("GET, PUT");
+  const get = await call(`${url}?status=paid&order=42`, "", {}, "GET");
+  expect(get.status).toBe(202);
+  const { runId } = (await get.json()) as { runId: string };
+  const [run] = (await t.db.select().from(schema.routineRuns)).filter((r) => r.id === runId);
+  expect((run?.event?.calls as { body: string; method: string }[])[0]).toMatchObject({
+    body: '{"status":"paid","order":"42"}',
+    method: "GET",
+  });
+  expect((await (await api(`/routines/${routine.id}/hook`)).json()) as Hook).toMatchObject({ methods: ["GET", "PUT"] });
+  const bad = await api(`/routines/${routine.id}`, {
+    method: "PATCH",
+    json: { trigger: { type: "webhook", methods: [] } },
+  });
+  expect(bad.status).toBe(400);
 });

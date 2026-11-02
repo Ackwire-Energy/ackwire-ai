@@ -299,6 +299,11 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     void qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) });
     return true;
   }
+  // A routine's run was queued, started or ended: its runs, its line in Rotinas and its webhook's calls follow.
+  if (event.type === "routine.runs") {
+    void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+    return true;
+  }
   return false;
 }
 

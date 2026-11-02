@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  createAgent,
   createScheduleToolSource,
   createWebhookEndpoint,
   getRoutineView,
@@ -9,7 +10,7 @@ import {
   type ToolDefinition,
   undoAgentAction,
 } from "../src";
-import { type Fixture, SECRET, setup } from "./fixtures";
+import { addMember, type Fixture, SECRET, setup } from "./fixtures";
 
 /** A live webhook of `provider` in the fixture's workspace: its events can start routines. */
 const hook = (f: Fixture, provider: "github" | "sentry") =>
@@ -32,13 +33,17 @@ afterEach(async () => {
  * A real run of the agent in #general whose trigger is `author`'s message: the tools read who is
  * behind it from the run (authority.ts), so the run row must exist.
  */
-async function runContext(fx: Fixture, author: "person" | "agent" = "person"): Promise<ToolContext> {
+async function runContext(
+  fx: Fixture,
+  author: "person" | "agent" = "person",
+  userId = fx.owner.id,
+): Promise<ToolContext> {
   const trigger = await insertMessage(fx.db, {
     orgId: fx.org.id,
     channelId: fx.general.id,
     author:
       author === "person"
-        ? { type: "person", userId: fx.owner.id }
+        ? { type: "person", userId }
         : { type: "agent", agentId: fx.agent.id, runId: null, hop: 0, stretchId: null },
     body: "rotinas, por favor",
   });
@@ -145,6 +150,93 @@ describe("schedule tools: routines", () => {
     for (const text of [out.content, listed.content, JSON.stringify(out.data), JSON.stringify(receipt)]) {
       expect(text).not.toContain("/api/hooks/");
     }
+  });
+
+  test("asked for a routine another agent should do, it is that agent's own, not a relay; who can't manage it is told", async () => {
+    f = await setup();
+    const theo = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo", role: "Ops", instructions: "Post updates.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const ctx = await runContext(f);
+    const call = await tools(f, ctx);
+    const out = await call("create_routine", {
+      agent: "@theo",
+      prompt: 'Poste "works" no #general.',
+      trigger: { type: "webhook", methods: ["GET", "POST"] },
+    });
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toContain("on @theo (it does the work itself, each run)");
+    expect(out.content).toContain("with GET or POST");
+    expect(out.content).toContain("copy it with the button on the routine's line under your reply");
+    const id = (out.data?.routine as { id: string } | undefined)?.id ?? "";
+    // Theo isn't in this conversation: it reports to the person directly.
+    expect(await routineOf(id)).toMatchObject({
+      agentId: theo.id,
+      target: { type: "dm" },
+      createdByUserId: f.owner.id,
+    });
+    const [stored] = await f.db.select().from(schema.routineHooks).where(eq(schema.routineHooks.routineId, id));
+    expect(stored?.methods).toEqual(["GET", "POST"]);
+    expect((await receipts(ctx.runId))[0]?.params).toMatchObject({ trigger: "webhook", methods: ["GET", "POST"] });
+
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const asked = await tools(f, await runContext(f, "person", bia.id));
+    const refused = await asked("create_routine", {
+      agent: "@theo",
+      prompt: "Poste works.",
+      schedule: "toda segunda às 9h",
+    });
+    expect(refused).toMatchObject({ isError: true, content: expect.stringContaining("can't manage @theo's routines") });
+    expect(refused.content).toContain("offer another way");
+    expect(
+      await call("create_routine", { agent: "@nobody", prompt: "x", schedule: "toda segunda às 9h" }),
+    ).toMatchObject({
+      isError: true,
+    });
+  });
+
+  test("update_routine edits a routine the person manages, another agent's too: title, prompt, webhook methods, active", async () => {
+    f = await setup();
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo", role: "Ops", instructions: "Post updates.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const ctx = await runContext(f);
+    const call = await tools(f, ctx);
+    const made = await call("create_routine", { agent: "@theo", prompt: "Poste works.", trigger: { type: "webhook" } });
+    const id = (made.data?.routine as { id: string } | undefined)?.id ?? "";
+    const out = await call("update_routine", {
+      id,
+      title: "Avisar no general",
+      prompt: "Poste works no #general.",
+      trigger: { type: "webhook", methods: ["GET"] },
+      active: false,
+    });
+    expect(out.isError).toBeFalsy();
+    expect(await routineOf(id)).toMatchObject({
+      name: "Avisar no general",
+      prompt: "Poste works no #general.",
+      active: false,
+    });
+    const [stored] = await f.db.select().from(schema.routineHooks).where(eq(schema.routineHooks.routineId, id));
+    expect(stored?.methods).toEqual(["GET"]);
+    // Handed back to the agent the person is talking to.
+    expect((await call("update_routine", { id, agent: "@dev" })).isError).toBeFalsy();
+    expect((await routineOf(id)).agentId).toBe(f.agent.id);
+
+    // A member who didn't create it and doesn't manage the agent: told, nothing changed.
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const asked = await tools(f, await runContext(f, "person", bia.id));
+    const refused = await asked("update_routine", { id, title: "Outro nome" });
+    expect(refused.isError).toBe(true);
+    expect((await routineOf(id)).name).toBe("Avisar no general");
   });
 
   test("an event no webhook brings here is refused with the setup step; one whose webhook goes away says it can't run", async () => {

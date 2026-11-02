@@ -41,6 +41,7 @@ export const routineHookDeps = (deps: AppDeps): RoutineHookDeps => ({
   hooks: hookConfig(deps.config),
   keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
   rateLimiter: deps.adapters.rateLimiter,
+  pubsub: deps.adapters.pubsub,
 });
 
 /** Allowed browser origins for state-changing requests and WebSocket upgrades. */
