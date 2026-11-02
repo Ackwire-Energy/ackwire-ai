@@ -261,7 +261,7 @@ describe("the agent a plan starts on, and the order of the plans", () => {
 describe("All agents: one login per agent, the key pasted once", () => {
   test("every plan signs in once per agent, ChatGPT's and Cursor's too", () => {
     expect(LOGIN_PER_AGENT).toEqual({ claude_code: true, codex: true, cursor: true, key: true });
-    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(PLAN_CHOICES);
+    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual([...PLAN_CHOICES]);
   });
 
   /** Ada and Theo have no AI, Lia is on GLM Coding, Bo on the API key, Cy on Claude, Di on the other computer. */

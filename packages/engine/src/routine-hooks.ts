@@ -15,6 +15,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { connectorCallPasses, sourceOf } from "./connector-triggers";
 import { openSecret, randomToken, routineHookToken, sealSecret, sha256 } from "./crypto";
 import { ConflictError, TooManyError } from "./errors";
 import { cutText } from "./format";
@@ -119,7 +120,7 @@ export async function ensureRoutineHook(
     .onConflictDoNothing();
 }
 
-/** The key, its token's hash and whether calls must be signed, for each of these routines that has an address. */
+/** The key, its token's hash, whether calls must be signed and its connector event, for each of these routines that has an address. */
 export async function routineHookKeys(db: Executor, routineIds: string[]) {
   const rows =
     routineIds.length === 0
@@ -130,10 +131,13 @@ export async function routineHookKeys(db: Executor, routineIds: string[]) {
             keyId: routineHooks.keyId,
             tokenHash: routineHooks.tokenHash,
             secret: routineHooks.secretCiphertext,
+            source: routineHooks.source,
           })
           .from(routineHooks)
           .where(inArray(routineHooks.routineId, routineIds));
-  return new Map(rows.map(({ secret, ...r }) => [r.routineId, { ...r, signed: secret !== null }]));
+  return new Map(
+    rows.map(({ secret, source, ...r }) => [r.routineId, { ...r, signed: secret !== null, source: sourceOf(source) }]),
+  );
 }
 
 type RoutineRef = { id: string; orgId: string; name: string };
@@ -298,6 +302,9 @@ export async function receiveRoutineHook(
     await logCall(deps.db, hook, { outcome: "bad_signature", status: 401, bytes: body.byteLength });
     return { status: 401, code: "invalid_signature" };
   }
+  // A connector's event (ADR 0130): what isn't that event, or that its filter leaves out, runs nothing.
+  const source = sourceOf(hook.source);
+  if (source && !connectorCallPasses(source, body)) return { status: 202, runId: null, duplicate: false };
   return accept(deps, hook, { headers: input.headers, body, test: false, token: input.token });
 }
 
@@ -360,8 +367,11 @@ function logCall(
   return db.insert(routineHookCalls).values({ orgId: hook.orgId, routineId: hook.routineId, ...call });
 }
 
+/** The sender's delivery id: ours, GitHub's, or Standard Webhooks' (MillionSend, Resend, Svix). */
 const idempotencyKeyOf = (headers: Headers) =>
-  (headers.get("idempotency-key") ?? headers.get("x-github-delivery") ?? "").trim().slice(0, 200) || null;
+  (headers.get("idempotency-key") ?? headers.get("x-github-delivery") ?? headers.get("webhook-id") ?? "")
+    .trim()
+    .slice(0, 200) || null;
 
 /** A call that passed the checks: a repeat answers with the first one's run, anything else joins the next run. */
 async function accept(

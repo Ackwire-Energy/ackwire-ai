@@ -4634,7 +4634,8 @@
         "schedule": "Waktu",
         "event": "Peristiwa",
         "email": "Email",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "Email MillionSend"
       },
       "frequency": "Frekuensi",
       "frequencyPlaceholder": "Misalnya: setiap Senin pukul 9 pagi",
@@ -9083,6 +9084,9 @@
       "openConnectors": "Buka Konektor",
       "when": "Saat email masuk ke {{address}}",
       "whenFolder": "Saat email masuk ke {{address}} ({{folder}})",
+      "whenMillionSend": "Saat email masuk ke MillionSend",
+      "inboxAddress": "Alamat kotak surat",
+      "inboxAddressHelp": "Kosong = kotak surat MillionSend mana pun.",
       "unknownMailbox": "sebuah kotak surat",
       "waiting": "Menunggu email",
       "thisWeek_other": "{{count}} email minggu ini",

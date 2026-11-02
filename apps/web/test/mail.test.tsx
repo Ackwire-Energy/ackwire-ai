@@ -731,3 +731,61 @@ describe("Rotinas: quando chegar um email", () => {
     expect(card.textContent).toContain("Precisa reconectar");
   });
 });
+
+describe("Rotinas: quando chegar um email no MillionSend (ADR 0130)", () => {
+  test("offered where MillionSend is connected: the inbox's address and filters, then the card in words", async () => {
+    const { api } = mailApi([]);
+    api.customConnectors.list = async () => [
+      {
+        id: "ms-1",
+        serverUrl: "https://api.millionsend.com/mcp",
+        label: "MillionSend",
+        accountLabel: null,
+        authType: "oauth",
+        iconUrl: null,
+        status: "active",
+        tools: [],
+        events: ["millionsend.email.received"],
+        reviewedAt: null,
+        createdAt: "2026-11-01T00:00:00Z",
+      },
+    ];
+    const created: RoutineInput[] = [];
+    const real = api.routines.create;
+    api.routines.create = (orgId, input) => {
+      created.push(input);
+      return real(orgId, input);
+    };
+    await renderApp(`/org/${ORG_ID}/routines`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    await click(within(dialog).getByRole("radio", { name: "Email no MillionSend" }));
+    await settle(4);
+    await type(within(dialog).getByLabelText("Endereço da caixa"), " Vendas@Loja.example ");
+    await type(within(dialog).getByLabelText("Assunto contém"), "pedido");
+    await type(within(dialog).getByLabelText("O que fazer"), "Responda o pedido.");
+    await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
+    await settle(6);
+    expect(created[0]?.trigger).toEqual({
+      type: "connector",
+      connectionId: "ms-1",
+      event: "millionsend.email.received",
+      inboxId: null,
+      filter: { to: "vendas@loja.example", subject: "pedido" },
+    });
+    await settle(6);
+    expect(screen().getByText("Quando chegar um email em vendas@loja.example")).toBeTruthy();
+  });
+
+  test("never offered without a MillionSend connection", async () => {
+    const { api } = mailApi([]);
+    await renderApp(`/org/${ORG_ID}/routines`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    expect(within(dialog).queryByRole("radio", { name: "Email no MillionSend" })).toBeNull();
+  });
+});

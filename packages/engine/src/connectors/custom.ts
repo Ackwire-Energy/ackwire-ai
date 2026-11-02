@@ -3,6 +3,7 @@ import type { BlobStore } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, like, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
+import { type ConnectorEventId, connectorEventsOf } from "../connector-triggers";
 import { randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import type { Judge } from "../judge";
@@ -174,6 +175,8 @@ export interface CustomServerView {
   /** `needs_reconnect`: its Composio account stopped working, and it has no tools until Reconectar. */
   status: "active" | "needs_reconnect";
   tools: CustomToolView[];
+  /** What routines can wait on from it (ADR 0130): MillionSend's received email. */
+  events: ConnectorEventId[];
   reviewedAt: string | null;
   createdAt: string;
 }
@@ -252,6 +255,7 @@ function view(c: ConnectorConnection, tools: ToolRow[]): CustomServerView {
     ...(composioToolkitOf(c.serverUrl) ? { via: "composio" as const } : {}),
     status: c.status === "needs_reconnect" ? "needs_reconnect" : "active",
     tools: mine.map((t) => toolView(t, prefix)),
+    events: connectorEventsOf(c.serverUrl),
     reviewedAt: c.reviewedAt ? c.reviewedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),
   };

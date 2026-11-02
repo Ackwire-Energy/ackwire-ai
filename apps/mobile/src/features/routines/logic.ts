@@ -1,6 +1,7 @@
 import type {
   MailFolder,
   Routine,
+  RoutineConnectorTrigger,
   RoutineEmailFilter,
   RoutineEvent,
   RoutineInput,
@@ -30,10 +31,12 @@ export const ROUTINE_EVENTS: RoutineEvent[] = [
 
 /** Started by something happening (an event, an email, a webhook call), not by the clock. */
 export const isEventDriven = (r: Pick<Routine, "trigger">) =>
-  r.trigger.type === "event" || r.trigger.type === "email" || r.trigger.type === "webhook";
-/** An email routine whose mailbox needs reconnecting (or whose watch fails). */
+  r.trigger.type !== "schedule" && r.trigger.type !== "once";
+/** An email routine whose mailbox needs reconnecting (or whose watch fails, or that MillionSend refused). */
 export const mailTrouble = (r: Pick<Routine, "trigger">) =>
-  r.trigger.type === "email" && r.trigger.status && r.trigger.status !== "active" ? r.trigger.status : null;
+  (r.trigger.type === "email" || r.trigger.type === "connector") && r.trigger.status && r.trigger.status !== "active"
+    ? r.trigger.status
+    : null;
 /** A run of it is working now (Parar stops it). */
 export const isRunning = (r: Pick<Routine, "state">) => r.state === "running";
 /** A run of it is at work: working, waiting for a person or its computer, or paused near its plan's limit. */
@@ -143,7 +146,7 @@ export function targetIcon(target: RoutineTarget): IconName {
 /** What starts it: an event, an email, a reminder, the clock. */
 export function whenIcon(r: Pick<Routine, "trigger" | "target">): IconName {
   if (r.trigger.type === "event") return "bolt";
-  if (r.trigger.type === "email") return "mail";
+  if (r.trigger.type === "email" || r.trigger.type === "connector") return "mail";
   if (r.trigger.type === "webhook") return "globe";
   if (r.trigger.type === "once" && isReminder(r)) return "bell";
   return "clock";
@@ -189,7 +192,8 @@ export function nextLine(
   if (!r.active) return { kind: "paused" };
   if (isEventDriven(r)) {
     const week = r.recentRuns.filter((x) => now.getTime() - new Date(x.at).getTime() < 7 * 86_400_000).length;
-    return { kind: r.trigger.type === "email" || r.trigger.type === "webhook" ? r.trigger.type : "event", week };
+    const kind = r.trigger.type === "connector" ? "email" : r.trigger.type;
+    return { kind: kind === "email" || kind === "webhook" ? kind : "event", week };
   }
   if (!r.nextRunAt) return { kind: "none" };
   const ms = new Date(r.nextRunAt).getTime() - now.getTime();
@@ -346,7 +350,28 @@ export const emailDraftOf = (r: Routine | undefined): EmailDraft =>
 
 // ── The form ────────────────────────────────────────────────────────────────
 
-export type TriggerKind = "schedule" | "event" | "email" | "webhook";
+export type TriggerKind = "schedule" | "event" | "email" | "webhook" | "connector";
+
+/** "Email no MillionSend" (ADR 0130): the connection and the inbox's address, sender and subject filters. */
+export interface ConnectorDraft {
+  connectionId: string;
+  filter: RoutineConnectorTrigger["filter"];
+}
+
+/** Only the filters that say something. */
+export const cleanConnectorFilter = (f: RoutineConnectorTrigger["filter"]): RoutineConnectorTrigger["filter"] => ({
+  ...(f.to?.trim() ? { to: f.to.trim().toLowerCase() } : {}),
+  ...(f.from?.length ? { from: f.from } : {}),
+  ...(f.subject?.trim() ? { subject: f.subject.trim() } : {}),
+});
+
+const connectorTrigger = (c: ConnectorDraft) => ({
+  type: "connector" as const,
+  connectionId: c.connectionId,
+  event: "millionsend.email.received" as const,
+  inboxId: null,
+  filter: cleanConnectorFilter(c.filter),
+});
 
 /** The phrase the routine was written with, as the person wrote it (made with the web's picker, or new: none). */
 export const phraseOf = (r: Routine | undefined) => (r?.trigger.type === "schedule" ? (r.trigger.phrase ?? "") : "");
@@ -383,6 +408,7 @@ export interface RoutineDraft {
   kind: TriggerKind;
   event: RoutineEvent;
   email: EmailDraft;
+  connector: ConnectorDraft;
   rule: RecurrenceRule;
   active: boolean;
   report: RoutineReport;
@@ -397,12 +423,13 @@ export function draftOf(r: Routine | undefined, zone: string, today = new Date()
     forumRounds: forumRoundsOf(r?.target),
     prompt: r?.prompt ?? "",
     name: r?.name ?? "",
-    kind:
-      r?.trigger.type === "event" || r?.trigger.type === "email" || r?.trigger.type === "webhook"
-        ? r.trigger.type
-        : "schedule",
+    kind: r && isEventDriven(r) ? (r.trigger.type as TriggerKind) : "schedule",
     event: r?.trigger.type === "event" ? r.trigger.event : "sentry.issue_created",
     email: emailDraftOf(r),
+    connector:
+      r?.trigger.type === "connector"
+        ? { connectionId: r.trigger.connectionId, filter: r.trigger.filter }
+        : { connectionId: "", filter: {} },
     rule: ruleOf(r, zone, today),
     active: r?.active ?? true,
     report: r?.report ?? "when_new",
@@ -428,7 +455,10 @@ const emailTrigger = (e: EmailDraft) => ({
 });
 
 /** What starts it, as the API takes it: a webhook call, an email, an event, a one-off (its instant) or the rule. */
-export function draftTrigger(d: Pick<RoutineDraft, "kind" | "event" | "email" | "rule">): RoutineInput["trigger"] {
+export function draftTrigger(
+  d: Pick<RoutineDraft, "kind" | "event" | "email" | "connector" | "rule">,
+): RoutineInput["trigger"] {
+  if (d.kind === "connector") return connectorTrigger(d.connector);
   if (d.kind === "webhook") return { type: "webhook" };
   if (d.kind === "email") return emailTrigger(d.email);
   if (d.kind === "event") return { type: "event", event: d.event };
@@ -470,27 +500,31 @@ export function draftChanges(r: Routine, d: RoutineDraft, savedRule: string, rul
   if (d.target !== TARGET_KEEP && (d.target !== targetChoice(r.target) || forumChanged)) patch.target = draftTarget(d);
   const once = d.rule.freq === "once";
   const triggerChanged =
-    d.kind === "webhook"
-      ? r.trigger.type !== "webhook"
-      : d.kind === "email"
-        ? r.trigger.type !== "email" ||
-          JSON.stringify(emailTrigger(d.email)) !==
-            JSON.stringify({
-              type: "email",
-              accountId: r.trigger.accountId,
-              folder: r.trigger.folder,
-              filter: cleanFilter(r.trigger.filter ?? {}),
-            })
-        : d.kind === "event"
-          ? r.trigger.type !== "event" || r.trigger.event !== d.event
-          : once
-            ? // To the minute, as the form shows it: the server's instant has seconds ("em 10 minutos"), and a
-              // one-off that already ran would be sent again as a time in the past.
-              r.trigger.type !== "once" || minuteOf(onceAt(d.rule)) !== minuteOf(r.trigger.at)
-            : r.trigger.type !== "schedule" ||
-              // A routine kept as a cron (every N minutes) changes only with a phrase read into a rule (`ruleTyped`):
-              // its form holds a placeholder rule, which must never replace it.
-              (r.trigger.rule ? JSON.stringify(toApiRule(d.rule)) !== savedRule : ruleTyped);
+    d.kind === "connector"
+      ? r.trigger.type !== "connector" ||
+        JSON.stringify(connectorTrigger(d.connector)) !==
+          JSON.stringify(connectorTrigger({ connectionId: r.trigger.connectionId, filter: r.trigger.filter }))
+      : d.kind === "webhook"
+        ? r.trigger.type !== "webhook"
+        : d.kind === "email"
+          ? r.trigger.type !== "email" ||
+            JSON.stringify(emailTrigger(d.email)) !==
+              JSON.stringify({
+                type: "email",
+                accountId: r.trigger.accountId,
+                folder: r.trigger.folder,
+                filter: cleanFilter(r.trigger.filter ?? {}),
+              })
+          : d.kind === "event"
+            ? r.trigger.type !== "event" || r.trigger.event !== d.event
+            : once
+              ? // To the minute, as the form shows it: the server's instant has seconds ("em 10 minutos"), and a
+                // one-off that already ran would be sent again as a time in the past.
+                r.trigger.type !== "once" || minuteOf(onceAt(d.rule)) !== minuteOf(r.trigger.at)
+              : r.trigger.type !== "schedule" ||
+                // A routine kept as a cron (every N minutes) changes only with a phrase read into a rule (`ruleTyped`):
+                // its form holds a placeholder rule, which must never replace it.
+                (r.trigger.rule ? JSON.stringify(toApiRule(d.rule)) !== savedRule : ruleTyped);
   if (triggerChanged) patch.trigger = draftTrigger(d);
   if (d.active !== r.active) patch.active = d.active;
   if (d.report !== r.report) patch.report = d.report;

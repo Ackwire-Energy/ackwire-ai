@@ -4598,7 +4598,8 @@
         "schedule": "時刻",
         "event": "イベント",
         "email": "メール",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend のメール"
       },
       "frequency": "頻度",
       "frequencyPlaceholder": "例: 毎週月曜の9時",
@@ -9016,6 +9017,9 @@
       "openConnectors": "コネクタを開く",
       "when": "{{address}}にメールが届いたとき",
       "whenFolder": "{{address}}（{{folder}}）にメールが届いたとき",
+      "whenMillionSend": "MillionSend にメールが届いたとき",
+      "inboxAddress": "メールボックスのアドレス",
+      "inboxAddressHelp": "空欄の場合は MillionSend のどのメールボックスでも。",
       "unknownMailbox": "メールボックス",
       "waiting": "メールを待っています",
       "thisWeek_other": "今週のメール {{count}}件",

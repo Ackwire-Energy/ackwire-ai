@@ -4722,7 +4722,8 @@
         "schedule": "Saat",
         "event": "Olay",
         "email": "E-posta",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend e-postası"
       },
       "frequency": "Sıklık",
       "frequencyPlaceholder": "Örn.: her pazartesi saat 9'da",
@@ -9317,6 +9318,9 @@
       "openConnectors": "Bağlayıcıları aç",
       "when": "{{address}} adresine bir e-posta geldiğinde",
       "whenFolder": "{{address}} adresine ({{folder}}) bir e-posta geldiğinde",
+      "whenMillionSend": "MillionSend'e bir e-posta geldiğinde",
+      "inboxAddress": "Posta kutusu adresi",
+      "inboxAddressHelp": "Boş = herhangi bir MillionSend posta kutusu.",
       "unknownMailbox": "bir posta kutusu",
       "waiting": "E-posta bekleniyor",
       "thisWeek_one": "Bu hafta {{count}} e-posta",

@@ -1,6 +1,7 @@
 import {
   type Routine,
   useChannels,
+  useCustomServers,
   useMailAccounts,
   useMailFolders,
   useRoutineAction,
@@ -128,6 +129,9 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const creator = routine?.createdByUserId ?? me;
   const channels = useChannels(orgId);
   const mailboxes = useMailAccounts(orgId);
+  const eventConnections = (useCustomServers(orgId).data ?? []).filter((s) =>
+    s.events?.includes("millionsend.email.received"),
+  );
   const targetLabel = useTargetLabel();
   const action = useRoutineAction(orgId);
   const agents = dir.agents;
@@ -251,6 +255,18 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const setFilter = (patch: { subject?: string; text?: string }) =>
     setD((x) => ({ ...x, email: { ...x.email, filter: { ...x.email.filter, ...patch } } }));
   const fromBad = d.kind === "email" && from.invalid.length > 0;
+  // "Email no MillionSend" (ADR 0130): the first connection, its inbox's address and the same filters.
+  const hasMillionSend = d.kind === "connector" || eventConnections.length > 0;
+  const firstConnection = eventConnections[0]?.id;
+  useEffect(() => {
+    if (d.kind === "connector" && !d.connector.connectionId && firstConnection)
+      setD((x) => ({ ...x, connector: { ...x.connector, connectionId: firstConnection } }));
+  }, [d.kind, d.connector.connectionId, firstConnection]);
+  const [msFromText, setMsFromText] = useState(() => (d.connector.filter.from ?? []).join(", "));
+  const msFrom = splitAddresses(msFromText);
+  const setConnectorFilter = (patch: { to?: string; from?: string[]; subject?: string }) =>
+    setD((x) => ({ ...x, connector: { ...x.connector, filter: { ...x.connector.filter, ...patch } } }));
+  const msFromBad = d.kind === "connector" && msFrom.invalid.length > 0;
 
   // A routine on someone's computer that runs hourly or more often: how often it wakes that computer.
   const brain = dir.agentById.get(d.agentId)?.brain;
@@ -268,7 +284,11 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const scheduleOk =
     d.kind === "event" ||
     d.kind === "webhook" ||
-    (d.kind === "email" ? Boolean(d.email.accountId) && !fromBad : !phraseFailed);
+    (d.kind === "connector"
+      ? Boolean(d.connector.connectionId) && !msFromBad
+      : d.kind === "email"
+        ? Boolean(d.email.accountId) && !fromBad
+        : !phraseFailed);
   const ready =
     !action.isPending && Boolean(d.agentId) && (promptHidden || d.prompt.trim().length > 0) && scheduleOk && !parsing;
 
@@ -493,6 +513,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
             { key: "schedule", label: t("routines.form.kind.schedule") },
             { key: "event", label: t("routines.form.kind.event") },
             ...(hasMail ? [{ key: "email", label: t("routines.form.kind.email") }] : []),
+            ...(hasMillionSend ? [{ key: "connector", label: t("routines.form.kind.connector") }] : []),
             { key: "webhook", label: t("routines.form.kind.webhook") },
           ]}
           value={d.kind}
@@ -672,6 +693,60 @@ function Form({ routine }: { routine: Routine | undefined }) {
               )}
             </>
           )
+        ) : null}
+
+        {d.kind === "connector" ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <StackedField label={t("mail.routine.inboxAddress")}>
+                <TextInput
+                  value={d.connector.filter.to ?? ""}
+                  onChangeText={(to) => setConnectorFilter({ to })}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  accessibilityLabel={t("mail.routine.inboxAddress")}
+                  style={input}
+                />
+              </StackedField>
+            </GroupedList>
+            <GroupedFooter>{t("mail.routine.inboxAddressHelp")}</GroupedFooter>
+            <GroupedHeader>{t("mail.routine.filters")}</GroupedHeader>
+            <GroupedList>
+              <StackedField label={t("mail.routine.from")}>
+                <TextInput
+                  value={msFromText}
+                  onChangeText={(text) => {
+                    setMsFromText(text);
+                    setConnectorFilter({ from: splitAddresses(text).valid });
+                  }}
+                  placeholder={t("mail.list.placeholder")}
+                  placeholderTextColor={c.faint}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  accessibilityLabel={t("mail.routine.from")}
+                  style={input}
+                />
+              </StackedField>
+              <StackedField label={t("mail.routine.subject")}>
+                <TextInput
+                  value={d.connector.filter.subject ?? ""}
+                  onChangeText={(subject) => setConnectorFilter({ subject })}
+                  accessibilityLabel={t("mail.routine.subject")}
+                  style={input}
+                />
+              </StackedField>
+            </GroupedList>
+            {msFromBad ? (
+              <Text variant="footnote" tone="danger" style={styles.error} accessibilityLiveRegion="polite">
+                {t("mail.list.invalid")}
+              </Text>
+            ) : (
+              <GroupedFooter>{t("mail.routine.fromHelp")}</GroupedFooter>
+            )}
+          </>
         ) : null}
 
         {d.kind === "webhook" ? (

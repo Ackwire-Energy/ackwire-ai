@@ -5025,7 +5025,8 @@
         "schedule": "Время",
         "event": "Событие",
         "email": "Почта",
-        "webhook": "Вебхук"
+        "webhook": "Вебхук",
+        "connector": "Почта MillionSend"
       },
       "frequency": "Частота",
       "frequencyPlaceholder": "Например: каждый понедельник в 9:00",
@@ -10008,6 +10009,9 @@
       "openConnectors": "Открыть «Коннекторы»",
       "when": "Когда на {{address}} приходит письмо",
       "whenFolder": "Когда на {{address}} ({{folder}}) приходит письмо",
+      "whenMillionSend": "Когда в MillionSend приходит письмо",
+      "inboxAddress": "Адрес ящика",
+      "inboxAddressHelp": "Пусто = любой ящик MillionSend.",
       "unknownMailbox": "почтовый ящик",
       "waiting": "Ждём письмо",
       "thisWeek_one": "{{count}} письмо на этой неделе",

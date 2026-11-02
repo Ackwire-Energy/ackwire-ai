@@ -4813,7 +4813,8 @@
         "schedule": "Tijd",
         "event": "Gebeurtenis",
         "email": "E-mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend-mail"
       },
       "frequency": "Frequentie",
       "frequencyPlaceholder": "Bijv.: elke maandag om 9:00",
@@ -9457,6 +9458,9 @@
       "openConnectors": "Connectors openen",
       "when": "Als er een mail binnenkomt op {{address}}",
       "whenFolder": "Als er een mail binnenkomt op {{address}} ({{folder}})",
+      "whenMillionSend": "Als er een mail binnenkomt op MillionSend",
+      "inboxAddress": "Adres van de mailbox",
+      "inboxAddressHelp": "Leeg = elke MillionSend-mailbox.",
       "unknownMailbox": "een mailbox",
       "waiting": "Wachten op een mail",
       "thisWeek_one": "{{count}} mail deze week",

@@ -4648,7 +4648,8 @@
         "schedule": "时间",
         "event": "事件",
         "email": "邮件",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend 邮件"
       },
       "frequency": "频率",
       "frequencyPlaceholder": "例如：每周一上午 9 点",
@@ -9094,6 +9095,9 @@
       "openConnectors": "打开连接器",
       "when": "当 {{address}} 收到邮件时",
       "whenFolder": "当 {{address}}（{{folder}}）收到邮件时",
+      "whenMillionSend": "当 MillionSend 收到邮件时",
+      "inboxAddress": "邮箱地址",
+      "inboxAddressHelp": "留空 = 任意 MillionSend 邮箱。",
       "unknownMailbox": "某个邮箱",
       "waiting": "等待邮件中",
       "thisWeek_other": "本周 {{count}} 封邮件",

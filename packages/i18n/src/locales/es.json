@@ -4899,7 +4899,8 @@
         "schedule": "Hora",
         "event": "Evento",
         "email": "Correo",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "Correo de MillionSend"
       },
       "frequency": "Frecuencia",
       "frequencyPlaceholder": "Ej.: cada lunes a las 9",
@@ -9705,6 +9706,9 @@
       "openConnectors": "Abrir Conectores",
       "when": "Cuando llega un correo a {{address}}",
       "whenFolder": "Cuando llega un correo a {{address}} ({{folder}})",
+      "whenMillionSend": "Cuando llega un correo a MillionSend",
+      "inboxAddress": "Dirección del buzón",
+      "inboxAddressHelp": "Vacío = cualquier buzón de MillionSend.",
       "unknownMailbox": "un buzón",
       "waiting": "Esperando un correo",
       "thisWeek_one": "{{count}} correo esta semana",

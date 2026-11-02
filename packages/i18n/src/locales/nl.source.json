@@ -29413,5 +29413,17 @@
   },
   "agentComputer.phone.chooseOnWeb": {
     "value": "Choose it on agentes.chat, in Settings › Computers."
+  },
+  "routines.form.kind.connector": {
+    "value": "MillionSend email"
+  },
+  "mail.routine.whenMillionSend": {
+    "value": "When an email arrives in MillionSend"
+  },
+  "mail.routine.inboxAddress": {
+    "value": "Inbox address"
+  },
+  "mail.routine.inboxAddressHelp": {
+    "value": "Empty = any MillionSend inbox."
   }
 }

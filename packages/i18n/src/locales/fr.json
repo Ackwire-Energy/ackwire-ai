@@ -4953,7 +4953,8 @@
         "schedule": "Heure",
         "event": "Événement",
         "email": "E-mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "E-mail MillionSend"
       },
       "frequency": "Fréquence",
       "frequencyPlaceholder": "Ex. : tous les lundis à 9 h",
@@ -9777,6 +9778,9 @@
       "openConnectors": "Ouvrir Connecteurs",
       "when": "Quand un e-mail arrive sur {{address}}",
       "whenFolder": "Quand un e-mail arrive sur {{address}} ({{folder}})",
+      "whenMillionSend": "Quand un e-mail arrive sur MillionSend",
+      "inboxAddress": "Adresse de la boîte",
+      "inboxAddressHelp": "Vide = n'importe quelle boîte MillionSend.",
       "unknownMailbox": "une boîte mail",
       "waiting": "En attente d'un e-mail",
       "thisWeek_one": "{{count}} e-mail cette semaine",

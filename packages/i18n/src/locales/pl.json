@@ -5059,7 +5059,8 @@
         "schedule": "Godzina",
         "event": "Zdarzenie",
         "email": "E-mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "E-mail w MillionSend"
       },
       "frequency": "Częstotliwość",
       "frequencyPlaceholder": "Np.: w każdy poniedziałek o 9:00",
@@ -10043,6 +10044,9 @@
       "openConnectors": "Otwórz Konektory",
       "when": "Gdy przyjdzie e-mail na {{address}}",
       "whenFolder": "Gdy przyjdzie e-mail na {{address}} ({{folder}})",
+      "whenMillionSend": "Gdy przyjdzie e-mail do MillionSend",
+      "inboxAddress": "Adres skrzynki",
+      "inboxAddressHelp": "Puste = dowolna skrzynka MillionSend.",
       "unknownMailbox": "skrzynka",
       "waiting": "Czeka na e-mail",
       "thisWeek_one": "{{count}} e-mail w tym tygodniu",
