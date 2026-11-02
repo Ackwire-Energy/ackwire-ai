@@ -1266,6 +1266,7 @@ async function executeRunInner(
     // Skills: only names and descriptions here; the body loads with `load_skill` (progressive disclosure).
     const skillList = tools.some((t) => t.name === "load_skill") ? await enabledSkills(db, run.orgId, agent.id) : [];
     const readsWiki = tools.some((t) => t.name === "read_wiki_page");
+    const personBehind = () => runAuthority(db, run).then((a) => a.personId);
     // Limited to some GitHub repositories: which ones, and where to start.
     const repositories = granted.some((t) => t.scope.startsWith("github:"))
       ? repositoriesPrompt(await agentRepositoryList(db, run.orgId, agent.id).catch(() => []))
@@ -1293,20 +1294,20 @@ async function executeRunInner(
         ai: { gateway: deps.gateway, machines: deps.machines },
       }),
       contextDeps
-        ? retrieveForRun(contextDeps, {
-            orgId: run.orgId,
-            agentId: agent.id,
-            channelId: run.channelId,
-            text: trigger?.body ?? "",
-            known: agent.instructions,
-            // A person's own preferences come in for the runs they are behind (ADR 0120).
-            personIds: [
-              ...(trigger?.authorUserId ? [trigger.authorUserId] : []),
-              ...(await runAuthority(db, run)
-                .then((a) => (a.personId ? [a.personId] : []))
-                .catch(() => [] as string[])),
-            ],
-          }).catch(() => ({ text: "", itemIds: [] as string[] }))
+        ? // A person's own message already names who is behind the run: no read for it.
+          (trigger?.authorUserId ? Promise.resolve(trigger.authorUserId) : personBehind().catch(() => null))
+            .then((personId) =>
+              retrieveForRun(contextDeps, {
+                orgId: run.orgId,
+                agentId: agent.id,
+                channelId: run.channelId,
+                text: trigger?.body ?? "",
+                known: agent.instructions,
+                // A person's own preferences come in for the runs they are behind (ADR 0120).
+                personIds: personId ? [personId] : [],
+              }),
+            )
+            .catch(() => ({ text: "", itemIds: [] as string[] }))
         : Promise.resolve({ text: "", itemIds: [] as string[] }),
       // A routine's instructions name what it checks; the wiki stays one `read_wiki_page` away.
       readsWiki && !viaRoutine
@@ -1316,7 +1317,7 @@ async function executeRunInner(
               orgId: run.orgId,
               agentId: agent.id,
               text: trigger?.body ?? "",
-              readers: { channelId: run.channelId, person: async () => (await runAuthority(db, run)).personId },
+              readers: { channelId: run.channelId, person: personBehind },
             },
           ).catch(() => ({ text: "", pageIds: [] as string[] }))
         : Promise.resolve({ text: "", pageIds: [] as string[] }),

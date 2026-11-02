@@ -1,5 +1,5 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
-import { caches } from "./cache";
+import { caches, cachesEnabled } from "./cache";
 import { type RoutineBrief, routineBriefOf } from "./routine-brief";
 
 const { agentRuns, messages, routineRuns } = schema;
@@ -87,11 +87,25 @@ function returnsTo(meta: Record<string, unknown>): string | null {
  * stops at the first link it already knows, and a long chain costs what its newest link does.
  */
 export async function messageRoot(db: Executor, orgId: string, messageId: string): Promise<MessageRoot> {
+  if (!cachesEnabled()) return (await walkAndRemember(db, orgId, messageId)) ?? { kind: "agent" };
+  // A run's parallel reads ask for the same root at once: one walk answers them all.
+  const key = `${orgId}:${messageId}`;
+  let walk = walking.get(key);
+  if (!walk) {
+    walk = walkAndRemember(db, orgId, messageId).finally(() => walking.delete(key));
+    walking.set(key, walk);
+  }
+  return (await walk) ?? { kind: "agent" };
+}
+
+const walking = new Map<string, Promise<MessageRoot | null>>();
+
+async function walkAndRemember(db: Executor, orgId: string, messageId: string): Promise<MessageRoot | null> {
   const walked: string[] = [];
   const found = await walkRoot(db, orgId, messageId, walked);
   if (found)
     for (const id of walked) await caches.messageRoots.getOrLoad(`${orgId}:${id}`, () => Promise.resolve(found));
-  return found ?? { kind: "agent" };
+  return found;
 }
 
 /** The walk, collecting the ids it passed in `walked`; null when the chain is broken or too long (never remembered). */
