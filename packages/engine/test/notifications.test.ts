@@ -224,6 +224,22 @@ test("one-off notifications are idempotent; done, undo, read-all and the cursor"
   });
   // An approval waits: it comes first (for who may decide it).
   await makeAdmin(f.db, f.org.id, bia.id);
+  const [approval] = await f.db
+    .insert(schema.approvals)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      toolUseId: "tool-1",
+      tool: "github_merge",
+      scope: "github:pr.merge",
+      params: { pr: 42 },
+      actionHash: "hash",
+      title: "Merge PR #42",
+      expiresAt: new Date(Date.now() + 3_600_000),
+    })
+    .returning();
   await notify(deps(), {
     orgId: f.org.id,
     userIds: [bia.id, f.agent.id],
@@ -231,7 +247,7 @@ test("one-off notifications are idempotent; done, undo, read-all and the cursor"
     groupKey: "approval:test",
     waiting: true,
     actor: { type: "agent", id: f.agent.id },
-    source: {},
+    source: { approvalId: approval?.id },
   });
   expect(await f.db.select().from(schema.notifications)).toHaveLength(6); // never for an agent id
 

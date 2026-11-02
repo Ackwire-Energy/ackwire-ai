@@ -166,6 +166,28 @@ describe("notifications follow access", () => {
   const deps = () => ({ db: f.db, pubsub: f.pubsub });
   const inbox = async (userId: string) =>
     (await listNotifications(deps(), userId, f.org.id)).items.map((n) => `${n.kind}:${n.latest.text}`).sort();
+  /** A pending approval of the fixture's agent, in #general unless `channelId`, asked of `ownerUserId`. */
+  const pendingApproval = async (ownerUserId: string | null = null, channelId = f.general.id) => {
+    const [approval] = await f.db
+      .insert(schema.approvals)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId,
+        threadRootId: crypto.randomUUID(),
+        toolUseId: "t1",
+        tool: "github",
+        scope: "github:pr.merge",
+        params: {},
+        actionHash: "h",
+        title: "Merge PR #42",
+        ownerUserId,
+        expiresAt: new Date(Date.now() + 3600_000),
+      })
+      .returning();
+    if (!approval) throw new Error("no approval");
+    return approval;
+  };
 
   test("leaving a channel takes its snippets; an approval its member may still decide stays", async () => {
     f = await setup();
@@ -190,7 +212,7 @@ describe("notifications follow access", () => {
       kind: "approval",
       groupKey: "approval:1",
       waiting: true,
-      source: { channelId, approvalId: crypto.randomUUID() },
+      source: { channelId, approvalId: (await pendingApproval(null, channelId)).id },
       latest: { text: "deploy" },
     });
     await notify(deps(), {
@@ -248,30 +270,14 @@ describe("notifications follow access", () => {
     f = await setup();
     const admin = await addMember(f.db, f.org.id, "admin", "admin");
     const owner = await addMember(f.db, f.org.id, "member", "agent-owner");
-    const [approval] = await f.db
-      .insert(schema.approvals)
-      .values({
-        orgId: f.org.id,
-        agentId: f.agent.id,
-        channelId: f.general.id,
-        threadRootId: crypto.randomUUID(),
-        toolUseId: "t1",
-        tool: "github",
-        scope: "github:pr.merge",
-        params: {},
-        actionHash: "h",
-        title: "Merge PR #42",
-        ownerUserId: owner.id,
-        expiresAt: new Date(Date.now() + 3600_000),
-      })
-      .returning();
+    const approval = await pendingApproval(owner.id);
     await notify(deps(), {
       orgId: f.org.id,
       userIds: [admin.id, owner.id],
       kind: "approval",
       groupKey: "approval:1",
       waiting: true,
-      source: { channelId: f.general.id, approvalId: approval?.id },
+      source: { channelId: f.general.id, approvalId: approval.id },
       latest: { text: "merge it" },
     });
     expect(await inbox(admin.id)).toEqual(["approval:merge it"]);
@@ -294,7 +300,7 @@ describe("notifications follow access", () => {
       kind: "approval",
       groupKey: "approval:1",
       waiting: true,
-      source: { channelId: f.general.id, approvalId: crypto.randomUUID() },
+      source: { channelId: f.general.id, approvalId: (await pendingApproval()).id },
       latest: { text: "deploy the secret build" },
     });
     const [row] = (await listNotifications(deps(), admin.id, f.org.id)).items;
