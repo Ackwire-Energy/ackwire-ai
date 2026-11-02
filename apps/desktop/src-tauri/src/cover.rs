@@ -3,9 +3,18 @@
 //! (⌘R, macOS ending the page, switching servers) and while the server can't be reached; it goes when the
 //! page says it painted (`page_ready`). The cover only asks the server open now whether it answers, to tell
 //! offline from down, and may only ask to load the page again or to step aside (capabilities/cover.json).
+//!
+//! A page that never paints while its server answers (seen on macOS: the web view's own HTTP cache left it stuck,
+//! and only clearing it brought the site back) is never left as a blank window: the cover loads it again, then
+//! again with that cache cleared (cookies and the site's storage stay: no one is signed out, nothing typed is
+//! lost), and then says it didn't open. An opening that never painted clears that cache on the next one, and
+//! each step is written to the window's log (`window.log` in the app's log folder).
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+use std::io::Write;
+use std::path::PathBuf;
 
 use tauri::window::Color;
 use tauri::{AppHandle, LogicalPosition, Manager, WebviewBuilder, WebviewUrl};
@@ -20,6 +29,9 @@ pub const OPENING: Duration = Duration::from_secs(1);
 const FADE: Duration = Duration::from_millis(260);
 /// The sky's deepest tone (packages/ui sky SKY_TONES[0]), before the cover's page paints.
 const SKY: Color = Color(10, 63, 156, 255);
+/// Written when the window opens, removed when the site paints: still there at the next opening, the last one
+/// never painted.
+const PENDING_FILE: &str = "page-pending";
 
 #[derive(Default)]
 pub struct Cover(Mutex<Shown>);
@@ -146,19 +158,118 @@ pub fn page_ready(app: AppHandle, webview: tauri::Webview) -> Result<(), String>
     if webview.label() != main_window::LABEL {
         return Err("only the site says it painted".into());
     }
+    if let Some(path) = pending_path(&app).filter(|p| p.exists()) {
+        let _ = std::fs::remove_file(path);
+    }
     hide(&app);
     Ok(())
 }
 
-/// The cover: the site is reachable again after it wasn't; load it (the cover stays until it paints).
+fn pending_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join(PENDING_FILE))
+}
+
+/// The main window was just made: when the last opening never painted, its web cache goes first (the site is
+/// asked for again once it is gone), and this opening is marked until the site paints.
+pub fn opening(app: &AppHandle) {
+    let Some(path) = pending_path(app) else { return };
+    if path.exists() {
+        note(app, "the last opening never painted: clearing the web cache");
+        let handle = app.clone();
+        clear_http_cache(app, move || load_again(&handle));
+    }
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&path, b"");
+}
+
+/// The site, from its server again (a first load that never arrived leaves nothing to reload).
+fn load_again(app: &AppHandle) {
+    if let (Some(page), Some(site)) = (app.get_webview(main_window::LABEL), main_window::site(app)) {
+        let _ = page.navigate(site);
+    }
+}
+
+/// One line in the window's log: what the cover did to bring a stuck page back, to learn why it got stuck.
+fn note(app: &AppHandle, what: &str) {
+    let Ok(dir) = app.path().app_log_dir() else { return };
+    let _ = std::fs::create_dir_all(&dir);
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or_default();
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("window.log")) {
+        let _ = writeln!(file, "{at} {} {what}", app.package_info().version);
+    }
+}
+
+/// Empties the web views' HTTP caches (on disk and in memory), never their cookies or the sites' storage, then
+/// runs `then`. On macOS that is the default website data store's, which every web view of the app uses.
+#[cfg(target_os = "macos")]
+fn clear_http_cache(app: &AppHandle, then: impl FnOnce() + Send + 'static) {
+    use block2::RcBlock;
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use std::sync::Mutex;
+
+    let then = Mutex::new(Some(then));
+    let _ = app.run_on_main_thread(move || {
+        // SAFETY: WebKit's data store, on the main thread; the strings, set and date are autoreleased objects
+        // used right here, and the block is copied by WebKit and called once on the main thread.
+        unsafe {
+            let store: *mut AnyObject = msg_send![class!(WKWebsiteDataStore), defaultDataStore];
+            let kinds: [*mut AnyObject; 2] = [
+                msg_send![class!(NSString), stringWithUTF8String: c"WKWebsiteDataTypeDiskCache".as_ptr()],
+                msg_send![class!(NSString), stringWithUTF8String: c"WKWebsiteDataTypeMemoryCache".as_ptr()],
+            ];
+            let since: *mut AnyObject = msg_send![class!(NSDate), distantPast];
+            if store.is_null() || kinds.iter().any(|k| k.is_null()) || since.is_null() {
+                if let Some(then) = then.lock().ok().and_then(|mut t| t.take()) {
+                    then();
+                }
+                return;
+            }
+            let set: *mut AnyObject = msg_send![class!(NSSet), setWithObjects: kinds.as_ptr(), count: kinds.len()];
+            let done = RcBlock::new(move || {
+                if let Some(then) = then.lock().ok().and_then(|mut t| t.take()) {
+                    then();
+                }
+            });
+            let _: () = msg_send![store, removeDataOfTypes: set, modifiedSince: since, completionHandler: &*done];
+        }
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+fn clear_http_cache(_app: &AppHandle, then: impl FnOnce() + Send + 'static) {
+    then();
+}
+
+/// The cover: load the site again (the cover stays until it paints): the server is reachable again after it
+/// wasn't, or it answers and the page never painted. `fresh`: with the web cache cleared first.
 #[tauri::command]
-pub fn cover_retry(app: AppHandle, webview: tauri::Webview) -> Result<(), String> {
+pub fn cover_retry(
+    app: AppHandle,
+    webview: tauri::Webview,
+    fresh: Option<bool>,
+    why: Option<String>,
+) -> Result<(), String> {
     if webview.label() != LABEL {
         return Err("only the cover asks this".into());
     }
     let page = app.get_webview(main_window::LABEL).ok_or("no site")?;
     // A first load that never arrived leaves nothing to reload: go to the server again.
     let site = main_window::site(&app).ok_or("no server chosen")?;
+    if let Some(why) = why.as_deref().filter(|w| w.len() <= 80) {
+        let how = if fresh == Some(true) { " with the web cache cleared" } else { "" };
+        note(&app, &format!("{why}: loading again{how}"));
+    }
+    if fresh == Some(true) {
+        let handle = app.clone();
+        clear_http_cache(&app, move || load_again(&handle));
+        return Ok(());
+    }
     page.navigate(site).map_err(|e| e.to_string())
 }
 
@@ -171,12 +282,13 @@ pub fn cover_server(app: AppHandle, webview: tauri::Webview) -> Result<Option<St
     Ok(main_window::site(&app).map(|s| s.origin().ascii_serialization()))
 }
 
-/// The cover: the site is up but never said it painted (an older site): stop covering it.
+/// The cover: the person chose to see the page as it is ("Mostrar assim mesmo"), after it didn't open.
 #[tauri::command]
 pub fn cover_hide(app: AppHandle, webview: tauri::Webview) -> Result<(), String> {
     if webview.label() != LABEL {
         return Err("only the cover asks this".into());
     }
+    note(&app, "the page never painted: shown as it is, by hand");
     hide(&app);
     Ok(())
 }

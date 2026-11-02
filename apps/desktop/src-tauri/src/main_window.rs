@@ -306,6 +306,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         let _ = built.set_zoom(crate::menus::restore_zoom(app, step));
     }
     crate::cover::attach(app, &window).map_err(|e| e.to_string())?;
+    crate::cover::opening(app);
     #[cfg(target_os = "macos")]
     follow_lights(app);
     fit_page(app);

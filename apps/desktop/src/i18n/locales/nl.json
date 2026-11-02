@@ -532,7 +532,9 @@
     "copied": "Gekopieerd",
     "retry": "Opnieuw proberen",
     "openTailscale": "Tailscale openen",
-    "otherServer": "Een andere server gebruiken"
+    "otherServer": "Een andere server gebruiken",
+    "stuck": "agentes.chat is niet geopend. Probeer het opnieuw of bekijk de pagina zoals hij is.",
+    "showAnyway": "Toch tonen"
   },
   "menu": {
     "about": "Over agentes.chat",
