@@ -30,3 +30,16 @@ test("the person's language (ADR 0121): PATCH /me saves any language of the app,
   await t.drain();
   expect(t.email.sent.slice(before).map((m) => m.html.includes('lang="fr"'))).toEqual([true]);
 });
+
+test("a browser that says no language of ours gets English", async () => {
+  t = await createTestServer();
+  const bia = browser(t);
+  const res = await bia("/api/auth/sign-up/email", {
+    json: { email: "bia@example.com", password: "correct horse battery", name: "bia" },
+    headers: { "accept-language": "xx-XX" },
+  });
+  expect(res.status).toBe(200);
+  await t.drain();
+  expect(t.email.sent.at(-1)?.subject).toBe("Confirm your email for agentes.chat");
+  expect(((await (await bia("/api/app/me")).json()) as { user: { locale: string | null } }).user.locale).toBeNull();
+});
