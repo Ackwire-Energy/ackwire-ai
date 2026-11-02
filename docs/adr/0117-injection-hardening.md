@@ -88,11 +88,10 @@ Four ways out stayed open after ADR 0109:
    classification, and resolves the notice once nothing of the connection waits. A change back to the pinned
    version clears the pending one, and resolves the notice once nothing of the connection waits. Composio's tools (pinned by toolkit version) and the tools we serve ourselves
    are never pinned. A custom server's admin classification gate is unchanged.
-3. **A chat card's preview loads nothing from the network** (`HtmlFrame.tsx`, `PREVIEW_CSP`). The thumbnail's page
-   starts, right after its doctype and before anything of the page or our shim, with a CSP meta: `default-src
-   'none'`, scripts inline and from cdnjs, jsDelivr and unpkg, styles inline and Google Fonts, fonts from data and
-   Google Fonts, images from data and blob, `connect-src 'none'`, `form-action 'none'`. The opened page is
-   unchanged.
+3. **A chat card's preview loads nothing from the network** (`HtmlFrame.tsx`). Every agent-made page, the card's
+   thumbnail and the opened page alike, now starts with ADR 0019's page policy (`isolatedPage`, `PAGE_CSP`:
+   `default-src 'none'`, inline scripts and styles only, images, media and fonts from data and blob, `form-action
+   'none'`), which replaced the thumbnail-only policy this item first added.
 4. **A work turn loads none of the checkout's Claude Code settings** (`apps/server/runner/brain.ts`,
    `brainProfileLaunch`, `repoInstructions`). Work turns without the owner's own MCP servers start with
    `--setting-sources ""`, like plan turns. Checked against the real CLI (2.1.316, its API pointed at a local fake,

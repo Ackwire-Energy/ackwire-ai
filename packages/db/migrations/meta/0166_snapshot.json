@@ -1,6 +1,6 @@
 {
-  "id": "4970ca48-4212-402d-b2b9-b9748dede5c6",
-  "prevId": "d4d7b6d5-15d5-4844-aec9-6f3a02072dfc",
+  "id": "4a02d6de-87d7-4adf-9042-be1df640b413",
+  "prevId": "1a2264cd-6584-43cd-821c-6aee9993ef82",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -14837,6 +14837,13 @@
           "notNull": true,
           "default": false
         },
+        "in_drive": {
+          "name": "in_drive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "excerpt": {
           "name": "excerpt",
           "type": "text",
@@ -15201,6 +15208,219 @@
         "blobs_org_id_organizations_id_fk": {
           "name": "blobs_org_id_organizations_id_fk",
           "tableFrom": "blobs",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.poll_votes": {
+      "name": "poll_votes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "artifact_id": {
+          "name": "artifact_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "option": {
+          "name": "option",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "poll_votes_choice": {
+          "name": "poll_votes_choice",
+          "columns": [
+            {
+              "expression": "artifact_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "option",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "poll_votes_org_id_index": {
+          "name": "poll_votes_org_id_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "poll_votes_org_id_organizations_id_fk": {
+          "name": "poll_votes_org_id_organizations_id_fk",
+          "tableFrom": "poll_votes",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "poll_votes_artifact_id_polls_artifact_id_fk": {
+          "name": "poll_votes_artifact_id_polls_artifact_id_fk",
+          "tableFrom": "poll_votes",
+          "tableTo": "polls",
+          "columnsFrom": [
+            "artifact_id"
+          ],
+          "columnsTo": [
+            "artifact_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.polls": {
+      "name": "polls",
+      "schema": "",
+      "columns": {
+        "artifact_id": {
+          "name": "artifact_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closes_at": {
+          "name": "closes_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "polls_org_id_index": {
+          "name": "polls_org_id_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "polls_artifact_id_artifacts_id_fk": {
+          "name": "polls_artifact_id_artifacts_id_fk",
+          "tableFrom": "polls",
+          "tableTo": "artifacts",
+          "columnsFrom": [
+            "artifact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "polls_org_id_organizations_id_fk": {
+          "name": "polls_org_id_organizations_id_fk",
+          "tableFrom": "polls",
           "tableTo": "organizations",
           "columnsFrom": [
             "org_id"
@@ -19735,134 +19955,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.connector_tool_pins": {
-      "name": "connector_tool_pins",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "connection_id": {
-          "name": "connection_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tool_name": {
-          "name": "tool_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fingerprint": {
-          "name": "fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "input_schema": {
-          "name": "input_schema",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pinned_at": {
-          "name": "pinned_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "pending_fingerprint": {
-          "name": "pending_fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pending_description": {
-          "name": "pending_description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pending_schema": {
-          "name": "pending_schema",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "changed_at": {
-          "name": "changed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "connector_tool_pins_connection_id_index": {
-          "name": "connector_tool_pins_connection_id_index",
-          "columns": [
-            {
-              "expression": "connection_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "connector_tool_pins_connection_id_connector_connections_id_fk": {
-          "name": "connector_tool_pins_connection_id_connector_connections_id_fk",
-          "tableFrom": "connector_tool_pins",
-          "tableTo": "connector_connections",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "connector_tool_pins_orgId_connectionId_toolName_unique": {
-          "name": "connector_tool_pins_orgId_connectionId_toolName_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "org_id",
-            "connection_id",
-            "tool_name"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -20125,7 +20217,9 @@
         "diff",
         "html",
         "diagram",
-        "file"
+        "file",
+        "block",
+        "poll"
       ]
     },
     "public.storage_kind": {

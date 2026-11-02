@@ -127,7 +127,7 @@ describe("who can talk to the agent", () => {
     const gone = await addUser(f.db, "gone");
     const stale = [cid.id, gone.id, bia.id];
     await f.db.update(schema.agents).set({ audienceMode: "people", audienceUserIds: stale });
-    const file = await Bun.file(new URL("../../db/migrations/0161_agent_audience_members.sql", import.meta.url)).text();
+    const file = await Bun.file(new URL("../../db/migrations/0162_agent_audience_members.sql", import.meta.url)).text();
     await f.db.execute(sql.raw(file));
     await f.db.execute(sql.raw(file));
     const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));

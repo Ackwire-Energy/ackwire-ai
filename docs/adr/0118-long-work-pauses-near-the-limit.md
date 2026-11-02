@@ -3,7 +3,7 @@
 - Status: Accepted (built: the server, the web and the phone app; the runner is unchanged)
 - Date: 2026-11-01
 - Builds on: the usage-aware design's Phase 1 (a run at the limit waits in its own session and resumes by itself, `usage-pause.ts`), ADR 0097 (the continuation controller), ADR 0089 (the stretch card's look and its Continuar)
-- Code: `packages/ui/src/plan-state.ts` (`PLAN_PAUSE`, `PLAN_NOTICE`, `planBinding`, `extraUsageOn`, `extraUsageLeft`), `packages/engine/src/usage-pause.ts` (`isLongWork`, `budgetUsedPercent`, `usageNoticeText`, `continueUsagePause`, `usageCardResumed`), `executor.ts` (`usageReading`, `longWorkPause`, `postUsagePauseCard`, `waitForUsage` with `usage_pause`), `run-hold.ts`, `steering.ts`, `brains/select.ts` (`sessionFor`), `no-ai.ts` (`answerNow`), `brain-settings.ts` (`extraUsage`), migration `0169_long_work_extra_usage`, `packages/client/src/lib/usage-pause.ts`, web `UsagePauseCard.tsx` and Quem pensa, phone `UsagePauseCard.tsx` and Pensa com
+- Code: `packages/ui/src/plan-state.ts` (`PLAN_PAUSE`, `PLAN_NOTICE`, `planBinding`, `extraUsageOn`, `extraUsageLeft`), `packages/engine/src/usage-pause.ts` (`isLongWork`, `budgetUsedPercent`, `usageNoticeText`, `continueUsagePause`, `usageCardResumed`), `executor.ts` (`usageReading`, `longWorkPause`, `postUsagePauseCard`, `waitForUsage` with `usage_pause`), `run-hold.ts`, `steering.ts`, `brains/select.ts` (`sessionFor`), `no-ai.ts` (`answerNow`), `brain-settings.ts` (`extraUsage`), migration `0170_long_work_extra_usage`, `packages/client/src/lib/usage-pause.ts`, web `UsagePauseCard.tsx` and Quem pensa, phone `UsagePauseCard.tsx` and Pensa com
 
 ## Context
 

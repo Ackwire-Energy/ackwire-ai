@@ -38,6 +38,14 @@ class MockConflictError extends Error {
   readonly code = "stale_version";
 }
 
+const openPoll = (id: string) => ({
+  id,
+  closesAt: new Date(Date.now() + 3_600_000).toISOString(),
+  closedAt: null,
+  people: 1,
+  votes: [],
+});
+
 const editable = (kind: Artifact["kind"]) => kind === "document" || kind === "table" || kind === "file";
 
 export function serializeContent(content: ArtifactContent): { text: string; type: string } {
@@ -59,6 +67,10 @@ export function serializeContent(content: ArtifactContent): { text: string; type
       return { text: content.html, type: "text/html" };
     case "file":
       return { text: content.text ?? "", type: content.contentType };
+    case "block":
+      return { text: content.html, type: "text/html" };
+    case "poll":
+      return { text: content.question, type: "text/plain" };
   }
 }
 
@@ -212,6 +224,14 @@ export function createMockArtifacts(
       );
     },
     get: async (orgId, id, version) => detail(orgId, await find(orgId, id), version),
+    keep: async (orgId, id) => {
+      const s = await find(orgId, id);
+      s.meta.inDrive = true;
+      return view(orgId, s);
+    },
+    reply: async () => ({ id: mockId("msg") }),
+    poll: async (_orgId, id) => openPoll(id),
+    vote: async (_orgId, id) => openPoll(id),
     versions: async (orgId, id) =>
       (await find(orgId, id)).versions.map(({ content: _c, bytes: _b, ...v }) => clone(v)).reverse(),
     fileUrl: (orgId, id, options = {}) => {
