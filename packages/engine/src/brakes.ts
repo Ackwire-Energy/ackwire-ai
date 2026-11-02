@@ -14,7 +14,7 @@ import {
 } from "./autonomy-settings";
 import { crowdedAgents } from "./computer-queue";
 import { publishDelivery } from "./delivery";
-import { ConflictError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
@@ -270,8 +270,8 @@ export type ProposalDecision = "go" | "not_now" | "never" | "always";
 export const PROPOSAL_DECISIONS: readonly ProposalDecision[] = ["go", "not_now", "never", "always"];
 
 /**
- * A person decides a proposal card: the person it is for, the agent's owner or an admin. `always` and `never` are
- * remembered on the agent (`autonomy.go` / `autonomy.never`) for that kind; every decision reaches the run that asked
+ * A person decides a proposal card: the person it is for (`go`, `not_now`), the agent's owner or an admin (also
+ * `always` and `never`). `always` and `never` are remembered on the agent (`autonomy.go` / `autonomy.never`) for that kind; every decision reaches the run that asked
  * as a notice, which wakes it.
  */
 export async function decideCostlyProposal(
@@ -305,8 +305,11 @@ export async function decideCostlyProposal(
     .from(organizationMembers)
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, actorId)));
   if (!card || !agent || !member) throw new NotFoundError("Proposal not found");
-  if (actorId !== card.forUserId && actorId !== agent.ownerUserId && !can(membership, "manage_agents"))
-    throw new NotFoundError("Proposal not found");
+  const manages = actorId === agent.ownerUserId || can(membership, "manage_agents");
+  if (actorId !== card.forUserId && !manages) throw new NotFoundError("Proposal not found");
+  // "Always" and "never" change the agent for everyone's work: only who may change the agent.
+  if ((decision === "always" || decision === "never") && !manages)
+    throw new ForbiddenError("Only the agent's owner or an admin can decide this for every time");
   const cost = signal.signature as CostKind;
   const out = await db.transaction(async (tx) => {
     const [decided] = await tx

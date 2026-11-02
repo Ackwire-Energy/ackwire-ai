@@ -1,5 +1,5 @@
 import { type CostlyDecision, type Message, useApi } from "@agenteschat/client";
-import { costlyProposalOf, mayDecideCostly } from "@agenteschat/client/lib/action-cards";
+import { costlyProposalOf, mayDecideCostly, mayRememberCostly } from "@agenteschat/client/lib/action-cards";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,7 +25,9 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
   const [pending, setPending] = useState(false);
   const card = costlyProposalOf(m.meta);
   if (!card || m.author.type !== "agent") return null;
-  const may = mayDecideCostly(card, meId ?? "", (id) => dir.agentById.get(id)?.ownerUserId, can(org, "manage_agents"));
+  const ownerOf = (id: string) => dir.agentById.get(id)?.ownerUserId;
+  const may = mayDecideCostly(card, meId ?? "", ownerOf, can(org, "manage_agents"));
+  const remembers = mayRememberCostly(card, meId ?? "", ownerOf, can(org, "manage_agents"));
   const decide = async (decision: CostlyDecision) => {
     setPending(true);
     try {
@@ -65,13 +67,15 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
             disabled={pending}
             onPress={() => void decide("go")}
           />
-          <Button
-            size="sm"
-            variant="secondary"
-            label={t("costlyCard.always")}
-            disabled={pending}
-            onPress={() => void decide("always")}
-          />
+          {remembers ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              label={t("costlyCard.always")}
+              disabled={pending}
+              onPress={() => void decide("always")}
+            />
+          ) : null}
           <Button
             size="sm"
             variant="ghost"
@@ -79,13 +83,15 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
             disabled={pending}
             onPress={() => void decide("not_now")}
           />
-          <Button
-            size="sm"
-            variant="ghost"
-            label={t("costlyCard.never")}
-            disabled={pending}
-            onPress={() => void decide("never")}
-          />
+          {remembers ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              label={t("costlyCard.never")}
+              disabled={pending}
+              onPress={() => void decide("never")}
+            />
+          ) : null}
         </View>
       ) : (
         <Text variant="footnote" tone="faint">

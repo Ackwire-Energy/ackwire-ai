@@ -1,6 +1,6 @@
 import type { CostlyDecision, Message } from "@agenteschat/client";
 import { useApi } from "@agenteschat/client";
-import { type CostlyProposalCard, mayDecideCostly } from "@agenteschat/client/lib/action-cards";
+import { type CostlyProposalCard, mayDecideCostly, mayRememberCostly } from "@agenteschat/client/lib/action-cards";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Icon } from "@agenteschat/ui";
@@ -22,7 +22,9 @@ export function CostlyProposalCardView({ message, card }: { message: Message; ca
   const api = useApi();
   const toast = useToast();
   const [pending, setPending] = useState<CostlyDecision | null>(null);
-  const may = mayDecideCostly(card, me.user.id, (id) => dir.agentById.get(id)?.ownerUserId, can(org, "manage_agents"));
+  const ownerOf = (id: string) => dir.agentById.get(id)?.ownerUserId;
+  const may = mayDecideCostly(card, me.user.id, ownerOf, can(org, "manage_agents"));
+  const remembers = mayRememberCostly(card, me.user.id, ownerOf, can(org, "manage_agents"));
   const decide = async (decision: CostlyDecision) => {
     setPending(decision);
     try {
@@ -53,15 +55,19 @@ export function CostlyProposalCardView({ message, card }: { message: Message; ca
           <Button size="sm" variant="primary" loading={pending === "go"} onClick={() => decide("go")}>
             {t("costlyCard.go")}
           </Button>
-          <Button size="sm" loading={pending === "always"} onClick={() => decide("always")}>
-            {t("costlyCard.always")}
-          </Button>
+          {remembers && (
+            <Button size="sm" loading={pending === "always"} onClick={() => decide("always")}>
+              {t("costlyCard.always")}
+            </Button>
+          )}
           <Button size="sm" variant="ghost" loading={pending === "not_now"} onClick={() => decide("not_now")}>
             {t("costlyCard.notNow")}
           </Button>
-          <Button size="sm" variant="ghost" loading={pending === "never"} onClick={() => decide("never")}>
-            {t("costlyCard.never")}
-          </Button>
+          {remembers && (
+            <Button size="sm" variant="ghost" loading={pending === "never"} onClick={() => decide("never")}>
+              {t("costlyCard.never")}
+            </Button>
+          )}
         </span>
       ) : (
         <span className="small muted">{t("costlyCard.waiting")}</span>

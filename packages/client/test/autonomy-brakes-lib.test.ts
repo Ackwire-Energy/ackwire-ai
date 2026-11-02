@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { resources } from "@agenteschat/i18n";
 import { LOCALE_CODES } from "@agenteschat/i18n/locale";
 import i18next, { type TFunction } from "i18next";
-import { actionCardOf, costlyProposalOf, mayDecideCostly } from "../src/lib/action-cards";
+import { actionCardOf, costlyProposalOf, mayDecideCostly, mayRememberCostly } from "../src/lib/action-cards";
 import { serverBody } from "../src/lib/message-body";
 
 /** The autonomy brakes in the apps (ADR 0131): the proposal card and the server's own lines, in every language. */
@@ -34,6 +34,10 @@ test("a proposal card: read from the message, and decided by its person, the age
   expect(mayDecideCostly(parsed, "u2", owner, false)).toBe(true);
   expect(mayDecideCostly(parsed, "u3", owner, true)).toBe(true);
   expect(mayDecideCostly(parsed, "u3", owner, false)).toBe(false);
+  // "Sempre" and "Nunca" change the agent: not for the person the card is for alone.
+  expect(mayRememberCostly(parsed, "u1", owner, false)).toBe(false);
+  expect(mayRememberCostly(parsed, "u2", owner, false)).toBe(true);
+  expect(mayRememberCostly(parsed, "u3", owner, true)).toBe(true);
 });
 
 test("the server's own lines read in every language, never as the English fallback", () => {

@@ -141,7 +141,15 @@ export const mayDecideCostly = (
   userId: string,
   ownerOf: (agentId: string) => string | null | undefined,
   managesAgents: boolean,
-) => card.forUserId === userId || ownerOf(card.agentId) === userId || managesAgents;
+) => card.forUserId === userId || mayRememberCostly(card, userId, ownerOf, managesAgents);
+
+/** Who may answer it for every time ("Sempre", "Nunca"), which changes the agent: its owner or who manages agents. */
+export const mayRememberCostly = (
+  card: CostlyProposalCard,
+  userId: string,
+  ownerOf: (agentId: string) => string | null | undefined,
+  managesAgents: boolean,
+) => ownerOf(card.agentId) === userId || managesAgents;
 
 /** An agent's proposal of a new agent (ADR 0081), or null. Unlike the Connect card, it keeps its state. */
 export function agentProposalOf(meta: Record<string, unknown> | null | undefined): AgentProposalCard | null {

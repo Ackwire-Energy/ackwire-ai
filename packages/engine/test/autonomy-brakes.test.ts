@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { PERMISSION_TOOL } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import {
   askStillOpen,
   autonomySettings,
@@ -266,6 +266,35 @@ describe("costly work nobody asked for needs a go (§3)", () => {
       (m) => (m.meta as { actionCard?: { kind?: string } }).actionCard?.kind === "autonomy_proposal",
     );
     expect(cards).toHaveLength(1);
+  });
+
+  test("the person a card is for says go or not now; only the agent's owner or an admin says always or never", async () => {
+    f = await setup();
+    const trigger = await alert(f.agent.id, "Erro novo em produção");
+    const run = await working(f.agent.id, trigger.id);
+    const at = {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: trigger.id,
+    };
+    const member = await addMember(f.db, f.org.id, "member", "Rui");
+    await costlyGate(f, at, UNATTENDED, "pr", "gh pr create");
+    // A card for a person who doesn't manage the agent (as a routine's creator would get).
+    const [card] = (await f.db.select().from(messages)).filter(
+      (m) => (m.meta as { actionCard?: { kind?: string } }).actionCard?.kind === "autonomy_proposal",
+    );
+    await f.db
+      .update(messages)
+      .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard,forUserId}', ${JSON.stringify(member.id)}::jsonb)` })
+      .where(eq(messages.id, card?.id ?? ""));
+    const [proposal] = await signalsOf("proposal");
+    await expect(decideCostlyProposal(f, member.id, f.org.id, proposal?.id ?? "", "always")).rejects.toThrow();
+    await expect(decideCostlyProposal(f, member.id, f.org.id, proposal?.id ?? "", "never")).rejects.toThrow();
+    const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(autonomySettings(agent?.autonomyBrakes).go).toEqual([]);
+    expect(await decideCostlyProposal(f, member.id, f.org.id, proposal?.id ?? "", "go")).toEqual({ state: "go" });
   });
 
   test("always and never are remembered on the agent; the hourly PR cap holds even with a go", async () => {
