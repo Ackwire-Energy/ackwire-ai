@@ -911,6 +911,14 @@ export async function removeMember(
       .update(schema.wikiPages)
       .set({ audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})` })
       .where(and(eq(schema.wikiPages.orgId, orgId), sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds})`));
+    // And the agents' "only some people" lists, for the same reason.
+    const unlisted = await tx
+      .update(schema.agents)
+      .set({ audienceUserIds: sql`array_remove(${schema.agents.audienceUserIds}, ${targetUserId})` })
+      .where(and(eq(schema.agents.orgId, orgId), sql`${targetUserId} = any(${schema.agents.audienceUserIds})`))
+      .returning({ id: schema.agents.id });
+    for (const a of unlisted) caches.agents.delete(`${orgId}:${a.id}`);
+    if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
