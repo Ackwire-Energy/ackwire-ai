@@ -487,6 +487,9 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
         void qc.invalidateQueries({ queryKey: keys.roles(orgId) });
         void qc.invalidateQueries({ queryKey: keys.me });
+        // Roles decide whom an agent answers: its `canTalk` and the routines shown follow them.
+        void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
       }
       // Someone arranged the sidebar's channel categories (ADR 0080): channels and categories refetch.
       if (event.type === "channels.layout") {

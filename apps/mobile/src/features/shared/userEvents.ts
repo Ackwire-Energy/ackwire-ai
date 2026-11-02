@@ -69,6 +69,9 @@ export function useUserEvents() {
         void qc.invalidateQueries({ queryKey: keys.members(orgId) });
         void qc.invalidateQueries({ queryKey: keys.roles(orgId) });
         void qc.invalidateQueries({ queryKey: keys.me });
+        // Roles decide whom an agent answers: its `canTalk` and the routines shown follow them.
+        void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
       }
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")
         refreshMission(qc, orgId, event.missionId);
