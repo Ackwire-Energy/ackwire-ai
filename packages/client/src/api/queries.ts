@@ -2704,6 +2704,8 @@ export const useAnswerChoices = (orgId: string, id: string) => {
   return useMutation({
     mutationFn: (picks: number[]) => api.artifacts.answerChoices(orgId, id, picks, newClientId()),
     onSuccess: (out) => qc.setQueryData(keys.choices(orgId, id), out.choices),
+    // The card says it itself, and says nothing when someone answered first.
+    meta: { silent: true },
   });
 };
 

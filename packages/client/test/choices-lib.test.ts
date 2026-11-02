@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
+import { ApiError } from "../src/api/http";
 import {
+  answeredFirst,
   choiceLetter,
   choiceOfKey,
   choiceReplyLine,
@@ -45,4 +47,10 @@ test("the answered card and the compact reply", () => {
   ]);
   expect(choiceReplyLine("@dev Amanhã")).toBe("Amanhã");
   expect(choiceReplyLine("Amanhã")).toBe("Amanhã");
+});
+
+test("someone answering first is told apart from a failed pick", () => {
+  expect(answeredFirst(new ApiError(409, "choices.answered", "x"))).toBe(true);
+  expect(answeredFirst(new ApiError(500, "internal", "x"))).toBe(false);
+  expect(answeredFirst(new Error("offline"))).toBe(false);
 });

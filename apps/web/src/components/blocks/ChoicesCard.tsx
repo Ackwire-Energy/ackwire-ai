@@ -1,5 +1,6 @@
 import { useAnswerChoices, useArtifact, useChoices } from "@agenteschat/client";
 import {
+  answeredFirst,
   type ChoiceDraft,
   choiceLetter,
   choiceOfKey,
@@ -88,18 +89,21 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const d = draft ?? emptyDraft(questions);
   const q = questions[d.step];
   if (!q) return null;
+  // Another question's options replace the focused button: the first of them takes the focus, so keys keep working.
+  const focusFirst = () =>
+    requestAnimationFrame(() => list.current?.querySelector<HTMLButtonElement>("button")?.focus());
   const pick = (option: number) => {
     if (answer.isPending) return;
     const next = pickChoice(d, option);
     setDraft(next.draft);
     if (next.send)
       answer.mutate(next.send, {
-        onError: () => {
-          toast.show(t("choices.failed"), "error");
+        onError: (e) => {
+          if (!answeredFirst(e)) toast.show(t("choices.failed"), "error");
           void query.refetch();
         },
       });
-    else requestAnimationFrame(() => list.current?.querySelector<HTMLButtonElement>("button")?.focus());
+    else focusFirst();
   };
   const onKeyDown = (e: KeyboardEvent<HTMLFieldSetElement>) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -117,7 +121,9 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
       rows[(at + by + rows.length) % rows.length]?.focus();
     } else if (questions.length > 1 && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
       e.preventDefault();
-      setDraft(moveStep(d, e.key === "ArrowRight" ? 1 : -1));
+      const next = moveStep(d, e.key === "ArrowRight" ? 1 : -1);
+      setDraft(next);
+      if (next !== d) focusFirst();
     }
   };
   return (

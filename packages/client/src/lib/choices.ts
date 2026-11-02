@@ -1,3 +1,4 @@
+import { ApiError } from "../api/http";
 import type { ChoiceQuestion } from "../api/types";
 
 /**
@@ -54,3 +55,6 @@ export function choiceSummary(questions: readonly ChoiceQuestion[], picks: reado
 
 /** The person's reply as its compact line shows it: without the agent's @handle the server put in front. */
 export const choiceReplyLine = (body: string) => body.replace(/^@[\w.-]+\s+/, "");
+
+/** Someone answered first (409 `choices.answered`): not a failure to retry, the card just shows their pick. */
+export const answeredFirst = (e: unknown) => e instanceof ApiError && e.code === "choices.answered";

@@ -1,5 +1,6 @@
 import { useAnswerChoices, useArtifact, useChoices } from "@agenteschat/client";
 import {
+  answeredFirst,
   type ChoiceDraft,
   choiceLetter,
   choiceSummary,
@@ -114,8 +115,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
     setDraft(next.draft);
     if (next.send)
       answer.mutate(next.send, {
-        onError: () => {
-          toast({ title: t("mobile.choices.failed"), icon: "x" });
+        onError: (e) => {
+          if (!answeredFirst(e)) toast({ title: t("mobile.choices.failed"), icon: "x" });
           void query.refetch();
         },
       });
