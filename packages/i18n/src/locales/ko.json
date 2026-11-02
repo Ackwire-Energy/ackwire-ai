@@ -7075,9 +7075,73 @@
     "uses": {
       "title": "이 페이지를 사용하는 에이전트",
       "count_other": "최근 7일 사용 횟수",
+      "week_other": "이번 주 {{count}}회 참조",
       "last": "{{name}}이(가) {{when}} 사용했어요",
       "lastIn": "{{name}}이(가) {{when}} #{{channel}}에서 답하며 사용했어요",
       "none": "아직 사용한 에이전트가 없어요. 누군가 이 주제에 대해 물으면 답변에 활용돼요."
+    },
+    "editedWhen": "{{when}} 편집",
+    "access": {
+      "label": "볼 수 있는 사람: {{who}}",
+      "everyone": "워크스페이스 전체",
+      "everyoneHint": "Wiki에 접근할 수 있는 모든 멤버와 에이전트가 이 페이지를 읽습니다.",
+      "peopleAnd": "모든 사람과 {{agents}}",
+      "peopleOnly": "모든 사람, 에이전트 없음",
+      "ownersOnly": "소유자만",
+      "withAllAgents": "{{names}} 및 모든 에이전트",
+      "more_other": "외 {{count}}"
+    },
+    "backlinkDm": "{{name}}님과의 대화",
+    "backlinkDmSomeone": "누군가",
+    "draftKept": "초안 저장됨",
+    "draftRecovered": "초안 복구됨",
+    "markdown": "Markdown",
+    "markdownHint": "텍스트를 Markdown으로 보고 편집",
+    "props": {
+      "folderHint": "페이지 폴더",
+      "noFolder": "폴더 없음",
+      "searchFolder": "폴더 검색",
+      "createFolder": "‘{{name}}’ 폴더 만들기",
+      "addTag": "태그",
+      "removeTag": "#{{tag}} 빼기"
+    },
+    "rich": {
+      "placeholder": "여기에 쓰세요. [[ 로 다른 페이지를 연결하고 / 로 블록을 봅니다.",
+      "hint": "[[ 페이지 연결 · / 블록 보기 · {{key}} S 버전 저장",
+      "blockLabel": "블록 종류",
+      "strike": "취소선",
+      "linkPage": "페이지 연결",
+      "column": "열",
+      "addRow": "행",
+      "addColumn": "열",
+      "calloutText": "강조할 내용을 여기에 쓰세요.",
+      "codeText": "코드",
+      "blocks": {
+        "paragraph": "문단",
+        "heading": "제목",
+        "subheading": "부제목",
+        "list": "목록",
+        "numbered": "번호 목록",
+        "task": "할 일",
+        "table": "표",
+        "callout": "강조 블록",
+        "code": "코드",
+        "quote": "인용",
+        "rule": "구분선",
+        "link": "Wiki 페이지"
+      }
+    },
+    "ask": {
+      "button": "에이전트에게 부탁하기",
+      "title": "에이전트에게 부탁하기",
+      "text": "요청은 페이지 링크와 함께 에이전트와의 대화로 갑니다. 에이전트는 Wiki 도구로 편집하고, 그 버전은 기록에 내 요청으로 남습니다.",
+      "agent": "에이전트",
+      "what": "무엇을 바꿀까요?",
+      "placeholder": "예: 2027년 인상분을 반영해 줘",
+      "send": "{{name}}에게 보내기",
+      "sendNone": "보내기",
+      "sent": "{{name}}님과의 대화로 요청을 보냈습니다.",
+      "message": "[[{{title}}]] 페이지에 대해:"
     },
     "import": {
       "cta": "Obsidian에서 가져오기",

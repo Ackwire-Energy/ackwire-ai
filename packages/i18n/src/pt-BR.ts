@@ -7294,8 +7294,7 @@ export const ptBR = {
     ask: {
       button: "Pedir a um agente",
       title: "Pedir a um agente",
-      text:
-        "O pedido vai para a sua conversa com o agente, com o link da página. Ele edita com as ferramentas da wiki, e a versão fica no histórico como sendo a seu pedido.",
+      text: "O pedido vai para a sua conversa com o agente, com o link da página. Ele edita com as ferramentas da wiki, e a versão fica no histórico como sendo a seu pedido.",
       agent: "Agente",
       what: "O que mudar?",
       placeholder: "Ex.: atualiza com o reajuste de 2027",

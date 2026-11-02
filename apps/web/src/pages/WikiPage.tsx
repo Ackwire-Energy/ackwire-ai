@@ -376,9 +376,7 @@ function WikiNav({
       {!filtering && pinned.length > 0 && (
         <section className="wiki-nav__section" aria-label={t("wiki.pinnedPages")}>
           <span className="wiki-label">{t("wiki.pinnedPages")}</span>
-          <div className="wiki-nav__list">
-            {pinned.map((p) => pageRow(p, false))}
-          </div>
+          <div className="wiki-nav__list">{pinned.map((p) => pageRow(p, false))}</div>
         </section>
       )}
       <nav className="wiki-nav__section" aria-label={t("wiki.tree")}>

@@ -103,7 +103,9 @@ describe("links", () => {
       body: `Atualiza a [[${renamed.title}]], por favor`,
     });
     const read = await getWikiPage(f.db, me, f.org.id, renamed.slug);
-    expect(read.backlinks).toMatchObject([{ kind: "message", channelId: dm.id, dm: { type: "agent", id: f.agent.id } }]);
+    expect(read.backlinks).toMatchObject([
+      { kind: "message", channelId: dm.id, dm: { type: "agent", id: f.agent.id } },
+    ]);
   });
 
   test("backlinks from pages, messages and issues; unresolved links resolve when the page appears", async () => {

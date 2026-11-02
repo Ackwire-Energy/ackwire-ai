@@ -26,7 +26,22 @@ type Kind = "p" | "h2" | "h3" | "ul" | "ol" | "task" | "table" | "call" | "code"
 type Command = Kind | "bold" | "italic" | "strike" | "link" | "rule";
 
 /** The blocks of the "/" menu and of the toolbar's selector: what each is called and does. */
-const BLOCKS: { cmd: Command; icon: IconName; key: string }[] = [
+/** A block's name in `wiki.rich.blocks`. */
+type BlockKey =
+  | "paragraph"
+  | "heading"
+  | "subheading"
+  | "list"
+  | "numbered"
+  | "task"
+  | "table"
+  | "callout"
+  | "code"
+  | "quote"
+  | "rule"
+  | "link";
+
+const BLOCKS: { cmd: Command; icon: IconName; key: BlockKey }[] = [
   { cmd: "p", icon: "document", key: "paragraph" },
   { cmd: "h2", icon: "page", key: "heading" },
   { cmd: "h3", icon: "page", key: "subheading" },
@@ -41,7 +56,7 @@ const BLOCKS: { cmd: Command; icon: IconName; key: string }[] = [
 ];
 
 /** Each kind's name in `wiki.rich.blocks`. */
-const KIND_KEY: Record<Kind, string> = {
+const KIND_KEY: Record<Kind, BlockKey> = {
   p: "paragraph",
   h2: "heading",
   h3: "subheading",
@@ -514,11 +529,13 @@ export const WikiRichEditor = forwardRef<
         )}
       </div>
       <div className="wiki-page__body wiki-prose">
+        {/* biome-ignore lint/a11y/useSemanticElements: rich text (headings, lists, tables, links) can't live in a textarea */}
         <div
           ref={box}
           className="md wiki-rich"
           contentEditable
           suppressContentEditableWarning
+          tabIndex={0}
           role="textbox"
           aria-multiline="true"
           aria-label={label}

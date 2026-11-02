@@ -322,11 +322,7 @@ function blockMarkdown(el: HTMLElement): string {
       const title = el.querySelector(".md__callout-title");
       const bodyEl = el.querySelector(".md__callout-body");
       const titleText = title ? inlineMarkdown(title).trim() : "";
-      const bodyText = bodyEl
-        ? inlineMarkdown(bodyEl).trim()
-        : inlineMarkdown(el)
-            .replace(titleText, "")
-            .trim();
+      const bodyText = bodyEl ? inlineMarkdown(bodyEl).trim() : inlineMarkdown(el).replace(titleText, "").trim();
       return [`> [!${kind}]${titleText ? ` ${titleText}` : ""}`, ...(bodyText ? [`> ${bodyText}`] : [])].join("\n");
     }
     case "PRE": {
@@ -397,7 +393,9 @@ export function markdownFromRich(
     const i = Number(el.dataset.b);
     return doc.snapshots.get(i) === el.outerHTML ? doc.sources[i] : undefined;
   };
-  const body = childrenMarkdown(root, kept).replace(/\n{3,}/g, "\n\n").trim();
+  const body = childrenMarkdown(root, kept)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return doc?.lead ? (body ? `${doc.lead}\n\n${body}` : doc.lead) : body;
 }
 

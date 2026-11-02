@@ -7095,8 +7095,7 @@ export const en = {
     ask: {
       button: "Ask an agent",
       title: "Ask an agent",
-      text:
-        "The request goes to your conversation with the agent, with a link to the page. It edits with the wiki tools, and the version shows in the history as done at your request.",
+      text: "The request goes to your conversation with the agent, with a link to the page. It edits with the wiki tools, and the version shows in the history as done at your request.",
       agent: "Agent",
       what: "What should change?",
       placeholder: "E.g. update it with the 2027 price increase",

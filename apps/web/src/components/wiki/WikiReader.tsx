@@ -441,9 +441,7 @@ function Backlinks({ page }: { page: WikiPageData }) {
                 <Icon name="channel" size={16} />
               )}
               <span>
-                <b>
-                  {b.dm ? t("wiki.backlinkDm", { name: who ?? t("wiki.backlinkDmSomeone") }) : `#${b.channelName}`}
-                </b>
+                <b>{b.dm ? t("wiki.backlinkDm", { name: who ?? t("wiki.backlinkDmSomeone") }) : `#${b.channelName}`}</b>
                 <small>{b.excerpt}</small>
               </span>
             </Link>
@@ -904,9 +902,7 @@ export function WikiReader({
         {(dirty || recovered) && (
           <span className="wiki-top__status" aria-live="polite">
             <Icon name="check" size={14} />
-            <span className="wiki-top__status-text">
-              {recovered ? t("wiki.draftRecovered") : t("wiki.draftKept")}
-            </span>
+            <span className="wiki-top__status-text">{recovered ? t("wiki.draftRecovered") : t("wiki.draftKept")}</span>
           </span>
         )}
         <Button
