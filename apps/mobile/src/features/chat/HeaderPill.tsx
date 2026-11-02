@@ -201,17 +201,7 @@ export function HeaderPill({
 }
 
 /** The quiet line: each new one rolls in over the last. */
-function StatusLine({
-  text,
-  natural,
-  box,
-  reduced,
-}: {
-  text: string;
-  natural: number;
-  box: number;
-  reduced: boolean;
-}) {
+function StatusLine({ text, natural, box, reduced }: { text: string; natural: number; box: number; reduced: boolean }) {
   return (
     <View style={styles.lineBox}>
       <LayoutAnimationConfig skipEntering>

