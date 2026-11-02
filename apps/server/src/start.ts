@@ -26,6 +26,7 @@ import {
   createTurnstileCheck,
   createWebPushSender,
   type EmailSender,
+  type ErrorReporter,
   envPlatformCredentials,
   type GifProvider,
   type KeyWrapper,
@@ -139,7 +140,7 @@ export async function startServer(options: StartOptions) {
   });
   const log = createLogger(config.LOG_LEVEL, errors);
   try {
-    return await boot(options, config, log, release);
+    return await boot(options, config, log, release, errors);
   } catch (error) {
     log.error("startup failed", { error, unhandled: true });
     await log.flush(EXIT_FLUSH_MS);
@@ -153,6 +154,7 @@ async function boot(
   config: Config,
   log: Logger,
   release: string,
+  errors: ErrorReporter,
 ) {
   log.info("starting agentes.chat", { version: release, edition, config: redactConfig(config) });
   log.info(
@@ -302,6 +304,7 @@ async function boot(
     onRunProfile: (p) => log.debug("run profile", p),
     emailArt,
     log,
+    errors,
   });
   // The saved Jev key, before anything calls Jev (vision reads it synchronously).
   await engine.jevKey.ready();

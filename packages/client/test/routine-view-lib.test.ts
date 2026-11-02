@@ -137,6 +137,12 @@ describe("a routine's state and its one-tap fix", () => {
     expect(usageContinueBlock({ canManage: true, usagePause: { source: "plan", resetsAt, extraOff: true } })).toBe(
       "extra_off",
     );
+    expect(
+      usageContinueBlock({
+        canManage: true,
+        usagePause: { source: "plan", resetsAt, extraOff: false, extraUsedUp: true },
+      }),
+    ).toBe("extra_used_up");
   });
 
   test("a run paused near its limit is stopped with Parar, and the list is read again at its reset", () => {

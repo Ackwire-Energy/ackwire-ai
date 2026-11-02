@@ -4637,7 +4637,9 @@ export const ptBR = {
       continuedToast: "Execução continuando.",
       forbidden: "Só quem criou a rotina, o dono do agente ou um admin pode continuar agora",
       extra_off:
-        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora",
+        "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora, ou ele retoma depois que o limite renovar",
+      extra_used_up:
+        "A janela deste plano acabou e o uso extra pago dele acabou ou não está disponível. Ele retoma depois que o limite renovar",
     },
     pausedRunningToast: "Rotina pausada. A execução em andamento também parou.",
     deleteBodyRunning:
@@ -8842,7 +8844,9 @@ export const ptBR = {
       agentNotInChannel: "Adicione o agente à conversa antes.",
       webhookPaused: "Ligue a rotina para testar.",
       continueExtraOff:
-        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora.",
+        "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora, ou ele retoma depois que o limite renovar.",
+      continueExtraUsedUp:
+        "A janela deste plano acabou e o uso extra pago dele acabou ou não está disponível. Ele retoma depois que o limite renovar.",
     },
     run: {
       notContinuable: "Esta resposta não pode mais ser continuada.",

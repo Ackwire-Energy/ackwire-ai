@@ -4591,7 +4591,10 @@ export const en: Translations = {
       line: "It picks up by itself when the limit resets. Nothing is posted in the conversation.",
       continuedToast: "Run continuing.",
       forbidden: "Only who created the routine, the agent's owner or an admin can continue it now",
-      extra_off: "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now",
+      extra_off:
+        "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset",
+      extra_used_up:
+        "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset",
     },
     pausedRunningToast: "Routine paused. The run in progress stopped too.",
     deleteBodyRunning:
@@ -8778,7 +8781,9 @@ export const en: Translations = {
       agentNotInChannel: "Add the agent to the conversation first.",
       webhookPaused: "Turn the routine on to test it.",
       continueExtraOff:
-        "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now.",
+        "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset.",
+      continueExtraUsedUp:
+        "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset.",
     },
     run: {
       notContinuable: "This answer can't be continued anymore.",

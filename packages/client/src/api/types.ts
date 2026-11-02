@@ -2819,10 +2819,11 @@ export interface Routine {
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /**
    * Its run paused near its plan's or budget's limit (state `usage_paused`, ADR 0118): it picks up at `resetsAt`
-   * (null: not known yet). `extraOff`: the agent's long work may not use paid extra usage, so Continuar agora is
-   * refused. Who may press it: `canManage`.
+   * (null: not known yet). `extraOff`: the plan's window is used up and the agent's long work may not use paid
+   * extra usage, so Continuar agora is refused; `extraUsedUp`: the same with the switch on but no extra usage left.
+   * Who may press it: `canManage`.
    */
-  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean } | null;
+  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp?: boolean } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
   /**
