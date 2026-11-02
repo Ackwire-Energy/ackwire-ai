@@ -99,29 +99,73 @@ export async function personWords(
   return rows.map((r) => r.body).join("\n");
 }
 
-const URL_HOST = /\b(?:https?:\/\/|www\.)([a-z0-9.-]+\.[a-z]{2,})|\b((?:[a-z0-9-]+\.)+[a-z]{2,})\/[^\s]*/gi;
-const EMAIL = /[\w.+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi;
+/** Defanged forms (`hxxps://evil[.]io`, `ana[at]x.io`) read as what they stand for. */
+const refang = (text: string) =>
+  text
+    .replace(/\bhxxp(s?):\/\//gi, "http$1://")
+    .replace(/\s*[[({]\s*(?:\.|dot)\s*[\])}]\s*/gi, ".")
+    .replace(/\s*[[({]\s*at\s*[\])}]\s*/gi, "@");
+
+const SCHEME_HOST = /\b(?:https?|ftp|wss?):\/\/(?:[^\s/@]*@)?(\[[0-9a-f:.]+\]|[^\s/:?#[\]]+)/giu;
+const BARE_HOST =
+  /(?<![\p{L}\p{N}@._-])((?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+(\p{L}{2,63}))(?![\p{L}\p{N}-]|\.[\p{L}\p{N}])/gu;
+const IPV4 = /(?<![\d.])\d{1,3}(?:\.\d{1,3}){3}(?![\d.])/g;
+const EMAIL = /[\p{L}\p{N}._%+-]+@((?:[\p{L}\p{N}-]+\.)+[\p{L}]{2,63})/giu;
 const HANDLE = /(?<![\w.@])@([a-z0-9_][\w-]*)/gi;
-const PHONE = /\+?\d[\d\s().-]{7,}\d/g;
+/** A phone: a leading + or digit groups ending in four digits; never a date or a bare id. */
+const PHONE = /(?<![\w+])(?:\+\d[\d\s().-]{6,}\d|\(?\d{2,4}\)?[\s.-]?\d{3,5}[\s.-]\d{4})(?![\w])/g;
 const digits = (s: string) => s.replace(/\D/g, "");
 
+/** Generic TLDs counted for a bare host (no scheme); any two-letter one counts too unless it is a file extension. */
+const TLDS = new Set(
+  "com net org io ai app dev co me info biz xyz site online tech store cloud link click top club live pro page email digital agency tools zone world space fun shop news blog today life website host run gov edu".split(
+    " ",
+  ),
+);
+const FILE_EXTENSIONS = new Set("js ts md py sh rb go rs cs db gz pl ps hs ml so el mk cc hh am in".split(" "));
+const isTld = (tld: string) => {
+  const t = tld.toLowerCase();
+  return TLDS.has(t) || (/^[a-z]{2}$/.test(t) && !FILE_EXTENSIONS.has(t));
+};
+
 /**
- * The first address in `text` (a URL's host, an email address, an @handle, a phone number) that appears nowhere in
- * `words` (what people wrote, `personWords`), or null. Compared without case; a phone by its digits.
+ * Every host in `text` (a URL's, a bare domain with a known TLD, an IPv4 address), lowercased, without a trailing
+ * dot. `anyTld`: a bare domain with any TLD counts (what a person wrote: reading more there only lets more through).
+ */
+function hostsIn(text: string, anyTld = false): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(SCHEME_HOST)) out.push(m[1] ?? "");
+  for (const m of text.replace(EMAIL, " ").matchAll(BARE_HOST)) if (anyTld || isTld(m[2] ?? "")) out.push(m[1] ?? "");
+  for (const m of text.matchAll(IPV4)) out.push(m[0]);
+  return out.map((h) => h.toLowerCase().replace(/\.$/, "")).filter(Boolean);
+}
+
+/**
+ * The first address in `text` (a URL's host, a bare domain, an IP address, an email address, an @handle, a phone
+ * number) that no person wrote in `words` (`personWords`), or null. Hosts and emails compare whole, without case; a
+ * host counts as written when a person wrote it or a domain it belongs to, an email when a person wrote it or its
+ * domain; a handle when a person wrote the name; a phone by its digits (a country code may be left out).
  */
 export function unaskedDestination(text: string, words: string): string | null {
-  const said = words.toLowerCase();
-  const saidDigits = digits(words);
-  for (const m of text.matchAll(EMAIL)) if (!said.includes(m[0].toLowerCase())) return m[0];
-  const noEmails = text.replace(EMAIL, " ");
-  for (const m of noEmails.matchAll(URL_HOST)) {
-    const host = (m[1] ?? m[2] ?? "").replace(/\.$/, "");
-    if (host && !said.includes(host.toLowerCase())) return host;
+  const rule = refang(text);
+  const said = refang(words);
+  const saidHosts = new Set([
+    ...hostsIn(said, true),
+    ...[...said.matchAll(EMAIL)].map((m) => (m[1] ?? "").toLowerCase()),
+  ]);
+  const hostSaid = (host: string) => [...saidHosts].some((h) => host === h || host.endsWith(`.${h}`));
+  const saidEmails = new Set([...said.matchAll(EMAIL)].map((m) => m[0].toLowerCase()));
+  for (const m of rule.matchAll(EMAIL)) {
+    if (!saidEmails.has(m[0].toLowerCase()) && !hostSaid((m[1] ?? "").toLowerCase())) return m[0];
   }
-  for (const m of noEmails.matchAll(HANDLE)) if (!said.includes((m[1] ?? "").toLowerCase())) return m[0];
+  for (const host of hostsIn(rule)) if (!hostSaid(host)) return host;
+  const noEmails = rule.replace(EMAIL, " ");
+  const saidNames = new Set(said.toLowerCase().split(/[^\w-]+/));
+  for (const m of noEmails.matchAll(HANDLE)) if (!saidNames.has((m[1] ?? "").toLowerCase())) return m[0];
+  const saidPhones = [...said.matchAll(PHONE)].map((m) => digits(m[0]));
   for (const m of noEmails.matchAll(PHONE)) {
     const d = digits(m[0]);
-    if (d.length >= 8 && !saidDigits.includes(d)) return m[0].trim();
+    if (d.length >= 8 && !saidPhones.some((p) => p.length >= 8 && (d.endsWith(p) || p.endsWith(d)))) return m[0].trim();
   }
   return null;
 }
