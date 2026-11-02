@@ -594,21 +594,21 @@ export function ModelCards({
   );
 }
 
-/** A plan brain (Claude Code, Codex) on a computer, chosen while creating an agent. */
+/** A plan brain (Claude Code, Codex, Cursor) on a computer, chosen while creating an agent. */
 export interface PlanChoice {
-  kind: "claude_code" | "codex";
+  kind: "claude_code" | "codex" | "cursor";
   machineId: string;
   /** One account there (an agent's proposal suggests a free one, ADR 0081); none: the computer's own sign-in. */
   accountId?: string;
   label?: string;
 }
 
-const PLAN_KINDS = ["claude_code", "codex"] as const;
-/** Whose models each plan runs, for the mark in the corner (the same as the API cards'). */
-const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai" } as const;
+const PLAN_KINDS = ["claude_code", "codex", "cursor"] as const;
+/** Whose models each plan runs, for the mark in the corner (the same as the API cards'); Cursor runs several makers'. */
+const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai", cursor: "cursor" } as const;
 
 /**
- * "Pelo plano, num computador": Claude Code and Codex on each computer that has them, as cards like the models';
+ * "Pelo plano, num computador": Claude Code, Codex and Cursor on each computer that has them, as cards like the models';
  * one that no computer offers says why ("Sem computador", "Indisponível") instead. A card names its computer only
  * where there is more than one (`namesComputers`), or when it is offline.
  */
@@ -628,7 +628,7 @@ export function PlanCards({
       <b>{t(`brain.card.${kind}`)}</b>
       <span className="newag__model-prov">
         <ProviderLogo id={PLAN_PROVIDER[kind]} size="xs" />
-        {providerLabel(PLAN_PROVIDER[kind])}
+        {kind === "cursor" ? t("brain.card.cursor") : providerLabel(PLAN_PROVIDER[kind])}
       </span>
     </span>
   );

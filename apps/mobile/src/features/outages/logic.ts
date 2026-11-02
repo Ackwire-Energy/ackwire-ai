@@ -57,7 +57,11 @@ export interface MoveAgentsResult {
 export const OUTAGES_POLL_MS = 30_000;
 
 /** The brains' product names (not translated). */
-export const BRAIN_NAME: Record<ComputerBrain, string> = { claude_code: "Claude Code", codex: "Codex" };
+export const BRAIN_NAME: Record<ComputerBrain, string> = {
+  claude_code: "Claude Code",
+  codex: "Codex",
+  cursor: "Cursor",
+};
 
 // ── Words ───────────────────────────────────────────────────────────────────
 

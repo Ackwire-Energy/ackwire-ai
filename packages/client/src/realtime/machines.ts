@@ -50,6 +50,7 @@ export function accessOf(v: unknown): MachineAccess | null | undefined {
     tools: {
       claude: t.claude === true,
       codex: t.codex === true,
+      ...(typeof t.cursor === "boolean" ? { cursor: t.cursor } : {}),
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
     },

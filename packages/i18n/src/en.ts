@@ -1552,6 +1552,7 @@ export const en: Translations = {
     notSignedIn: {
       claude_code: "Claude Code isn't signed in on this computer. Connect a Claude account on {{name}}'s\u00a0page.",
       codex: "Codex isn't signed in on this computer. Connect a ChatGPT account on {{name}}'s\u00a0page.",
+      cursor: "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s\u00a0page.",
     },
     card: {
       connected: "Done: {{name}} has an AI now.",
@@ -1570,6 +1571,7 @@ export const en: Translations = {
       any: "Connect an AI",
       claude: "Connect your Claude plan",
       chatgpt: "Connect your ChatGPT plan",
+      cursor: "Connect your Cursor plan",
       api_key: "Add an API key",
     },
     titleFor: "Connect an AI for {{name}}",
@@ -1583,6 +1585,7 @@ export const en: Translations = {
     plan: {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
       chatgpt: { title: "Your ChatGPT plan", tiers: "Plus, Pro, Business or Enterprise" },
+      cursor: { title: "Your Cursor plan", tiers: "Pro, Pro+, Ultra or Teams, or a Cursor API key" },
       zai: { tiers: "Lite, Pro or Max" },
       kimi: { tiers: "Plus, Pro, Max or Ultra" },
       minimax: { tiers: "Go, Explore or Build" },
@@ -1642,6 +1645,7 @@ export const en: Translations = {
     otherAccount: {
       claude_code: "Claude signed in as {{email}}, not {{account}}. Sign out on Claude's page and try again.",
       codex: "ChatGPT signed in as {{email}}, not {{account}}. Sign out on ChatGPT's page and try again.",
+      cursor: "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again.",
     },
     useAnyway: "Use {{email}}",
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
@@ -2812,14 +2816,22 @@ export const en: Translations = {
           missed_other: "{{count}} agents didn't change.",
         },
         add: {
-          title: { claude_code: "Add a Claude account", codex: "Add a ChatGPT account" },
+          title: {
+            claude_code: "Add a Claude account",
+            codex: "Add a ChatGPT account",
+            cursor: "Add a Cursor account",
+          },
           stepOne: {
             claude_code: "The account with your plan",
             codex: "The account with your plan",
+            cursor: "The account with your plan",
           },
           stepOneHint:
             "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
-          open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT" },
+          open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT", cursor: "Sign in with Cursor" },
+          /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
+          cursorFinish: "Sign in on Cursor's page. {{computer}} finishes by itself.",
+          cursorKey: "Use a Cursor API key instead",
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",
@@ -2840,6 +2852,8 @@ export const en: Translations = {
               "Claude signed in as {{account}}, an account you already connected. To use another, sign out on Claude's page and try again.",
             codex:
               "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
+            cursor:
+              "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again.",
           },
           startFailed: "No answer from {{computer}}. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
@@ -5755,6 +5769,7 @@ export const en: Translations = {
     connect: {
       claude_code: "Claude",
       codex: "ChatGPT",
+      cursor: "Cursor",
       needs: {
         keys: "Update agentes on the computer to use a plan's key",
       },
@@ -5763,6 +5778,7 @@ export const en: Translations = {
       needsCloud: {
         claude_code: "Not ready on {{computer}} yet",
         codex: "Not ready on {{computer}} yet",
+        cursor: "Not ready on {{computer}} yet",
         online: "{{computer}} isn't answering right now. We're on it.",
       },
     },
@@ -6929,22 +6945,26 @@ export const en: Translations = {
     line: {
       claude: "{{model}} on the Claude plan",
       chatgpt: "{{model}} on the ChatGPT plan",
+      cursor: "{{model}} on the Cursor plan",
       coding: "{{model}} on {{plan}}",
       claudeOf: "{{model}} on {{owner}}'s Claude plan",
       chatgptOf: "{{model}} on {{owner}}'s ChatGPT plan",
+      cursorOf: "{{model}} on {{owner}}'s Cursor plan",
       codingOf: "{{model}} on {{owner}}'s {{plan}}",
       claudeAuto: "Claude plan",
       chatgptAuto: "ChatGPT plan",
+      cursorAuto: "Cursor plan",
       codingAuto: "{{plan}}",
       claudeAutoOf: "{{owner}}'s Claude plan",
       chatgptAutoOf: "{{owner}}'s ChatGPT plan",
+      cursorAutoOf: "{{owner}}'s Cursor plan",
       codingAutoOf: "{{owner}}'s {{plan}}",
       on: "{{line}} on {{computer}}",
     },
     model: "Model (API)",
     modelText: "An AI model through the API, with a workspace key.",
     countsBudget: "Counts against {{name}}'s budget.",
-    card: { claude_code: "Claude Code", codex: "Codex" },
+    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor" },
     foot: {
       api: "Through the API",
       noComputer: "No computer",
@@ -6953,6 +6973,9 @@ export const en: Translations = {
     },
     claude_codeText: "Uses the Claude plan of whoever connected the computer.",
     codexText: "Uses the ChatGPT plan of whoever connected the computer.",
+    cursorText: "Uses the Cursor plan of whoever connected the computer.",
+    /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
+    cursorModel: { inPlan: "In your Cursor plan", apiPrice: "Billed by Cursor at API prices" },
     testing: "Testing",
     reasons: {
       no_computer: "Choose a connected computer under Computer to use it.",
@@ -6995,6 +7018,7 @@ export const en: Translations = {
       model: "Model (API)",
       claude_code: "Claude Code · {{model}}",
       codex: "Codex · {{model}}",
+      cursor: "Cursor · {{model}}",
       noFallback: "{{brain}}, no API fallback",
     },
     mission: {
@@ -8766,10 +8790,11 @@ export const en: Translations = {
       removed: "{{folder}} was removed.",
       removedAgent: "{{name}} no longer uses {{folder}}.",
       tools: "Tools",
-      tool: { claude: "Claude Code", codex: "Codex", commands: "Commands", browser: "Browser" },
+      tool: { claude: "Claude Code", codex: "Codex", cursor: "Cursor", commands: "Commands", browser: "Browser" },
       toolText: {
         claude: "Writes and changes files, only in the allowed folders.",
         codex: "Like Claude Code, with a ChatGPT account. Only in the allowed folders.",
+        cursor: "Like Claude Code, with a Cursor account. Only in the allowed folders.",
         commands: "Runs Terminal commands, like tests and builds.",
       },
       commandsWarn: "Commands can reach other parts of the computer, not only the allowed folders.",

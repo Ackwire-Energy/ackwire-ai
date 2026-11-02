@@ -15,6 +15,8 @@ export * from "@agenteschat/providers/plans";
 
 export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "needs" | "maker"> {
   value: string;
+  /** Cursor: its CLI said the person's plan includes it (the others cost API prices there). */
+  inPlan?: boolean;
 }
 
 /**
@@ -23,7 +25,7 @@ export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "nee
  */
 export const brainModelChoices = (
   plan: CodingPlan | undefined,
-  models: readonly { value: string; label: string }[],
+  models: readonly { value: string; label: string; inPlan?: boolean }[],
 ): BrainModelChoice[] =>
   plan
     ? plan.claudeCode.models.map((m) => ({
@@ -33,7 +35,7 @@ export const brainModelChoices = (
         ...(m.needs ? { needs: m.needs } : {}),
         ...(m.maker ? { maker: m.maker } : {}),
       }))
-    : models.map(({ value, label }) => ({ value, label }));
+    : models.map(({ value, label, inPlan }) => ({ value, label, ...(inPlan ? { inPlan } : {}) }));
 
 /**
  * The choice a stored model shows as: on a plan, the model it runs there (an alias the plan leaves out or another
@@ -52,6 +54,19 @@ export const brainPlan = (view: Pick<AgentBrain, "account" | "accounts">) =>
   accountPlan(view.accounts.find((a) => a.id === view.account));
 
 /** The plan as the CLI says it (`team`, `max`), as a name ("Team"). */
+/**
+ * A Cursor account made with its API key instead of a sign-in (ADR 0114): the key step as a coding plan's, the key
+ * made in Cursor's dashboard. Not a coding plan: Cursor's CLI thinks with it, never Claude Code.
+ */
+export const CURSOR_KEY_PLAN: Pick<CodingPlan, "label" | "name" | "maker" | "site" | "keyPattern" | "placeholder"> = {
+  label: "Cursor",
+  name: "Cursor API key",
+  maker: "Cursor",
+  site: "https://cursor.com/dashboard?tab=integrations",
+  keyPattern: "^[\\x21-\\x7e]{16,512}$",
+  placeholder: "key_",
+};
+
 export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
 
 /** Team and enterprise seats are one person's each, not a personal subscription. */

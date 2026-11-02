@@ -77,6 +77,11 @@ const MARKS = {
     path: "M16.8 4.8L7.2 4.8L7.2 19.2L16.8 19.2L16.8 4.8ZM21.6 24L2.4 24L2.4 0L21.6 0L21.6 24Z",
     parts: [{ path: "M16.8 19.2L7.2 19.2L7.2 9.6L16.8 9.6L16.8 19.2Z", color: "#CFCECD", dark: "#4B4646" }],
   },
+  // Cursor's cube (the 2D logomark), one color, so it takes the ink: brand-logo-1.svg of https://cursor.com/brand
+  // (read 2026-11-01).
+  cursor: {
+    path: "M22.076 5.704L12.497 .178C12.189 0 11.81 0 11.502 .178L1.923 5.704C1.665 5.853 1.505 6.129 1.505 6.428V17.572C1.505 17.87 1.665 18.147 1.923 18.296L11.503 23.823C11.81 24 12.19 24 12.497 23.823L22.077 18.296C22.335 18.147 22.495 17.871 22.495 17.572V6.428C22.495 6.13 22.335 5.853 22.077 5.704H22.076ZM21.475 6.875L12.227 22.88C12.165 22.988 11.999 22.944 11.999 22.819V12.339C11.999 12.129 11.887 11.936 11.706 11.83L2.623 6.591C2.516 6.528 2.56 6.363 2.685 6.363H21.18C21.442 6.363 21.606 6.648 21.475 6.875H21.475V6.875Z",
+  },
   // The makers whose models a plan sells beside the providers' (OpenCode Go groups them by maker): each maker's
   // mark for its model family. Qwen's mark for Alibaba, from lobehub/lobe-icons
   // (@lobehub/icons-static-svg@1.101.0, icons/qwen-color.svg).

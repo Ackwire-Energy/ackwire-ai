@@ -77,7 +77,7 @@ export function toolOffReason(
   if (!m || allowsInApp(m.os)) return { key: "brain.reasons.tool_off" as const, command: "" };
   return {
     key: "brain.reasons.tool_offLinux" as const,
-    command: toolOnCommand(m, kind === "codex" ? "codex" : "claude"),
+    command: toolOnCommand(m, kind === "codex" || kind === "cursor" ? kind : "claude"),
   };
 }
 
@@ -87,7 +87,7 @@ export function folderName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-export const MACHINE_TOOLS: MachineToolName[] = ["claude", "codex", "commands"];
+export const MACHINE_TOOLS: MachineToolName[] = ["claude", "codex", "cursor", "commands"];
 
 /** The folders of a machine an agent may use (beyond its own folder). */
 export const foldersOfAgent = (access: MachineAccess | null | undefined, agentId: string): MachineFolderGrant[] =>

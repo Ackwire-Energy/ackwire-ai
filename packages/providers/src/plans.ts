@@ -255,7 +255,7 @@ export function claudeCodeModel(plan: CodingPlan | undefined, value: unknown): s
 }
 
 /** A pasted key that fits the plan: one line, the plan's shape. */
-export const planKeyFits = (plan: CodingPlan, key: string) => new RegExp(plan.keyPattern).test(key);
+export const planKeyFits = (plan: Pick<CodingPlan, "keyPattern">, key: string) => new RegExp(plan.keyPattern).test(key);
 
 /**
  * The accounts that may have one login per agent, the same account signed in again for each, where a login thinks

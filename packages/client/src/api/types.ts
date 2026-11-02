@@ -3213,7 +3213,7 @@ export interface MachinePause {
 }
 
 /** A tool the person turns on or off on the machine. */
-export type MachineToolName = "claude" | "codex" | "commands";
+export type MachineToolName = "claude" | "codex" | "cursor" | "commands";
 
 /** A folder allowed on the machine and the agents (ids) that may use it; empty: allowed, no agent yet. */
 export interface MachineFolderGrant {
@@ -3228,7 +3228,13 @@ export interface MachineAccess {
    * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
    * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
    */
-  tools: Record<MachineToolName, boolean> & { browser?: boolean; desktop?: boolean; terminal?: boolean };
+  tools: Record<Exclude<MachineToolName, "cursor">, boolean> & {
+    /** Protocol 35 (ADR 0114): Cursor's CLI; absent on older runners, where it follows Codex's. */
+    cursor?: boolean;
+    browser?: boolean;
+    desktop?: boolean;
+    terminal?: boolean;
+  };
 }
 
 /** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
@@ -4338,6 +4344,8 @@ export interface BrainModelOption {
   recommended?: boolean;
   /** Its context window in tokens. */
   contextWindow?: number;
+  /** Cursor (ADR 0114): its CLI said the person's plan includes it; absent: it didn't say. */
+  inPlan?: boolean;
 }
 
 export interface BrainOption {
@@ -4452,9 +4460,9 @@ export interface AiComputer {
   /** Its runner takes coding plans' keys. */
   keys: boolean;
   /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
-  shares?: { claude_code: boolean; codex: boolean; key: boolean };
+  shares?: { claude_code: boolean; codex: boolean; cursor?: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
-  brains: { claude_code: boolean; codex: boolean };
+  brains: { claude_code: boolean; codex: boolean; cursor?: boolean };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the viewer connected (absent: a server
    * too old to say). Its plan and usage when the computer reported them.
