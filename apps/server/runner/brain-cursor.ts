@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
@@ -104,11 +104,18 @@ export function cursorMcpEntry(input: { command?: string[]; url?: string }): Rec
   };
 }
 
-/** Writes `<folder>/.cursor/mcp.json` with our server alone (written whole, then renamed). */
+/**
+ * Project config a turn could plant in the agent's folder that would run or allow commands outside Cursor's
+ * sandbox and our checks (ADR 0117): removed every turn, as Claude Code's work turns load no project settings.
+ */
+export const CURSOR_PLANTED = ["hooks.json", "cli.json"] as const;
+
+/** Writes `<folder>/.cursor/mcp.json` with our server alone (written whole, then renamed), dropping `CURSOR_PLANTED`. */
 export function writeCursorMcp(folder: string, entry: Record<string, unknown>) {
   const dir = path.join(folder, ".cursor");
   const file = path.join(dir, "mcp.json");
   mkdirSync(dir, { recursive: true });
+  for (const name of CURSOR_PLANTED) rmSync(path.join(dir, name), { force: true });
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify({ mcpServers: { [CODEX_MCP_SERVER]: entry } }, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, file);

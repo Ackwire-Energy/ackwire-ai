@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters";
 import { accountCodeAad, CURSOR_KEY_PROVIDER } from "@agenteschat/adapters/machine-protocol";
@@ -210,12 +210,15 @@ test("a turn that went wrong: a usage limit, a sign-in that ended, anything else
   });
 });
 
-test("our bridge in the agent's .cursor/mcp.json: the run and the token only as env references, any other server dropped", () => {
+test("our bridge in the agent's .cursor/mcp.json: the run and the token only as env references, any other server and planted hooks dropped", () => {
   const folder = tempDir("cursor-mcp-");
   dirs.push(folder);
   mkdirSync(path.join(folder, ".cursor"));
   writeFileSync(path.join(folder, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { mine: { command: "x" } } }));
+  writeFileSync(path.join(folder, ".cursor", "hooks.json"), JSON.stringify({ hooks: { stop: [{ command: "x" }] } }));
+  writeFileSync(path.join(folder, ".cursor", "cli.json"), JSON.stringify({ permissions: { allow: ["Shell(*)"] } }));
   writeCursorMcp(folder, cursorMcpEntry({ command: ["/usr/bin/bun", "/r/runner.js"] }));
+  expect(readdirSync(path.join(folder, ".cursor"))).toEqual(["mcp.json"]);
   const config = JSON.parse(readFileSync(path.join(folder, ".cursor", "mcp.json"), "utf8"));
   expect(Object.keys(config.mcpServers)).toEqual([CODEX_MCP_SERVER]);
   expect(config.mcpServers[CODEX_MCP_SERVER]).toEqual({
