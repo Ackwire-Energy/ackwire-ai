@@ -672,19 +672,23 @@ function Chat({
   // "Ver" on the requests' line: the list goes to the request and stays there. It stops following the end, as
   // when reading a long message from its top, so a reply streaming in doesn't pull it back down; reaching the end,
   // sending or the pill follow again. The card ends its message: a message taller than the screen shows its end.
-  const seeAsk = useCallback(() => {
-    const id = awayAsk?.ask.messageId;
-    const key = id ? rows.find((r) => r.kind === "message" && r.message.id === id)?.key : undefined;
-    if (!key) return;
-    letGo();
-    setReadHold(true);
-    // After the render that turns following off, so the end doesn't pull it back down.
-    requestAnimationFrame(() => {
-      const index = listRef.current?.getState().indexByKey(key);
-      if (index === undefined) return;
-      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5, viewPositionFallback: "end" });
-    });
-  }, [awayAsk, rows, letGo]);
+  const holdAt = useCallback(
+    (messageId: string | undefined) => {
+      const key = messageId ? rows.find((r) => r.kind === "message" && r.message.id === messageId)?.key : undefined;
+      if (!key) return false;
+      letGo();
+      setReadHold(true);
+      // After the render that turns following off, so the end doesn't pull it back down.
+      requestAnimationFrame(() => {
+        const index = listRef.current?.getState().indexByKey(key);
+        if (index === undefined) return;
+        void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5, viewPositionFallback: "end" });
+      });
+      return true;
+    },
+    [rows, letGo],
+  );
+  const seeAsk = useCallback(() => void holdAt(awayAsk?.ask.messageId), [awayAsk, holdAt]);
 
   // Rows that arrive at the bottom while the screen is open rise in; older pages and the first load don't.
   const prevKeysRef = useRef<string[]>([]);

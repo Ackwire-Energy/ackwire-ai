@@ -293,6 +293,7 @@ import {
 } from "@/components/RequestCard";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
+import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { TeamChecks } from "@/components/TeamChecks";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
@@ -1761,6 +1762,7 @@ function ChannelView({
                     onDetails={() => setDetailsOpen(true)}
                   />
                   {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+                  {isMember && <SearchHereButton channelId={channel.id} />}
                   <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
                 </div>
               </header>

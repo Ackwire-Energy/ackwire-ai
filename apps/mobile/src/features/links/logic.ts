@@ -33,13 +33,12 @@ export type AppHref =
   | "/usage";
 
 /** `messageId`: open at that message (`m=`: paged in, scrolled to and lit for a moment). */
-export const chatHref = (channelId: string, threadId?: string | null, messageId?: string): AppHref => {
-  const base: AppHref =
-    threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
-  if (!messageId) return base;
-  return threadId && threadId !== channelId
-    ? `/chat/${channelId}?thread=${threadId}&m=${messageId}`
-    : `/chat/${channelId}?m=${messageId}`;
+export const chatHref = (channelId: string, threadId?: string | null, messageId?: string | null): AppHref => {
+  const params = [
+    threadId && threadId !== channelId ? `thread=${threadId}` : null,
+    messageId ? `m=${messageId}` : null,
+  ].filter(Boolean);
+  return params.length ? `/chat/${channelId}?${params.join("&")}` : `/chat/${channelId}`;
 };
 
 /** Two agents' conversation for a question asked in a conversation, read only. */

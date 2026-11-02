@@ -160,6 +160,8 @@
       "routines.hoursMinutes",
       "routines.target.dmShort",
       "run.ctx.minutes",
+      "searchPage.hasLabel.link",
+      "searchPage.words.has.link",
       "settings.group.org",
       "settings.media.gifs",
       "settings.orgTitle",

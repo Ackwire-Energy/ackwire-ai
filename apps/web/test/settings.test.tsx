@@ -651,7 +651,7 @@ describe("Buscar no workspace", () => {
       },
     ];
     const { state } = await go(seeded, "search");
-    const box = screen().getByRole("searchbox", { name: "Buscar" });
+    const box = screen().getByRole("combobox", { name: "Buscar" });
     expect(box.getAttribute("placeholder")).toBe("Mensagens, decisões, resumos…");
     expect(document.body.textContent).toContain("Busca nos canais em que você está.");
     await type(box, "login");
@@ -666,16 +666,17 @@ describe("Buscar no workspace", () => {
     const regions = screen()
       .getAllByRole("region")
       .map((r) => r.getAttribute("aria-label"));
-    expect(regions.indexOf("Ações do time")).toBeLessThan(regions.indexOf("Mensagens"));
+    expect(regions.indexOf("Ações do time")).toBeLessThan(regions.indexOf("#eng"));
     const done = screen().getByRole("region", { name: "Ações do time" });
     expect(done.textContent).toContain("GitHub · Corrige o login com Google");
     expect(done.textContent).toContain("Ada · em #eng");
     expect(done.textContent).not.toContain("open_pull_request");
-    const messages = screen().getByRole("region", { name: "Mensagens" });
+    // Messages are grouped by their channel, each with its author, opening at the message (ADR 0123).
+    const messages = screen().getByRole("region", { name: "#eng" });
     const link = within(messages).getAllByRole("link")[0] as HTMLElement;
     expect(link.textContent).toContain("o login está devolvendo 401");
-    expect(link.textContent).toContain("João · em #eng");
-    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/c/00000000-0000-4000-8000-0000000000c2`);
+    expect(link.textContent).toContain("João · ");
+    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/c/00000000-0000-4000-8000-0000000000c2?m=m-1`);
     expect(screen().getByRole("region", { name: "Contexto" }).textContent).toContain("tokens de 15 minutos");
     await type(box, "nada-disso");
     await act(() => new Promise((r) => setTimeout(r, 300)));

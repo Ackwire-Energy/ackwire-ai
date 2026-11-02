@@ -211,6 +211,7 @@ import type {
   ScheduleParse,
   ScopeGrant,
   ScreenKind,
+  SearchFilterInput,
   SearchHit,
   SearchKind,
   SecretBox,
@@ -719,7 +720,10 @@ export interface ApiClient {
     repositories(orgId: string): Promise<GitHubRepositories>;
   };
   search: {
-    query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;
+    query(
+      orgId: string,
+      input: { q: string; kinds?: SearchKind[]; limit?: number; filters?: SearchFilterInput },
+    ): Promise<SearchHit[]>;
   };
   sandbox: {
     settings(orgId: string): Promise<SandboxSettings>;
