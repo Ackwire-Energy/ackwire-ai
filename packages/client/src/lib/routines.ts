@@ -68,23 +68,23 @@ export function hookCurl(url: string, secret: string | null) {
   ].join("\n");
 }
 
-/** Zones people pick most often; the select also keeps whatever zone a routine already has. */
+/** Zones people pick most often, around the world; the select also keeps whatever zone a routine already has. */
 export const COMMON_TIMEZONES = [
-  "America/Sao_Paulo",
-  "America/Manaus",
-  "America/Fortaleza",
-  "America/Recife",
-  "America/Belem",
-  "America/Cuiaba",
-  "America/Rio_Branco",
-  "America/Noronha",
-  "America/New_York",
-  "America/Chicago",
-  "America/Los_Angeles",
-  "Europe/Lisbon",
-  "Europe/London",
-  "Europe/Madrid",
   "UTC",
+  "America/Los_Angeles",
+  "America/New_York",
+  "America/Sao_Paulo",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Istanbul",
+  "Europe/Moscow",
+  "Asia/Kolkata",
+  "Asia/Jakarta",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Asia/Seoul",
+  "Australia/Sydney",
 ];
 
 /** English names (the Portuguese ones below are the default), one for every zone named there. */
@@ -127,8 +127,9 @@ const NAMES_EN: Record<keyof typeof NAMES, string> = {
   "Australia/Sydney": "Sydney",
   "Pacific/Auckland": "Auckland",
 };
+/** Our own names in Portuguese (the default) and English; every other language gets the platform's (Intl). */
 const namesFor = (locale?: string): Partial<Record<string, string>> =>
-  locale && !locale.startsWith("pt") ? NAMES_EN : NAMES;
+  !locale || locale.startsWith("pt") ? NAMES : locale.startsWith("en") ? NAMES_EN : {};
 
 const NAMES = {
   "America/Sao_Paulo": "horário de Brasília",

@@ -327,7 +327,7 @@ function JevCard({ routing }: { routing?: AiRouting["by"] }) {
   const facts = [
     view.hint && t("settings.keyEndsIn", { hint: view.hint }),
     view.month.decisions > 0 &&
-      t("jev.month", { count: view.month.decisions, cost: formatUsd(t, i18n.language, view.month.costUsd) }),
+      t("jev.month", { count: view.month.decisions, cost: formatUsd(i18n.language, view.month.costUsd) }),
   ].filter(Boolean);
 
   return (

@@ -94,7 +94,9 @@ export function SuggestPersonScreen() {
           {error}
         </Text>
       ) : null}
-      <GroupedHeader>{`${t("members.suggest.who")} ${t("members.dialog.optional")}`}</GroupedHeader>
+      <GroupedHeader>
+        {t("common.joinSentences", { a: t("members.suggest.who"), b: t("members.dialog.optional") })}
+      </GroupedHeader>
       <TextArea
         value={note}
         onChangeText={setNote}

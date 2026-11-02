@@ -177,7 +177,7 @@ function Profile({ id }: { id: string }) {
   // On a plan, its limits first and the budget only once it spent through the API (ADR 0063 §5).
   const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);
   const money = (v: number) =>
-    new Intl.NumberFormat(i18n.language || "pt-BR", { style: "currency", currency: "USD" }).format(v);
+    new Intl.NumberFormat(i18n.language || "en", { style: "currency", currency: "USD" }).format(v);
   const originText = useMemoryOriginText();
 
   const openDm = () =>

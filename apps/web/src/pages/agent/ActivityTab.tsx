@@ -142,7 +142,7 @@ function MonthStrip({
             <dd>
               {"spent" in money ? (
                 <>
-                  {formatUsd(t, locale, money.spent)}{" "}
+                  {formatUsd(locale, money.spent)}{" "}
                   <small>{t("agentPage.stats.of", { amount: usd(t, locale, money.limit) })}</small>
                 </>
               ) : (

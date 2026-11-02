@@ -1,3 +1,4 @@
+import { isAppLocale } from "@agenteschat/i18n/locale";
 import { createFileRoute } from "@tanstack/react-router";
 import type { LocaleCode } from "@/i18n";
 import { HelpPage } from "@/pages/help/HelpPage";
@@ -6,7 +7,7 @@ import { HelpPage } from "@/pages/help/HelpPage";
 export const Route = createFileRoute("/help/$slug")({
   // Always returns `lang`: a key left out would pass the address's own value through unchecked.
   validateSearch: (search: Record<string, unknown>): { lang?: LocaleCode } => ({
-    lang: search.lang === "en" || search.lang === "pt-BR" ? search.lang : undefined,
+    lang: isAppLocale(search.lang) ? search.lang : undefined,
   }),
   component: function Help() {
     const { slug } = Route.useParams();

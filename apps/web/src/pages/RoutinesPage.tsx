@@ -1132,7 +1132,7 @@ function RoutineDetails({
         usage.tokens !== null
           ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
           : null,
-        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(i18n.language, usage.costUsd) }) : null,
       ]
         .filter(Boolean)
         .join(" · ")

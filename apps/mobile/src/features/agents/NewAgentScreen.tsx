@@ -704,7 +704,7 @@ function NewAgentForm({
           ) : null}
           <Text variant="footnote" tone="faint">
             {proposed && listedApps.length + myMail.length > 0
-              ? `${t("mobile.settings.access.how")} ${t("newAgent.approvalsNote")}`
+              ? t("common.joinSentences", { a: t("mobile.settings.access.how"), b: t("newAgent.approvalsNote") })
               : t("newAgent.approvalsNote")}
           </Text>
         </View>

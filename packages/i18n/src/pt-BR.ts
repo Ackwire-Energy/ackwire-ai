@@ -10,6 +10,7 @@ export const ptBR = {
   app: { name: "agentes" },
   common: {
     close: "Fechar",
+    joinSentences: "{{a}} {{b}}",
     removeName: "Remover {{name}}",
     /** The ⓘ hint's name beside a label: "Sobre Fuso horário". */
     about: "Sobre {{label}}",
@@ -1651,6 +1652,7 @@ export const ptBR = {
     theComputer: "computador",
     own: {
       shared: "A conta que os seus agentes dividem",
+      sharedLower: "a conta que os seus agentes dividem",
       one: "Uma conta só para o {{name}}",
       one_female: "Uma conta só para a {{name}}",
       /** For "Todos os agentes": one sign-in each, with the same account. */
@@ -2034,12 +2036,14 @@ export const ptBR = {
     busy: "Ocupado",
     hidden: "Oculto",
     offline: "Offline",
+    lower: { online: "online", away: "ausente", busy: "ocupado", hidden: "oculto", offline: "offline" },
     setStatus: "Definir status",
     seen: "visto {{when}}",
     title: "Definir status",
     howOthersSee: "Como as pessoas te veem",
     hiddenPreview: "Para os outros você está offline",
     placeholder: "O que você está fazendo?",
+    placeholderLower: "o que você está fazendo?",
     emoji: "Escolher emoji",
     wipe: "Apagar",
     appearAs: "Aparecer como",
@@ -2697,6 +2701,7 @@ export const ptBR = {
       noHistory: "É o primeiro pedido desse tipo.",
       deciders: "Quem pode decidir",
       you: "Você",
+      youLower: "você",
       admin: "admin",
       owner: "responsável pelo agente",
       firstWins: "Quem decidir primeiro vale. O pedido também está em #{{channel}}.",
@@ -2860,6 +2865,7 @@ export const ptBR = {
           "Responde pela API e conta no orçamento da {{name}}. Se não, a {{name}} avisa quem chamou e espera o computador voltar.",
         effort: "Esforço",
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
+        effortsLower: { auto: "automático", low: "baixo", medium: "médio", high: "alto", max: "máximo" },
         effortText: {
           auto: "Escolhe o esforço para cada tarefa.",
           low: "Responde rápido. Bom para perguntas simples.",

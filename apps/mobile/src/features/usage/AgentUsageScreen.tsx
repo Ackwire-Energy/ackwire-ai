@@ -129,7 +129,7 @@ function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tone
               ),
             })}
             {typeof data.equivalentUsd === "number" && data.equivalentUsd > 0
-              ? ` ${t("usageViews.agent.equivalent", { amount: formatUsd(t, i18n.language, data.equivalentUsd) })}`
+              ? ` ${t("usageViews.agent.equivalent", { amount: formatUsd(i18n.language, data.equivalentUsd) })}`
               : ""}
           </Text>
           <UsageDays
@@ -225,12 +225,12 @@ function BySource({
           const money =
             s.type === "api"
               ? s.costUsd !== undefined
-                ? t("usageViews.paid", { amount: formatUsd(t, i18n.language, s.costUsd) })
+                ? t("usageViews.paid", { amount: formatUsd(i18n.language, s.costUsd) })
                 : s.budgetPercent !== undefined
                   ? t("usageViews.budgetShare", { percent: formatPercent(i18n.language, s.budgetPercent) })
                   : null
               : typeof s.equivalentUsd === "number"
-                ? t("usageViews.equivalent", { amount: formatUsd(t, i18n.language, s.equivalentUsd) })
+                ? t("usageViews.equivalent", { amount: formatUsd(i18n.language, s.equivalentUsd) })
                 : t("usageViews.agent.ofMonth", { percent: formatPercent(i18n.language, s.share) });
           return (
             <View

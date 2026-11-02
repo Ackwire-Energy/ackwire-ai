@@ -333,7 +333,7 @@ export function SettingsTab({
               <div className="agp-spent__top">
                 {admin && spent !== undefined && limit !== undefined ? (
                   <>
-                    <b>{formatUsd(t, locale, spent)}</b>
+                    <b>{formatUsd(locale, spent)}</b>
                     <span className="small muted">
                       {saved.budget === null
                         ? t("agentPage.settings.spentOfDefault", { month, amount: usd(t, locale, limit) })

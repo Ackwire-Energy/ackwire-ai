@@ -765,7 +765,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         title={t("agentPage.archive.title", g)}
         description={
           agent.coordinator
-            ? `${t("agentPage.archive.text", g)} ${t("coordinator.archive", g)}`
+            ? t("common.joinSentences", { a: t("agentPage.archive.text", g), b: t("coordinator.archive", g) })
             : t("agentPage.archive.text", g)
         }
         closeLabel={t("common.close")}

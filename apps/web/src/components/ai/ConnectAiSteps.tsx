@@ -26,7 +26,7 @@ import {
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { lowerFirst, NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
+import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
@@ -589,7 +589,7 @@ function PlanSteps({
   agent: PlanSetAgent;
   everyAgent: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -761,7 +761,7 @@ function PlanSteps({
     );
   }
   if (ownSaved) {
-    const label = lowerFirst(t("connectAi.own.shared"), i18n.language);
+    const label = t("connectAi.own.sharedLower");
     return (
       <>
         <SettingNote icon="check" live>

@@ -90,7 +90,7 @@ export function useDmStatusLine(
   }
   const p = of.person(who.id);
   if (!p) return undefined;
-  return p.status ? personLine(t, i18n.language || "pt-BR", p.status) : t(`presence.${p.presence}`);
+  return p.status ? personLine(t, i18n.language || "en", p.status) : t(`presence.${p.presence}`);
 }
 
 export interface AgentProfileStatus {
@@ -124,7 +124,7 @@ export function useAgentProfileStatus(agentId: string, name: string): AgentProfi
       : until
         ? t("mobile.status.bySelfUntil", {
             name,
-            when: lowerFirst(clearsText(t, i18n.language || "pt-BR", until)),
+            when: lowerFirst(clearsText(t, i18n.language || "en", until)),
           })
         : t("presence.bySelf", { name });
   return {

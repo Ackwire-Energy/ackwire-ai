@@ -1,5 +1,4 @@
 import { plural } from "@agenteschat/i18n/format";
-import type { Inline, Text } from "../layout";
 import { atHost, type Words } from "./en";
 
 export const ptBR: Words = {

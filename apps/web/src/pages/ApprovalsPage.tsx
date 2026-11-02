@@ -1355,7 +1355,7 @@ function Outcome({ approval: a, agent }: { approval: Approval; agent: Agent | un
   const p = approvalPhase(a);
   const who =
     a.decidedByUserId === me.user.id
-      ? t("approvals.panel.you").toLowerCase()
+      ? t("approvals.panel.youLower")
       : (dir.memberById.get(a.decidedByUserId ?? "")?.name ?? "");
   const when = a.decidedAt ? relativeTime(t, i18n.language, a.decidedAt) : "";
   return (

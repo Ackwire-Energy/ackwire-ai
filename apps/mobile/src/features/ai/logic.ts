@@ -17,7 +17,6 @@ import {
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
-import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, type PlanGate, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import {
@@ -171,7 +170,7 @@ function thinksNow(t: TFunction, view: ThinkingView): string | undefined {
  */
 export function accountSaved(
   t: TFunction,
-  language: string,
+  _language: string,
   agentName: string,
   a: Pick<MachineAccount, "label"> | null,
   input: Pick<AgentBrainInput, "model">,
@@ -181,7 +180,7 @@ export function accountSaved(
   if ("model" in input) return t("agentPage.work.saved.brain", { ...g, brain: thinksNow(t, saved) ?? "" });
   return a
     ? t("agentPage.work.saved.account", { ...g, account: a.label })
-    : t("aiAccounts.done.savedAgent", { agent: agentName, label: lowerFirst(t("connectAi.own.shared"), language) });
+    : t("aiAccounts.done.savedAgent", { agent: agentName, label: t("connectAi.own.sharedLower") });
 }
 
 /** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */

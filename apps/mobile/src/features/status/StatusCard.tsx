@@ -40,7 +40,7 @@ export function PersonStatusCard({ userId }: { userId: string }) {
     <StatusCard
       emoji={status.emoji}
       text={status.text}
-      note={status.until ? clearsText(t, i18n.language || "pt-BR", status.until) : t("presence.untilChanged")}
+      note={status.until ? clearsText(t, i18n.language || "en", status.until) : t("presence.untilChanged")}
     />
   );
 }

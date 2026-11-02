@@ -39,9 +39,14 @@ export const NO_OWNER = "__none__";
 /** Value of the "Chave padrão do workspace" option (the API takes `credentialId: null`). */
 export const DEFAULT_KEY = "__default__";
 
-/** "US$ 10", "US$ 12,50": whole amounts without cents. */
-export const usd = (t: TFunction, locale: string, n: number) =>
-  t("format.usd", { value: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n) });
+/** "$10", "US$ 12,50": whole amounts without cents, as the language writes dollars. */
+export const usd = (_t: TFunction, locale: string, n: number) =>
+  new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(n);
 
 /** 1–3 bars by price among the catalog's models (cheapest third = 1). */
 export function priceTier(model: Model, models: Model[]) {

@@ -1,7 +1,6 @@
 import type { TFunction } from "i18next";
 import type { BrainKind } from "../api/types";
 import { type ContextLimit, contextSize } from "./context-limits";
-import { lowerFirst } from "./format";
 
 /*
  * "Configuração avançada" of an agent's AI (ADR 0086), the same on the web (a dialog over "Quem pensa") and the
@@ -42,13 +41,13 @@ export function advancedSummary(t: TFunction, language: string, o: AdvancedOf): 
 }
 
 /** What differs from the defaults, each as the row says it; none when everything is. */
-export function advancedParts(t: TFunction, language: string, o: AdvancedOf): string[] {
+export function advancedParts(t: TFunction, _language: string, o: AdvancedOf): string[] {
   const computer = o.kind !== "model";
   const { now } = o;
   return [
     computer && !o.autoModel && now.effort !== ADVANCED_DEFAULTS.effort
       ? t("agentPage.work.brain.advanced.effort", {
-          level: lowerFirst(t(`agentPage.work.brain.efforts.${now.effort}`), language),
+          level: t(`agentPage.work.brain.effortsLower.${now.effort}`),
         })
       : null,
     now.contextTokens ? t("agentPage.work.brain.advanced.context", { size: contextSize(now.contextTokens) }) : null,

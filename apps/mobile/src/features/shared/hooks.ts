@@ -108,7 +108,7 @@ export function useColors() {
 /** Times as the lists say them: "9:41" today, "Ontem", "seg", "12 out". */
 export function useWhen() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language || "pt-BR";
+  const locale = i18n.language || "en";
   return useMemo(() => {
     const time = (iso: string) =>
       new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(new Date(iso));

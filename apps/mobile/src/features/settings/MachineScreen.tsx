@@ -575,7 +575,9 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
         ) : (
           // A Linux computer may be a server without the app: the command too.
           <>
-            <GroupedFooter>{`${t("browser.machine.offHelp")} ${t("machines.access.grantTerminal")}`}</GroupedFooter>
+            <GroupedFooter>
+              {t("common.joinSentences", { a: t("browser.machine.offHelp"), b: t("machines.access.grantTerminal") })}
+            </GroupedFooter>
             <Gap />
             <CommandBlock command={toolOnCommand(m, "browser")} />
           </>
@@ -643,7 +645,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
           <GroupedFooter>
             {allowed.length > 0
               ? t("browser.machine.whoHelp")
-              : `${t("browser.machine.whoNone")} ${t("browser.machine.whoHelp")}`}
+              : t("common.joinSentences", { a: t("browser.machine.whoNone"), b: t("browser.machine.whoHelp") })}
           </GroupedFooter>
         </>
       ) : null}
