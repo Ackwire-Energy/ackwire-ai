@@ -77,7 +77,13 @@ import {
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { standingRefusal } from "./standing";
-import { assertMayContinuePause, overrideUsagePause, pauseContinuesPastPlan, USAGE_WAIT_CODES } from "./usage-pause";
+import {
+  assertMayContinuePause,
+  overrideUsagePause,
+  type PastPlanReason,
+  pauseContinuesPastPlan,
+  USAGE_WAIT_CODES,
+} from "./usage-pause";
 
 export { startRoutineRun } from "./routine-room";
 
@@ -265,9 +271,10 @@ export interface RoutineView {
   /**
    * Its run paused near its plan's or budget's limit (ADR 0118, `usage_paused`): it picks up at `resetsAt` (null:
    * not known yet). `extraOff`: a plan pause whose window is used up, on an agent whose switch keeps long work
-   * off paid extra usage, so Continuar agora is refused (`pauseContinuesPastPlan`). Who may press it: `canManage`.
+   * off paid extra usage, so Continuar agora is refused (`pauseContinuesPastPlan`); `extraUsedUp`: the same with the
+   * switch on but no extra usage left. Who may press it: `canManage`.
    */
-  usagePause: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean } | null;
+  usagePause: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp: boolean } | null;
   /** Where it thinks: the agent's brain and, for a computer brain, the computer's name. */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -795,10 +802,11 @@ async function views(
     }
   }
   // Paused plan runs Continuar agora would take past the plan with extra usage off: their button is greyed.
-  const pastPlan = new Set<string>();
+  const pastPlan = new Map<string, PastPlanReason>();
   for (const a of details.agentRuns.values()) {
-    if (a.waitSource !== "budget" && usagePausedAt(a, now) && (await pauseContinuesPastPlan(db, orgId, a.id)))
-      pastPlan.add(a.id);
+    if (a.waitSource === "budget" || !usagePausedAt(a, now)) continue;
+    const reason = await pauseContinuesPastPlan(db, orgId, a.id);
+    if (reason) pastPlan.set(a.id, reason);
   }
   return rows.map((r): RoutineView => {
     const right = rights.get(r.id) as ViewerRights;
@@ -830,7 +838,8 @@ async function views(
       ? {
           source: paused.waitSource === "budget" ? ("budget" as const) : ("plan" as const),
           resetsAt: paused.resetsAt,
-          extraOff: pastPlan.has(paused.id),
+          extraOff: pastPlan.get(paused.id) === "extra_off",
+          extraUsedUp: pastPlan.get(paused.id) === "extra_used_up",
         }
       : null;
     const hook = webhookOf(r);
@@ -1995,7 +2004,7 @@ export async function continueRoutineUsagePause(
     .orderBy(desc(routineRuns.createdAt))
     .limit(1);
   if (!paused?.waitId) return { continued: false };
-  await assertMayContinuePause(db, orgId, paused.runId, "routine.continue_extra_off");
+  await assertMayContinuePause(db, orgId, paused.runId, "routine");
   const continued = await db.transaction((tx) =>
     overrideUsagePause(tx, {
       orgId,

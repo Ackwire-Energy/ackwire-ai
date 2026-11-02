@@ -272,6 +272,10 @@ const Routine = z
           description:
             "A plan pause whose window is used up, on an agent whose long work may not use paid extra usage: continuing is refused.",
         }),
+        extraUsedUp: z.boolean().openapi({
+          description:
+            "A plan pause whose window is used up, on an agent whose long work may use paid extra usage but the plan has none left: continuing is refused.",
+        }),
       })
       .nullable()
       .openapi({ description: "Its run paused near a limit (ADR 0118); Continuar agora is `POST …/continue`." }),
@@ -767,7 +771,7 @@ export function routineRoutes(deps: AppDeps) {
       security,
       summary: "Continue a run paused near its plan's or budget's limit now (its creator, admins or the agent's owner)",
       description:
-        "The paused run goes on past the pause line until that window resets. Nothing is posted. With paid extra usage off it goes on up to the plan's own allowance: refused with `routine.continue_extra_off` (409) once that window is used up. Nothing paused: the routine as it is.",
+        "The paused run goes on past the pause line until that window resets. Nothing is posted. With paid extra usage off it goes on up to the plan's own allowance: refused with `routine.continue_extra_off` (409) once that window is used up, or `routine.continue_extra_used_up` when the switch is on but the plan has no extra usage left. Nothing paused: the routine as it is.",
       request: { params: RoutineParams },
       responses: { 200: json(Routine), ...errors },
     }),

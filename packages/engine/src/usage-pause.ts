@@ -163,9 +163,18 @@ export interface PlanReadingRef {
 export const continuesPastPlan = (r: { source: "plan" | "budget"; used: number; extra?: boolean } | null) =>
   r !== null && r.source === "plan" && !r.extra && r.used >= PLAN_FULL;
 
-/** Why Continuar agora is refused (`continuesPastPlan`), in the words both places use. */
-export const CONTINUE_PAST_PLAN =
-  "This plan's window is used up and this agent's long work doesn't use paid extra usage: turn that on in its AI settings to continue now, or it picks up after the reset";
+/**
+ * Why Continuar agora is refused (`continuesPastPlan`), in the words both places use: the agent's extra-usage switch
+ * is off, or it is on but the plan has no extra usage left (none reported, or that window is used up too).
+ */
+export const CONTINUE_PAST_PLAN = {
+  extra_off:
+    "This plan's window is used up and this agent's long work doesn't use paid extra usage: turn that on in its AI settings to continue now, or it picks up after the reset",
+  extra_used_up:
+    "This plan's window is used up and its paid extra usage is used up or unavailable: it picks up after the reset",
+} as const;
+
+export type PastPlanReason = keyof typeof CONTINUE_PAST_PLAN;
 
 /** Where the plan of a run paused at `ref` stands now, as the executor's gate reads it. Null: nothing known. */
 export async function pausedPlanReading(
@@ -178,11 +187,17 @@ export async function pausedPlanReading(
   if (!ref?.machineId) return null;
   const usage = await storedPlanUsage(db, orgId, ref.machineId, kind, ref.accountId).catch(() => null);
   const top = planBinding(usage, { model: ref.model ?? null });
-  return top ? { source: "plan" as const, used: top.used, extra: extraUsage && extraUsageLeft(usage) } : null;
+  return top
+    ? { source: "plan" as const, used: top.used, extra: extraUsage && extraUsageLeft(usage), extraSwitch: extraUsage }
+    : null;
 }
 
-/** Whether Continuar agora on the paused run `runId` would go past its plan with extra usage off (`continuesPastPlan`). */
-export async function pauseContinuesPastPlan(db: Executor, orgId: string, runId: string): Promise<boolean> {
+/** Why Continuar agora on the paused run `runId` would go past its plan without extra usage (`continuesPastPlan`); null: it may go on. */
+export async function pauseContinuesPastPlan(
+  db: Executor,
+  orgId: string,
+  runId: string,
+): Promise<PastPlanReason | null> {
   const { agentRuns, agents } = schema;
   const [row] = await db
     .select({
@@ -193,13 +208,16 @@ export async function pauseContinuesPastPlan(db: Executor, orgId: string, runId:
     .innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));
   const wait = row?.wait as { kind?: BrainKind; source?: string; reading?: PlanReadingRef } | null | undefined;
-  if (!row || !wait?.kind || wait.source === "budget") return false;
-  return continuesPastPlan(await pausedPlanReading(db, orgId, wait.kind, wait.reading, row.extraUsage));
+  if (!row || !wait?.kind || wait.source === "budget") return null;
+  const reading = await pausedPlanReading(db, orgId, wait.kind, wait.reading, row.extraUsage);
+  if (!continuesPastPlan(reading)) return null;
+  return row.extraUsage ? "extra_used_up" : "extra_off";
 }
 
-/** Refuses Continuar agora that would go past the plan with extra usage off; `code` names it where it was pressed. */
-export async function assertMayContinuePause(db: Executor, orgId: string, runId: string, code: string) {
-  if (await pauseContinuesPastPlan(db, orgId, runId)) throw new ConflictError(CONTINUE_PAST_PLAN, code);
+/** Refuses Continuar agora that would go past the plan without extra usage, as `<where>.continue_<reason>`. */
+export async function assertMayContinuePause(db: Executor, orgId: string, runId: string, where: "routine" | "run") {
+  const reason = await pauseContinuesPastPlan(db, orgId, runId);
+  if (reason) throw new ConflictError(CONTINUE_PAST_PLAN[reason], `${where}.continue_${reason}`);
 }
 
 /**
@@ -391,7 +409,7 @@ export async function continueUsagePause(
   if (!row) return { runs: [] };
   if (!(await mayStopRun(db, userId, membership, row)))
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can do this", "run.answer_forbidden");
-  if (card.source !== "budget") await assertMayContinuePause(db, message.orgId, card.runId, "run.continue_extra_off");
+  if (card.source !== "budget") await assertMayContinuePause(db, message.orgId, card.runId, "run");
   const until = card.resetsAt ?? null;
   const done = await db.transaction(async (tx) => {
     const moved = await overrideUsagePause(tx, {

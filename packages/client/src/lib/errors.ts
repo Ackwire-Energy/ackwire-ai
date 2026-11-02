@@ -94,6 +94,8 @@ const KNOWN = {
   "routine.webhook_paused": "errors.routine.webhookPaused",
   "routine.continue_extra_off": "errors.routine.continueExtraOff",
   "run.continue_extra_off": "errors.routine.continueExtraOff",
+  "routine.continue_extra_used_up": "errors.routine.continueExtraUsedUp",
+  "run.continue_extra_used_up": "errors.routine.continueExtraUsedUp",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
   "wiki.no_access": "errors.wiki.noAccess",
   "wiki.audience_forbidden": "errors.wiki.audienceForbidden",
