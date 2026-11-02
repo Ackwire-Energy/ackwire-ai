@@ -712,6 +712,9 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(system).toContain("cp -r --no-preserve=mode");
     expect(system).toContain("mv or a plain cp keeps it private or read-only to the others");
     expect(system).toContain("chgrp -R --reference=/srv/agentes/shared");
+    // A runner's clone borrows from a cache only its agent reads; another agent's repository is "dubious" to git.
+    expect(system).toContain("git repack -a -d && rm -f .git/objects/info/alternates");
+    expect(system).toContain("git -c safe.directory=<its path>");
     expect(system).toContain("flock /srv/agentes/shared/.lock");
     expect(system).toContain("Never put credentials there");
     expect(system).toContain("df -h");
@@ -719,6 +722,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
     const single = sharedFolderText("MacBook", { dir: "/Users/ana/agentes/shared", system: false });
     expect(single).not.toContain("~/shared");
     expect(single).not.toContain("chgrp");
+    expect(single).not.toContain("safe.directory");
     expect(single).not.toContain("PATH");
     expect(single).toContain("/Users/ana/agentes/shared/bin");
     // A Mac has no flock, Windows neither flock nor df: a lock and a space check they can do.

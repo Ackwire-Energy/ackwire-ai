@@ -1486,6 +1486,9 @@ export function sharedFolderText(computer: string, shared: { dir: string; system
           // With the folder's default ACL, a file's group access is capped by the mode it is created with: a plain
           // cp keeps the source's (0644 and 0755 leave it read-only to the others), mv keeps its owner's group.
           `- To move something of yours there, copy it with cp -r --no-preserve=mode and then delete your copy; mv or a plain cp keeps it private or read-only to the others. Something already there that they can't write: chgrp -R --reference=${dir} it and chmod -R g+rwX it.`,
+          // A clone the runner made borrows objects from root's cache only its agent may read (ADR 0116), and git
+          // refuses a repository another user owns ("dubious ownership") unless the caller vouches for it.
+          `- A git repository you put there: first git repack -a -d && rm -f .git/objects/info/alternates in it, or the others can't read its objects. One another agent put there: git calls it dubious ownership; check its .git/config and .git/hooks, then use it with git -c safe.directory=<its path> ….`,
         ]
       : []),
     linux
