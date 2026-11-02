@@ -63,12 +63,14 @@ export const reachKey = (e: ReachEntry) =>
 export function routineReachWarnings(
   prompt: string,
   agents: readonly Agent[],
-  options: { agentId: string | null; creatorUserId?: string | null },
+  options: { agentId: string | null; creatorUserId?: string | null; creatorRoleIds?: readonly string[] },
 ): { agent: Agent }[] {
   const handles = new Set([...prompt.matchAll(MENTION)].map((m) => (m[2] ?? "").toLowerCase()));
   return agents.flatMap((agent) => {
     if (agent.id === options.agentId || !handles.has(agent.handle.toLowerCase())) return [];
-    const reaches = options.creatorUserId ? audienceAdmits(agent, options.creatorUserId) : canTalk(agent);
+    const reaches = options.creatorUserId
+      ? audienceAdmits(agent, options.creatorUserId, options.creatorRoleIds)
+      : canTalk(agent);
     return reaches ? [] : [{ agent }];
   });
 }

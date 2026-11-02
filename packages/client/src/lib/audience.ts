@@ -14,16 +14,17 @@ export function audienceOf(agent: Agent): Required<AgentAudience> {
 export const modeOf = (agent: Agent): AudienceMode => agent.audience?.mode ?? agent.audienceMode ?? "everyone";
 
 /**
- * Whether its audience lets `userId` talk to the agent (the server's `canTalkTo`, without that person's role): its
- * owner, everyone, or one of its people. A people list the directory didn't send, or roles picked (whose holders
- * the app doesn't track), say yes (don't warn on a guess).
+ * Whether its audience lets `userId` talk to the agent (the server's `canTalkTo`, without `talk_to_agents`): its
+ * owner, everyone, one of its people, or holding one of its roles (`roleIds`: theirs, from the directory). A people
+ * list the directory didn't send, or roles picked when theirs aren't known, say yes (don't warn on a guess).
  */
-export function audienceAdmits(agent: Agent, userId: string): boolean {
+export function audienceAdmits(agent: Agent, userId: string, roleIds?: readonly string[]): boolean {
   if (agent.ownerUserId === userId) return true;
   const mode = modeOf(agent);
   if (mode !== "people") return mode === "everyone";
   const a = audienceOf(agent);
-  return !agent.audience || a.roleIds.length > 0 || a.userIds.includes(userId);
+  if (!agent.audience || a.userIds.includes(userId)) return true;
+  return roleIds ? a.roleIds.some((id) => roleIds.includes(id)) : a.roleIds.length > 0;
 }
 
 /** Its audience with `userId` let in; null when its people list wasn't sent (saving would drop them). */

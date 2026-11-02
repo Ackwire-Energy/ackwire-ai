@@ -47,6 +47,22 @@ describe("someone else's routine, being edited", () => {
     ).toEqual(["a-gil"]);
     expect(routineReachWarnings(prompt, [owned], { agentId: null, creatorUserId: "u-bob" })).toEqual([]);
   });
+
+  test("a role it answers: the creator's roles decide; unknown roles don't warn", () => {
+    const support = agent("a-dev", "dev", {
+      canTalk: true,
+      ownerUserId: "u-carla",
+      audience: { mode: "people", userIds: [], roleIds: ["r-sup"] },
+    });
+    const warned = (creatorRoleIds?: string[]) =>
+      routineReachWarnings("Cobre o @dev", [support], { agentId: null, creatorUserId: "u-caio", creatorRoleIds }).map(
+        (w) => w.agent.id,
+      );
+    expect(warned(["r-tec"])).toEqual(["a-dev"]);
+    expect(warned([])).toEqual(["a-dev"]);
+    expect(warned(["r-tec", "r-sup"])).toEqual([]);
+    expect(warned(undefined)).toEqual([]);
+  });
 });
 
 describe("audienceWith", () => {
