@@ -53,7 +53,8 @@ AGPL and self-hostable) waits for human translators.
    `plural()`), push words per language over English, pushes in `users.locale` before the device's, the workspace
    computer's default name from the shared strings, dates and money through Intl and the registry, the CJK system
    fonts in the email stack. Jobs queued without a language render in English. A refusal code the app has no words
-   for shows the server's English message in every language.
+   for shows the server's English message in every language. A run's turn names the person's app language (for a file's
+   title or a form's labels); replies still follow the language the person writes in.
 7. **Formatting.** `@agenteschat/i18n/format`: `plural`, `formatList`, `formatMoneyUsd`, `formatDate`, `formatTime`,
    `relativeTime`, `dayMonthOrder`. No case change on translated text (a lowercase form is its own key) and no two
    `t()` glued with a space (`common.joinSentences`); guards in the web's and the phone's tests.
