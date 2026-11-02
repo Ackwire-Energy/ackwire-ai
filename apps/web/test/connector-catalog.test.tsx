@@ -999,7 +999,7 @@ describe("a server whose tools can't be read", () => {
     await settle(8);
     const review = () => screen().getByRole("dialog", { name: REVIEW });
     expect(within(review()).getByRole("alert").textContent).toBe(
-      `Não deu para ler as ferramentas desse servidor: ${reason}`,
+      `Não deu para ler as ferramentas do conector: ${reason}`,
     );
     expect(review().textContent).not.toContain("Classificamos");
     expect(review().textContent).not.toContain("O servidor não ofereceu nenhuma ferramenta.");
