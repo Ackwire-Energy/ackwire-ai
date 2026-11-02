@@ -1,13 +1,14 @@
-import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { enqueue } from "./outbox";
 
-const { agentRuns } = schema;
+const { agentRuns, agents } = schema;
 
 /**
- * The line for a shared computer's room (ADR 0032, "Calm waits"). The runner admits a turn only while its memory
- * floor holds and keeps no order, so the engine keeps it: runs a person is waiting on go first, then by when each
- * started waiting. Only the head of the line asks the runner again, and agents' turns start `ROOM_ASK_SPACING_MS`
- * apart, so a burst of mentions reaches the computer one by one instead of all refused at once.
+ * The line for a shared computer's room (ADR 0032, "Calm waits" and "Calm wakes"). The runner admits a turn only
+ * while its memory floor holds and keeps no order, so the engine keeps it, in three ranks: runs a person is waiting
+ * on, then agents' work a person asked for lately (`transcript.roomAsked`), then the rest; by when each started
+ * waiting within a rank. Only the head of the line asks the runner again, and agents' turns start
+ * `ROOM_ASK_SPACING_MS` apart, so a burst of mentions reaches the computer one by one instead of all refused at once.
  */
 export const ROOM_ASK_SPACING_MS = 10_000;
 
@@ -18,6 +19,10 @@ const inLine = and(
 const waitingForRoom = (machineId: string) => and(eq(agentRuns.waitingMachineId, machineId), inLine);
 const waitIdSql = sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`;
 const peopleSql = sql`coalesce((${agentRuns.transcript}->>'roomPeople')::boolean, false)`;
+const askedSql = sql`coalesce((${agentRuns.transcript}->>'roomAsked')::boolean, false)`;
+/** A run's rank in the line: 0 a person waits on it, 1 work a person asked for lately, 2 the rest. */
+const rankSql = sql<number>`(case when ${peopleSql} then 0 when ${askedSql} then 1 else 2 end)`;
+export type RoomRank = 0 | 1 | 2;
 const sinceSql = sql`coalesce((${agentRuns.transcript}->>'roomWaitSince')::bigint, 0)`;
 
 /** The run first in line for room on this computer, with the wait its job must carry. */
@@ -33,7 +38,7 @@ export async function roomHead(
     })
     .from(agentRuns)
     .where(waitingForRoom(machineId))
-    .orderBy(sql`${peopleSql} desc`, sinceSql, agentRuns.id)
+    .orderBy(rankSql, sinceSql, agentRuns.id)
     .limit(1);
   return head ?? null;
 }
@@ -75,7 +80,7 @@ export async function kickRoomQueue(db: Database, machineId: string, at?: Date) 
 /**
  * Whether this run may send its computer turn now. Null: go (its ask is recorded, and the next in line is asked
  * once the spacing is over). Otherwise it is behind: `retryAt` is when it may look again. Behind when a run waiting
- * for room ranks ahead of it (people first, then the longest wait), or, for agents' work, when another run asked
+ * for room ranks ahead of it (by rank, then the longest wait), or, for agents' work, when another run asked
  * this computer less than `ROOM_ASK_SPACING_MS` ago. A person's turn never waits for the spacing; the runner's
  * memory floor still decides whether it fits.
  */
@@ -83,12 +88,11 @@ export async function roomGate(
   db: Database,
   run: { id: string; orgId: string },
   machineId: string,
-  rank: { people: boolean; since: number },
+  place: { rank: RoomRank; since: number },
 ): Promise<{ retryAt: number } | null> {
   const now = Date.now();
   const behind = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`room:${machineId}`}))`);
-    const mine = sql`(${rank.since}::bigint, ${run.id}::uuid)`;
     const [ahead] = await tx
       .select({ id: agentRuns.id })
       .from(agentRuns)
@@ -96,14 +100,12 @@ export async function roomGate(
         and(
           waitingForRoom(machineId),
           sql`${agentRuns.id} <> ${run.id}`,
-          rank.people
-            ? sql`${peopleSql} and (${sinceSql}, ${agentRuns.id}) < ${mine}`
-            : sql`(${peopleSql} or (${sinceSql}, ${agentRuns.id}) < ${mine})`,
+          sql`(${rankSql}, ${sinceSql}, ${agentRuns.id}) < (${place.rank}::int, ${place.since}::bigint, ${run.id}::uuid)`,
         ),
       )
       .limit(1);
     if (ahead) return { retryAt: now + ROOM_ASK_SPACING_MS };
-    if (!rank.people) {
+    if (place.rank > 0) {
       const [last] = await tx
         .select({ at: sql<string>`max((${agentRuns.transcript}->'roomAsk'->>'at')::bigint)` })
         .from(agentRuns)
@@ -128,4 +130,28 @@ export async function roomGate(
   });
   if (!behind) await kickRoomQueue(db, machineId, new Date(now + ROOM_ASK_SPACING_MS));
   return behind;
+}
+
+/** The best rank among this agent's runs in a computer's line, null when none is in line. */
+export async function agentLineRank(db: Executor, orgId: string, agentId: string): Promise<RoomRank | null> {
+  const [row] = await db
+    .select({ rank: sql<number | null>`min(${rankSql})` })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.agentId, agentId), inLine));
+  return row?.rank == null ? null : (Number(row.rank) as RoomRank);
+}
+
+/** For a select naming an agent: its computer has runs waiting for room (it is full, and work queues on it). */
+export const computerCrowdedSql = (agentId: SQL) => sql<boolean>`exists (select 1 from ${agentRuns} w
+  join ${agents} ca on ca.machine_id = w.waiting_machine_id
+  where ca.id = ${agentId} and w.status = 'waiting_input' and w.transcript->'waitingForBrain'->>'code' = 'busy')`;
+
+/** Of these agents, the ones whose computer has runs waiting for room. */
+export async function crowdedAgents(db: Executor, orgId: string, agentIds: string[]): Promise<Set<string>> {
+  if (agentIds.length === 0) return new Set();
+  const rows = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds), computerCrowdedSql(sql`${agents}.id`)));
+  return new Set(rows.map((r) => r.id));
 }

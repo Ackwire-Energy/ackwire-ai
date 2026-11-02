@@ -208,7 +208,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
         });
         // A run of the consulted agent still active in this DM for the same person reads the question at
         // its next step: the consultation waits on that run then. Another person's run never takes it.
-        const started = await startOrJoinRun(tx, message, target.id, "dm");
+        const started = await startOrJoinRun(tx, message, target.id, "dm", { park: 1 });
         const targetRunId = started ? ("created" in started ? started.created.id : started.joined) : null;
         const [row] = await tx
           .insert(agentConsultations)
@@ -392,7 +392,24 @@ export async function sendNote(
       },
     });
     // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
-    const started = await startOrJoinRun(tx, message, input.targetAgentId, "dm");
+    const started = await startOrJoinRun(tx, message, input.targetAgentId, "dm", { park: 1 });
+    // A mention's copy that run already answers an open note of this chain for: no row of its own, so what comes of
+    // both goes back once (ADR 0032 "Calm wakes").
+    if (input.fromMention && started && "joined" in started) {
+      const [open] = await tx
+        .select({ id: agentConsultations.id })
+        .from(agentConsultations)
+        .where(
+          and(
+            eq(agentConsultations.orgId, input.orgId),
+            eq(agentConsultations.targetRunId, started.joined),
+            inArray(agentConsultations.askerAgentId, [...input.chain, input.agentId]),
+            eq(agentConsultations.status, "open"),
+          ),
+        )
+        .limit(1);
+      if (open) return { message, consultationId: open.id };
+    }
     await tx.insert(agentConsultations).values({
       id: consultationId,
       orgId: input.orgId,
@@ -720,8 +737,10 @@ export interface HandOff {
   answeredAt: Date | null;
   /** The sender heard what came of it. */
   reportedAt: Date | null;
-  /** Null: nobody started it (the stretch held it). */
+  /** Null: nobody started it (the stretch held it, or it waits for its agent in its computer's line: `parked`). */
   target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean; outage?: boolean } | null;
+  /** No run yet and its agent is in its computer's line: it waits outside any run (`StartRunOptions.park`). */
+  parked?: boolean;
 }
 
 /** How many of them the block lists. */
@@ -755,11 +774,15 @@ export async function handOffsFrom(
     waiting_machine_id: string | null;
     handed_on: boolean | string | null;
     outage: boolean | string | null;
+    parked: boolean | string | null;
   }>(
     await db.execute(sql`select c.id, c.kind, c.status, c.question, c.answer, a.handle, c.created_at, c.answered_at,
         c.reported_at, t.status as target_status, t.waiting_machine_id,
         exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on,
-        (t.status = 'waiting_input' and t.transcript -> 'outage' is not null) as outage
+        (t.status = 'waiting_input' and t.transcript -> 'outage' is not null) as outage,
+        (c.target_run_id is null and exists (select 1 from agent_runs w where w.org_id = c.org_id
+          and w.agent_id = c.target_agent_id and w.status = 'waiting_input'
+          and w.transcript -> 'waitingForBrain' ->> 'code' = 'busy')) as parked
       from agent_consultations c
       join agent_runs r on r.id = c.asker_run_id
       join channels ch on ch.id = r.channel_id
@@ -792,6 +815,7 @@ export async function handOffsFrom(
           outage: r.outage === true || r.outage === "t",
         }
       : null,
+    ...(r.parked === true || r.parked === "t" ? { parked: true } : {}),
   }));
 }
 

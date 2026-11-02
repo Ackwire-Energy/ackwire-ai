@@ -4,7 +4,8 @@ import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { messageRoot } from "./authority";
 import { routineBriefOfRun } from "./background";
-import { eligibleChannelAgents, type RunTrigger, startOrJoinRun } from "./dispatch";
+import { computerCrowdedSql } from "./computer-queue";
+import { eligibleChannelAgents, type RunTrigger, startOrJoinRun, takeConsultation } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { ForbiddenError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
@@ -26,11 +27,40 @@ const { agentConsultations, agentRuns, agents, channels, messages, usageRecords 
  * their stretch next to their hop, so every way agents wake each other is counted.
  *
  * No limit reads words. Agents start at most `runs` runs on their own in one stretch (`unattendedRuns` when nobody
- * asked for the work), and each agent spends at most `budgetShare` of its monthly budget there. Past either, the
- * wake-up is held and one card in the conversation says why, with Continuar. Waiting costs nothing: only runs and
- * API spend count.
+ * asked for the work; `crowdedRuns` and `crowdedUnattendedRuns` while the woken agent's computer has runs waiting
+ * for room, ADR 0032 "Calm wakes"), and each agent spends at most `budgetShare` of its monthly budget there. Past
+ * either, the wake-up is held and one card in the conversation says why, with Continuar. Waiting costs nothing: only
+ * runs and API spend count.
  */
-export const STRETCH = { runs: 50, unattendedRuns: 10, budgetShare: 0.2 } as const;
+export const STRETCH = {
+  runs: 50,
+  unattendedRuns: 10,
+  crowdedRuns: 15,
+  crowdedUnattendedRuns: 5,
+  budgetShare: 0.2,
+} as const;
+
+/**
+ * How long work a person asked for (a stretch they opened) goes before agents' own in a computer's line
+ * (`transcript.roomAsked`, ADR 0032 "Calm wakes").
+ */
+export const PERSON_ASKED_MS = 4 * 3600_000;
+
+/** Nobody asked for the stretch's work: an agent wrote its first message, or it is a routine's brief. */
+const unattendedSql = (orgId: string, stretchId: string) => sql`exists (select 1 from ${messages} m
+  where m.org_id = ${orgId}::uuid and m.id = ${stretchId}::uuid and (m.author_type = 'agent' or m.meta ? 'routineBrief'))`;
+
+/**
+ * Whether a stretch is work a person asked for (their message, decision or Continuar opened it) within
+ * `PERSON_ASKED_MS`. Stretch ids are UUIDv7: their first 48 bits are when it opened.
+ */
+export async function personAskedLately(db: Executor, orgId: string, stretchId: string): Promise<boolean> {
+  const [row] = rowsOf<{ asked: boolean | string }>(
+    await db.execute(sql`select (not ${unattendedSql(orgId, stretchId)}
+      and ('x' || left(replace(${stretchId}::text, '-', ''), 12))::bit(48)::bigint > ${Date.now() - PERSON_ASKED_MS}) as asked`),
+  );
+  return row?.asked === true || row?.asked === "t";
+}
 
 /**
  * How many links up a chain of questions and hand-offs between agents the walks to where people read go
@@ -69,7 +99,13 @@ export async function stretchStop(
   agentId: string,
   triggerId: string | null = null,
 ): Promise<StretchStop | null> {
-  const [row] = rowsOf<{ started: boolean; runs: number; unattended: boolean; spent: string | number | null }>(
+  const [row] = rowsOf<{
+    started: boolean;
+    runs: number;
+    unattended: boolean;
+    crowded: boolean;
+    spent: string | number | null;
+  }>(
     await db.execute(sql`with runs as (
         select r.id, r.agent_id, r.created_at from ${agentRuns} r
         where r.org_id = ${orgId}::uuid and r.stretch_id = ${stretchId}::uuid and r.hop >= 2
@@ -77,14 +113,22 @@ export async function stretchStop(
       select exists (select 1 from ${agentRuns} s where ${triggerId}::uuid is not null
           and s.trigger_message_id = ${triggerId}::uuid and s.agent_id = ${agentId}::uuid) as started,
         (select count(*) from runs)::int as runs,
-        exists (select 1 from ${messages} m where m.org_id = ${orgId}::uuid and m.id = ${stretchId}::uuid
-          and (m.author_type = 'agent' or m.meta ? 'routineBrief')) as unattended,
+        ${unattendedSql(orgId, stretchId)} as unattended,
+        ${computerCrowdedSql(sql`${agentId}::uuid`)} as crowded,
         (select sum(u.cost_nano_usd) from ${usageRecords} u
           where u.org_id = ${orgId}::uuid and u.agent_id = ${agentId}::uuid and u.billed_to = 'org'
             and u.created_at >= (select min(created_at) from mine) and u.run_id in (select id from mine)) as spent`),
   );
   if (!row || row.started === true || (row.started as unknown) === "t") return null;
-  const limit = row.unattended === true || (row.unattended as unknown) === "t" ? STRETCH.unattendedRuns : STRETCH.runs;
+  const yes = (v: unknown) => v === true || v === "t";
+  const crowded = yes(row.crowded);
+  const limit = yes(row.unattended)
+    ? crowded
+      ? STRETCH.crowdedUnattendedRuns
+      : STRETCH.unattendedRuns
+    : crowded
+      ? STRETCH.crowdedRuns
+      : STRETCH.runs;
   if (Number(row.runs) >= limit) return { reason: "runs", limit };
   const spent = Number(row.spent ?? 0);
   if (spent <= 0) return null;
@@ -478,17 +522,11 @@ export async function continueStretch(
       const out = await startOrJoinRun(tx, trigger, h.agentId, h.trigger, { granted: stretchId });
       if (!out) continue;
       // A question or a note the stretch held is answered by the run that takes it now (ADR 0095).
-      await tx
-        .update(agentConsultations)
-        .set({ targetRunId: "created" in out ? out.created.id : out.joined })
-        .where(
-          and(
-            eq(agentConsultations.orgId, message.orgId),
-            eq(agentConsultations.messageId, trigger.id),
-            eq(agentConsultations.status, "open"),
-            isNull(agentConsultations.targetRunId),
-          ),
-        );
+      await takeConsultation(
+        tx,
+        { orgId: message.orgId, messageId: trigger.id },
+        "created" in out ? out.created.id : out.joined,
+      );
       if ("joined" in out) {
         await rerootRun(tx, { id: out.joined }, stretchId);
         // Should that run end before reading it, the run it is handed on to counts in the new stretch, not in the

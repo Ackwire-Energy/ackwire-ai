@@ -208,7 +208,7 @@ import { truncateOutput } from "./sandbox";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
-import { rerootRun } from "./stretch";
+import { personAskedLately, rerootRun, runStretchOf } from "./stretch";
 import {
   isStuck,
   noteStep,
@@ -504,6 +504,8 @@ export interface Transcript {
   roomWaitSince?: number;
   /** A person waits on this run: it goes first in the computer's line (`computer-queue.ts`). */
   roomPeople?: boolean;
+  /** Its stretch is work a person asked for lately (`personAskedLately`): next in the line after people's runs. */
+  roomAsked?: boolean;
   /** When this run last sent a turn to its computer: agents' turns there are spaced (`roomGate`). */
   roomAsk?: { machineId: string; at: number };
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
@@ -3008,7 +3010,12 @@ async function executeRunInner(
       const roomMachine = plan.kind !== "model" ? (plan.session?.machineId ?? agent.machineId ?? null) : null;
       if (roomMachine && computerTurns === 0) {
         const people = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
-        const behind = await roomGate(db, run, roomMachine, { people, since: transcript.roomWaitSince ?? Date.now() });
+        transcript.roomAsked ??=
+          !people && !run.background && (await personAskedLately(db, run.orgId, runStretchOf(run)));
+        const behind = await roomGate(db, run, roomMachine, {
+          rank: people ? 0 : transcript.roomAsked ? 1 : 2,
+          since: transcript.roomWaitSince ?? Date.now(),
+        });
         if (behind) {
           const handled = await brainUnavailable({
             code: "busy",

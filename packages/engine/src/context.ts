@@ -898,7 +898,10 @@ function handOffQuote(text: string) {
 /** Where the colleague of a hand-off still out is, from its run. */
 function handOffState(h: HandOff) {
   const t = h.target;
-  if (!t) return "not started: the agents reached what they may do on their own; a person can let it go on (Continuar)";
+  if (!t)
+    return h.parked
+      ? "not started yet: it is in line for its computer and takes this up by itself"
+      : "not started: the agents reached what they may do on their own; a person can let it go on (Continuar)";
   if (t.status === "queued") return "starting";
   if (t.status === "waiting_approval") return "waiting for a person's approval";
   if (t.status === "waiting_input")
