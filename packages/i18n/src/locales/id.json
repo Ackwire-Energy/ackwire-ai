@@ -1368,7 +1368,6 @@
       "button_other": "Pesan yang disematkan ({{count}})",
       "label": "Pesan yang disematkan di #{{channel}}",
       "in": "Disematkan di #{{channel}}",
-      "empty": "Belum ada yang disematkan di sini. Sematkan pesan dari menunya.",
       "unpin": "Lepas sematan pesan {{name}}"
     },
     "membersButton_other": "Anggota kanal ({{count}})",
@@ -1479,6 +1478,8 @@
     "failed_other": "{{names}} tidak bisa menjawab",
     "asking_other": "{{names}} menunggu jawabanmu",
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
+    "queued_other": "{{names}} sedang antre untuk komputer",
+    "away_other": "{{names}} menunggu komputer",
     "nobody": "Tidak ada agen yang akan menjawab",
     "status": {
       "seen": "Sudah melihat",
@@ -1487,9 +1488,12 @@
       "waiting": "Menunggu persetujuan",
       "asking": "Menunggu jawabanmu",
       "outage": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
+      "queued": "Antre untuk komputer",
+      "away": "Menunggu komputer",
       "handled": "Sudah menjawab",
       "failed": "Gagal",
-      "referenced": "Hanya disebut"
+      "referenced": "Hanya disebut",
+      "reacted": "Bereaksi"
     },
     "failedShort": "Tidak bisa menjawab",
     "popoverTitle": "Agen",
@@ -1713,6 +1717,10 @@
     "forbidden": "Hanya yang meminta, pemilik agen, atau admin yang bisa melanjutkan sekarang",
     "resumed": "{{agent}} melanjutkan pekerjaannya lagi",
     "ended": "Pekerjaan ini berakhir sebelum sempat dilanjutkan",
+    "canceled": "Dibatalkan. Tidak akan berjalan saat batasnya diatur ulang.",
+    "dontRun": "Jangan jalankan",
+    "dontRunHint": "Batalkan: tidak ada yang berjalan saat batasnya diatur ulang",
+    "dontRunForbidden": "Hanya yang meminta, pemilik agen, atau admin yang bisa membatalkannya",
     "extraTitle": "Pekerjaan panjang bisa memakai penggunaan ekstra berbayar",
     "extraHint": "Kalau penggunaan ekstra di paket aktif, pekerjaan panjang terus berjalan melewati 95%. Kalau mati, pekerjaan dijeda di 95% dan lanjut saat paket diatur ulang."
   },
@@ -1904,6 +1912,18 @@
     "publicDesc": "Siapa pun di ruang kerja bisa melihat dan bergabung.",
     "private": "Privat",
     "privateDesc": "Hanya yang ditambahkan.",
+    "roles": "Departemen atau peran",
+    "rolesDesc": "Siapa pun dengan salah satu peran yang dipilih bisa melihat dan bergabung, sekarang atau nanti.",
+    "rolesPick": "Peran yang melihat kanal",
+    "rolesNone": "Workspace belum punya peran.",
+    "rolesNeeded": "Pilih setidaknya satu peran.",
+    "rolesLeave": "Siapa pun yang kehilangan peran keluar dari kanal.",
+    "rolesChoose": "Pilih peran",
+    "rolesChange": "Ubah peran",
+    "rolesDone": "Selesai",
+    "publicTitle": "Jadikan #{{channel}} publik?",
+    "publicBody": "Semua orang di workspace bisa bergabung dan membaca semua pesannya, termasuk yang lama.",
+    "publicConfirm": "Jadikan publik",
     "members": "Anggota awal",
     "membersSearch": "Cari orang atau agen",
     "membersEmpty": "Tidak ada yang ditemukan untuk “{{q}}”.",
@@ -2007,7 +2027,10 @@
     "can": "Bisa",
     "budgetUsed": "{{percent}} anggaran terpakai bulan ini",
     "spendLabel": "Anggaran terpakai bulan ini",
-    "former": "Sudah tidak ada di ruang kerja ini"
+    "former": "Sudah tidak ada di ruang kerja ini",
+    "askAccess": "Minta akses",
+    "detailsHiddenTitle": "Cara kerjanya",
+    "detailsHidden": "Hanya orang yang dilayani {{name}}, penanggung jawabnya, dan admin yang bisa melihat instruksi, alat, memori, dan pemakaiannya."
   },
   "presence": {
     "online": "Online",
@@ -2078,6 +2101,7 @@
       "waiting_approval": "Menunggu persetujuan",
       "waiting_answer": "Menunggu jawaban",
       "waiting_computer": "Menunggu komputer",
+      "queued_computer": "Antre untuk komputer",
       "waiting_plan": "Menunggu paket diatur ulang",
       "waiting_budget": "Menunggu anggaran diatur ulang",
       "provider_down": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
@@ -2280,6 +2304,7 @@
     "refusedBy": "Ditolak oleh {{name}} · {{when}}",
     "approvedByYou": "Disetujui olehmu · {{when}}",
     "outcomeApprovedBy": "Disetujui oleh {{name}}",
+    "requesterDecides": "Diminta oleh orang yang menyetujuinya lewat perannya, jadi ia juga boleh memutuskan",
     "outcomeApprovedByYou": "Disetujui olehmu",
     "outcomeRefusedBy": "Ditolak oleh {{name}}",
     "outcomeRefusedByYou": "Ditolak olehmu",
@@ -2404,7 +2429,8 @@
       "mentions": "Sebutan",
       "waiting": "Menunggumu",
       "unread": "Belum dibaca",
-      "reactions": "Reaksi"
+      "reactions": "Reaksi",
+      "done": "Selesai"
     },
     "keys": {
       "title": "Pintasan",
@@ -2536,6 +2562,8 @@
     "replyTip": "Balas · R",
     "done": "Selesai",
     "doneTip": "Selesai · E",
+    "restore": "Kembalikan",
+    "restoreTip": "Kembalikan · E",
     "snooze": "Ingatkan nanti",
     "snoozeShort": "Ingatkan",
     "open": "Buka",
@@ -2568,6 +2596,7 @@
       "done": "Ditandai selesai",
       "doneQuestion": "{{name}} masih menunggu. Pertanyaannya tetap ada di percakapan.",
       "doneApproval": "Permintaannya tetap ada di Persetujuan.",
+      "restored": "Kembali ke kotak masukmu",
       "undo": "Urungkan",
       "readAll_other": "{{count}} ditandai sudah dibaca",
       "sent": "Balasan terkirim",
@@ -2583,6 +2612,7 @@
     "noneWaiting": "Tidak ada yang menunggumu.",
     "noneUnread": "Semua sudah dibaca.",
     "noneHere": "Belum ada apa-apa di sini.",
+    "noneDone": "Tidak ada yang ditandai selesai dalam 30 hari terakhir.",
     "more": "Tampilkan lebih banyak"
   },
   "approvals": {
@@ -3689,6 +3719,13 @@
     "defaultKeyDesc": "{{provider}} · berakhiran {{hint}}",
     "otherKeyDesc": "{{provider}} · berakhiran {{hint}}",
     "modelNeedsKey": "Perlu kunci API {{provider}}",
+    "brainPick": {
+      "searchPlaceholder": "Model, paket, atau pembuat",
+      "connect": "Hubungkan {{plan}}",
+      "connectText": "Perlu kunci {{plan}}. Kamu menambahkannya tepat setelah membuat agen.",
+      "needsKey": "Perlu kunci {{plan}}",
+      "other": "Pilih yang lain"
+    },
     "noKeys": "Belum ada kunci",
     "budgetTitle": "Anggaran bulanan",
     "budget": "Anggaran bulanan (US$)",
@@ -4640,7 +4677,9 @@
       "usagePaused": "Dijeda sampai {{until}} (batas paket)",
       "usagePausedUnknown": "Dijeda sampai paket diatur ulang (batas paket)",
       "usagePausedBudget": "Dijeda sampai {{until}} (batas anggaran)",
-      "usagePausedBudgetUnknown": "Dijeda sampai anggaran diperbarui (batas anggaran)"
+      "usagePausedBudgetUnknown": "Dijeda sampai anggaran diperbarui (batas anggaran)",
+      "waitingPlan": "Menunggu paket {{plan}} · berjalan pukul {{until}}",
+      "waitingPlanUnknown": "Menunggu paket {{plan}} diatur ulang"
     },
     "pausedReason": {
       "creator_left": "Dijeda: pembuatnya keluar dari ruang kerja",
@@ -4685,6 +4724,8 @@
       "waiting": "Menunggu seseorang menjawab",
       "waitingApproval": "Menunggu persetujuanmu",
       "waitingComputer": "Menunggu komputer",
+      "waitingPlan": "Menunggu paket diatur ulang",
+      "waitingBudget": "Menunggu anggaran diperbarui",
       "reported": "Melaporkan temuannya",
       "silent": "Tidak ada yang baru, tetap diam",
       "failed": "Gagal",
@@ -4742,6 +4783,10 @@
     "stoppedToast": "Proses dihentikan.",
     "usagePause": {
       "line": "Dia lanjut sendiri saat batasnya diatur ulang. Tidak ada yang diposting di percakapan.",
+      "lineLimit": "Dia berjalan sendiri saat batasnya diatur ulang. Tidak ada yang diposting di percakapan.",
+      "dontRun": "Jangan jalankan",
+      "dontRunName": "Jangan jalankan {{name}} saat batasnya diatur ulang",
+      "canceledToast": "Dibatalkan. Tidak akan berjalan saat batasnya diatur ulang.",
       "continuedToast": "Proses dilanjutkan.",
       "forbidden": "Hanya pembuat rutinitas, pemilik agen, atau admin yang bisa melanjutkannya sekarang",
       "extra_off": "Jatah paket ini sudah habis dan pekerjaan panjang agen ini tidak memakai penggunaan ekstra berbayar. Aktifkan di pengaturan AI-nya untuk lanjut sekarang, atau dia lanjut setelah diatur ulang",
@@ -7405,6 +7450,7 @@
       "freeTraining": "Penyedia model ini mungkin memakai permintaan untuk melatihnya. Di OpenCode, di Settings › Privacy, nyalakan izin untuk model gratis. Tanpa itu, model ini tidak menjawab."
     },
     "recommended": "Disarankan",
+    "free": "Gratis",
     "modelHelp": "Model yang lebih besar berpikir lebih banyak dan menghabiskan paket lebih cepat.",
     "hidden": "{{owner}} atau admin yang memilih siapa yang berpikir.",
     "hiddenAdmins": "Hanya admin yang memilih siapa yang berpikir.",
@@ -7562,7 +7608,8 @@
       "html": "Halaman HTML",
       "file": "File",
       "block": "Blok",
-      "poll": "Polling"
+      "poll": "Polling",
+      "choices": "Pilihan"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · dibuat oleh {{name}}",
@@ -7640,6 +7687,16 @@
     "pollAnswered_other": "{{count}} dari {{total}} sudah menjawab",
     "voteFailed": "Suaramu tidak masuk."
   },
+  "choices": {
+    "step": "{{step}} dari {{total}}",
+    "back": "Kembali",
+    "next": "Berikutnya",
+    "close": "Tutup",
+    "closed": "{{title}} · ditutup",
+    "reopen": "Tampilkan lagi",
+    "answeredBy": "{{name}} memilih",
+    "failed": "Pilihanmu tidak terkirim. Coba lagi."
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "Semua yang dibuat atau diunggah orang dan agen.",
@@ -7676,7 +7733,8 @@
       "html": "Halaman HTML",
       "file": "File",
       "block": "Blok",
-      "poll": "Polling"
+      "poll": "Polling",
+      "choices": "Pilihan"
     },
     "kindCount": "{{kind}}: {{count}}",
     "view": "Tampilan",
@@ -9114,7 +9172,71 @@
     "empty": "Tidak ada hasil untuk “{{q}}”.",
     "hint": "Mencari di kanal yang kamu ikuti.",
     "inChannel": "di #{{channel}}",
-    "count_other": "{{count}} hasil"
+    "count_other": "{{count}} hasil",
+    "countMore": "{{count}}+ hasil",
+    "words": {
+      "ops": {
+        "from": "dari",
+        "in": "di",
+        "has": "ada",
+        "mentions": "sebut",
+        "before": "sebelum",
+        "after": "sesudah",
+        "during": "selama",
+        "author": "penulis",
+        "pinned": "disematkan"
+      },
+      "has": {
+        "link": "tautan",
+        "file": "file",
+        "image": "gambar",
+        "card": "kartu"
+      },
+      "author": {
+        "person": "orang",
+        "agent": "agen"
+      }
+    },
+    "options": "Opsi pencarian",
+    "option": {
+      "from": "Dari orang atau agen tertentu",
+      "in": "Dikirim di kanal atau DM tertentu",
+      "has": "Berisi tautan, file, gambar, atau kartu",
+      "mentions": "Menyebut orang atau agen tertentu",
+      "before": "Sebelum tanggal",
+      "after": "Sesudah tanggal",
+      "during": "Pada hari, bulan, atau tahun",
+      "author": "Ditulis oleh orang atau agen",
+      "pinned": "Pesan yang disematkan"
+    },
+    "moreFilters": "Filter lainnya",
+    "hasLabel": {
+      "link": "Tautan",
+      "file": "File",
+      "image": "Gambar",
+      "card": "Kartu"
+    },
+    "authorLabel": {
+      "person": "Orang",
+      "agent": "Agen"
+    },
+    "pinnedChip": "Disematkan",
+    "removeFilter": "Hapus {{filter}}",
+    "filtersApplied_other": "{{count}} filter",
+    "recent": "Pencarian terbaru",
+    "clearRecent": "Bersihkan",
+    "pickDate": "Tanggal",
+    "dateHint": "Ketik tanggal: 2026-10-05, 2026-10, atau 2026",
+    "noMatch": "Tidak ada orang dengan nama itu di sini.",
+    "noPlace": "Tidak ada kanal atau DM dengan nama itu.",
+    "sort": {
+      "label": "Urutkan",
+      "newest": "Terbaru",
+      "oldest": "Terlama",
+      "relevance": "Paling relevan"
+    },
+    "searchHere": "Cari di percakapan ini",
+    "dm": "DM dengan {{name}}"
   },
   "files": {
     "upload": "Unggah file",
@@ -9327,6 +9449,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Jaringan sedang berubah. Sesi komputer yang terbuka akan dimulai ulang pukul {{when}}.",
+      "restart": "Sesi komputer sedang dimulai ulang untuk menerapkan jaringan. Pekerjaan baru menunggu sampai selesai.",
+      "line": "IP keluar {{ip}}",
+      "hint": "Alamat yang dilihat situs saat agen menjelajah. Alamat ini ikut berubah saat jaringan komputer berubah."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Perintah mati",
@@ -10404,6 +10532,10 @@
       "answeredRequestFar": "{{to}} menjawab permintaan {{from}}",
       "see": "Lihat"
     },
+    "talk": {
+      "readAll": "Baca semua",
+      "more_other": "{{count}} baris lagi"
+    },
     "consultPanel": {
       "label": "Percakapan antara {{from}} dan {{to}}",
       "title": "{{from}} ⇄ {{to}}",
@@ -10702,15 +10834,18 @@
       "brain_unavailable": "{{brain}} tidak bisa menjawab sekarang. Aku akan menjawab saat ia kembali.",
       "provider_unavailable": "Penyedia AI-ku sedang tidak merespons. Aku akan menjawab begitu ia kembali.",
       "brain_busy": "Komputerku sedang sibuk dengan tugas lain. Aku akan menjawab begitu ia luang.",
+      "brain_queued": "Aku masih antre untuk komputer. Aku akan menjawab begitu ada tempat.",
       "brain_interrupted": "{{brain}} berhenti sebelum selesai. Sudah dikerjakan, tidak diulang: {{tools}}.",
       "plan_limit_cut": "Aku berhenti di batas paket {{plan}}. Aku akan melanjutkan dari titik terakhir {{when}}, saat batasnya direset.",
       "plan_limit_cut_unknown": "Aku berhenti di batas paket {{plan}}. Aku akan melanjutkan dari titik terakhir begitu batasnya direset.",
       "plan_limit_wait": "Paket {{plan}} mencapai batasnya. Aku akan menjawab {{when}}, saat batasnya direset.",
       "plan_limit_wait_unknown": "Paket {{plan}} mencapai batasnya. Aku akan menjawab begitu batasnya direset.",
       "budget_wait": "Anggaranku untuk bulan ini sudah habis. Aku akan lanjut {{when}}, atau lebih cepat jika admin menaikkannya.",
+      "usage_wait_canceled": "Dibatalkan. Tidak akan berjalan saat batasnya diatur ulang.",
       "usage_paused": "{{agent}} menjeda pekerjaan ini · paket {{plan}} di {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} menjeda pekerjaan ini · anggaran bulanan di {{percent}}%",
       "work_auto_moved": "Ini akan makan waktu, jadi aku lanjutkan di latar belakang. Aku akan memposting kabar di sini, berikutnya sekitar {{minutes}} menit lagi.",
+      "work_auto_movedOver": "Ini akan makan waktu, jadi aku lanjutkan di latar belakang. Aku akan memposting kabar di sini.",
       "work_end_done": "Selesai ({{minutes}} menit).",
       "work_end_failed": "Pekerjaan latar belakang ini tidak selesai ({{minutes}} menit).",
       "work_end_failedWhy": "Pekerjaan latar belakang ini tidak selesai ({{minutes}} menit): {{why}}.",
@@ -11664,6 +11799,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Kamu hanya menonton.",
+      "title": "Mau ambil kendali?",
+      "working": "{{name}} berhenti sejenak selama kamu yang mengendalikan."
+    },
     "sub": {
       "control": "Kamu yang mengendalikan · {{name}} menunggu",
       "control_female": "Kamu yang mengendalikan · {{name}} menunggu",

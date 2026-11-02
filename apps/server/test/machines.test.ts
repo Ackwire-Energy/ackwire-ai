@@ -347,3 +347,27 @@ test("the runner's WebSocket: no Origin, hello → welcome, online in the list",
   ws.onclose = null;
   ws.close();
 });
+
+test("the public IP echo returns an observed address and country without credentials or caching", async () => {
+  t = await createTestServer();
+  const res = await runnerCall("/api/machines/ip", { headers: { "x-forwarded-for": "8.8.8.8", "cf-ipcountry": "US" } });
+  expect(res.status).toBe(200);
+  expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(await res.json()).toEqual({ ip: "8.8.8.8", country: "US" });
+  const unknown = await runnerCall("/api/machines/ip", {
+    headers: { "x-forwarded-for": "not-an-ip", "cf-ipcountry": "XX" },
+  });
+  expect(await unknown.json()).toEqual({ ip: null, country: null });
+});
+
+test("the IP echo ignores a spoofed leftmost hop and a trusted reverse proxy", async () => {
+  t = await createTestServer({ env: { TRUSTED_PROXIES: "203.0.113.10" } });
+  const res = await runnerCall("/api/machines/ip", {
+    headers: {
+      "x-forwarded-for": "1.1.1.1, 8.8.8.8, 203.0.113.10",
+      "x-real-ip": "9.9.9.9",
+      "cf-ipcountry": "<script>",
+    },
+  });
+  expect(await res.json()).toEqual({ ip: "8.8.8.8", country: null });
+});

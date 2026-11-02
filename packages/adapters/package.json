@@ -13,7 +13,8 @@
     "./secret-box": "./src/secret-box.ts",
     "./redact": "./src/redact.ts",
     "./error-scrub": "./src/error-scrub.ts",
-    "./host-stats": "./src/host-stats.ts"
+    "./host-stats": "./src/host-stats.ts",
+    "./browser-start": "./src/browser-start.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

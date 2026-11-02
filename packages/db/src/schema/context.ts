@@ -55,6 +55,8 @@ export const searchDocuments = pgTable(
   (t) => [
     unique().on(t.kind, t.sourceId),
     index().on(t.orgId, t.kind),
+    // Searches listed by date (ADR 0123): a filter with no words, or newest/oldest first.
+    index().on(t.orgId, t.kind, t.sourceCreatedAt),
     index("search_documents_tsv_idx").using("gin", t.tsv),
     index("search_documents_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
   ],

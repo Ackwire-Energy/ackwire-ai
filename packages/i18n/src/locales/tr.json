@@ -1416,7 +1416,6 @@
       "button_other": "Sabitlenen mesajlar ({{count}})",
       "label": "#{{channel}} kanalında sabitlenen mesajlar",
       "in": "#{{channel}} kanalında sabitlendi",
-      "empty": "Burada henüz sabitlenen bir şey yok. Bir mesajı menüsünden sabitleyin.",
       "unpin": "{{name}} mesajının sabitlemesini kaldır"
     },
     "membersButton_one": "Kanal üyeleri ({{count}})",
@@ -1538,6 +1537,10 @@
     "asking_other": "{{names}} yanıtınızı bekliyor",
     "outage_one": "{{names}}: yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
     "outage_other": "{{names}}: yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
+    "queued_one": "{{names}} bilgisayar için sırada",
+    "queued_other": "{{names}} bilgisayar için sırada",
+    "away_one": "{{names}} bilgisayarı bekliyor",
+    "away_other": "{{names}} bilgisayarı bekliyor",
     "nobody": "Hiçbir ajan yanıtlamayacak",
     "status": {
       "seen": "Gördü",
@@ -1546,9 +1549,12 @@
       "waiting": "Onay bekliyor",
       "asking": "Yanıtınızı bekliyor",
       "outage": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
+      "queued": "Bilgisayar için sırada",
+      "away": "Bilgisayarı bekliyor",
       "handled": "Yanıtladı",
       "failed": "Başarısız oldu",
-      "referenced": "Yalnızca bahsedildi"
+      "referenced": "Yalnızca bahsedildi",
+      "reacted": "Tepki verdi"
     },
     "failedShort": "Yanıtlayamadı",
     "popoverTitle": "Ajanlar",
@@ -1758,6 +1764,10 @@
     "forbidden": "Şu anda yalnızca isteyen kişi, ajanın sahibi ya da bir yönetici devam ettirebilir",
     "resumed": "{{agent}} işe yeniden başladı",
     "ended": "Bu iş, yeniden başlamadan önce sona erdi",
+    "canceled": "İptal edildi. Sınır sıfırlanınca çalışmayacak.",
+    "dontRun": "Çalıştırma",
+    "dontRunHint": "İptal edin, sınır sıfırlanınca hiçbir şey çalışmaz",
+    "dontRunForbidden": "Yalnızca isteyen kişi, ajanın sahibi ya da bir yönetici iptal edebilir",
     "extraTitle": "Uzun işler ücretli ek kullanımı kullanabilir",
     "extraHint": "Planda ek kullanım açıkken uzun işler %95'in ötesinde sürer. Kapalıyken %95'te duraklar ve plan sıfırlanınca devam eder."
   },
@@ -1949,6 +1959,18 @@
     "publicDesc": "Çalışma alanındaki herkes görür ve katılabilir.",
     "private": "Özel",
     "privateDesc": "Yalnızca eklenenler.",
+    "roles": "Departmanlar veya roller",
+    "rolesDesc": "Seçilen rollerden birine sahip olan herkes kanalı görür ve katılır, şimdi veya sonra.",
+    "rolesPick": "Kanalı gören roller",
+    "rolesNone": "Workspace'te henüz rol yok.",
+    "rolesNeeded": "En az bir rol seç.",
+    "rolesLeave": "Rolü kaybeden kanaldan çıkar.",
+    "rolesChoose": "Rolleri seç",
+    "rolesChange": "Rolleri değiştir",
+    "rolesDone": "Tamam",
+    "publicTitle": "#{{channel}} herkese açık yapılsın mı?",
+    "publicBody": "Çalışma alanındaki herkes katılabilecek ve eskiler dahil tüm mesajları okuyabilecek.",
+    "publicConfirm": "Herkese açık yap",
     "members": "İlk üyeler",
     "membersSearch": "Kişi veya ajan ara",
     "membersEmpty": "“{{q}}” için kimse bulunamadı.",
@@ -2056,7 +2078,10 @@
     "can": "Yapabilir",
     "budgetUsed": "Bu ay bütçenin {{percent}} kadarı kullanıldı",
     "spendLabel": "Bu ay kullanılan bütçe",
-    "former": "Artık bu çalışma alanında değil"
+    "former": "Artık bu çalışma alanında değil",
+    "askAccess": "Erişim iste",
+    "detailsHiddenTitle": "Nasıl çalışır",
+    "detailsHidden": "{{name}} adlı ajanın talimatlarını, araçlarını, hafızasını ve kullanımını yalnızca yanıt verdiği kişiler, sorumlusu ve yöneticiler görür."
   },
   "presence": {
     "online": "Çevrimiçi",
@@ -2127,6 +2152,7 @@
       "waiting_approval": "Onay bekliyor",
       "waiting_answer": "Yanıt bekliyor",
       "waiting_computer": "Bilgisayarı bekliyor",
+      "queued_computer": "Bilgisayar için sırada",
       "waiting_plan": "Planın sıfırlanmasını bekliyor",
       "waiting_budget": "Bütçenin sıfırlanmasını bekliyor",
       "provider_down": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
@@ -2332,6 +2358,7 @@
     "refusedBy": "{{name}} reddetti · {{when}}",
     "approvedByYou": "Siz onayladınız · {{when}}",
     "outcomeApprovedBy": "{{name}} onayladı",
+    "requesterDecides": "Rolü gereği onaylayan biri istedi, bu yüzden o da karar verebilir",
     "outcomeApprovedByYou": "Siz onayladınız",
     "outcomeRefusedBy": "{{name}} reddetti",
     "outcomeRefusedByYou": "Siz reddettiniz",
@@ -2458,7 +2485,8 @@
       "mentions": "Bahsetmeler",
       "waiting": "Sizi bekleyenler",
       "unread": "Okunmamış",
-      "reactions": "Tepkiler"
+      "reactions": "Tepkiler",
+      "done": "Tamamlananlar"
     },
     "keys": {
       "title": "Kısayollar",
@@ -2598,6 +2626,8 @@
     "replyTip": "Yanıtla · R",
     "done": "Tamam",
     "doneTip": "Tamam · E",
+    "restore": "Geri taşı",
+    "restoreTip": "Geri taşı · E",
     "snooze": "Daha sonra hatırlat",
     "snoozeShort": "Hatırlat",
     "open": "Aç",
@@ -2629,6 +2659,7 @@
       "done": "Tamamlandı olarak işaretlendi",
       "doneQuestion": "{{name}} hâlâ bekliyor. Soru sohbette kalır.",
       "doneApproval": "İstek Onaylar bölümünde kalır.",
+      "restored": "Gelen Kutunuza geri döndü",
       "undo": "Geri al",
       "readAll_one": "{{count}} bildirim okundu olarak işaretlendi",
       "readAll_other": "{{count}} bildirim okundu olarak işaretlendi",
@@ -2645,6 +2676,7 @@
     "noneWaiting": "Sizi bekleyen kimse yok.",
     "noneUnread": "Hepsi okundu.",
     "noneHere": "Şimdilik burada bir şey yok.",
+    "noneDone": "Son 30 günde tamamlandı olarak işaretlenen bir şey yok.",
     "more": "Daha fazla göster"
   },
   "approvals": {
@@ -3764,6 +3796,13 @@
     "defaultKeyDesc": "{{provider}} · sonu {{hint}}",
     "otherKeyDesc": "{{provider}} · sonu {{hint}}",
     "modelNeedsKey": "{{provider}} API anahtarı gerekli",
+    "brainPick": {
+      "searchPlaceholder": "Model, plan veya üretici",
+      "connect": "{{plan}} bağla",
+      "connectText": "{{plan}} anahtarı gerekir. Ajanı oluşturduktan hemen sonra eklersiniz.",
+      "needsKey": "{{plan}} anahtarı gerekli",
+      "other": "Başkasını seçin"
+    },
     "noKeys": "Henüz anahtar yok",
     "budgetTitle": "Aylık bütçe",
     "budget": "Aylık bütçe (US$)",
@@ -4727,7 +4766,9 @@
       "usagePaused": "{{until}} tarihine kadar duraklatıldı (plan sınırı)",
       "usagePausedUnknown": "Plan sıfırlanana kadar duraklatıldı (plan sınırı)",
       "usagePausedBudget": "{{until}} tarihine kadar duraklatıldı (bütçe sınırı)",
-      "usagePausedBudgetUnknown": "Bütçe yenilenene kadar duraklatıldı (bütçe sınırı)"
+      "usagePausedBudgetUnknown": "Bütçe yenilenene kadar duraklatıldı (bütçe sınırı)",
+      "waitingPlan": "{{plan}} planı bekleniyor · {{until}} çalışacak",
+      "waitingPlanUnknown": "{{plan}} planının sıfırlanması bekleniyor"
     },
     "pausedReason": {
       "creator_left": "Duraklatıldı: oluşturan kişi çalışma alanından ayrıldı",
@@ -4777,6 +4818,8 @@
       "waiting": "Birinin yanıt vermesi bekleniyor",
       "waitingApproval": "Onayınız bekleniyor",
       "waitingComputer": "Bilgisayar bekleniyor",
+      "waitingPlan": "Planın sıfırlanması bekleniyor",
+      "waitingBudget": "Bütçenin yenilenmesi bekleniyor",
       "reported": "Bulduklarını bildirdi",
       "silent": "Yeni bir şey yok, sessiz kaldı",
       "failed": "Çalışmadı",
@@ -4834,6 +4877,10 @@
     "stoppedToast": "Çalıştırma durduruldu.",
     "usagePause": {
       "line": "Sınır sıfırlanınca kendi kendine devam eder. Konuşmaya hiçbir şey yazılmaz.",
+      "lineLimit": "Sınır sıfırlanınca kendi kendine çalışır. Konuşmaya hiçbir şey yazılmaz.",
+      "dontRun": "Çalıştırma",
+      "dontRunName": "Sınır sıfırlanınca {{name}} çalıştırılmasın",
+      "canceledToast": "İptal edildi. Sınır sıfırlanınca çalışmayacak.",
       "continuedToast": "Çalıştırma devam ediyor.",
       "forbidden": "Şu anda yalnızca rutini oluşturan kişi, ajanın sahibi ya da bir yönetici devam ettirebilir",
       "extra_off": "Bu planın kullanım aralığı doldu ve bu ajanın uzun işleri ücretli ek kullanımı kullanmıyor. Şimdi devam etmek için ajanın yapay zeka ayarlarından bunu açın, yoksa sıfırlamadan sonra devam eder",
@@ -7596,6 +7643,7 @@
       "freeTraining": "Bu modelin sağlayıcısı, istekleri modeli eğitmek için kullanabilir. OpenCode'da Settings › Privacy altında ücretsiz modeller için izni açın. Bu olmadan bu model yanıt vermez."
     },
     "recommended": "Önerilen",
+    "free": "Ücretsiz",
     "modelHelp": "Büyük modeller daha çok düşünür ve planı daha hızlı tüketir.",
     "hidden": "Düşünen yapay zekayı {{owner}} veya bir yönetici seçer.",
     "hiddenAdmins": "Düşünen yapay zekayı yalnızca yöneticiler seçer.",
@@ -7757,7 +7805,8 @@
       "html": "HTML sayfası",
       "file": "Dosya",
       "block": "Blok",
-      "poll": "Anket"
+      "poll": "Anket",
+      "choices": "Seçenekler"
     },
     "version": "s{{version}}",
     "createdBy": "{{kind}} · oluşturan: {{name}}",
@@ -7838,6 +7887,16 @@
     "pollAnswered_other": "{{total}} kişiden {{count}} kişi yanıtladı",
     "voteFailed": "Oyunuz iletilemedi."
   },
+  "choices": {
+    "step": "{{step}} / {{total}}",
+    "back": "Geri",
+    "next": "İleri",
+    "close": "Kapat",
+    "closed": "{{title}} · kapandı",
+    "reopen": "Yeniden göster",
+    "answeredBy": "{{name}} seçti",
+    "failed": "Seçiminiz gönderilemedi. Tekrar deneyin."
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "Kişilerin ve ajanların oluşturduğu veya yüklediği her şey.",
@@ -7875,7 +7934,8 @@
       "html": "HTML sayfaları",
       "file": "Dosyalar",
       "block": "Bloklar",
-      "poll": "Anketler"
+      "poll": "Anketler",
+      "choices": "Seçenekler"
     },
     "kindCount": "{{kind}}: {{count}}",
     "view": "Görünüm",
@@ -9348,7 +9408,72 @@
     "hint": "Bulunduğunuz kanallarda arar.",
     "inChannel": "#{{channel}} kanalında",
     "count_one": "{{count}} sonuç",
-    "count_other": "{{count}} sonuç"
+    "count_other": "{{count}} sonuç",
+    "countMore": "{{count}}+ sonuç",
+    "words": {
+      "ops": {
+        "from": "kimden",
+        "in": "nerede",
+        "has": "içeren",
+        "mentions": "bahseden",
+        "before": "önce",
+        "after": "sonra",
+        "during": "sırasında",
+        "author": "yazar",
+        "pinned": "sabit"
+      },
+      "has": {
+        "link": "bağlantı",
+        "file": "dosya",
+        "image": "görsel",
+        "card": "kart"
+      },
+      "author": {
+        "person": "kişi",
+        "agent": "ajan"
+      }
+    },
+    "options": "Arama seçenekleri",
+    "option": {
+      "from": "Belirli bir kişiden veya ajandan",
+      "in": "Belirli bir kanalda veya DM'de gönderilen",
+      "has": "Bağlantı, dosya, görsel veya kart içeren",
+      "mentions": "Belirli bir kişiden veya ajandan bahseden",
+      "before": "Bir tarihten önce",
+      "after": "Bir tarihten sonra",
+      "during": "Bir gün, ay veya yılda",
+      "author": "Kişiler veya ajanlar tarafından yazılan",
+      "pinned": "Sabitlenen mesajlar"
+    },
+    "moreFilters": "Daha fazla filtre",
+    "hasLabel": {
+      "link": "Bağlantı",
+      "file": "Dosya",
+      "image": "Görsel",
+      "card": "Kart"
+    },
+    "authorLabel": {
+      "person": "Kişiler",
+      "agent": "Ajanlar"
+    },
+    "pinnedChip": "Sabitlenen",
+    "removeFilter": "Kaldır: {{filter}}",
+    "filtersApplied_one": "{{count}} filtre",
+    "filtersApplied_other": "{{count}} filtre",
+    "recent": "Son aramalar",
+    "clearRecent": "Temizle",
+    "pickDate": "Tarih",
+    "dateHint": "Bir tarih yazın: 2026-10-05, 2026-10 veya 2026",
+    "noMatch": "Burada bu adda kimse yok.",
+    "noPlace": "Bu adda kanal veya DM yok.",
+    "sort": {
+      "label": "Sırala",
+      "newest": "En yeni",
+      "oldest": "En eski",
+      "relevance": "En alakalı"
+    },
+    "searchHere": "Bu konuşmada ara",
+    "dm": "{{name}} ile DM"
   },
   "files": {
     "upload": "Dosya yükle",
@@ -9562,6 +9687,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Ağ değişiyor. Bilgisayarın açık oturumları {{when}} saatinde yeniden başlayacak.",
+      "restart": "Bilgisayar oturumları ağı uygulamak için yeniden başlıyor. Yeni işler bu bitene kadar bekler.",
+      "line": "Çıkış IP’si {{ip}}",
+      "hint": "Ajanlar gezinirken sitelerin gördüğü adres. Bilgisayarın ağı değişince güncellenir."
+    },
     "online": "Çevrimiçi",
     "offline": "Çevrimdışı",
     "execOff": "Komutlar kapalı",
@@ -10561,7 +10692,7 @@
       "waitingComputer": "Bilgisayar bekleniyor",
       "paused": "Plan sınırında duraklatıldı",
       "pausedUntil": "Plan sınırında duraklatıldı · {{time}} saatinde geri döner",
-      "done": "{{duration}} içinde tamamlandı",
+      "done": "{{duration}} içinde bitti",
       "failed": "Bitmedi",
       "canceled": "{{name}}, {{duration}} sonra durdurdu",
       "canceledAnon": "{{duration}} sonra durduruldu"
@@ -10664,6 +10795,11 @@
       "answeredFar": "{{to}}, {{from}} ajanının sorusunu yanıtladı",
       "answeredRequestFar": "{{to}}, {{from}} ajanının isteğini yanıtladı",
       "see": "Gör"
+    },
+    "talk": {
+      "readAll": "Tümünü oku",
+      "more_one": "{{count}} satır daha",
+      "more_other": "{{count}} satır daha"
     },
     "consultPanel": {
       "label": "{{from}} ile {{to}} arasındaki konuşma",
@@ -10966,15 +11102,18 @@
       "brain_unavailable": "{{brain}} şu anda yanıt veremiyor. Geri gelince yanıt vereceğim.",
       "provider_unavailable": "Yapay zeka sağlayıcım şu anda yanıt vermiyor. Geri gelir gelmez yanıt vereceğim.",
       "brain_busy": "Bilgisayarım şu anda başka görevlerle meşgul. Boşalır boşalmaz yanıt vereceğim.",
+      "brain_queued": "Hâlâ bilgisayar için sıradayım. Yer açılır açılmaz yanıt vereceğim.",
       "brain_interrupted": "{{brain}} bitirmeden durdu. Zaten yapılanlar tekrarlanmadı: {{tools}}.",
       "plan_limit_cut": "{{plan}} planının sınırında durdum. Sıfırlandığında, {{when}}, kaldığım yerden devam edeceğim.",
       "plan_limit_cut_unknown": "{{plan}} planının sınırında durdum. Sıfırlanır sıfırlanmaz kaldığım yerden devam edeceğim.",
       "plan_limit_wait": "{{plan}} planı sınırına ulaştı. Sıfırlandığında, {{when}}, yanıt vereceğim.",
       "plan_limit_wait_unknown": "{{plan}} planı sınırına ulaştı. Sıfırlanır sıfırlanmaz yanıt vereceğim.",
       "budget_wait": "Bu ayki bütçem bitti. {{when}} devam edeceğim, bir yönetici artırırsa daha erken.",
+      "usage_wait_canceled": "İptal edildi. Sınır sıfırlanınca çalışmayacak.",
       "usage_paused": "{{agent}} bu işi duraklattı · {{plan}} planı %{{percent}} {{window}}",
       "usage_paused_budget": "{{agent}} bu işi duraklattı · aylık bütçe %{{percent}}",
       "work_auto_moved": "Bu biraz sürecek, o yüzden arka planda devam ediyorum. Güncellemeleri buraya yazacağım, bir sonraki yaklaşık {{minutes}} dk içinde.",
+      "work_auto_movedOver": "Bu biraz sürecek, o yüzden arka planda devam ediyorum. Güncellemeleri buraya yazacağım.",
       "work_end_done": "Bitti ({{minutes}} dk).",
       "work_end_failed": "Bu arka plan işi tamamlanmadı ({{minutes}} dk).",
       "work_end_failedWhy": "Bu arka plan işi tamamlanmadı ({{minutes}} dk): {{why}}.",
@@ -11903,6 +12042,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Yalnızca izliyorsunuz.",
+      "title": "Kontrolü almak ister misiniz?",
+      "working": "Kontrol sizdeyken {{name}} duraklar."
+    },
     "sub": {
       "control": "Kontrol sizde · {{name}} bekliyor",
       "controlAsked": "Kontrol sizde · {{name}} istedi",

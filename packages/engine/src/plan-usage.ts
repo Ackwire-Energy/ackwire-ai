@@ -7,6 +7,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { catalogModelOf, nanoUsdToUsd, summedCostNanoUsd } from "@agenteschat/providers";
+import { agentIdsWithDetails } from "./audience";
 import { NotFoundError } from "./errors";
 import { LISTED_ACCOUNT_STATUSES } from "./machine-accounts";
 import { requirePermission } from "./organizations";
@@ -515,8 +516,10 @@ export async function orgPlanUsage(
 
   const apiTokens = new Map<string, number>();
   for (const r of month) if (!r.plan) apiTokens.set(r.agentId, (apiTokens.get(r.agentId) ?? 0) + tokensOf(r));
+  // Without `view_usage`, only the agents whose details the viewer sees (`seesAgentDetails`).
+  const seen = money ? null : await agentIdsWithDetails(db, userId, orgId);
   const api = [...budgets]
-    .filter(([id, b]) => b.spentNanoUsd > 0 || (apiTokens.get(id) ?? 0) > 0)
+    .filter(([id, b]) => (b.spentNanoUsd > 0 || (apiTokens.get(id) ?? 0) > 0) && (!seen || seen.has(id)))
     .map(([agentId, b]) =>
       apiUsageOf(agentId, ctx.agents.get(agentId)?.name ?? "", apiTokens.get(agentId) ?? 0, b, money),
     )

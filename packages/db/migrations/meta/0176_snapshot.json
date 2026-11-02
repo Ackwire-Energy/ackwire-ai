@@ -1,5 +1,5 @@
 {
-  "id": "848dcb6e-3222-4d8e-b2b9-685a3e9f9651",
+  "id": "319da399-2914-4371-bd29-fa20a8ab772e",
   "prevId": "c4d4d73f-9e17-4440-96a3-728ea47e63cf",
   "version": "7",
   "dialect": "postgresql",
@@ -617,13 +617,6 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
-        },
-        "voice_messages": {
-          "name": "voice_messages",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "updated_at": {
           "name": "updated_at",
@@ -7903,7 +7896,7 @@
       "checkConstraints": {
         "instance_secrets_name": {
           "name": "instance_secrets_name",
-          "value": "\"instance_secrets\".\"name\" in ('typesafe', 'giphy', 'speech')"
+          "value": "\"instance_secrets\".\"name\" in ('typesafe', 'giphy')"
         }
       },
       "isRLSEnabled": false
@@ -11248,6 +11241,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "done_by_user": {
+          "name": "done_by_user",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "snoozed_until": {
           "name": "snoozed_until",
           "type": "timestamp with time zone",
@@ -11294,6 +11294,34 @@
           ],
           "isUnique": false,
           "where": "\"notifications\".\"done_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notifications_done": {
+          "name": "notifications_done",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "done_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"notifications\".\"done_by_user\" and \"notifications\".\"done_at\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -18756,267 +18784,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "deletion_requested_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.voice_clips": {
-      "name": "voice_clips",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "thread_id": {
-          "name": "thread_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_id": {
-          "name": "client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reply_to": {
-          "name": "reply_to",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "storage_config_id": {
-          "name": "storage_config_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "blob_key": {
-          "name": "blob_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content_type": {
-          "name": "content_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "duration_ms": {
-          "name": "duration_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "peaks": {
-          "name": "peaks",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "language": {
-          "name": "language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "message_id": {
-          "name": "message_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "engine": {
-          "name": "engine",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cost_nano_usd": {
-          "name": "cost_nano_usd",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "audio_deleted_at": {
-          "name": "audio_deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "voice_clips_org_id_user_id_client_id_index": {
-          "name": "voice_clips_org_id_user_id_client_id_index",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "voice_clips_org_id_created_at_index": {
-          "name": "voice_clips_org_id_created_at_index",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "voice_clips_user_id_created_at_index": {
-          "name": "voice_clips_user_id_created_at_index",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "voice_clips_created_at_index": {
-          "name": "voice_clips_created_at_index",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "voice_clips_org_id_organizations_id_fk": {
-          "name": "voice_clips_org_id_organizations_id_fk",
-          "tableFrom": "voice_clips",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "voice_clips_channel_id_channels_id_fk": {
-          "name": "voice_clips_channel_id_channels_id_fk",
-          "tableFrom": "voice_clips",
-          "tableTo": "channels",
-          "columnsFrom": [
-            "channel_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "voice_clips_user_id_users_id_fk": {
-          "name": "voice_clips_user_id_users_id_fk",
-          "tableFrom": "voice_clips",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
           ],
           "columnsTo": [
             "id"

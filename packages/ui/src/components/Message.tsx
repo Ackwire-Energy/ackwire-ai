@@ -245,6 +245,11 @@ export function MessageText({ className, ...rest }: HTMLAttributes<HTMLDivElemen
 }
 
 /** "Hoje", "Ontem", a date. */
-export function DayDivider({ children }: { children: ReactNode }) {
-  return <div className="ac-divider">{children}</div>;
+/** `day`: the day's ISO time, which the list's floating date reads while it scrolls (`data-day`). */
+export function DayDivider({ children, day }: { children: ReactNode; day?: string }) {
+  return (
+    <div className="ac-divider" data-day={day}>
+      {children}
+    </div>
+  );
 }

@@ -1036,6 +1036,11 @@ describe("an agent's turn as one block", () => {
     expect(stepLimitOf(stuck)).toEqual({ continuedRunId: null, stuck: true });
     expect(stepLimitOf(withContinued(stuck, "r4"))).toEqual({ continuedRunId: "r4", stuck: true });
   });
+
+  test("a long work's end its AI provider failed: continued in its own meta", () => {
+    const end = { workEnd: { id: "w1", status: "failed", errorCode: "run.provider_error" } };
+    expect(withContinued(end, "r5")).toEqual({ workEnd: { ...end.workEnd, continuedRunId: "r5" } });
+  });
 });
 
 describe("automatic lines (notices) and fast replies", () => {

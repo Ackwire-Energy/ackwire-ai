@@ -443,6 +443,7 @@ export function parseAgents(v: unknown): MachineAgent[] {
       name: str(o.name, 100) || str(o.handle, 64),
       ...(lookOut && Object.keys(lookOut).length ? { look: lookOut } : {}),
       ...(isAccountId(o.account) ? { account: o.account } : {}),
+      ...(str(o.locale, 32) ? { locale: str(o.locale, 32) } : {}),
     });
   }
   return out;

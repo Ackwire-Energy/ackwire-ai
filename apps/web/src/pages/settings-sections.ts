@@ -40,22 +40,24 @@ export const SETTINGS_SECTIONS: {
   { id: "notifications", icon: "bell", group: "you", allowed: () => true },
   // AI apps (ADR 0119): each person connects their own, in this workspace.
   { id: "apps", icon: "link", group: "you", allowed: () => true },
-  { id: "general", icon: "settings", group: "org", allowed: () => true },
+  // The workspace's sections are for who runs it: a member keeps only their own (above) and what they use themselves
+  // (the people, where a member who may not invite suggests someone (ADR 0090), connectors, computers, AI accounts).
+  { id: "general", icon: "settings", group: "org", allowed: (o) => can(o, "configure") },
   { id: "members", icon: "members", group: "org", allowed: () => true },
-  // Every member reads what each role allows (ADR 0085); who manages roles changes the ones below theirs.
-  { id: "roles", icon: "audiencePeople", group: "org", allowed: () => true },
+  { id: "roles", icon: "audiencePeople", group: "org", allowed: (o) => can(o, "manage_roles") },
   // What agents did and people changed: only for who may see it (it shows everyone's work).
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
-  // GIFs and stickers in chat (ADR 0091): everyone reads them, who configures the workspace changes them.
-  { id: "media", icon: "sticker", group: "org", allowed: () => true },
-  // Voice messages (ADR 0100): everyone reads the switch, who configures the workspace changes it.
-  { id: "voice", icon: "mic", group: "org", allowed: () => true },
+  // GIFs and stickers in chat (ADR 0091): who configures the workspace.
+  { id: "media", icon: "sticker", group: "org", allowed: (o) => can(o, "configure") },
+  // Voice messages (ADR 0100): who configures the workspace.
+  { id: "voice", icon: "mic", group: "org", allowed: (o) => can(o, "configure") },
   { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
   // Every member sees the computers and can pair one (ADR 0025).
   { id: "computers", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
-  // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
+  // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
+  // money and the workspace's report only for who has `view_usage`.
   { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", icon: "key", group: "costs", allowed: (o) => can(o, "read") },

@@ -68,7 +68,7 @@ Every update is an `issue_activity` event `work_update`. The plan (`[{ id, text,
 ### 6. Conversation UX (web and phone)
 
 - Work runs never drive the conversation's working bar: their events carry `background`, and `activeRunsIn` marks them so.
-- The anchor's **WorkLine** (`packages/ui`, phone `features/chat/WorkLine.tsx`, one view model `workLine` in `packages/client/src/lib/long-work.ts`): "Em segundo plano · 12 min · próximo update em ~8 min", the queue, "Aguardando sua aprovação", "Pausado no limite do plano · volta às 14:00", "Concluído em 38 min", "Não terminou", "Parado por Bia aos 12 min"; the last update as a second line; Abrir thread (only where no thread line already opens it), Tarefa #42, Ver resultado, Parar. Plain text that wraps.
+- The anchor's **WorkLine** (`packages/ui`, phone `features/chat/WorkLine.tsx`, one view model `workLine` in `packages/client/src/lib/long-work.ts`): "Em segundo plano · 12 min · próximo update em ~8 min", the queue, "Aguardando sua aprovação", "Pausado no limite do plano · volta às 14:00", "Terminou em 38 min", "Não terminou", "Parado por Bia aos 12 min"; the last update as a second line; Abrir thread (only where no thread line already opens it), Tarefa #42, Ver resultado, Parar. Plain text that wraps.
 - The agent stays free: an own-thread work no longer matches the join rules, and an in-thread work is excluded explicitly (`workKeepsThread` in the `active` and `floor_runs` CTEs and `startOrJoinRun`). A reply in the anchor's thread joins the work run (live on steerable brains).
 - A new run in the conversation reads "# Your background work here" and has `steer_work` (forwards the person's messages unchanged into the work's inbox, live when it can) and `stop_work` (through `cancelRun`, so `mayStopRun` decides).
 - **Parar** calls `POST …/runs/{runId}/cancel`; who may is computed by the apps as for any run (who asked, the agent's owner, an admin); the line is broadcast to everyone, so it can't carry a per-reader flag, and a refusal shows as a toast. `stopRun` closes the work home at once ("Parado por …").
@@ -92,9 +92,14 @@ Migration `0174_background_work.sql`: `agent_works` (with `org_id`, `anchor_mess
 
 `packages/engine/test/works.test.ts` (move and freed conversation, flat DM, in-thread ask, steering and `stop_work`, the safety net by time and by calls, check-in nudge/fallback/race/redelivery, update gaps and clamps, waits, cards and their stages, the 15-minute card, caps and the queue, the workspace cap, the sweep twice, status lines, Continuar), `engine-brains.test.ts` (a steerable brain gets the check-in live and keeps its session while a conversation run gets another; a brain that reads at its turn's end gets it next turn and the server's line covers the silence), `apps/server/test/long-work.test.ts` (the anchor's view, `agent.work`, `background` in active runs, Parar refused to others and closing it home), `apps/mobile/test/features/long-work.test.ts` (every line state in both languages, status lines, badges, server bodies, `workingNow`).
 
+### 10. The owner's decisions (2026-11-02, approved as recommended; ADR 0124)
+
+- **A card from a DM or a private channel stays private** to who reads that conversation; Mostrar para todos stays the way to show it to everyone (`works.test.ts` holds it).
+- **Continuar after a provider error**: a work whose run failed with `run.provider_error` or `run.provider_unavailable` shows Continuar under its end (`workContinuable` in the apps; `continueRun` takes the work's `result_message_id` and marks `meta.workEnd.continuedRunId`). It carries the same work, as Continuar at the step limit does.
+- **A finished anchor keeps no promise**: the line says "Terminou em N min" (or the failed or stopped wording), the anchor's text is dimmed, the server's automatic anchor shows its words without the next update (`work_auto_movedOver`), and an agent's anchor drops a last sentence that promises a time (`workAnchorBody`). `say` no longer carries a time: the line under it does.
+
 ## Left out
 
 - Works for unattended runs and for missions (missions keep their own plan and progress).
-- Showing every work to the whole workspace by default: a card from a DM is visible like the DM until someone presses Mostrar para todos. Open question for the owner.
 - A Bloqueado column: a badge for now; one enum value later if wanted.
 - "Continuar agora" on the paused line: the usage pause card in the work's thread has it.

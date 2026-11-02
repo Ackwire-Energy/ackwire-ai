@@ -43,6 +43,16 @@
     "pollAnswered_other": "{{count}} von {{total}} haben geantwortet",
     "voteFailed": "Deine Stimme wurde nicht gezählt."
   },
+  "choices": {
+    "step": "{{step}} von {{total}}",
+    "back": "Zurück",
+    "next": "Weiter",
+    "close": "Schließen",
+    "closed": "{{title}} · geschlossen",
+    "reopen": "Wieder anzeigen",
+    "answeredBy": "{{name}} hat gewählt",
+    "failed": "Deine Auswahl wurde nicht gesendet. Versuch es noch einmal."
+  },
   "chart": {
     "pending": "Diagramm wird erstellt…",
     "table": "Tabelle",
@@ -504,7 +514,10 @@
     "full": "Dieser Chat hat schon 100 angepinnte Nachrichten. Löse zuerst eine.",
     "mark": "Angepinnt",
     "none": "Noch nichts angepinnt",
-    "empty": "Hier ist noch nichts angepinnt. Halte eine Nachricht gedrückt und tippe auf Anpinnen."
+    "empty": "Hier ist noch nichts angepinnt. Halte eine Nachricht gedrückt und tippe auf Anpinnen.",
+    "bar_one": "Angeheftete Nachrichten ({{count}})",
+    "bar_other": "Angeheftete Nachrichten ({{count}})",
+    "unpinOf": "Nachricht von {{name}} lösen"
   },
   "thread": {
     "threadIn": "Thread in #{{channel}}",
@@ -732,7 +745,8 @@
     "title": "Aktivität",
     "filter": {
       "all": "Alle",
-      "waiting": "Wartet auf dich"
+      "waiting": "Wartet auf dich",
+      "done": "Erledigt"
     },
     "day": {
       "today": "Heute",
@@ -812,6 +826,8 @@
     "markUnread": "Als ungelesen markieren",
     "unread": "Ungelesen",
     "done": "Erledigt",
+    "restore": "Zurückverschieben",
+    "noneDone": "In den letzten 30 Tagen nichts als erledigt markiert.",
     "more": "Mehr ansehen",
     "empty": "Nichts wartet auf dich. Durchatmen."
   },

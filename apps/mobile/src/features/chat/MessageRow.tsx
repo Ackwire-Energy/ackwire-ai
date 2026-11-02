@@ -15,12 +15,16 @@ import {
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
+import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib/agent-talk";
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
+import { choiceReplyLine } from "@agenteschat/client/lib/choices";
+import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
+import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
@@ -34,7 +38,7 @@ import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { memo, type ReactNode, useEffect, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -54,11 +58,11 @@ import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
-import { UsagePauseCard } from "../ai/UsagePauseCard";
+import { UsagePauseCard, UsageWaitCancel } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
-import { consultationHref, routineHref } from "../links/logic";
+import { chatHref, consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
@@ -120,6 +124,7 @@ export const MessageRow = memo(function MessageRow({
   receipt,
   seenBy,
   readOnly = false,
+  inThread = false,
   run: runAt = "solo",
   above,
   aboveThread = false,
@@ -143,6 +148,8 @@ export const MessageRow = memo(function MessageRow({
   seenBy?: string;
   /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
   readOnly?: boolean;
+  /** On its thread's own screen: a long message between agents is read whole there. */
+  inThread?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
@@ -182,10 +189,28 @@ export const MessageRow = memo(function MessageRow({
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a
   // task ran is said only where the workspace has more than one computer.
   const names = useNamesComputers();
-  const body = hidesBody(m)
+  const said = hidesBody(m)
     ? ""
     : reminderBody(splitCanceled(serverBody(t, m.body, meta, i18n.language, names), meta).body, meta);
+  // A long work's anchor once it's over: no promise left, and dimmed (its line says how it ended).
+  const body = m.longWork ? workAnchorBody(t, said, meta, m.longWork) : said;
+  const workOver = Boolean(m.longWork && workIsOver(m.longWork));
+  // The person's pick on a choice card (ADR 0124): one compact line, not a bubble.
+  const choiceReply = meta?.choiceReply && body ? <ChoiceReply text={choiceReplyLine(body)} /> : null;
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
+  // A long message from one agent to another (ADR 0034): its first paragraph and "Ler tudo", which pushes its
+  // thread's screen with it whole. On that screen, and where it is read only, it stays whole.
+  const talk = useMemo(
+    () =>
+      isAgent &&
+      !inThread &&
+      !readOnly &&
+      !m.local &&
+      talksToAgent(m, (handle) => agentsByAnyHandle(dir.agents).get(handle)?.id)
+        ? foldTalk(body, TALK_LINE_CHARS.phone)
+        : null,
+    [isAgent, inThread, readOnly, m, body, dir.agents],
+  );
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);
   // The one an agent adds after its own reply carries the reply's run: the run's tools, questions and stop line
@@ -213,6 +238,8 @@ export const MessageRow = memo(function MessageRow({
   const stopped = isAgent && m.agentRunId && !mediaAfter ? stoppedOf(meta) : null;
   // The reply of a run that reached its step limit: the same line, with Continuar.
   const atLimit = isAgent && m.agentRunId && !stopped && !mediaAfter ? stepLimitOf(meta) : null;
+  // A long work's end after its AI provider failed: Continuar under it too.
+  const providerCut = isAgent && m.agentRunId && !stopped && !atLimit ? workContinuable(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
@@ -309,11 +336,14 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // A voice message's player, the bubble, or the GIF or sticker or the files of a message with no words, leads.
+    // A voice message's player, a choice's answer, the bubble, or the GIF or sticker or the files of a message
+    // with no words, leads.
     const lead = voiceOf(meta) ? (
       <View style={styles.meFiles}>
         <VoiceMessage message={m} />
       </View>
+    ) : choiceReply ? (
+      <View style={styles.meFiles}>{choiceReply}</View>
     ) : body ? (
       <View style={[styles.bubble, BUBBLE_RUN[run], { backgroundColor: c.bubble }]}>
         <MessageText
@@ -475,7 +505,12 @@ export const MessageRow = memo(function MessageRow({
           </View>
         ) : null}
         {consulted.map((cs) => (
-          <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
+          <ConsultationCard
+            key={cs.consultationId}
+            askerId={m.author.id ?? ""}
+            consultation={cs}
+            channelId={readOnly ? undefined : m.channelId}
+          />
         ))}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {brainWait ? (
@@ -493,23 +528,49 @@ export const MessageRow = memo(function MessageRow({
               ) : null
             }
           />
+        ) : choiceReply ? (
+          choiceReply
         ) : body ? (
           <MessageText
-            body={body}
-            muted={m.local === "pending"}
+            body={talk ? talk.lead : body}
+            muted={m.local === "pending" || workOver}
             selectable={false}
             accent={accent}
             channelRefs={channelRefsOf(m.meta)}
           />
         ) : null}
+        {talk && !brainWait ? (
+          <Pressable
+            onPress={() => {
+              tapHaptic();
+              router.push(chatHref(m.channelId, m.threadId ?? m.id));
+            }}
+            accessibilityRole="button"
+            hitSlop={8}
+            style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
+          >
+            <Text variant="footnote" tone="muted" style={styles.medium}>
+              {t("chat.talk.readAll")}
+            </Text>
+            <Text variant="footnote" tone="faint">
+              · {t("chat.talk.more", { count: talk.more })}
+            </Text>
+            <Icon name="right" size={14} color={c.faint} />
+          </Pressable>
+        ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
         {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
-        {(stopped || atLimit) && m.agentRunId ? (
+        {(stopped || atLimit || providerCut) && m.agentRunId ? (
           <StoppedLine
             message={m}
             runId={m.agentRunId}
-            stopped={stopped ?? { byUserId: null, continuedRunId: atLimit?.continuedRunId ?? null }}
-            limit={atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
+            stopped={
+              stopped ?? {
+                byUserId: null,
+                continuedRunId: atLimit?.continuedRunId ?? providerCut?.continuedRunId ?? null,
+              }
+            }
+            limit={providerCut ? "failed" : atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
           />
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
@@ -562,6 +623,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
         {isAgent ? <UsagePauseCard message={m} /> : null}
+        {isAgent ? <UsageWaitCancel message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
         {isAgent ? <InstructionProposals message={m} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
@@ -609,8 +671,11 @@ function StoppedLine({
   message: Message;
   runId: string;
   stopped: { byUserId: string | null; continuedRunId: string | null };
-  /** It ended at its step limit, or because it got stuck: nobody stopped it. */
-  limit?: "steps" | "stuck";
+  /**
+   * It ended at its step limit, or because it got stuck, or its long work failed on its AI provider (the end's text
+   * already says so, so only Continuar shows): nobody stopped it.
+   */
+  limit?: "steps" | "stuck" | "failed";
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -661,17 +726,23 @@ function StoppedLine({
         });
       });
   };
+  const said = limit !== "failed";
+  if (!said && !open) return null;
   return (
     <View style={styles.stopped}>
-      <PixelStopped size={12} />
-      <Text variant="caption" tone="muted">
-        {by}
-      </Text>
+      {said ? <PixelStopped size={12} /> : null}
+      {said ? (
+        <Text variant="caption" tone="muted">
+          {by}
+        </Text>
+      ) : null}
       {open ? (
         <>
-          <Text variant="caption" tone="faint">
-            ·
-          </Text>
+          {said ? (
+            <Text variant="caption" tone="faint">
+              ·
+            </Text>
+          ) : null}
           <PressScale
             onPress={onContinue}
             accessibilityRole="button"
@@ -686,6 +757,19 @@ function StoppedLine({
           </PressScale>
         </>
       ) : null}
+    </View>
+  );
+}
+
+/** The person's pick sent from a choice card (ADR 0124): a check and what they picked. */
+function ChoiceReply({ text }: { text: string }) {
+  const c = useColors();
+  return (
+    <View style={styles.choiceReply}>
+      <Icon name="check" size={13} color={c.muted} />
+      <Text variant="footnote" tone="ink" style={[styles.medium, styles.shrink]}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -844,6 +928,7 @@ const styles = StyleSheet.create({
   cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
+  choiceReply: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 },
   // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
   who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
   // A person's name line keeps room at its end for the receipt's mark, with or without one, so a mark that comes
@@ -879,6 +964,15 @@ const styles = StyleSheet.create({
   },
   continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
+  talkMore: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    marginTop: 6,
+    minHeight: 28,
+  },
+  pressedDim: { opacity: 0.6 },
   shrink: { flexShrink: 1 },
   // The chip's own shrink only works if what holds it can shrink too (a long routine name ends in "…").
   tagPress: { flexShrink: 1, maxWidth: "100%", alignSelf: "center" },

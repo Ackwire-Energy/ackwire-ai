@@ -785,9 +785,15 @@ export type UserLocale = AppLocale;
  * Saves the person's app language (ADR 0122): `auto` when a device detected it ("Automático"), false when they
  * picked it, so every device shows that one.
  */
-export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false) {
+export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false, pubsub?: PubSub) {
   if (!isAppLocale(locale)) throw new ValidationError(`locale must be one of ${LOCALE_CODES.join(", ")}`);
   await db.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+  // Runners render each agent's browser start page in its responsible person's language.
+  if (pubsub) {
+    const orgs = await db.selectDistinct({ id: agents.orgId }).from(agents).where(eq(agents.ownerUserId, userId));
+    const { publishMachineAgentsChanged } = await import("./machines");
+    await Promise.all(orgs.map((org) => publishMachineAgentsChanged(pubsub, org.id)));
+  }
 }
 
 /** The person's language and whether it follows each device's. */

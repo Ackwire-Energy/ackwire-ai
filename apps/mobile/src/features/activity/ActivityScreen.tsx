@@ -73,7 +73,7 @@ export function ActivityScreen() {
   useEffect(() => {
     if (asked) setFilter("waiting");
   }, [asked]);
-  const list = useNotifications(orgId, filter === "waiting" ? "waiting" : "all");
+  const list = useNotifications(orgId, filter);
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const counts = list.data?.pages[0]?.counts;
   const { waiting, days } = activitySections(items, filter);
@@ -89,6 +89,7 @@ export function ActivityScreen() {
         items={[
           { key: "all", label: t("mobile.activity.filter.all") },
           { key: "waiting", label: t("mobile.activity.filter.waiting"), count: counts?.waiting ?? waiting.length },
+          { key: "done", label: t("mobile.activity.filter.done") },
         ]}
         value={filter}
         onChange={(key) => setFilter(key as ActivityFilter)}
@@ -102,8 +103,12 @@ export function ActivityScreen() {
             ))}
           </View>
         </>
-      ) : !list.isLoading ? (
+      ) : list.isLoading ? null : filter !== "done" ? (
         <AllClear />
+      ) : days.length === 0 ? (
+        <Text variant="body" tone="muted" style={styles.noneDone}>
+          {t("mobile.activity.noneDone")}
+        </Text>
       ) : null}
       {days.map(([group, groupItems]) => (
         <View key={group}>
@@ -387,7 +392,10 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
 
   // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.
   const toggleRead = () => act.mutate({ type: "read", item: n, read: unread });
-  const done = () => act.mutate({ type: "done", item: n, done: true });
+  // In "Concluídas" the same swipe moves it back to the inbox.
+  const isDone = Boolean(n.doneAt);
+  const done = () => act.mutate({ type: "done", item: n, done: !isDone });
+  const doneLabel = isDone ? t("mobile.activity.restore") : t("mobile.activity.done");
   const open = () => {
     if (unread) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
@@ -420,7 +428,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           onAction: toggleRead,
         }}
         // On the green, the page's color reads in both themes (white in light, near black on dark's light green).
-        right={{ label: t("mobile.activity.done"), icon: "archive", color: c.ok, ink: c.bg, onAction: done }}
+        right={{ label: doneLabel, icon: isDone ? "undo" : "archive", color: c.ok, ink: c.bg, onAction: done }}
       >
         <View style={{ backgroundColor: c.bg }}>
           <ListRow
@@ -429,7 +437,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
             accessibilityLabel={a11y}
             accessibilityActions={[
               { name: "read", label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread") },
-              { name: "done", label: t("mobile.activity.done") },
+              { name: "done", label: doneLabel },
             ]}
             onAccessibilityAction={(e) => (e.nativeEvent.actionName === "read" ? toggleRead() : done())}
             dot={unread}
@@ -467,6 +475,7 @@ const faceOf = (a: AppNotification["actors"][number] | undefined) =>
 
 const styles = StyleSheet.create({
   cards: { gap: 10, paddingHorizontal: 16 },
+  noneDone: { paddingHorizontal: 16, paddingVertical: 24, textAlign: "center" },
   wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   wpressed: { opacity: 0.85 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },

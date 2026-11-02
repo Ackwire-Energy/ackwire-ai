@@ -45,7 +45,10 @@ function hop(p: Picture, color: RGB, alpha: number, cell = 4) {
   const x1 = APPS[0] - 84;
   const y0 = APP[1] - 6;
   const peak = APP[1] - 52;
-  const at = (t: number): [number, number] => [x0 + (x1 - x0) * t, (1 - t) ** 2 * y0 + 2 * (1 - t) * t * peak + t * t * y0];
+  const at = (t: number): [number, number] => [
+    x0 + (x1 - x0) * t,
+    (1 - t) ** 2 * y0 + 2 * (1 - t) * t * peak + t * t * y0,
+  ];
   for (let i = 0; i <= 9; i++) {
     const t = i / 10;
     const [x, y] = at(t);
@@ -65,7 +68,8 @@ function hop(p: Picture, color: RGB, alpha: number, cell = 4) {
     [-1, 3],
     [-2, 4],
   ];
-  for (const [dx, dy] of head) p.box(hx + (dx as number) * cell, hy - 2 * cell + (dy as number) * cell, cell, cell, color, alpha);
+  for (const [dx, dy] of head)
+    p.box(hx + (dx as number) * cell, hy - 2 * cell + (dy as number) * cell, cell, cell, color, alpha);
 }
 
 function background(k: number): Picture {
@@ -111,7 +115,9 @@ writeFileSync(one, background(1).png());
 writeFileSync(two, background(2).png());
 if (process.platform === "darwin") {
   // One TIFF with both sizes: Finder picks the one the screen needs.
-  const tiff = spawnSync("tiffutil", ["-cathidpicheck", one, two, "-out", join(dir, "background.tiff")], { stdio: "inherit" });
+  const tiff = spawnSync("tiffutil", ["-cathidpicheck", one, two, "-out", join(dir, "background.tiff")], {
+    stdio: "inherit",
+  });
   if (tiff.status !== 0) throw new Error("tiffutil could not join the .dmg backgrounds");
   console.log("dmg art: background.png, background@2x.png and background.tiff written");
 } else {

@@ -191,10 +191,12 @@ describe("run policy table", () => {
     expect(toolKind(builtIn("get_context")).kind).toBe("read");
     const missionWork: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
     for (const name of ["start_task", "upload_artifact", "update_plan", "complete_mission", "request_approval"]) {
-      expect(decide(person, builtIn(name))).toBe("allow");
-      expect(decide(missionWork, builtIn(name))).toBe("allow");
-      expect(decide(unattended, builtIn(name))).toBe("allow");
-      expect(toolPolicy(routine("act"), builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.missionOnly });
+      // The mission's request_approval has a scope; the built-in one (ADR 0126) any run may use.
+      const tool = name === "request_approval" ? builtIn(name, "sandbox:run") : builtIn(name);
+      expect(decide(person, tool)).toBe("allow");
+      expect(decide(missionWork, tool)).toBe("allow");
+      expect(decide(unattended, tool)).toBe("allow");
+      expect(toolPolicy(routine("act"), tool)).toEqual({ action: "refuse", reason: REFUSALS.missionOnly });
     }
     // The computer's own background task: code work, so a routine that may act starts one.
     expect(decide(routine("act"), builtIn("start_task", "sandbox:run"))).toBe("allow");

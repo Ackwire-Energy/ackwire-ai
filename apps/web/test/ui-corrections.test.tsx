@@ -328,14 +328,14 @@ describe("the agent page's cards and the chat's", () => {
   });
 });
 
-describe("Fixadas in the channel header", () => {
+describe("the pinned bar under the channel header", () => {
   const pinOf = (messageId: string, pinnedAt: string) => {
     const message = seedState().messages.find((m) => m.id === messageId) as Message;
     return { messageId, channelId: ENG_ID, threadId: null, pinnedByUserId: "u-joao", pinnedAt, message };
   };
   const button = () => screen().getByRole("button", { name: /^Mensagens fixadas/ });
 
-  test("its count, the list (face, words, time), a row goes to the message, Desafixar unpins; live", async () => {
+  test("the latest pin and the count, the list (face, words, time), a row goes to the message, Desafixar unpins; live", async () => {
     const api = createFakeApi(seedState());
     let pinned = [pinOf("m-2", "2026-11-01T10:05:00.000Z"), pinOf("m-1", "2026-11-01T10:00:00.000Z")];
     const unpinned: string[] = [];
@@ -350,6 +350,9 @@ describe("Fixadas in the channel header", () => {
     const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
     expect(button().getAttribute("aria-label")).toBe("Mensagens fixadas (2)");
+    expect(button().classList.contains("pinbar")).toBe(true);
+    expect(button().querySelector(".pinbar__text b")?.textContent).toBe("Ada");
+    expect(button().querySelector(".pinbar__text")?.textContent).toContain("Achei a causa");
     expect(button().querySelector(".ac-countchip")?.textContent).toBe("2");
     await act(async () => fireEvent.click(button()));
     await settle(2);
@@ -371,6 +374,8 @@ describe("Fixadas in the channel header", () => {
     await settle(4);
     expect(unpinned).toEqual(["m-2"]);
     expect(button().getAttribute("aria-label")).toBe("Mensagens fixadas (1)");
+    expect(button().querySelector(".pinbar__text b")?.textContent).toBe("João");
+    expect(button().querySelector(".ac-countchip")).toBeNull();
 
     // Someone else pins one: the count follows the event.
     pinned = [pinOf("m-2", "2026-11-01T10:10:00.000Z"), ...pinned];
@@ -394,15 +399,13 @@ describe("Fixadas in the channel header", () => {
     expect(button().getAttribute("aria-label")).toBe("Mensagens fixadas (2)");
   });
 
-  test("nothing pinned: no count, and the list says how to pin", async () => {
+  test("nothing pinned: no bar", async () => {
     const api = createFakeApi(seedState());
     api.pins = { list: async () => [], pin: async () => ({}) as never, unpin: async () => {} };
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
-    expect(button().querySelector(".ac-countchip")).toBeNull();
-    await act(async () => fireEvent.click(button()));
-    await settle(2);
-    expect(document.body.textContent).toContain("Nada fixado aqui ainda.");
+    expect(screen().queryByRole("button", { name: /^Mensagens fixadas/ })).toBeNull();
+    expect(document.querySelector(".pinbar")).toBeNull();
   });
 });
 

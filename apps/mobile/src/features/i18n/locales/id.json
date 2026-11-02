@@ -41,6 +41,16 @@
     "pollAnswered_other": "{{count}} dari {{total}} menjawab",
     "voteFailed": "Suaramu tidak terkirim."
   },
+  "choices": {
+    "step": "{{step}} dari {{total}}",
+    "back": "Kembali",
+    "next": "Berikutnya",
+    "close": "Tutup",
+    "closed": "{{title}} · ditutup",
+    "reopen": "Tampilkan lagi",
+    "answeredBy": "{{name}} memilih",
+    "failed": "Pilihanmu tidak terkirim. Coba lagi."
+  },
   "chart": {
     "pending": "Membuat grafik…",
     "table": "Tabel",
@@ -489,7 +499,9 @@
     "full": "Obrolan ini sudah punya 100 sematan. Lepas satu dulu.",
     "mark": "Disematkan",
     "none": "Belum ada yang disematkan",
-    "empty": "Belum ada yang disematkan di sini. Tahan pesan lalu ketuk Sematkan."
+    "empty": "Belum ada yang disematkan di sini. Tahan pesan lalu ketuk Sematkan.",
+    "bar_other": "Pesan yang disematkan ({{count}})",
+    "unpinOf": "Lepas sematan pesan {{name}}"
   },
   "thread": {
     "threadIn": "Utas di #{{channel}}",
@@ -709,7 +721,8 @@
     "title": "Aktivitas",
     "filter": {
       "all": "Semua",
-      "waiting": "Menunggumu"
+      "waiting": "Menunggumu",
+      "done": "Selesai"
     },
     "day": {
       "today": "Hari ini",
@@ -756,6 +769,8 @@
     "markUnread": "Tandai belum dibaca",
     "unread": "Belum dibaca",
     "done": "Selesai",
+    "restore": "Kembalikan",
+    "noneDone": "Tidak ada yang ditandai selesai dalam 30 hari terakhir.",
     "more": "Lihat lainnya",
     "empty": "Tidak ada yang menunggumu. Tarik napas."
   },

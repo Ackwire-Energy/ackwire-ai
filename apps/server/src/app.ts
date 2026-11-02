@@ -26,7 +26,7 @@ import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
 import { customConnectorRoutes } from "./routes/app/connectors-custom";
-import type { AppDeps } from "./routes/app/context";
+import { type AppDeps, agentDetailsGate } from "./routes/app/context";
 import { databaseRoutes } from "./routes/app/databases";
 import { desktopRoutes } from "./routes/app/desktop";
 import { dmRoutes } from "./routes/app/dms";
@@ -154,6 +154,7 @@ export function createApp(options: AppOptions) {
     });
     const deps: AppDeps = { log, ...options.services };
     registerInstance(api, deps, version);
+    api.use("/app/organizations/:orgId/agents/:agentId/:part", agentDetailsGate(deps));
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));

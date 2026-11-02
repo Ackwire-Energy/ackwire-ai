@@ -32,6 +32,7 @@ import type { FetchLike } from "./push";
 import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
 import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from "./secrets";
 import { AGENTS_CGROUP, agentCgroup, systemdBooted } from "./service";
+import { systemStartPage } from "./start-page";
 import {
   BROWSER_LEASE_MS,
   UPLOAD_CHUNK_BYTES,
@@ -98,7 +99,9 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
   const limits = { ...DEFAULT_LIMITS, ...(f.limits as Partial<WorkerState["limits"]>) };
   const viewers = Number.isSafeInteger(f.desktopViewers) ? Math.max(0, f.desktopViewers as number) : 0;
   const account = f.account === null || isAccountId(f.account) ? { account: f.account } : {};
-  return access && paused ? { access, paused, limits, desktopViewers: viewers, ...account } : null;
+  return access && paused
+    ? { access, paused, limits, desktopViewers: viewers, privateNetwork: f.privateNetwork === true, ...account }
+    : null;
 }
 
 /**
@@ -462,7 +465,10 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   };
   const browser = new BrowserManager({
     home,
-    ...(o.browserPorts ? { fixedPorts: o.browserPorts } : {}),
+    privateNetwork: () => state.privateNetwork === true,
+    ...(o.browserPorts
+      ? { fixedPorts: o.browserPorts, startPageDirectory: systemStartPage(process.getuid?.() ?? 0) }
+      : {}),
     log,
     send: (frame) => live?.send(frame) ?? false,
     secret: (agent, name) => secretValue(secretsDir, agent, name),

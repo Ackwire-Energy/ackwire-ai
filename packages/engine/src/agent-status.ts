@@ -41,6 +41,8 @@ export type AgentStatusKind =
   | "waiting_approval"
   | "waiting_answer"
   | "waiting_computer"
+  /** In line for room on a shared computer (`computer-queue.ts`). */
+  | "queued_computer"
   | "waiting_plan"
   | "waiting_budget"
   | "provider_down"
@@ -324,7 +326,9 @@ const waitLine = (r: {
         : r.waitCode === "budget"
           ? "waiting_budget"
           : r.waitingMachineId
-            ? "waiting_computer"
+            ? r.waitCode === "busy"
+              ? "queued_computer"
+              : "waiting_computer"
             : "waiting_answer",
   subject: null,
   emoji: null,
@@ -352,6 +356,7 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     waiting_approval: "waiting for an approval",
     waiting_answer: "waiting for an answer",
     waiting_computer: "waiting for its computer",
+    queued_computer: "in line for its computer",
     waiting_plan: "waiting for its plan to reset",
     waiting_budget: "waiting for its budget to renew",
     provider_down: "waiting for its AI provider to come back (it retries by itself)",

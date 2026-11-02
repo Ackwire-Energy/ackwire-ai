@@ -6,6 +6,7 @@ import {
   routineStateWords,
   runPixels,
   usageContinueBlock,
+  usageContinueOffered,
 } from "@agenteschat/client/lib/routine-view";
 import { router } from "expo-router";
 import { memo } from "react";
@@ -57,8 +58,9 @@ export function StateChip({ routine: r }: { routine: Routine }) {
 }
 
 /**
- * A run paused near its plan's or budget's limit (the web's note): it picks up by itself, and Continuar agora lets
- * it go on now for its creator, the agent's owner and admins. Everyone else sees the button greyed with the reason.
+ * A run waiting on its plan's or budget's limit (the web's note): it picks up by itself. Paused near the limit,
+ * Continuar agora lets it go on now for its creator, the agent's owner and admins (everyone else sees the button
+ * greyed with the reason); at the limit itself there is nothing to continue.
  */
 export function UsagePausedNote({
   routine: r,
@@ -69,6 +71,14 @@ export function UsagePausedNote({
 }) {
   const { t } = useTranslation();
   const blocked = usageContinueBlock(r);
+  if (!usageContinueOffered(r))
+    return (
+      <View style={styles.usagePause}>
+        <Text variant="footnote" tone="muted">
+          {t("routines.usagePause.lineLimit")}
+        </Text>
+      </View>
+    );
   return (
     <View style={styles.usagePause}>
       <Text variant="footnote" tone="muted">

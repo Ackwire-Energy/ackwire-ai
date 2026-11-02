@@ -1368,7 +1368,6 @@
       "button_other": "ピン留めしたメッセージ（{{count}}）",
       "label": "#{{channel}}のピン留めしたメッセージ",
       "in": "#{{channel}}にピン留め",
-      "empty": "ここにはまだピン留めがありません。メッセージのメニューからピン留めしてください。",
       "unpin": "{{name}}のメッセージのピン留めを外す"
     },
     "membersButton_other": "チャンネルのメンバー（{{count}}）",
@@ -1479,6 +1478,8 @@
     "failed_other": "{{names}}は回答できませんでした",
     "asking_other": "{{names}}があなたの回答を待っています",
     "outage_other": "{{names}}: AIプロバイダーが停止中 · 自動で再試行します",
+    "queued_other": "{{names}}がコンピューターの順番待ちです",
+    "away_other": "{{names}}がコンピューターを待っています",
     "nobody": "回答するエージェントはいません",
     "status": {
       "seen": "確認済み",
@@ -1487,9 +1488,12 @@
       "waiting": "承認待ち",
       "asking": "あなたの回答待ち",
       "outage": "AIプロバイダーが停止中 · 自動で再試行します",
+      "queued": "コンピューターの順番待ち",
+      "away": "コンピューター待ち",
       "handled": "回答済み",
       "failed": "失敗",
-      "referenced": "メンションのみ"
+      "referenced": "メンションのみ",
+      "reacted": "リアクションしました"
     },
     "failedShort": "回答できませんでした",
     "popoverTitle": "エージェント",
@@ -1704,6 +1708,10 @@
     "forbidden": "今すぐ続けられるのは、依頼した人、エージェントのオーナー、管理者だけです",
     "resumed": "{{agent}}が作業を再開しました",
     "ended": "この作業は再開前に終了しました",
+    "canceled": "キャンセルしました。上限がリセットされても実行されません。",
+    "dontRun": "実行しない",
+    "dontRunHint": "キャンセルします。上限がリセットされても何も実行されません",
+    "dontRunForbidden": "キャンセルできるのは、依頼した人、エージェントのオーナー、管理者だけです",
     "extraTitle": "長い作業で有料の追加使用量を使う場合があります",
     "extraHint": "プランで追加使用量がオンの場合、長い作業は95%を超えても続きます。オフの場合は95%で一時停止し、プランのリセット後に再開します。"
   },
@@ -1894,6 +1902,18 @@
     "publicDesc": "ワークスペースの誰でも見られて、参加できます。",
     "private": "非公開",
     "privateDesc": "追加された人だけ。",
+    "roles": "部署またはロール",
+    "rolesDesc": "選んだロールを持つ人がチャンネルを見て参加できます。あとからロールを得た人も含みます。",
+    "rolesPick": "チャンネルが見えるロール",
+    "rolesNone": "ワークスペースにはまだロールがありません。",
+    "rolesNeeded": "ロールを1つ以上選んでください。",
+    "rolesLeave": "ロールを失った人はチャンネルから外れます。",
+    "rolesChoose": "ロールを選ぶ",
+    "rolesChange": "ロールを変更",
+    "rolesDone": "完了",
+    "publicTitle": "#{{channel}} を公開しますか?",
+    "publicBody": "ワークスペースの全員が参加でき、過去のものも含めてすべてのメッセージを読めるようになります。",
+    "publicConfirm": "公開する",
     "members": "最初のメンバー",
     "membersSearch": "人またはエージェントを検索",
     "membersEmpty": "「{{q}}」に一致する人は見つかりませんでした。",
@@ -1997,7 +2017,10 @@
     "can": "できること",
     "budgetUsed": "今月の予算の{{percent}}を使用",
     "spendLabel": "今月の予算使用量",
-    "former": "このワークスペースのメンバーではなくなりました"
+    "former": "このワークスペースのメンバーではなくなりました",
+    "askAccess": "アクセスをリクエスト",
+    "detailsHiddenTitle": "仕組み",
+    "detailsHidden": "{{name}}の指示、ツール、メモリ、使用量を見られるのは、{{name}}が応答する人、担当者、管理者だけです。"
   },
   "presence": {
     "online": "オンライン",
@@ -2068,6 +2091,7 @@
       "waiting_approval": "承認待ち",
       "waiting_answer": "回答待ち",
       "waiting_computer": "コンピューター待ち",
+      "queued_computer": "コンピューターの順番待ち",
       "waiting_plan": "プランのリセット待ち",
       "waiting_budget": "予算のリセット待ち",
       "provider_down": "AIプロバイダーが停止中 · 自動で再試行します",
@@ -2270,6 +2294,7 @@
     "refusedBy": "{{name}}が却下 · {{when}}",
     "approvedByYou": "あなたが承認 · {{when}}",
     "outcomeApprovedBy": "{{name}}が承認",
+    "requesterDecides": "役割で承認できる人が依頼したため、その人も決定できます",
     "outcomeApprovedByYou": "あなたが承認",
     "outcomeRefusedBy": "{{name}}が却下",
     "outcomeRefusedByYou": "あなたが却下",
@@ -2392,7 +2417,8 @@
       "mentions": "メンション",
       "waiting": "あなたの対応待ち",
       "unread": "未読",
-      "reactions": "リアクション"
+      "reactions": "リアクション",
+      "done": "完了"
     },
     "keys": {
       "title": "ショートカット",
@@ -2523,6 +2549,8 @@
     "replyTip": "返信 · R",
     "done": "完了",
     "doneTip": "完了 · E",
+    "restore": "元に戻す",
+    "restoreTip": "元に戻す · E",
     "snooze": "あとで通知",
     "snoozeShort": "あとで",
     "open": "開く",
@@ -2554,6 +2582,7 @@
       "done": "完了にしました",
       "doneQuestion": "{{name}}はまだ待っています。質問は会話に残ります。",
       "doneApproval": "リクエストは承認に残ります。",
+      "restored": "受信トレイに戻しました",
       "undo": "元に戻す",
       "readAll_other": "{{count}}件を既読にしました",
       "sent": "返信を送信しました",
@@ -2569,6 +2598,7 @@
     "noneWaiting": "あなたを待っている人はいません。",
     "noneUnread": "すべて既読です。",
     "noneHere": "今は何もありません。",
+    "noneDone": "過去30日間に完了にしたものはありません。",
     "more": "さらに表示"
   },
   "approvals": {
@@ -3663,6 +3693,13 @@
     "defaultKeyDesc": "{{provider}} · 末尾 {{hint}}",
     "otherKeyDesc": "{{provider}} · 末尾 {{hint}}",
     "modelNeedsKey": "{{provider}}のAPIキーが必要です",
+    "brainPick": {
+      "searchPlaceholder": "モデル、プラン、開発元",
+      "connect": "{{plan}}を接続",
+      "connectText": "{{plan}}のキーが必要です。エージェントを作成した直後に追加します。",
+      "needsKey": "{{plan}}のキーが必要です",
+      "other": "別のものを選ぶ"
+    },
     "noKeys": "まだキーがありません",
     "budgetTitle": "月間予算",
     "budget": "月間予算（US$）",
@@ -4604,7 +4641,9 @@
       "usagePaused": "{{until}}まで一時停止（プランの上限）",
       "usagePausedUnknown": "プランのリセットまで一時停止（プランの上限）",
       "usagePausedBudget": "{{until}}まで一時停止（予算の上限）",
-      "usagePausedBudgetUnknown": "予算の更新まで一時停止（予算の上限）"
+      "usagePausedBudgetUnknown": "予算の更新まで一時停止（予算の上限）",
+      "waitingPlan": "{{plan}}プランを待っています · {{until}}に実行",
+      "waitingPlanUnknown": "{{plan}}プランのリセットを待っています"
     },
     "pausedReason": {
       "creator_left": "一時停止: 作成した人がワークスペースを離れました",
@@ -4649,6 +4688,8 @@
       "waiting": "誰かの回答を待機中",
       "waitingApproval": "あなたの承認待ち",
       "waitingComputer": "コンピューターを待機中",
+      "waitingPlan": "プランのリセットを待っています",
+      "waitingBudget": "予算の更新を待っています",
       "reported": "見つけたことを報告しました",
       "silent": "新しい情報はなく、投稿しませんでした",
       "failed": "失敗しました",
@@ -4706,6 +4747,10 @@
     "stoppedToast": "実行を停止しました。",
     "usagePause": {
       "line": "上限がリセットされると自動で再開します。会話には何も投稿されません。",
+      "lineLimit": "上限がリセットされると自動で実行します。会話には何も投稿されません。",
+      "dontRun": "実行しない",
+      "dontRunName": "上限がリセットされても{{name}}を実行しない",
+      "canceledToast": "キャンセルしました。上限がリセットされても実行されません。",
       "continuedToast": "実行を続けています。",
       "forbidden": "今すぐ続けられるのは、ルーティンの作成者、エージェントのオーナー、管理者だけです",
       "extra_off": "このプランの利用枠を使い切りました。このエージェントの長い作業には有料の追加使用量が使われません。今すぐ続けるにはAI設定でオンにしてください。オフのままならリセット後に再開します",
@@ -7339,6 +7384,7 @@
       "freeTraining": "このモデルのプロバイダーは、リクエストを学習に使う場合があります。OpenCodeの「Settings › Privacy」で、無料モデルの許可をオンにしてください。オンにしないと、このモデルは応答しません。"
     },
     "recommended": "おすすめ",
+    "free": "無料",
     "modelHelp": "大きいモデルほど深く考え、プランの消費が早くなります。",
     "hidden": "考えるAIを選ぶのは{{owner}}または管理者です。",
     "hiddenAdmins": "考えるAIを選べるのは管理者だけです。",
@@ -7495,7 +7541,8 @@
       "html": "HTMLページ",
       "file": "ファイル",
       "block": "ブロック",
-      "poll": "投票"
+      "poll": "投票",
+      "choices": "選択肢"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · 作成: {{name}}",
@@ -7573,6 +7620,16 @@
     "pollAnswered_other": "{{total}}人中{{count}}人が回答",
     "voteFailed": "投票できませんでした。"
   },
+  "choices": {
+    "step": "{{step}} / {{total}}",
+    "back": "戻る",
+    "next": "次へ",
+    "close": "閉じる",
+    "closed": "{{title}} · 終了",
+    "reopen": "もう一度表示",
+    "answeredBy": "{{name}}が選びました",
+    "failed": "選択を送信できませんでした。もう一度お試しください。"
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "人とエージェントが作成・アップロードしたすべてのもの。",
@@ -7609,7 +7666,8 @@
       "html": "HTMLページ",
       "file": "ファイル",
       "block": "ブロック",
-      "poll": "投票"
+      "poll": "投票",
+      "choices": "選択肢"
     },
     "kindCount": "{{kind}}: {{count}}",
     "view": "表示",
@@ -9047,7 +9105,71 @@
     "empty": "「{{q}}」に一致するものは見つかりませんでした。",
     "hint": "参加しているチャンネルを検索します。",
     "inChannel": "#{{channel}}",
-    "count_other": "{{count}}件の結果"
+    "count_other": "{{count}}件の結果",
+    "countMore": "{{count}}件以上の結果",
+    "words": {
+      "ops": {
+        "from": "送信者",
+        "in": "場所",
+        "has": "含む",
+        "mentions": "メンション",
+        "before": "以前",
+        "after": "以後",
+        "during": "期間",
+        "author": "作成者",
+        "pinned": "ピン留め"
+      },
+      "has": {
+        "link": "リンク",
+        "file": "ファイル",
+        "image": "画像",
+        "card": "カード"
+      },
+      "author": {
+        "person": "人",
+        "agent": "エージェント"
+      }
+    },
+    "options": "検索オプション",
+    "option": {
+      "from": "特定の人またはエージェントから",
+      "in": "特定のチャンネルまたはDMで送信",
+      "has": "リンク、ファイル、画像、カードを含む",
+      "mentions": "特定の人またはエージェントへのメンション",
+      "before": "指定日より前",
+      "after": "指定日より後",
+      "during": "特定の日、月、年",
+      "author": "人またはエージェントが作成",
+      "pinned": "ピン留めしたメッセージ"
+    },
+    "moreFilters": "その他のフィルター",
+    "hasLabel": {
+      "link": "リンク",
+      "file": "ファイル",
+      "image": "画像",
+      "card": "カード"
+    },
+    "authorLabel": {
+      "person": "人",
+      "agent": "エージェント"
+    },
+    "pinnedChip": "ピン留め",
+    "removeFilter": "{{filter}}を削除",
+    "filtersApplied_other": "フィルター{{count}}件",
+    "recent": "最近の検索",
+    "clearRecent": "クリア",
+    "pickDate": "日付",
+    "dateHint": "日付を入力（2026-10-05、2026-10、2026）",
+    "noMatch": "その名前の人はいません。",
+    "noPlace": "その名前のチャンネルやDMはありません。",
+    "sort": {
+      "label": "並べ替え",
+      "newest": "新しい順",
+      "oldest": "古い順",
+      "relevance": "関連度順"
+    },
+    "searchHere": "この会話を検索",
+    "dm": "{{name}}とのDM"
   },
   "files": {
     "upload": "ファイルをアップロード",
@@ -9260,6 +9382,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "ネットワークが変わります。コンピューターの開いているセッションは{{when}}に再起動します。",
+      "restart": "ネットワークを反映するため、コンピューターのセッションを再起動しています。新しい作業は完了まで待機します。",
+      "line": "出口IP {{ip}}",
+      "hint": "エージェントがブラウズするときにサイトから見えるアドレスです。コンピューターのネットワークが変わると更新されます。"
+    },
     "online": "オンライン",
     "offline": "オフライン",
     "execOff": "コマンドはオフ",
@@ -10238,7 +10366,7 @@
       "waitingComputer": "コンピューター待ち",
       "paused": "プランの上限で一時停止中",
       "pausedUntil": "プランの上限で一時停止中 · {{time}}に再開",
-      "done": "{{duration}}で完了",
+      "done": "{{duration}}で終了",
       "failed": "完了しませんでした",
       "canceled": "{{duration}}後に{{name}}が停止しました",
       "canceledAnon": "{{duration}}後に停止しました"
@@ -10336,6 +10464,10 @@
       "answeredFar": "{{to}}が{{from}}の質問に回答しました",
       "answeredRequestFar": "{{to}}が{{from}}の依頼に回答しました",
       "see": "見る"
+    },
+    "talk": {
+      "readAll": "すべて読む",
+      "more_other": "あと{{count}}行"
     },
     "consultPanel": {
       "label": "{{from}}と{{to}}の会話",
@@ -10635,15 +10767,18 @@
       "brain_unavailable": "{{brain}}は現在応答できません。戻り次第返信します。",
       "provider_unavailable": "AIプロバイダーが現在応答していません。戻り次第すぐに返信します。",
       "brain_busy": "コンピューターが現在ほかのタスクで埋まっています。空き次第すぐに返信します。",
+      "brain_queued": "まだコンピューターの順番待ちです。空きができ次第すぐに返信します。",
       "brain_interrupted": "{{brain}}が完了前に停止しました。完了済みで繰り返さないもの: {{tools}}。",
       "plan_limit_cut": "{{plan}}プランの上限で停止しました。リセットされる{{when}}に、続きから再開します。",
       "plan_limit_cut_unknown": "{{plan}}プランの上限で停止しました。リセットされ次第、続きから再開します。",
       "plan_limit_wait": "{{plan}}プランが上限に達しました。リセットされる{{when}}に返信します。",
       "plan_limit_wait_unknown": "{{plan}}プランが上限に達しました。リセットされ次第、返信します。",
       "budget_wait": "今月の予算を使い切りました。{{when}}に再開します。管理者が予算を引き上げればもっと早く再開します。",
+      "usage_wait_canceled": "キャンセルしました。上限がリセットされても実行されません。",
       "usage_paused": "{{agent}}がこの作業を一時停止しました · {{plan}}プラン {{window}} {{percent}}%",
       "usage_paused_budget": "{{agent}}がこの作業を一時停止しました · 月間予算 {{percent}}%",
       "work_auto_moved": "時間がかかりそうなので、バックグラウンドで続けます。ここに進捗を投稿します。次回は約{{minutes}}分後です。",
+      "work_auto_movedOver": "時間がかかりそうなので、バックグラウンドで続けます。ここに進捗を投稿します。",
       "work_end_done": "完了しました（{{minutes}}分）。",
       "work_end_failed": "このバックグラウンド作業は完了しませんでした（{{minutes}}分）。",
       "work_end_failedWhy": "このバックグラウンド作業は完了しませんでした（{{minutes}}分）: {{why}}。",
@@ -11563,6 +11698,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "見ているだけです。",
+      "title": "操作を代わりますか？",
+      "working": "あなたが操作している間、{{name}}は一時停止します。"
+    },
     "sub": {
       "control": "あなたが操作中 · {{name}}は待機中",
       "controlAsked": "あなたが操作中 · {{name}}が依頼",

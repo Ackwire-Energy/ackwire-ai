@@ -71,6 +71,7 @@ import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { BrowserProfilesCard } from "./browser/BrowserProfiles";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
+import { Egress } from "./computer/Egress";
 import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
 import { ComputerTitle, SetupFacts, useSetupView } from "./WorkspaceComputer";
 
@@ -1055,6 +1056,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
               })}
             </span>
           )}
+          <Egress machine={m} />
           {paused && <span className="small muted">{t("machines.pausedHint")}</span>}
           {/* System mode: each agent works in its own home, never in the folder the computer was connected from. */}
           {m.mode === "system" && !managed && m.kind !== "host" && (

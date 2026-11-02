@@ -541,6 +541,11 @@ export interface Agent {
   audienceMode?: AudienceMode;
   /** Whether I can talk to it (absent = yes). */
   canTalk?: boolean;
+  /**
+   * Whether I see how it works (its owner, who manages agents, whoever it answers); absent = yes (an older server).
+   * Without it `instructions` is empty and its tools, memory, usage and activity are refused: only its public card.
+   */
+  seesDetails?: boolean;
   /** Its look (color, eyes, accessory), from the backend's allow-list. */
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
@@ -589,6 +594,8 @@ export interface TeamAgent {
   /** Working on something right now. */
   busy: boolean;
   canTalk: boolean;
+  /** Whether I see how it works (absent = yes); without it `capabilities` is empty. */
+  seesDetails?: boolean;
 }
 
 /** One agent asked another (`ask_agent`); the question itself stays private. */
@@ -765,6 +772,8 @@ export interface Channel {
   name: string;
   topic: string;
   visibility: "public" | "private";
+  /** Private and limited to these roles (departments, ADR 0125): their people see it and may join. Empty or absent: public or invite only. */
+  audienceRoleIds?: string[];
   isMember: boolean;
   createdAt: string;
   /** Who created it: may change it and its members, like admins. */
@@ -783,12 +792,22 @@ export interface Channel {
   lastMessage?: ChannelLastMessage | null;
 }
 
+/** Who may join a channel, on creating it or changing it later. */
+export interface ChannelInput {
+  topic?: string;
+  visibility?: "public" | "private";
+  /** Private only: limits it to people holding one of these roles (ADR 0125); empty: invite only. */
+  audienceRoleIds?: string[];
+}
+
 /** A `#channel` link's card (`chat.card`): what the channel is and who is in it. */
 export interface ChannelCard {
   id: string;
   name: string;
   topic: string;
   visibility: "public" | "private";
+  /** As on `Channel`. */
+  audienceRoleIds?: string[];
   isMember: boolean;
   archived: boolean;
   /** People in it. */
@@ -896,6 +915,8 @@ export interface MessageReceipts {
     reason?: string;
     /** `waiting_input` because its AI provider is down: it retries by itself. */
     outage?: true;
+    /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+    computer?: "queued" | "away";
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
@@ -1039,6 +1060,8 @@ export type ChannelEvent =
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: Poll }
+  /** A choice card was answered (ADR 0124). */
+  | { type: "choices.updated"; channelId: string; choices: Choices }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws. */
   | {
@@ -1105,6 +1128,8 @@ export type ChannelEvent =
       background?: boolean;
       /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
       outage?: true;
+      /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+      computer?: "queued" | "away";
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -1190,6 +1215,8 @@ export type ChannelEvent =
       status: "done" | "failed" | "waiting_approval" | "waiting_input";
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
+      /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+      computer?: "queued" | "away";
       error?: string;
       /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
       errorCode?: string;
@@ -1278,6 +1305,8 @@ export type ChannelEvent =
       reason?: string;
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
+      /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
+      computer?: "queued" | "away";
     }
   /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
   | {
@@ -1399,6 +1428,11 @@ export interface Approval {
   routineId?: string | null;
   /** Approved ahead and not run yet, and you may withdraw it (`approvals.cancel`). */
   canCancel?: boolean;
+  /**
+   * Asked with `request_approval` (ADR 0126): who decides, in words ("Diretoria"), and whose request it was, who
+   * decides it only as an approver by role (`requesterDecides`). Null or absent: any other approval.
+   */
+  approvers?: { label: string; requestedByUserId: string | null; requesterDecides: boolean } | null;
 }
 
 /** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */
@@ -1745,6 +1779,7 @@ export type AgentStatusKind =
   | "waiting_approval"
   | "waiting_answer"
   | "waiting_computer"
+  | "queued_computer"
   | "waiting_plan"
   | "waiting_budget"
   | "provider_down"
@@ -2070,6 +2105,30 @@ export interface SearchHit {
   createdAt: string;
   /** Message hits: who wrote it; action hits: the agent that did it. */
   author?: { type: AuthorType; id: string; name: string } | null;
+  /** Message hits: the message (open it there) and its thread (null = the main timeline). */
+  messageId?: string | null;
+  threadId?: string | null;
+}
+
+/** What a message has (ADR 0123): a link, a file, an image (an image file, a GIF, a sticker), a card. */
+export type SearchHas = "link" | "file" | "image" | "card";
+/** `relevance`: the best matches; `newest` / `oldest`: by date. */
+export type SearchSort = "relevance" | "newest" | "oldest";
+
+/** Search filters as the API takes them (ADR 0123; `lib/search-filters.ts` builds them from chips). */
+export interface SearchFilterInput {
+  in?: string[];
+  fromUsers?: string[];
+  fromAgents?: string[];
+  mentionsUsers?: string[];
+  mentionsAgents?: string[];
+  has?: SearchHas[];
+  author?: "person" | "agent";
+  pinned?: boolean;
+  /** ISO times: at or after, before. */
+  after?: string;
+  before?: string;
+  sort?: SearchSort;
 }
 
 /**
@@ -2523,7 +2582,7 @@ export interface StorageMigration {
 
 // ── Artifacts (expected: `…/artifacts`, events `artifact.created` / `artifact.updated`, `meta.artifacts`) ──
 
-export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html" | "file" | "block" | "poll";
+export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html" | "file" | "block" | "poll" | "choices";
 
 /**
  * An uploaded file as is (ADR 0025): metadata only; the bytes come from the
@@ -2558,7 +2617,20 @@ export type ArtifactContent =
   | { kind: "html"; html: string }
   | { kind: "block"; html: string; subtitle?: string }
   | { kind: "poll"; question: string; options: string[]; multiple: boolean }
+  | { kind: "choices"; questions: ChoiceQuestion[] }
   | ArtifactFileContent;
+
+/** One question of a choice card (ADR 0124): its options show as A, B, C… */
+export interface ChoiceQuestion {
+  question: string;
+  options: { label: string; description?: string }[];
+}
+
+/** A choice card's answer, once someone picked (`choices.updated`): the option of each question, in order. */
+export interface Choices {
+  id: string;
+  answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
+}
 
 /** One person's mark in a poll: a row per option they chose. */
 export interface PollVote {
@@ -2889,7 +2961,7 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `usage_paused` (its run paused near its plan's or budget's limit: `usagePause`), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * or an answer), `usage_paused` (its run waits on its plan or budget: `usagePause`), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
  * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
 export type RoutineState =
@@ -2932,12 +3004,19 @@ export interface Routine {
   /** Its run waits for this computer since `since` (state `waiting_computer`). */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /**
-   * Its run paused near its plan's or budget's limit (state `usage_paused`, ADR 0118): it picks up at `resetsAt`
-   * (null: not known yet). `extraOff`: the plan's window is used up and the agent's long work may not use paid
+   * Its run waits on its plan or budget (state `usage_paused`, ADR 0118): paused near the limit, or stopped at it
+   * (`limit`: nothing to continue). It picks up at `resetsAt` (null: not known yet); `plan` is the plan's name. `extraOff`: the plan's window is used up and the agent's long work may not use paid
    * extra usage, so Continuar agora is refused; `extraUsedUp`: the same with the switch on but no extra usage left.
    * Who may press it: `canManage`.
    */
-  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp?: boolean } | null;
+  usagePause?: {
+    source: "plan" | "budget";
+    resetsAt: string | null;
+    limit?: boolean;
+    plan?: string | null;
+    extraOff: boolean;
+    extraUsedUp?: boolean;
+  } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -3323,6 +3402,9 @@ export type MachineKind = "connected" | "host" | "managed";
 /** `GET …/machines`: a computer connected with `agentes-runner`. */
 export interface Machine {
   id: string;
+  /** The public address measured through an agent process, absent on older runners. */
+  egress?: { ip: string; country?: string; at: string } | null;
+  networkTransition?: { state: "draining" | "restart_required"; deadline: string; agents: string[] } | null;
   name: string;
   /**
    * Absent from a server that doesn't say: `connected`. A `managed` one can't be removed, and its hostname,
@@ -5360,9 +5442,10 @@ export interface AuditQuery {
   kind?: "tool" | "change";
 }
 
-export type NotificationFilter = "all" | "mentions" | "waiting" | "unread" | "reactions";
+/** `done`: "Concluídas", what I marked done in the last 30 days, the latest first (not counted). */
+export type NotificationFilter = "all" | "mentions" | "waiting" | "unread" | "reactions" | "done";
 
-export type NotificationCounts = Record<NotificationFilter, number>;
+export type NotificationCounts = Record<Exclude<NotificationFilter, "done">, number>;
 
 /** `GET …/notifications`: visible ones (not done, not snoozed), waiting first, then newest. */
 export interface NotificationPage {

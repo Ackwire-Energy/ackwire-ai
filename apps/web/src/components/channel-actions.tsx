@@ -19,8 +19,11 @@ export interface ChannelActions {
    * starts the thread); in a thread view, the composer.
    */
   reply?: (message: MessageType) => void;
-  /** A thread's line or link: the panel beside the channel (absent in a thread view: links go to its page). */
-  openThread?: (threadId: string) => void;
+  /**
+   * A thread's line or link: the panel beside the channel (absent in a thread view: links go to its page). With
+   * `focusMessageId`, it opens at that message (a pin).
+   */
+  openThread?: (threadId: string, focusMessageId?: string) => void;
   /**
    * A question an agent asked another from here ("Theo ⇄ Iris" in the reply's block): what the two said for it, in
    * the panel over the channel, read only (absent in a thread view: the block opens it in place).

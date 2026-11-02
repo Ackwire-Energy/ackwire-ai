@@ -1,7 +1,13 @@
 import type { Adapters } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
-import { type AiStatusDeps, ForbiddenError, type RoutineHookConfig, type RoutineHookDeps } from "@agenteschat/engine";
+import {
+  type AiStatusDeps,
+  ForbiddenError,
+  type RoutineHookConfig,
+  type RoutineHookDeps,
+  requireAgentDetails,
+} from "@agenteschat/engine";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import { type Auth, type SessionUser, sessionUser, signInPageUrl } from "../../auth";
@@ -117,6 +123,48 @@ export function requireSession(auth: Auth) {
     if (!user) return apiError(c, 401, "unauthorized", "Sign in to continue");
     c.set("user", user);
     await next();
+  });
+}
+
+/** What an agent's page reads about how it works, under `/organizations/{orgId}/agents/{agentId}/{part}`. */
+const AGENT_DETAIL_READS = new Set([
+  "access",
+  "approval-rules",
+  "browser",
+  "databases",
+  "learned-skills",
+  "mail",
+  "memories",
+  "repositories",
+  "scopes",
+  "skills",
+  "usage",
+]);
+
+/**
+ * Before the routes that read how an agent works: only who sees its details (`requireAgentDetails`) gets them,
+ * whichever route answers. `memories?about=me` stays open: what it learned from the viewer is theirs to see.
+ */
+export function agentDetailsGate(deps: Pick<AppDeps, "auth" | "db">) {
+  const session = requireSession(deps.auth);
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const orgId = c.req.param("orgId");
+    const agentId = c.req.param("agentId");
+    const part = c.req.param("part");
+    if (
+      c.req.method !== "GET" ||
+      !orgId ||
+      !part ||
+      !AGENT_DETAIL_READS.has(part) ||
+      !z.uuid().safeParse(agentId).success ||
+      (part === "memories" && c.req.query("about") === "me")
+    ) {
+      return next();
+    }
+    return session(c, async () => {
+      await requireAgentDetails(deps.db, c.get("user").id, orgId, agentId as string);
+      await next();
+    });
   });
 }
 

@@ -11,6 +11,7 @@ import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
 import { recordRead } from "../outbound";
+import { routineCreatorOf } from "../requester";
 import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
 import { describeWhen } from "../schedule";
@@ -927,6 +928,15 @@ export function createToolGateway(deps: {
           : ctx.runId
             ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId)
             : null;
+        const asked =
+          tool.approvers && !tool.connectionId
+            ? await tool.approvers(
+                call.input,
+                ctx,
+                authority ? (authority.personId ?? routineCreatorOf(authority)) : null,
+              )
+            : null;
+        if (asked && !asked.ok) return finish({ content: asked.message, isError: true }, "refused");
         const described = tool.describe?.(call.input) ?? { title: `${tool.name}`, detail: canonicalJson(call.input) };
         const connectionId = tool.connectionId ?? null;
         const [approval] = await ctx.db
@@ -951,6 +961,7 @@ export function createToolGateway(deps: {
             ownerUserId: owner,
             expiresAt: new Date(now().getTime() + APPROVAL_TTL_MS),
             approveAlways: remember,
+            approvers: asked?.approvers ?? null,
           })
           .onConflictDoNothing()
           .returning();

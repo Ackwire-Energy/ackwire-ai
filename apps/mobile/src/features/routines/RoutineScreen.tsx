@@ -21,6 +21,7 @@ import {
   runPixelStatus,
   runPixels,
   runsPerDay,
+  stopWordsKey,
   usageParts,
   whereItRuns,
 } from "@agenteschat/client/lib/routine-view";
@@ -262,7 +263,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                     size="sm"
                     variant="secondary"
                     icon="stop"
-                    label={t("routines.stop")}
+                    label={t(stopWordsKey(r))}
                     disabled={controls.action.isPending}
                     onPress={controls.stop}
                   />

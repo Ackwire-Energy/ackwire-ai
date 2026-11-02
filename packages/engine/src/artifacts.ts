@@ -12,7 +12,7 @@ import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./se
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
 
-export type ArtifactKind = "document" | "table" | "diff" | "html" | "diagram" | "file" | "block" | "poll";
+export type ArtifactKind = "document" | "table" | "diff" | "html" | "diagram" | "file" | "block" | "poll" | "choices";
 export const ARTIFACT_KINDS: readonly ArtifactKind[] = [
   "document",
   "table",
@@ -22,12 +22,13 @@ export const ARTIFACT_KINDS: readonly ArtifactKind[] = [
   "file",
   "block",
   "poll",
+  "choices",
 ];
 /**
- * What lives in a conversation and not in the Drive (ADR 0113): made only through `show_block` and `start_poll`,
- * never by `create_artifact` or a person.
+ * What lives in a conversation and not in the Drive (ADR 0113, 0124): made only through `show_block`, `start_poll`
+ * and `ask_choices`, never by `create_artifact` or a person.
  */
-export type ConversationKind = "block" | "poll";
+export type ConversationKind = "block" | "poll" | "choices";
 /** Kinds made from content (JSON); `file` is made only from bytes (`createFileArtifact`, ADR 0025). */
 export const TEXT_ARTIFACT_KINDS: readonly Exclude<ArtifactKind, "file" | ConversationKind>[] = [
   "document",
@@ -55,7 +56,28 @@ export type ArtifactContent =
   | { kind: "html"; html: string }
   | { kind: "block"; html: string; subtitle?: string }
   | { kind: "poll"; question: string; options: string[]; multiple: boolean }
+  | { kind: "choices"; questions: ChoiceQuestion[] }
   | FileContent;
+
+/** One question of a choice card (ADR 0124): its options are shown as A, B, C… */
+export interface ChoiceQuestion {
+  question: string;
+  options: { label: string; description?: string }[];
+}
+
+/** A choice card as text, for the model and for search: each question with its lettered options. */
+export function choicesText(questions: ChoiceQuestion[]): string {
+  return questions
+    .map((q, i) =>
+      [
+        questions.length > 1 ? `${i + 1}. ${q.question}` : q.question,
+        ...q.options.map(
+          (o, j) => `${String.fromCharCode(65 + j)}. ${o.label}${o.description ? ` (${o.description})` : ""}`,
+        ),
+      ].join("\n"),
+    )
+    .join("\n\n");
+}
 
 type TextContent = Exclude<ArtifactContent, FileContent>;
 
@@ -116,6 +138,12 @@ export const ARTIFACT_LIMITS = {
   blockBytes: 200_000,
   pollOptions: 8,
   pollOptionChars: 120,
+  /** A choice card (ADR 0124): a few short decisions, never a form. */
+  choiceQuestions: 5,
+  choiceOptions: 6,
+  choiceQuestionChars: 300,
+  choiceLabelChars: 120,
+  choiceDescriptionChars: 200,
   diagramBytes: 200_000,
   tableRows: 10_000,
   tableColumns: 100,
@@ -167,6 +195,31 @@ export function validateContent(raw: unknown): TextContent {
       }
       if (options.some((o) => o.length > ARTIFACT_LIMITS.pollOptionChars)) throw tooBig("poll option");
       return { kind: "poll", question: c.question.trim(), options, multiple: c.multiple === true };
+    }
+    case "choices": {
+      const L = ARTIFACT_LIMITS;
+      const raw = Array.isArray(c.questions) ? (c.questions as Record<string, unknown>[]) : [];
+      if (raw.length < 1 || raw.length > L.choiceQuestions)
+        throw new ValidationError(`a choice card takes 1 to ${L.choiceQuestions} questions`);
+      const questions = raw.map((q): ChoiceQuestion => {
+        const question = typeof q?.question === "string" ? q.question.trim() : "";
+        if (!question) throw new ValidationError("every question needs its text");
+        if (question.length > L.choiceQuestionChars) throw tooBig("question");
+        const options = (Array.isArray(q.options) ? (q.options as Record<string, unknown>[]) : []).map((o) => {
+          const label = typeof o?.label === "string" ? o.label.trim() : "";
+          const description = typeof o?.description === "string" ? o.description.trim() : "";
+          if (!label) throw new ValidationError("every option needs a label");
+          if (label.length > L.choiceLabelChars || description.length > L.choiceDescriptionChars)
+            throw tooBig("option");
+          return description ? { label, description } : { label };
+        });
+        if (options.length < 2 || options.length > L.choiceOptions)
+          throw new ValidationError(`a question takes 2 to ${L.choiceOptions} options`);
+        if (new Set(options.map((o) => o.label)).size !== options.length)
+          throw new ValidationError("options must differ");
+        return { question, options };
+      });
+      return { kind: "choices", questions };
     }
     case "diagram": {
       if (typeof c.mermaid !== "string") throw new ValidationError("diagram needs mermaid source");
@@ -223,6 +276,8 @@ function encode(content: TextContent): { body: Uint8Array; contentType: string }
         JSON.stringify({ question: content.question, options: content.options, multiple: content.multiple }),
         "application/json",
       );
+    case "choices":
+      return text(JSON.stringify({ questions: content.questions }), "application/json");
     case "diagram":
       return text(content.mermaid, "text/plain; charset=utf-8");
     case "table":
@@ -243,6 +298,8 @@ function decode(kind: Exclude<ArtifactKind, "file">, body: Uint8Array): TextCont
       return { kind, ...(JSON.parse(s) as { html: string; subtitle?: string }) };
     case "poll":
       return { kind, ...(JSON.parse(s) as { question: string; options: string[]; multiple: boolean }) };
+    case "choices":
+      return { kind, questions: (JSON.parse(s) as { questions: ChoiceQuestion[] }).questions };
     case "diagram":
       return { kind, mermaid: s };
     case "table": {
@@ -263,6 +320,7 @@ const EXTENSIONS: Record<ArtifactKind, string> = {
   file: "bin",
   block: "json",
   poll: "json",
+  choices: "json",
 };
 
 // ── Files (ADR 0025) ─────────────────────────────────────────────────────────
@@ -387,11 +445,13 @@ function excerptOf(content: ArtifactContent): string {
           ? content.html.replace(/<[^>]+>/g, " ")
           : content.kind === "poll"
             ? [content.question, ...content.options].join("\n")
-            : content.kind === "diagram"
-              ? content.mermaid
-              : content.kind === "table"
-                ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
-                : content.files.map((f) => f.path).join("\n");
+            : content.kind === "choices"
+              ? choicesText(content.questions)
+              : content.kind === "diagram"
+                ? content.mermaid
+                : content.kind === "table"
+                  ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
+                  : content.files.map((f) => f.path).join("\n");
   return s.replace(/\s+/g, " ").trim().slice(0, 20_000);
 }
 

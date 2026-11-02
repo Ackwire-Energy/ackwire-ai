@@ -21,7 +21,7 @@ import type { ArtifactDeps } from "./artifacts";
 import { audienceError, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
 import { brainOf } from "./brain-settings";
-import type { BrainKind } from "./brains/types";
+import { BRAIN_PLAN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { canceledBy } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
@@ -269,12 +269,21 @@ export interface RoutineView {
   /** Its run waits for the agent's computer since then. */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /**
-   * Its run paused near its plan's or budget's limit (ADR 0118, `usage_paused`): it picks up at `resetsAt` (null:
-   * not known yet). `extraOff`: a plan pause whose window is used up, on an agent whose switch keeps long work
+   * Its run waits on its plan or budget (`usage_paused`): paused near the limit (ADR 0118) or stopped at it (`limit`).
+   * It picks up at `resetsAt` (null: not known yet). `extraOff`: a plan pause whose window is used up, on an agent whose switch keeps long work
    * off paid extra usage, so Continuar agora is refused (`pauseContinuesPastPlan`); `extraUsedUp`: the same with the
    * switch on but no extra usage left. Who may press it: `canManage`.
    */
-  usagePause: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp: boolean } | null;
+  usagePause: {
+    source: "plan" | "budget";
+    resetsAt: string | null;
+    /** Stopped at the limit itself (not paused near it): nothing to continue, it runs after the reset. */
+    limit: boolean;
+    /** The plan it waits for in words ("Claude", "ChatGPT"); null for a budget. */
+    plan: string | null;
+    extraOff: boolean;
+    extraUsedUp: boolean;
+  } | null;
   /** Where it thinks: the agent's brain and, for a computer brain, the computer's name. */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -409,9 +418,10 @@ type AgentRunInfo = {
   waitingMachineId: string | null;
   /** What it waits on when that's its plan's limit or its budget (`USAGE_WAIT_CODES`). */
   waitingCode: string | null;
-  /** A long-work pause's (`usage_pause`): on what and when the limit resets. */
+  /** A long-work pause's (`usage_pause`): on what. Any usage wait: when the limit resets, and the plan's name. */
   waitSource: string | null;
   resetsAt: string | null;
+  plan: string | null;
   /** Continuar agora was pressed on it: back at work as soon as its job runs. */
   continued: boolean;
   updatedAt: Date;
@@ -429,14 +439,11 @@ const agentWaiting = (a: AgentRunInfo | undefined) =>
 /** Waiting for its computer (ADR 0032 §5), not for a person. */
 const agentAway = (a: AgentRunInfo | undefined) => a?.status === "waiting_input" && Boolean(a.waitingMachineId);
 /**
- * Long work paused near a limit (ADR 0118), not continued, whose reset hasn't passed: continued or past its reset,
- * its job picks it up any moment.
+ * Waiting on its plan or budget: paused near the limit (ADR 0118) or stopped at it, and not continued. It says so
+ * until its job picks it up, past the reset too: a slot that is still waiting is not "running".
  */
-const usagePausedAt = (a: AgentRunInfo, now: Date) =>
-  a.status === "waiting_input" &&
-  a.waitingCode === "usage_pause" &&
-  !a.continued &&
-  !(a.resetsAt && Date.parse(a.resetsAt) <= now.getTime());
+const usageWaiting = (a: AgentRunInfo | undefined) =>
+  a?.status === "waiting_input" && USAGE_WAIT_CODES.has(a.waitingCode ?? "") && !a.continued;
 /**
  * Not an email run held for the next email (§6.8): that row stays queued with no job on purpose and is no
  * run yet, so no view shows it and it never makes a routine look busy.
@@ -452,7 +459,7 @@ function runStatus(run: RunRow, agentRun: AgentRunInfo | undefined): RoutineRunS
   if (run.status === "queued" || run.status === "starting") return "queued";
   if (run.status !== "started") return endedAs(run.status) ?? "running";
   // For a person (an approval, an answer) or for its computer.
-  if (agentWaiting(agentRun)) return "waiting";
+  if (agentWaiting(agentRun) || usageWaiting(agentRun)) return "waiting";
   // Its agent run ended but the ledger isn't closed yet (the reaper closes it): its outcome already.
   if (agentRun?.status === "done") return "silent";
   if (agentRun?.status === "failed") return "failed";
@@ -493,6 +500,7 @@ async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<
           waitingCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
           waitSource: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
           resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+          plan: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'plan'`,
           continued: sql<boolean>`(${agentRuns.transcript}->'usagePause'->'override') is not null`,
           updatedAt: agentRuns.updatedAt,
         })
@@ -564,7 +572,16 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
     at: run.at.toISOString(),
     status,
     // Waiting for its computer, not for a person: the app says which.
-    code: status === "waiting" && agentAway(agentRun) ? "waiting_computer" : run.code,
+    code:
+      status !== "waiting"
+        ? run.code
+        : agentAway(agentRun)
+          ? "waiting_computer"
+          : usageWaiting(agentRun)
+            ? agentRun?.waitingCode === "budget" || agentRun?.waitSource === "budget"
+              ? "waiting_budget"
+              : "waiting_plan"
+            : run.code,
     ...(by ? { codeParams: { by } } : {}),
     summary: detailed && run.status !== "canceled" ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
     brain: run.brain,
@@ -804,7 +821,7 @@ async function views(
   // Paused plan runs Continuar agora would take past the plan with extra usage off: their button is greyed.
   const pastPlan = new Map<string, PastPlanReason>();
   for (const a of details.agentRuns.values()) {
-    if (a.waitSource === "budget" || !usagePausedAt(a, now)) continue;
+    if (a.waitingCode !== "usage_pause" || a.waitSource === "budget" || !usageWaiting(a)) continue;
     const reason = await pauseContinuesPastPlan(db, orgId, a.id);
     if (reason) pastPlan.set(a.id, reason);
   }
@@ -833,11 +850,15 @@ async function views(
         }
       : null;
     const agent = agentById.get(r.agentId);
-    const paused = openAgents.find((a) => usagePausedAt(a, now));
+    const kind = brainKindOf(agent?.brain);
+    const paused = openAgents.find(usageWaiting);
     const usagePause = paused
       ? {
-          source: paused.waitSource === "budget" ? ("budget" as const) : ("plan" as const),
+          source:
+            paused.waitSource === "budget" || paused.waitingCode === "budget" ? ("budget" as const) : ("plan" as const),
           resetsAt: paused.resetsAt,
+          limit: paused.waitingCode !== "usage_pause",
+          plan: paused.plan ?? (isComputerBrain(kind) ? BRAIN_PLAN_NAMES[kind] : null),
           extraOff: pastPlan.get(paused.id) === "extra_off",
           extraUsedUp: pastPlan.get(paused.id) === "extra_used_up",
         }
@@ -877,7 +898,6 @@ async function views(
       skipped: count("skipped") + count("superseded"),
       missed: count("missed"),
     };
-    const kind = brainKindOf(agent?.brain);
     const used = usageOf.get(r.id);
     const hookKey = hookKeys.get(r.id);
     return {
