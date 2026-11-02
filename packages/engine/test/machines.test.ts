@@ -436,9 +436,18 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     expect(warned?.source).toMatchObject({ machineId: paired.machineId, label: "Build box" });
     expect(warned?.latest).toMatchObject({ diskUse: 0.91, diskFreeGb: 9 });
 
-    // Back under the line, then over it again: a new notice.
-    await runner.frame({ type: "pong", at: 4, load: { ...base, diskFreeGb: 30, diskUse: 0.7 } });
-    await runner.frame({ type: "pong", at: 5, load: { ...base, diskFreeGb: 5, diskUse: 0.95 } });
+    // A runner that restarts reports once without the disk: the page keeps it and nobody hears it again.
+    await runner.frame({ type: "pong", at: 4, load: base });
+    expect((await listMachines(f.db, f.owner.id, f.org.id))[0]?.disk).toEqual({ freeGb: 8, use: 0.92, sharedGb: 31 });
+    await runner.frame({ type: "pong", at: 5, load: { ...base, diskFreeGb: 8, diskUse: 0.92 } });
+    // Hovering at the line: under 85% but not under 80% doesn't arm it again.
+    await runner.frame({ type: "pong", at: 6, load: { ...base, diskFreeGb: 14, diskUse: 0.83 } });
+    await runner.frame({ type: "pong", at: 7, load: { ...base, diskFreeGb: 9, diskUse: 0.86 } });
+    expect(await warnings()).toHaveLength(1);
+
+    // Back under 80%, then over the line again: a new notice.
+    await runner.frame({ type: "pong", at: 8, load: { ...base, diskFreeGb: 30, diskUse: 0.7 } });
+    await runner.frame({ type: "pong", at: 9, load: { ...base, diskFreeGb: 5, diskUse: 0.95 } });
     expect(await warnings()).toHaveLength(2);
   });
 

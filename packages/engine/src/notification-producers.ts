@@ -1026,6 +1026,8 @@ export async function notifyMachineConnected(
 
 /** The share of a computer's workspace disk in use past which its admins hear it (ADR 0115). */
 export const DISK_WARN_USE = 0.85;
+/** Under this share the warning is armed again, so a disk hovering at the line doesn't notify on every report. */
+export const DISK_REARM_USE = 0.8;
 
 /**
  * A computer's disk passed `DISK_WARN_USE` (ADR 0115): who configures the workspace hears it, once each time it

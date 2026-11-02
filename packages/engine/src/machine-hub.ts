@@ -61,7 +61,7 @@ import {
   publishMachineStatus,
   publishMachineUpdated,
 } from "./machines";
-import { DISK_WARN_USE, notifyComputerDiskFull } from "./notification-producers";
+import { DISK_REARM_USE, DISK_WARN_USE, notifyComputerDiskFull } from "./notification-producers";
 import { enqueue } from "./outbox";
 import { assertCanWork, standingRefusal } from "./standing";
 
@@ -812,31 +812,44 @@ export function createMachineHub(deps: MachineHubDeps) {
     const now = new Date();
     const at = now.toISOString();
     const machineId = conn.machineId;
-    // ADR 0115: the disk just passed the warning line (the last report was under it, or said nothing).
-    const crossed =
-      load?.diskUse !== undefined && load.diskUse >= DISK_WARN_USE
-        ? await db
-            .select({ load: machines.load, orgId: machines.orgId, name: machines.name })
-            .from(machines)
-            .where(eq(machines.id, machineId))
-            .then(([m]) => (m && !((m.load?.diskUse ?? 0) >= DISK_WARN_USE) ? m : null))
-            .catch(() => null)
-        : null;
+    const stored = load
+      ? await db
+          .select({ load: machines.load, orgId: machines.orgId, name: machines.name })
+          .from(machines)
+          .where(eq(machines.id, machineId))
+          .then(([m]) => m ?? null)
+          .catch(() => null)
+      : null;
+    const prev = stored?.load;
+    // ADR 0115: a report without the disk's figures (a runner that just started) keeps the last ones.
+    const next =
+      load && load.diskUse === undefined && prev?.diskUse !== undefined
+        ? {
+            ...load,
+            diskUse: prev.diskUse,
+            ...(prev.diskFreeGb === undefined ? {} : { diskFreeGb: prev.diskFreeGb }),
+            ...(prev.sharedGb === undefined ? {} : { sharedGb: prev.sharedGb }),
+          }
+        : load;
+    const wasWarned = prev?.diskWarned === true;
+    const use = next?.diskUse;
+    const diskWarned =
+      use === undefined ? wasWarned : use >= DISK_WARN_USE || (wasWarned && use >= DISK_REARM_USE);
     await db
       .update(machines)
       .set({
         lastSeenAt: now,
         online: true,
-        ...(load ? { load: { ...load, at } } : {}),
+        ...(next ? { load: { ...next, ...(diskWarned ? { diskWarned } : {}), at } } : {}),
         ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
       })
       .where(and(eq(machines.id, machineId), eq(machines.connectedReplica, replicaId)))
       .catch(() => undefined);
-    if (crossed && load?.diskUse !== undefined) {
+    if (stored && diskWarned && !wasWarned && use !== undefined) {
       await notifyComputerDiskFull(
         { db, pubsub },
-        { id: machineId, orgId: crossed.orgId, name: crossed.name },
-        { diskUse: load.diskUse, ...(load.diskFreeGb === undefined ? {} : { diskFreeGb: load.diskFreeGb }) },
+        { id: machineId, orgId: stored.orgId, name: stored.name },
+        { diskUse: use, ...(next?.diskFreeGb === undefined ? {} : { diskFreeGb: next.diskFreeGb }) },
         now,
       ).catch((error) => deps.log?.warn("disk warning failed", { machineId, error: String(error) }));
     }
