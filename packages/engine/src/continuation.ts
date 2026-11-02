@@ -105,40 +105,52 @@ export async function continuationVerdict(
     onLearn?: (signal: LearnSignal) => void;
   },
 ): Promise<ContinuationVerdict> {
-  const answers = await judge.ask({
-    orgId: input.orgId,
-    agentId: input.agentId,
-    runId: input.runId,
-    kind: "follow_through",
-    state: {
-      request: cutText(input.request, 2000),
-      reply: cutTextEnd(input.reply, 3000),
-      means: input.means,
-      tried: input.tried.slice(-20),
-      runKind: input.runKind,
-      ...(input.unreached ? { unreached: input.unreached } : {}),
-    },
-    questions: {
-      verdict: {
-        type: "choice",
-        instructions:
-          "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
-        criteria: {
-          done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
-          untried:
-            "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt.",
-          continue:
-            "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
-          ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
-          secret:
-            "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
-        },
+  const ask = (learn: boolean) =>
+    judge.ask({
+      orgId: input.orgId,
+      agentId: input.agentId,
+      runId: input.runId,
+      kind: "follow_through",
+      state: {
+        request: cutText(input.request, 2000),
+        reply: cutTextEnd(input.reply, 3000),
+        means: input.means,
+        tried: input.tried.slice(-20),
+        runKind: input.runKind,
+        ...(input.unreached ? { unreached: input.unreached } : {}),
       },
-      ...(input.onLearn ? { learn: LEARN_QUESTION } : {}),
-    },
-  });
+      questions: {
+        verdict: {
+          type: "choice",
+          instructions:
+            "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
+          criteria: {
+            done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
+            untried:
+              "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt.",
+            continue:
+              "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
+            ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
+            secret:
+              "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
+          },
+        },
+        ...(learn ? { learn: LEARN_QUESTION } : {}),
+      },
+    });
+  let learned = input.onLearn !== undefined;
+  let answers: Awaited<ReturnType<typeof ask>>;
+  try {
+    answers = await ask(learned);
+  } catch (error) {
+    // Some providers' filters refuse a wording (a Claude subscription sign-in's misleading 400): the follow-through
+    // verdict must never fail because of the extra question, so it is asked again alone.
+    if (!learned) throw error;
+    learned = false;
+    answers = await ask(false);
+  }
   if (input.onLearn) {
-    const choice = answers.learn?.choice;
+    const choice = learned ? answers.learn?.choice : undefined;
     input.onLearn(LEARN_SIGNALS.includes(choice as LearnSignal) ? (choice as LearnSignal) : "none");
   }
   const a = answers.verdict;

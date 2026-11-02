@@ -23,6 +23,7 @@ import {
   type ToolContext,
   type ToolSource,
 } from "../src";
+import { continuationVerdict } from "../src/continuation";
 import { addMember, setup as baseSetup, type Fixture } from "./fixtures";
 
 let f: Fixture;
@@ -730,5 +731,32 @@ describe("learning guards", () => {
     await invoke(run, "update_skill", { name: "northwind-api", body: "# northwind-api\n1. GET the models." });
     expect(await flags(owner.id)).toEqual([[true, true]]);
     expect(await flags(f.owner.id)).toEqual([[true, true]]);
+  });
+
+  test("a judge that refuses the learn question still gives the follow-through verdict", async () => {
+    f = await setup();
+    const asked: string[][] = [];
+    const judge = {
+      ask: async (req: { questions: Record<string, unknown> }) => {
+        asked.push(Object.keys(req.questions));
+        if ("learn" in req.questions) throw new Error("400 invalid_request_error");
+        return { verdict: { choice: "continue", probabilities: { continue: 0.9 } } };
+      },
+    } as unknown as Parameters<typeof continuationVerdict>[0];
+    let signal: string | undefined;
+    const verdict = await continuationVerdict(judge, {
+      orgId: crypto.randomUUID(),
+      agentId: crypto.randomUUID(),
+      runId: crypto.randomUUID(),
+      request: "triage these",
+      reply: "I'll create the issues next.",
+      means: [],
+      tried: [],
+      runKind: "conversation",
+      onLearn: (s) => {
+        signal = s;
+      },
+    });
+    expect([verdict, signal, asked]).toEqual(["continue", "none", [["verdict", "learn"], ["verdict"]]]);
   });
 });
