@@ -814,8 +814,13 @@ export const lockWorkspacesOf = (tx: Executor, userId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
 
 /** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
-export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
-  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.members" } });
+/** `agents`: the ones whose owner or brain changed with it, which open apps read again. */
+export const announceMembers = (pubsub: PubSub | undefined, orgId: string, agents: string[] = []) =>
+  publishOrgEvent(pubsub, {
+    type: "org.broadcast",
+    orgId,
+    event: { type: "org.members", ...(agents.length ? { agents } : {}) },
+  });
 
 /**
  * A change to who is in the workspace, in the audit log: the person's name and address as they were then
@@ -890,13 +895,14 @@ async function removableMember(db: Database, actorId: string, orgId: string, tar
 
 /**
  * Who answers for the agents of someone leaving: whoever removes them, or, when they leave themselves, the workspace's
- * longest-standing other owner (the last owner can't leave, so one is there).
+ * longest-standing other owner, one who can still sign in first (the last owner can't leave, so one is there).
  */
 async function heirOf(db: Executor, actorId: string, orgId: string, targetUserId: string) {
   if (actorId !== targetUserId) return actorId;
   const [owner] = await db
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
     .where(
       and(
         eq(organizationMembers.orgId, orgId),
@@ -904,7 +910,7 @@ async function heirOf(db: Executor, actorId: string, orgId: string, targetUserId
         ne(organizationMembers.userId, targetUserId),
       ),
     )
-    .orderBy(asc(organizationMembers.createdAt))
+    .orderBy(sql`${users.blockedAt} is not null`, asc(organizationMembers.createdAt))
     .limit(1);
   return owner?.userId ?? null;
 }
@@ -1002,7 +1008,7 @@ export async function removeMember(
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
-  const { released, removed, handed } = await db.transaction(async (tx) => {
+  const { released, removed, handed, changed } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -1040,7 +1046,25 @@ export async function removeMember(
     for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
       removed.push({ computer, freed: await detachMachine(tx, computer) });
     }
-    return { released, removed, handed };
+    // A plan thinks only for its owner's agents (ADR 0059 §3, `updateAgent`): a handed agent, or one that was on
+    // their computer, whose plan (an account, or the computer's own sign-in) isn't its owner's now goes back to the API.
+    const touched = [...new Set([...handed.map((a) => a.id), ...removed.flatMap((r) => r.freed)])];
+    if (touched.length)
+      await tx
+        .update(agents)
+        .set({ brain: "model", brainAccountId: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(agents.orgId, orgId),
+            inArray(agents.id, touched),
+            inArray(agents.brain, ["claude_code", "codex"]),
+            sql`not exists (select 1 from ${schema.machines} m where m.id = ${agents.machineId} and m.deleted_at is null
+                and ${agents.ownerUserId} = case when ${agents.brainAccountId} is null then m.paired_by_user_id
+                  else (select a.created_by from ${schema.machineAccounts} a where a.id = ${agents.brainAccountId}) end)`,
+          ),
+        );
+    const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
+    return { released, removed, handed, changed };
   });
   forgetAgents(
     orgId,
@@ -1054,7 +1078,7 @@ export async function removeMember(
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   const quiet = actorId === targetUserId ? { quiet: true as const } : {};
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId, ...quiet });
-  await announceMembers(options.pubsub, orgId);
+  await announceMembers(options.pubsub, orgId, changed);
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
   // Loaded here: the routine engine builds on this module.
   const { pauseRoutinesOfCreator } = await import("./routine-firing");

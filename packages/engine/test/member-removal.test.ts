@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { ACCOUNTS_PROTOCOL } from "@agenteschat/adapters";
+import { ACCOUNTS_PROTOCOL, orgTopic, type RealtimeEvent } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   ConflictError,
@@ -18,6 +18,17 @@ beforeEach(async () => {
   f = await setup();
 });
 afterEach(() => f.close());
+
+const MAC = {
+  name: "mac",
+  hostname: "mac",
+  os: "darwin",
+  arch: "arm64",
+  version: "0.9.0",
+  workspace: "/Users/a/agentes",
+  protocol: ACCOUNTS_PROTOCOL,
+  exec: true,
+};
 
 const ACCOUNT_ID = "0193eeee-0000-4000-8000-000000000001";
 
@@ -105,4 +116,52 @@ test("only someone above removes a member, and the preview refuses the same", as
   expect(await removalPreview(f.db, admin.id, f.org.id, dev.id)).not.toBeNull();
   await removeMember(f.db, admin.id, f.org.id, dev.id);
   expect(await removalPreview(f.db, admin.id, f.org.id, dev.id)).toBeNull();
+});
+
+test("an agent thinking with the removed person's own computer goes back to the API, and open apps hear it", async () => {
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, caio.id, f.org.id, MAC);
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: caio.id, machineId, brain: "claude_code", brainAccountId: null })
+    .where(eq(schema.agents.id, f.agent.id));
+  expect((await removalPreview(f.db, f.owner.id, f.org.id, caio.id))?.losePlan).toEqual([
+    { id: f.agent.id, name: f.agent.name },
+  ]);
+  const told: RealtimeEvent[] = [];
+  f.pubsub.subscribe(orgTopic(f.org.id), (e) => told.push(e));
+
+  await removeMember(f.db, f.owner.id, f.org.id, caio.id, { pubsub: f.pubsub });
+  const after = await agentRow();
+  expect(after).toMatchObject({ ownerUserId: f.owner.id, machineId: null, brain: "model", brainAccountId: null });
+  expect(told).toContainEqual({
+    type: "org.broadcast",
+    orgId: f.org.id,
+    event: { type: "org.members", agents: [f.agent.id] },
+  });
+  // Taken out by someone else: not quiet.
+  expect(told.find((e) => e.type === "membership.revoked")).toEqual({
+    type: "membership.revoked",
+    orgId: f.org.id,
+    userId: caio.id,
+  });
+});
+
+test("leaving on one's own is quiet, and the agents skip a blocked owner", async () => {
+  const blocked = await addMember(f.db, f.org.id, "member", "old");
+  await changeMemberRole(f.db, f.owner.id, f.org.id, blocked.id, "owner");
+  // The longest-standing other owner, but blocked: can't sign in.
+  await f.db
+    .update(schema.organizationMembers)
+    .set({ createdAt: new Date(0) })
+    .where(eq(schema.organizationMembers.userId, blocked.id));
+  await f.db.update(schema.users).set({ blockedAt: new Date() }).where(eq(schema.users.id, blocked.id));
+  const cy = await addMember(f.db, f.org.id, "member", "cy");
+  await f.db.update(schema.agents).set({ ownerUserId: cy.id }).where(eq(schema.agents.id, f.agent.id));
+  const told: RealtimeEvent[] = [];
+  f.pubsub.subscribe(orgTopic(f.org.id), (e) => told.push(e));
+
+  await removeMember(f.db, cy.id, f.org.id, cy.id, { pubsub: f.pubsub });
+  expect((await agentRow()).ownerUserId).toBe(f.owner.id);
+  expect(told).toContainEqual({ type: "membership.revoked", orgId: f.org.id, userId: cy.id, quiet: true });
 });
