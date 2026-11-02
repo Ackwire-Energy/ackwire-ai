@@ -1300,12 +1300,26 @@ export const TASK_LIMITS = {
   prUrl: 500,
 } as const;
 
+/** Protocol 33: the public address observed from an agent process, absent until measured. */
+export interface MachineEgress {
+  ip: string | null;
+  country?: string;
+}
+export interface MachineNetworkTransition {
+  state: "draining" | "restart_required";
+  deadline: string;
+  agents: string[];
+}
+export const EGRESS_PROTOCOL = 33;
+
 /** An agent that uses this machine, as the `agents` frame lists it (protocol 9). */
 export interface MachineAgent {
   id: string;
   handle: string;
   name: string;
   look?: { color?: string; eyes?: string; accessory?: string };
+  /** Protocol 33: language of the responsible person; absent falls back to English. */
+  locale?: string;
   /** Protocol 20: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
   account?: string;
 }
@@ -1787,6 +1801,8 @@ export type ServerFrame =
       machineId: string;
       name: string;
       heartbeatMs: number;
+      /** Only the workspace’s managed computer observes its agents’ public route. */
+      observeEgress?: boolean;
       /**
        * The server runs each `mcp.call` once per `callId` and answers a copy with the first answer: a call cut by
        * a reconnect may be sent again. Absent (older servers): sent again it would run twice.
@@ -1830,7 +1846,14 @@ export type RunnerFrame =
    * Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed);
    * protocol 23: `browserTraffic` the same way.
    */
-  | { type: "pong"; at: number; load?: MachineLoad; browserTraffic?: BrowserTraffic }
+  | {
+      type: "pong";
+      at: number;
+      load?: MachineLoad;
+      browserTraffic?: BrowserTraffic;
+      egress?: MachineEgress;
+      networkTransition?: MachineNetworkTransition | null;
+    }
   /** A task's progress: a human last line, files it touched, or elapsed time (throttled). */
   | {
       type: "task.event";
@@ -2284,9 +2307,43 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       return null;
     case "pong": {
       if (typeof f.at !== "number") return null;
+      const rawTransition = f.networkTransition;
+      const transition =
+        isObject(rawTransition) &&
+        (rawTransition.state === "draining" || rawTransition.state === "restart_required") &&
+        typeof rawTransition.deadline === "string" &&
+        Number.isFinite(Date.parse(rawTransition.deadline)) &&
+        Array.isArray(rawTransition.agents) &&
+        rawTransition.agents.length <= 1000 &&
+        rawTransition.agents.every((id) => typeof id === "string" && id.length <= 64)
+          ? {
+              state: rawTransition.state as MachineNetworkTransition["state"],
+              deadline: rawTransition.deadline,
+              agents: rawTransition.agents as string[],
+            }
+          : null;
       const load = parseMachineLoad(f.load);
       const browserTraffic = parseBrowserTraffic(f.browserTraffic);
-      return { type: "pong", at: f.at, ...(load ? { load } : {}), ...(browserTraffic ? { browserTraffic } : {}) };
+      const rawEgress = isObject(f.egress) ? f.egress : null;
+      const egress =
+        rawEgress &&
+        (rawEgress.ip === null ||
+          (typeof rawEgress.ip === "string" && rawEgress.ip.length <= 45 && /^[0-9a-fA-F:.]+$/.test(rawEgress.ip)))
+          ? {
+              ip: rawEgress.ip as string | null,
+              ...(typeof rawEgress.country === "string" && /^[A-Z]{2}$/.test(rawEgress.country)
+                ? { country: rawEgress.country }
+                : {}),
+            }
+          : null;
+      return {
+        type: "pong",
+        at: f.at,
+        ...(load ? { load } : {}),
+        ...(browserTraffic ? { browserTraffic } : {}),
+        ...(egress ? { egress } : {}),
+        ...(transition || rawTransition === null ? { networkTransition: transition } : {}),
+      };
     }
     case "task.event": {
       if (!isString(f.taskId) || (f.kind !== "line" && f.kind !== "files" && f.kind !== "progress")) return null;

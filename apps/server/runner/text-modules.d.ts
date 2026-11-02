@@ -9,3 +9,9 @@ declare module "*.b64" {
   const base64: string;
   export default base64;
 }
+
+/** Offline browser assets embedded verbatim. */
+declare module "*.txt" {
+  const source: string;
+  export default source;
+}

@@ -9764,6 +9764,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Het netwerk verandert. Open sessies van de computer starten om {{when}} opnieuw.",
+      "restart": "De sessies van de computer starten opnieuw om het netwerk toe te passen. Nieuw werk wacht tot dit klaar is.",
+      "line": "Uitgaand IP {{ip}}",
+      "hint": "Het adres dat websites zien als de agents browsen. Het verandert mee met het netwerk van de computer."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Opdrachten uit",
@@ -12203,6 +12209,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Je kijkt alleen mee.",
+      "title": "Wil je de controle overnemen?",
+      "working": "{{name}} pauzeert zolang jij de controle hebt."
+    },
     "sub": {
       "control": "Jij hebt de controle · {{name}} wacht",
       "control_female": "Jij hebt de controle · {{name}} wacht",

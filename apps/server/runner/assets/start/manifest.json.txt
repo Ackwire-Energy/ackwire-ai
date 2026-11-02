@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "agentes.chat",
+  "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnhHkuBQUoz+h1CDNDjKFRN6qmKBiey0bQXO4ala21CVMUbnDKeeaBpdxdpizXTti7He9go8+XKN/pX+dxPlvLmwCrx38awhaA0j3SFSYpN2HoSUuV22wZNKUPjthrVQeQQPUrzv/tuXrU5NlGEBkaGyH6Zp2Jc6P2acX7e9DiKnQJj6G1nfGVo3WXCC2Om1WwGPVzgM+dBzi7yiigB2sI6EYWIXMB+eNIb3vcxv4KNjk7BuldvLzBt9EwYyUVlVxkVSxnpvohUhicoMVZvqH1O6WHZCYsoQ2HF1tQQtr9QTgWx5asALgGtMkeKHWiKRiCuoUpG5/7SkZpyUban7ZUQIDAQAB",
+  "chrome_url_overrides": {
+    "newtab": "start.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'"
+  }
+}

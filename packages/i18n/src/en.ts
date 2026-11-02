@@ -9058,6 +9058,12 @@ export const en = {
     },
   },
   machines: {
+    egress: {
+      draining: "Network settings are changing. Open computer sessions will restart at {{when}}.",
+      restart: "Computer sessions are restarting to apply network settings. New work waits until this finishes.",
+      line: "Exit IP {{ip}}",
+      hint: "The address websites see when the agents browse. It updates when the computer’s network changes.",
+    },
     online: "Online",
     offline: "Offline",
     execOff: "Commands off",
@@ -11454,6 +11460,11 @@ export const en = {
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
   desktop: {
+    ask: {
+      watching: "You're just watching.",
+      title: "Want to take control?",
+      working: "{{name}} pauses while you’re in control.",
+    },
     sub: {
       control: "You're in control · {{name}} waits",
       controlAsked: "You're in control · {{name}} asked",

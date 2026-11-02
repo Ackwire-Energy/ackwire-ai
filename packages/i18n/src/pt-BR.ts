@@ -9262,6 +9262,12 @@ export const ptBR = {
     },
   },
   machines: {
+    egress: {
+      draining: "A rede está mudando. As sessões abertas do computador serão reiniciadas às {{when}}.",
+      restart: "As sessões do computador estão reiniciando para aplicar a rede. Novos trabalhos aguardam a conclusão.",
+      line: "IP de saída {{ip}}",
+      hint: "O endereço que os sites veem quando os agentes navegam. Ele acompanha as mudanças de rede do computador.",
+    },
     online: "Online",
     offline: "Offline",
     execOff: "Comandos desligados",
@@ -11782,6 +11788,12 @@ export const ptBR = {
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
   desktop: {
+    ask: {
+      watching: "Você está só assistindo.",
+      title: "Quer assumir o controle?",
+      working: "O\u00a0{{name}} pausa enquanto você está no controle.",
+      working_female: "A\u00a0{{name}} pausa enquanto você está no controle.",
+    },
     sub: {
       control: "Você no controle · o\u00a0{{name}} espera",
       control_female: "Você no controle · a\u00a0{{name}} espera",
