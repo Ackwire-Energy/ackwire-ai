@@ -1,7 +1,7 @@
 import { type ComposioClient, composioFile, FileTooLargeError, type PubSub } from "@agenteschat/adapters";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact } from "../artifacts";
 import { recordAudit } from "../audit";
 import { connectorKeyOf } from "../connector-usage";
@@ -109,7 +109,80 @@ export async function mcpSessionOver(transport: Transport): Promise<McpSession> 
 }
 
 export const connectOverHttp: McpConnect = (connection, headers) =>
-  mcpSessionOver(new StreamableHTTPClientTransport(new URL(connection.serverUrl), { requestInit: { headers } }));
+  mcpSessionOver(
+    new StreamableHTTPClientTransport(new URL(connection.serverUrl), {
+      requestInit: { headers },
+      fetch: tolerantMcpFetch(),
+    }),
+  );
+
+const JSONRPC_MEMBERS = ["jsonrpc", "id", "method", "params", "result", "error"];
+
+/** A JSON-RPC message (or batch) with only the members JSON-RPC defines; anything else is returned as it is. */
+export function jsonRpcMembers(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(jsonRpcMembers);
+  if (!isRecord(value) || !("jsonrpc" in value)) return value;
+  return Object.fromEntries(JSONRPC_MEMBERS.filter((k) => k in value).map((k) => [k, value[k]]));
+}
+
+/** The JSON text normalized by `jsonRpcMembers`; null when it isn't JSON. */
+function jsonRpcText(text: string): string | null {
+  try {
+    return JSON.stringify(jsonRpcMembers(JSON.parse(text)));
+  } catch {
+    return null;
+  }
+}
+
+/** Rewrites each SSE `data:` line that holds JSON; every other line passes as it came. */
+function sseJsonRpcLines(): TransformStream<string, string> {
+  let rest = "";
+  const line = (l: string) => {
+    if (!l.startsWith("data:")) return l;
+    const json = jsonRpcText(l.slice(5));
+    return json === null ? l : `data: ${json}`;
+  };
+  return new TransformStream({
+    transform(chunk, out) {
+      const lines = (rest + chunk).split("\n");
+      rest = lines.pop() ?? "";
+      for (const l of lines) out.enqueue(`${line(l)}\n`);
+    },
+    flush(out) {
+      if (rest) out.enqueue(line(rest));
+    },
+  });
+}
+
+/**
+ * A fetch for the MCP transport that drops members JSON-RPC doesn't define from the server's messages before the SDK
+ * reads them: the SDK refuses a whole response for one extra top-level member (some servers add their own, like a
+ * `fonte` beside `result`), where other MCP clients ignore it. `result` and `error` pass untouched, so their shapes are
+ * still checked; redirects and failed responses pass as they came.
+ */
+export function tolerantMcpFetch(base: FetchLike = fetch): FetchLike {
+  return async (url, init) => {
+    const res = await base(url, init);
+    if (!res.ok || !res.body) return res;
+    const type = res.headers.get("content-type") ?? "";
+    let body: string | ReadableStream<Uint8Array>;
+    if (type.includes("application/json")) {
+      const text = await res.text();
+      body = jsonRpcText(text) ?? text;
+    } else if (type.includes("text/event-stream")) {
+      body = res.body
+        .pipeThrough(new TextDecoderStream())
+        .pipeThrough(sseJsonRpcLines())
+        .pipeThrough(new TextEncoderStream());
+    } else {
+      return res;
+    }
+    const headers = new Headers(res.headers);
+    headers.delete("content-length");
+    headers.delete("content-encoding");
+    return new Response(body, { status: res.status, statusText: res.statusText, headers });
+  };
+}
 
 /** Name the model sees for a connector tool: `github_merge_pull_request`. */
 export const exposedToolName = (connector: string, tool: string) =>

@@ -8939,6 +8939,7 @@
     "clearSearch": "Zoekopdracht wissen",
     "noMatch": "Niets gevonden voor “{{q}}”.",
     "noTools": "De server bood geen tools aan.",
+    "unreadable": "De tools van deze server konden niet worden gelezen: {{reason}}",
     "refresh": "Zoeken naar nieuwe tools",
     "decideTitle": "Jouw beslissing nodig · {{count}}",
     "decideHelp": "Hun naam zegt niet wat ze doen. Bevestig de suggestie of kies iets anders.",

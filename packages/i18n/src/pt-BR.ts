@@ -8516,6 +8516,7 @@ export const ptBR = {
     clearSearch: "Limpar busca",
     noMatch: "Nada encontrado para “{{q}}”.",
     noTools: "O servidor não ofereceu nenhuma ferramenta.",
+    unreadable: "Não deu para ler as ferramentas desse servidor: {{reason}}",
     refresh: "Buscar ferramentas novas",
     decideTitle: "Precisam da sua decisão · {{count}}",
     decideHelp: "O nome não diz o que fazem. Confirme a sugestão ou escolha outra.",

@@ -8597,6 +8597,7 @@
     "clearSearch": "清除搜索",
     "noMatch": "没有找到“{{q}}”相关内容。",
     "noTools": "服务器没有提供任何工具。",
+    "unreadable": "无法读取此服务器的工具：{{reason}}",
     "refresh": "查找新工具",
     "decideTitle": "需要你决定 · {{count}}",
     "decideHelp": "从名称看不出它们做什么。请确认建议或选择其他级别。",

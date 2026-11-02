@@ -2012,6 +2012,8 @@ export interface CustomServer {
   via?: "composio";
   /** `needs_reconnect`: its Composio account stopped working; no tools until Reconectar. Older servers leave it out. */
   status?: "active" | "needs_reconnect";
+  /** Why its tools couldn't be read the last time they were listed (short); null or absent when they were. */
+  toolsError?: string | null;
   tools: CustomTool[];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;

@@ -975,3 +975,37 @@ describe("several accounts of one service", () => {
     expect(screen().queryByRole("dialog")).toBeNull();
   });
 });
+
+describe("a server whose tools can't be read", () => {
+  test("the review says why with Tentar de novo, not '0 ferramentas'; a working retry lists them", async () => {
+    const api = createFakeApi(seedState({ connections: [] }));
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.suporte.example.com",
+      label: "Suporte",
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    const reason = "Streamable HTTP error: Error POSTing to endpoint: upstream timed out";
+    const list = api.customConnectors.list;
+    let broken = true;
+    api.customConnectors.list = async (orgId) =>
+      (await list(orgId)).map((s) => (broken ? { ...s, tools: [], toolsError: reason } : s));
+    const refresh = api.customConnectors.refresh;
+    api.customConnectors.refresh = async (orgId, id) => {
+      broken = false;
+      return refresh(orgId, id);
+    };
+    await renderApp(`/org/${ORG_ID}/settings?connected=custom:${res.server.id}`, { api });
+    await settle(8);
+    const review = () => screen().getByRole("dialog", { name: REVIEW });
+    expect(within(review()).getByRole("alert").textContent).toBe(
+      `Não deu para ler as ferramentas desse servidor: ${reason}`,
+    );
+    expect(review().textContent).not.toContain("Classificamos");
+    expect(review().textContent).not.toContain("O servidor não ofereceu nenhuma ferramenta.");
+    await click(within(review()).getByRole("button", { name: "Tentar de novo" }));
+    await settle(4);
+    expect(within(review()).queryByRole("alert")).toBeNull();
+    expect(review().textContent).toContain(`Classificamos as ${res.server.tools.length} ferramentas do Suporte.`);
+  });
+});

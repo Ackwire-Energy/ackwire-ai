@@ -9168,6 +9168,7 @@
     "clearSearch": "Borrar búsqueda",
     "noMatch": "No se encontró nada para “{{q}}”.",
     "noTools": "El servidor no ofreció ninguna herramienta.",
+    "unreadable": "No se pudieron leer las herramientas de este servidor: {{reason}}",
     "refresh": "Buscar herramientas nuevas",
     "decideTitle": "Necesitan tu decisión · {{count}}",
     "decideHelp": "Sus nombres no dicen lo que hacen. Confirma la sugerencia o elige otra.",

@@ -9245,6 +9245,7 @@
     "clearSearch": "Cancella ricerca",
     "noMatch": "Nessun risultato per “{{q}}”.",
     "noTools": "Il server non ha offerto nessuno strumento.",
+    "unreadable": "Non è stato possibile leggere gli strumenti di questo server: {{reason}}",
     "refresh": "Cerca nuovi strumenti",
     "decideTitle": "Serve una tua decisione · {{count}}",
     "decideHelp": "I loro nomi non dicono cosa fanno. Conferma il suggerimento o scegline un altro.",
