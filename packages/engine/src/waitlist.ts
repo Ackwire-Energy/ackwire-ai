@@ -1,14 +1,15 @@
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, lt, ne, or, schema, sql } from "@agenteschat/db";
+import { type AppLocale, appLocale, LOCALE_CODES } from "@agenteschat/i18n/locale";
 import { randomToken, sha256 } from "./crypto";
-import { queueEmail } from "./email";
+import { emailLocale, queueEmail } from "./email";
 import { ValidationError } from "./errors";
 import { enqueue, PermanentJobError } from "./outbox";
 
 const { waitlistEntries } = schema;
 
-export const WAITLIST_LOCALES = ["pt-BR", "en"] as const;
-export type WaitlistLocale = (typeof WAITLIST_LOCALES)[number];
+export const WAITLIST_LOCALES = LOCALE_CODES;
+export type WaitlistLocale = AppLocale;
 
 /** A new confirmation email waits this long after the previous one. */
 export const WAITLIST_RESEND_AFTER_MS = 2 * 60_000;
@@ -41,9 +42,7 @@ export async function joinWaitlist(
 ): Promise<{ sent: boolean }> {
   const email = normalizeWaitlistEmail(input.email);
   if (!email) throw new ValidationError("Use an email like name@company.com", "invalid_email");
-  const locale: WaitlistLocale = WAITLIST_LOCALES.includes(input.locale as WaitlistLocale)
-    ? (input.locale as WaitlistLocale)
-    : "pt-BR";
+  const locale: WaitlistLocale = appLocale([input.locale], true) ?? "en";
   await db.transaction(async (tx) => {
     const [added] = await tx
       .insert(waitlistEntries)
@@ -83,7 +82,7 @@ export async function joinWaitlist(
       to: [email],
       template: {
         kind: "waitlist_confirm",
-        locale: entry.locale === "en" ? "en" : "pt-BR",
+        locale: emailLocale(entry.locale),
         email,
         url: `${input.publicUrl.replace(/\/$/, "")}/?confirm=${token}`,
       },

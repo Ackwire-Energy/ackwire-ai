@@ -14,8 +14,13 @@ export const users = pgTable("users", {
   email: text().notNull().unique(),
   emailVerified: boolean().notNull().default(false),
   image: text(),
-  /** UI language chosen at sign-up (`pt-BR`, `en`). */
+  /** The app's language (a code of `@agenteschat/i18n/locale`): emails and pushes are written in it. */
   locale: text(),
+  /**
+   * The language follows each device's own ("Automático", the default) until the person picks one; the devices
+   * then show that one everywhere (ADR 0121). Not a Better Auth field.
+   */
+  localeAuto: boolean().notNull().default(true),
   /**
    * Blocked by the people who run this server (operator API, ADR 0056): no sign-in and no membership
    * anywhere (`standing.ts`). Not a Better Auth field, so it never reaches a session or the cookie cache.

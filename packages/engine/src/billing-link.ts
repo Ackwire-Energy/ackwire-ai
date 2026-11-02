@@ -125,7 +125,7 @@ export async function mintBillingLink(
     email: user.email,
     name: user.name,
     role: membership.role === "owner" ? "owner" : "admin",
-    locale: appLocale([user.locale]) ?? "pt-BR",
+    locale: appLocale([user.locale], true) ?? "en",
     from,
     return: `/org/${orgId}${RETURN_TO[from] ?? ""}`,
     usage: {

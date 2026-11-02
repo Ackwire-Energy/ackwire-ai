@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { serverText } from "@agenteschat/i18n";
 import { type AiStatusDeps, orgHasAi } from "./ai-status";
 import { caches } from "./cache";
 import { decodeCursor, encodeCursor } from "./cursor";
@@ -314,7 +315,7 @@ export async function setProvisioning(
  * it says a computer, never the bare workspace.
  */
 export const managedMachineName = (orgName: string, locale: EmailLocale) =>
-  cleanMachineName(locale === "en" ? `${orgName}'s computer` : `Computador da ${orgName}`);
+  cleanMachineName(serverText(locale, "computerSetup.title", { org: orgName }));
 
 /** The workspace was renamed: its computer, still under the name it got for the old one, takes the new one. */
 export async function followWorkspaceName(db: Executor, orgId: string, from: string, to: string) {

@@ -47,3 +47,17 @@ export const STRINGS: Record<AppLocale, LocaleStrings> = {
 export const resources = /* @__PURE__ */ Object.fromEntries(
   Object.entries(STRINGS).map(([code, strings]) => [code, { translation: fillPluralGaps(code as AppLocale, strings) }]),
 ) as Record<AppLocale, { translation: LocaleStrings }>;
+
+const leafAt = (tree: LocaleStrings, key: string): unknown =>
+  key
+    .split(".")
+    .reduce<unknown>((node, k) => (node && typeof node === "object" ? (node as LocaleStrings)[k] : undefined), tree);
+
+/**
+ * A string the server writes itself (a computer's default name) in `code`, English where that language has none,
+ * with `{{name}}` filled from `vars`.
+ */
+export function serverText(code: AppLocale, key: string, vars: Record<string, string> = {}): string {
+  const raw = leafAt(STRINGS[code], key) ?? leafAt(en, key);
+  return typeof raw === "string" ? raw.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => vars[k] ?? m) : key;
+}
