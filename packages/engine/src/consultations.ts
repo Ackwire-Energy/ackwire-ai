@@ -567,7 +567,7 @@ export function consultationNotice(
     "id" | "kind" | "status" | "answer" | "question" | "askerRunId" | "askerAgentId" | "targetAgentId"
   >,
   handle: string,
-  options: { wake?: boolean; pending?: string } = {},
+  options: { wake?: boolean; pending?: string; hidden?: boolean } = {},
 ): Notice {
   const quoted = `"${c.question.slice(0, 300)}${c.question.length > 300 ? "…" : ""}"`;
   const note = c.kind === "note";
@@ -584,7 +584,7 @@ export function consultationNotice(
       : c.status === "expired"
         ? `No answer: it didn't answer within ${CONSULTATION_TTL_MS / 60_000} minutes (${asked}). Say what is still missing if it matters; ask again only if you still need it.`
         : `No answer: it couldn't (${c.answer ?? "its run failed"}; ${asked}). Go on with what you know.`;
-  const shown = c.answer ? answerForPeople(c.answer) : "";
+  const shown = c.answer && !options.hidden ? answerForPeople(c.answer) : "";
   return {
     kind: "consult_reply",
     text,
@@ -811,8 +811,9 @@ async function closeConsultation(
   if (!out) return null;
   const { closed, asker, handle } = out;
   if (!asker) return closed;
+  const hidden = await keptFromPeople(deps.db, closed);
   if (!isAsyncConsultation(closed)) {
-    const notice = consultationNotice(closed, handle);
+    const notice = consultationNotice(closed, handle, { hidden });
     await resumeRunWithResult(deps.db, {
       runId: closed.askerRunId,
       waitId: closed.waitId,
@@ -823,7 +824,10 @@ async function closeConsultation(
         consultationId: closed.id,
         status,
         question: cutText(closed.question, 2000),
-        answer: status === "answered" && closed.answer ? cutText(answerForPeople(closed.answer), 4000) || null : null,
+        answer:
+          status === "answered" && closed.answer && !hidden
+            ? cutText(answerForPeople(closed.answer), 4000) || null
+            : null,
       },
       late: { kind: notice.kind, text: notice.text, from: notice.from },
       pubsub: deps.pubsub,
@@ -837,7 +841,7 @@ async function closeConsultation(
     await reportHandOffs(deps, asker);
   } else {
     const delivered = await deps.db.transaction(async (tx) => {
-      const sent = await deliverNoticeToRun(tx, asker, consultationNotice(closed, handle));
+      const sent = await deliverNoticeToRun(tx, asker, consultationNotice(closed, handle, { hidden }));
       await tx.update(agentConsultations).set({ reportedAt: now }).where(eq(agentConsultations.id, closed.id));
       return sent;
     });
@@ -902,7 +906,7 @@ async function handBack(tx: Executor, asker: AgentRun, closed: AgentConsultation
     // It goes back inside that answer: reported (I3), whether or not this run reads it too.
     await tx.update(agentConsultations).set({ reportedAt: new Date() }).where(eq(agentConsultations.id, closed.id));
   }
-  const notice = consultationNotice(closed, handle);
+  const notice = consultationNotice(closed, handle, { hidden: await keptFromPeople(tx, closed) });
   if (asker.status === "queued" || asker.status === "running") return deliverNoticeToRun(tx, asker, notice);
   // It answers nothing still out: written for the record, waking nobody.
   if (owed.length === 0) await deliverNoticeToRun(tx, asker, notice, { wake: false });
@@ -1027,7 +1031,8 @@ export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: A
     for (const [i, row] of claimed.entries()) {
       const wake = i === claimed.length - 1;
       const handle = await handleOf(tx, row.orgId, row.targetAgentId);
-      const notice = consultationNotice(row, handle, { wake, ...(wake && pending ? { pending } : {}) });
+      const hidden = await keptFromPeople(tx, row);
+      const notice = consultationNotice(row, handle, { wake, hidden, ...(wake && pending ? { pending } : {}) });
       // A routine's run never reads them itself: all of them land where it reports, so none is lost when it ends unread.
       out.push(await deliverNoticeToRun(tx, asker, notice, { wake, joinRun: !asker.background }));
     }
@@ -1370,10 +1375,22 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
       r.status === "open" && r.targetRunId ? [{ runId: r.targetRunId, dmId: r.dmId, since: r.createdAt }] : [],
     ),
   );
-  return rows.map((r) => ({
-    ...consultationView(r, waitOf),
-    progress: r.status === "open" && r.targetRunId ? (progressOf.get(r.targetRunId) ?? null) : null,
-  }));
+  const hidden = new Set(
+    (
+      await Promise.all(
+        [...new Set(rows.flatMap((r) => (r.targetRunId ? [r.targetRunId] : [])))].map(async (id) =>
+          (await answersAgentsOnly(db, orgId, id)) ? [id] : [],
+        ),
+      )
+    ).flat(),
+  );
+  return rows.map((r) => {
+    const kept = !!r.targetRunId && hidden.has(r.targetRunId);
+    return {
+      ...consultationView(r, waitOf, kept),
+      progress: r.status === "open" && r.targetRunId && !kept ? (progressOf.get(r.targetRunId) ?? null) : null,
+    };
+  });
 }
 
 /**
@@ -1410,7 +1427,12 @@ type ConsultationRow = Pick<
   "id" | "kind" | "targetRunId" | "status" | "question" | "answer" | "createdAt" | "answeredAt" | "expiresAt"
 > & { runId: string; agentId: string; consultedAgentId: string };
 
-function consultationView(r: ConsultationRow, waitOf: Map<string, ConsultationWait | null>): RunConsultation {
+/** `hidden`: the consulted run answers agents only (`answersAgentsOnly`), so its answer stays theirs. */
+function consultationView(
+  r: ConsultationRow,
+  waitOf: Map<string, ConsultationWait | null>,
+  hidden = false,
+): RunConsultation {
   const status = r.status as RunConsultation["status"];
   const open = status === "open";
   return {
@@ -1425,7 +1447,9 @@ function consultationView(r: ConsultationRow, waitOf: Map<string, ConsultationWa
     question: cutText(r.question, NOTICE_QUESTION_MAX),
     // Open (what it gathered so far is the agents'), or expired: no answer; a failed one keeps its reason.
     answer:
-      open || status === "expired" || !r.answer ? null : cutText(answerForPeople(r.answer), NOTICE_ANSWER_MAX) || null,
+      open || status === "expired" || !r.answer || hidden
+        ? null
+        : cutText(answerForPeople(r.answer), NOTICE_ANSWER_MAX) || null,
     progress: null,
     createdAt: r.createdAt,
     answeredAt: r.answeredAt,
@@ -1499,6 +1523,10 @@ export async function consultationConversation(
   // Still out: what the consulted run waits on now, as the list says it.
   const waitOf = new Map<string, ConsultationWait | null>();
   if (target && run && row.status === "open") waitOf.set(target, consultationWait(run));
+  // It answers the agent that asked, never the people here: they see where it stands, not its words.
+  if (target && (await answersAgentsOnly(db, orgId, target))) {
+    return { consultation: consultationView(row, waitOf, true), messages: [] };
+  }
   const consultation = consultationView(row, waitOf);
   // Its words in the DM belong to this conversation only while every question the run answers was asked here.
   const ownRun =
@@ -1762,6 +1790,10 @@ export async function answersAgentsOnly(db: Executor, orgId: string, runId: stri
   const person = authority.kind === "person" ? authority.personId : routineCreatorOf(authority);
   return !!person && !canTalkTo(run.agent, person, await speakerFor(db, orgId, person));
 }
+
+/** Whether a consultation's consulted run answers agents only: what it wrote stays out of the people's views. */
+const keptFromPeople = async (db: Executor, c: Pick<AgentConsultationRow, "orgId" | "targetRunId">) =>
+  !!c.targetRunId && (await answersAgentsOnly(db, c.orgId, c.targetRunId));
 
 /** Where a consulted run's cards go: the thread of whoever asked, or null for its main timeline. */
 export async function consultationCardThread(db: Executor, orgId: string, runId: string, fallback: string) {

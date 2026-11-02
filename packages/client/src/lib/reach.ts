@@ -42,6 +42,9 @@ export function reachOf(meta: Record<string, unknown> | null | undefined): Reach
 /** Old messages: the routine then only looked and told, so its access, not anyone's audience, kept the agent out. */
 export const reachByAccess = (e: ReachEntry) => e.reason === "routine_creator_reach" && e.routine?.access === "read";
 
+/** Whether the line opens the hand-off beside it: not for an agent consulted for someone outside its audience (its words are the agents'). */
+export const reachOpens = (e: ReachEntry) => !!e.consultationId && e.reason === "not_in_channel";
+
 /** The line's text key: handed (or consulted for someone outside its audience), a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
 export const reachKey = (e: ReachEntry) =>
   e.consultationId

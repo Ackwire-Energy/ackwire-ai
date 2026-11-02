@@ -4,7 +4,9 @@ import {
   answersAgentsOnly,
   approverIds,
   canTalkTo,
+  consultationConversation,
   consultationOrigin,
+  consultationsIn,
   createAgent,
   drainOutbox,
   insertMessage,
@@ -114,6 +116,19 @@ describe("other agents can consult it", () => {
     expect(await invoke(ninoCtx, "send_dm", { person: "lia", text: "Paga." })).toMatchObject({
       output: { isError: true, content: expect.stringContaining("You were consulted by another agent") },
     });
+
+    // Where Lia reads: the consultation's state, never Nino's words (the list, the panel, the trail on Dev's reply).
+    const [listed] = await consultationsIn(f.db, f.org.id, f.general.id);
+    expect(listed).toMatchObject({ status: "answered", answer: null, progress: null });
+    const opened = await consultationConversation(f.db, f.org.id, f.general.id, consultation?.id ?? "");
+    expect(opened?.consultation.answer).toBeNull();
+    expect(opened?.messages).toEqual([]);
+    const replies = (await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, f.general.id)))
+      .map((m) => (m.meta as { notice?: { kind: string; refs?: Record<string, string> } }).notice)
+      .filter((n) => n?.kind === "consult_reply");
+    expect(replies).toHaveLength(1);
+    expect(replies[0]?.refs?.status).toBe("answered");
+    expect(replies[0]?.refs?.answer).toBeUndefined();
   });
 
   test("a person it does answer still sees its cards where they asked", async () => {
@@ -124,6 +139,8 @@ describe("other agents can consult it", () => {
     const runId = consultation?.targetRunId ?? "";
     expect(await answersAgentsOnly(f.db, f.org.id, runId)).toBe(false);
     expect((await consultationOrigin(f.db, f.org.id, runId))?.channelId).toBe(f.general.id);
+    await drainOutbox(f.db, f.handlers);
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]?.answer).toBe("Paga.");
   });
 
   test("off: refused with the line that says why and how to open it", async () => {

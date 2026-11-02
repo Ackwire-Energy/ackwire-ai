@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Agent } from "../src/api/types";
 import { audienceWith } from "../src/lib/audience";
-import { reachByAccess, reachKey, reachOf, routineReachWarnings } from "../src/lib/reach";
+import { reachByAccess, reachKey, reachOf, reachOpens, routineReachWarnings } from "../src/lib/reach";
 
 const agent = (id: string, handle: string, extra: Partial<Agent> = {}) => ({ id, handle, ...extra }) as Agent;
 const gil = agent("a-gil", "gil", { canTalk: false, audience: { mode: "owner", userIds: [] } });
@@ -87,5 +87,14 @@ describe("reachKey", () => {
     expect(reachKey({ ...base, noAi: true })).toBe("reach.noAi");
     expect(reachKey({ ...base, reason: "routine_creator_reach", routinePost: true })).toBe("reach.routinePost");
     expect(reachKey({ ...base, reason: "audience" })).toBe("reach.blocked");
+  });
+});
+
+describe("reachOpens", () => {
+  test("a hand-off opens beside the conversation; a private consultation for someone outside the audience doesn't", () => {
+    const base = { agentId: "a", handle: "ivo", consultationId: "c" };
+    expect(reachOpens({ ...base, reason: "not_in_channel" })).toBe(true);
+    expect(reachOpens({ ...base, reason: "audience" })).toBe(false);
+    expect(reachOpens({ agentId: "a", handle: "ivo", reason: "not_in_channel" })).toBe(false);
   });
 });
