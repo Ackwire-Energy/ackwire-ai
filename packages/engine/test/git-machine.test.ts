@@ -58,13 +58,22 @@ type Request = Extract<ServerFrame, { type: "request" }>;
 type SyncRequest = Extract<Request, { op: "git.sync" }>;
 
 /** A runner over an in-memory socket that answers `git.sync` with `answer` (and records what it got). */
-function fakeRunner(hub: MachineHub, answer: (req: SyncRequest) => GitSyncRepo[], protocol = MACHINE_PROTOCOL_VERSION) {
+function fakeRunner(
+  hub: MachineHub,
+  answer: (req: SyncRequest) => GitSyncRepo[],
+  protocol = MACHINE_PROTOCOL_VERSION,
+  listing: () => string[] = () => [],
+) {
   const sent: ServerFrame[] = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const socket = {
     send(text: string) {
       const frame = JSON.parse(text) as ServerFrame;
       sent.push(frame);
+      if (frame.type === "request" && frame.op === "list") {
+        const entries = listing().map((p) => ({ path: p, isDir: true, size: 0 }));
+        setTimeout(() => void reply({ type: "result", id: frame.id, ok: true, data: { entries } }), 1);
+      }
       if (frame.type === "request" && frame.op === "git.sync") {
         setTimeout(() => {
           reply({ type: "output", id: frame.id, stream: "stderr", chunk: "Receiving objects: 100% (3/3)\r" });
@@ -119,10 +128,16 @@ async function world(options: { scopes?: string[]; protocol?: number } = {}) {
         ...(r.clone ? { branch: "main", defaultBranch: "main", head: "abc1234" } : {}),
       })),
   };
-  const runner = fakeRunner(hub, (req) => answers.fn(req), options.protocol);
+  const listing: { dirs: string[] } = { dirs: [] };
+  const runner = fakeRunner(
+    hub,
+    (req) => answers.fn(req),
+    options.protocol,
+    () => listing.dirs,
+  );
   await runner.hello(paired.token);
   const git = { publicUrl: PUBLIC_URL, secret: SECRET };
-  return { hub, connectors, connection, paired, runner, answers, git, machineDeps: { db: f.db, hub, git } };
+  return { hub, connectors, connection, paired, runner, answers, listing, git, machineDeps: { db: f.db, hub, git } };
 }
 
 async function runCtx(): Promise<ToolContext> {
@@ -460,7 +475,7 @@ describe("fetches straight from GitHub with the App (ADR 0116)", () => {
   test("an older runner gets no token and the whole clone deadline", async () => {
     const w = await appWorld(GIT_DIRECT_PROTOCOL - 1);
     await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
-    const target = { orgId: f.org.id, agentId: f.agent.id };
+    const target = { orgId: f.org.id, agentId: f.agent.id, machineId: w.paired.machineId };
     const deps = { ...w.machineDeps, github: { app: APP, http: w.github } };
     expect((await directFetchTokens(deps, target, GIT_DIRECT_PROTOCOL - 1, ["acme/app"])).size).toBe(0);
     expect((await directFetchTokens(deps, target, GIT_DIRECT_PROTOCOL, ["acme/app"])).size).toBe(1);
@@ -475,6 +490,77 @@ describe("fetches straight from GitHub with the App (ADR 0116)", () => {
     const [sync] = w.runner.syncs();
     expect(sync?.repos[0]?.github).toBeUndefined();
     expect(sync?.timeoutSeconds).toBe(MACHINE_CLONE_SECONDS);
+  });
+});
+
+describe("fetches straight from GitHub: who gets a token, and what the turn is told (ADR 0116)", () => {
+  const TOKEN = `ghs_${"t".repeat(36)}`;
+  async function appWorld() {
+    const w = await world();
+    await f.db
+      .insert(schema.githubAppInstallations)
+      .values({ orgId: f.org.id, installationId: 9, accountLogin: "acme", accountType: "Organization" });
+    const fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (/\/repos\/acme\/[^/]+\/installation$/.test(url)) return Response.json({ id: 9 });
+      if (url.endsWith("/app/installations/9/access_tokens")) {
+        return Response.json({ token: TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() });
+      }
+      return new Response("unexpected", { status: 500 });
+    }) as typeof globalThis.fetch;
+    const deps = { ...w.machineDeps, github: { app: APP, http: { apiUrl: API, fetch } } };
+    return { ...w, deps };
+  }
+  const turn = (machineId: string) => ({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    threadRootId: null,
+    trigger: "hi",
+    messages: [],
+    session: { machineId, cwd: "" },
+  });
+
+  test("an owner/* grant: the checkouts found on the computer get tokens too, so they stay off the proxy", async () => {
+    const w = await appWorld();
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/*"]);
+    w.listing.dirs = ["repos/acme", "repos/acme/app", "repos/other", "repos/other/thing"];
+    w.answers.fn = (req) => req.repos.map((r) => ({ repo: r.repo, dir: r.dir, status: "updated" as const }));
+    await prepareAgentCode(w.deps, turn(w.paired.machineId));
+    const repos = w.runner.syncs().at(-1)?.repos ?? [];
+    expect(repos.find((r) => r.repo === "acme/app")?.github).toBe(TOKEN);
+    // A folder outside the grant gets none (the proxy would refuse it as well).
+    expect(repos.find((r) => r.repo === "other/thing")?.github).toBeUndefined();
+    // Each token handed out is audited as a fetch, since the fetch itself no longer passes the proxy.
+    const audits = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "git.fetch")));
+    expect(audits.map((a) => [a.targetId, (a.details as { via?: string }).via])).toEqual([
+      ["acme/app", "github-direct"],
+    ]);
+  });
+
+  test("an archived agent gets no token", async () => {
+    const w = await appWorld();
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    const target = { orgId: f.org.id, agentId: f.agent.id, machineId: w.paired.machineId };
+    expect((await directFetchTokens(w.deps, target, MACHINE_PROTOCOL_VERSION, ["acme/app"])).size).toBe(1);
+    await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
+    expect((await directFetchTokens(w.deps, target, MACHINE_PROTOCOL_VERSION, ["acme/app"])).size).toBe(0);
+  });
+
+  test("a repository still downloading is said so, not offered to clone again", async () => {
+    const w = await appWorld();
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app", "acme/web"]);
+    w.answers.fn = (req) =>
+      req.repos.map((r) =>
+        r.repo === "acme/app"
+          ? { repo: r.repo, dir: r.dir, status: "cloning" as const, message: "still downloading" }
+          : { repo: r.repo, dir: r.dir, path: `${FOLDER}/${r.dir}`, status: "updated" as const },
+      );
+    const out = await prepareAgentCode(w.deps, turn(w.paired.machineId));
+    expect(out?.prompt).toContain("Still downloading on your computer: acme/app.");
+    expect(out?.prompt).not.toContain("Not cloned yet");
   });
 });
 

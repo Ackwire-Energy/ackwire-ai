@@ -1,17 +1,22 @@
 import {
   type AgentScope,
+  GIT_CHECKOUTS_DIR,
   GIT_DIRECT_PROTOCOL,
   GIT_PROTOCOL,
+  GIT_SYNC_LIMITS,
   type GitSyncRepo,
   type GitSyncRequest,
   gitCheckoutDir,
+  isGitRepoName,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { recordAudit } from "../audit";
 import { activeConnections } from "../connectors/connections";
 import type { MachineCaller, MachineCallOptions, MachineStatus } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, REMOVED_COMPUTER_MESSAGE } from "../machines";
 import { missionOfRun } from "../mission-context";
+import { standingRefusal } from "../standing";
 import { grantedScopeKeys } from "../tools/scopes";
 import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
 import { appTokenForRepo, type GitHubAppConfig, type GitHubHttp } from "./github-app";
@@ -105,18 +110,24 @@ export async function machineGitSetup(
 
 /**
  * Single-repository read tokens of our GitHub App for the repositories among `repos` the agent may use, keyed by
- * repository; empty without the App, on an older runner, or where the App isn't installed. Never the connection's
- * own token.
+ * repository; empty without the App, on an older runner, where the App isn't installed, or for an agent that is
+ * archived, held or suspended (as the proxy refuses it). Never the connection's own token. Each token handed out
+ * is audited as a fetch (`via: github-direct`): the fetches themselves no longer pass through us.
  */
 export async function directFetchTokens(
   deps: MachineGitDeps,
-  target: { orgId: string; agentId: string },
+  target: { orgId: string; agentId: string; machineId: string },
   protocol: number,
   repos: readonly string[],
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const github = deps.github;
   if (!github || protocol < GIT_DIRECT_PROTOCOL || repos.length === 0) return out;
+  const [agent] = await deps.db
+    .select({ archivedAt: schema.agents.archivedAt })
+    .from(schema.agents)
+    .where(and(eq(schema.agents.id, target.agentId), eq(schema.agents.orgId, target.orgId)));
+  if (!agent || agent.archivedAt || (await standingRefusal(deps.db, target.orgId, target.agentId))) return out;
   const list = await agentRepositoryList(deps.db, target.orgId, target.agentId);
   await Promise.all(
     repos.map(async (repo) => {
@@ -125,10 +136,41 @@ export async function directFetchTokens(
       const token = await appTokenForRepo(github.app, github.http, { db: deps.db, orgId: target.orgId }, owner, name, {
         contents: "read",
       }).catch(() => null);
-      if (token) out.set(repo, token);
+      if (!token) return;
+      out.set(repo, token);
+      await recordAudit(deps.db, {
+        orgId: target.orgId,
+        actor: { type: "agent", id: target.agentId },
+        action: "git.fetch",
+        target: { type: "git_repo", id: repo },
+        details: { via: "github-direct", machineId: target.machineId },
+      }).catch(() => undefined);
     }),
   );
   return out;
+}
+
+/** The `owner/name` folders under the agent's `repos/` on the computer (`list`); none when it can't say. */
+async function checkoutsOnMachine(
+  hub: MachineCaller,
+  machineId: string,
+  agent: AgentScope,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  try {
+    const { entries } = await hub.call(
+      machineId,
+      { op: "list", agent, path: GIT_CHECKOUTS_DIR, depth: 2 },
+      { timeoutMs: 10_000, ...(signal ? { signal } : {}) },
+    );
+    return entries.flatMap((e) => {
+      const parts = e.path.split("/");
+      const repo = parts.slice(1).join("/");
+      return e.isDir && parts.length === 3 && parts[0] === GIT_CHECKOUTS_DIR && isGitRepoName(repo) ? [repo] : [];
+    });
+  } catch {
+    return [];
+  }
 }
 
 /** `git_clone` on a connected machine: clones (or, when it is there, updates) one repository in the agent's folder. */
@@ -223,16 +265,28 @@ export async function prepareAgentCode(
     const list = await agentRepositoryList(deps.db, turn.orgId, turn.agentId);
     const explicit = list.filter((r) => !r.endsWith("/*"));
     const { agent, ...rest } = setup;
+    // An `owner/*` (or all) grant names no repository: its checkouts are found on the computer, so they fetch
+    // straight from GitHub too instead of going back to the proxy.
+    const wildcard = list.length === 0 || list.length > explicit.length;
+    const found =
+      wildcard && deps.github && status.protocol >= GIT_DIRECT_PROTOCOL
+        ? await checkoutsOnMachine(deps.hub, session.machineId, agent, options.signal)
+        : [];
+    const lowerExplicit = new Set(explicit.map((r) => r.toLowerCase()));
+    const repos = [...explicit, ...found.filter((r) => !lowerExplicit.has(r.toLowerCase()))].slice(
+      0,
+      GIT_SYNC_LIMITS.repos,
+    );
     // Fresh each turn (GitHub's tokens last an hour; cached until a few minutes before), so the agent's own
     // `git fetch` keeps working between syncs.
-    const tokens = await directFetchTokens(deps, turn, status.protocol, explicit);
+    const tokens = await directFetchTokens(deps, { ...turn, machineId: session.machineId }, status.protocol, repos);
     const reply = await deps.hub.call(
       session.machineId,
       {
         op: "git.sync",
         agent,
         ...rest,
-        repos: explicit.map((repo) => {
+        repos: repos.map((repo) => {
           const github = tokens.get(repo);
           return { repo, dir: gitCheckoutDir(repo), clone: false, ...(github ? { github } : {}) };
         }),
@@ -247,9 +301,16 @@ export async function prepareAgentCode(
       // Only what the agent may still use (a repository removed from its list stays on disk, unmentioned).
       return there && repoInList(list, owner, name);
     });
+    const downloading = reply.repos
+      .filter((r) => {
+        const [owner = "", name = ""] = r.repo.split("/");
+        return r.status === "cloning" && repoInList(list, owner, name);
+      })
+      .map((r) => r.repo);
     const lower = new Set(present.map((r) => r.repo.toLowerCase()));
-    const notCloned = explicit.filter((r) => !lower.has(r.toLowerCase()));
-    if (present.length === 0 && notCloned.length === 0) return null;
+    const coming = new Set(downloading.map((r) => r.toLowerCase()));
+    const notCloned = explicit.filter((r) => !lower.has(r.toLowerCase()) && !coming.has(r.toLowerCase()));
+    if (present.length === 0 && notCloned.length === 0 && downloading.length === 0) return null;
     const texts = [
       turn.trigger,
       ...turn.messages
@@ -276,6 +337,7 @@ export async function prepareAgentCode(
       handle: agent.handle,
       checkouts,
       notCloned,
+      downloading,
       cwd: start ? (start.path ?? start.dir) : null,
     });
     return { cwd: start?.dir ?? "", prompt };
