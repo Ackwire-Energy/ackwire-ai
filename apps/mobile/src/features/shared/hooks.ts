@@ -13,6 +13,7 @@ import {
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formerById } from "@agenteschat/client/lib/directory";
+import { clockHour } from "@agenteschat/client/lib/format";
 import { namesComputers } from "@agenteschat/client/lib/machines";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -108,10 +109,10 @@ export function useColors() {
 /** Times as the lists say them: "9:41" today, "Ontem", "seg", "12 out". */
 export function useWhen() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language || "pt-BR";
+  const locale = i18n.language || "en";
   return useMemo(() => {
     const time = (iso: string) =>
-      new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+      new Intl.DateTimeFormat(locale, { hour: clockHour(locale), minute: "2-digit" }).format(new Date(iso));
     const short = (iso: string) => {
       switch (whenKind(iso)) {
         case "time":

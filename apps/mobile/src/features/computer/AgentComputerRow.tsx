@@ -37,7 +37,7 @@ export function AgentComputerRow({ agentId }: { agentId: string }) {
   const now = wait.now ?? requestNow;
   const state = entryState(f, now);
   const name = dir.agentById.get(agentId)?.name ?? "";
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const line = entryLine(t, state, {
     edition: f.edition,
     locale: i18n.language,

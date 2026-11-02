@@ -50,30 +50,46 @@
           location.reload();
           return true;
         };
+        // The words in every language of the app (packages/i18n/src/locale.ts), before any of its files loaded.
+        const WORDS = {
+          en: ["agentes.chat didn't open", "Part of the app didn't load. Check your connection, then reload.", "Reload"],
+          "pt-BR": ["O agentes.chat não abriu", "Uma parte do app não carregou. Confira a conexão e recarregue.", "Recarregar"],
+          es: ["agentes.chat no se abrió", "Una parte de la app no cargó. Revisa tu conexión y vuelve a cargar.", "Volver a cargar"],
+          fr: ["agentes.chat ne s'est pas ouvert", "Une partie de l'app n'a pas chargé. Vérifiez votre connexion, puis rechargez.", "Recharger"],
+          de: ["agentes.chat hat sich nicht geöffnet", "Ein Teil der App wurde nicht geladen. Prüf deine Verbindung und lade neu.", "Neu laden"],
+          it: ["agentes.chat non si è aperto", "Una parte dell'app non si è caricata. Controlla la connessione e ricarica.", "Ricarica"],
+          nl: ["agentes.chat is niet geopend", "Een deel van de app is niet geladen. Controleer je verbinding en laad opnieuw.", "Opnieuw laden"],
+          ja: ["agentes.chat を開けませんでした", "アプリの一部が読み込まれませんでした。接続を確認して、再読み込みしてください。", "再読み込み"],
+          ko: ["agentes.chat를 열지 못했어요", "앱 일부를 불러오지 못했어요. 연결을 확인한 뒤 다시 불러오세요.", "다시 불러오기"],
+          "zh-Hans": ["agentes.chat 未能打开", "应用的部分内容未能加载。请检查网络连接，然后重新加载。", "重新加载"],
+          id: ["agentes.chat tidak terbuka", "Sebagian aplikasi tidak termuat. Periksa koneksimu, lalu muat ulang.", "Muat ulang"],
+          tr: ["agentes.chat açılmadı", "Uygulamanın bir kısmı yüklenmedi. Bağlantınızı kontrol edip yeniden yükleyin.", "Yeniden yükle"],
+          pl: ["agentes.chat się nie otworzył", "Część aplikacji się nie wczytała. Sprawdź połączenie i odśwież.", "Odśwież"],
+          ru: ["agentes.chat не открылся", "Часть приложения не загрузилась. Проверьте подключение и перезагрузите страницу.", "Перезагрузить"],
+        };
+        /** "pt-PT" → pt-BR, "zh-TW" → zh-Hans, "in" → id, "es-MX" → es; else null (as `appLocale` does). */
+        const known = (tag) => {
+          const base = String(tag || "").toLowerCase().replace(/_/g, "-").split("-")[0];
+          const code = base === "pt" ? "pt-BR" : base === "zh" ? "zh-Hans" : base === "in" ? "id" : base;
+          return Object.hasOwn(WORDS, code) ? code : null;
+        };
         const language = () => {
           let lang = null;
           try {
             lang = localStorage.getItem("agentes.locale");
           } catch {}
-          if (lang === "pt-BR" || lang === "en") return lang;
-          const cookie = /(?:^|;\s*)agentes_locale=(pt|en)(?![^;])/.exec(document.cookie);
-          if (cookie) return cookie[1] === "pt" ? "pt-BR" : "en";
+          if (lang && lang !== "auto" && known(lang)) return known(lang);
+          const cookie = /(?:^|;\s*)agentes_locale=([\w-]+)/.exec(document.cookie);
+          if (lang !== "auto" && cookie && known(cookie[1])) return known(cookie[1]);
           const tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
-          for (const tag of tags) {
-            const t = String(tag || "").toLowerCase();
-            if (t.startsWith("pt")) return "pt-BR";
-            if (t.startsWith("en")) return "en";
-          }
-          return "pt-BR";
+          for (const tag of tags) if (known(tag)) return known(tag);
+          return "en";
         };
         const failed = () => {
           const boot = document.querySelector("#root > .boot");
           if (!boot || reloaded()) return;
           const lang = language();
-          const words =
-            lang === "en"
-              ? ["agentes.chat didn't open", "Part of the app didn't load. Check your connection, then reload.", "Reload"]
-              : ["O agentes.chat não abriu", "Uma parte do app não carregou. Confira a conexão e recarregue.", "Recarregar"];
+          const words = WORDS[lang];
           document.documentElement.lang = lang;
           const box = document.createElement("div");
           box.className = "boot__box";

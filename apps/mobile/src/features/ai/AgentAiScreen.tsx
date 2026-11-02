@@ -8,7 +8,7 @@ import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { brainPlan, isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
-import { limitOffers, planState } from "@agenteschat/ui/plan-state";
+import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Fragment, useEffect, useState } from "react";
@@ -109,7 +109,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const meId = useMeId();
   const agent = dir.agentById.get(agentId);
   const name = agent?.name ?? "";
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const ownerFirst = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
   // As on the web: its owner and admins load it, members don't.
   const allowed = (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
@@ -276,6 +276,15 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       onPress={() => choose(a)}
                     />
                   ))}
+                  {extraUsageOn(usage) ? (
+                    <GroupedRow
+                      label={t("usageCard.extraTitle")}
+                      labelLines={2}
+                      toggle={view.extraUsage}
+                      disabled={busy || !view.canUsePlans}
+                      onPress={() => void save({ extraUsage: !view.extraUsage }, t("usageCard.extraTitle"))}
+                    />
+                  ) : null}
                   {limited && view.canUsePlans && view.canManageAccounts ? (
                     <GroupedRow
                       icon="plus"
@@ -389,7 +398,7 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const dir = useDirectory();
-  const g = agentGrammar(t, dir.agentById.get(agentId)?.name ?? "");
+  const g = agentGrammar(dir.agentById.get(agentId)?.name ?? "");
   const brain = useAgentBrain(orgId, agentId);
   const { busy, save } = useSaveBrain(agentId);
   const view = brain.data;

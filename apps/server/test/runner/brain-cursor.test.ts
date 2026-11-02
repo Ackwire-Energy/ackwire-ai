@@ -54,6 +54,7 @@ test("command line: print mode with stream-json deltas in the turn's folder; pla
     "/w/app",
   ]);
   expect(work).toContain("--trust");
+  expect(work).toContain("--disable-auto-update");
   expect(work).toContain("--approve-mcps");
   expect(work.join(" ")).toContain("--force --sandbox enabled");
   expect(work.join(" ")).toContain("--model grok-5-code");
@@ -64,6 +65,7 @@ test("command line: print mode with stream-json deltas in the turn's folder; pla
   expect(plan).not.toContain("--force");
   expect(plan).not.toContain("--resume");
   expect(plan).not.toContain("--approve-mcps");
+  expect(plan).toContain("--disable-auto-update");
 });
 
 test("--approve-mcps only in the agent's own folder or under it, with no other .cursor/mcp.json on the way", () => {

@@ -41,7 +41,7 @@ export function useThreadWhere(thread: ThreadInfo) {
       ? [dir.authorName({ type: p.type, id: p.id } as Parameters<typeof dir.authorName>[0])]
       : [],
   );
-  const name = dm?.with.name ?? joinNames(others.slice(0, 3), t("newAgent.and"));
+  const name = dm?.with.name ?? joinNames(others.slice(0, 3), t);
   return name ? t("threads.view.dmWith", { name }) : t("threads.dm");
 }
 
@@ -53,7 +53,7 @@ function useWho(thread: ThreadInfo) {
   const names = thread.participants.flatMap((p) =>
     p.id ? [dir.authorName({ type: p.type, id: p.id } as Parameters<typeof dir.authorName>[0])] : [],
   );
-  return joinNames(names.slice(0, 4), t("newAgent.and"));
+  return joinNames(names.slice(0, 4), t);
 }
 
 /** The title: a click (or Enter) edits it; Enter or leaving saves, Esc cancels. */

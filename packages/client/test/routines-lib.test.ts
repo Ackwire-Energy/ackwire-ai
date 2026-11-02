@@ -7,9 +7,7 @@ import {
   platformZoneName,
   routineHookUrl,
   routineReplyOf,
-  timezoneLabel,
   timezoneName,
-  utcOffset,
   zoneDisplayName,
 } from "../src/lib/routines";
 import { buildTimeline } from "../src/lib/timeline";
@@ -52,22 +50,17 @@ describe("routine messages", () => {
 });
 
 describe("time zones", () => {
-  test("human labels with the offset; UTC stays plain; unknown zones by name", () => {
-    const at = new Date(Date.UTC(2026, 9, 15, 12));
-    expect(utcOffset("America/Sao_Paulo", at)).toBe("UTC−3");
-    expect(timezoneLabel("America/Sao_Paulo", at)).toBe("horário de Brasília (UTC−3)");
-    expect(timezoneLabel("Asia/Kolkata", at)).toBe("Índia (UTC+5:30)");
-    // A zone without a friendly name keeps its IANA id (as in the selector, which shows the city).
-    expect(timezoneLabel("Asia/Kathmandu", at)).toBe("Asia/Kathmandu (UTC+5:45)");
-    expect(timezoneLabel("UTC", at)).toBe("UTC");
-  });
-
   test("a zone said in words: ours, else the platform's in the person's language, not its IANA id", () => {
     expect(timezoneName("America/Sao_Paulo", "pt-BR")).toBe("horário de Brasília");
     expect(timezoneName("America/Sao_Paulo", "en")).toBe("Brasília time");
     expect(timezoneName("Etc/UTC", "pt-BR")).toBe("UTC");
     expect(timezoneName("Asia/Kathmandu", "pt-BR")).toBe("Horário do Nepal");
     expect(timezoneName("Asia/Kathmandu", "en")).toBe("Nepal Time");
+    // Languages without names of our own get the platform's; no language means English.
+    expect(timezoneName("Asia/Tokyo", "fr")).toBe(platformZoneName("Asia/Tokyo", "fr") ?? "");
+    expect(timezoneName("Asia/Tokyo", "fr")).not.toContain("Asia/");
+    expect(timezoneName("America/Sao_Paulo")).toBe("Brasília time");
+    expect(zoneDisplayName("America/Sao_Paulo")).toBe("Brasília time");
     // Only a zone the platform doesn't know keeps what it was given.
     expect(timezoneName("Not/A_Zone", "en")).toBe("Not/A_Zone");
   });

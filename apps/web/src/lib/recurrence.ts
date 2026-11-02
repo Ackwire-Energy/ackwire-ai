@@ -1,5 +1,5 @@
 import type { ApiRule, ProposedRoutine } from "@agenteschat/client";
-import { joinNames, toYmd } from "@agenteschat/client/lib/format";
+import { clockHour, joinNames, toYmd } from "@agenteschat/client/lib/format";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import {
   BUSINESS_DAYS,
@@ -106,12 +106,11 @@ export function ruleSentence(
   /** Leave the zone out (the card says it only when it isn't mine). */
   withZone = true,
 ): string {
-  const and = t("newAgent.and");
   const n = Math.max(1, rule.interval || 1);
   const days = (list: Weekday[]) =>
     joinNames(
       list.map((d) => t(`recurrence.wd.${d}.abbr`)),
-      and,
+      t,
     );
   let head: string;
   switch (rule.freq) {
@@ -155,7 +154,7 @@ export function ruleSentence(
   const times = [...rule.times].sort();
   const parts = [head];
   if (rule.freq === "hourly") parts.push(t("recurrence.s.from", { time: times[0] ?? "00:00" }));
-  else if (times.length) parts.push(t("recurrence.s.at", { times: joinNames(times, and) }));
+  else if (times.length) parts.push(t("recurrence.s.at", { times: joinNames(times, t) }));
   let out = withZone ? `${parts.join(", ")} (${timezoneName(rule.timezone, locale)})` : parts.join(", ");
   if (rule.until) out += `, ${t("recurrence.s.until", { date: shortDate(locale, rule.until, now) })}`;
   else if (rule.count) out += `, ${t("recurrence.s.count", { count: rule.count })}`;
@@ -175,7 +174,7 @@ export function upcomingLabels(locale: string, rule: RecurrenceRule, from = new 
       .replace(/\./g, "")
       .replace(/ de /g, " ");
     const time = new Intl.DateTimeFormat(locale, {
-      hour: "2-digit",
+      hour: clockHour(locale),
       minute: "2-digit",
       timeZone: rule.timezone,
     }).format(d);

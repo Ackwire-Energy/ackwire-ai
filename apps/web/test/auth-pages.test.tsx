@@ -255,13 +255,14 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
   });
 
-  test("a blocked account is told so; another refusal in the person's words, never the server's English", async () => {
+  test("a blocked account is told so; another refusal in the server's words when the app has none", async () => {
     for (const [signIn, says] of [
       [
         { ok: false, status: 403, message: "This account can't sign in.", code: "ACCOUNT_BLOCKED" },
         "Esta conta não pode entrar.",
       ],
-      [{ ok: false, status: 403, message: "Invalid origin" }, "Algo deu errado. Tente de novo."],
+      // A refusal the app has no words for: the server's own, English being every language's fallback.
+      [{ ok: false, status: 403, message: "Invalid origin" }, "Invalid origin"],
     ] as const) {
       const { api } = authApi(ACCOUNT);
       await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
@@ -348,6 +349,11 @@ describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
     await renderApp(at(`/org/${ORG_ID}/agents/new`), { api, auth: createFakeAuth().auth });
     expect(heading()).toBe("Oi. Qual é o seu e-mail?");
     expect(lead()).toBe("Para criar um agente.");
+    cleanup();
+
+    // An AI app's sign-in (ADR 0119): back to its consent page.
+    await renderApp(at("/autorizar?req=0192"), { api, auth: createFakeAuth().auth });
+    expect(lead()).toBe("Para conectar um app ao agentes.chat.");
   });
 
   test("a link that no longer works, an unknown one, or anywhere else: the general line", async () => {
@@ -1309,7 +1315,7 @@ describe("Onboarding", () => {
     const keys = screen().getByRole("region", { name: "Chave de API" });
     const makers = within(keys).getByRole("group", { name: "Provedor" });
     expect(within(makers).getByRole("button", { name: "Claude" }).getAttribute("aria-pressed")).toBe("true");
-    expect(keys.textContent).toContain("Crie a sua chave de API do Claude");
+    expect(keys.textContent).toContain("Crie a sua chave de API Claude");
     const site = within(keys).getByRole("link", { name: "Abrir platform.claude.com" });
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
     expect(site.className).toContain("ac-btn");

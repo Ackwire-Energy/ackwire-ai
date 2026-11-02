@@ -44,7 +44,7 @@ export const kindsLine = (t: TFunction, count: (kind: ImportItemKind) => number)
  */
 export function todoLine(t: TFunction, todo: BundleTodo, nameOf: (key: string) => string): string {
   const names = todo.agents.map(nameOf);
-  const who = names.length > 0 ? joinNames(names, t("newAgent.and")) : t("onboarding.import.need.someone");
+  const who = names.length > 0 ? joinNames(names, t) : t("onboarding.import.need.someone");
   return t(`onboarding.import.need.${todo.kind}`, { who, label: todo.label, count: Math.max(names.length, 1) });
 }
 

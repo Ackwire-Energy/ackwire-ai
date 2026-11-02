@@ -184,7 +184,7 @@ export function LiveCodeToggle({ name, code, output }: { name: string; code: Liv
     <div className="live-code-toggle">
       <button type="button" className="live-code-toggle__btn" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Icon name="code" size={14} />
-        {open ? t("code.hide") : t("code.show", agentGrammar(t, name))}
+        {open ? t("code.hide") : t("code.show", agentGrammar(name))}
       </button>
       {open && <CodePanel code={code} output={output} live header={t("code.running", { name })} />}
     </div>

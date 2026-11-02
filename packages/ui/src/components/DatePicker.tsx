@@ -1,3 +1,4 @@
+import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { Popover as RPopover } from "radix-ui";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
@@ -25,10 +26,10 @@ const sameDay = (a: Date | null, b: Date | null) => Boolean(a && b && ymd(a) ===
 /** Hard bound for the grid: 6 weeks × 7 days. */
 const GRID_CELLS = 42;
 
-/** The 6×7 days shown for `month` (weeks start on Monday). */
-export function monthGrid(month: Date): Date[] {
+/** The 6×7 days shown for `month`, weeks starting on `weekStart` (0 Sunday, 1 Monday). */
+export function monthGrid(month: Date, weekStart: 0 | 1 = 1): Date[] {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  const start = addDays(first, -((first.getDay() + 6) % 7));
+  const start = addDays(first, -((first.getDay() + 7 - weekStart) % 7));
   return Array.from({ length: GRID_CELLS }, (_, i) => addDays(start, i));
 }
 
@@ -101,13 +102,15 @@ export function DatePicker({
       )
     : (placeholder ?? "");
   const monthTitle = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(focus);
-  const weekdays = monthGrid(focus)
+  // The week starts where the reader's language starts it (CLDR: Sunday in the US, Brazil, Japan…; else Monday).
+  const weekStart = localeInfo(appLocale([locale], true) ?? "en").weekStart;
+  const weekdays = monthGrid(focus, weekStart)
     .slice(0, 7)
     .map((d) => ({
       short: new Intl.DateTimeFormat(locale, { weekday: "narrow" }).format(d),
       long: new Intl.DateTimeFormat(locale, { weekday: "long" }).format(d),
     }));
-  const days = monthGrid(focus);
+  const days = monthGrid(focus, weekStart);
   const weeks = Array.from({ length: 6 }, (_, w) => days.slice(w * 7, w * 7 + 7));
 
   const pick = (d: Date) => {

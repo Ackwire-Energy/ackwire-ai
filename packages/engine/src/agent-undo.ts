@@ -11,6 +11,7 @@ import { announceMessageMemories } from "./message-memories";
 import { assertActiveMembership, can, getMembership } from "./organizations";
 import { nextRoutineTime } from "./routines";
 import { enqueueIndex } from "./search";
+import { writeSkillBody } from "./skills";
 import { closeThread, getThread, reopenThread, updateThread } from "./threads";
 import { canonicalJson } from "./tools/json-schema";
 import { deleteWikiPage, getWikiPage, getWikiVersion, restoreWikiPage, updateWikiPage } from "./wiki";
@@ -455,6 +456,43 @@ const handlers: Record<string, Handler> = {
     return undefined;
   },
 };
+// ── Skills an agent made or fixed (ADR 0120) ─────────────────────────────────
+
+handlers["skill.created"] = async (deps, a, _userId, direction) => {
+  const [skill] = await deps.db
+    .select()
+    .from(schema.skills)
+    .where(and(eq(schema.skills.orgId, a.orgId), eq(schema.skills.id, a.targetId)));
+  if (!skill) throw new NotFoundError("The skill is gone", "action.target_gone");
+  const noteIds = (obj(a.after).noteIds as string[] | undefined) ?? [];
+  if (direction === "undo" ? skill.deletedAt !== null : skill.deletedAt === null) throw changedSince();
+  await deps.db
+    .update(schema.skills)
+    .set({ deletedAt: direction === "undo" ? new Date() : null, updatedAt: new Date() })
+    .where(eq(schema.skills.id, skill.id));
+  // Its how-tos come back while it is gone, and leave again with it.
+  if (noteIds.length > 0)
+    await setMemory(
+      deps,
+      a.orgId,
+      noteIds.map((id) => ({ id, status: direction === "undo" ? "active" : "archived", supersededBy: null })),
+    );
+  return undefined;
+};
+
+handlers["skill.updated"] = async (deps, a, _userId, direction) => {
+  const [skill] = await deps.db
+    .select()
+    .from(schema.skills)
+    .where(and(eq(schema.skills.orgId, a.orgId), eq(schema.skills.id, a.targetId), isNull(schema.skills.deletedAt)));
+  if (!skill) throw new NotFoundError("The skill is gone", "action.target_gone");
+  const [from, to] =
+    direction === "undo" ? [obj(a.after).body, obj(a.before).body] : [obj(a.before).body, obj(a.after).body];
+  if (typeof to !== "string" || skill.body !== from) throw changedSince();
+  await writeSkillBody(deps.db, skill, to);
+  return undefined;
+};
+
 handlers["issue.assigned"] = handlers["issue.updated"] as Handler;
 handlers["memory.updated"] = handlers["memory.saved"] as Handler;
 

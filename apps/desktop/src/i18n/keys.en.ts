@@ -1,7 +1,7 @@
-import type { DesktopTranslations } from "./keys.pt-BR";
+import type { Widen } from "@agenteschat/i18n/widen";
 
-/** The desktop app's own strings in English (same shape as keys.pt-BR.ts). */
-export const desktopEn: DesktopTranslations = {
+/** The desktop app's own strings in English, the source: every other language follows this shape. */
+export const desktopEn = {
   device: { mac: "Mac", windows: "PC", linux: "computer" },
   common: {
     cancel: "Cancel",
@@ -548,6 +548,8 @@ export const desktopEn: DesktopTranslations = {
     retry: "Try again",
     openTailscale: "Open Tailscale",
     otherServer: "Use another server",
+    stuck: "agentes.chat didn't open. Try again, or see the page as it is.",
+    showAnyway: "Show it anyway",
   },
   menu: {
     about: "About agentes.chat",
@@ -598,3 +600,6 @@ export const desktopEn: DesktopTranslations = {
     downloaded: "Download complete",
   },
 };
+
+/** Every language of these strings has this shape (English is the source). */
+export type DesktopTranslations = Widen<typeof desktopEn>;

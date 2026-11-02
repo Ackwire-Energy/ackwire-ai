@@ -54,13 +54,11 @@ export function ConsultationPanel({
   const items = useMemo(() => buildTimeline(list ?? [], [], []), [list]);
   const asker = c ? dir.agentById.get(c.agentId) : undefined;
   const consulted = c ? dir.agentById.get(c.consultedAgentId) : undefined;
-  const from = agentGrammar(t, asker?.name ?? t("channel.unknownAgent"));
-  const to = agentGrammar(t, consulted?.name ?? t("channel.unknownAgent"));
+  const from = agentGrammar(asker?.name ?? t("channel.unknownAgent"));
+  const to = agentGrammar(consulted?.name ?? t("channel.unknownAgent"));
   const label = t("chat.consultPanel.label", {
     from: from.name,
-    articleFrom: from.article,
     to: to.name,
-    articleTo: to.article,
   });
   const state = c ? consultLineState(c, now) : null;
   // The cards keep their buttons (a question answers in its own field); nothing else acts
@@ -156,7 +154,6 @@ export function ConsultationPanel({
                   <span>
                     {t(consultOriginKey(c, Boolean(channelName)), {
                       from: from.name,
-                      toArticle: to.to,
                       to: to.name,
                       channel: channelName,
                       time: formatTime(i18n.language, c.createdAt),
@@ -167,7 +164,7 @@ export function ConsultationPanel({
               {rows}
               {c?.status === "answered" && c.answer && !said && (
                 <div className="ac-consult__body ac-consult__body--inline consult-answer">
-                  <small>{t("chat.consultation.answerOf", { name: to.name, of: to.of })}</small>
+                  <small>{t("chat.consultation.answerOf", { name: to.name, context: to.context })}</small>
                   <div className="ac-consult__text">
                     <MessageBody body={c.answer} resolveMention={dir.mentionName} />
                   </div>
@@ -195,12 +192,12 @@ export function ConsultationPanel({
                 <Icon name="lock" size={16} />
                 <span>
                   <b>{t("chat.consultPanel.readOnly")}</b>{" "}
-                  {t("chat.consultPanel.steer", { name: from.name, article: from.article })}
+                  {t("chat.consultPanel.steer", { name: from.name, context: from.context })}
                 </span>
               </span>
               {asker && (
                 <Button size="sm" icon="message" onClick={() => onTalk(asker.handle)}>
-                  {t("chat.consultPanel.talk", { name: from.name, article: from.article })}
+                  {t("chat.consultPanel.talk", { name: from.name, context: from.context })}
                 </Button>
               )}
             </div>

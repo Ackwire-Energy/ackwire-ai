@@ -17,7 +17,8 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
-import { appLocale } from "@agenteschat/i18n/locale";
+import { type AppLocale, appLocale, isAppLocale, LOCALE_CODES } from "@agenteschat/i18n/locale";
+import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
@@ -777,17 +778,29 @@ export async function setShowActivity(db: Database, userId: string, orgId: strin
 }
 
 /** The languages of the app (`users.locale`): emails and pushes are written in it. */
-export const USER_LOCALES = ["pt-BR", "en"] as const;
-export type UserLocale = (typeof USER_LOCALES)[number];
+export const USER_LOCALES = LOCALE_CODES;
+export type UserLocale = AppLocale;
 
-/** Saves the person's app language (picked up from the onboarding). */
-export async function setMyLocale(db: Database, userId: string, locale: UserLocale) {
-  if (!USER_LOCALES.includes(locale)) throw new ValidationError("locale must be pt-BR or en");
-  await db.update(users).set({ locale }).where(eq(users.id, userId));
+/**
+ * Saves the person's app language (ADR 0122): `auto` when a device detected it ("Automático"), false when they
+ * picked it, so every device shows that one.
+ */
+export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false) {
+  if (!isAppLocale(locale)) throw new ValidationError(`locale must be one of ${LOCALE_CODES.join(", ")}`);
+  await db.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+}
+
+/** The person's language and whether it follows each device's. */
+export async function myLocale(db: Database, userId: string) {
+  const [row] = await db
+    .select({ locale: users.locale, localeAuto: users.localeAuto })
+    .from(users)
+    .where(eq(users.id, userId));
+  return { locale: row?.locale ?? null, localeAuto: row?.localeAuto ?? true };
 }
 
 /**
- * The app language a request's `Accept-Language` asks for: its most preferred English or Portuguese tag
+ * The app language a request's `Accept-Language` asks for: its most preferred tag of a language people can pick
  * ("en-GB,en;q=0.9" → en, "pt-PT" → pt-BR), else null. The web app sends its own language in it.
  */
 export function requestLocale(acceptLanguage: string | null | undefined): UserLocale | null {
@@ -1074,6 +1087,8 @@ export async function removeMember(
       .returning({ id: schema.agents.id });
     for (const a of unlisted) caches.agents.delete(`${orgId}:${a.id}`);
     if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
+    // Their AI apps and personal tokens here stop now (ADR 0119).
+    await revokeMemberApps(tx, orgId, targetUserId);
     // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an
     // agent on a computer of theirs then goes back to the API too (`releaseAgents`).
     const heir = await heirOf(tx, actorId, orgId, targetUserId);

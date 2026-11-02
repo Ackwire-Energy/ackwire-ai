@@ -27,6 +27,7 @@ import {
 } from "../lib/notifications";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
+import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
@@ -51,6 +52,7 @@ import type {
   AgentSetup,
   AiStatus,
   ApiRule,
+  AppConsentDecision,
   AppNotification,
   Approval,
   ArtifactContent,
@@ -98,6 +100,7 @@ import type {
   NotificationFilter,
   OrgRoles,
   Person,
+  PersonalTokenInput,
   Proposal,
   ReactionCount,
   ReminderInput,
@@ -131,6 +134,7 @@ import type {
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
+  WorkView,
 } from "./types";
 
 /**
@@ -2436,6 +2440,21 @@ export function cacheMessageActions(
   });
 }
 
+/** A long work changed (`agent.work`, ADR 0121): its anchor's cached message carries the new view. */
+export function cacheMessageWork(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  work: WorkView,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === work.anchorMessageId)) return data;
+    return list.map((m) => (m.id === work.anchorMessageId ? { ...m, longWork: work } : m));
+  });
+}
+
 /** One receipt changed: put it in its message's cached list (keeps the others). */
 function cacheOneAction(qc: ReturnType<typeof useQueryClient>, orgId: string, channelId: string, action: AgentAction) {
   qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
@@ -2509,6 +2528,20 @@ export function useAcceptToolChange(orgId: string) {
   return useMutation({
     mutationFn: (c: { connectionId: string; toolName: string }) =>
       api.customConnectors.acceptToolChange(orgId, c.connectionId, c.toolName),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+      ]),
+  });
+}
+
+/** "Aceitar todas" on one connection's changed tools (ADR 0117). */
+export function useAcceptConnectionToolChanges(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) => api.customConnectors.acceptConnectionToolChanges(orgId, connectionId),
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
@@ -2966,7 +2999,11 @@ export function useIssueColumnAction(orgId: string) {
 
 export const useRoutines = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+  return useQuery({
+    queryKey: keys.routines(orgId),
+    queryFn: () => api.routines.list(orgId),
+    refetchInterval: (q) => usagePauseRefetchMs(q.state.data),
+  });
 };
 
 export const useRoutineRuns = (orgId: string, id: string | null) => {
@@ -3052,6 +3089,8 @@ export function useRoutineAction(orgId: string) {
         | { type: "active"; id: string; active: boolean }
         | { type: "run"; id: string }
         | { type: "stop"; id: string }
+        /** Continuar agora on a run paused near its plan's or budget's limit. */
+        | { type: "continueUsage"; id: string }
         | { type: "update"; id: string; patch: RoutinePatch }
         | { type: "delete"; id: string }
         | { type: "duplicate"; id: string; name?: string }
@@ -3066,6 +3105,7 @@ export function useRoutineAction(orgId: string) {
       if (action.type === "duplicate") return api.routines.duplicate(orgId, action.id, action.name);
       if (action.type === "active") return api.routines.setActive(orgId, action.id, action.active);
       if (action.type === "stop") return api.routines.stop(orgId, action.id);
+      if (action.type === "continueUsage") return api.routines.continueUsage(orgId, action.id);
       if (action.type === "takeOver") {
         await api.routines.takeOver(orgId, action.id);
         return api.routines.setActive(orgId, action.id, true);
@@ -3170,6 +3210,16 @@ export const useAgentSkills = (orgId: string, agentId: string, enabled = true) =
   });
 };
 
+/** Skills the agent made from its own how-tos ("Aprendizados"); empty on a server without them. */
+export const useLearnedSkills = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.learnedSkills(orgId, agentId),
+    queryFn: () => api.skills.learned?.(orgId, agentId) ?? Promise.resolve([]),
+    retry: false,
+  });
+};
+
 /** Which agents use each skill (the API lists skills per agent): skillId → agents. */
 export function useSkillUsage(orgId: string, enabled: boolean) {
   const api = useApi();
@@ -3208,6 +3258,8 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
         | { type: "remove"; id: string }
+        | { type: "revert"; id: string }
+        | { type: "restore"; id: string }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
       switch (action.type) {
@@ -3225,8 +3277,13 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
           return api.skills.remove(orgId, action.id);
         case "assign":
           return api.skills.setForAgent(orgId, action.agentId, action.skills);
+        case "revert":
+          return api.skills.revert?.(orgId, action.id) ?? Promise.resolve();
+        case "restore":
+          return api.skills.restore?.(orgId, action.id) ?? Promise.resolve();
       }
     },
+    // The library and every agent's lists (`keys.skills` is their prefix).
     onSettled: () => qc.invalidateQueries({ queryKey: keys.skills(orgId) }),
   });
 }
@@ -4491,4 +4548,59 @@ export function useSetAgentDatabase(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
     },
   });
+}
+
+/** `/autorizar?req=`: the app asking and the workspaces it could get (ADR 0119). Asked once: it answers once. */
+export const useAppConsent = (requestId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.appConsent(requestId),
+    queryFn: () => api.apps.consent(requestId),
+    enabled: requestId.length > 0,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    meta: { quiet: true },
+  });
+};
+
+/** Permitir or Cancelar on the consent page; the page goes to `redirectTo` once. */
+export function useDecideAppConsent(requestId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AppConsentDecision) => api.apps.decide(requestId, input),
+    meta: { silent: true },
+    onSuccess: (_r, input) => {
+      if (input.orgId) void qc.invalidateQueries({ queryKey: ["org", input.orgId, "apps"] });
+    },
+  });
+}
+
+/** Settings → AI apps. `pollMs`: also refetch this often (while waiting for an app to connect). */
+export const useApps = (orgId: string, all = false, pollMs: number | false = false) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.apps(orgId, all),
+    queryFn: () => api.apps.list(orgId, all),
+    refetchInterval: pollMs,
+  });
+};
+
+/** Desconectar an app, Revogar a token, Criar token: both lists refresh. */
+export function useAppActions(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const done = () => void qc.invalidateQueries({ queryKey: ["org", orgId, "apps"] });
+  return {
+    disconnect: useMutation({ mutationFn: (grantId: string) => api.apps.disconnect(orgId, grantId), onSuccess: done }),
+    revokeToken: useMutation({
+      mutationFn: (grantId: string) => api.apps.revokeToken(orgId, grantId),
+      onSuccess: done,
+    }),
+    createToken: useMutation({
+      mutationFn: (input: PersonalTokenInput) => api.apps.createToken(orgId, input),
+      meta: { silent: true },
+      onSuccess: done,
+    }),
+  };
 }

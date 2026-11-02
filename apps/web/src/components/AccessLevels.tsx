@@ -13,6 +13,7 @@ import {
 } from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { humanize } from "@agenteschat/client/lib/custom-tools";
+import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { builtinToolText } from "@agenteschat/client/lib/scopes";
 import { Card, Chip, Icon, type IconName, InfoHint, Segmented } from "@agenteschat/ui";
@@ -106,11 +107,15 @@ export function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
  * What a level means for a resource: a sentence for built-in areas (in the agent's own words, `agentGrammar`), the
  * tools for connectors.
  */
-export function levelText(t: TFunction, r: AccessResource, level: LevelState, g: Record<string, string>) {
+export function levelText(t: TFunction, r: AccessResource, level: LevelState, g: ReturnType<typeof agentGrammar>) {
   if (level === "none") return t("access.noneText");
   if (level === "custom") return t("access.customText");
   if (r.kind === "builtin") {
-    const text = (t as unknown as TT)(`access.areaText.${r.area}.${level}`, { ...g, defaultValue: "" });
+    const text = (t as unknown as TT)(`access.areaText.${r.area}.${level}`, {
+      name: g.name,
+      context: g.context ?? "",
+      defaultValue: "",
+    });
     if (text) return text;
   }
   const names = toolsAt(r, level)

@@ -1,8 +1,9 @@
 import { type InvitationPreview, useAuthConfig } from "@agenteschat/client";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { agentLook, joinNames } from "@/features/shared/logic";
+import { agentLook } from "@/features/shared/logic";
 import { useSession } from "@/providers/session";
 import { AgentAvatar, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
 import { CENTER } from "@/ui/auth/AuthScaffold";
@@ -40,7 +41,7 @@ export function useAgentsLine(key: "invite.crew" | "invite.ask.agents", agents: 
   const { t } = useTranslation();
   if (agents.length === 0) return null;
   const names = [...agents.map((a) => a.name), ...(more ? [t("invite.ask.moreAgents", { count: more })] : [])];
-  return t(key, { count: agents.length + more, names: joinNames(names, t("newAgent.and")) });
+  return t(key, { count: agents.length + more, names: joinNames(names, t) });
 }
 
 /** The faces leading "who already works there": as tall as that line, so they sit on it. */

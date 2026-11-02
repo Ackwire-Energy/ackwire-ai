@@ -1,6 +1,7 @@
 import {
   type NoticeCategory,
   type StartPage as StartPageId,
+  useApi,
   useChannels,
   useDms,
   useNoticePrefs,
@@ -8,6 +9,7 @@ import {
   useSetShowActivity,
   useSetStart,
 } from "@agenteschat/client";
+import { type AppLocale, localeInfo, readyLocales } from "@agenteschat/i18n/locale";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -16,6 +18,7 @@ import { StyleSheet, View } from "react-native";
 import { pushPermission, unregisterPush } from "@/lib/push";
 import { setSoundChoice, useSoundChoice } from "@/lib/sounds";
 import { readValue, STORED } from "@/lib/storage";
+import { deviceLocale, readLocaleState, rememberLocale, setLocale } from "@/providers/i18n";
 import { useOrg } from "@/providers/org";
 import { usePush } from "@/providers/push";
 import {
@@ -304,16 +307,35 @@ export function AppearancePage() {
   );
 }
 
-/** Idioma: Português or English. */
-export function LanguagePage() {
-  const { t, i18n } = useTranslation();
-  const en = i18n.language.startsWith("en");
+/**
+ * Idioma: Automático (the phone's language) first, then each language by its own name. Signed out, the pick waits on
+ * the phone for the next sign-in.
+ */
+export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const [choice, setChoice] = useState(() => readLocaleState().stored ?? "auto");
+  const pick = (next: AppLocale | "auto") => {
+    setChoice(next);
+    const code = next === "auto" ? deviceLocale() : next;
+    rememberLocale(next, !signedIn);
+    setLocale(code);
+    // Not heard: kept as pending, so the next start sends it.
+    if (signedIn)
+      void api.account.updateMe({ locale: code, auto: next === "auto" }).catch(() => rememberLocale(next, true));
+  };
   return (
     <Page title={t("mobile.me.language")}>
       <View style={styles.gap} />
       <GroupedList>
-        <GroupedRow label={t("mobile.me.langPt")} checked={!en} onPress={() => void i18n.changeLanguage("pt-BR")} />
-        <GroupedRow label={t("mobile.me.langEn")} checked={en} onPress={() => void i18n.changeLanguage("en")} />
+        <GroupedRow
+          label={t("shell.languageAuto", { language: localeInfo(deviceLocale()).native })}
+          checked={choice === "auto"}
+          onPress={() => pick("auto")}
+        />
+        {readyLocales().map((l) => (
+          <GroupedRow key={l.code} label={l.native} checked={choice === l.code} onPress={() => pick(l.code)} />
+        ))}
       </GroupedList>
     </Page>
   );

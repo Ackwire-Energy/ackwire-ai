@@ -115,7 +115,7 @@ test("entries from before the sync are caught up as contacts, each in its status
       .map((c) => [c.email, c.properties.waitlist, c.properties.locale])
       .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
   ).toEqual([
-    ["old@acme.com", "confirmed", "pt-BR"],
+    ["old@acme.com", "confirmed", "en"],
     ["pending@acme.com", "pending", "en"],
   ]);
   expect(await enqueueWaitlistContacts(t.db)).toBe(2);
@@ -123,13 +123,13 @@ test("entries from before the sync are caught up as contacts, each in its status
   expect(t.email.contacts.length).toBe(2);
 });
 
-test("no locale means pt-BR, and the email is in Portuguese", async () => {
+test("no locale means English, and the email is in English", async () => {
   expect((await browser(t)("/api/waitlist", { json: { email: "bia@acme.com" } })).status).toBe(202);
   const [row] = await t.db.select().from(schema.waitlistEntries);
-  expect(row?.locale).toBe("pt-BR");
+  expect(row?.locale).toBe("en");
   await t.drain();
-  expect(t.email.sent[0]?.subject).toBe("Confirme seu lugar na lista do agentes.chat");
-  expect(t.email.sent[0]?.html).toContain('lang="pt-BR"');
+  expect(t.email.sent[0]?.subject).toBe("Confirm your spot on the agentes.chat waiting list");
+  expect(t.email.sent[0]?.html).toContain('lang="en"');
 });
 
 test("an unknown, malformed or expired link is refused with a stable code", async () => {
@@ -183,7 +183,7 @@ test("a bad email or body is refused with a stable code", async () => {
   const bad = await anon("/api/waitlist", { json: { email: "not-an-email" } });
   expect(bad.status).toBe(400);
   expect(await errorCode(bad)).toBe("invalid_email");
-  const wrongLocale = await anon("/api/waitlist", { json: { email: "a@acme.com", locale: "fr" } });
+  const wrongLocale = await anon("/api/waitlist", { json: { email: "a@acme.com", locale: "xx" } });
   expect(wrongLocale.status).toBe(400);
   expect(await errorCode(wrongLocale)).toBe("invalid_request");
   const tooLong = await anon("/api/waitlist", { json: { email: `${"a".repeat(250)}@acme.com` } });

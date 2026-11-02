@@ -90,7 +90,7 @@ describe("someone asking to join, in Atividade", () => {
       count: 4,
       latest: { names: ["Ana", "Bia", "Caio"] },
     });
-    expect(joinRequestLine(en, four)).toEqual({ text: "Ana, Bia and 2 more ask to join", faces: ["Ana", "Bia"] });
+    expect(joinRequestLine(en, four)).toEqual({ text: "Ana, Bia, and 2 more ask to join", faces: ["Ana", "Bia"] });
     // A notice from before it kept the names: the newest one's, and the others counted.
     const old = notification({ id: "j0", kind: "join_request", actors: [], count: 3, latest: { title: "Rui" } });
     expect(joinRequestLine(en, old).text).toBe("Rui and 2 more ask to join");

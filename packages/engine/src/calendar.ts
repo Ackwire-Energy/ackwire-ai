@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gte, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
+import { localeInfo } from "@agenteschat/i18n/locale";
 import { currentHandles, getAgent } from "./agents";
 import { zonedParts, zonedTime } from "./cron";
 import { type EmailLocale, emailLocale, queueEmail } from "./email";
@@ -282,7 +283,7 @@ async function checkParticipants(db: Database, orgId: string, participants: Cale
  * naming the zone, which may be the event's rather than the reader's.
  */
 const formatWhen = (d: Date, timeZone: string, locale: EmailLocale) =>
-  new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
+  new Intl.DateTimeFormat(localeInfo(locale).intl, {
     timeZone,
     year: "numeric",
     month: "short",

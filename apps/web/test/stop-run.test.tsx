@@ -117,7 +117,7 @@ describe("Parar is immediate", () => {
     const group = screen().getByRole("radiogroup", { name: "Como mandar enquanto a Ada trabalha" });
     expect(
       within(group)
-        .getByRole("radio", { name: /Juntar ao que ela faz/ })
+        .getByRole("radio", { name: /Juntar ao que (a|o) \w+ faz/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
     await act(async () => fireEvent.keyDown(box, { key: "Enter", ctrlKey: true }));

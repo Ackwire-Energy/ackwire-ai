@@ -12,6 +12,23 @@
   --font-dot: "Doto", var(--font-mono);
 }
 
+/* Japanese, Korean and Chinese read in each system's own face after Onest (no web font to download). Russian titles:
+   Funnel Display has no Cyrillic, Onest does. */
+:lang(ja) {
+  --font-sans:
+    "Onest Variable", Onest, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, "Noto Sans JP",
+    system-ui, sans-serif;
+}
+:lang(ko) {
+  --font-sans: "Onest Variable", Onest, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+}
+:lang(zh-Hans) {
+  --font-sans: "Onest Variable", Onest, "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif;
+}
+:lang(ru) {
+  --font-display: var(--font-sans);
+}
+
 * {
   box-sizing: border-box;
 }

@@ -29,11 +29,13 @@ import {
   pruneMessageClientIds,
   pruneOperatorEvents,
   pruneRoutineHookCalls,
+  purgeApps,
   purgeDeletedArtifacts,
   queueApprovalDigests,
   reapRoutineRuns,
   reconcileComposioAccounts,
   reconcileComposioConnectors,
+  reconcileWorks,
   recoverStaleRuns,
   releaseJobs,
   sweepEndedInboxes,
@@ -121,6 +123,8 @@ export const WORKER_INTERVALS_MS = {
   deletions: 3600_000,
   /** Yesterday's stall-and-noise report, queued for an hour after the UTC day ended (once per day: its dedupe key). */
   opsReport: 3600_000,
+  /** AI apps' expired requests, tokens and unused registrations (ADR 0119). */
+  apps: 3600_000,
 };
 
 /**
@@ -176,6 +180,7 @@ export function startWorkers(deps: WorkerDeps) {
     while (!stopped && (await outboxPump.pump()) > 0) {}
   });
 
+  every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));
   every("partitions", WORKER_INTERVALS_MS.partitions, async () => {
     const created = await ensureMessagePartitions(db);
     if (created > 0) log.info("created message partitions", { created });
@@ -233,6 +238,9 @@ export function startWorkers(deps: WorkerDeps) {
   every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
     const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
     if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
+    // Long work whose run ended without closing it (a crash between the two) gets its end, once (ADR 0121 §7).
+    const closed = await reconcileWorks({ db, pubsub: deps.pubsub });
+    if (closed > 0) log.warn("background works closed by the sweep", { works: closed });
   });
 
   every("inboxes", WORKER_INTERVALS_MS.inboxes, async () => {

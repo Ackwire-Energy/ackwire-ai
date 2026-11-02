@@ -56,12 +56,6 @@ export function agentLook(agent: { appearance?: unknown } | null | undefined): A
 /** Which grammar keys to use with a name (`mobile.grammar.*F` / `*M`), by the web's rule. */
 export const genderOf = (name: string): "F" | "M" => (isFeminineName(name) ? "F" : "M");
 
-/** "Ana e Theo", "Ana, Theo e Iris" (`and` is " e " / " and "). */
-export function joinNames(names: string[], and: string) {
-  if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")}${and}${names[names.length - 1]}`;
-}
-
 /** The letter on a person's avatar. */
 export function initialOf(name: string) {
   const first = name.trim().charAt(0);

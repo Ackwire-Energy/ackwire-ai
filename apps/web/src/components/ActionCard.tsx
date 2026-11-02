@@ -34,6 +34,7 @@ import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
 import { StretchCardView } from "@/components/StretchCard";
+import { UsagePauseCardView } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { inPlaceClick } from "@/lib/navigate";
@@ -64,10 +65,11 @@ export function ActionCard({ message }: { message: Message }) {
   if (!card) return null;
   if (card.kind === "agent_proposal") return <AgentProposalCardView message={message} card={card} />;
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
+  if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
     card.agentIds.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),
-    t("newAgent.and"),
+    t,
   );
   const title = agents
     ? t("actionCard.connect_ai.title", { context: card.what, agents })

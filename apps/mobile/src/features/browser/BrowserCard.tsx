@@ -148,7 +148,7 @@ export function BrowserCard({
   const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
   const hiddenNote = surface
-    ? t("browser.inCard.hiddenHelp", agentGrammar(t, name))
+    ? t("browser.inCard.hiddenHelp", agentGrammar(name))
     : t("mobile.browser.live.hidden", { name: helper });
   const sky = !live.frame && skyBehind(note);
   const doneLabel = handoff?.kind === "takeover" ? t("mobile.browser.live.handBack") : t("mobile.browser.live.done");
@@ -226,9 +226,7 @@ export function BrowserCard({
   // Nothing going on (its profile, the agent idle): the agent's browser and where it runs, not "in the browser".
   const idle = !working && !handoff && !host;
   const title =
-    asked ||
-    host ||
-    (surface ? "" : idle ? t("browser.inCard.group", agentGrammar(t, name)) : t("browser.watch.title"));
+    asked || host || (surface ? "" : idle ? t("browser.inCard.group", agentGrammar(name)) : t("browser.watch.title"));
   const hasAction = Boolean(mine && handoff) || waiting || (!controller && canTake);
   const left = waiting ? handoffTimeLeft(t, handoff, now) : null;
   const subtitle = mine

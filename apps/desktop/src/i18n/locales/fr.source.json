@@ -1,0 +1,1565 @@
+{
+  "device.mac": {
+    "value": "Mac"
+  },
+  "device.windows": {
+    "value": "PC"
+  },
+  "device.linux": {
+    "value": "computer"
+  },
+  "common.cancel": {
+    "value": "Cancel"
+  },
+  "common.close": {
+    "value": "Close"
+  },
+  "common.continue": {
+    "value": "Continue"
+  },
+  "common.back": {
+    "value": "Back"
+  },
+  "common.skip": {
+    "value": "Skip"
+  },
+  "common.open": {
+    "value": "Open"
+  },
+  "common.remove": {
+    "value": "Remove"
+  },
+  "common.retry": {
+    "value": "Try again"
+  },
+  "common.soon": {
+    "value": "Soon"
+  },
+  "common.less": {
+    "value": "Less"
+  },
+  "common.more": {
+    "value": "More"
+  },
+  "common.copy": {
+    "value": "Copy"
+  },
+  "common.copied": {
+    "value": "Copied"
+  },
+  "common.error": {
+    "value": "Something went wrong. Try again."
+  },
+  "common.now": {
+    "value": "now"
+  },
+  "common.minutes": {
+    "value": "{{count}} min"
+  },
+  "common.hours": {
+    "value": "{{count}} h"
+  },
+  "status.connected": {
+    "value": "Connected"
+  },
+  "status.connecting": {
+    "value": "Connecting"
+  },
+  "status.offline": {
+    "value": "Offline"
+  },
+  "status.paused": {
+    "value": "Paused"
+  },
+  "status.refused": {
+    "value": "Disconnected"
+  },
+  "status.outdated": {
+    "value": "Needs an update"
+  },
+  "status.starting": {
+    "value": "Starting"
+  },
+  "orgCount": {
+    "value": {
+      "one": "{{count}} workspace",
+      "other": "{{count}} workspaces"
+    }
+  },
+  "tray.browser.title": {
+    "value": "{{agent}} in the browser"
+  },
+  "tray.browser.needs": {
+    "value": "{{agent}} needs you"
+  },
+  "tray.browser.inControl": {
+    "value": "{{person}} is in control"
+  },
+  "tray.browser.someoneInControl": {
+    "value": "A person is in control"
+  },
+  "tray.browser.noSite": {
+    "value": "opening"
+  },
+  "tray.browser.someAgent": {
+    "value": "An agent"
+  },
+  "tray.browser.see": {
+    "value": "See"
+  },
+  "tray.browser.open": {
+    "value": "Open"
+  },
+  "tray.browser.stop": {
+    "value": "Stop"
+  },
+  "tray.browser.stopAsk": {
+    "value": "Close {{agent}}'s browser?"
+  },
+  "tray.browser.stopHint": {
+    "value": "Sign-ins stay saved."
+  },
+  "tray.browser.stopConfirm": {
+    "value": "Close"
+  },
+  "tray.browser.stopped": {
+    "value": "{{agent}}'s browser closed"
+  },
+  "tray.browser.notifTitle": {
+    "value": "{{agent}} needs you in the browser"
+  },
+  "tray.browser.doing.opening": {
+    "value": "opening the page"
+  },
+  "tray.browser.doing.reading": {
+    "value": "reading the page"
+  },
+  "tray.browser.doing.clicking": {
+    "value": "clicking"
+  },
+  "tray.browser.doing.filling": {
+    "value": "filling in"
+  },
+  "tray.browser.doing.choosing": {
+    "value": "choosing"
+  },
+  "tray.browser.doing.typing": {
+    "value": "typing"
+  },
+  "tray.browser.doing.scrolling": {
+    "value": "scrolling"
+  },
+  "tray.browser.doing.waiting": {
+    "value": "waiting for the page"
+  },
+  "tray.browser.doing.uploading": {
+    "value": "uploading a file"
+  },
+  "tray.browser.doing.capturing": {
+    "value": "taking a screenshot"
+  },
+  "tray.browser.doing.tabs": {
+    "value": "switching tabs"
+  },
+  "tray.label": {
+    "value": "agentes.chat"
+  },
+  "tray.now": {
+    "value": "Now"
+  },
+  "tray.seeAll": {
+    "value": "See all"
+  },
+  "tray.background": {
+    "value": "In the background"
+  },
+  "tray.nothingNow": {
+    "value": "Nothing now"
+  },
+  "tray.waitingConnection": {
+    "value": "Waiting for the connection"
+  },
+  "tray.calmTitle": {
+    "value": "All quiet here"
+  },
+  "tray.calmBody": {
+    "value": "Agents use this {{device}} when they need it."
+  },
+  "tray.pausedEmptyTitle": {
+    "value": "Everything is on hold"
+  },
+  "tray.pausedEmptyBody": {
+    "value": "Nothing new starts until you resume."
+  },
+  "tray.waiting": {
+    "value": {
+      "one": "{{count}} waiting for you",
+      "other": "{{count}} waiting for you"
+    }
+  },
+  "tray.nothingWaiting": {
+    "value": "Nothing waiting for you"
+  },
+  "tray.pause": {
+    "value": "Pause the agents"
+  },
+  "tray.pause1h": {
+    "value": "For 1 hour"
+  },
+  "tray.pauseTomorrow": {
+    "value": "Until tomorrow at 9 AM"
+  },
+  "tray.pauseManual": {
+    "value": "Until I resume"
+  },
+  "tray.pauseHint": {
+    "value": "What is already running finishes normally."
+  },
+  "tray.resume": {
+    "value": "Resume the agents"
+  },
+  "tray.open": {
+    "value": "Open agentes.chat"
+  },
+  "tray.prefs": {
+    "value": "Preferences…"
+  },
+  "tray.quit": {
+    "value": "Quit agentes.chat"
+  },
+  "tray.pausedFor1h": {
+    "value": "Paused for 1 hour"
+  },
+  "tray.pausedTomorrow": {
+    "value": "Paused until tomorrow at 9 AM"
+  },
+  "tray.pausedManual": {
+    "value": "Paused until you resume"
+  },
+  "tray.resumed": {
+    "value": "Agents are back"
+  },
+  "tray.reconnect": {
+    "value": "Reconnect"
+  },
+  "tray.reconnecting": {
+    "value": "Reconnecting…"
+  },
+  "tray.offlineTitle": {
+    "value": "No internet. Trying again…"
+  },
+  "tray.offlineBody": {
+    "value": "What already started keeps running here and sends the result when the connection is back."
+  },
+  "tray.unreachable": {
+    "value": "Can't reach {{host}}. Trying again…"
+  },
+  "tray.unreachableBody": {
+    "value": "What already started keeps running here and sends the result when the server is back."
+  },
+  "tray.pausedUntil": {
+    "value": "Paused until {{time}}"
+  },
+  "tray.pausedUntilResume": {
+    "value": "Paused until you resume"
+  },
+  "tray.pausedBody": {
+    "value": "No agent, from any workspace, starts anything new on this {{device}}."
+  },
+  "tray.resumeNow": {
+    "value": "Resume now"
+  },
+  "tray.plusHour": {
+    "value": "+1 hour"
+  },
+  "tray.updateTitle": {
+    "value": "Version {{version}} is available"
+  },
+  "tray.updateSee": {
+    "value": "See what's new"
+  },
+  "tray.requiredTitle": {
+    "value": "Update to keep going"
+  },
+  "tray.requiredBody": {
+    "value": "This version of the app is too old for the server."
+  },
+  "tray.refusedTitle": {
+    "value": "{{org}} disconnected this {{device}}"
+  },
+  "tray.refusedBody": {
+    "value": "Reconnect to come back with the same agents and permissions."
+  },
+  "tray.reconnectMac": {
+    "value": "Reconnect this {{device}}"
+  },
+  "tray.incompatibleTitle": {
+    "value": "Install the app again"
+  },
+  "tray.incompatibleBody": {
+    "value": "One part of the app doesn't match the other. Download the latest version at agentes.chat."
+  },
+  "tray.requests": {
+    "value": "Requests"
+  },
+  "tray.wantsFolder": {
+    "value": "{{agent}} wants to use a folder"
+  },
+  "tray.allowFor": {
+    "value": "Allow for"
+  },
+  "tray.onlyAgent": {
+    "value": "Only {{agent}}"
+  },
+  "tray.allAgents": {
+    "value": "All agents"
+  },
+  "tray.allow": {
+    "value": "Allow"
+  },
+  "tray.deny": {
+    "value": "Not now"
+  },
+  "tray.allowedOne": {
+    "value": "{{folder}} allowed for {{agent}}"
+  },
+  "tray.allowedAll": {
+    "value": "{{folder}} allowed for all agents"
+  },
+  "tray.denied": {
+    "value": "Declined. {{agent}} lets them know in the chat."
+  },
+  "tray.notifTitle": {
+    "value": "{{agent}} wants to use the folder {{folder}}"
+  },
+  "tray.quitTitle": {
+    "value": "Quit agentes.chat?"
+  },
+  "tray.quitBody": {
+    "value": "Agents can't use this {{device}} while the app is closed. What is already running finishes and sends the result when you open it again."
+  },
+  "tray.quitHereBody": {
+    "value": "agentes.chat stops on this {{device}}: nobody can use it, here, on your phone or your teammates', until you open the app again."
+  },
+  "tray.quitConfirm": {
+    "value": "Quit"
+  },
+  "first.title": {
+    "value": "Your team and your agents, together"
+  },
+  "first.lead": {
+    "value": "Chat, tasks and documents where people and AI agents work side by side."
+  },
+  "first.cloud": {
+    "value": "Sign in to agentes.chat"
+  },
+  "first.create": {
+    "value": "New here?"
+  },
+  "first.createLink": {
+    "value": "Create an account"
+  },
+  "first.own": {
+    "value": "Use your own server"
+  },
+  "own.title": {
+    "value": "Your own server"
+  },
+  "own.lead": {
+    "value": "agentes.chat runs on your computers, and your data stays on them."
+  },
+  "own.back": {
+    "value": "agentes.chat"
+  },
+  "own.connect": {
+    "value": "Connect to my server"
+  },
+  "own.connectText": {
+    "value": "It runs on another computer: a Mac mini, a spare laptop or a server online."
+  },
+  "own.here": {
+    "value": "Run agentes.chat on this {{device}}"
+  },
+  "own.hereText": {
+    "value": "This {{device}} becomes the server, while it's on."
+  },
+  "own.which": {
+    "value": "Which one to choose?"
+  },
+  "connect.title": {
+    "value": "Connect to my server"
+  },
+  "connect.lead": {
+    "value": "Its address, the same one you open in the browser."
+  },
+  "connect.label": {
+    "value": "Server address"
+  },
+  "connect.placeholder": {
+    "value": "agentes.yourteam.ts.net"
+  },
+  "connect.go": {
+    "value": "Connect"
+  },
+  "connect.checking": {
+    "value": "Checking…"
+  },
+  "connect.found": {
+    "value": "Found"
+  },
+  "connect.looking": {
+    "value": "Looking for your server…"
+  },
+  "connect.foundTailnet": {
+    "value": "On your Tailscale network"
+  },
+  "connect.foundHere": {
+    "value": "agentes.chat is running here"
+  },
+  "connect.use": {
+    "value": "Use"
+  },
+  "connect.none": {
+    "value": "Don't have one yet? Run this on it"
+  },
+  "connect.noneText": {
+    "value": "In the terminal of a server or a Mac mini. At the end it shows a link that connects this app to it."
+  },
+  "connect.invalid": {
+    "value": "Check the address, something like agentes.yourteam.ts.net."
+  },
+  "connect.httpRefused": {
+    "value": "{{host}} uses plain http, which only works on this {{device}}. Use its Tailscale address or one with https."
+  },
+  "connect.noOwner": {
+    "value": "{{host}} has no owner account yet. Open its owner link (it ends in /owner#claim=…), on this {{device}} or on your phone."
+  },
+  "connect.unreachable": {
+    "value": "We can't reach {{host}}. If it's on Tailscale, open Tailscale on this {{device}}, connect and try again."
+  },
+  "connect.unreachableHere": {
+    "value": "Nothing answers at {{host}} on this {{device}}. Start agentes.chat here, then try again."
+  },
+  "connect.certificate": {
+    "value": "The certificate of {{host}} isn't valid. Talk to whoever runs the server."
+  },
+  "connect.notAgentes": {
+    "value": "{{host}} isn't an agentes.chat server. Check the address."
+  },
+  "connect.serverTooOld": {
+    "value": "{{host}} needs an update to work with this app."
+  },
+  "connect.appTooOld": {
+    "value": "Update the app to use {{host}}."
+  },
+  "here.title": {
+    "value": "Run agentes.chat on this {{device}}"
+  },
+  "here.how": {
+    "value": "It runs inside this app, with its own database built in, and keeps everything in one folder on this {{device}}."
+  },
+  "here.again": {
+    "value": "It ran here before, and its data is still in {{path}}."
+  },
+  "here.name": {
+    "value": "Your name"
+  },
+  "here.nameNeeded": {
+    "value": "Write your name."
+  },
+  "here.email": {
+    "value": "Your email"
+  },
+  "here.emailNeeded": {
+    "value": "Write your email, like ana@example.com."
+  },
+  "here.reach": {
+    "value": "Reach it from your phone and teammates"
+  },
+  "here.reachText": {
+    "value": "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat."
+  },
+  "here.reachOff": {
+    "value": "Tailscale isn't connected."
+  },
+  "here.reachOffTerminal": {
+    "value": "Tailscale isn't connected. Connect it in the terminal:"
+  },
+  "here.reachTray": {
+    "value": "Tailscale isn't connected. Connect it from its icon by the clock."
+  },
+  "here.reachMissing": {
+    "value": "Needs Tailscale, which is free."
+  },
+  "here.reachChecking": {
+    "value": "Checking whether Tailscale is connected…"
+  },
+  "here.reachStage.sharing": {
+    "value": "Asking Tailscale to share it…"
+  },
+  "here.reachStage.approve": {
+    "value": "Tailscale asks for HTTPS to be turned on in your network. Turn it on in its page: the rest goes on by itself."
+  },
+  "here.reachStage.restarting": {
+    "value": "Restarting agentes.chat at its new address…"
+  },
+  "here.reachStage.signingIn": {
+    "value": "Signing in again at the new address…"
+  },
+  "here.approveOpen": {
+    "value": "Open Tailscale's page"
+  },
+  "here.approveStop": {
+    "value": "Stop waiting"
+  },
+  "here.openTailscale": {
+    "value": "Open Tailscale"
+  },
+  "here.getTailscale": {
+    "value": "Get Tailscale"
+  },
+  "here.usage": {
+    "value": "Send anonymous usage statistics to agentes.chat"
+  },
+  "here.usageText": {
+    "value": "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites."
+  },
+  "here.start": {
+    "value": "Start agentes.chat"
+  },
+  "here.setting": {
+    "value": "Setting up agentes.chat on this {{device}}"
+  },
+  "here.step.database": {
+    "value": "Preparing the database"
+  },
+  "here.step.databaseNote": {
+    "value": "first time only"
+  },
+  "here.step.start": {
+    "value": "Starting"
+  },
+  "here.step.account": {
+    "value": "Creating your account"
+  },
+  "here.step.computer": {
+    "value": "Getting this {{device}} ready for your agents"
+  },
+  "here.step.reach": {
+    "value": "Turning on access from your devices"
+  },
+  "here.stepState.active": {
+    "value": "in progress"
+  },
+  "here.stepState.done": {
+    "value": "done"
+  },
+  "here.stepState.failed": {
+    "value": "didn't work"
+  },
+  "here.stepState.warn": {
+    "value": "needs your attention"
+  },
+  "here.fail.start": {
+    "value": "agentes.chat didn't start on this {{device}}."
+  },
+  "here.fail.database": {
+    "value": "The database wasn't prepared."
+  },
+  "here.fail.account": {
+    "value": "Your account wasn't created."
+  },
+  "here.fail.retry": {
+    "value": "Try again in Preferences › Servers."
+  },
+  "here.reason.https": {
+    "value": "HTTPS is off on your Tailscale network"
+  },
+  "here.reason.serve": {
+    "value": "Tailscale on this {{device}} can't share it"
+  },
+  "here.reason.operator": {
+    "value": "Tailscale needs your permission first"
+  },
+  "here.reason.stopped": {
+    "value": "you stopped waiting for HTTPS to be turned on"
+  },
+  "here.reason.start": {
+    "value": "agentes.chat didn't answer again at its new address"
+  },
+  "here.serveFix": {
+    "value": "Install Tailscale from tailscale.com."
+  },
+  "here.operatorRun": {
+    "value": "Give that permission once, in the terminal:"
+  },
+  "here.turnOn": {
+    "value": "Turn it on"
+  },
+  "here.copyDetails": {
+    "value": "Copy details"
+  },
+  "here.slow": {
+    "value": "Taking a little longer than expected"
+  },
+  "here.notifyFailed": {
+    "value": "Setting up agentes.chat on this {{device}} didn't finish"
+  },
+  "here.notifyFailedBody": {
+    "value": "Open agentes.chat to see what happened."
+  },
+  "here.already": {
+    "value": "agentes.chat is already installed on this {{device}}"
+  },
+  "here.alreadyText": {
+    "value": "It runs on its own, installed from the terminal, at {{url}}."
+  },
+  "here.useIt": {
+    "value": "Use it"
+  },
+  "here.notRunning": {
+    "value": "agentes.chat is installed on this {{device}}, but it isn't running"
+  },
+  "here.notRunningText": {
+    "value": "It was installed from the terminal, in {{path}}. Start it there, then try again."
+  },
+  "here.running": {
+    "value": "agentes.chat already runs on this {{device}}"
+  },
+  "here.runningText": {
+    "value": "This app runs it, at {{url}}."
+  },
+  "here.openIt": {
+    "value": "Open it"
+  },
+  "link.question": {
+    "value": "Connect the app to this server?"
+  },
+  "link.questionSignIn": {
+    "value": "Sign in to this server with your account from the other device?"
+  },
+  "link.questionClaim": {
+    "value": "Set up this server: create its owner account."
+  },
+  "link.leave": {
+    "value": "You leave {{current}} in this app. Your account there stays."
+  },
+  "link.connect": {
+    "value": "Connect"
+  },
+  "link.continue": {
+    "value": "Continue"
+  },
+  "link.checking": {
+    "value": "Checking the server…"
+  },
+  "link.notALink": {
+    "value": "This link isn't from an agentes.chat server."
+  },
+  "link.chipTailnet": {
+    "value": "Tailscale"
+  },
+  "link.chipHere": {
+    "value": "This {{device}}"
+  },
+  "servers.title": {
+    "value": "Servers"
+  },
+  "servers.lead": {
+    "value": "Where this app opens agentes.chat."
+  },
+  "servers.cloud": {
+    "value": "agentes.chat"
+  },
+  "servers.cloudSub": {
+    "value": "Cloud"
+  },
+  "servers.ownSub": {
+    "value": "Your server"
+  },
+  "servers.ownTailnet": {
+    "value": "Your server · on your Tailscale network"
+  },
+  "servers.ownHere": {
+    "value": "Your server · on this {{device}}"
+  },
+  "servers.hereOnly": {
+    "value": "Runs here · only on this {{device}}"
+  },
+  "servers.hereTailnet": {
+    "value": "Runs here · on your Tailscale network"
+  },
+  "servers.open": {
+    "value": "Open"
+  },
+  "servers.openNow": {
+    "value": "Open now"
+  },
+  "servers.add": {
+    "value": "Add a server…"
+  },
+  "servers.manage": {
+    "value": "Manage servers…"
+  },
+  "servers.more": {
+    "value": "More for {{host}}"
+  },
+  "servers.remove": {
+    "value": "Remove"
+  },
+  "servers.removeTitle": {
+    "value": "Remove {{host}} from this app?"
+  },
+  "servers.removeBody": {
+    "value": "The server and your account there stay as they are."
+  },
+  "servers.removeAgents": {
+    "value": "Agents of its workspaces stop working on this {{device}}."
+  },
+  "servers.removed": {
+    "value": "{{host}} left this app"
+  },
+  "server.title": {
+    "value": "agentes.chat on this {{device}}"
+  },
+  "server.running": {
+    "value": "Running"
+  },
+  "server.starting": {
+    "value": "Starting"
+  },
+  "server.stopped": {
+    "value": "Stopped"
+  },
+  "server.updating": {
+    "value": "Updating"
+  },
+  "server.failing": {
+    "value": "Not starting"
+  },
+  "server.onlyHere": {
+    "value": "Running · only on this {{device}}"
+  },
+  "server.onTailnet": {
+    "value": "Running · on your Tailscale network"
+  },
+  "server.address": {
+    "value": "Address"
+  },
+  "server.data": {
+    "value": "Data"
+  },
+  "server.phone": {
+    "value": "On your phone"
+  },
+  "server.phoneOff": {
+    "value": "Turn on reach first."
+  },
+  "server.showQr": {
+    "value": "Show QR code"
+  },
+  "server.usageRestart": {
+    "value": "Changing it restarts agentes.chat for a moment."
+  },
+  "server.jev": {
+    "value": "Jev"
+  },
+  "server.jevText": {
+    "value": "A fast model by TypeSafe that picks who answers, keeps memory tidy and lets agents see the screen. Optional, with your own key."
+  },
+  "server.jevWhere": {
+    "value": "In agentes.chat › Settings › AI accounts."
+  },
+  "server.reachFailed": {
+    "value": "Access from your devices didn't turn on: {{reason}}."
+  },
+  "server.backup": {
+    "value": "Back up now"
+  },
+  "server.backedUp": {
+    "value": "Backed up: {{file}}"
+  },
+  "server.reveal": {
+    "value": "Show in Finder"
+  },
+  "server.revealFiles": {
+    "value": "Show in Files"
+  },
+  "server.start": {
+    "value": "Start it"
+  },
+  "server.stop": {
+    "value": "Stop"
+  },
+  "server.restart": {
+    "value": "Restart"
+  },
+  "server.stopHere": {
+    "value": "Stop running it here…"
+  },
+  "server.stopHereTitle": {
+    "value": "Stop agentes.chat on this {{device}}?"
+  },
+  "server.stopHereBody": {
+    "value": "It stops now and no longer starts with the app. Its data stays in {{path}}."
+  },
+  "server.stopHereConfirm": {
+    "value": "Stop it"
+  },
+  "server.notHere": {
+    "value": "Not running here. Its data is still in {{path}}."
+  },
+  "server.startHere": {
+    "value": "Start it here"
+  },
+  "server.stoppedBanner": {
+    "value": "agentes.chat stopped on this {{device}}"
+  },
+  "server.stoppedBody": {
+    "value": "Nobody can use it until it starts again."
+  },
+  "server.failingBanner": {
+    "value": "agentes.chat isn't starting on this {{device}}"
+  },
+  "server.version": {
+    "value": "Version {{version}}, updated with the app"
+  },
+  "server.updatesWithApp": {
+    "value": "Updating the app updates agentes.chat on this {{device}} too."
+  },
+  "server.updateBack": {
+    "value": "The update didn't start. agentes.chat is back on {{version}}."
+  },
+  "pair.title": {
+    "value": "Let agents of {{org}} work on this {{device}}?"
+  },
+  "pair.body": {
+    "value": "{{host}} asked. They start with no folders of yours and commands off."
+  },
+  "pair.allow": {
+    "value": "Allow"
+  },
+  "pair.notNow": {
+    "value": "Not now"
+  },
+  "tools.claudeName": {
+    "value": "Claude Code"
+  },
+  "tools.claudeDesc": {
+    "value": "Writes and changes code in the allowed folders, with your Claude account."
+  },
+  "tools.codexName": {
+    "value": "Codex"
+  },
+  "tools.codexDesc": {
+    "value": "Writes and changes code in the allowed folders, with your ChatGPT account."
+  },
+  "tools.found": {
+    "value": "Found"
+  },
+  "tools.notFound": {
+    "value": "Not found"
+  },
+  "tools.loggedOut": {
+    "value": "Not signed in"
+  },
+  "tools.commandsName": {
+    "value": "Commands"
+  },
+  "tools.commandsDesc": {
+    "value": "Tests, builds and other Terminal commands. Each one shows in Activity."
+  },
+  "tools.commandsWarn": {
+    "value": "Commands can reach the rest of this {{device}}, not only the allowed folders."
+  },
+  "tools.commandsWarnOrgs": {
+    "value": "Commands can reach the rest of this {{device}}, other workspaces' folders included."
+  },
+  "tools.commandsWarnHere": {
+    "value": "Commands run as you and can reach the rest of this {{device}}, agentes.chat's own data included."
+  },
+  "tools.commandsSome": {
+    "value": "On only for {{orgs}}. Turn it on for every workspace here."
+  },
+  "tools.browserName": {
+    "value": "Browser"
+  },
+  "tools.browserDesc": {
+    "value": "Opens websites for the agents in a browser of their own, without your logins."
+  },
+  "tools.browserLogins": {
+    "value": "Logins an agent makes stay on this {{device}}, in its folder. Use only test accounts or the agent's own."
+  },
+  "notch.label": {
+    "value": "Agents in the notch"
+  },
+  "notch.here": {
+    "value": "On this {{device}}"
+  },
+  "notch.needs": {
+    "value": "{{agent}} needs you"
+  },
+  "notch.inBrowser": {
+    "value": "{{agent}} in the browser"
+  },
+  "notch.done": {
+    "value": "{{agent}} is done"
+  },
+  "notch.pausedTitle": {
+    "value": "Agents paused on this {{device}}"
+  },
+  "notch.pausedBody": {
+    "value": "Nothing new starts here until you resume."
+  },
+  "notch.resume": {
+    "value": "Resume"
+  },
+  "notch.open": {
+    "value": "Open"
+  },
+  "notch.openApp": {
+    "value": "Open agentes.chat"
+  },
+  "notch.someAgent": {
+    "value": "An agent"
+  },
+  "prefs.nav.label": {
+    "value": "Sections"
+  },
+  "prefs.nav.general": {
+    "value": "General"
+  },
+  "prefs.nav.servers": {
+    "value": "Servers"
+  },
+  "prefs.nav.thisDevice": {
+    "value": "This {{device}}"
+  },
+  "prefs.nav.folders": {
+    "value": "Folders"
+  },
+  "prefs.nav.tools": {
+    "value": "Tools"
+  },
+  "prefs.nav.updates": {
+    "value": "Updates"
+  },
+  "prefs.nav.activity": {
+    "value": "Activity"
+  },
+  "prefs.nav.advanced": {
+    "value": "Advanced"
+  },
+  "prefs.general.title": {
+    "value": "General"
+  },
+  "prefs.general.thisMac": {
+    "value": "This {{device}}"
+  },
+  "prefs.general.name": {
+    "value": "Name"
+  },
+  "prefs.general.nameLabel": {
+    "value": "Computer name"
+  },
+  "prefs.general.save": {
+    "value": "Save"
+  },
+  "prefs.general.saved": {
+    "value": "Name saved"
+  },
+  "prefs.general.orgs": {
+    "value": "Workspaces"
+  },
+  "prefs.general.agents": {
+    "value": {
+      "one": "{{count}} agent can use it",
+      "other": "{{count}} agents can use it"
+    }
+  },
+  "prefs.general.noAgents": {
+    "value": "No agent uses it yet"
+  },
+  "prefs.general.leave": {
+    "value": "Leave"
+  },
+  "prefs.general.leaveTitle": {
+    "value": "Disconnect {{org}} from this {{device}}?"
+  },
+  "prefs.general.leaveBody": {
+    "value": "Its agents stop using this {{device}} right away. Their folders stay on disk."
+  },
+  "prefs.general.leaveConfirm": {
+    "value": "Disconnect"
+  },
+  "prefs.general.left": {
+    "value": "{{org}} disconnected"
+  },
+  "prefs.general.behavior": {
+    "value": "Behavior"
+  },
+  "prefs.general.launchTitle": {
+    "value": "Open at login"
+  },
+  "prefs.general.launchDesc": {
+    "value": "Agents only use this {{device}} while the app is open."
+  },
+  "prefs.general.launchHere": {
+    "value": "agentes.chat on this {{device}} runs only while the app is open."
+  },
+  "prefs.general.notifySiteTitle": {
+    "value": "Let me know about messages and requests"
+  },
+  "prefs.general.notifySiteDesc": {
+    "value": "Mentions, direct messages and what waits for you, while the app is in the background."
+  },
+  "prefs.general.notifyTitle": {
+    "value": "Let me know when an agent asks for a folder"
+  },
+  "prefs.general.notifyBrowserTitle": {
+    "value": "Let me know when an agent needs me in its browser"
+  },
+  "prefs.general.notifyBrowserDesc": {
+    "value": "The request already reaches your phone and the site. This tells you here too."
+  },
+  "prefs.general.dockTitle": {
+    "value": "Show in the Dock"
+  },
+  "prefs.general.dockDesc": {
+    "value": "With the count of what waits for you. Off, the app stays in the menu bar only while no window is open."
+  },
+  "prefs.general.menuBarTitle": {
+    "value": "Show in the menu bar"
+  },
+  "prefs.general.notchTitle": {
+    "value": "Show the agents in the notch"
+  },
+  "prefs.general.notchDesc": {
+    "value": "On MacBooks with a notch: who is working shows around the camera."
+  },
+  "prefs.folders.title": {
+    "value": "Folders"
+  },
+  "prefs.folders.lead": {
+    "value": "What agents can see and change on this {{device}}."
+  },
+  "prefs.folders.how": {
+    "value": "How folders work"
+  },
+  "prefs.folders.add": {
+    "value": "Add folder"
+  },
+  "prefs.folders.org": {
+    "value": "Workspace"
+  },
+  "prefs.folders.agents": {
+    "value": "Agents"
+  },
+  "prefs.folders.whoUses": {
+    "value": "Who uses {{folder}}"
+  },
+  "prefs.folders.noAgents": {
+    "value": "No agent uses it yet"
+  },
+  "prefs.folders.noOrgAgents": {
+    "value": "No agent of this workspace uses this {{device}} yet."
+  },
+  "prefs.folders.noneTitle": {
+    "value": "No extra folder in {{org}}"
+  },
+  "prefs.folders.noneBody": {
+    "value": "Its agents only use their own folders."
+  },
+  "prefs.folders.removeLabel": {
+    "value": "Remove {{folder}}"
+  },
+  "prefs.folders.removeTitle": {
+    "value": "Remove {{folder}}?"
+  },
+  "prefs.folders.removeBody": {
+    "value": "Agents stop using this folder right away. Nothing is deleted."
+  },
+  "prefs.folders.removed": {
+    "value": "Folder removed"
+  },
+  "prefs.folders.added": {
+    "value": "Choose which agents use {{folder}}"
+  },
+  "prefs.folders.invalid": {
+    "value": "This folder can't be allowed. Choose one of your folders, not a system one."
+  },
+  "prefs.tools.title": {
+    "value": "Tools"
+  },
+  "prefs.tools.lead": {
+    "value": "What agents of every workspace can run on this {{device}}."
+  },
+  "prefs.tools.connected": {
+    "value": "Connected"
+  },
+  "prefs.tools.protection": {
+    "value": "Protection"
+  },
+  "prefs.tools.protectedTitle": {
+    "value": "Protected mode"
+  },
+  "prefs.tools.protectedDesc": {
+    "value": "Commands only write in the allowed folders and don't read the rest of the {{device}}. Some tools may get slower."
+  },
+  "prefs.tools.commandsOn": {
+    "value": "Commands are on"
+  },
+  "prefs.accounts.titleClaude": {
+    "value": "Claude accounts"
+  },
+  "prefs.accounts.titleCodex": {
+    "value": "ChatGPT accounts"
+  },
+  "prefs.accounts.org": {
+    "value": "Workspace"
+  },
+  "prefs.accounts.thisMac": {
+    "value": "This {{device}}'s account"
+  },
+  "prefs.accounts.thisMacHint": {
+    "value": "The one in {{tool}}"
+  },
+  "prefs.accounts.noEmail": {
+    "value": "Account without email"
+  },
+  "prefs.accounts.loggedOutDesc": {
+    "value": "This account signed out. Remove it and add it again."
+  },
+  "prefs.accounts.help": {
+    "value": "Each agent picks its account on its own page. Accounts stay on this {{device}} only."
+  },
+  "prefs.accounts.helpOrg": {
+    "value": "Each {{org}} agent picks its account on its own page. Accounts stay on this {{device}} only."
+  },
+  "prefs.accounts.add": {
+    "value": "Add account"
+  },
+  "prefs.accounts.removeLabel": {
+    "value": "Remove {{account}}"
+  },
+  "prefs.accounts.removeTitle": {
+    "value": "Remove {{account}}?"
+  },
+  "prefs.accounts.removeBody": {
+    "value": "Agents using this account go back to this {{device}}'s account. To cut access for good, also sign out at {{site}}."
+  },
+  "prefs.accounts.removed": {
+    "value": "Account removed"
+  },
+  "prefs.accounts.signInClaude": {
+    "value": "Sign in to Claude in your browser"
+  },
+  "prefs.accounts.signInClaudeLead": {
+    "value": "Sign in with the account you want to add, then click Authorize."
+  },
+  "prefs.accounts.signInCodex": {
+    "value": "Sign in to ChatGPT in your browser"
+  },
+  "prefs.accounts.signInCodexLead": {
+    "value": "Sign in with the account you want to add."
+  },
+  "prefs.accounts.codeHint": {
+    "value": "Type this code on the page that opens."
+  },
+  "prefs.accounts.codeAria": {
+    "value": "Code {{code}}"
+  },
+  "prefs.accounts.wrongAccount": {
+    "value": "Signed in to the wrong account by itself? Sign out of {{product}} there and try again."
+  },
+  "prefs.accounts.wrongAccountAbout": {
+    "value": "About the wrong account"
+  },
+  "prefs.accounts.opening": {
+    "value": "Opening your browser…"
+  },
+  "prefs.accounts.waiting": {
+    "value": "Waiting for you to sign in…"
+  },
+  "prefs.accounts.notOpened": {
+    "value": "Browser didn't open?"
+  },
+  "prefs.accounts.openLink": {
+    "value": "Open the link"
+  },
+  "prefs.accounts.linkCopied": {
+    "value": "Link copied. Paste it in your browser."
+  },
+  "prefs.accounts.addedTitle": {
+    "value": "Account added"
+  },
+  "prefs.accounts.addedBody": {
+    "value": "On each agent's page, choose who uses this account."
+  },
+  "prefs.accounts.addedPlan": {
+    "value": "{{plan}} plan"
+  },
+  "prefs.accounts.ok": {
+    "value": "OK"
+  },
+  "prefs.accounts.failedTitle": {
+    "value": "The account wasn't added"
+  },
+  "prefs.accounts.failedExpired": {
+    "value": "Time to sign in ran out. Try again."
+  },
+  "prefs.accounts.failedLogin": {
+    "value": "The sign-in didn't finish. Try again."
+  },
+  "prefs.accounts.failedError": {
+    "value": "Couldn't start the sign-in right now. Try again."
+  },
+  "prefs.updates.title": {
+    "value": "Updates"
+  },
+  "prefs.updates.upToDate": {
+    "value": "Up to date"
+  },
+  "prefs.updates.newer": {
+    "value": "Version {{version}} is available"
+  },
+  "prefs.updates.required": {
+    "value": "Update to keep going"
+  },
+  "prefs.updates.lastCheck": {
+    "value": "Last check: {{time}}"
+  },
+  "prefs.updates.neverChecked": {
+    "value": "Not checked yet"
+  },
+  "prefs.updates.checkNow": {
+    "value": "Check now"
+  },
+  "prefs.updates.checkFailed": {
+    "value": "Couldn't check right now. Try again later."
+  },
+  "prefs.updates.latestAlready": {
+    "value": "You already have the latest version"
+  },
+  "prefs.updates.install": {
+    "value": "Update and reopen"
+  },
+  "prefs.updates.downloading": {
+    "value": "Downloading…"
+  },
+  "prefs.updates.installing": {
+    "value": "Installing…"
+  },
+  "prefs.updates.installFailed": {
+    "value": "Couldn't update on its own. Download and install it by hand."
+  },
+  "prefs.updates.download": {
+    "value": "Download version {{version}}"
+  },
+  "prefs.updates.howTitle": {
+    "value": "Update by hand"
+  },
+  "prefs.updates.step1": {
+    "value": "Quit agentes.chat (⌘Q)."
+  },
+  "prefs.updates.step2": {
+    "value": "Delete the old agentes.chat from the Applications folder."
+  },
+  "prefs.updates.step3": {
+    "value": "Open the downloaded file and drag the new agentes.chat into Applications."
+  },
+  "prefs.updates.installerNote": {
+    "value": "Open the downloaded file: it installs the new version over the old one."
+  },
+  "prefs.updates.keepNote": {
+    "value": "Your servers and settings stay."
+  },
+  "prefs.updates.whatsNew": {
+    "value": "What's new in {{version}}"
+  },
+  "prefs.activity.title": {
+    "value": "Activity"
+  },
+  "prefs.activity.lead": {
+    "value": "Everything agents did on this {{device}}."
+  },
+  "prefs.activity.all": {
+    "value": "All"
+  },
+  "prefs.activity.org": {
+    "value": "Workspace"
+  },
+  "prefs.activity.copyDiag": {
+    "value": "Copy details"
+  },
+  "prefs.activity.diagCopied": {
+    "value": "Details copied, without passwords or files"
+  },
+  "prefs.activity.showMore": {
+    "value": "Show more"
+  },
+  "prefs.activity.empty": {
+    "value": "Nothing here yet."
+  },
+  "prefs.activity.today": {
+    "value": "Today"
+  },
+  "prefs.activity.yesterday": {
+    "value": "Yesterday"
+  },
+  "prefs.activity.you": {
+    "value": "You"
+  },
+  "prefs.activity.resultOk": {
+    "value": "Worked"
+  },
+  "prefs.activity.resultFailed": {
+    "value": "Failed"
+  },
+  "prefs.activity.resultRefused": {
+    "value": "Refused"
+  },
+  "prefs.activity.resultRunning": {
+    "value": "Running"
+  },
+  "prefs.advanced.title": {
+    "value": "Advanced"
+  },
+  "prefs.advanced.lead": {
+    "value": "Only change this if the {{device}} feels slow or busy."
+  },
+  "prefs.advanced.defaults": {
+    "value": "Back to defaults"
+  },
+  "prefs.advanced.defaultsDone": {
+    "value": "Defaults are back"
+  },
+  "prefs.advanced.longJobs": {
+    "value": "Long jobs"
+  },
+  "prefs.advanced.concurrent": {
+    "value": "At the same time"
+  },
+  "prefs.advanced.concurrentDesc": {
+    "value": "How many long jobs, like builds and tests, run together in each workspace."
+  },
+  "prefs.advanced.maxTime": {
+    "value": "Longest each one may run"
+  },
+  "prefs.advanced.maxTimeDesc": {
+    "value": "After that the job stops and the agent says so."
+  },
+  "prefs.advanced.claude": {
+    "value": "Claude Code"
+  },
+  "prefs.advanced.brainMax": {
+    "value": "Open conversations"
+  },
+  "prefs.advanced.brainMaxDesc": {
+    "value": "How many stay open in each workspace. More of them answer faster but use more memory."
+  },
+  "prefs.advanced.brainIdle": {
+    "value": "Close an idle conversation after"
+  },
+  "prefs.advanced.folder": {
+    "value": "Agents' folder"
+  },
+  "prefs.advanced.folderDesc": {
+    "value": "One folder per workspace, with a folder for each agent."
+  },
+  "cover.offline": {
+    "value": "No internet connection · trying again…"
+  },
+  "cover.unreachable": {
+    "value": "Can't reach {{host}} · trying again…"
+  },
+  "cover.tailnet": {
+    "value": "Is Tailscale connected on this {{device}}?"
+  },
+  "cover.starting": {
+    "value": "Starting agentes.chat on this {{device}}…"
+  },
+  "cover.migrating": {
+    "value": "Updating agentes.chat on this {{device}}. This can take a minute."
+  },
+  "cover.stopped": {
+    "value": "agentes.chat stopped on this {{device}}"
+  },
+  "cover.failing": {
+    "value": "agentes.chat isn't starting on this {{device}}"
+  },
+  "cover.tailnetOff": {
+    "value": "Connect Tailscale on this {{device}} to open agentes.chat."
+  },
+  "cover.tailnetUp": {
+    "value": "In the terminal: sudo tailscale up"
+  },
+  "cover.tailnetTray": {
+    "value": "Open it from its icon by the clock."
+  },
+  "cover.onlyHere": {
+    "value": "Use only on this {{device}}"
+  },
+  "cover.start": {
+    "value": "Start it"
+  },
+  "cover.copy": {
+    "value": "Copy details"
+  },
+  "cover.copied": {
+    "value": "Copied"
+  },
+  "cover.retry": {
+    "value": "Try again"
+  },
+  "cover.openTailscale": {
+    "value": "Open Tailscale"
+  },
+  "cover.otherServer": {
+    "value": "Use another server"
+  },
+  "cover.stuck": {
+    "value": "agentes.chat didn't open. Try again, or see the page as it is."
+  },
+  "cover.showAnyway": {
+    "value": "Show it anyway"
+  },
+  "menu.about": {
+    "value": "About agentes.chat"
+  },
+  "menu.updates": {
+    "value": "Check for updates…"
+  },
+  "menu.prefs": {
+    "value": "App preferences…"
+  },
+  "menu.orgSettings": {
+    "value": "Workspace settings"
+  },
+  "menu.services": {
+    "value": "Services"
+  },
+  "menu.hide": {
+    "value": "Hide agentes.chat"
+  },
+  "menu.hideOthers": {
+    "value": "Hide others"
+  },
+  "menu.showAll": {
+    "value": "Show all"
+  },
+  "menu.quit": {
+    "value": "Quit agentes.chat"
+  },
+  "menu.servers": {
+    "value": "Servers"
+  },
+  "menu.file": {
+    "value": "File"
+  },
+  "menu.newChannel": {
+    "value": "New channel"
+  },
+  "menu.newAgent": {
+    "value": "New agent"
+  },
+  "menu.search": {
+    "value": "Search or ask…"
+  },
+  "menu.print": {
+    "value": "Print…"
+  },
+  "menu.closeWindow": {
+    "value": "Close window"
+  },
+  "menu.edit": {
+    "value": "Edit"
+  },
+  "menu.undo": {
+    "value": "Undo"
+  },
+  "menu.redo": {
+    "value": "Redo"
+  },
+  "menu.cut": {
+    "value": "Cut"
+  },
+  "menu.copy": {
+    "value": "Copy"
+  },
+  "menu.paste": {
+    "value": "Paste"
+  },
+  "menu.selectAll": {
+    "value": "Select all"
+  },
+  "menu.view": {
+    "value": "View"
+  },
+  "menu.back": {
+    "value": "Back"
+  },
+  "menu.forward": {
+    "value": "Forward"
+  },
+  "menu.reload": {
+    "value": "Reload"
+  },
+  "menu.toggleSidebar": {
+    "value": "Show or hide the sidebar"
+  },
+  "menu.zoomIn": {
+    "value": "Zoom in"
+  },
+  "menu.zoomOut": {
+    "value": "Zoom out"
+  },
+  "menu.zoomReset": {
+    "value": "Actual size"
+  },
+  "menu.fullscreen": {
+    "value": "Full screen"
+  },
+  "menu.go": {
+    "value": "Go"
+  },
+  "menu.goHome": {
+    "value": "Home"
+  },
+  "menu.goWaiting": {
+    "value": "Waiting for you"
+  },
+  "menu.goTasks": {
+    "value": "Tasks"
+  },
+  "menu.goWiki": {
+    "value": "Wiki"
+  },
+  "menu.goDrive": {
+    "value": "Drive"
+  },
+  "menu.window": {
+    "value": "Window"
+  },
+  "menu.minimize": {
+    "value": "Minimize"
+  },
+  "menu.zoom": {
+    "value": "Zoom"
+  },
+  "menu.thisMac": {
+    "value": "This {{device}}"
+  },
+  "menu.requests": {
+    "value": "Access requests"
+  },
+  "menu.bringAllToFront": {
+    "value": "Bring all to front"
+  },
+  "menu.help": {
+    "value": "Help"
+  },
+  "menu.downloaded": {
+    "value": "Download complete"
+  }
+}

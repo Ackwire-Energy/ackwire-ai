@@ -11,6 +11,7 @@ import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
 import { ErrorScreen } from "./components/ErrorScreen";
+import { withComposerDraftsSignOut } from "./hooks/useComposerDraft";
 import { loadI18n, savedLocale } from "./i18n";
 import {
   checkAppVersion,
@@ -147,10 +148,12 @@ showReturnNotices(i18n.t, toasts.show);
 
 const services: AppServices = {
   api,
-  // Signing out also stops this browser's notifications for the account (ADR 0071).
-  auth: withWebPushSignOut(
-    createBetterAuthClient(window.location.origin, () => i18n.language),
-    api,
+  // Signing out also stops this browser's notifications for the account (ADR 0071) and forgets unsent texts.
+  auth: withComposerDraftsSignOut(
+    withWebPushSignOut(
+      createBetterAuthClient(window.location.origin, () => i18n.language),
+      api,
+    ),
   ),
   queryClient,
   i18n,

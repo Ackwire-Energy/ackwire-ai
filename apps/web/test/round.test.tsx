@@ -364,7 +364,7 @@ describe("models by provider and the default key", () => {
     ]);
     const gpt = within(models).getByRole("button", { name: /GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
-    expect(gpt.textContent).toContain("Precisa de uma chave da OpenAI");
+    expect(gpt.textContent).toContain("Precisa de uma chave de API OpenAI");
     const key = screen().getByRole("combobox", { name: "Chave" });
     expect(key.textContent).toContain("Chave padrão do workspace");
   });

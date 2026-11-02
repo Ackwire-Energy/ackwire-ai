@@ -2,7 +2,7 @@ import type { Agent } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { routineReachWarnings } from "@agenteschat/client/lib/reach";
 import { Icon } from "@agenteschat/ui";
-import { Trans, useTranslation } from "react-i18next";
+import { Trans } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { AllowTalkButton } from "@/components/ReachLines";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -41,8 +41,7 @@ export function RoutineReachWarnings({
 }
 
 function Warning({ agent, creator }: { agent: Agent; creator: string }) {
-  const { t } = useTranslation();
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   return (
     <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">

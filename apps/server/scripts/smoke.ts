@@ -15,7 +15,9 @@
  * running at PUBLIC_URL: the agent's desktop (started by watching it, if it
  * wasn't running) watched until one framebuffer update, and its terminal's
  * `id -un`, which must not be root, or its refusal where sessions are screened
- * (`smoke-desktop.ts`). Without a model key, only that runs.
+ * (`smoke-desktop.ts`). Without a model key, only that runs. With `--apps`, the
+ * AI apps' endpoint at PUBLIC_URL (ADR 0119): its resource document and the exact
+ * 401 challenge of `/mcp`, as an app sees them through every proxy in front.
  */
 import { parseArgs } from "node:util";
 import {
@@ -31,7 +33,9 @@ import {
 import { loadConfig } from "@agenteschat/config";
 import { createDatabase, type Database, ensureMessagePartitions, eq, schema } from "@agenteschat/db";
 import {
+  APP_SCOPES,
   addChannelMember,
+  appsUrls,
   createAgent,
   createCredential,
   createLocalKeyWrapper,
@@ -46,13 +50,16 @@ import { buildEngine } from "../src/engine";
 import { createLogger } from "../src/logger";
 import { checkDesktop, signInForDesktop } from "./smoke-desktop";
 
-const desktopAgent = parseArgs({ args: process.argv.slice(2), options: { "desktop-agent": { type: "string" } } })
-  .values["desktop-agent"];
+const args = parseArgs({
+  args: process.argv.slice(2),
+  options: { "desktop-agent": { type: "string" }, apps: { type: "boolean" } },
+}).values;
+const desktopAgent = args["desktop-agent"];
 const config = loadConfig();
 const orgKey = process.env.ANTHROPIC_API_KEY?.trim();
 const orgWorkspace = process.env.ANTHROPIC_WORKSPACE_ID?.trim() || undefined;
 const modelKey = Boolean(orgKey || config.PLATFORM_ANTHROPIC_API_KEY);
-if (!modelKey && !desktopAgent) {
+if (!modelKey && !desktopAgent && !args.apps) {
   console.error(
     "Set ANTHROPIC_API_KEY or PLATFORM_ANTHROPIC_API_KEY in .env, or check an agent's desktop only (--desktop-agent)",
   );
@@ -194,6 +201,22 @@ async function modelSmoke(db: Database) {
   );
 }
 
+/** AI apps (ADR 0119): what an MCP client reads first, through the proxies in front of PUBLIC_URL. */
+async function appsSmoke() {
+  const urls = appsUrls(config.PUBLIC_URL);
+  const doc = (await (await fetch(urls.resourceMetadata)).json()) as { resource?: string };
+  if (doc.resource !== urls.resource) throw new Error(`resource document says ${doc.resource}, not ${urls.resource}`);
+  const res = await fetch(urls.resource, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  const want = `Bearer resource_metadata="${urls.resourceMetadata}", scope="${APP_SCOPES.join(" ")}"`;
+  if (res.status !== 401 || res.headers.get("www-authenticate") !== want)
+    throw new Error(`/mcp answered ${res.status} with ${res.headers.get("www-authenticate")}, not 401 with ${want}`);
+  step(`apps: ${urls.resource} answers its challenge`);
+}
+
 /** The agent's desktop and terminal through the server at PUBLIC_URL, as whoever may drive its computer. */
 async function desktopSmoke(db: Database, agent: string) {
   const origin = new URL(config.PUBLIC_URL).origin;
@@ -214,6 +237,7 @@ try {
   if (modelKey) await modelSmoke(database.db);
   else step("model: skipped (no ANTHROPIC_API_KEY or PLATFORM_ANTHROPIC_API_KEY)");
   if (desktopAgent) await desktopSmoke(database.db, desktopAgent);
+  if (args.apps) await appsSmoke();
   step("smoke ok");
 } catch (error) {
   console.error("smoke FAILED:", error instanceof Error ? error.message : error);

@@ -7,7 +7,8 @@ import type {
   ImportSkipReason,
   MigrationBundle,
 } from "@agenteschat/client";
-import { keys } from "@agenteschat/client";
+import { keys, useApps } from "@agenteschat/client";
+import { aiAppImport } from "@agenteschat/client/lib/apps";
 import { formatBytes, MAX_UPLOAD_MB } from "@agenteschat/client/lib/files";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { frontmatter } from "@agenteschat/client/lib/import/shared";
@@ -44,6 +45,7 @@ import { failedOffline } from "@/chat/offline";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { fileSaver } from "@/components/artifacts/fileSaver";
 import { HelpLink } from "@/components/HelpLink";
+import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import {
   type AgentFile,
@@ -408,7 +410,7 @@ export function ImportFlow({
   if (flow.planned && flow.report)
     return <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} linked={standalone} />;
   if (flow.planned) return <Preview flow={flow} orgId={orgId} standalone={standalone} level={level} />;
-  return <Picker flow={flow} />;
+  return <Picker flow={flow} orgId={orgId} />;
 }
 
 function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">) {
@@ -435,7 +437,7 @@ function SourceMark({ card }: { card: ImportCard }) {
 }
 
 /** Pick the app (for where its file is), then drop, choose, link or paste: the source is recognized either way. */
-function Picker({ flow }: { flow: ImportFlowState }) {
+function Picker({ flow, orgId }: { flow: ImportFlowState; orgId: string }) {
   const { t } = useTranslation();
   const filesInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
@@ -476,6 +478,7 @@ function Picker({ flow }: { flow: ImportFlowState }) {
         if (!busy) void flow.read({ files: droppedFiles(e.dataTransfer) });
       }}
     >
+      <AiAppImport orgId={orgId} />
       {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
       <div className="imp-sources" role="group" aria-label={t("onboarding.import.sourcesLabel")}>
         {IMPORT_CARDS.map((c) => (
@@ -601,6 +604,80 @@ function Picker({ flow }: { flow: ImportFlowState }) {
         </span>
       </p>
     </div>
+  );
+}
+
+/**
+ * "Do seu app de IA" on top of the sources (ADR 0119): the person connects their AI app to this server and asks it to
+ * create here what it has, which beats any file or copied reply. Where apps on the internet can't reach this server
+ * (a self-hosted one on a private host), one line says why instead.
+ */
+function AiAppImport({ orgId }: { orgId: string }) {
+  const { t } = useTranslation();
+  const option = aiAppImport(t, useApps(orgId).data);
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+  if (!option) return null;
+  if (!option.available)
+    return (
+      <p className="imp-tip ac-iconline">
+        <Icon name="info" size={16} />
+        <span>{t("onboarding.import.aiApp.private")}</span>
+      </p>
+    );
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(option.prompt);
+      setCopied("ok");
+    } catch {
+      setCopied("failed");
+    }
+  };
+  return (
+    <>
+      <OptionCard pressed={open} onClick={() => setOpen(!open)} className="imp-aiapp">
+        <span className="imp-mark" aria-hidden="true">
+          <Icon name="agent" />
+        </span>
+        <span className="ac-option__text">
+          <span className="ac-option__title">{t("onboarding.import.aiApp.title")}</span>
+          <span className="ac-option__desc">{t("onboarding.import.aiApp.lead")}</span>
+        </span>
+      </OptionCard>
+      {open && (
+        <section className="imp-other" aria-label={t("onboarding.import.aiApp.title")}>
+          <p className="imp-other__steps">{t("onboarding.import.aiApp.connect")}</p>
+          <CommandBlock command={option.url} copied={t("apps.serverCopied")} />
+          <p className="imp-help">
+            <Link className="ac-link" to="/org/$orgId/settings/$section" params={{ orgId, section: "apps" }}>
+              {t("onboarding.import.aiApp.howTo")}
+            </Link>
+          </p>
+          <p className="imp-other__steps">{t("onboarding.import.aiApp.allow")}</p>
+          <p className="imp-other__steps">{t("onboarding.import.aiApp.paste")}</p>
+          <Textarea
+            readOnly
+            rows={4}
+            value={option.prompt}
+            aria-label={t("onboarding.import.aiApp.promptLabel")}
+            className="imp-other__prompt"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <div className="imp-other__copy">
+            <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
+              {copied === "ok" ? t("common.copied") : t("onboarding.import.aiApp.copy")}
+            </Button>
+            <span role="status" className="small muted">
+              {copied === "ok"
+                ? t("onboarding.import.aiApp.copied")
+                : copied === "failed"
+                  ? t("onboarding.import.request.copyFailed")
+                  : ""}
+            </span>
+          </div>
+        </section>
+      )}
+    </>
   );
 }
 
@@ -998,7 +1075,7 @@ function Row({
   const pickable = choosable(item) && !reason;
   const checked = pickable && flow.pick.has(id);
   const status = statusOf(item, reason);
-  const names = (list: string[]) => joinNames(list, t("newAgent.and"));
+  const names = (list: string[]) => joinNames(list, t);
 
   let title = item.label;
   let lead: ReactNode = <Icon name={KIND_ICON[item.kind]} size={16} />;

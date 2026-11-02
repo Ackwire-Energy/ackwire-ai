@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/client";
 import { approvalCardItems, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
@@ -184,6 +185,12 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
         <Icon name="drive" size={16} />
       </span>
     );
+  if (n.kind === "app_created")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="agent" size={16} />
+      </span>
+    );
   if (n.kind !== "org_standing") return null;
   const status = n.latest.statusTo;
   return (
@@ -347,6 +354,7 @@ export function Headline({
   );
   const own = workspaceHeadline(n);
   if (own) return t(own, { name: n.source.label });
+  if (n.kind === "app_created") return appCreatedLine(t, n);
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });
@@ -439,7 +447,7 @@ function placeholderFor(t: TFunction, n: AppNotification, dir: Dir, channelName:
       : t("notifications.composer.issueNoNumber");
   if (target.kind === "question" || n.kind === "dm") {
     const name = nameOf(t, dir, n.actors[0]);
-    return t("notifications.composer.replyTo", { to: agentGrammar(t, name).to, name });
+    return t("notifications.composer.replyTo", { context: agentGrammar(name).context, name });
   }
   if (target.threadId) return t("notifications.composer.thread");
   const channel = channelName(target.channelId);
@@ -719,7 +727,7 @@ function Row({
   const joiner = n.kind === "invitation_accepted" ? joinerOf(t, dir, n) : undefined;
   const name = joiner ?? nameOf(t, dir, first);
   const own = workspaceHeadline(n);
-  const label = own ? t(own, { name: n.source.label }) : name;
+  const label = own ? t(own, { name: n.source.label }) : n.kind === "app_created" ? appCreatedLine(t, n) : name;
   const reaction = n.kind === "reaction";
   const group = n.actors.length > 1;
   const other = n.actors.find((a, i) => i > 0 && (a.id !== first?.id || a.type !== first?.type));
@@ -1005,7 +1013,7 @@ function ApprovalSay({
   mine: string | null;
   fallback: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const approval = useApproval(org.id, approvalId);
   const approvals = useApprovals(org.id);
@@ -1023,7 +1031,7 @@ function ApprovalSay({
       <p className="nt-say">
         <Trans
           i18nKey="notifications.wait.wants"
-          values={{ name, action: approvalDoing(t, a) }}
+          values={{ name, action: approvalDoing(t, a, i18n.language) }}
           components={{ b: <b /> }}
         />
       </p>
@@ -1168,7 +1176,7 @@ function WaitCard({
   const { t, i18n } = useTranslation();
   const first = n.actors[0];
   const name = nameOf(t, dir, first);
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const feminine = isFeminineName(name);
   const l = n.latest;
   const unread = n.readAt === null;
@@ -1257,7 +1265,7 @@ function WaitCard({
     body = resolving ? (
       <div className="nt-resolved">
         <Spinner size={14} />
-        {t("notifications.wait.resolved", { The: g.The, name })}
+        {t("notifications.wait.resolved", { context: g.context, name })}
       </div>
     ) : s.replying ? (
       <Composer

@@ -227,7 +227,7 @@ export function useAgentMenu() {
             {
               kind: "item",
               id: "stop",
-              label: t("run.stopAgent", agentGrammar(t, a.name)),
+              label: t("run.stopAgent", agentGrammar(a.name)),
               icon: "stop",
               danger: true,
               run: () => {

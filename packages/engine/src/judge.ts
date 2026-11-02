@@ -85,6 +85,23 @@ export interface Judge {
   ask(request: JudgeRequest): Promise<Record<string, JudgeAnswer>>;
 }
 
+/** The model call a judge made, as an error report tags it (`judgeCallOf`). */
+export interface JudgeCallTags {
+  judge_provider: string;
+  judge_model: string;
+}
+
+/** Marks `error` with the judge call that threw it, so a report names that call, not the agent it was for. */
+export function withJudgeCall(error: unknown, model: string, provider: string) {
+  if (error && typeof error === "object" && Object.isExtensible(error))
+    Object.assign(error, { judgeCall: { judge_provider: provider, judge_model: model } satisfies JudgeCallTags });
+  return error;
+}
+
+/** The judge call `error` came from (`withJudgeCall`); empty when it failed before calling a model. */
+export const judgeCallOf = (error: unknown): Partial<JudgeCallTags> =>
+  (error as { judgeCall?: JudgeCallTags } | null)?.judgeCall ?? {};
+
 const clamp = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
 
 /** Whether a request needs a model that sees images (an image in it, or a `box` question). */
@@ -141,6 +158,8 @@ export function createJevJudge(options: {
         timeoutMs: vision
           ? (options.visionTimeoutMs ?? Math.max(6000, options.timeoutMs ?? 0))
           : (options.timeoutMs ?? 2000),
+      }).catch((error: unknown) => {
+        throw withJudgeCall(error, model, "typesafe");
       });
       const inputTokens = body.usage?.input_tokens ?? 0;
       await options.gateway
@@ -215,30 +234,35 @@ export function createLlmJudge(deps: {
               : { type: "number", description: "Probability that the `true` criterion holds, 0 to 1." };
       }
       const outputSchema = { type: "object", properties, required: ids, additionalProperties: false };
-      const result = await deps.gateway.complete({
-        orgId: request.orgId,
-        agentId: request.agentId,
-        runId: request.runId,
-        kind: "router",
-        model,
-        system: LLM_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: JSON.stringify({ state: request.state, questions: request.questions }),
-          },
-        ],
-        // Thinking counts toward the cap: a model that can't turn it off needs room for it.
-        maxTokens: modelInfo(model)?.leastThinking === "off" ? 512 : 2048,
-        effort: "none",
-        outputSchema,
-      });
+      const provider = modelInfo(model)?.provider ?? "unknown";
+      const result = await deps.gateway
+        .complete({
+          orgId: request.orgId,
+          agentId: request.agentId,
+          runId: request.runId,
+          kind: "router",
+          model,
+          system: LLM_SYSTEM,
+          messages: [
+            {
+              role: "user",
+              content: JSON.stringify({ state: request.state, questions: request.questions }),
+            },
+          ],
+          // Thinking counts toward the cap: a model that can't turn it off needs room for it.
+          maxTokens: modelInfo(model)?.leastThinking === "off" ? 512 : 2048,
+          effort: "none",
+          outputSchema,
+        })
+        .catch((error: unknown) => {
+          throw withJudgeCall(error, model, provider);
+        });
       let parsed: Record<string, unknown> = {};
       try {
         const text = result.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
         parsed = JSON.parse(text) as Record<string, unknown>;
       } catch {
-        throw new Error("judge: the model didn't answer with JSON");
+        throw withJudgeCall(new Error("judge: the model didn't answer with JSON"), model, provider);
       }
       const out: Record<string, JudgeAnswer> = {};
       for (const [id, q] of Object.entries(request.questions)) {

@@ -23,6 +23,21 @@ body {
   font-feature-settings: "ss01", "tnum";
   -webkit-font-smoothing: antialiased;
 }
+
+/* Japanese and Chinese break lines by their own strict rules, Korean between words; none of the three slants a
+   word for emphasis. */
+:lang(ja),
+:lang(zh-Hans) {
+  line-break: strict;
+}
+:lang(ko) {
+  word-break: keep-all;
+}
+:lang(ja) em,
+:lang(ko) em,
+:lang(zh-Hans) em {
+  font-style: normal;
+}
 code,
 kbd,
 pre,
@@ -1537,7 +1552,14 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   border-radius: var(--control-r-sm);
 }
 
-/* Menu (listbox of the Select, dropdown menus) */
+/*
+ * Menu (listbox of the Select, dropdown menus, the right click). Its rows are as dense as the message's hover bar:
+ * one height and side padding for every menu's item (taller under a finger, below).
+ */
+:root {
+  --menu-item-h: 28px;
+  --menu-item-px: 8px;
+}
 .ac-menu {
   z-index: var(--z-floating);
   min-width: 100%;
@@ -1584,8 +1606,8 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-menu__reaction {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 32px;
+  width: 32px;
+  height: var(--menu-item-h);
   border-radius: var(--radius-sm);
   font-size: 17px;
   cursor: pointer;
@@ -1620,7 +1642,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   gap: var(--space-2);
   width: 100%;
   box-sizing: border-box;
-  padding: 8px 10px;
+  padding: calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1724,7 +1746,7 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   white-space: normal;
 }
 .ac-menu__heading {
-  padding: 8px 10px 4px;
+  padding: 6px var(--menu-item-px) 2px;
   font-size: 12px;
   line-height: 16px;
   font-weight: 600;
@@ -1966,6 +1988,14 @@ html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
   display: flex;
   gap: var(--space-1);
   border-bottom: 1px solid var(--line);
+}
+.ac-tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ac-tabpanel[hidden] {
+  display: none;
 }
 .ac-tab {
   font: inherit;
@@ -3552,7 +3582,9 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   --skeleton: var(--surface-sunken);
   --skeleton-shine: color-mix(in srgb, var(--surface-sunken) 45%, var(--surface-raised));
 }
-[data-theme="dark"] {
+/* Resolved again on the skeleton itself, so inside a card or dialog (the elevation context) it is a step above it. */
+[data-theme="dark"],
+[data-theme="dark"] .ac-skeleton {
   --skeleton: var(--surface-raised);
   --skeleton-shine: color-mix(in srgb, var(--surface-raised) 60%, var(--line));
 }
@@ -4446,10 +4478,10 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   }
 }
 .ac-menu {
-  padding: 6px;
+  padding: 4px;
 }
 .ac-menu__item {
-  min-height: 36px;
+  min-height: var(--menu-item-h);
   border-radius: var(--radius-item);
 }
 .ac-menu__item:hover,
@@ -4470,10 +4502,10 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--faint);
-  padding: 8px 10px 4px;
+  padding: 6px var(--menu-item-px) 2px;
 }
 .ac-menu__separator {
-  margin: 6px 8px;
+  margin: 4px var(--menu-item-px);
 }
 .ac-toast {
   align-items: center;
@@ -4967,11 +4999,12 @@ html:not([data-pointer]) .ac-hint:focus-visible {
  * The viewer's own messages: on the right in a neutral bubble a step off the page, no face or name (the hidden head
  * still reads them). What hangs under the bubble (a file, reactions, the thread line, an error, the time) shares its
  * right edge. A run of rows grouped under the first reads as one turn: the corners they share square off, and the
- * time goes under the last.
+ * time goes under the last. The turn's last corner is cut, as a card's is, on the side the bubble stands.
  */
 :root,
 [data-theme="light"] {
   --own-bubble: color-mix(in srgb, var(--ink) 6%, var(--bg));
+  --own-cut: 5px;
 }
 [data-theme="dark"] {
   --own-bubble: color-mix(in srgb, var(--ink) 11%, var(--bg));
@@ -5048,6 +5081,9 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own[data-run="end"] .ac-msg__text {
   border-top-right-radius: 6px;
 }
+.ac-msg--own:is([data-run="solo"], [data-run="end"]) .ac-msg__text {
+  border-bottom-right-radius: var(--own-cut);
+}
 /* Hovered, or its menu open: the bubble itself lights a step, in place of the row's plate. */
 .ac-msg--own:is(:hover, [data-menu-open="true"]) .ac-msg__text {
   filter: brightness(0.97);
@@ -5103,35 +5139,31 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   right: 0;
 }
 /*
- * Left of the bubble: the check (agents saw it, answered it; a DM's "Vista por" face) at its bottom edge, the action
- * bar on hover with its middle on its top edge, as on everyone's rows. On a one-line bubble (40px) the bar (30px)
- * ends 4px above the face, so the check stays on screen and a mouse can open it. Neither ever covers the words.
- *
- * The check is a zero-height item put right after the bubble (`order`), whatever hangs under it (time, reactions, a
- * file, receipt words) after the check: its bottom sits on the bubble's, and it never adds height to the row.
+ * The receipt's mark (agents saw it, answered it; a DM's "Vista por" face) ends the time's line, its right on the
+ * bubble's edge, so a turn says when and how it went in one place and a mark that comes never adds a line. An empty
+ * mark takes no room, so the time keeps that edge. A taller face hangs over the line's 16px.
  */
-.ac-msg--own > .ac-msg__body > .ac-msg__aside--floating {
-  order: 1;
-  position: relative;
-  right: calc(100% + 8px);
-  height: 0;
+.ac-msg__own-foot {
+  display: flex;
   align-items: flex-end;
-  float: none;
-  margin: 0;
-  line-height: 16px;
-  translate: none;
+  justify-content: flex-end;
 }
-.ac-msg--own > .ac-msg__body > .ac-msg__text ~ * {
-  order: 2;
+.ac-msg__own-foot > .ac-msg__aside {
+  gap: 0;
+  height: 16px;
+  margin-left: 0;
 }
-/* The keys on the check (a DM's "Vista por" face): the bar gives way, so nothing comes near its ring. */
-html:not([data-pointer])
-  .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible)
-  > .ac-msg__body
-  > .ac-msg__actions {
-  opacity: 0;
-  pointer-events: none;
+.ac-msg__own-foot .ac-receipt__check,
+.ac-msg__own-foot .ac-receipt__check:has(> .ac-avatar) {
+  position: relative;
+  margin-left: 4px;
+  padding: 0;
 }
+.ac-msg__own-foot .ac-receipt__check .ac-icon {
+  width: 14px;
+  height: 14px;
+}
+/* Left of the bubble, on hover: the action bar, its middle on the bubble's top edge, as on everyone's rows. */
 .ac-msg--own > .ac-msg__body > .ac-msg__actions,
 .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   top: 0;
@@ -5148,58 +5180,32 @@ html:not([data-pointer])
     top: -4px;
     right: 8px;
   }
+  /* A small mark, a finger: the button reaches past it, over nothing else it could press. */
+  .ac-msg__own-foot .ac-receipt__check::after {
+    content: "";
+    position: absolute;
+    inset: -14px -10px;
+  }
 }
-/*
- * A run's rows before its last: the time on hover or keyboard focus, in the left column where everyone's grouped
- * rows show theirs, on the bubble's first line (7px padding, 26px line). Keyboard focus in any of my rows opens the
- * time's details too: its head is hidden, so nothing else would.
- */
-.ac-msg--own > .ac-msg__gutter {
-  position: absolute;
-  left: var(--msg-inline);
-  margin-top: 7px;
-}
-/* Beside a full-width bubble the bar fills that column on the first line: the time goes under it. */
-.ac-msg--own.ac-msg--wide > .ac-msg__gutter {
-  margin-top: 40px;
-}
-.ac-msg--own:is(:hover, :focus-within) > .ac-msg__gutter .ac-msg__gutter-time {
-  visibility: visible;
-}
-.ac-msg--own:has(:focus-visible) :is(.ac-msg__gutter-time, .ac-msg__own-time) > .ac-msg__tip {
+/* Keyboard focus in my row opens its time's details: its head is hidden, so nothing else would. */
+.ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
   visibility: visible;
   opacity: 1;
-}
-/* A narrow window with a mouse: any bubble can reach that column, so every row's time goes under the bar. */
-@media (max-width: 600px) and (hover: hover) and (pointer: fine) {
-  .ac-msg--own > .ac-msg__gutter {
-    margin-top: 40px;
-  }
 }
 /*
  * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
  * the usual gap under it, its corner round, and the next bubble's top corner round too.
  */
-.ac-msg--own:has(
-  > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
-) {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) {
   padding-bottom: 6px;
 }
-.ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
-  )
-  .ac-msg__text {
-  border-bottom-right-radius: 18px;
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) .ac-msg__text {
+  border-bottom-right-radius: var(--own-cut);
 }
-.ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
-  )
-  + .ac-msg--own {
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) + .ac-msg--own {
   padding-top: 6px;
 }
-.ac-msg--own:has(
-    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
-  )
+.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))
   + .ac-msg--own
   .ac-msg__text {
   border-top-right-radius: 18px;
@@ -5313,6 +5319,135 @@ html:not([data-pointer]) .ac-work__head:focus-visible {
   .ac-msg {
     transition: none;
   }
+}
+
+/* A long work's line (ADR 0121): under the agent's "Vou cuidar disso" and on its card. Plain text that wraps. */
+.ac-workline {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 10px;
+  max-width: var(--msg-card-w);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--plate-soft);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.ac-workline__mark {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--ink2);
+}
+.ac-workline--waiting .ac-workline__mark,
+.ac-workline--queued .ac-workline__mark {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.ac-workline--done .ac-workline__mark {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+}
+.ac-workline--failed .ac-workline__mark {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.ac-workline--stopped .ac-workline__mark {
+  background: var(--plate);
+  color: var(--muted);
+}
+.ac-workline__body {
+  min-width: 0;
+  flex: 1;
+}
+.ac-workline__text {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.ac-workline__update {
+  margin: 4px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ac-workline__action {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ac-workline__action:hover {
+  text-decoration-color: currentColor;
+}
+html:not([data-pointer]) .ac-workline__action:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.ac-workline__action--danger {
+  color: var(--danger);
+}
+.ac-workline__action:disabled {
+  color: var(--faint);
+  cursor: default;
+  text-decoration: none;
+}
+.ac-workplan {
+  margin-top: 12px;
+}
+.ac-workplan__head {
+  margin: 0 0 6px;
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ac-workplan__count {
+  font-weight: 400;
+  color: var(--faint);
+}
+.ac-workplan__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.ac-workplan__step {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.ac-workplan__step--todo {
+  color: var(--muted);
+}
+.ac-workplan__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
 }
 
 /* Reactions: compact 32px toggles (rounded rect, not pills); counts in the text face. */
@@ -7719,12 +7854,11 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-emoji__tab {
     height: 40px;
   }
-  .ac-menu__item {
-    min-height: 40px;
+  :root {
+    --menu-item-h: 40px;
   }
   .ac-menu__reaction {
     width: 40px;
-    height: 40px;
   }
 }
 

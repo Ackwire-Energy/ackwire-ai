@@ -316,7 +316,10 @@ export function GeneralScreen() {
       <View style={styles.contextHead}>
         <InfoHint
           name={t("common.about", { label: contextTitle })}
-          text={`${t("settings.contextSubtitle")} ${t("settings.contextHelp", { name: orgName })}`}
+          text={t("common.joinSentences", {
+            a: t("settings.contextSubtitle"),
+            b: t("settings.contextHelp", { name: orgName }),
+          })}
           variant="title"
         >
           <Text variant="title" tone="ink">

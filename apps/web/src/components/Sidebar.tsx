@@ -88,6 +88,7 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { requestAgentPanel } from "@/lib/agent-panel-ask";
 import { requestChannelDetails } from "@/lib/channel-details";
 import type { MenuEntry } from "@/lib/context-menu";
 import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
@@ -116,6 +117,7 @@ import { DeleteAccountDialog } from "./DeleteAccount";
 import { MenuEntries } from "./DesktopMenus";
 import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
+import { useNow } from "./missions/MissionBits";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
@@ -1321,6 +1323,8 @@ function AgentRow({
   // Its presence from its work and its line (ADR 0084): the badge on its face, both in the row's title (no emoji in
   // the list: the line shows where the agent is opened).
   const shown = useAgentPresence(a.id);
+  // Background work's minutes move with the anchor's line, every half minute.
+  useNow(shown?.line?.kind === "work", 30_000);
   const word = shown ? t(`presence.${shown.presence}`) : null;
   const line = agentLine(t, shown?.line ?? null);
   const dir = useDirectory(org.id);
@@ -1358,7 +1362,12 @@ function AgentRow({
         />
         <span className="sidebar__item-text">
           <span className="sidebar__item-label">{a.name}</span>
-          {a.role && <span className="sidebar__item-role">{a.role}</span>}
+          {/* Background work (ADR 0121) says what it is on, in place of the role. */}
+          {shown?.line?.kind === "work" && line ? (
+            <span className="sidebar__item-role sidebar__item-work">{line.text}</span>
+          ) : (
+            a.role && <span className="sidebar__item-role">{a.role}</span>
+          )}
         </span>
         {unread > 0 ? (
           <UnreadCount count={unread} />
@@ -1390,13 +1399,11 @@ function AgentRow({
             <RowAction
               icon="settings"
               label={t("shell.sidebarMenu.agentSettings", { name: a.name })}
-              onClick={() =>
-                void navigate({
-                  to: "/org/$orgId/agents/$agentId",
-                  params: { orgId: org.id, agentId: a.id },
-                  search: { tab: "settings" },
-                })
-              }
+              onClick={() => {
+                if (requestAgentPanel(a.id, "settings")) return;
+                onOpen();
+                void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: a.id } });
+              }}
             />
           )}
           {menu}

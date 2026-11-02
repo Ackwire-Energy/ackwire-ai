@@ -184,7 +184,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const [acts, setActs] = useState<HTMLElement | null>(null);
   const [full, setFull] = useState(false);
   useFullScreen(full, setFull);
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const who = { name: agent.name, appearance: lookOf(agent) };
   const handoff = view.facts?.handoff ?? null;
   const mine = controlledBy(handoff, me.user.id);
@@ -282,7 +282,7 @@ function ComputerStage({
   // The screen's own held cover says it all: no pause line over it.
   const [screenHeld, setScreenHeld] = useState(false);
   const f = view.facts;
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const color = colorOf(agent);
   const waitingFor = f?.handoff && isWaitingHandoff(f.handoff) ? f.handoff : null;
   const now = useNow(waitingFor ? 15_000 : false);

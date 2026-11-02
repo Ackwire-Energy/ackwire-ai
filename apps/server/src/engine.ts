@@ -1,6 +1,7 @@
 import {
   type Adapters,
   type BrainTurnRequest,
+  type ErrorReporter,
   type S3Fetch,
   type SpeechFetch,
   STREAM_CLOSE,
@@ -68,6 +69,7 @@ import {
   createWikiToolSource,
   createWithdrawRequestToolSource,
   createWorkspaceToolSource,
+  createWorkToolSource,
   type EmailArt,
   emailArtAt,
   envSpeechEngines,
@@ -93,6 +95,7 @@ import {
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  setWorkOrgCap,
   smallModelFor,
   standingJudge,
   streamClosed,
@@ -151,6 +154,8 @@ export interface EngineOptions {
     info(message: string, data?: Record<string, unknown>): void;
     warn(message: string, data?: Record<string, unknown>): void;
   };
+  /** Error reports (ADR 0104) for failures nothing logs: learning's (`reportLearnFailure`). */
+  errors?: ErrorReporter;
 }
 
 /**
@@ -186,10 +191,16 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
     judge: o.judge,
     schedules: o.schedules,
+    errors: o.errors,
     reflect: {
       everyMessages: config.REFLECT_EVERY_MESSAGES,
       idleMinutes: config.REFLECT_IDLE_MINUTES,
       maxPerThread: config.REFLECT_MAX_PER_THREAD,
+    },
+    learn: {
+      maxPerAgentDay: config.LEARN_MAX_PER_AGENT_DAY,
+      minToolCalls: config.LEARN_MIN_TOOL_CALLS,
+      skillAfter: config.LEARN_SKILL_AFTER,
     },
   };
   // The installation's Jev key (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in Settings.
@@ -295,6 +306,8 @@ export function buildEngine(o: EngineOptions) {
     vision,
     publicUrl: config.PUBLIC_URL,
   });
+  // The workspace's cap of live background works (ADR 0121 §7).
+  setWorkOrgCap(config.AGENT_WORK_MAX_PER_ORG);
   const tools = createToolGateway({
     sources: [
       // A question for what the agent could find, or a secret asked in the chat, is held first (ADR 0109).
@@ -314,6 +327,8 @@ export function buildEngine(o: EngineOptions) {
       createReactToolSource({ pubsub: adapters.pubsub }),
       // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
       createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
+      // Long work goes to the background and reports back by itself, on every brain (ADR 0121).
+      createWorkToolSource({ pubsub: adapters.pubsub }),
       // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
@@ -328,7 +343,7 @@ export function buildEngine(o: EngineOptions) {
       // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.
       createSetupToolSource({ pubsub: adapters.pubsub, ai: { gateway }, context }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
-      createSkillToolSource({ db, blobs: artifacts.blobs }),
+      createSkillToolSource({ db, blobs: artifacts.blobs, pubsub: adapters.pubsub, judge: context.judge }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
       createScheduleToolSource({
         pubsub: adapters.pubsub,

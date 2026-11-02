@@ -568,7 +568,7 @@ describe("receipts: a check with a popover", () => {
       status: "done",
     });
     expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
-    expect(icon(check())).toBe("m2.5 10.5 3 3 6-7M9 13l.5.5 6-7");
+    expect(icon(check())).toBe("m2 10.5 3 3 6-7M10 12.5l1 1 7-8");
     // Keyboard-openable popover; Esc closes.
     check().focus();
     await act(async () => fireEvent.click(check()));
@@ -768,13 +768,11 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       await closePopover(pop);
     }
     expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder·Chamar um agente");
-    // Only the newest message says it in words: an older one keeps the check, whose popover says it.
+    // Only the newest message says it in words; an older bubble of the same turn has no time line, so no check.
     await sendText("e depois");
     await settle(4);
-    expect(receiptOf("ninguém pegou").textContent).not.toContain("Nenhum agente vai responder");
-    const older = await popoverOf("ninguém pegou");
-    expect(older.textContent).toContain("Nenhum agente vai responder·Chamar um agente");
-    await closePopover(older);
+    expect(rowsWith("ninguém pegou")[0]?.textContent).not.toContain("Nenhum agente vai responder");
+    expect(rowsWith("ninguém pegou")[0]?.querySelector(".ac-receipt__check")).toBeNull();
   });
 });
 
@@ -828,9 +826,8 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
       "Vista por Ada. Nenhum agente vai responder",
     );
-    // The first message keeps its own receipt.
-    const firstReceipt = rowsWith("oi @Ada")[0]?.querySelector(".ac-receipt__check");
-    expect(firstReceipt?.getAttribute("aria-label")).toBe("Vista por Ada. Ada respondeu");
+    // The first message is now an earlier bubble of the turn: the mark stands under its last one.
+    expect(rowsWith("oi @Ada")[0]?.querySelector(".ac-receipt__check")).toBeNull();
   });
 });
 

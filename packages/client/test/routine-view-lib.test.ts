@@ -7,16 +7,20 @@ import { openTarget } from "../src/lib/notifications";
 import {
   busyOnComputer,
   healthWords,
+  isStoppable,
   pausedFix,
   routineChannelOf,
   routineNotificationWords,
+  routineStateTime,
   routineStateWords,
   runMessageLink,
   runOutcome,
   runPixelStatus,
   runPixels,
   runsPerDay,
+  usageContinueBlock,
   usageParts,
+  usagePauseRefetchMs,
   whereItRuns,
 } from "../src/lib/routine-view";
 
@@ -110,6 +114,61 @@ describe("a routine's runs", () => {
 });
 
 describe("a routine's state and its one-tap fix", () => {
+  test("paused near its plan's limit: until its reset, quietly; who may continue it now", () => {
+    const now = new Date(2026, 10, 1, 11, 0);
+    const resetsAt = new Date(2026, 10, 1, 14, 0).toISOString();
+    const t = ((key: string) => key) as unknown as TFunction;
+    const plan = state({ state: "usage_paused", usagePause: { source: "plan", resetsAt, extraOff: false } });
+    const until = routineStateTime(t, "pt-BR", plan, now);
+    expect(until).toBe("14:00");
+    expect(routineStateWords(plan, until)).toEqual({
+      key: "routines.state.usagePaused",
+      values: { until: "14:00" },
+      icon: "pause",
+      tone: "neutral",
+    });
+    const budget = state({ state: "usage_paused", usagePause: { source: "budget", resetsAt, extraOff: false } });
+    expect(routineStateWords(budget, until).key).toBe("routines.state.usagePausedBudget");
+    const unknown = state({ state: "usage_paused", usagePause: { source: "plan", resetsAt: null, extraOff: false } });
+    expect(routineStateTime(t, "pt-BR", unknown, now)).toBe("");
+    expect(routineStateWords(unknown, "").key).toBe("routines.state.usagePausedUnknown");
+    expect(usageContinueBlock({ canManage: true, usagePause: plan.usagePause })).toBeNull();
+    expect(usageContinueBlock({ canManage: false, usagePause: plan.usagePause })).toBe("forbidden");
+    expect(usageContinueBlock({ canManage: true, usagePause: { source: "plan", resetsAt, extraOff: true } })).toBe(
+      "extra_off",
+    );
+    expect(
+      usageContinueBlock({
+        canManage: true,
+        usagePause: { source: "plan", resetsAt, extraOff: false, extraUsedUp: true },
+      }),
+    ).toBe("extra_used_up");
+  });
+
+  test("a run paused near its limit is stopped with Parar, and the list is read again at its reset", () => {
+    expect(isStoppable({ state: "usage_paused" })).toBe(true);
+    expect(isStoppable({ state: "running" })).toBe(true);
+    expect(isStoppable({ state: "waiting_person" })).toBe(false);
+    const now = Date.parse("2026-11-01T11:00:00.000Z");
+    const pause = (resetsAt: string | null) => ({ source: "plan" as const, resetsAt, extraOff: false });
+    expect(usagePauseRefetchMs(undefined, now)).toBe(false);
+    expect(usagePauseRefetchMs([{ state: "active", usagePause: null }], now)).toBe(false);
+    expect(usagePauseRefetchMs([{ state: "usage_paused", usagePause: pause(null) }], now)).toBe(false);
+    expect(
+      usagePauseRefetchMs(
+        [
+          { state: "usage_paused", usagePause: pause("2026-11-01T14:00:00.000Z") },
+          { state: "usage_paused", usagePause: pause("2026-11-01T12:00:00.000Z") },
+        ],
+        now,
+      ),
+    ).toBe(3_600_000 + 1000);
+    // Already past: read again in a second.
+    expect(usagePauseRefetchMs([{ state: "usage_paused", usagePause: pause("2026-11-01T10:00:00.000Z") }], now)).toBe(
+      1000,
+    );
+  });
+
   test("the chip for each state", () => {
     expect(routineStateWords(state({}))).toMatchObject({ key: "routines.state.active", tone: "neutral" });
     expect(routineStateWords(state({ state: "running" }))).toMatchObject({ key: "routines.state.running" });

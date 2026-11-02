@@ -194,10 +194,10 @@ export function MachineScreen({ machineId }: { machineId: string }) {
                 folders && (folders.length > 0 || !managed)
                   ? folders.length > 0
                     ? t("machines.page.agentFolders", {
-                        ...agentGrammar(t, a.name),
-                        folders: joinNames(folders, t("newAgent.and")),
+                        ...agentGrammar(a.name),
+                        folders: joinNames(folders, t),
                       })
-                    : t("machines.page.agentOwnFolder", agentGrammar(t, a.name))
+                    : t("machines.page.agentOwnFolder", agentGrammar(a.name))
                   : null;
               const agentRow = (
                 <GroupedRow
@@ -218,7 +218,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
                 <GroupedRow
                   key={`${a.id}:computer`}
                   icon="laptop"
-                  label={t("agentComputer.title", agentGrammar(t, a.name))}
+                  label={t("agentComputer.title", agentGrammar(a.name))}
                   value={t("agentComputer.open")}
                   chevron
                   onPress={() => router.push(`/computer/${a.id}`)}
@@ -370,9 +370,7 @@ function FoldersSection({ machine: m }: { machine: Machine }) {
                 subLines={2}
                 below={
                   <Text variant="caption" tone="faint" numberOfLines={2}>
-                    {f.agents.length > 0
-                      ? joinNames(f.agents.map(nameOf), t("newAgent.and"))
-                      : t("machines.access.nobody")}
+                    {f.agents.length > 0 ? joinNames(f.agents.map(nameOf), t) : t("machines.access.nobody")}
                   </Text>
                 }
                 chevron={reduces}
@@ -535,7 +533,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
     return [{ agent: a, domains: settings[i]?.data?.allowedDomains ?? null }];
   });
   const stop = (agentId: string, name: string) => {
-    const g = agentGrammar(t, name);
+    const g = agentGrammar(name);
     confirmAction({
       title: t("browser.machine.stopConfirm", g),
       action: t("browser.machine.stop"),
@@ -575,7 +573,9 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
         ) : (
           // A Linux computer may be a server without the app: the command too.
           <>
-            <GroupedFooter>{`${t("browser.machine.offHelp")} ${t("machines.access.grantTerminal")}`}</GroupedFooter>
+            <GroupedFooter>
+              {t("common.joinSentences", { a: t("browser.machine.offHelp"), b: t("machines.access.grantTerminal") })}
+            </GroupedFooter>
             <Gap />
             <CommandBlock command={toolOnCommand(m, "browser")} />
           </>
@@ -600,7 +600,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
           ) : (
             <GroupedList>
               {uses.map(({ agent, open }) => {
-                const g = agentGrammar(t, agent.name);
+                const g = agentGrammar(agent.name);
                 const waiting = open.status === "pending";
                 return (
                   <GroupedRow
@@ -643,7 +643,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
           <GroupedFooter>
             {allowed.length > 0
               ? t("browser.machine.whoHelp")
-              : `${t("browser.machine.whoNone")} ${t("browser.machine.whoHelp")}`}
+              : t("common.joinSentences", { a: t("browser.machine.whoNone"), b: t("browser.machine.whoHelp") })}
           </GroupedFooter>
         </>
       ) : null}

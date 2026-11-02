@@ -25,6 +25,11 @@
   color: var(--faint);
   font-size: 13px;
 }
+.legal__courtesy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
 .legal__toc ol {
   margin: 0;
   padding: 0;

@@ -348,6 +348,12 @@ export const envVars = {
       "Maximum model calls in one agent run (each tool round trip is one, browser and desktop steps included). A backstop for runaway runs: a run that goes in circles stops long before it. Near it the agent wraps up, and a conversation run ends with Continuar.",
     section: "Agents",
   },
+  AGENT_WORK_MAX_PER_ORG: {
+    schema: z.coerce.number().int().min(1).max(1000).default(10),
+    description:
+      "How many background works (long tasks agents moved out of a conversation) may run at once in one workspace. Past it a new one waits in line and starts by itself when one ends. Each agent runs at most 3 at once.",
+    section: "Agents",
+  },
   AGENT_CONTEXT_MESSAGES: {
     schema: z.coerce.number().int().min(1).max(500).default(30),
     description: "How many recent channel (or thread) messages are included in an agent's context.",
@@ -391,6 +397,23 @@ export const envVars = {
   REFLECT_MAX_PER_THREAD: {
     schema: z.coerce.number().int().min(1).max(100).default(5),
     description: "Upper bound on reflections per thread (bounds cost and agent-to-agent loops).",
+    section: "Agents",
+  },
+  LEARN_MAX_PER_AGENT_DAY: {
+    schema: z.coerce.number().int().min(0).max(1000).default(20),
+    description:
+      "Upper bound on background learning jobs per agent and day (an agent's run that figured something out or was corrected). 0 turns them off.",
+    section: "Agents",
+  },
+  LEARN_MIN_TOOL_CALLS: {
+    schema: z.coerce.number().int().min(1).max(100).default(6),
+    description:
+      "Without a judge, a run learns after a failed tool call later fixed only when it made at least this many tool calls.",
+    section: "Agents",
+  },
+  LEARN_SKILL_AFTER: {
+    schema: z.coerce.number().int().min(2).max(100).default(3),
+    description: "A how-to an agent reused successfully this many times becomes one of its skills.",
     section: "Agents",
   },
   EMBEDDINGS_PROVIDER: {

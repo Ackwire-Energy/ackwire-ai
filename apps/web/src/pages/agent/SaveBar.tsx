@@ -36,7 +36,7 @@ export function SaveBar({
             <span className="agp-savebar__where">
               {where.length > 3
                 ? t("agentPage.saveBar.andMore", { names: where.slice(0, 3).join(", ") })
-                : joinNames(where, t("newAgent.and"))}
+                : joinNames(where, t)}
             </span>
           </>
         )}

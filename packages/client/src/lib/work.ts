@@ -4,7 +4,7 @@ import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
-import { joinNames, shortTarget } from "./format";
+import { capitalize, joinNames, shortTarget } from "./format";
 import { MAIL_BRANDS } from "./mail";
 
 /**
@@ -279,7 +279,7 @@ export function formatDuration(t: TFunction, ms: number) {
 export function workHeader(t: TFunction, w: { steps: number; connectors: string[]; durationMs: number | null }) {
   return {
     steps: t("chat.work.steps", { count: w.steps }),
-    connectors: w.connectors.length > 0 ? joinNames(w.connectors, ", ") : null,
+    connectors: w.connectors.length > 0 ? joinNames(w.connectors, t) : null,
     duration: w.durationMs !== null ? formatDuration(t, w.durationMs) : null,
   };
 }
@@ -617,8 +617,6 @@ export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "too
   if (l.state === "fail") return t("chat.work.erred", { activity: verb });
   return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolLabel(l.tool) });
 }
-
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
 /**
  * The waiting row's step line: what the agent does right now, verb first ("Usando o navegador · console.example.com…",

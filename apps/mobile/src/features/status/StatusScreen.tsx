@@ -64,7 +64,7 @@ function StatusEditor() {
   const [draft, setDraft] = useState<StatusDraft | null>(null);
   const d = draft ?? draftOf(me);
   const edit = (patch: Partial<StatusDraft>) => setDraft((prev) => ({ ...(prev ?? draftOf(me)), ...patch }));
-  const language = i18n.language || "pt-BR";
+  const language = i18n.language || "en";
   const shown = presenceOfAvailability(d.availability);
   const text = d.text.trim();
   const name = me?.name ?? (meId ? dir.memberById.get(meId)?.name : undefined) ?? "";

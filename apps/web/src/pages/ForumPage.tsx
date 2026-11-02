@@ -243,7 +243,7 @@ export function useLiveLine() {
       const name = who.agentName(now.agentId);
       return now.synthesis || !name
         ? t("forum.live.stalledSynthesis")
-        : t("forum.live.stalled", { name, of: who.g(name).of });
+        : t("forum.live.stalled", { name, context: who.g(name).context });
     }
     if (now.kind === "synthesis") return t("forum.live.synthesis", { name: who.agentName(now.agentId) });
     if (now.kind === "person")

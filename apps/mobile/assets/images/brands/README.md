@@ -12,6 +12,6 @@ The logos of the apps agents are imported from (the onboarding's "Bring your age
 
 `soniox.png` is Soniox's mark for `ProviderLogo`, the web's file as is.
 
-`gemini.png` is Gemini's mark for `ProviderLogo`, the web's `gemini.png` byte for byte (its source and terms are in that README).
+`gemini.png` and `vscode.png` are Gemini's and Visual Studio Code's marks for `ProviderLogo`, the web's files byte for byte (their sources and terms are in that README).
 
 Each logo is a trademark of its owner, used only to name the project.

@@ -1,4 +1,4 @@
-import type { PubSub, SearchIndexResolver } from "@agenteschat/adapters";
+import type { ErrorReporter, PubSub, SearchIndexResolver } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { cutText, cutTextEnd } from "../format";
 import type { ModelGateway } from "../gateway";
@@ -21,10 +21,14 @@ export interface ContextDeps {
   cheapModels?: Record<string, string>;
   pubsub?: PubSub;
   reflect?: { maxPerThread?: number; everyMessages?: number; idleMinutes?: number };
+  /** Learning from runs (ADR 0120): `LEARN_MAX_PER_AGENT_DAY`, `LEARN_MIN_TOOL_CALLS`, `LEARN_SKILL_AFTER`. */
+  learn?: { maxPerAgentDay?: number; minToolCalls?: number; skillAfter?: number };
   /** Semantic yes/no and choice judgments (judge.ts); default: the org's cheap model. Tests pass a fake. */
   judge?: Judge;
   /** Reads schedules and moments people write (schedule-reader.ts); default: the org's cheap model. Tests pass a fake. */
   schedules?: ScheduleReader;
+  /** Where learning's failures are reported (ADR 0104, `reportLearnFailure`); absent: not reported. */
+  errors?: ErrorReporter;
 }
 
 /** How memory writes are judged: by meaning, in every organization (ADR 0028). */

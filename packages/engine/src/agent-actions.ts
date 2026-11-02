@@ -38,6 +38,8 @@ export const AGENT_ACTION_KINDS = [
   "wiki.page_edited",
   "thread.renamed",
   "thread.closed",
+  "skill.created",
+  "skill.updated",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
@@ -57,9 +59,11 @@ export const UNDOABLE_TOOLS = new Set([
   "update_wiki_page",
   "link_to_wiki",
   "update_thread",
+  "save_how_to",
+  "update_skill",
 ]);
 
-export type AgentActionTargetType = "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread";
+export type AgentActionTargetType = "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
 
 /** What the change was made to, with enough to label it ("#23 · Prompt…"). */
 export interface AgentActionTarget {
@@ -67,7 +71,7 @@ export interface AgentActionTarget {
   id: string;
   /** Issues. */
   number?: number;
-  /** Issue, routine, wiki page or thread title; channel name (without `#`). */
+  /** Issue, routine, wiki page or thread title; channel name (without `#`); skill name. */
   title?: string;
   /** Wiki pages. */
   slug?: string;
@@ -276,5 +280,9 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
       return `renamed the thread to "${String(p.to ?? "")}"`;
     case "thread.closed":
       return `closed the thread${title}`;
+    case "skill.created":
+      return `made the skill${title} from its how-tos`;
+    case "skill.updated":
+      return `changed the skill${title}`;
   }
 }

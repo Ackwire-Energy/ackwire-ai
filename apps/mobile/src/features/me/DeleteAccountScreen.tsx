@@ -217,7 +217,7 @@ export function DeleteAccountScreen() {
               })}
               {blockedBy.length > 0 ? (
                 <Text variant="small" tone="ink2">
-                  {t("mobile.delete.blocked", { names: joinNames(blockedBy, t("newAgent.and")) })}
+                  {t("mobile.delete.blocked", { names: joinNames(blockedBy, t) })}
                 </Text>
               ) : null}
             </View>

@@ -213,7 +213,7 @@ describe("the working line's sentence", () => {
     };
     const entries = (status: "asking" | "answered" | "expired" | "failed", runs: LiveRun[] = []) =>
       barEntries(runs, [], nameOf, () => undefined, [{ ...asking, status }]);
-    expect(activityText(t, entries("asking"))).toBe("Dev está perguntando ao Bento…");
+    expect(activityText(t, entries("asking"))).toBe("Dev está perguntando para Bento…");
     expect(activityText(tEn, entries("asking"))).toBe("Dev is asking Bento…");
     expect(activityText(t, entries("answered"))).toBe("Bento respondeu. Dev está escrevendo…");
     expect(activityText(t, entries("expired"))).toBe("Dev está escrevendo…");
@@ -222,7 +222,7 @@ describe("the working line's sentence", () => {
     const toNina = barEntries([], [], nameOf, () => undefined, [
       { ...asking, consultedAgentId: "nina", status: "asking" as const },
     ]);
-    expect(activityText(t, toNina)).toBe("Dev está perguntando à Nina…");
+    expect(activityText(t, toNina)).toBe("Dev está perguntando para Nina…");
     // Its resumed run doesn't add a second Dev; with others at work the line just says who works (its reply tells the rest).
     expect(activityText(t, entries("answered", [run("dev", "r-dev"), run("theo"), run("nina")]))).toBe(
       "Dev e mais 2 estão trabalhando…",

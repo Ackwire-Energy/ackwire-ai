@@ -42,8 +42,8 @@ const HOW_PICKED: Words = ["Como os agentes são escolhidos", "How agents are pi
 const ABOUT: Words = ["Sobre Jev", "About Jev"];
 const HOW_JEV: Words = ["Como o Jev funciona", "How Jev works"];
 const THIS_MONTH: Words = [
-  "Termina em 9f2c · 1.240 decisões este mês · US$ 0,13",
-  "Ends in 9f2c · 1,240 decisions this month · US$ 0.13",
+  "Termina em 9f2c · 1.240 decisões este mês · US$\u00a00,13",
+  "Ends in 9f2c · 1,240 decisions this month · $0.13",
 ];
 const REPLACE: Words = ["Trocar a chave", "Replace the key"];
 const KEYS_PAGE: Words = ["Abrir as chaves de API", "Open API keys"];
@@ -247,7 +247,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     );
     expect(card().querySelector(".ac-chip")?.textContent).toBe("Ligado");
     expect(card().textContent).toContain("Chave da TypeSafe");
-    expect(card().textContent).toContain("Termina em 9f2c · 1.240 decisões este mês · US$ 0,13");
+    expect(card().textContent).toContain("Termina em 9f2c · 1.240 decisões este mês · US$\u00a00,13");
     expect(card().querySelector(".ac-setnote")).toBeNull();
 
     await click(within(card()).getByRole("button", { name: "Trocar a chave" }));

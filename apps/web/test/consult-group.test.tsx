@@ -140,7 +140,7 @@ const push = (socket: { push: (f: unknown) => void }, event: Record<string, unkn
   act(async () =>
     socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, threadId: null, ...event } }),
   );
-/** Ada's question going out, live: "Ada está perguntando ao Atlas…" on the working line. */
+/** Ada's question going out, live: "Ada está perguntando para Atlas…" on the working line. */
 const asking = { type: "agent.consulting", runId: RUN, agentId: ADA_ID, consultedAgentId: ATLAS_ID };
 
 describe("the questions inside the reply that asked (ConsultGroup)", () => {
@@ -177,7 +177,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     await act(async () => fireEvent.click(line));
     await settle(3);
     const side = panel() as HTMLElement;
-    expect(side.textContent).toContain("Ada fez um pedido ao Atlas em #eng");
+    expect(side.textContent).toContain("Ada fez um pedido para Atlas em #eng");
     expect(side.textContent).toContain("O Atlas passou uma parte adiante e espera o retorno");
   });
 
@@ -214,7 +214,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     // Not in place: in the panel over the channel, the question as it went and the answer.
     expect(block.textContent).not.toContain(QUESTION);
     const side = panel() as HTMLElement;
-    expect(side.getAttribute("aria-label")).toBe("Conversa entre a Ada e o Atlas");
+    expect(side.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
     expect(side.textContent).toContain(QUESTION);
     expect(side.textContent).toContain("subiu 6 pb");
     expect(line.getAttribute("aria-pressed")).toBe("true");
@@ -311,7 +311,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(card.textContent).toContain("ajudando a Ada");
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver conversa" })));
     await settle(3);
-    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre a Ada e o Atlas");
+    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
   });
 
   test("the answer far below its question: one line where it arrived, 'Ver' opens the conversation", async () => {
@@ -394,7 +394,7 @@ describe("the working line while the block shows the questions", () => {
     const { socket } = await open(talkAfter(withAsk([consultation({})]), 3));
     await push(socket, asking);
     await settle(2);
-    expect(bar()).toBe("Ada está perguntando ao Atlas…");
+    expect(bar()).toBe("Ada está perguntando para Atlas…");
     expect(typingBar().querySelector(".ac-typing__clock")).not.toBeNull();
   });
 });

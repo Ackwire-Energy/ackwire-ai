@@ -63,7 +63,7 @@ import {
 } from "@agenteschat/client/lib/brain-advanced";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
-import { firstName, lowerFirst } from "@agenteschat/client/lib/format";
+import { firstName } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
   commandInReason,
@@ -119,6 +119,7 @@ import {
   SettingNote,
   Switch,
 } from "@agenteschat/ui";
+import { extraUsageOn } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
@@ -293,9 +294,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const effort =
     kind !== "model" && view
       ? t("agentPage.work.cell.effort", {
-          level: t(
-            `agentPage.work.brain.efforts.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`,
-          ).toLowerCase(),
+          level: t(`agentPage.work.brain.effortsLower.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`),
         })
       : null;
   const target = work.target;
@@ -690,6 +689,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const kind: BrainKind = card === "key" ? "model" : kindOf(card);
   const [planModel, setPlanModel] = useState<string | null>(view.effectiveModel);
   const [fallback, setFallback] = useState(view.fallback);
+  const [extraUsage, setExtraUsage] = useState(view.extraUsage);
   const [model, setModel] = useState(saved.model);
   const [key, setKey] = useState(saved.key ?? DEFAULT_KEY);
   const [account, setAccount] = useState<string | null>(view.account);
@@ -713,6 +713,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // "Atende outras pessoas" (ADR 0059 §5): moved onto a plan, the agent answers only its owner until they turn it on.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
   const offId = useId();
+  const extraId = useId();
   // Opening it is looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -857,6 +858,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const unchanged =
     card === savedCard &&
     fallback === view.fallback &&
+    extraUsage === view.extraUsage &&
     !accountChanged &&
     !effortChanged &&
     !shareChanged &&
@@ -905,6 +907,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       brain: kind,
       model: planModel === option?.defaultModel ? null : planModel,
       fallback,
+      ...(extraUsage !== view.extraUsage ? { extraUsage } : {}),
       ...(effortChanged ? { effort: effortToSave } : {}),
       ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
       ...(shareChanged ? { onlyOwner } : {}),
@@ -960,7 +963,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
                   t("aiAccounts.done.savedAgent", {
                     agent: agent.name,
-                    label: lowerFirst(t("connectAi.own.shared"), i18n.language),
+                    label: t("connectAi.own.sharedLower"),
                   })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
@@ -1167,6 +1170,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
       {accountNote && <SettingNote icon={signedOut ? "alert" : "lock"}>{accountNote}</SettingNote>}
       {usage && <PlanMeter usage={usage} text={meterText} />}
+      {usage && extraUsageOn(usage) && (
+        <div className="agp-advswitch">
+          <SwitchLabel htmlFor={extraId} label={t("usageCard.extraTitle")} hint={t("usageCard.extraHint")} />
+          <Switch
+            id={extraId}
+            aria-describedby={`${extraId}-hint`}
+            checked={extraUsage}
+            disabled={!view.canUsePlans}
+            onCheckedChange={setExtraUsage}
+          />
+        </div>
+      )}
       {limited && view.canUsePlans && (offers.length > 0 || view.canManageAccounts) && (
         <div className="agp-planoffer">
           {offers.map(({ account: a, used }) => (

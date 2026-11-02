@@ -48,6 +48,7 @@ const TYPED = [
   "approverName",
   "reason",
   "byName",
+  "appName",
 ];
 const SENTINEL = "Zq9 evil.com";
 const withoutUrls = (s: string) => s.replace(/https?:\/\/\S+/g, "");
@@ -129,6 +130,7 @@ describe("every email, in both languages", () => {
       workspace_deleting: true,
       workspace_restored: true,
       account_deleted: true,
+      app_connected: true,
       autonomy_report: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
@@ -608,7 +610,7 @@ describe("where the pictures come from", () => {
       // classic Outlook is told its own.
       if (from) expect(html).toContain(`<!--[if !mso]><!--><style>${faces[0]}</style><!--<![endif]-->`);
       expect(html).toContain(
-        "font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+        "font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif",
       );
       expect(html).toContain("<!--[if mso]>");
       expect(html).toMatch(/<!--\[if mso\]>.*font-family:'Segoe UI',Arial,sans-serif!important.*<!\[endif\]-->/);
@@ -665,10 +667,10 @@ describe("where the pictures come from", () => {
 });
 
 describe("jobs queued before this look", () => {
-  test("old payloads, with no language or new fields, still render (pt-BR)", () => {
+  test("old payloads, with no language or new fields, still render (in English, every language's fallback)", () => {
     const e = renderEmail({ kind: "verify_email", url: "u" });
-    expect(e.subject).toBe("Confirme seu e-mail no agentes.chat");
-    expect(e.html).toContain('<html lang="pt-BR"');
+    expect(e.subject).toBe("Confirm your email for agentes.chat");
+    expect(e.html).toContain('<html lang="en"');
     const old: EmailTemplate[] = [
       { kind: "invitation", orgName: "Acme", inviterName: "", url: "https://x/invite/t", role: "member" },
       { kind: "budget", level: "warning", agentName: "Ada", orgName: "Acme", percent: 80.4, url: "u" },
@@ -688,14 +690,14 @@ describe("jobs queued before this look", () => {
       expect(`${r.subject}${r.html}${r.text}`).not.toMatch(/undefined|null|\{\w+\}/);
     }
     const [invitation, budget, digest] = old.map((t) => renderEmail(t, art).text);
-    expect(invitation).toContain("Você recebeu um convite para entrar na Acme como membro.");
+    expect(invitation).toContain("You're invited to join Acme as a member.");
     // A percentage only: owners who aren't admins never see money.
-    expect(budget).toContain("Usou 80% do orçamento deste mês · Acme");
-    expect(budget).not.toContain("US$");
-    expect(digest).toContain(`Ada · Merge PR #42 · há\u00a05\u00a0h`);
-    expect(digest).toContain(`Um agente · Deploy · há\u00a01\u00a0h`);
+    expect(budget).toContain("Used 80% of this month's budget · Acme");
+    expect(budget).not.toContain("$");
+    expect(digest).toContain(`Ada · Merge PR #42 · 5\u00a0h\u00a0ago`);
+    expect(digest).toContain(`An agent · Deploy · 1\u00a0h\u00a0ago`);
     // No `afterHours`: the footer stops after its first sentence.
-    expect(digest).toContain("Você recebeu este e-mail porque pode aprovar estes pedidos na Acme.\n");
+    expect(digest).toContain("You got this email because you can approve these requests in Acme.\n");
   });
 });
 

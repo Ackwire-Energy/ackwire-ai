@@ -234,6 +234,13 @@ const NO_NETWORK =
 export const MACHINE_NETWORK_NOTE =
   "network failure: this is a connected computer, on that machine's own network (we block nothing there), so the problem is the address, the site or that machine's network. Tell the person.";
 
+/**
+ * A command killed by SIGKILL (128 + 9) that no person or timeout stopped: on a computer, the kernel stopping the
+ * process using the most memory, which may be another agent's work that left this one no room.
+ */
+export const KILLED_NOTE =
+  "exit code 137: the system killed it, most likely because the computer ran out of memory. Check what is using the computer before trying again, and tell the person what happened and why.";
+
 /** Which computer the agent's tools act on (from `agentComputerInfo`). */
 type ComputerInfo = Awaited<ReturnType<typeof agentComputerInfo>>;
 
@@ -302,6 +309,7 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
     out.length > 0 ? untrustedBlock(`${label.split(" ")[0]} output`, out.join("\n"), MAX_RESULT_CHARS) : "(no output)",
   );
   if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) parts.push(MACHINE_NETWORK_NOTE);
+  if (r.exitCode === 137 && !r.canceled && !r.timedOut) parts.push(KILLED_NOTE);
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,
@@ -497,7 +505,7 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; long work needs it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
       scope: SANDBOX_SCOPE,
       readsOutside: true,
       sensitive: requireApproval,
@@ -875,7 +883,7 @@ export function createSandboxToolSource(
   const taskTools = (requireApproval: boolean, info: Extract<ComputerInfo, { kind: "machine" }>): ToolDefinition[] => [
     {
       name: "start_task",
-      description: `Start long work in the background on the connected computer "${info.name}" and return at once with its id. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
+      description: `Start a detached command or a parallel CLI job on the connected computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       whyAsks: true,

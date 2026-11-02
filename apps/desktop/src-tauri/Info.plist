@@ -5,22 +5,35 @@
   <!-- A menu bar app: no Dock icon and no app menu, even before the Rust side sets the activation policy. -->
   <key>LSUIElement</key>
   <true/>
-  <!-- The app is in Portuguese and English: the system's own menus (text fields, sharing, dialogs) follow
+  <!-- The ready languages of @agenteschat/i18n/locale (the Mac App Store lists them): the system's own menus (text fields, sharing, dialogs) follow
        the Mac's language instead of staying in English. -->
   <key>CFBundleDevelopmentRegion</key>
-  <string>pt-BR</string>
+  <string>en</string>
   <key>CFBundleLocalizations</key>
   <array>
-    <string>pt-BR</string>
     <string>en</string>
+    <string>pt-BR</string>
+    <string>es</string>
+    <string>fr</string>
+    <string>de</string>
+    <string>it</string>
+    <string>nl</string>
+    <string>ja</string>
+    <string>ko</string>
+    <string>zh-Hans</string>
+    <string>id</string>
+    <string>tr</string>
+    <string>pl</string>
+    <string>ru</string>
   </array>
   <key>CFBundleAllowMixedLocalizations</key>
   <true/>
   <!-- Voice messages: what the Mac says when the site first asks for the microphone. -->
   <key>NSMicrophoneUsageDescription</key>
   <string>agentes.chat uses the microphone to record voice messages.</string>
-  <!-- Files downloaded from the site get the quarantine mark, as from a browser: the Mac checks them. -->
-  <key>LSFileQuarantineEnabled</key>
-  <true/>
+  <!-- No LSFileQuarantineEnabled: it marks every file made by the app's child processes too (the runner and
+       the agents' commands), so each binary an agent builds and runs (a Swift package's manifest, a compiled
+       tool) was stopped by Gatekeeper with a dialog. Downloads from the site get the mark one by one instead
+       (main_window.rs `quarantine`). -->
 </dict>
 </plist>

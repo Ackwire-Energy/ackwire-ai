@@ -1,3 +1,4 @@
+import { type AppLocale, localeInfo } from "@agenteschat/i18n/locale";
 /**
  * At most `max` UTF-16 units of `text`, never half of a pair (an emoji) at the end: Postgres refuses jsonb that
  * holds a lone surrogate.
@@ -62,8 +63,8 @@ export function formatBytes(n: number) {
  * A moment as a person reads it in their time zone and language: the day ("November 6, 2026", "6 de novembro de
  * 2026") and the time with its zone ("3:42 PM GMT-3", "15:42 BRT").
  */
-export function dayAndTime(at: Date, timeZone: string, locale: "en" | "pt-BR") {
-  const tag = locale === "en" ? "en-US" : "pt-BR";
+export function dayAndTime(at: Date, timeZone: string, locale: AppLocale) {
+  const tag = localeInfo(locale).intl;
   return {
     day: new Intl.DateTimeFormat(tag, { timeZone, dateStyle: "long" }).format(at),
     time: new Intl.DateTimeFormat(tag, { timeZone, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(

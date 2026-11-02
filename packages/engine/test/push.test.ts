@@ -10,6 +10,7 @@ import {
   type PushSender,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import { LOCALE_CODES } from "@agenteschat/i18n/locale";
 import { unplainLeaves } from "../../i18n/test/plain-marks";
 import {
   addChannelMember,
@@ -30,9 +31,9 @@ import {
   openDm,
   PUSH_ACTIVE_DELAY_MS,
   PUSH_RECEIPTS_DELAY_MS,
-  PUSH_STRINGS,
   postPersonMessage,
   pushLocale,
+  pushStrings,
   pushTicketsOf,
   registerPushDevice,
   renderPush,
@@ -101,14 +102,21 @@ describe("push text", () => {
     expect(pushLocale("pt_PT")).toBe("pt-BR");
     expect(pushLocale("en-US")).toBe("en");
     expect(pushLocale(null)).toBe("en");
+    expect(pushLocale("ja-JP")).toBe("ja");
+    // The person's language first, then the device's.
+    expect(pushLocale("fr", "pt-BR")).toBe("fr");
+    expect(pushLocale(null, "pt-BR")).toBe("pt-BR");
   });
 
   test("no semicolon, no em dash in any push, as the phone shows it", () => {
     const shown = Object.fromEntries(
-      Object.entries(PUSH_STRINGS).map(([locale, words]) => [
+      LOCALE_CODES.map((locale) => [
         locale,
         Object.fromEntries(
-          Object.entries(words).map(([key, w]) => [key, typeof w === "function" ? w("Ana", "Acme") : w]),
+          Object.entries(pushStrings(locale)).map(([key, w]) => [
+            key,
+            typeof w === "function" ? (w as (...a: string[]) => string)("Ana", "Acme") : w,
+          ]),
         ),
       ]),
     );

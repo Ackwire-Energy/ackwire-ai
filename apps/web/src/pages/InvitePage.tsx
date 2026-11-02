@@ -172,7 +172,7 @@ function OrgLine({ org }: { org: OrgFacts }) {
           count: agents.length + more,
           names: joinNames(
             [...agents.map((a) => a.name), ...(more ? [t("invite.ask.moreAgents", { count: more })] : [])],
-            t("newAgent.and"),
+            t,
           ),
         })
       : null;

@@ -8,7 +8,7 @@ export function CoordinatorChip({ agent }: { agent: Pick<Agent, "name" | "coordi
   const { t } = useTranslation();
   if (!agent.coordinator) return null;
   return (
-    <Chip icon="flag" title={t("coordinator.help", agentGrammar(t, agent.name))}>
+    <Chip icon="flag" title={t("coordinator.help", agentGrammar(agent.name))}>
       {t("coordinator.chip")}
     </Chip>
   );

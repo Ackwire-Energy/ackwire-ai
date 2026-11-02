@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
-import { appLocale } from "@agenteschat/i18n/locale";
+import { formatMoneyUsd } from "@agenteschat/i18n/format";
+import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { nanoUsdToUsd } from "@agenteschat/providers";
 import { z } from "zod";
 import { approverIds } from "./approvals";
@@ -20,7 +21,7 @@ import {
   renderDoc,
   type Scene,
 } from "./email/layout";
-import { WORDS } from "./email/words";
+import { wordsFor } from "./email/words";
 import { dayAndTime } from "./format";
 import { adminIds } from "./gateway";
 import { publicHostAddress, type ResolveHost, resolveHostDns } from "./net-guard";
@@ -41,9 +42,9 @@ const SENDER_NAME = "agentes.chat";
 /** The sender when `EMAIL_FROM` is unset, at this server's host (`loadConfig` sets the Cloud's: ping@agentes.chat). */
 export const defaultEmailFrom = (publicUrl: string) => `${SENDER_NAME} <ping@${new URL(publicUrl).hostname}>`;
 
-/** A stored or chosen language as an email locale: "en…" is English, anything else (or none) pt-BR. */
+/** A stored or chosen language as an email locale: any registry language ("pt-PT" reads pt-BR), else English. */
 export const emailLocale = (value: unknown): EmailLocale =>
-  (typeof value === "string" ? appLocale([value]) : null) ?? "pt-BR";
+  (typeof value === "string" ? appLocale([value], true) : null) ?? "en";
 
 /**
  * Transactional emails in pt-BR or English (`locale`, the recipient's; jobs
@@ -188,6 +189,8 @@ export type EmailTemplate =
     }
   /** An owner restored a workspace that was being deleted, one email per member. */
   | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
+  /** An AI app or a personal token got access to the person's account in a workspace (ADR 0119), to that person. */
+  | { kind: "app_connected"; locale: EmailLocale; appName: string; orgName: string; url: string }
   /**
    * The account `email` was deleted. `orgNames`: the workspaces only they were in, which closed with it and go for
    * good at `dueAt` (ISO, shown in `timeZone`). `support`: whom to write to if it wasn't them (`SUPPORT_EMAIL`), else
@@ -304,7 +307,7 @@ const JOIN_REASON_SHOWN = 300;
  */
 function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
   const lang = emailLocale(t.locale);
-  const w = WORDS[lang];
+  const w = wordsFor(lang);
   const doc = (
     subject: string,
     preheader: string,
@@ -616,8 +619,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
     case "autonomy_report": {
       const c = w.autonomy;
       const num = (v: number, digits = 0) => v.toLocaleString(lang, { maximumFractionDigits: digits });
-      const money = (nano: number) =>
-        `US$\u00a0${nanoUsdToUsd(nano).toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const money = (nano: number) => formatMoneyUsd(localeInfo(lang).intl, nanoUsdToUsd(nano));
       // An average keeps a decimal, except a count of tokens.
       const shown = (metric: string, v: number, average = false) =>
         metric === "noiseCostNanoUsd" ? money(v) : num(v, average && metric !== "noiseTokens" ? 1 : 0);
@@ -680,6 +682,17 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.preheader,
         c.headline,
         [{ p: c.body(inertText(t.byName) || w.someone, org) }, { button: c.button, url: t.url }],
+        c.why(org),
+      );
+    }
+    case "app_connected": {
+      const c = w.appConnected;
+      const org = inertText(t.orgName);
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [{ p: c.body(inertText(t.appName), org) }, { note: c.note }, { button: c.button, url: t.url }],
         c.why(org),
       );
     }

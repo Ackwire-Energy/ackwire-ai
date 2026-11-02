@@ -34,6 +34,7 @@ import {
 import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
+import { IssueWorkLine } from "../chat/WorkLine";
 import { chatHref } from "../links/logic";
 import { useOpenDm } from "../new/useOpenDm";
 import { Face } from "../shared/Face";
@@ -129,6 +130,7 @@ function IssueView({ number }: { number: number }) {
         >
           <Head issue={i} />
           <WorkCard issue={i} />
+          <IssueWorkLine issue={i} />
           <Description issue={i} />
           <Criteria issue={i} />
           <Linked issue={i} />
@@ -239,7 +241,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
           ) : null}
           {noAi ? (
             <Text variant="small" tone="muted">
-              {t("noAi.agent", agentGrammar(t, name))}
+              {t("noAi.agent", agentGrammar(name))}
             </Text>
           ) : w.reason ? (
             <Text variant="small" tone="muted">
@@ -267,7 +269,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
                     { type: "ask", id: i.id, agentId: w.agentId },
                     {
                       onSuccess: () =>
-                        toast({ title: t("issues.work.resumed", agentGrammar(t, name)), agentId: w.agentId }),
+                        toast({ title: t("issues.work.resumed", agentGrammar(name)), agentId: w.agentId }),
                       onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
                     },
                   )

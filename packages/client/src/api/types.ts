@@ -185,6 +185,10 @@ export interface User {
    * access allowed them; `org.create_refused` and `org.create_unpaid` can still refuse it).
    */
   canCreateWorkspace?: boolean;
+  /** The app's language for emails, pushes and every device (ADR 0122); null before any app said one. */
+  locale?: string | null;
+  /** The language follows each device's own (Automático) until the person picks one. */
+  localeAuto?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */
@@ -852,6 +856,8 @@ export interface Message {
   pinned?: boolean;
   /** Agents' messages: what the agent changed with it, as receipts with Undo; live via `message.actions`. */
   actions?: AgentAction[];
+  /** A long work's anchor (`meta.longWork`, ADR 0121): its line; live via `agent.work`. */
+  longWork?: WorkView;
   /** Client only: an optimistic message waiting for the server, or one that failed to send. */
   local?: "pending" | "failed";
   createdAt: string;
@@ -1034,6 +1040,15 @@ export type ChannelEvent =
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: Poll }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
+  /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws. */
+  | {
+      type: "agent.work";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string | null;
+      work: WorkView;
+    }
   /** An agent message's receipts changed (linked to it, undone or redone): its whole list now (replace). */
   | { type: "message.actions"; channelId: string; threadId: string | null; messageId: string; actions: AgentAction[] }
   /** A message was pinned here (`pins.list` has them all, newest first). */
@@ -1537,7 +1552,7 @@ export interface Memory {
   /** "Written by Walter in #eng · Oct 12" (the server's English; `origin` has the parts). */
   source: string;
   origin?: {
-    by: "person" | "agent" | "lesson" | "recorded";
+    by: "person" | "app" | "agent" | "lesson" | "recorded";
     name: string | null;
     channel: string | null;
     at: string;
@@ -1554,6 +1569,14 @@ export interface Memory {
   supersedes: string | null;
   /** Set when a person edited it ("Editado por você · agora"). */
   editedByUserId: string | null;
+  /** What the agent learned itself ("Aprendizados"); older servers leave it out. */
+  learned?: boolean;
+  /** A how-to it worked out. */
+  howTo?: boolean;
+  /** Another memory says otherwise, until a person decides. */
+  disputed?: boolean;
+  /** Where it was learned. */
+  channelId?: string | null;
   updatedAt: string;
   /** `about: "me"` only: the viewer's message it came from ("Você disse hoje, nesta conversa"). */
   from?: { messageId: string; channelId: string; threadId: string | null; dm: boolean; at: string } | null;
@@ -1579,7 +1602,8 @@ export interface Proposal {
     | { type: "agent_instructions"; agentId: string }
     | { type: "org_context" }
     | { type: "agent_role"; agentId: string }
-    | { type: "agent_access"; agentId: string };
+    | { type: "agent_access"; agentId: string }
+    | { type: "skill"; agentId: string; skillId: string; name: string };
   /** `agent_access`: each app turned on or off. */
   access?: ProposalAccessLine[] | null;
   title: string;
@@ -1589,7 +1613,7 @@ export interface Proposal {
     where: string;
     what: string;
     channelId?: string | null;
-    type?: "outcome" | "human" | "agent" | "self";
+    type?: "outcome" | "human" | "agent" | "app" | "self";
   }[];
   /** `agent_role`: the role then and the one proposed; `agent_access`: both empty. */
   before: string;
@@ -1723,7 +1747,9 @@ export type AgentStatusKind =
   | "waiting_computer"
   | "waiting_plan"
   | "waiting_budget"
-  | "provider_down";
+  | "provider_down"
+  /** Background work (ADR 0121): `subject` its title where everyone may read it, `count` how many. */
+  | "work";
 
 /** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
 export interface AgentStatusLine {
@@ -1735,6 +1761,44 @@ export interface AgentStatusLine {
   emoji: string | null;
   /** ISO; null = until the run ends. */
   until: string | null;
+  /** Background work: since when. */
+  since?: string;
+  /** Background work: how many at once. */
+  count?: number;
+  /** Background work: a second title. */
+  second?: string | null;
+  /** One background work that waits: on what. */
+  wait?: "approval" | "answer" | "plan" | "computer" | "line";
+}
+
+/** A long work (ADR 0121): the line under its anchor, its card's block and its agent's status. */
+export interface WorkView {
+  id: string;
+  agentId: string;
+  channelId: string;
+  title: string;
+  status: "queued" | "live" | "done" | "failed" | "canceled";
+  /** While live: what its run does now. */
+  state: "working" | "waiting_approval" | "waiting_input" | "paused" | "waiting_computer" | "queued" | null;
+  how: "agent" | "auto";
+  anchorMessageId: string;
+  /** Where its updates are. */
+  threadId: string | null;
+  /** Where it was asked: its report is there. */
+  homeThreadId: string | null;
+  runId: string | null;
+  requestedByUserId: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  nextUpdateAt: string | null;
+  lastUpdate: { text: string; at: string; seq: number } | null;
+  plan: { id: string; text: string; state: "todo" | "doing" | "done" }[];
+  issue: { id: string; number: number } | null;
+  resultMessageId: string | null;
+  queuePosition: number | null;
+  pausedUntil: string | null;
+  canceledByUserId: string | null;
+  errorCode: string | null;
 }
 
 /** `GET …/agent-status`: one agent's presence and its line. */
@@ -2164,12 +2228,14 @@ export const AGENT_ACTION_KINDS = [
   "wiki.page_edited",
   "thread.renamed",
   "thread.closed",
+  "skill.created",
+  "skill.updated",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread";
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
   id: string;
   /** Issues. */
   number?: number;
@@ -2648,6 +2714,10 @@ export interface Issue {
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
   artifacts: { id: string; title: string; createdBy: Actor }[];
   work?: IssueWork | null;
+  /** Background work stopped on something (ADR 0121): a badge, the card stays in its stage. */
+  blocked?: { reason: string; since: string; text?: string } | null;
+  /** The agent's background work this card tracks: its plan, last update and line (ADR 0121). */
+  backgroundWork?: WorkView | null;
   /** The issue this one is a sub-issue of (a plan step from the forum). */
   parentIssueId?: string | null;
   /** On the detail: its sub-issues. */
@@ -2819,7 +2889,7 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * or an answer), `usage_paused` (its run paused near its plan's or budget's limit: `usagePause`), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
  * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
 export type RoutineState =
@@ -2828,6 +2898,7 @@ export type RoutineState =
   | "running"
   | "waiting_computer"
   | "waiting_person"
+  | "usage_paused"
   | "failing"
   | "needs_webhook";
 
@@ -2860,6 +2931,13 @@ export interface Routine {
   state: RoutineState;
   /** Its run waits for this computer since `since` (state `waiting_computer`). */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
+  /**
+   * Its run paused near its plan's or budget's limit (state `usage_paused`, ADR 0118): it picks up at `resetsAt`
+   * (null: not known yet). `extraOff`: the plan's window is used up and the agent's long work may not use paid
+   * extra usage, so Continuar agora is refused; `extraUsedUp`: the same with the switch on but no extra usage left.
+   * Who may press it: `canManage`.
+   */
+  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp?: boolean } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -3130,6 +3208,13 @@ export interface Skill {
   /** Turned on for agents created from now on. */
   defaultForNewAgents: boolean;
   metadata: Record<string, unknown>;
+  /** `agent`: made from an agent's own how-tos (older servers leave it out). */
+  origin?: "person" | "agent";
+  ownerAgentId?: string | null;
+  /** Agents can't change it; never archived for disuse. */
+  locked?: boolean;
+  useCount?: number;
+  lastUsedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3194,6 +3279,18 @@ export interface SkillPatch {
   description?: string;
   body?: string;
   defaultForNewAgents?: boolean;
+  /** Freeze it: agents can't change it. */
+  locked?: boolean;
+}
+
+/** A skill an agent made from its own how-tos (ADR 0120), archived ones too. */
+export interface LearnedSkill extends Skill {
+  body: string;
+  archived: boolean;
+  /** The viewer may lock it and undo its changes (who manages agents, or the agent's owner). */
+  canChange: boolean;
+  /** It has a change of its own to undo (Desfazer última mudança). */
+  canRevert: boolean;
 }
 
 // ── Agent computer and Run code settings: apps/server/src/routes/app/sandboxes.ts ──
@@ -4517,6 +4614,8 @@ export interface AgentBrain {
   effectiveModel: string | null;
   /** If the computer isn't available, answer through the API (counts against the budget). */
   fallback: boolean;
+  /** Long work may go on into the plan's paid extra usage where the provider reports it on (ADR 0118). */
+  extraUsage: boolean;
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
@@ -4634,6 +4733,8 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
+  /** Off: long work pauses at 95% of the plan even with its paid extra usage on. */
+  extraUsage?: boolean;
   /**
    * "Atende outras pessoas" turned off: false lets in whoever its "who can talk" list allows (everyone with no list).
    */
@@ -5110,7 +5211,12 @@ export type NotificationKind =
    */
   | "connector_tool_changed"
   /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
-  | "computer_disk_full";
+  | "computer_disk_full"
+  /**
+   * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
+   * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
+   */
+  | "app_created";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5187,6 +5293,8 @@ export interface NotificationLatest {
   /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
   diskUse?: number;
   diskFreeGb?: number;
+  /** `app_created`: how many of each kind (`agent`, `routine`, `skill`, `memory`, `channel`). */
+  created?: Record<string, number>;
 }
 
 export interface AppNotification {
@@ -5350,6 +5458,8 @@ export interface WorkingRun {
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
   background?: boolean;
+  /** Long work in the background (ADR 0121): its title, plan and start. */
+  work?: { id: string; title: string; plan: { done: number; total: number } | null; since: string } | null;
 }
 
 /** A one-off reminder in a conversation (`reminders.*`; also a routine in Rotinas). */
@@ -5760,6 +5870,93 @@ export interface AgentPlanUsage {
   /** Every day of the month so far: tokens per source key. */
   days: { date: string; tokens: Record<string, number> }[];
   current: PlanAccountUsage | null;
+}
+
+// ── AI apps (ADR 0119): this server as a remote MCP server ──
+
+/**
+ * What a connected app or a personal token may do: `read` only reads, `write` also sends tasks, `manage` also creates
+ * and edits agents, routines and skills.
+ */
+export type AppAccess = "read" | "write" | "manage";
+
+/**
+ * How an app is shown, from the address its codes go back to: `verified` (its metadata document was fetched from
+ * `host`), `https` (a site that says its own name), `loopback` (a program on this computer), `app_scheme` (Cursor).
+ */
+export type AppDisplayKind = "verified" | "https" | "loopback" | "app_scheme";
+
+/** `GET /api/app/authorize/{req}`: what the consent page shows. */
+export interface AppConsent {
+  request: {
+    id: string;
+    expiresAt: string;
+    access: { requested: AppAccess[] };
+    client: {
+      displayKind: AppDisplayKind;
+      /** As the app calls itself: text, never markup. */
+      name: string;
+      host: string | null;
+      /** `claude`, `openai`, `cursor`, `vscode`: only from an address the app proved. */
+      brand: string | null;
+      /** Where the browser goes back to: a host, or `scheme://host`. */
+      returnsTo: string;
+      reservedNameWarning: boolean;
+    };
+  };
+  account: { name: string; email: string };
+  workspaces: { id: string; name: string; logo: string | null; paused: boolean; current: boolean }[];
+}
+
+export interface AppConsentDecision {
+  decision: "allow" | "deny";
+  orgId?: string;
+  access?: AppAccess;
+}
+
+export interface ConnectedApp {
+  id: string;
+  kind: "oauth";
+  displayKind: AppDisplayKind;
+  name: string;
+  host: string | null;
+  brand: string | null;
+  access: AppAccess;
+  /** Only in the whole workspace's list. */
+  person?: { id: string; name: string };
+  connectedAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface PersonalToken {
+  id: string;
+  name: string;
+  access: AppAccess;
+  createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  person?: { id: string; name: string };
+}
+
+/** `GET …/apps`: this server's `/mcp`, the connected apps and the personal tokens. */
+export interface AppsList {
+  serverUrl: string;
+  /** Apps that call from their own servers (claude.ai, ChatGPT) can reach it: https on a public name. */
+  serverPublic: boolean;
+  apps: ConnectedApp[];
+  tokens: PersonalToken[];
+}
+
+export interface PersonalTokenInput {
+  name: string;
+  access: AppAccess;
+  expiresInDays: 30 | 90 | 365 | null;
+}
+
+/** `POST …/tokens`: `secret` is shown once. */
+export interface CreatedPersonalToken {
+  token: { id: string; name: string; access: AppAccess; expiresAt: string | null };
+  secret: string;
 }
 
 /** Who has a shared browser profile now (ADR 0110): an agent's run or a person in control. */

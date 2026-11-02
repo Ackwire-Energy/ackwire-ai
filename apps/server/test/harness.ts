@@ -31,6 +31,7 @@ import {
   drainOutbox,
   type EmailArt,
   type FakeScheduleAnswers,
+  type FetchAppDocument,
   type McpConnect,
   type ResolveHost,
   type ToolSource,
@@ -112,6 +113,8 @@ export async function createTestServer(
     signedBlobs?: boolean;
     /** Fake speech providers (ADR 0100), for an engine set through `env`. */
     speechFetch?: typeof fetch;
+    /** AI apps (ADR 0119): a fake fetch of apps' metadata documents (CIMD); absent = none answers. */
+    appsFetchDocument?: FetchAppDocument;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -194,6 +197,11 @@ export async function createTestServer(
     version: "test",
     modules: [],
     pingDatabase: async () => {},
+    appsFetchDocument:
+      options.appsFetchDocument ??
+      (async () => {
+        throw new Error("no network in tests");
+      }),
     services: {
       db,
       auth,
@@ -297,6 +305,8 @@ export function browser(t: TestServer) {
     } = {},
   ) => {
     const headers = new Headers(init.headers);
+    // The tests' people read Portuguese, as before English became the default (a browser that says none reads English).
+    if (!headers.has("accept-language")) headers.set("accept-language", "pt-BR");
     if (cookie) headers.set("cookie", cookie);
     if (init.origin !== null) headers.set("origin", init.origin ?? ORIGIN);
     if (init.json !== undefined) headers.set("content-type", "application/json");

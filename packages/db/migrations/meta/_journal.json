@@ -1181,8 +1181,50 @@
     {
       "idx": 169,
       "version": "7",
-      "when": 1793609502195,
-      "tag": "0170_voice_messages",
+      "when": 1793599502196,
+      "tag": "0170_ai_apps",
+      "breakpoints": true
+    },
+    {
+      "idx": 170,
+      "version": "7",
+      "when": 1793599502197,
+      "tag": "0171_app_token_family",
+      "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "7",
+      "when": 1793599502198,
+      "tag": "0172_long_work_extra_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "7",
+      "when": 1793599502199,
+      "tag": "0173_agent_learning",
+      "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "7",
+      "when": 1793599502200,
+      "tag": "0174_background_work",
+      "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1793605482256,
+      "tag": "0175_locales",
+      "breakpoints": true
+    },
+    {
+      "idx": 175,
+      "version": "7",
+      "when": 1793615482256,
+      "tag": "0176_voice_messages",
       "breakpoints": true
     }
   ]

@@ -555,6 +555,11 @@ export function createMockPlanning(
         c.done = done;
         return clone(i);
       },
+      share: async (orgId, id) => {
+        const i = await findIssue(orgId, id);
+        i.channelId = null;
+        return clone(i);
+      },
       activity: async (orgId, id) => clone((await store(orgId)).activity.get(id) ?? []),
       comment: async (orgId, id, text) =>
         clone(await log(orgId, await findIssue(orgId, id), { kind: "comment", author: await me(), text: text.trim() })),
@@ -750,6 +755,12 @@ export function createMockPlanning(
       takeOver: async (orgId, id) => {
         record("routines.takeOver", id);
         const r = await findRoutine(orgId, id);
+        return clone(r);
+      },
+      continueUsage: async (orgId, id) => {
+        record("routines.continueUsage", id);
+        const r = await findRoutine(orgId, id);
+        if (r.state === "usage_paused") Object.assign(r, { state: "running", usagePause: null });
         return clone(r);
       },
       runs: async (orgId, id) => {

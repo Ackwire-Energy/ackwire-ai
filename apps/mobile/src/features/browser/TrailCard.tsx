@@ -11,6 +11,7 @@ import {
   type ScreenKind,
   useAgentBrowserHandoff,
 } from "@agenteschat/client";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
@@ -37,7 +38,6 @@ function screenT(t: TFunction, screen: ScreenKind) {
 
 /** A step in the person's words, from the saved trail. */
 const said = (t: TFunction, s: BrowserTrailStep, screen: ScreenKind) => stepText(t, s, screen);
-const lower = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
 
 /**
  * Where the agent browsed, on its message after the run, as on the web (`BrowserTrailCard`): the closed card
@@ -65,7 +65,7 @@ export function TrailCard({
   recent?: boolean;
   screen?: ScreenKind;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const tt = screenT(t, screen);
   const orgId = useOrgId();
   const meId = useMeId();
@@ -108,7 +108,7 @@ export function TrailCard({
   };
 
   return (
-    <View style={[styles.card, surface]} accessibilityLabel={tt("inCard.group", agentGrammar(t, agent?.name ?? ""))}>
+    <View style={[styles.card, surface]} accessibilityLabel={tt("inCard.group", agentGrammar(agent?.name ?? ""))}>
       <TrailSky color={color} />
       <Pressable
         onPress={toggle}
@@ -188,7 +188,7 @@ export function TrailCard({
                   const [a, b] = line.steps;
                   if (!a) return null;
                   const text = b
-                    ? tt("after.pair", { a: said(t, a, screen), b: lower(said(t, b, screen)) })
+                    ? tt("after.pair", { a: said(t, a, screen), b: lowerFirst(said(t, b, screen), i18n.language) })
                     : a.failed
                       ? tt("after.failed", { step: said(t, a, screen) })
                       : said(t, a, screen);

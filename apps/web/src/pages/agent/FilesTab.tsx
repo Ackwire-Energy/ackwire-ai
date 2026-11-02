@@ -23,7 +23,7 @@ export function FilesTab() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const { agent } = useAgentEdit();
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const files = useArtifacts(org.id, { author: { type: "agent", id: agent.id }, changed: true });
   const channels = useChannels(org.id);
   const viewer = useArtifactViewer();

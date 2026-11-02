@@ -47,9 +47,10 @@ export function allowedOrigins(config: Config): Set<string> {
 
 /**
  * Header the phone app sends instead of an `Origin` (ADR 0035). A browser
- * can't send it cross-site without a CORS preflight, and we never allow one
- * (the only CORS is the waiting list's, for the landing page, and it allows
- * `content-type` alone), so it can't be forged by a web page.
+ * can't send it cross-site without a CORS preflight, and no CORS rule allows it
+ * (the waiting list's allows `content-type` and the bot check; the AI apps'
+ * endpoints, `/mcp`, `/api/oauth/*` and their discovery, allow the MCP and
+ * OAuth headers with no credentials), so it can't be forged by a web page.
  */
 export const APP_CLIENT_HEADER = "x-agentes-client";
 export const MOBILE_CLIENT = "mobile";

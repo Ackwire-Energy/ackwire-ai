@@ -128,6 +128,12 @@ export const NOTIFICATION_KINDS = [
    * `latest.diskFreeGb` what is left.
    */
   "computer_disk_full",
+  /**
+   * An AI app connected as the person created agents, routines, skills, memories or channels for them (ADR 0119):
+   * one row per connection merging while unread, `latest.title` the app's name and `latest.created` how many of each
+   * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.
+   */
+  "app_created",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -205,6 +211,8 @@ export interface NotificationLatest {
   /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
   diskUse?: number;
   diskFreeGb?: number;
+  /** `app_created`: how many of each kind (`agent`, `routine`, `skill`, `memory`, `channel`), summed as rows merge. */
+  created?: Record<string, number>;
   /** `browser_handoff` still unanswered an hour later (`remindNotifications`): its push says the agent still needs them. */
   reminder?: boolean;
 }
@@ -249,6 +257,7 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "join_request",
   // One per approval card: requests joining it update it, read or not (`notifyApproval`).
   "approval",
+  "app_created",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
@@ -311,6 +320,11 @@ export function mergeActors(newest: NotificationActor | null | undefined, before
 
 /** A merge's `latest`: the newest event's, the names the row had kept first (each once, `MAX_NAMES`). */
 function mergeLatest(next: Record<string, unknown>, before: Record<string, unknown>): Record<string, unknown> {
+  if (next.created && before.created) {
+    const sum = { ...(before.created as Record<string, number>) };
+    for (const [kind, n] of Object.entries(next.created as Record<string, number>)) sum[kind] = (sum[kind] ?? 0) + n;
+    return { ...next, created: sum };
+  }
   if (!Array.isArray(next.names) || !Array.isArray(before.names)) return next;
   return { ...next, names: [...new Set([...before.names, ...next.names])].slice(0, MAX_NAMES) };
 }

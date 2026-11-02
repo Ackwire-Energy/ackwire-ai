@@ -2,7 +2,7 @@ import type { Actor, Agent } from "@agenteschat/client";
 import { useAgentDetail, useModels, usePeople, useRoles, useSettings } from "@agenteschat/client";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
+import { clockHour, formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
@@ -118,7 +118,7 @@ function PersonCard({ userId }: { userId: string }) {
   let localTime: string | null = null;
   try {
     localTime = new Intl.DateTimeFormat(i18n.language, {
-      hour: "2-digit",
+      hour: clockHour(i18n.language),
       minute: "2-digit",
       ...(timezone ? { timeZone: timezone } : {}),
     }).format(new Date());

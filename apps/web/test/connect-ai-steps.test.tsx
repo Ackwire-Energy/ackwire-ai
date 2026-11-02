@@ -890,7 +890,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     ]);
     // OpenRouter passes what is sent on to other providers: its privacy settings say who may keep it, in the ⓘ.
     await click(within(panel).getByRole("button", { name: "OpenRouter" }));
-    expect(hintOf("Crie a sua chave de API da OpenRouter", panel)).toMatchObject({
+    expect(hintOf("Crie a sua chave de API OpenRouter", panel)).toMatchObject({
       text: "As configurações de privacidade da OpenRouter decidem quais provedores podem guardar o que seus agentes enviam.",
       hidden: true,
     });
@@ -900,13 +900,13 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(panel).getByLabelText("Cole aqui").getAttribute("placeholder")).toBe("sk-or-v1-…");
     // A maker with coding plans: where a plan's key goes is the first step's ⓘ, with no line under it.
     await click(within(panel).getByRole("button", { name: "Kimi" }));
-    expect(hintOf("Crie a sua chave de API da Kimi", panel).text).toBe(
+    expect(hintOf("Crie a sua chave de API Kimi", panel).text).toBe(
       "A chave de um plano de código vai na opção dele, acima.",
     );
     expect(shownText(panel)).not.toContain("plano de código");
     // Gemini: its free tier may use what the agents send, so the first step's ⓘ says to turn on billing.
     await click(within(panel).getByRole("button", { name: "Gemini" }));
-    expect(hintOf("Crie a sua chave de API do Gemini", panel)).toMatchObject({
+    expect(hintOf("Crie a sua chave de API Gemini", panel)).toMatchObject({
       text: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
       hidden: true,
     });

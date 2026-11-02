@@ -31,7 +31,7 @@ export function NoAiBanner({ banner }: { banner: NoAiBannerView }) {
       <View style={styles.text}>
         {banner.kind === "agent" ? (
           <Text variant="small" tone="ink2" style={styles.strong}>
-            {t("noAi.agent", agentGrammar(t, name))}
+            {t("noAi.agent", agentGrammar(name))}
           </Text>
         ) : banner.askInChat ? (
           <InfoHint name={t("common.about", { label: action })} text={t("noAi.banner.orgHint")} variant="small">

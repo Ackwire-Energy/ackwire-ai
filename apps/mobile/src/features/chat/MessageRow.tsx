@@ -15,6 +15,7 @@ import {
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
+import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
@@ -28,19 +29,32 @@ import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
+import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { memo, useEffect, useState } from "react";
+import { memo, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { CHROME_MAX_SCALE, Count, Icon, InkOrbit, PixelStopped, PressScale, Text, useTheme, useToast } from "@/ui";
+import {
+  CHROME_MAX_SCALE,
+  Count,
+  Icon,
+  InkOrbit,
+  PixelStopped,
+  PressScale,
+  ProviderLogo,
+  Text,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
+import { UsagePauseCard } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
@@ -81,11 +95,10 @@ import { SecretCard } from "./SecretCard";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
+import { MessageWorkLine } from "./WorkLine";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
-/** The room beside my bubble for its receipt's mark: my row's 64px left padding past the screen's 16px edge. */
-const MARK_ROOM = 48;
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
@@ -93,9 +106,9 @@ const MARK_ROOM = 48;
  * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
  * line under its words and what it changed ("Usou N ferramentas"), the same place live, kept and saved, and a
  * stopped one says so with "Continuar". A person's message's
- * receipt is a mark in room the row already has (`ReceiptMark`), so it never changes the row's height: beside my
- * bubble, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of someone
- * else's name line, the agents' receipt of their latest message.
+ * receipt is a mark in a line the row already has (`ReceiptMark`), so it never changes the row's height: after the
+ * time under my turn, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of
+ * someone else's name line, the agents' receipt of their latest message.
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
@@ -163,6 +176,9 @@ export const MessageRow = memo(function MessageRow({
   const reminder = isReminderMessage(meta);
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = isAgent && isTalkerReply(meta);
+  // A person's message sent through a connected AI app (ADR 0119): "via Claude".
+  const via = m.author.type === "person" ? appVia(meta) : null;
+  const viaMark = via?.brand ? APP_BRANDS[via.brand] : undefined;
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a
   // task ran is said only where the workspace has more than one computer.
   const names = useNamesComputers();
@@ -293,14 +309,13 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // The bubble, or the GIF or sticker or the files of a message with no words, leads; the receipt's mark stands
-    // beside it.
+    // A voice message's player, the bubble, or the GIF or sticker or the files of a message with no words, leads.
     const lead = voiceOf(meta) ? (
-      <View style={styles.grow}>
+      <View style={styles.meFiles}>
         <VoiceMessage message={m} />
       </View>
     ) : body ? (
-      <View style={[styles.bubble, BUBBLE_RUN[run], styles.lead, { backgroundColor: c.bubble }]}>
+      <View style={[styles.bubble, BUBBLE_RUN[run], { backgroundColor: c.bubble }]}>
         <MessageText
           body={body}
           muted={m.local === "pending"}
@@ -310,11 +325,11 @@ export const MessageRow = memo(function MessageRow({
         />
       </View>
     ) : media ? (
-      <View style={styles.grow}>
+      <View style={styles.meFiles}>
         <ChatMedia media={media} align="end" liveId={m.id} />
       </View>
     ) : files.length > 0 ? (
-      <View style={styles.grow}>
+      <View style={styles.meFiles}>
         <MessageFiles files={files} align="end" />
       </View>
     ) : null;
@@ -338,14 +353,7 @@ export const MessageRow = memo(function MessageRow({
             </Text>
           </View>
         ) : null}
-        {lead ? (
-          <View style={styles.meLine}>
-            <View style={styles.meMark}>
-              {m.local ? null : <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />}
-            </View>
-            {lead}
-          </View>
-        ) : null}
+        {lead}
         {body && media ? (
           <View style={styles.meFiles}>
             <ChatMedia media={media} align="end" liveId={m.id} />
@@ -361,11 +369,15 @@ export const MessageRow = memo(function MessageRow({
           {missionDecision}
           {foot}
         </View>
-        {/* One time per run of my rows (they group a few minutes apart), under its last; a send in flight says so. */}
+        {/* One time per run of my rows (they group a few minutes apart), under its last, the receipt's mark ending
+            its line; a send in flight says so. */}
         {!m.local && (run === "end" || run === "solo") ? (
-          <Text variant="caption" tone="faint" style={styles.meTime}>
-            {when.time(m.createdAt)}
-          </Text>
+          <View style={styles.meTime}>
+            <Text variant="caption" tone="faint">
+              {when.time(m.createdAt)}
+            </Text>
+            <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />
+          </View>
         ) : null}
       </Pressable>
     );
@@ -391,6 +403,14 @@ export const MessageRow = memo(function MessageRow({
               {name}
             </Text>
             {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
+            {via ? (
+              <Tag
+                icon="sparkle"
+                lead={viaMark ? <ProviderLogo id={viaMark} size="xs" /> : undefined}
+                label={t("apps.via", { name: via.name })}
+                hint={t("apps.viaTip", { person: name, name: via.name })}
+              />
+            ) : null}
             {routine ? (
               // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
               <Tag
@@ -495,6 +515,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <ReachLines message={m} /> : null}
+        {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {trails && m.author.id && trails.browser.length > 0 ? (
           <TrailCard
@@ -540,6 +561,7 @@ export const MessageRow = memo(function MessageRow({
         {/* What waits for a person's click comes last, after the words and the tools. */}
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
+        {isAgent ? <UsagePauseCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
         {isAgent ? <InstructionProposals message={m} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
@@ -674,19 +696,22 @@ function StoppedLine({
  */
 function Tag({
   icon,
+  lead,
   label,
   onPress,
   hint,
 }: {
-  icon: "bell" | "clock";
+  icon: "bell" | "clock" | "sparkle";
+  /** In place of the icon (an app's mark). */
+  lead?: ReactNode;
   label: string;
   onPress?: () => void;
   hint?: string;
 }) {
   const c = useColors();
   const chip = (
-    <View style={[styles.tag, { backgroundColor: c.sunken }]}>
-      <Icon name={icon} size={11} color={c.muted} />
+    <View style={[styles.tag, { backgroundColor: c.sunken }]} accessibilityHint={onPress ? undefined : hint}>
+      {lead ?? <Icon name={icon} size={11} color={c.muted} />}
       <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
         {label}
       </Text>
@@ -710,12 +735,12 @@ function Tag({
 function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultation; channelId: string }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("mobile.chat.someone"));
+  const from = agentGrammar(dir.agentById.get(c.agentId)?.name ?? t("mobile.chat.someone"));
   return (
     <>
       <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
         {withAgentFaces(
-          t("chat.consultPanel.helping", { name: from.name, article: from.article }),
+          t("chat.consultPanel.helping", { name: from.name, context: from.context }),
           [{ name: from.name, agentId: c.agentId }],
           12,
         )}
@@ -802,12 +827,15 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   );
 }
 
+/** The turn's last corner, cut as a card's is, on the side my bubble stands. */
+const BUBBLE_CUT = 5;
+
 /** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
 const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
-  solo: {},
+  solo: { borderBottomRightRadius: BUBBLE_CUT },
   start: { borderBottomRightRadius: 6 },
   mid: { borderTopRightRadius: 6, borderBottomRightRadius: 6 },
-  end: { borderTopRightRadius: 6 },
+  end: { borderTopRightRadius: 6, borderBottomRightRadius: BUBBLE_CUT },
 };
 
 const styles = StyleSheet.create({
@@ -827,7 +855,7 @@ const styles = StyleSheet.create({
   meCont: { paddingTop: 1, marginTop: 0 },
   // A run of my rows sits 2px apart (1 under this one, 1 over the next).
   meRunOn: { paddingBottom: 1 },
-  meTime: { marginTop: 4, textAlign: "right" },
+  meTime: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 4, height: 16 },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
@@ -836,18 +864,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 18,
   },
-  // My row keeps 64px free on the left, 48 of them past the screen's 16px edge: the receipt's mark stands there, on
-  // the bubble's last line (10px under the text, 24px lines), so it never adds a line.
-  meLine: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "flex-end",
-    marginLeft: -MARK_ROOM,
-  },
-  meMark: { width: MARK_ROOM, alignItems: "flex-end", paddingRight: 6, paddingBottom: 14 },
-  lead: { flexShrink: 1 },
-  grow: { flex: 1 },
   meFiles: { alignSelf: "stretch" },
   meCards: { alignSelf: "stretch" },
   meStatus: { marginTop: 4, textAlign: "right" },

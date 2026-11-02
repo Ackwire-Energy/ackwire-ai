@@ -236,7 +236,7 @@ function AskAgent({ agents, composer }: { agents: Agent[]; composer: RefObject<H
   const [text, setText] = useState("");
   const agent = agents.find((a) => a.id === picked) ?? agents[0];
   if (!agent) return null;
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   return (
     <section className="home-ask" aria-label={t("home.ask.title")}>
       <Composer

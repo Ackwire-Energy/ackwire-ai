@@ -11,6 +11,7 @@ const INITIAL_SIZE = { xs: 9, chip: 10, sm: 13, tile: 18, hero: 24 } as const;
 const MARK_IMAGES: Partial<Record<MarkId, number>> = {
   gemini: require("../../assets/images/brands/gemini.png"),
   soniox: require("../../assets/images/brands/soniox.png"),
+  vscode: require("../../assets/images/brands/vscode.png"),
 };
 
 export interface ProviderLogoProps {

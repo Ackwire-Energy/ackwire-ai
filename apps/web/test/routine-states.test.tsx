@@ -81,6 +81,12 @@ function withRoutines(list: Routine[], runs: Record<string, RoutineRun[]> = {}, 
         calls.push(`takeOver:${id}`);
         return structuredClone(find(id));
       },
+      continueUsage: async (_orgId, id) => {
+        calls.push(`continueUsage:${id}`);
+        const r = find(id);
+        Object.assign(r, { state: "running", usagePause: null });
+        return structuredClone(r);
+      },
     },
   };
   return { api, calls, state, machines: fakeMachinesOf.get(base) };
@@ -169,6 +175,88 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     const off = card("Pausada à mão");
     expect(off.querySelector(".ac-chip--waiting")).toBeNull();
     expect(within(off).queryByRole("button", { name: "Retomar" })).toBeNull();
+  });
+
+  test("paused near its plan's limit: until when, quietly; Continuar agora for its people, greyed with the reason for others", async () => {
+    const resetsAt = new Date(Date.now() + 2 * 3_600_000).toISOString();
+    const clock = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(resetsAt));
+    const paused = (over: Partial<Routine> & Pick<Routine, "id" | "name">) =>
+      routine({
+        state: "usage_paused",
+        usagePause: { source: "plan", resetsAt, extraOff: false },
+        brain: { kind: "claude_code", machineName: null },
+        ...over,
+      });
+    const { calls, state } = await open([
+      paused({ id: "rt-plan", name: "Revisar deploys" }),
+      paused({ id: "rt-other", name: "Resumo do suporte", canManage: false }),
+      paused({
+        id: "rt-extra",
+        name: "Triagem de issues",
+        usagePause: { source: "plan", resetsAt, extraOff: true },
+      }),
+    ]);
+    const row = card("Revisar deploys");
+    expect(row.textContent).toContain(`Pausada até ${clock} (limite do plano)`);
+    // Quiet: no chip asking for a look, no fix on the row.
+    expect(row.querySelector(".ac-chip--waiting")).toBeNull();
+    // Its run is still at work: Parar stops it, not "Rodar agora" (which would throw its progress away).
+    expect(within(row).getByRole("button", { name: "Parar Revisar deploys" })).toBeTruthy();
+    expect(within(row).queryByRole("button", { name: "Rodar agora" })).toBeNull();
+
+    const mine = await details("Revisar deploys");
+    expect(mine.textContent).toContain(`Pausada até ${clock} (limite do plano)`);
+    expect(within(mine).getByRole("button", { name: "Parar" })).toBeTruthy();
+    expect(within(mine).queryByRole("button", { name: "Rodar agora" })).toBeNull();
+    const go = within(mine).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement;
+    expect(go.disabled).toBe(false);
+    await click(go);
+    await settle(6);
+    expect(calls).toEqual(["continueUsage:rt-plan"]);
+    expect(screen().getByText("Execução continuando.")).toBeTruthy();
+    // Nothing is posted in the conversation.
+    expect(state.calls.some((c) => c.method.startsWith("chat."))).toBe(false);
+    await click(within(mine).getByRole("button", { name: "Fechar detalhes" }));
+    await settle(4);
+
+    const theirs = await details("Resumo do suporte");
+    expect((within(theirs).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(theirs.textContent).toContain("Só quem criou a rotina, o dono do agente ou um admin pode continuar agora");
+    await click(within(theirs).getByRole("button", { name: "Fechar detalhes" }));
+    await settle(4);
+
+    const off = await details("Triagem de issues");
+    expect((within(off).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(off.textContent).toContain(
+      "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago",
+    );
+  });
+
+  test("Continuar agora on a run its timed job already holds: no 'Execução continuando.'", async () => {
+    const resetsAt = new Date(Date.now() + 3_600_000).toISOString();
+    const r = withRoutines([
+      routine({
+        id: "rt-late",
+        name: "Revisar deploys",
+        state: "usage_paused",
+        usagePause: { source: "plan", resetsAt, extraOff: false },
+      }),
+    ]);
+    const routines = r.api.routines;
+    r.api.routines = {
+      ...routines,
+      continueUsage: async (_orgId, id) => {
+        r.calls.push(`continueUsage:${id}`);
+        return structuredClone((await routines.list(ORG_ID)).find((x) => x.id === id) as Routine);
+      },
+    };
+    await renderApp(`/org/${ORG_ID}/routines`, { api: r.api });
+    await settle(8);
+    const panel = await details("Revisar deploys");
+    await click(within(panel).getByRole("button", { name: "Continuar agora" }));
+    await settle(6);
+    expect(r.calls).toEqual(["continueUsage:rt-late"]);
+    expect(screen().queryByText("Execução continuando.")).toBeNull();
   });
 
   test("a run a person stopped reads 'Parada', not 'Não rodou'; every N minutes in Portuguese", async () => {

@@ -24,6 +24,7 @@ import { BootSplash } from "@/components/Sky";
 import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standing";
 import { useWebPushClear, useWebPushRefresh, WebPushAsk } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
+import { useServerLocale } from "@/i18n";
 import { inDesktopApp } from "@/lib/desktop";
 import { rememberPlace, showWorkspace } from "@/lib/start";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -56,6 +57,7 @@ function OrgLayout() {
   const focused = /\/agents\/new\/?$/.test(path) && can(membership, "create_agents");
   // Notifications in this browser (ADR 0071), when already on: the server hears of them again, quietly.
   useWebPushRefresh(me.user.id);
+  useServerLocale(me.user);
   // …and the ones it still shows for what was already read elsewhere close.
   useWebPushClear();
   useEffect(() => {

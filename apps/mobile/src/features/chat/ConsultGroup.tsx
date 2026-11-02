@@ -41,7 +41,7 @@ export const consultLineLabel = (
   state: ConsultLineState,
   c: RunConsultation,
   to: ReturnType<typeof agentGrammar>,
-) => t(consultLineKey(state, c), { name: to.name, The: to.The });
+) => t(consultLineKey(state, c), { name: to.name, context: to.context });
 
 /** A clock for the open questions' times; still once none is out. */
 function useTick(active: boolean) {
@@ -83,10 +83,10 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
   if (!draws || !group || !m.author.id) return null;
   const summary = consultGroupSummary(group, now);
   const words = consultGroupKeys(group);
-  const from = agentGrammar(t, dir.agentById.get(m.author.id)?.name ?? t("mobile.chat.someone"));
+  const from = agentGrammar(dir.agentById.get(m.author.id)?.name ?? t("mobile.chat.someone"));
   const items: BlockItem[] = group.map((c) => {
     const state = consultLineState(c, now);
-    const to = agentGrammar(t, dir.agentById.get(c.consultedAgentId)?.name ?? t("mobile.chat.someone"));
+    const to = agentGrammar(dir.agentById.get(c.consultedAgentId)?.name ?? t("mobile.chat.someone"));
     const answer = state === "answered" ? (c.answer ?? "") : null;
     const progress = consultProgress(c);
     return {
@@ -122,7 +122,7 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
       }}
       items={items}
       color={color}
-      label={t(words.label, { name: from.name, of: from.of })}
+      label={t(words.label, { name: from.name, context: from.context })}
       defaultOpen={summary.open}
       // One question: its own line ("Atlas respondeu"), with no "Perguntou a 1 colega" to open.
       one={group.length === 1}

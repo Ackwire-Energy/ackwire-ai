@@ -1,5 +1,6 @@
 import { connectorOAuthApps } from "@agenteschat/config";
 import {
+  acceptConnectionToolChanges,
   acceptCustomSuggestion,
   acceptToolChange,
   type CustomDeps,
@@ -419,6 +420,33 @@ export function customConnectorRoutes(deps: AppDeps) {
         toolName,
       );
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/connectors/{connectionId}/tool-changes/accept",
+      tags,
+      security,
+      summary: "Accept every change waiting on one connection's tools at once (connector admins)",
+      request: { params: OrgParams.extend({ connectionId: z.uuid() }) },
+      responses: { 200: json(z.object({ accepted: z.number().int() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, connectionId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      const accepted = await acceptConnectionToolChanges(
+        {
+          db,
+          pubsub: adapters.pubsub,
+          resync: (id) => refreshCustomServer(custom, actor, orgId, id),
+        },
+        actor,
+        orgId,
+        connectionId,
+      );
+      return c.json({ accepted }, 200);
     },
   );
 

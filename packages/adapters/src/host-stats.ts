@@ -70,7 +70,12 @@ export const inContainer = () =>
 
 /** `MemAvailable` from `/proc/meminfo`, in bytes. */
 export function memAvailable(meminfo: string): number | null {
-  const kb = /^MemAvailable:\s+(\d+) kB/m.exec(meminfo)?.[1];
+  return meminfoBytes(meminfo, "MemAvailable");
+}
+
+/** A line of `/proc/meminfo` (`MemAvailable`, `SwapTotal`…), in bytes; null when it isn't there. */
+export function meminfoBytes(meminfo: string, key: string): number | null {
+  const kb = new RegExp(`^${key}:\\s+(\\d+) kB`, "m").exec(meminfo)?.[1];
   return kb ? Number(kb) * 1024 : null;
 }
 

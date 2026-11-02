@@ -28,16 +28,14 @@ import {
 } from "../control/local-server";
 import { platformOf } from "../control/platform";
 import { SITE_URL } from "../control/version";
-import { DESKTOP_STRINGS, systemLocale } from "../i18n";
-import type { DesktopTranslations } from "../i18n/keys.pt-BR";
+import { desktopStrings, systemLocale } from "../i18n";
 import { elapsedClock, fillIn } from "../ui/time";
+import { stuckAction } from "./stuck";
 
 /** How long the cover waits before it asks whether the site can be reached, and how often after. */
 const CHECK_MS = 3000;
-/** Reachable but never said it painted (an older site): the cover steps aside after this. */
-const GIVE_UP_MS = 15_000;
 
-const strings = DESKTOP_STRINGS[systemLocale()] as DesktopTranslations;
+const strings = desktopStrings(systemLocale());
 const words = strings.cover;
 const platform = platformOf(navigator.userAgent);
 const device = strings.device[platform];
@@ -56,6 +54,8 @@ let unreachable = false;
 let hereWaiting = false;
 /** Since when the cover sees the server here starting or updating. */
 let waitSince: { state: "starting" | "migrating"; at: number } | null = null;
+/** How many of the stuck page's steps were taken in this showing (`stuck.ts`). */
+let stuckSteps = 0;
 
 if (sky) {
   // The same sky as the site's BootSplash (apps/web Sky.tsx), so the hand-over doesn't show.
@@ -140,6 +140,7 @@ function shown() {
   shownAt = performance.now();
   unreachable = false;
   waitSince = null;
+  stuckSteps = 0;
   say("");
   tick();
   buttons([]);
@@ -262,7 +263,31 @@ async function check() {
     void invoke("cover_retry").catch(() => {});
     return;
   }
-  if (waited > GIVE_UP_MS) void invoke("cover_hide").catch(() => {});
+  stuck(waited);
+}
+
+/** The server answers and the page never painted: load it again, then with the web cache cleared, then say so. */
+function stuck(waited: number) {
+  const next = stuckAction(waited, stuckSteps);
+  if (!next) return;
+  stuckSteps = next.step;
+  if (next.action !== "say") {
+    const why = `not painted after ${Math.round(waited / 1000)} s`;
+    void invoke("cover_retry", { fresh: next.action === "fresh", why }).catch(() => {});
+    return;
+  }
+  say(words.stuck);
+  buttons([
+    [
+      words.retry,
+      () => {
+        shown();
+        void invoke("cover_retry", { fresh: true, why: "try again" }).catch(() => {});
+      },
+    ],
+    [words.copy, copyDiagnostics],
+    [words.showAnyway, () => void invoke("cover_hide").catch(() => {})],
+  ]);
 }
 
 setInterval(() => void check(), CHECK_MS);

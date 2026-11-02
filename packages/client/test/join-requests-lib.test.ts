@@ -84,7 +84,8 @@ test("when a request came in reads as a sentence: just now, some time ago, yeste
     askedLabel(t, "en", new Date(now.getTime() - minutesAgo * 60_000).toISOString(), now);
   expect(asked(0.5)).toBe("members.requests.askedNow");
   expect(asked(180)).toBe(`members.requests.asked ${JSON.stringify({ ago: 'format.hoursAgo {"count":3}' })}`);
-  expect(asked(24 * 60)).toBe(`members.requests.asked ${JSON.stringify({ ago: "common.yesterday" })}`);
+  // "yesterday" in the reader's own words (Intl), lowercase where the language writes it so.
+  expect(asked(24 * 60)).toBe(`members.requests.asked ${JSON.stringify({ ago: "yesterday" })}`);
   expect(asked(4 * 24 * 60)).toBe(`members.requests.askedOn ${JSON.stringify({ date: "Oct 22" })}`);
 });
 

@@ -1,3 +1,4 @@
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { WikiAccess } from "../lib/wiki";
 import type {
@@ -34,9 +35,12 @@ import type {
   AiAccounts,
   AiStatus,
   ApiRule,
+  AppConsent,
+  AppConsentDecision,
   AppNotification,
   Approval,
   ApprovalRule,
+  AppsList,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -69,6 +73,7 @@ import type {
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
+  CreatedPersonalToken,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -122,6 +127,7 @@ import type {
   JoinApproval,
   JoinClaim,
   JoinRequest,
+  LearnedSkill,
   Machine,
   MachineAccess,
   MachineAccessReduce,
@@ -176,6 +182,7 @@ import type {
   OrgRoles,
   OrgSettings,
   Person,
+  PersonalTokenInput,
   PhoneSignIn,
   Poll,
   PostMedia,
@@ -316,7 +323,7 @@ export interface ApiClient {
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
-    updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
+    updateMe(input: { locale: AppLocale; auto?: boolean }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
     /**
@@ -826,6 +833,12 @@ export interface ApiClient {
     /** Every library skill with `enabled` for this agent. */
     forAgent(orgId: string, agentId: string): Promise<AgentSkill[]>;
     setForAgent(orgId: string, agentId: string, skills: { skillId: string; enabled: boolean }[]): Promise<AgentSkill[]>;
+    /** Skills the agent made from its own how-tos, archived ones too (older servers: absent). */
+    learned?(orgId: string, agentId: string): Promise<LearnedSkill[]>;
+    /** Undo the agent's last change to its own skill. */
+    revert?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Bring back a skill archived for disuse. */
+    restore?(orgId: string, id: string): Promise<SkillDetail>;
   };
   access: {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
@@ -883,6 +896,8 @@ export interface ApiClient {
     toolChanges(orgId: string): Promise<ToolChange[]>;
     /** Accepts a tool's new description and input: agents get them now. */
     acceptToolChange(orgId: string, connectionId: string, toolName: string): Promise<void>;
+    /** "Aceitar todas": every change waiting on one connection's tools, at once. */
+    acceptConnectionToolChanges(orgId: string, connectionId: string): Promise<{ accepted: number }>;
   };
   dms: {
     /** My direct conversations, with unread counts. */
@@ -912,6 +927,8 @@ export interface ApiClient {
     create(orgId: string, input: IssueInput): Promise<Issue>;
     update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
+    /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
+    share(orgId: string, id: string): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
@@ -1093,6 +1110,8 @@ export interface ApiClient {
     stop(orgId: string, id: string): Promise<Routine>;
     /** An admin or the agent's owner becomes its creator (a routine paused because its creator left). */
     takeOver(orgId: string, id: string): Promise<Routine>;
+    /** Continuar agora on a run paused near its plan's or budget's limit (`usagePause`): it goes on now. */
+    continueUsage(orgId: string, id: string): Promise<Routine>;
     runs(orgId: string, id: string): Promise<RoutineRun[]>;
     /** A phrase → rule, its description, cron and next 5 runs. */
     parseRule(orgId: string, phrase: string, timezone?: string): Promise<RuleInfo>;
@@ -1490,6 +1509,21 @@ export interface ApiClient {
   gifs?: {
     /** Free text (`q`), a category, or neither (what is trending), at the workspace's rating. */
     search(orgId: string, query: GifQuery): Promise<GifPage>;
+  };
+  /**
+   * AI apps (ADR 0119): the consent page an app's sign-in opens (`/autorizar?req=`), and Settings → AI apps. A
+   * consent answers once (409 `request_used`); 410 `request_expired` past its 30 minutes.
+   */
+  apps: {
+    consent(requestId: string): Promise<AppConsent>;
+    /** Where the browser goes next, back in the app (with `error=access_denied` on deny): go there once. */
+    decide(requestId: string, input: AppConsentDecision): Promise<{ redirectTo: string }>;
+    /** Yours here; `all`: everyone's, with `person` (needs `manage_members`). */
+    list(orgId: string, all?: boolean): Promise<AppsList>;
+    disconnect(orgId: string, grantId: string): Promise<void>;
+    /** 409 `token_limit` past 10 live tokens per person here. */
+    createToken(orgId: string, input: PersonalTokenInput): Promise<CreatedPersonalToken>;
+    revokeToken(orgId: string, grantId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

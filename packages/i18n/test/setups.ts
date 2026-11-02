@@ -122,6 +122,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.computer.hostConnecting",
     "onboarding.computer.hostReady",
     "onboarding.computer.otherComputer",
+    // A self-hosted server on a private host, which AI apps on the internet can't reach.
+    "onboarding.import.aiApp.private",
     "onboarding.platformKeyDesc",
     "openOnPhone.stepTailscale",
     "outage.dialog.none",
@@ -217,14 +219,23 @@ export const ANYWHERE: readonly string[] = [
   "desktop.servers.",
 ];
 
-const listed = (key: string, entries: readonly string[]) =>
-  entries.some((e) => (e.endsWith(".") ? key.startsWith(e) : key === e));
+/** A key's agent-gender variant (`_female`, ADR 0122) goes where its base key goes. */
+const baseOf = (key: string) => key.replace(/_female(?=(_(zero|one|two|few|many|other))?$)/, "");
+const listed = (key: string, entries: readonly string[]) => {
+  const base = baseOf(key);
+  return entries.some((e) => (e.endsWith(".") ? base.startsWith(e) : base === e));
+};
 
 /** The conditions a key is shown under. */
 export function conditionsOf(key: string): Set<Condition> {
   const out = new Set<Condition>();
   for (const c of Object.keys(SHOWN_ONLY) as Condition[]) if (listed(key, SHOWN_ONLY[c])) out.add(c);
-  if (key.split(".").some((s) => s.endsWith("Cloud"))) out.add("cloud");
+  if (
+    baseOf(key)
+      .split(".")
+      .some((s) => s.endsWith("Cloud"))
+  )
+    out.add("cloud");
   return out;
 }
 

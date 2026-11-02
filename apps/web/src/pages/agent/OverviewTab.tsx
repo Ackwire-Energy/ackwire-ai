@@ -66,7 +66,7 @@ export function OverviewTab() {
   const budgetText =
     viewer === "admin" && spent !== undefined && limit !== undefined
       ? t("agentPage.overview.spentOf", {
-          spent: formatUsd(t, locale, spent),
+          spent: formatUsd(locale, spent),
           limit: usd(t, locale, limit),
           month: formatMonth(locale, new Date()),
         })

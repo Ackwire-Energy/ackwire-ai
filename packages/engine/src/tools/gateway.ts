@@ -634,6 +634,7 @@ export function createToolGateway(deps: {
       approvalId: approval.id,
       isError: output.isError === true,
       content: shown(output.content),
+      ...(tool?.external ? { external: true } : {}),
       ...(output.data || outside ? { data: { ...output.data, ...(outside ? { outside: true } : {}) } } : {}),
     });
     // The audit: the approved action ran (or couldn't any more). Who approved it is the approval's row.
@@ -767,6 +768,8 @@ export function createToolGateway(deps: {
           name: call.name,
           isError: output.isError === true,
           content: shown(output.content),
+          // `shown` drops the outside-content envelope; learning still needs to know the text came from outside.
+          ...(tool?.external ? { external: true } : {}),
           ...(data ? { data } : {}),
         });
         if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });

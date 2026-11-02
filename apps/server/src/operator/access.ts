@@ -214,7 +214,7 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
               .array(
                 z.object({
                   email: z.string().max(320),
-                  locale: Locale.optional().openapi({ description: "pt-BR when absent." }),
+                  locale: Locale.optional().openapi({ description: "English when absent." }),
                   joinedAt: z.iso.datetime({ offset: true }).optional(),
                 }),
               )
@@ -253,7 +253,7 @@ export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }:
       path: "/early-access/invitations",
       tags,
       summary: "Invite addresses to create an account and make workspaces",
-      description: `Each address, up to ${EARLY_ACCESS_INVITE_MAX}, gets an email with a link to sign up with that address only, valid ${EARLY_ACCESS_TTL_DAYS} days, in the language of its invitation, else of its waiting-list entry, else \`locale\`, else pt-BR. An address that has an account gets no link: the account is allowed at once, and an email in its language says so (none to a blocked account). An allowed account makes workspaces once its address is confirmed. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless \`resend\` is false. Answers come in the request's order, once per address. Outcomes: \`invalid_email\`, \`signed_up\` (its invitation made an account or allowed one already, so nothing went out), \`allowed\`, \`already_invited\` (with \`resend: false\`), \`recent\` (sent in the last 2 minutes, so nothing went out), \`resent\`, \`invited\`. Refused (409 \`early_access.no_email\`) on a server that sends no email.`,
+      description: `Each address, up to ${EARLY_ACCESS_INVITE_MAX}, gets an email with a link to sign up with that address only, valid ${EARLY_ACCESS_TTL_DAYS} days, in the language of its invitation, else of its waiting-list entry, else \`locale\`, else English. An address that has an account gets no link: the account is allowed at once, and an email in its language says so (none to a blocked account). An allowed account makes workspaces once its address is confirmed. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless \`resend\` is false. Answers come in the request's order, once per address. Outcomes: \`invalid_email\`, \`signed_up\` (its invitation made an account or allowed one already, so nothing went out), \`allowed\`, \`already_invited\` (with \`resend: false\`), \`recent\` (sent in the last 2 minutes, so nothing went out), \`resent\`, \`invited\`. Refused (409 \`early_access.no_email\`) on a server that sends no email.`,
       request: {
         body: body(
           z.object({

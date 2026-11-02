@@ -90,7 +90,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
           className="ac-back"
         >
           <Icon name="chevronLeft" />
-          {t("memory.title", agentGrammar(t, backAgent.name))}
+          {t("memory.title", agentGrammar(backAgent.name))}
         </Link>
       )}
       <header className="page__header">
@@ -180,7 +180,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   </Button>
                 )}
               </div>
-              {!isText(current) ? (
+              {!isText(current) && current.target.type !== "skill" ? (
                 <SettingChange p={current} />
               ) : editing && current.status === "pending" ? (
                 <Field
@@ -233,7 +233,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   {t("proposals.refuse")}
                 </Button>
                 <span className="small muted" style={{ flex: "1 1 200px" }}>
-                  {t("proposals.refuseNote", agentGrammar(t, agentName(proposerOf(current))))}
+                  {t("proposals.refuseNote", agentGrammar(agentName(proposerOf(current))))}
                 </span>
               </div>
             )}

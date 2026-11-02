@@ -2,7 +2,6 @@ import type { TFunction } from "i18next";
 import type { LiveConsult, LiveConsultStatus } from "../realtime/consults";
 import type { LiveRun } from "../realtime/streams";
 import { joinNames } from "./format";
-import { agentGrammar } from "./grammar";
 import { MAIL_BRANDS } from "./mail";
 
 /**
@@ -127,6 +126,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   remember: "updatingMemory",
   forget: "updatingMemory",
   update_memory: "updatingMemory",
+  save_how_to: "updatingMemory",
   propose_instruction_change: "updatingMemory",
   list_events: "checkingCalendar",
   find_free_time: "checkingCalendar",
@@ -154,6 +154,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   post_in_forum: "postingInForum",
   read_forum_topic: "readingForum",
   read_skill_file: "consultingSkill",
+  update_skill: "consultingSkill",
   // Missions (the agent's tools and the executor's MCP tools).
   propose_mission: "proposingMission",
   send_to_mission: "messagingMission",
@@ -517,14 +518,13 @@ export function markedPieces(text: string): MarkedPiece[] {
 
 /** "Theo", "Theo e Iris", "Theo e mais 2". */
 export function listNames(t: TFunction, names: string[], mark: MarkName = plain) {
-  if (names.length <= 2) return joinNames(names.map(mark), t("newAgent.and"));
+  if (names.length <= 2) return joinNames(names.map(mark), t);
   return t("chat.namesMore", { first: mark(names[0] ?? ""), count: names.length - 1 });
 }
 
 /** One consultation's phrase: "Dev está perguntando ao Infra", "Infra respondeu. Dev está escrevendo". */
 function consultPhrase(t: TFunction, from: string, c: EntryConsult, mark: MarkName) {
-  const g = agentGrammar(t, c.toName);
-  if (c.status === "asking") return t("chat.consult.asking", { from: mark(from), to: mark(c.toName), prep: g.to });
+  if (c.status === "asking") return t("chat.consult.asking", { from: mark(from), to: mark(c.toName) });
   if (c.status === "answered") return t("chat.consult.answered", { from: mark(from), to: mark(c.toName) });
   return t("chat.consult.writing", { from: mark(from) });
 }

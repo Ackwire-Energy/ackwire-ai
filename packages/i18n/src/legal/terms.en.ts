@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsEn: LegalDocument = {
   title: "Terms of Use",
   summary: "The agreement for using agentes.chat: your workspace, your agents, and what each side is responsible for.",
-  updated: "2026-10-30",
+  updated: "2026-11-02",
   sections: [
     {
       id: "agreement",
@@ -153,7 +153,7 @@ export const termsEn: LegalDocument = {
       id: "changes",
       heading: "17. Changes to these Terms",
       blocks: [
-        "We may update these Terms. Material changes will be announced by email or in the app at least 14 days before they take effect; continued use after the effective date is acceptance. The current version always lives at this page. If the Portuguese and English versions differ, the English version prevails, except where the law requires otherwise.",
+        "We may update these Terms. Material changes will be announced by email or in the app at least 14 days before they take effect; continued use after the effective date is acceptance. The current version always lives at this page. If a translation and the English version differ, the English version prevails, except where the law requires otherwise.",
       ],
     },
     {

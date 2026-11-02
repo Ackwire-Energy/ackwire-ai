@@ -508,12 +508,20 @@ export function agentRoutes(deps: AppDeps) {
                         "waiting_plan",
                         "waiting_budget",
                         "provider_down",
+                        "work",
                       ])
                       .nullable()
                       .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
                     subject: z.string().nullable(),
                     emoji: z.string().nullable(),
                     until: z.string().nullable(),
+                    since: z.string().optional().openapi({ description: "Background work: since when." }),
+                    count: z.number().optional().openapi({ description: "Background work: how many at once." }),
+                    second: z.string().nullable().optional().openapi({ description: "A second work's title." }),
+                    wait: z
+                      .enum(["approval", "answer", "plan", "computer", "line"])
+                      .optional()
+                      .openapi({ description: "One background work that waits: on what." }),
                   })
                   .nullable(),
                 activeAt: z.string().nullable(),
@@ -1026,6 +1034,10 @@ export function agentRoutes(deps: AppDeps) {
                 "Claude Code: `opus`, `sonnet`, `haiku`, a Claude model id or one of a coding plan's models by id (`@agenteschat/providers/plans`; another account runs `sonnet` for it); Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
+            extraUsage: z.boolean().optional().openapi({
+              description:
+                "Long work may go on into the plan's paid extra usage when the provider reports it on (ADR 0118; Claude's plans); false: it pauses at 95% of the plan like any other. Omitted = keep.",
+            }),
             onlyOwner: z.boolean().optional().openapi({
               description:
                 "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",

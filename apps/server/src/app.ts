@@ -15,6 +15,7 @@ import { actionRoutes } from "./routes/app/actions";
 import { agentImportRoutes } from "./routes/app/agent-imports";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
+import { appRoutes } from "./routes/app/apps";
 import { artifactRoutes } from "./routes/app/artifacts";
 import { auditRoutes } from "./routes/app/audit";
 import { billingRoutes } from "./routes/app/billing";
@@ -66,6 +67,7 @@ import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
 import { registerInstance } from "./routes/instance";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
+import { type AppsRouteOptions, registerAppsRoot, registerOauthRoutes } from "./routes/oauth";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerRoutineHooks, registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
@@ -81,6 +83,8 @@ export interface AppOptions {
   moduleContext?: ModuleContext;
   /** Database, auth and adapters. Without them only system routes are mounted (some tests). */
   services?: AppDeps;
+  /** AI apps (ADR 0119): how an app's metadata document is fetched; swapped in tests. */
+  appsFetchDocument?: AppsRouteOptions["fetchDocument"];
   /** Directory with the built web app (Vite SPA). Skipped when absent. */
   webDir?: string;
   log?: Logger;
@@ -104,6 +108,8 @@ export interface AppOptions {
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
  * - `/api/hooks/*`        public: a webhook routine's own address (POST, ADR 0106)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
+ * - `/api/oauth/*`        public: the OAuth 2.1 authorization server for AI apps (ADR 0119)
+ * - `/mcp`                AI apps' MCP endpoint, bearer tokens only (ADR 0119); `/.well-known/oauth-*` its discovery
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
@@ -156,6 +162,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", actionRoutes(deps));
     api.route("/app", channelRoutes(deps));
     api.route("/app", approvalRoutes(deps));
+    api.route("/app", appRoutes(deps));
     api.route("/app", auditRoutes(deps));
     api.route("/app", customConnectorRoutes(deps));
     api.route("/app", connectorRoutes(deps));
@@ -197,6 +204,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", voiceRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
+    registerOauthRoutes(api, deps, { version, fetchDocument: options.appsFetchDocument });
     registerWebhookReceiver(api, deps);
     registerRoutineHooks(api, deps);
     registerGitHubAppWebhook(api, deps);
@@ -282,7 +290,10 @@ export function createApp(options: AppOptions) {
     if (!c.res.headers.has("cache-control")) c.res.headers.set("cache-control", "no-store");
   });
   app.route("/api", api);
-  if (options.services) registerAppLinks(app, options.services.config);
+  if (options.services) {
+    registerAppLinks(app, options.services.config);
+    registerAppsRoot(app, { log, ...options.services }, { version, fetchDocument: options.appsFetchDocument });
+  }
   app.notFound((c) =>
     c.req.path.startsWith("/api/") ? apiError(c, 404, "not_found", "Route not found") : c.text("Not found", 404),
   );

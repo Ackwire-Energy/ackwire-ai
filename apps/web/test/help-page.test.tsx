@@ -9,6 +9,7 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { Block } from "@/pages/help/HelpPage";
 import { LegalPage } from "@/pages/LegalPage";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { pick } from "./new-agent-flow";
 import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => {
@@ -58,26 +59,25 @@ describe("help pages", () => {
     await renderApp("/help/wiki", { api: signedOut() });
     expectPage(helpDocument("wiki", "pt-BR"));
     cleanup();
-    // A language the site doesn't speak is the app's too.
+    // Every app language has the help pages: ?lang=fr is the French page.
     await renderApp("/help/wiki?lang=fr", { api: signedOut() });
-    expectPage(helpDocument("wiki", "pt-BR"));
-    expect(document.querySelector(".help")?.getAttribute("lang")).toBe("pt-BR");
+    expectPage(helpDocument("wiki", "fr"));
+    expect(document.querySelector(".help")?.getAttribute("lang")).toBe("fr");
   });
 
-  test("the language switch changes the page and the address's lang", async () => {
+  test("the language switch changes the page and the address's lang, never the app's language", async () => {
     const { router, services } = await renderApp("/help/approvals?lang=en", { api: signedOut() });
+    const app = services.i18n.language;
     expectPage(helpDocument("approvals", "en"));
-    await act(async () => fireEvent.click(screen().getByRole("radio", { name: "Português (Brasil)" })));
-    await settle();
+    await pick(screen().getByRole("combobox", { name: "Language" }), "Português (Brasil)");
     expect(router.state.location.pathname).toBe("/help/approvals");
     expect(router.state.location.search).toEqual({ lang: "pt-BR" });
     expectPage(helpDocument("approvals", "pt-BR"));
-    expect(services.i18n.language).toBe("pt-BR");
-    await act(async () => fireEvent.click(screen().getByRole("radio", { name: "English" })));
-    await settle();
+    await pick(screen().getByRole("combobox", { name: "Idioma" }), "English");
     expect(router.state.location.search).toEqual({ lang: "en" });
     expectPage(helpDocument("approvals", "en"));
-    expect(services.i18n.language).toBe("en");
+    expect(services.i18n.language).toBe(app);
+    expect(localStorage.getItem("agentes.locale")).toBeNull();
   });
 
   test("code reads as code: a path in a line, and a command in a block of its own", async () => {

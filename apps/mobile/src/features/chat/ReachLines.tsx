@@ -38,7 +38,7 @@ function Row({ entry: e, channelId }: { entry: ReachEntry; channelId: string }) 
   // A DM isn't in the channel list: "in this conversation".
   const place = channel ? t("reach.inChannel", { name: channel.name }) : t("reach.inHere");
   const agent = dir.agentById.get(e.agentId);
-  const g = agentGrammar(t, agent?.name ?? `@${e.handle}`);
+  const g = agentGrammar(agent?.name ?? `@${e.handle}`);
   const handed = Boolean(e.consultationId);
   const runs = boldRuns(t(reachKey(e) as "reach.handed", { ...g, place }) as string);
   const detail = [
@@ -101,10 +101,10 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
   const audience = audienceWith(agent, userId);
   if (!person || !audience || !me || modeOf(agent) === "everyone" || !canEditAudience(org ?? undefined, agent, me))
     return null;
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   return (
     <PillButton
-      label={t("reach.allow", { person, pronoun: g.pronoun })}
+      label={t("reach.allow", { person, context: g.context })}
       onPress={() => {
         if (update.isPending || update.isSuccess) return;
         tapHaptic();

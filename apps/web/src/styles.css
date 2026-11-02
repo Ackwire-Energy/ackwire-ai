@@ -24,3 +24,26 @@
   --font-brand: "Funnel Display", var(--font-sans);
   --font-dot: "Doto", var(--font-mono);
 }
+
+/* Japanese, Korean and Chinese read in each system's own face after the Latin one (no web font to download); Source
+   Sans 3's size adjustment is for Latin letters only. Russian needs nothing: Source Sans 3 has Cyrillic. */
+:lang(ja) {
+  --font-sans:
+    "Source Sans 3 Variable", "Source Sans 3", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo,
+    "Noto Sans JP", system-ui, sans-serif;
+}
+:lang(ko) {
+  --font-sans:
+    "Source Sans 3 Variable", "Source Sans 3", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui,
+    sans-serif;
+}
+:lang(zh-Hans) {
+  --font-sans:
+    "Source Sans 3 Variable", "Source Sans 3", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui,
+    sans-serif;
+}
+:lang(ja),
+:lang(ko),
+:lang(zh-Hans) {
+  --font-size-adjust: none;
+}

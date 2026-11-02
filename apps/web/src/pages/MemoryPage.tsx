@@ -103,7 +103,7 @@ function MemoryView({ agent }: { agent: Agent }) {
   const memory = useMemory(org.id, agent.id);
   const proposals = useProposals(org.id);
   const action = useMemoryAction(org.id, agent.id);
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const [tab, setTab] = useState<MemoryTab>("known");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Memory | null>(null);

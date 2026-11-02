@@ -225,7 +225,7 @@ export function stickerWords(t: TFunction) {
 
 /** A sticker's name for screen readers: "Figurinha do Dev: comemorando". */
 export const stickerLabel = (t: TFunction, agentName: string, mood: StickerMood) =>
-  t("media.stickerOf", { ...agentGrammar(t, agentName), mood: moodLabel(t, mood) });
+  t("media.stickerOf", { ...agentGrammar(agentName), mood: moodLabel(t, mood) });
 
 /** A GIF's name for screen readers: its title (the provider's words), or just "GIF". */
 export const gifLabel = (t: TFunction, title: string) =>

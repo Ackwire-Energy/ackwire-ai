@@ -1,5 +1,7 @@
+import type { LocaleStrings } from "@agenteschat/i18n/plurals";
+
 /**
- * The screens' strings (pt-BR, the primary locale), under `mobile.*`, next
+ * The screens' strings (pt-BR; English, `keys.en.ts`, is the source), under `mobile.*`, next
  * to the foundation's (`src/i18n/keys.pt-BR.ts`: `common`, `auth`, `account`,
  * `theme`, `push`, `a11y`, `composer`, `search`), which these never repeat.
  * They merge into the same `mobile` object; `keys.en.ts` has exactly this
@@ -823,6 +825,8 @@ export const featureKeysPtBR = {
       connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
       computer_disk_full_one: "O disco de um computador está quase cheio",
       computer_disk_full_other: "O disco de um computador está quase cheio",
+      app_created_one: "Um app de IA criou coisas para você",
+      app_created_other: "Um app de IA criou coisas para você",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
@@ -890,8 +894,6 @@ export const featureKeysPtBR = {
     activityHint:
       "As ferramentas que usaram e quanto tempo levou, neste workspace, aqui e no computador. Enquanto trabalham, você continua vendo o que estão fazendo.",
     activityFailed: "Não deu para salvar. Tente de novo.",
-    langPt: "Português",
-    langEn: "English",
     sounds: "Sons",
     soundsOn: "Sons no app",
     soundsOff: "Desligados",
@@ -1224,7 +1226,8 @@ export const featureKeysPtBR = {
     ownerYou: "Responsável: você",
     nowWaiting: "Espera seu ok: {{title}}",
     did: {
-      title: "O que {{she}} fez por você",
+      title: "O que ele fez por você",
+      title_female: "O que ela fez por você",
       month_one: "{{count}} este mês",
       month_other: "{{count}} este mês",
       seeAll: "Ver tudo",
@@ -1258,7 +1261,8 @@ export const featureKeysPtBR = {
       },
     },
     knows: {
-      title: "O que {{she}} sabe sobre você",
+      title: "O que ele sabe sobre você",
+      title_female: "O que ela sabe sobre você",
       footF: "Toque para corrigir ou esquecer.",
       footM: "Toque para corrigir ou esquecer.",
       footOwner: "Só {{name}} ou quem administra pode corrigir.",
@@ -1284,7 +1288,8 @@ export const featureKeysPtBR = {
     },
     thinks: "Pensa com",
     uses: {
-      title: "O que {{she}} pode usar",
+      title: "O que ele pode usar",
+      title_female: "O que ela pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },
       area: {
         context: "Memória",
@@ -1341,7 +1346,6 @@ export const featureKeysPtBR = {
       cloudTag: "Sempre ligado",
       managedDesc: "Só deste workspace · um usuário para cada agente",
       has: "Tem o {{brains}}",
-      and: " e o ",
       none: "Nenhum outro computador pode receber esses agentes agora. Conecte um pelo site.",
       gone: "O {{computer}} voltou. Ninguém precisa trocar.",
       reason: {
@@ -1663,7 +1667,8 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Quem {{she}} atende",
+    audience: "Quem ele atende",
+    audience_female: "Quem ela atende",
     another: "Outra IA",
   },
   crash: {
@@ -1701,9 +1706,4 @@ export const featureKeysPtBR = {
     cleared: "Status limpo",
     bySelfUntil: "Escrito por {{name}} · {{when}}",
   },
-};
-
-type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
-
-/** Every locale of the screens' strings has this shape. */
-export type FeatureTranslations = Shape<typeof featureKeysPtBR>;
+} satisfies LocaleStrings;

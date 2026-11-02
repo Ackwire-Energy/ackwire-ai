@@ -76,7 +76,7 @@ export function AiAccountsSection() {
   const accounts = groupPlans(rows);
   const own = ownSignIns(ai.data);
   const several = onSeveralComputers(rows);
-  const names = (list: string[]) => joinNames(list, t("newAgent.and"));
+  const names = (list: string[]) => joinNames(list, t);
   const meterText = planMeterText(t, i18n.language);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });
   // The same picker as everywhere an AI is connected, from the card's head as Provider keys' Add key is.
@@ -200,7 +200,7 @@ export function AiAccountsSection() {
                 <div className="ac-acts">
                   {give.length === 1 && give[0] ? (
                     <Button variant="ghost" size="sm" onClick={() => give[0] && void giveTo(a, give[0])}>
-                      {t("aiAccounts.page.useFor", agentGrammar(t, give[0].name))}
+                      {t("aiAccounts.page.useFor", agentGrammar(give[0].name))}
                     </Button>
                   ) : (
                     give.length > 1 && (

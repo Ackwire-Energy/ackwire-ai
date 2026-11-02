@@ -80,7 +80,7 @@ export function Numbers() {
           <Icon name="wallet" size={14} />
           <span>
             {money
-              ? `${formatUsd(t, locale, spent)} ${t("agentPage.stats.of", { amount: usd(t, locale, limit) })}`
+              ? `${formatUsd(locale, spent)} ${t("agentPage.stats.of", { amount: usd(t, locale, limit) })}`
               : t("agentPage.numbers.budget", { percent: formatPercent(locale, used) })}
           </span>
           <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} />
@@ -117,7 +117,7 @@ export function AgentHero({
   const name = draft.name.trim() || agent.name;
   const channelNames = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
   const home = channelNames[0];
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const face = useRef<HTMLSpanElement>(null);
   const acts = useRef<HTMLDivElement>(null);
   return (

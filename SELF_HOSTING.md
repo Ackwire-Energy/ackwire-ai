@@ -370,6 +370,17 @@ server {
 
     client_max_body_size 110m;
 
+    # AI apps' MCP endpoint (Apps de IA, below): small JSON requests only.
+    location ~ ^/mcp/?$ {
+        client_max_body_size 128k;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_read_timeout 300s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -610,6 +621,45 @@ version's `service install`:
 </details>
 
 <details>
+<summary><b>AI apps (MCP)</b></summary>
+
+Claude (claude.ai, Claude Desktop, the phone), Claude Code, ChatGPT, Cursor, VS Code and any other MCP client
+can ask this server's agents for tasks: the person pastes the server's address, signs in as themselves,
+picks a workspace, and the app can list agents and channels, send a task to an agent as that person, wait for
+and read the reply, and see recent tasks. It acts with exactly the person's permissions, never approves an
+agent's action (approvals stay with people in the chat) and changes no settings. It is on by default, with
+nothing to configure: Settings → Apps de IA shows the address and the steps for each app.
+
+- **The address** is `PUBLIC_URL` + `/mcp`, for example `https://chat.example.com/mcp` (`/mcp/` works too).
+- **Sign-in** is OAuth 2.1 on this server itself (PKCE, the app registers on its own), which needs https
+  except on `localhost`. A server reached over plain http on a LAN: use a **personal token** instead
+  (Settings → Apps de IA → Tokens pessoais), sent as `Authorization: Bearer agp_…`. It works on `/mcp` only, in
+  one workspace. One with no expiry takes a sign-in in the last 10 minutes.
+- **Who calls from where**: claude.ai, the Claude apps and ChatGPT call from their own servers, so the server
+  needs a public https address (a domain, or Tailscale Funnel: What needs a public URL). Claude Code, Cursor and
+  VS Code call from the computer they run on.
+- **Proxies**: the compose file's Caddy needs nothing more (answers are JSON, never streamed) and caps `/mcp`
+  bodies at 128 KB. With nginx, add the `location ~ ^/mcp/?$` block shown above. Behind Cloudflare, never challenge
+  `/mcp`, `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server`,
+  `/.well-known/openid-configuration` and `/api/oauth/*` (a WAF skip rule: no Bot Fight Mode, no managed
+  challenge, no rate limits there). On the free plan, which can't skip Bot Fight Mode per path, allow Claude's
+  connector addresses (`160.79.104.0/21`) and ChatGPT's published ones with an IP Access rule.
+
+Check it from any computer:
+
+```sh
+curl -s https://chat.example.com/.well-known/oauth-protected-resource/mcp
+curl -si -XPOST https://chat.example.com/mcp | grep -i www-authenticate
+npx @modelcontextprotocol/inspector --cli https://chat.example.com/mcp --transport http \
+  --method tools/list --header "Authorization: Bearer agp_…"
+```
+
+The first prints the server's resource document, the second its sign-in challenge, the third the tools (with a
+personal token).
+
+</details>
+
+<details>
 <summary><b>What needs a public URL</b></summary>
 
 On Tailscale, only devices in your tailnet reach the instance. Everything people do in the apps works
@@ -622,6 +672,8 @@ internet instead, and need it public:
 - A GitHub App's events (`/api/github-app/webhook`, with `GITHUB_APP_*`).
 - Composio's events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`): new mail for routines, and connector
   accounts that expired.
+- AI apps that call from their own servers (Apps de IA, below): claude.ai, the Claude apps and ChatGPT reach
+  `/mcp` from the internet. Claude Code, Cursor and VS Code on a computer that reaches the server don't need it.
 
 **Tailscale Funnel** opens the same address to the internet, still with no domain and no open port.
 The whole instance becomes public, as on a domain: sign-up stays closed (the default), and the owner
@@ -1034,7 +1086,7 @@ computer (`tailscale serve`, an nginx or a Caddy outside Docker) takes
 `sudo agentes-runner services allow tcp/443` too, or agents can't push to its git. Container and VM
 networks on the computer are closed to agents, except ports published on an address other than
 loopback. Each agent also has its own `/tmp`, `/dev/shm` and `/run/lock`, in memory as the computer's
-are (a tmpfs of its own, which counts in its memory limit), and its own `/var/tmp` on disk (in
+are (a tmpfs of its own, which counts in the agents' memory), and its own `/var/tmp` on disk (in
 `/var/lib/agentes-runner-tmp`), cleared of what is 10 days old (30 in `/var/tmp`), so a socket or file
 another agent leaves there is out of its reach, and its own adb server port
 (`ANDROID_ADB_SERVER_PORT`). Agents can't schedule cron or at jobs, which would run outside their own
@@ -1050,8 +1102,23 @@ organizations share, so Kotlin compiles inside Gradle there. Two things stay sha
 server an agent binds to `0.0.0.0` is as reachable from outside the computer as your firewall lets it
 be, so agents should bind private servers to `127.0.0.1`; and abstract Unix sockets (a name, not a file)
 have no owner, so a program an agent runs that listens on one without checking who connects is open to
-the other agents, and an agent can take a name another agent's program wants (an X display's: its
-desktop then starts on another one).
+the other agents, and an agent can take a name another agent's program wants. An X display's name taken
+before a desktop starts sends that desktop to another display, but an agent holding all 50 stops every new
+or restarted desktop on the computer, and on this server's own computer the names span its
+organizations.
+
+**Memory and CPUs.** With `--system` the agents share the computer: none has memory or CPUs of its own,
+so one agent's build may use every CPU and all the memory the agents have; when several want the CPUs,
+each gets an equal share. All of them together stop at 75% of the RAM (50% on this server's own
+computer), plus swap for a third of that, which keeps the rest for the system, the runner and, here,
+the server. At that limit the kernel stops one process, usually the biggest (Chrome's pages first), and
+only that process: the command it belonged to fails, and the agent is told it was most likely memory
+(with systemd 253 or newer; a desktop or a task already running when you update gets this when it next
+starts).
+`agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what is free
+for new work and which agents use the most; agents are told to run it before something heavy, to tell
+the person when another agent's work leaves no room, and to stop what a finished build left running.
+Expo's default Android debug build fits an 8 GB computer this way, using nearly all the agents' memory.
 
 **The shared folder.** Every computer has one folder all of its agents read and write, so what one of
 them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is

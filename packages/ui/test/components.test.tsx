@@ -774,6 +774,50 @@ describe("Message aside and foot", () => {
     }
   });
 
+  test("my own row: the time and then the receipt under the turn's last bubble, no time in the far-left column", () => {
+    const { container } = render(
+      <>
+        <Message author="Eu" time="8:39 PM" own run="start" aside={<span>✓</span>}>
+          <MessageText>primeira</MessageText>
+        </Message>
+        <Message author="Eu" time="8:40 PM" own run="end" grouped aside={<span>✓✓</span>}>
+          <MessageText>segunda</MessageText>
+        </Message>
+      </>,
+    );
+    const [start, end] = Array.from(container.querySelectorAll("article"));
+    // A line under the bubble: time first, then the receipt (a button stays one).
+    expect(end?.querySelector(".ac-msg__text + .ac-msg__own-foot")?.textContent).toBe("8:40 PM✓✓");
+    expect(end?.querySelector(".ac-msg__own-time")?.getAttribute("aria-hidden")).toBe("true");
+    expect(end?.querySelector(".ac-msg__own-foot > .ac-msg__aside")?.getAttribute("aria-hidden")).toBeNull();
+    // A run's earlier row: no time, in the left column or under it.
+    expect(start?.querySelector(".ac-msg__own-foot, .ac-msg__own-time")).toBeNull();
+    for (const row of [start, end])
+      expect(row?.querySelector(".ac-msg__gutter, .ac-msg__avatar, .ac-msg__aside--floating")).toBeNull();
+  });
+
+  test("every menu's rows share one dense height and side padding, as dense as the message's bar", async () => {
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const decls = (selector: string) =>
+      [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((m) => (m[1] ?? "").split(",").some((s) => s.trim() === selector))
+        .map((m) => m[2] ?? "")
+        .join(";");
+    const value = (selector: string, prop: string) =>
+      [...decls(selector).matchAll(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`, "g"))].at(-1)?.[1]?.trim();
+    expect(css).toContain(":root {\n  --menu-item-h: 28px;\n  --menu-item-px: 8px;\n}");
+    expect(value(".ac-menu__item", "padding")).toBe("calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px)");
+    expect(value(".ac-menu__item", "min-height")).toBe("var(--menu-item-h)");
+    expect(value(".ac-menu__item", "line-height")).toBe("20px");
+    expect(value(".ac-menu__reaction", "height")).toBe("var(--menu-item-h)");
+    expect(value(".ac-menu", "padding")).toBe("4px");
+    // No menu's rows taller than the bar's buttons by more than the token: nothing sets its own item height.
+    expect(css).not.toMatch(/\.ac-menu__item\s*\{[^}]*min-height:\s*\d+px/);
+  });
+
   test("the action bar is small and sits on the row's top edge, left of the check", async () => {
     const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
@@ -1012,8 +1056,8 @@ describe("Message on touch", () => {
     expect(rule(".ac-msg:hover")).toBe("background: var(--plate-soft);");
     expect(rule('.ac-msg[data-menu-open="true"]')).toBe("background: var(--plate);");
     expect(css.indexOf('.ac-msg[data-menu-open="true"]')).toBeGreaterThan(css.indexOf(".ac-msg:hover {"));
-    expect(rule(".ac-menu__item", block("pointer: coarse"))).toBe("min-height: 40px;");
-    expect(rule(".ac-menu__reaction", block("pointer: coarse"))).toBe("width: 40px; height: 40px;");
+    expect(rule(":root", block("pointer: coarse"))).toContain("--menu-item-h: 40px;");
+    expect(rule(".ac-menu__reaction", block("pointer: coarse"))).toBe("width: 40px;");
   });
 });
 

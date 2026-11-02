@@ -8,6 +8,7 @@ import { routineSeer } from "./routines";
 import { outageParkedSql } from "./runs";
 import { toolGroupKey } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
+import { liveWorksByAgent, type WorkView } from "./works";
 
 const { agents, agentRuns, channels, issues, messages, missions } = schema;
 type AgentRunRow = typeof agentRuns.$inferSelect;
@@ -42,7 +43,9 @@ export type AgentStatusKind =
   | "waiting_computer"
   | "waiting_plan"
   | "waiting_budget"
-  | "provider_down";
+  | "provider_down"
+  /** Long work in the background (ADR 0121): `subject` its title (only where everyone may read it), `count` how many. */
+  | "work";
 
 /** An agent's line: its own words (`self`), one picked for its run (`auto`), or what its run waits on (`wait`). */
 export interface AgentStatusLine {
@@ -52,6 +55,14 @@ export interface AgentStatusLine {
   subject: string | null;
   emoji: string | null;
   until: string | null;
+  /** Since when (a work's start). */
+  since?: string;
+  /** How many background works it is on (with `kind` `work`). */
+  count?: number;
+  /** A second work's title, for "Em 2 trabalhos: A e B". */
+  second?: string | null;
+  /** One work that waits: on what (`approval`, `answer`, `plan`, `computer`, `line`). */
+  wait?: "approval" | "answer" | "plan" | "computer" | "line";
 }
 
 export interface AgentStatusView {
@@ -133,13 +144,17 @@ export async function loadAgentStatuses(
         agentId: agentRuns.agentId,
         status: agentRuns.status,
         background: agentRuns.background,
+        workId: agentRuns.workId,
         issueId: agentRuns.issueId,
         startedAt: agentRuns.startedAt,
         heartbeatAt: agentRuns.heartbeatAt,
         updatedAt: agentRuns.updatedAt,
         waitingMachineId: agentRuns.waitingMachineId,
         outage: outageParkedSql,
-        waitCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+        // A long-work pause (ADR 0118) reads as the wait on what it paused on.
+        waitCode: sql<string | null>`case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'usage_pause'
+          then (case when ${agentRuns.transcript}->'waitingForBrain'->>'source' = 'budget' then 'budget' else 'plan_limit' end)
+          else ${agentRuns.transcript}->'waitingForBrain'->>'code' end`,
       })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),
@@ -155,6 +170,12 @@ export async function loadAgentStatuses(
       )
       .groupBy(agentRuns.agentId),
   ]);
+  const works = await liveWorksByAgent(db, orgId, ids);
+  const publicIds = await publicChannelIds(
+    db,
+    orgId,
+    [...works.values()].flat().map((w) => w.channelId),
+  );
   const ms = now.getTime();
   // A running run without a recent heartbeat lost its worker: it doesn't count (recovery takes it within a minute).
   const alive = open.filter(
@@ -164,7 +185,8 @@ export async function loadAgentStatuses(
   const runById = new Map(alive.map((r) => [r.id, r]));
   const lastAt = new Map(last.map((r) => [r.agentId, r.at ? new Date(r.at) : null]));
   return list.map((a) => {
-    const runs = alive.filter((r) => r.agentId === a.id);
+    // Long work (ADR 0121) speaks through its own line below, never through the wait lines.
+    const runs = alive.filter((r) => r.agentId === a.id && !r.workId);
     const working = runs.filter((r) => (ACTIVE as readonly string[]).includes(r.status));
     const long = (r: (typeof runs)[number]) =>
       r.startedAt !== null && ms - r.startedAt.getTime() >= AGENT_HEAVY_AFTER_MS;
@@ -184,10 +206,14 @@ export async function loadAgentStatuses(
       // Parked on a provider outage it waits on nobody: its line says the provider is down for as long as it is.
       status = waits.outage || ms - waits.updatedAt.getTime() < AGENT_WAIT_LINE_MS ? waitLine(waits) : null;
     }
+    const mine = works.get(a.id) ?? [];
+    // Precedence: its own words > its background works > a conversation run's line > what a run waits on.
+    if (mine.length > 0 && stored?.line.by !== "self") status = workLine(mine, publicIds);
     const heavy =
+      mine.some((w) => w.status === "live") ||
       working.some((r) => r.background || r.issueId !== null || long(r)) ||
       (stored?.busy === true && working.length > 0);
-    const activeAt = runs.length > 0 ? now : (lastAt.get(a.id) ?? null);
+    const activeAt = runs.length > 0 || mine.length > 0 ? now : (lastAt.get(a.id) ?? null);
     const presence: AgentPresence = a.heldAt
       ? "offline"
       : heavy
@@ -197,6 +223,50 @@ export async function loadAgentStatuses(
           : "away";
     return { agentId: a.id, presence, status, activeAt: activeAt?.toISOString() ?? null };
   });
+}
+
+const WORK_WAITS: Partial<Record<NonNullable<WorkView["state"]>, AgentStatusLine["wait"]>> = {
+  waiting_approval: "approval",
+  waiting_input: "answer",
+  paused: "plan",
+  waiting_computer: "computer",
+  queued: "line",
+};
+
+/** The line of an agent on background work: its titles only where everyone may read them (a public channel). */
+function workLine(list: WorkView[], publicIds: Set<string>): AgentStatusLine {
+  const titled = (w: WorkView) => (publicIds.has(w.channelId) ? w.title : null);
+  const first = list[0] as WorkView;
+  const oldest = list.reduce((a, w) => (w.startedAt < a ? w.startedAt : a), first.startedAt);
+  const wait = list.length === 1 && first.state ? WORK_WAITS[first.state] : undefined;
+  return {
+    by: "auto",
+    text: null,
+    kind: "work",
+    subject: titled(first),
+    emoji: null,
+    until: null,
+    since: list.length === 1 ? first.startedAt : oldest,
+    count: list.length,
+    second: list[1] ? titled(list[1]) : null,
+    ...(wait ? { wait } : {}),
+  };
+}
+
+async function publicChannelIds(db: Database, orgId: string, ids: string[]) {
+  if (ids.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ id: channels.id })
+    .from(channels)
+    .where(
+      and(
+        eq(channels.orgId, orgId),
+        inArray(channels.id, [...new Set(ids)]),
+        eq(channels.kind, "channel"),
+        eq(channels.visibility, "public"),
+      ),
+    );
+  return new Set(rows.map((r) => r.id));
 }
 
 interface StoredStatus {
@@ -285,6 +355,10 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     waiting_plan: "waiting for its plan to reset",
     waiting_budget: "waiting for its budget to renew",
     provider_down: "waiting for its AI provider to come back (it retries by itself)",
+    work:
+      (line.count ?? 1) > 1
+        ? `on ${line.count} background works${s ? ` ("${s}"…)` : ""}`
+        : `working in the background${s ? ` on "${s}"` : ""}`,
   };
   return line.kind ? words[line.kind] : null;
 }

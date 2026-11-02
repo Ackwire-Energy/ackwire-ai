@@ -122,7 +122,7 @@ export function ConnectAiSheet() {
         <ConnectAiFlow
           view={view}
           onView={setView}
-          sheetTitle={one ? t("connectAi.titleFor", agentGrammar(t, one.name)) : t("connectAi.title.any")}
+          sheetTitle={one ? t("connectAi.titleFor", agentGrammar(one.name)) : t("connectAi.title.any")}
           agents={agents}
           hasAi={hasAi}
           {...(params.agentId ? { startAgentId: params.agentId } : {})}

@@ -13,6 +13,7 @@ import {
   busyOnComputer,
   healthWords,
   isRunAtWork,
+  isStoppable,
   pausedFix,
   routineChannelOf,
   runMessageLink,
@@ -70,7 +71,7 @@ import {
   useWhenText,
 } from "./hooks";
 import { hasFired, isDoneOnce, isPaused, isReminder, isRunning, mailTrouble, routineTitle, targetIcon } from "./logic";
-import { FixButton, StateChip } from "./parts";
+import { FixButton, StateChip, UsagePausedNote } from "./parts";
 import { RunStrip } from "./RunPixels";
 import { nextLabel } from "./rule";
 import { WebhookCard } from "./WebhookCard";
@@ -158,6 +159,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
   const done = isDoneOnce(r);
   const fired = hasFired(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const reminder = isReminder(r);
   const trouble = mailTrouble(r);
   const described = useRuleDescribe(
@@ -181,7 +183,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
         usage.tokens !== null
           ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
           : null,
-        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(i18n.language, usage.costUsd) }) : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -254,8 +256,8 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                 onPress={() => router.push(editRoutineHref(r.id))}
               />
               {/* Parar for a run at work (a paused routine's too); "Rodar agora" while it may run. */}
-              {(running || !fired) && !reminder ? (
-                running ? (
+              {(stoppable || !fired) && !reminder ? (
+                stoppable ? (
                   <Button
                     size="sm"
                     variant="secondary"
@@ -288,6 +290,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
             </View>
           ) : null}
 
+          {r.state === "usage_paused" ? <UsagePausedNote routine={r} controls={controls} /> : null}
           <Section title={t("routines.panel.week")}>
             <Block>
               <Text variant="body">{health ? health.map(say).join(" · ") : t("routines.health.none")}</Text>
@@ -310,7 +313,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
             </Block>
           </Section>
 
-          <Section title={t("routines.panel.what", agentGrammar(t, agentName))}>
+          <Section title={t("routines.panel.what", agentGrammar(agentName))}>
             <Block>
               {r.canSeeDetails && r.prompt !== null ? (
                 <Text variant="body" selectable>
@@ -445,7 +448,10 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               <Block>
                 <Text variant="footnote" tone="muted">
                   {nexts[0] && !done
-                    ? `${t("routines.noRuns")} ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`
+                    ? t("common.joinSentences", {
+                        a: t("routines.noRuns"),
+                        b: t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) }),
+                      })
                     : t("routines.noRuns")}
                 </Text>
               </Block>

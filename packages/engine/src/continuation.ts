@@ -142,39 +142,64 @@ export async function continuationVerdict(
     runKind: TurnKind;
     /** Agents its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
     unreached?: string;
+    /**
+     * Asks the same call whether the turn taught something worth keeping (ADR 0120) and hands the answer here: no
+     * extra model call on any turn.
+     */
+    onLearn?: (signal: LearnSignal) => void;
+    /** The call with the `learn` question failed and the verdict was asked again without it (error reports). */
+    onLearnFailed?: (error: unknown) => void;
   },
 ): Promise<ContinuationVerdict> {
-  const answers = await judge.ask({
-    orgId: input.orgId,
-    agentId: input.agentId,
-    runId: input.runId,
-    kind: "follow_through",
-    state: {
-      request: cutText(input.request, 2000),
-      reply: cutTextEnd(input.reply, 3000),
-      means: input.means,
-      tried: input.tried.slice(-20).map(neutralizeUntrusted),
-      runKind: input.runKind,
-      ...(input.unreached ? { unreached: input.unreached } : {}),
-    },
-    questions: {
-      verdict: {
-        type: "choice",
-        instructions:
-          "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
-        criteria: {
-          done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
-          untried:
-            "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
-          continue:
-            "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
-          ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
-          secret:
-            "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
-        },
+  const ask = (learn: boolean) =>
+    judge.ask({
+      orgId: input.orgId,
+      agentId: input.agentId,
+      runId: input.runId,
+      kind: "follow_through",
+      state: {
+        request: cutText(input.request, 2000),
+        reply: cutTextEnd(input.reply, 3000),
+        means: input.means,
+        tried: input.tried.slice(-20).map(neutralizeUntrusted),
+        runKind: input.runKind,
+        ...(input.unreached ? { unreached: input.unreached } : {}),
       },
-    },
-  });
+      questions: {
+        verdict: {
+          type: "choice",
+          instructions:
+            "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
+          criteria: {
+            done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
+            untried:
+              "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
+            continue:
+              "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
+            ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
+            secret:
+              "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
+          },
+        },
+        ...(learn ? { learn: LEARN_QUESTION } : {}),
+      },
+    });
+  let learned = input.onLearn !== undefined;
+  let answers: Awaited<ReturnType<typeof ask>>;
+  try {
+    answers = await ask(learned);
+  } catch (error) {
+    // Some providers' filters refuse a wording (a Claude subscription sign-in's misleading 400): the follow-through
+    // verdict must never fail because of the extra question, so it is asked again alone.
+    if (!learned) throw error;
+    learned = false;
+    input.onLearnFailed?.(error);
+    answers = await ask(false);
+  }
+  if (input.onLearn) {
+    const choice = learned ? answers.learn?.choice : undefined;
+    input.onLearn(LEARN_SIGNALS.includes(choice as LearnSignal) ? (choice as LearnSignal) : "none");
+  }
   const a = answers.verdict;
   const p = (k: ContinuationVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
   const verdict: ContinuationVerdict =
@@ -191,6 +216,24 @@ export async function continuationVerdict(
   // (`continue`) goes on.
   return verdict === "untried" && onlySafetyRefusals(input.tried) ? "done" : verdict;
 }
+
+/** What a finished turn taught, as the turn-end judgment reads it (ADR 0120): `none` starts no learning. */
+export type LearnSignal = "none" | "method" | "correction" | "fact";
+const LEARN_SIGNALS: readonly LearnSignal[] = ["none", "method", "correction", "fact"];
+
+const LEARN_QUESTION = {
+  type: "choice" as const,
+  instructions:
+    "Did this turn show something durable the agent should keep for next time, as `request`, `reply` and `tried` show it?",
+  criteria: {
+    method:
+      "It worked out a way it will reuse: several tries before one worked, a new API or address, a command or a script it wrote.",
+    correction:
+      "A person corrected it or said how they want things done from now on ('always…', 'from now on…', 'don't… again').",
+    fact: "A person's message or a tool result gave a lasting fact about the company, its people or its systems.",
+    none: "Anything else: a one-off request, a passing error, a plain answer or a story.",
+  },
+};
 
 /** One tool call as the judge reads it: `name(argument) → outcome`, short. */
 export function callLine(name: string, input: unknown, result?: { content: string; isError?: boolean } | null) {
@@ -214,6 +257,16 @@ const oneLineCut = (text: string, max: number) => cutText(text.replace(/\s+/g, "
  * `tool_call` events with `executed` and the run keeps in `transcript.harnessTried`.
  */
 export async function triedCalls(db: Database, run: { id: string; orgId: string }, harness: string[] = []) {
+  const calls = await runCalls(db, run);
+  const tag = (line: string, safety: boolean | undefined) => (safety ? `${SAFETY_TAG} ${line}` : line);
+  return [
+    ...calls.map((c) => tag(callLine(c.name, c.input, c.result), c.safety)),
+    ...harness.map((l) => tag(l, !l.startsWith(SAFETY_TAG) && HARNESS_SAFETY.test(l))),
+  ].slice(-20);
+}
+
+/** A run's tool calls through the gateway, oldest first, each with its result once it came. */
+export async function runCalls(db: Database, run: { id: string; orgId: string }) {
   const steps = await db
     .select({ kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
     .from(schema.agentRunSteps)
@@ -225,26 +278,33 @@ export async function triedCalls(db: Database, run: { id: string; orgId: string 
       ),
     )
     .orderBy(schema.agentRunSteps.seq);
-  const calls = new Map<
-    string,
-    { name: string; input: unknown; result?: { content: string; isError?: boolean }; safety?: boolean }
-  >();
+  const calls = new Map<string, RunCall>();
   for (const { kind, data } of steps) {
     const id = typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`;
     const name = typeof data.name === "string" ? data.name : "";
     if (kind === "tool_call") calls.set(id, { name, input: data.input });
     else {
       const call = calls.get(id) ?? { name, input: undefined };
-      call.result = { content: String(data.content ?? ""), isError: data.isError === true };
+      call.result = {
+        content: String(data.content ?? ""),
+        isError: data.isError === true,
+        // `data.data.outside`: the gateway's mark for any outside read, which survives `shown` dropping the envelope.
+        external: data.external === true || (data.data as { outside?: unknown } | undefined)?.outside === true,
+      };
       call.safety = data.isError === true && isSafetyCode((data.data as { code?: unknown } | undefined)?.code);
       calls.set(id, call);
     }
   }
-  const tag = (line: string, safety: boolean | undefined) => (safety ? `${SAFETY_TAG} ${line}` : line);
-  return [
-    ...[...calls.values()].map((c) => tag(callLine(c.name, c.input, c.result), c.safety)),
-    ...harness.map((l) => tag(l, !l.startsWith(SAFETY_TAG) && HARNESS_SAFETY.test(l))),
-  ].slice(-20);
+  return [...calls.values()];
+}
+
+export interface RunCall {
+  name: string;
+  input: unknown;
+  /** `external`: an answer read from outside (an MCP server, a screen), recorded without its envelope. */
+  result?: { content: string; isError?: boolean; external?: boolean };
+  /** Refused for safety (`SAFETY_CODES`): final for that data. */
+  safety?: boolean;
 }
 
 export type TurnKind = "conversation" | "agents_dm" | "routine";

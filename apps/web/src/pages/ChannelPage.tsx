@@ -96,13 +96,14 @@ import {
   runPosition,
   usageLine,
 } from "@agenteschat/client/lib/chat";
+import { draftKeyOf } from "@agenteschat/client/lib/composer-drafts";
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
@@ -131,6 +132,7 @@ import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import {
@@ -218,6 +220,7 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
+import { MessageWorkLine } from "@/components/BackgroundWork";
 import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/browser/BrowserCard";
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
@@ -226,7 +229,7 @@ import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
 import { ChannelPinsButton } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
-import { NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
+import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -311,10 +314,12 @@ import {
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
+import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
+import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
@@ -621,7 +626,12 @@ function ChannelView({
   const sendTyping = useTypingSender(channel.id, thread?.id);
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
-  const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
+  // What I typed and didn't send stays in this browser: switching conversations or reloading keeps it.
+  const [draft, setDraft] = useComposerDraft(
+    me.user.id,
+    draftKeyOf(channel.id, thread?.id),
+    draftKey ? peekDraft(draftKey) : undefined,
+  );
   // Stopping is immediate, nothing asked (what it did stays, "Continuar" picks it up): the composer's
   // button when the box is empty, or Esc anywhere on the page (composer empty, nothing open).
   const { canStop: mayStop, stop: stopRun } = useStopRun();
@@ -668,6 +678,16 @@ function ChannelView({
     setConsultId(null);
     setProfile({ agentId, tab });
   }, []);
+  // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
+  useEffect(() => {
+    if (chrome?.panel) return;
+    const open = () => {
+      const ask = takeAgentPanel();
+      if (ask) openAgentPanel(ask.agentId, ask.tab);
+    };
+    open();
+    return onAgentPanel(open);
+  }, [chrome?.panel, openAgentPanel]);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
   // `/summary` and `/plan`: a card only I see, under the conversation.
@@ -1259,7 +1279,7 @@ function ChannelView({
   const commandAgent = dmAgent ?? suggestedAgent;
   const navigateTo = useNavigate();
   const commandPrefix = dmAgent || !commandAgent ? "" : `@${commandAgent.handle} `;
-  const cg = agentGrammar(t, commandAgent?.name ?? "");
+  const cg = agentGrammar(commandAgent?.name ?? "");
   const commands: ComposerCommand[] = commandAgent
     ? [
         {
@@ -1566,7 +1586,7 @@ function ChannelView({
   // While an agent works here: the send button turns into stop (box empty), and typing offers
   // "Juntar ao que ele faz" (↵) or "Parar e mandar" (⌘↵).
   const stopName = stopTarget ? (dir.agentById.get(stopTarget.agentId)?.name ?? t("channel.unknownAgent")) : "";
-  const stopGrammar = agentGrammar(t, stopName);
+  const stopGrammar = agentGrammar(stopName);
   const working = stopTarget
     ? {
         stopLabel: t("run.stopAgent", stopGrammar),
@@ -1576,7 +1596,6 @@ function ChannelView({
     : null;
   // The choice is for anyone who writes while an agent works (the stop button only for who may stop it).
   const busyGrammar = agentGrammar(
-    t,
     busyTarget ? (dir.agentById.get(busyTarget.agentId)?.name ?? t("channel.unknownAgent")) : "",
   );
   const choice = busyTarget
@@ -1764,7 +1783,7 @@ function ChannelView({
   const Tag = chrome?.panel ? "section" : "main";
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
-    t("newAgent.and"),
+    t,
   );
   const subtitle = [
     channel.topic,
@@ -2276,7 +2295,7 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
-  /** A DM with this person: my rows keep the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turns' time lines keep the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** The agents' questions to other agents: inside the replies that asked, and how their answers draw. */
   consultGroups: ConsultGroups;
@@ -2642,8 +2661,6 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
   );
 }
 
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
-
 /**
  * The block's header: the time it started, as any message. What it is doing and for how long is the
  * bar's above the composer (saying it twice was noise).
@@ -2662,7 +2679,7 @@ function LiveRunStatus({
   run: LiveRun /** The waiting row's step line says what it does. */;
   quietOnly?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -2712,7 +2729,7 @@ function LiveRunStatus({
       ) : (
         doing && (
           <p className="ac-msg__activity" aria-live="polite">
-            {capitalize(activityVerb(t, doing))}…
+            {capitalize(activityVerb(t, doing), i18n.language)}…
           </p>
         )
       )}
@@ -3182,7 +3199,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   seenLive?: LiveRun;
   /** The last message of its run here: it carries the run's browser card while a take over holds it. */
   lastOfRun?: boolean;
-  /** A DM with this person: my row keeps the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turn's time line keeps the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** My latest message, which they read: their face in that slot. */
   seen?: boolean;
@@ -3282,6 +3299,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
   const reminder = isReminderMessage(m.meta);
+  const via = m.author.type === "person" ? appVia(m.meta) : null;
   const myHandle = dir.memberById.get(me.user.id)?.handle?.toLowerCase();
   const mentionsMe =
     !!myHandle && !(m.author.type === "person" && m.author.id === me.user.id) && mentionsHandle(body, myHandle);
@@ -3365,7 +3383,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
   // Nobody called it: it joined the conversation on its own (`meta.joined`).
   const joined = m.author.type === "agent" && meta.joined === true;
-  const joinedTip = joined ? t("chat.joined.tip", agentGrammar(t, name)) : null;
+  const joinedTip = joined ? t("chat.joined.tip", agentGrammar(name)) : null;
   // The root of an issue's work thread (the person asked the agent to implement it): the issue card, no text.
   const issueWork = issueWorkOf(meta);
   // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
@@ -3500,6 +3518,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 onToggle={() => setReportOpen((o) => !o)}
               />
             )}
+            {via && <AppViaTag via={via} person={name} />}
             {talker && (
               <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
                 {t("chat.notice.talker")}
@@ -3802,6 +3821,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
             />
           )}
+          {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
+          {m.longWork && !m.local && <MessageWorkLine message={m} threaded={Boolean(threadLine)} />}
           {/* A "Responder" thread went on from here: its line (opens the panel). */}
           {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
           {feedback && (
@@ -4152,10 +4173,10 @@ function ChannelDetails({
                   {!r.autoReply
                     ? t("channelMembers.mentionLine", { handle: r.handle })
                     : !picksForMe(routing)
-                      ? t(replyAloneKey(routing), agentGrammar(t, r.name))
+                      ? t(replyAloneKey(routing), agentGrammar(r.name))
                       : dir.agentById.get(r.id)?.coordinator
                         ? t("channelMembers.coordinatorLine")
-                        : t("channelMembers.aloneLine", agentGrammar(t, r.name))}
+                        : t("channelMembers.aloneLine", agentGrammar(r.name))}
                 </span>
               </span>
               {r.setsReply && (
@@ -4174,7 +4195,7 @@ function ChannelDetails({
                   }
                 >
                   <MenuRadioGroup
-                    label={t("channelMembers.replyHeading", agentGrammar(t, r.name))}
+                    label={t("channelMembers.replyHeading", agentGrammar(r.name))}
                     value={r.autoReply ? "alone" : "mention"}
                     onValueChange={(v) => autoReply.mutate({ agentId: r.id, on: v === "alone" })}
                     options={[
@@ -4182,8 +4203,8 @@ function ChannelDetails({
                         value: "alone",
                         label: (
                           <>
-                            {t("channelMembers.replyAlone", agentGrammar(t, r.name))}
-                            <span className="ac-menu__desc">{t(replyAloneKey(routing), agentGrammar(t, r.name))}</span>
+                            {t("channelMembers.replyAlone", agentGrammar(r.name))}
+                            <span className="ac-menu__desc">{t(replyAloneKey(routing), agentGrammar(r.name))}</span>
                           </>
                         ),
                       },
@@ -4284,7 +4305,7 @@ function ChannelDetails({
         title={t("channelMembers.removeTitle", { name: removing?.name ?? "", channel: channel.name })}
         description={t(
           removing?.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody",
-          agentGrammar(t, removing?.name ?? ""),
+          agentGrammar(removing?.name ?? ""),
         )}
         closeLabel={t("common.close")}
         width={440}

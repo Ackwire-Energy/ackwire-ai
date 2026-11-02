@@ -158,9 +158,11 @@ export function AuthPage({
       ? t("auth.flow.toConnectAi")
       : goal && "create" in goal
         ? t("auth.flow.toCreateAgent")
-        : joining
-          ? t(joining.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", { org: joining.orgName })
-          : null;
+        : goal && "authorize" in goal
+          ? t("auth.flow.toAuthorizeApp")
+          : joining
+            ? t(joining.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", { org: joining.orgName })
+            : null;
   const [browser, setBrowser] = useState<{
     provider: SignInProvider;
     verifier: string;
