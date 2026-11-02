@@ -56,11 +56,11 @@ async function setup(options: Parameters<typeof baseSetup>[0] = {}) {
     skillTools: true,
     toolSources: [fetchSource],
     ...options,
-    reply: (req) => {
+    reply: (req, call) => {
       const system = systemText(req.system);
       if (isLearn(system)) return { chunks: [JSON.stringify(learnOutput)] };
       if (isPromotion(system)) return { chunks: [JSON.stringify(skillOutput)] };
-      return typeof options.reply === "function" ? options.reply(req) : { chunks: ["ok"] };
+      return typeof options.reply === "function" ? options.reply(req, call) : { chunks: ["ok"] };
     },
   });
 }
@@ -105,7 +105,11 @@ async function step(
 }
 
 /** Calls a tool as `run` would. */
-async function invoke(run: { id: string; channelId: string; triggerMessageId: string }, name: string, input: unknown) {
+async function invoke(
+  run: { id: string; channelId: string; triggerMessageId: string },
+  name: string,
+  input: Record<string, unknown>,
+) {
   const ctx: ToolContext = {
     db: f.db,
     orgId: f.org.id,
@@ -167,7 +171,7 @@ describe("agents learn on their own (ADR 0120)", () => {
     ]);
     expect(howTo?.subjectKey).toBe("how list models northwind the to");
     expect(howTo?.evidence.map((e) => e.type)).toEqual(["self"]);
-    expect((await receipts()).map((r) => [r.kind, r.targetId])).toEqual([["memory.saved", howTo?.id]]);
+    expect((await receipts()).map((r) => [r.kind, r.targetId])).toEqual([["memory.saved", howTo?.id ?? ""]]);
     // Quiet: no memory mark on the person's message.
     const marks = await memoriesFor(f.db, f.org.id, [{ id: msg.id, channelId: f.general.id, authorType: "person" }]);
     expect(marks.get(msg.id) ?? []).toEqual([]);
