@@ -343,12 +343,31 @@ const COMPUTING_FUNCTIONS = new Set(
 );
 
 /**
+ * Built-in operators (and the names the parser gives `LIKE`, `BETWEEN`, `IN`…): any other symbol is one the workspace
+ * made, whose function can write.
+ */
+const BUILTIN_OPERATORS = new Set([
+  ..."= <> < > <= >= + - * / % ^ || ~~ !~~ ~~* !~~* ~ ~* !~ !~* @> <@ ? ?| ?& -> ->> #> #>> #- @? @@ &&".split(" "),
+  "between",
+  "not between",
+  "between symmetric",
+  "not between symmetric",
+]);
+/** Built-in types a cast may name without `pg_catalog.` (the parser qualifies the SQL-standard ones itself). */
+const BUILTIN_TYPES = new Set(
+  "text date timestamptz timetz uuid json jsonb bytea name oid regclass regtype inet cidr macaddr money tsvector tsquery".split(
+    " ",
+  ),
+);
+
+/**
  * Whether Postgres's own parser shows this SQL can't change anything (ADR 0015, "Aprovar sempre leituras"): one or
  * more statements, each a `SELECT` or an `EXPLAIN` of one that `guardSql` lets through (no data-changing CTE, no
- * `SELECT INTO`, no lock), calling only built-in functions that compute, and no operator from another schema. Comments
- * and trailing semicolons are fine. Anything it can't parse is not proven.
- * ponytail: what a view runs when read is not seen (a view that calls a writing function); a workspace that has one
- * removes the rule, or the database's own read-only role covers it.
+ * `SELECT INTO`, no lock), calling only built-in functions that compute, built-in operators and casts to built-in
+ * types, and no `TABLESAMPLE`. Comments and trailing semicolons are fine. Anything it can't parse is not proven.
+ * ponytail: what the database resolves by the values' types is not seen: a view that calls a writing function, or the
+ * workspace's own overload of a built-in name for its own type (`lower(my_type)`, `=` on it, a cast from it); a
+ * workspace that has one removes the rule, or the database's own read-only role covers it.
  */
 export async function provenReadOnly(text: string): Promise<boolean> {
   const sqlText = text.trim();
@@ -361,17 +380,27 @@ export async function provenReadOnly(text: string): Promise<boolean> {
   }
   const stmts = tree.stmts ?? [];
   if (stmts.length === 0) return false;
+  // The parser's positions count UTF-8 bytes, not the string's characters.
+  const bytes = Buffer.from(sqlText);
   for (const s of stmts) {
     const start = s.stmt_location ?? 0;
-    const one = s.stmt_len ? sqlText.slice(start, start + s.stmt_len) : sqlText.slice(start);
+    const one = bytes.subarray(start, s.stmt_len ? start + s.stmt_len : undefined).toString();
     if (!(await guardSql(one, { tables: [], hiddenColumns: [] })).ok) return false;
   }
   let computes = true;
+  const builtin = (names: string[], known: ReadonlySet<string>) =>
+    names[0] === "pg_catalog" ? names.length === 2 : names.length === 1 && known.has(names[0] ?? "");
   walk(stmts, (key, node) => {
-    if (key !== "FuncCall" && key !== "A_Expr") return;
-    const names = svalsOf(key === "FuncCall" ? node.funcname : node.name).map(lower);
-    if (names.length > 1 && names[0] !== "pg_catalog") computes = false;
-    if (key === "FuncCall" && !COMPUTING_FUNCTIONS.has(names.at(-1) ?? "")) computes = false;
+    if (key === "RangeTableSample") computes = false;
+    else if (key === "TypeCast") computes &&= builtin(svalsOf((node.typeName as Node | undefined)?.names).map(lower), BUILTIN_TYPES);
+    else if (key === "A_Expr" || key === "SubLink") {
+      const names = svalsOf(key === "A_Expr" ? node.name : node.operName).map(lower);
+      computes &&= names.length === 0 || builtin(names, BUILTIN_OPERATORS);
+    } else if (key === "FuncCall") {
+      const names = svalsOf(node.funcname).map(lower);
+      if (names.length > 1 && names[0] !== "pg_catalog") computes = false;
+      if (!COMPUTING_FUNCTIONS.has(names.at(-1) ?? "")) computes = false;
+    }
   });
   return computes;
 }

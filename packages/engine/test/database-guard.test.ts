@@ -186,6 +186,10 @@ test("proven read-only (Aprovar sempre leituras): SELECTs and EXPLAINs calling o
     ["with x as (select id from orders) select date_trunc('day', now()), count(*) from x", true],
     ["explain select * from orders", true],
     ["select pg_catalog.count(*) from orders", true],
+    // Statement positions count bytes: text with accents before the next statement still proves it.
+    ["select count(*) from clientes where cidade = 'São Paulo';select 2", true],
+    ["select a ->> 'k', b between 1 and 2, c like 'x%', d in (1, 2), e::text, cast(f as int) from t", true],
+    ["select 1 = any(select 2), j @> '{}'::jsonb, now()::date, x::timestamptz from t", true],
     // Writes, in a CTE or after a read; DDL, COPY, state-changing SET, transactions.
     ["with d as (insert into orders default values returning id) select * from d", false],
     ["select 1; delete from orders", false],
@@ -204,6 +208,13 @@ test("proven read-only (Aprovar sempre leituras): SELECTs and EXPLAINs calling o
     ["select archive_old_orders()", false],
     ["select public.count(*) from orders", false],
     ["select 1 operator(public.+) 2", false],
+    // The workspace's own operators, types and sampling methods run its functions.
+    ["select 1 <=> 2", false],
+    ["select a <=> b from t", false],
+    ["select cast(x as evil) from t", false],
+    ["select x::public.evil from t", false],
+    ["select 1 = any(select 2) and 3 <=> any(select 4)", false],
+    ["select * from orders tablesample bernoulli (5)", false],
     ["", false],
     ["-- nothing here", false],
     ["select from where", false],
