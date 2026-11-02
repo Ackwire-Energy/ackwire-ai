@@ -1,6 +1,7 @@
 import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { audienceSql } from "./audience";
 import { messageRoot, personOfMessage, routinePostRun, runAuthorityById } from "./authority";
+import { frontOfLine } from "./computer-queue";
 import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
@@ -96,12 +97,21 @@ export async function startOrJoinRun(
     // next to an unattended one, or one held by a decision): the message joins the newest it may
     // (`mayJoin`). A run waiting on an approval, a secret or a mission's decision takes nothing new
     // (`holdsMessages`): the agent answers this in a run of its own meanwhile.
+    // Its run in the channel waiting for its computer takes the message: one turn per agent there, not one per
+    // mention, each waiting for the same computer. Not a Continuar's: that starts a fresh stretch.
+    const waitingForComputer =
+      message.threadId || options.granted
+        ? sql<boolean>`false`
+        : sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.waitingMachineId} is not null and ${inChannelRun(sql`${agentRuns}`)}
+          and not exists (select 1 from ${channels} c where c.id = ${message.channelId}::uuid and c.kind = 'dm'))`;
     const active = await tx
       .select({
         id: agentRuns.id,
         orgId: agentRuns.orgId,
         status: agentRuns.status,
         triggerMessageId: agentRuns.triggerMessageId,
+        waitingForComputer,
+        inLine: sql<boolean>`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy', false)`,
       })
       .from(agentRuns)
       .where(
@@ -124,13 +134,7 @@ export async function startOrJoinRun(
                 ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`
                 : sql`false`
             }
-            or ${
-              // Its run in the channel waiting for its computer takes the message: one turn per agent there, not
-              // one per mention, each waiting for the same computer.
-              message.threadId
-                ? sql`false`
-                : sql`(${agentRuns.status} = 'waiting_input' and ${agentRuns.waitingMachineId} is not null and ${inChannelRun(sql`${agentRuns}`)})`
-            })`,
+            or ${waitingForComputer})`,
         ),
       )
       .orderBy(sql`${agentRuns.createdAt} desc`)
@@ -142,8 +146,18 @@ export async function startOrJoinRun(
         !(await mayJoin(tx, message, run.id))
       )
         continue;
-      if (await queueOnRun(tx, run.id, message.id)) return { joined: run.id };
-      break;
+      if (!(await queueOnRun(tx, run.id, message.id))) break;
+      if (run.waitingForComputer && message.hop >= 1) {
+        // An agent's message keeps its depth: the run's replies carry its hop, so the hop limit still holds.
+        await tx
+          .update(agentRuns)
+          .set({ hop: sql`greatest(${agentRuns.hop}, ${message.hop + 1})` })
+          .where(eq(agentRuns.id, run.id));
+      }
+      // A person's message the router or a hand-on brought here (no steering after it): a person waits on it now.
+      if (run.inLine && !message.authorAgentId && message.hop === 0 && (await byPerson(tx, message)))
+        await frontOfLine(tx, run, message.id);
+      return { joined: run.id };
     }
   }
   // Agents started it (its trigger is an agent's, hop 1 or more): within its stretch's limits. A forum's turns and a
@@ -181,6 +195,14 @@ export async function startOrJoinRun(
   return { created: run };
 }
 
+const byPerson = async (tx: Executor, message: Pick<Message, "id" | "orgId">) => {
+  const [row] = await tx
+    .select({ authorType: messages.authorType })
+    .from(messages)
+    .where(and(eq(messages.orgId, message.orgId), eq(messages.id, message.id)));
+  return row?.authorType === "person";
+};
+
 /**
  * Whether a message may join a run active in its conversation (ADR 0053 §4, §9). A person's own words
  * steer the agent's run there (and put them behind an unattended one), except in the agents' DM, where a
@@ -199,11 +221,7 @@ export async function mayJoin(
     .from(channels)
     .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
   const agentsDm = !!channel && isAgentOnlyDm(channel);
-  const [row] = await tx
-    .select({ authorType: messages.authorType })
-    .from(messages)
-    .where(and(eq(messages.orgId, message.orgId), eq(messages.id, message.id)));
-  if (row?.authorType === "person" && !agentsDm) return true;
+  if (!agentsDm && (await byPerson(tx, message))) return true;
   const root = await messageRoot(tx, message.orgId, message.id);
   if (root.kind === "agent" && !agentsDm) return true;
   const behind = await runAuthorityById(tx, message.orgId, runId);

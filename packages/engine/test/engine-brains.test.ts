@@ -2534,6 +2534,151 @@ test("only the head of the computer's line asks it: an agent's run waits behind 
   expect(next).toHaveLength(1);
 });
 
+/** A person's run already waiting for room on this computer, ahead of anything that comes now. */
+async function personAhead(fx: Fixture, machineId: string) {
+  const id = Bun.randomUUIDv7();
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId: id,
+      triggerMessageId: id,
+      trigger: "mention",
+      hop: 1,
+      status: "waiting_input",
+      waitingMachineId: machineId,
+      transcript: {
+        waitingForBrain: { kind: "claude_code", machineId, code: "busy", waitId: Bun.randomUUIDv7() },
+        roomPeople: true,
+        roomWaitSince: Date.now() - 60_000,
+      },
+    })
+    .returning();
+  if (!run) throw new Error("no run");
+  return run;
+}
+
+test("held in line as it resumes after a decision: the turn that runs later reads what the person decided", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      const result = await executeToolForRun(
+        f.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+        {
+          id: "call-1",
+          name: "github_merge_pr",
+          input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+        },
+      );
+      yield { type: "tool_call", id: "call-1", name: "github_merge_pr", input: {}, executed: result };
+      yield { type: "done", text: "Pedi aprovação para o merge." };
+      return;
+    }
+    yield { type: "done", text: "Merge feito." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev faz o merge do PR 42");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  expect(run.status).toBe("waiting_approval");
+
+  const ahead = await personAhead(f, machineId);
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, handlers);
+  expect((await runById(f, run.id))?.transcript).toMatchObject({ waitingForBrain: { code: "busy" } });
+  expect(seen).toHaveLength(1);
+  expect(gh.executed).toHaveLength(1);
+
+  // The run ahead is done: this one's turn goes, with the decision (not the first message again).
+  await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, ahead.id));
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 11_000) });
+  expect((await runById(f, run.id))?.status).toBe("done");
+  expect(seen).toHaveLength(2);
+  expect(seen[1]?.trigger).toContain("github_merge_pr ok: acme/app#42");
+  expect(gh.executed).toHaveLength(1);
+});
+
+test("a real outage starts the wait for room over: a run in line isn't failed as busy for the time its computer was gone", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let online = true;
+  let lastSeenAt: string | null = null;
+  const { brain } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    computerBlipWaitMs: 50,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online, lastSeenAt }) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  const longAgo = Date.now() - 20 * 60_000;
+  await roomSince(f, run.id, longAgo);
+
+  // Gone past the outage grace: no blip, its wait for room is over.
+  online = false;
+  lastSeenAt = new Date(Date.now() - 3 * 60_000).toISOString();
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000), maxBatches: 1 });
+  let t = (await runById(f, run.id))?.transcript as { roomWaitSince?: number; waitingForBrain?: { code: string } };
+  expect(t.waitingForBrain?.code).toBe("machine_offline");
+  expect(t.roomWaitSince).toBeUndefined();
+
+  // Back, and still full: in line again from now, not failed.
+  online = true;
+  await resumeRunsWaitingForMachine(f.db, machineId);
+  await drainOutbox(f.db, handlers, { maxBatches: 1 });
+  const back = await runById(f, run.id);
+  t = back?.transcript as typeof t;
+  expect(back?.status).toBe("waiting_input");
+  expect(t.waitingForBrain?.code).toBe("busy");
+  expect(t.roomWaitSince).toBeGreaterThan(longAgo);
+});
+
+test("the computer drops as the turn of a run in line goes out: it keeps its place", async () => {
+  f = await setup();
+  await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const { brain, seen } = scriptedComputerBrain((n) => [
+    n === 1
+      ? { type: "error", code: "machine_offline", message: "The computer MacBook is offline.", retryable: true }
+      : { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  const since = (run.transcript as { roomWaitSince?: number }).roomWaitSince;
+  expect(typeof since).toBe("number");
+
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000), maxBatches: 3 });
+  expect(seen.length).toBeGreaterThanOrEqual(2);
+  expect((await runById(f, run.id))?.transcript).toMatchObject({ roomWaitSince: since });
+});
+
 test("a session whose folder is gone from the computer goes on fresh in the agent's own folder, told so", async () => {
   f = await setup();
   await computerAgent(f);

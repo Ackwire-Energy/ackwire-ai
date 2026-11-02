@@ -1,4 +1,4 @@
-import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
 import { enqueue } from "./outbox";
 
 const { agentRuns } = schema;
@@ -11,12 +11,12 @@ const { agentRuns } = schema;
  */
 export const ROOM_ASK_SPACING_MS = 10_000;
 
-const waitingForRoom = (machineId: string) =>
-  and(
-    eq(agentRuns.waitingMachineId, machineId),
-    eq(agentRuns.status, "waiting_input"),
-    sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'`,
-  );
+const inLine = and(
+  eq(agentRuns.status, "waiting_input"),
+  sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'`,
+);
+const waitingForRoom = (machineId: string) => and(eq(agentRuns.waitingMachineId, machineId), inLine);
+const waitIdSql = sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`;
 const peopleSql = sql`coalesce((${agentRuns.transcript}->>'roomPeople')::boolean, false)`;
 const sinceSql = sql`coalesce((${agentRuns.transcript}->>'roomWaitSince')::bigint, 0)`;
 
@@ -29,13 +29,33 @@ export async function roomHead(
     .select({
       id: agentRuns.id,
       orgId: agentRuns.orgId,
-      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      waitId: waitIdSql,
     })
     .from(agentRuns)
     .where(waitingForRoom(machineId))
     .orderBy(sql`${peopleSql} desc`, sinceSql, agentRuns.id)
     .limit(1);
   return head ?? null;
+}
+
+/**
+ * A person's message went into this run waiting in line: a person waits on it now, so it goes to the front and looks
+ * again at once (the same job as a steered message's).
+ */
+export async function frontOfLine(db: Executor, run: { id: string; orgId: string }, messageId: string) {
+  const [row] = await db
+    .update(agentRuns)
+    .set({ transcript: sql`jsonb_set(${agentRuns.transcript}, '{roomPeople}', 'true'::jsonb)` })
+    .where(and(eq(agentRuns.id, run.id), inLine))
+    .returning({ waitId: waitIdSql });
+  if (!row) return;
+  await enqueue(db, {
+    orgId: run.orgId,
+    kind: "agent_run.execute",
+    payload: { runId: run.id, ...(row.waitId ? { wait: row.waitId } : {}) },
+    dedupeKey: `agent_run.execute:${run.id}:steer:${messageId}`,
+    maxAttempts: 4,
+  });
 }
 
 /** Asks the head of the line to look again: now (a turn there ended), or `at` (the spacing is over). One job of each per wait. */

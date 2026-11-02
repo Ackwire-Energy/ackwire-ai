@@ -1,8 +1,9 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { type Database, inArray, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { runBrainOf } from "./brains/select";
 import { cancelRun, interruptRun } from "./cancel";
+import { frontOfLine } from "./computer-queue";
 import { publishChannelEvent } from "./events";
 import { isStopRequest, type Judge } from "./judge";
 import { deliverLive } from "./live-steer";
@@ -65,6 +66,14 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     const active = runs.find((r) => r.id === runId);
     if (!active) continue;
     const threadId = replyThreadOf(active);
+    /** Parked waiting for its computer brain, its plan or its budget (`waitingForBrain`). */
+    const parked =
+      active.status === "waiting_input"
+        ? ((active.transcript as { waitingForBrain?: { waitId?: string; code?: string } } | null)?.waitingForBrain ??
+          null)
+        : null;
+    // Long work paused near a limit is no wait a message moves (`holdsMessages`): it isn't woken for it.
+    const brainWait = parked?.code === "usage_pause" ? null : parked;
     // Gone from its inbox already, the app heard where it went (`agent.run.read`, `agent.run.redispatched`):
     // a late "steered" would move the receipt back onto this run.
     if (active.pendingMessageIds.includes(message.id)) {
@@ -76,17 +85,13 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
         agentId: active.agentId,
         messageId: message.id,
         ...(now ? { now: true as const } : {}),
+        // Into a run waiting for its computer: the message shows that wait, as a reload would.
+        ...(active.status === "waiting_input" && active.waitingMachineId
+          ? { computer: brainWait?.code === "busy" ? ("queued" as const) : ("away" as const) }
+          : {}),
       });
     }
     let live = false;
-    /** Parked waiting for its computer brain, its plan or its budget (`waitingForBrain`). */
-    const parked =
-      active.status === "waiting_input"
-        ? ((active.transcript as { waitingForBrain?: { waitId?: string; code?: string } } | null)?.waitingForBrain ??
-          null)
-        : null;
-    // Long work paused near a limit is no wait a message moves (`holdsMessages`): it isn't woken for it.
-    const brainWait = parked?.code === "usage_pause" ? null : parked;
     // Its model call stops and the loop reads the message at once (a running tool finishes first).
     // A computer brain (Claude Code, Codex) can't drop its turn halfway: one whose turn takes messages
     // gets it live and urgent (Claude Code reads it now or at its next tool boundary; Codex's app-server
@@ -110,21 +115,15 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     // run resumes and reads this message with the rest; still away: it parks again quietly (one answer later).
     else if (active.status === "waiting_input" && (active.waitingMachineId || brainWait)) {
       const wait = brainWait?.waitId;
-      // A person waits on it now: it goes to the front of its computer's line (`computer-queue.ts`).
-      if (brainWait?.code === "busy") {
-        await deps.db
-          .update(agentRuns)
-          .set({ transcript: sql`jsonb_set(${agentRuns.transcript}, '{roomPeople}', 'true'::jsonb)` })
-          .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "waiting_input")))
-          .catch(() => undefined);
-      }
-      await enqueue(deps.db, {
-        orgId,
-        kind: "agent_run.execute",
-        payload: { runId, ...(wait ? { wait } : {}) },
-        dedupeKey: `agent_run.execute:${runId}:steer:${message.id}`,
-        maxAttempts: 4,
-      }).catch(() => undefined);
+      if (brainWait?.code === "busy") await frontOfLine(deps.db, active, message.id).catch(() => undefined);
+      else
+        await enqueue(deps.db, {
+          orgId,
+          kind: "agent_run.execute",
+          payload: { runId, ...(wait ? { wait } : {}) },
+          dedupeKey: `agent_run.execute:${runId}:steer:${message.id}`,
+          maxAttempts: 4,
+        }).catch(() => undefined);
     }
     // What it does to a wait, then the fast reply: after the response (the judge may take a moment), in order.
     const waiting =

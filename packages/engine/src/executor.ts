@@ -498,8 +498,8 @@ export interface Transcript {
    */
   outage?: { since: number; n: number; waitId: string };
   /**
-   * When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something other
-   * than its computer (a deploy dropping the computer for seconds keeps its place in the line).
+   * When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else.
+   * A blip (a deploy dropping the computer for seconds, within the outage grace) keeps its place; a real outage doesn't.
    */
   roomWaitSince?: number;
   /** A person waits on this run: it goes first in the computer's line (`computer-queue.ts`). */
@@ -1997,9 +1997,12 @@ async function executeRunInner(
     triggerText = (await getMessage(db, run.orgId, run.triggerMessageId))?.body ?? "";
   }
   /** What a computer brain reads next when it isn't the trigger: results after a pause, new messages. */
-  let nextPrompt: string | null = transcript.interruptedTurn
-    ? interruptedTurnPrompt(transcript.interruptedTurn, resumeText)
-    : (resumeText ?? transcript.continued?.prompt ?? null);
+  // A prompt saved by a claim that parked before its turn already holds the cut turn's words and the trigger.
+  let nextPrompt: string | null = transcript.continued?.prompt
+    ? [transcript.continued.prompt, resumeText].filter(Boolean).join("\n\n")
+    : transcript.interruptedTurn
+      ? interruptedTurnPrompt(transcript.interruptedTurn, resumeText)
+      : resumeText;
   /** What the next turn must still read if this claim parks before one runs (messages that joined it). */
   let carried = transcript.continued?.prompt ?? null;
   // Read once: a later pause of this run resumes with its own text.
@@ -2223,7 +2226,7 @@ async function executeRunInner(
         return "failed";
       }
       if (!run.background && run.hop <= 1 && viaRoutine === null) t.roomPeople = true;
-    } else if (!COMPUTER_GONE_CODES.has(u.code)) delete t.roomWaitSince;
+    }
     // Just gone (our own deploy, a runner dialing again): it waits without a word until the outage grace is over.
     let quietUntil: number | null = null;
     if (u.code === "machine_offline") {
@@ -2232,6 +2235,9 @@ async function executeRunInner(
       if (status && !status.online && Date.now() - seen < TASK_OFFLINE_GRACE_MS)
         quietUntil = seen + TASK_OFFLINE_GRACE_MS;
     }
+    // Only a blip keeps its place in the line: after a real outage the wait for room starts over, or its clock
+    // (the note, `COMPUTER_BUSY_WAIT_MS`) would count the time the computer was gone as time it was busy.
+    if (!busy && quietUntil === null) delete t.roomWaitSince;
     // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
     const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
@@ -2275,8 +2281,9 @@ async function executeRunInner(
         });
     t.postedUpTo = t.messages.length;
     t.brainNotice = u.code;
-    // What it was about to read (messages that joined it) is read when it picks up.
-    if (carried) t.continued = { prompt: carried };
+    // What it was about to read (a person's decision, a cut turn, messages that joined it) is read when it picks up.
+    const keep = computerTurns === 0 ? nextPrompt : carried;
+    if (keep) t.continued = { prompt: keep };
     // `waitId`: one wait (its "computer is back" job is queued once per wait, `resumeRunsWaitingForMachine`).
     t.waitingForBrain = {
       kind: from,
@@ -3159,7 +3166,13 @@ async function executeRunInner(
         transcript.deltaSeq = deltas.seq();
         // Anything but "no room" means the computer took the turn: that wait for room is over.
         refused = error instanceof BrainFailure && error.code === "busy";
-        if (!refused) delete transcript.roomWaitSince;
+        // Dropped before the computer said or did anything (a deploy as the turn went out): still in line.
+        const unsent =
+          error instanceof BrainFailure &&
+          error.code === "machine_offline" &&
+          !deltas.text() &&
+          executedNow.length === 0;
+        if (!refused && !unsent) delete transcript.roomWaitSince;
         if (turnAbort?.signal.aborted) {
           await interruptedTurn(turn, deltas.text());
           continue;
@@ -4522,9 +4535,6 @@ function appendUserText(t: Transcript, text: string) {
     t.messages.push({ role: "user", content: [{ type: "text", text }] });
   }
 }
-
-/** Computer codes that keep a run's place in the line for room: a deploy drops the computer for seconds. */
-const COMPUTER_GONE_CODES: ReadonlySet<string> = new Set(["busy", "machine_offline", "machine_dropped"]);
 
 /**
  * Whether a note for this wait is already in the conversation (same channel and thread): the agent's last message

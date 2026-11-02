@@ -299,6 +299,8 @@ export type ChannelEvent =
       messageId: string;
       now?: true;
       stop?: boolean;
+      /** Into a run waiting for its computer: in line for room (`queued`) or for it to come back (`away`). */
+      computer?: "queued" | "away";
     }
   /** The run read these messages sent while it worked (they are in its conversation now): "Ada leu". */
   | {

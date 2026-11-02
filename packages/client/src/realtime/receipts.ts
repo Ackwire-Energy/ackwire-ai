@@ -327,7 +327,8 @@ export function applyReceiptEvent(
     case "agent.run.steered": {
       // Went into the agent's task in progress: that agent is on it (a "stop" ends it).
       const linked = linkRun(state, event.messageId, event.runId, event.agentId);
-      return event.agentId ? set(linked, event.messageId, event.agentId, event.stop ? "handled" : "claimed") : linked;
+      const phase = event.stop ? "handled" : (event.computer ?? "claimed");
+      return event.agentId ? set(linked, event.messageId, event.agentId, phase) : linked;
     }
     case "agent.run":
       return setForRun(
