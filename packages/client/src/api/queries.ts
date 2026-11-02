@@ -3995,11 +3995,15 @@ export function cacheNotification(qc: QC, orgId: string, item: AppNotification) 
 }
 
 /** Resolved on its own (question answered, approval decided, turn passed): out of every list. */
-export function dropNotification(qc: QC, orgId: string, id: string) {
+/**
+ * Takes a notification out of every list. `keepDone`: the `notification.removed` event says only that it left the
+ * inbox, so "Concluídas" keeps it; a drop the page asks for (answered, passed) takes it from there too.
+ */
+export function dropNotification(qc: QC, orgId: string, id: string, keepDone = false) {
   const before = knownNotification(qc, orgId, id);
   for (const [key, data] of listCaches(qc, orgId)) {
-    // "Concluídas" keeps what I marked done (the event says only that it left the inbox).
-    if (data && key[4] !== "done") qc.setQueryData<NotificationPages>(key, removeFromPages(data, id, before));
+    if (data && !(keepDone && key[4] === "done"))
+      qc.setQueryData<NotificationPages>(key, removeFromPages(data, id, before));
   }
   moveCount(qc, orgId, before, undefined);
 }
@@ -4010,7 +4014,7 @@ export function applyNotificationEvent(qc: QC, orgId: string, event: Notificatio
     void qc.invalidateQueries({ queryKey: keys.joinRequests(orgId) });
   if (event.type === "notification.upserted") cacheNotification(qc, orgId, event.notification);
   else if (event.type === "notification.removed") {
-    dropNotification(qc, orgId, event.id);
+    dropNotification(qc, orgId, event.id, true);
     // Marked done on another device: "Concluídas" gains it (one auto-resolved changes nothing there).
     void qc.invalidateQueries({ queryKey: keys.notificationList(orgId, "done") });
   } else {
