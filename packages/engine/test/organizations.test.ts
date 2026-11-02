@@ -76,6 +76,7 @@ describe("permissions", () => {
         role: "owner",
         permissions: expect.any(Set),
         rank: null,
+        roleIds: [],
         orgLogo: null,
         standing: { state: "active", reason: null, notice: "shown", deletionDueAt: null },
         start: { page: "home", channelId: null },

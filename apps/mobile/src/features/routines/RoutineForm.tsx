@@ -697,6 +697,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
         {routineReachWarnings(d.prompt, dir.agents, {
           agentId: d.agentId || null,
           creatorUserId: creator === me ? null : creator,
+          creatorRoleIds: creator ? dir.memberById.get(creator)?.roleIds : undefined,
         }).map((w) => (
           <View key={w.agent.id} style={styles.warning}>
             <Text variant="footnote" tone="ink2" accessibilityLiveRegion="polite">

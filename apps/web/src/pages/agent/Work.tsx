@@ -929,8 +929,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           : null;
       if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
-        // "Só algumas pessoas" with nobody picked has no one to let back in: no action.
-        const people = agent.audience?.userIds?.length ?? 0;
+        // "Só algumas pessoas ou papéis" with nobody picked has no one to let back in: no action.
+        const people = (agent.audience?.userIds?.length ?? 0) + (agent.audience?.roleIds?.length ?? 0);
         toast.show(
           t("aiAccounts.share.backOnApi", g),
           "info",

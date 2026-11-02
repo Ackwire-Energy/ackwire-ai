@@ -423,7 +423,7 @@ export interface AgentBrainInput {
   contextTokens?: unknown;
 }
 
-const EVERYONE: AgentAudience = { mode: "everyone", userIds: [] };
+const EVERYONE: AgentAudience = { mode: "everyone", userIds: [], roleIds: [] };
 
 /** Who it answers after this change: a switch onto a plan makes it its owner's only (ADR 0059 §5). */
 function nextAudience(
@@ -440,9 +440,13 @@ function nextAudience(
   if (onlyOwner) return { base, to: narrow(base) };
   if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
   // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only. One a person
-  // restricted ("Só algumas pessoas", even with nobody picked yet) stays restricted: never everyone.
-  const kept = agent.audienceUserIds.length > 0 || agent.audienceMode === "people";
-  return { base, to: kept ? { mode: "people", userIds: agent.audienceUserIds } : EVERYONE };
+  // restricted ("Só algumas pessoas ou papéis", even with nobody picked yet) stays restricted: never everyone.
+  const kept =
+    agent.audienceUserIds.length > 0 || agent.audienceRoleIds.length > 0 || agent.audienceMode === "people";
+  return {
+    base,
+    to: kept ? { mode: "people", userIds: agent.audienceUserIds, roleIds: agent.audienceRoleIds } : EVERYONE,
+  };
 }
 
 /**
@@ -558,9 +562,12 @@ export async function setAgentBrain(
         brainAccountId: account,
         brainEffort: effort,
         contextTokens,
-        // The people list stays while it is its owner's only, for when it is let out again.
+        // The people and roles lists stay while it is its owner's only, for when it is let out again.
         ...(audience
-          ? { audienceMode: audience.mode, ...(audience.mode === "everyone" ? { audienceUserIds: [] } : {}) }
+          ? {
+              audienceMode: audience.mode,
+              ...(audience.mode === "everyone" ? { audienceUserIds: [], audienceRoleIds: [] } : {}),
+            }
           : {}),
         updatedAt: new Date(),
       })
@@ -605,7 +612,7 @@ export async function setAgentBrain(
       actor: { type: "person", id: userId },
       action: "agent.audience_changed",
       target: { type: "agent", id: agentId },
-      details: { from: audienceOf(agent), to: audience },
+      details: { from: audienceOf(agent), to: { ...audience, consultable: agent.consultable } },
     });
   }
   if (next.from) {

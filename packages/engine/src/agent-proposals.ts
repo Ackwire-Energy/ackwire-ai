@@ -5,7 +5,7 @@ import { orgToolCatalog, setAgentAccess } from "./access";
 import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS, takenHandles } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
-import { canTalkTo, talksToAgents } from "./audience";
+import { canTalkTo, speakerFor } from "./audience";
 import { setAgentBrain } from "./brain-settings";
 import { requireChannelAccess } from "./channels";
 import { prefixService, toolPrefixOf, toolPrefixOfConnection } from "./connectors/connections";
@@ -918,7 +918,7 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
   for (const m of mail) {
     if (
       !mailAccountIds.includes(m.accountId) &&
-      !canTalkTo(now, m.ownerUserId, await talksToAgents(db, orgId, m.ownerUserId))
+      !canTalkTo(now, m.ownerUserId, await speakerFor(db, orgId, m.ownerUserId))
     )
       unheard.add(m.ownerUserId);
   }

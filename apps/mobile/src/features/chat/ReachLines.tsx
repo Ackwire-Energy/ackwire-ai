@@ -1,7 +1,7 @@
 import { type Agent, type Message, useChannels, useUpdateAgent } from "@agenteschat/client";
 import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { type ReachEntry, reachKey, reachOf } from "@agenteschat/client/lib/reach";
+import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -70,7 +70,7 @@ function Row({ entry: e, channelId }: { entry: ReachEntry; channelId: string }) 
           </Text>
         ) : null}
       </View>
-      {handed && e.consultationId ? (
+      {reachOpens(e) ? (
         <PillButton
           label={t("reach.see")}
           accessibilityRole="link"

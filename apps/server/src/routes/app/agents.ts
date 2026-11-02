@@ -42,11 +42,12 @@ import {
   requirePermission,
   revokeCredential,
   SETUP_AGENTS_MAX,
+  type Speaker,
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
   setCoordinator,
-  talksToAgents,
+  speakerFor,
   updateAgent,
   updateAgentGroup,
   usageSummary,
@@ -93,10 +94,10 @@ const toAgent = (
   a: AgentRow,
   viewerId: string,
   seesCost: boolean,
-  budgetUsedPercent?: number,
-  brain?: AgentBrainSummary,
-  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0085). */
-  talks = true,
+  budgetUsedPercent: number | undefined,
+  brain: AgentBrainSummary | undefined,
+  /** The viewer as the audience rule reads them (`speakerFor`, ADR 0085). */
+  talks: Speaker,
 ) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
@@ -381,7 +382,7 @@ export function agentRoutes(deps: AppDeps) {
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
-        talksToAgents(db, orgId, actor),
+        speakerFor(db, orgId, actor),
         oldHandlesByAgent(db, orgId),
       ]);
       const percent = (id: string) => {
@@ -632,7 +633,9 @@ export function agentRoutes(deps: AppDeps) {
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
-      return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
+      const userId = c.get("user").id;
+      const [seesCost, talks] = await Promise.all([canViewCost(db, userId, orgId), speakerFor(db, orgId, userId)]);
+      return c.json(toAgent(agent, userId, seesCost, undefined, undefined, talks), 201);
     },
   );
 
@@ -685,7 +688,14 @@ export function agentRoutes(deps: AppDeps) {
       if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(
         {
-          agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)),
+          agent: toAgent(
+            made.agent,
+            userId,
+            await canViewCost(db, userId, orgId),
+            undefined,
+            undefined,
+            await speakerFor(db, orgId, userId),
+          ),
           proposal: made.proposal,
           ai: made.ai,
         },
@@ -795,7 +805,7 @@ export function agentRoutes(deps: AppDeps) {
       const [seesCost, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
-        talksToAgents(db, orgId, actor),
+        speakerFor(db, orgId, actor),
         oldHandlesByAgent(db, orgId),
       ]);
       return c.json(

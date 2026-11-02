@@ -2,7 +2,7 @@ import { type Agent, type Message, useAddChannelMember, useChannels, useUpdateAg
 import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { type ReachEntry, reachKey, reachOf } from "@agenteschat/client/lib/reach";
+import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
 import { Icon } from "@agenteschat/ui";
 import { Trans, useTranslation } from "react-i18next";
 import { useChannelActions } from "@/components/channel-actions";
@@ -73,7 +73,7 @@ function ReachRow({
         </span>
         {detail && <span className="ag-rc__by">{detail}</span>}
       </span>
-      {handed && actions?.openConsultation && (
+      {reachOpens(e) && actions?.openConsultation && (
         <button
           type="button"
           className="ag-rc__btn"
@@ -82,7 +82,7 @@ function ReachRow({
           {t("reach.see")}
         </button>
       )}
-      {(handed || e.private) && addable && can(org, "manage_channels") && (
+      {((handed && e.reason === "not_in_channel") || e.private) && addable && can(org, "manage_channels") && (
         <button
           type="button"
           className="ag-rc__btn"

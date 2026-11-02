@@ -3,7 +3,7 @@ import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
 import { currentHandles } from "./agents";
 import { cancelAheadApproval, cancelableAhead } from "./approvals";
-import { canTalkTo, talksToAgents } from "./audience";
+import { canTalkTo, speakerFor } from "./audience";
 import { runAuthorityById } from "./authority";
 import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
@@ -632,6 +632,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               handle: agents.handle,
               audienceMode: agents.audienceMode,
               audienceUserIds: agents.audienceUserIds,
+              audienceRoleIds: agents.audienceRoleIds,
+              consultable: agents.consultable,
+              brain: agents.brain,
               ownerUserId: agents.ownerUserId,
             })
             .from(agents)
@@ -645,7 +648,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             agentId = found.id;
           }
           const mineOnly = agentId === ctx.agentId;
-          const talks = await talksToAgents(ctx.db, ctx.orgId, person);
+          const talks = await speakerFor(ctx.db, ctx.orgId, person);
           const list = (await listOrgRoutines(ctx.db, ctx.orgId, agentId ? { agentId } : {})).filter(
             (r) =>
               isRoutine(r) &&

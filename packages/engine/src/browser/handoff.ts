@@ -22,6 +22,7 @@ import {
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { isChannelMember } from "../channels";
+import { answersAgentsOnly } from "../consultations";
 import { openPersonAgentDm } from "../dms";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
@@ -387,7 +388,10 @@ export async function requireBrowserAccess(
           .limit(5)
       ).map((r) => r.id);
   for (const runId of runs) {
-    if ((await humanBehindRun({ db }, orgId, runId)) === userId) return access;
+    // A run consulted for someone outside the agent's audience has nobody behind it for its screen.
+    if ((await humanBehindRun({ db }, orgId, runId)) === userId && !(await answersAgentsOnly(db, orgId, runId))) {
+      return access;
+    }
   }
   if (screen === "desktop" && agent.machineId) {
     const machine = await getMachine(db, orgId, agent.machineId);
@@ -747,11 +751,18 @@ export function createBrowserHandoffToolSource(
         isError: true,
       };
     }
+    const agentsOnly = await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId);
     const recipient = drivers
       ? drivers.length === 1
         ? (drivers[0] ?? null)
         : null
-      : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      : await browserHandoffRecipient(
+          { db: ctx.db },
+          ctx.orgId,
+          // Consulted for someone outside its audience: its owner helps, never that person.
+          agentsOnly ? null : ctx.runId,
+          ctx.agentId,
+        );
     // The card goes where the person asked can act on it: the run's conversation when they're in it, else their DM
     // with the agent (a run in a room between agents, or one they aren't in, would leave the request unreachable).
     // Several drivers: one in the conversation keeps it there, else whoever asked for the work's DM; else it stays
@@ -770,9 +781,10 @@ export function createBrowserHandoffToolSource(
           ),
         )
         .limit(1);
-      const requester = member?.userId
-        ? null
-        : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      const requester =
+        member?.userId || agentsOnly
+          ? null
+          : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
       asked = member?.userId ?? (requester && drivers.includes(requester) ? requester : null);
     }
     const where =

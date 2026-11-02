@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, count, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, shareArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
+import { answersAgentsOnly } from "./consultations";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
@@ -25,6 +26,10 @@ const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
 });
+
+/** A run consulted for someone outside its agent's audience answers the agent that asked, nowhere else. */
+const AGENTS_ONLY =
+  "You were consulted by another agent for someone who doesn't talk to you directly: answer that agent with what you found (it passes it on), never them or anyone else from here.";
 
 /** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
@@ -99,6 +104,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       }),
       async execute(input, ctx) {
         try {
+          if (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId)) return { content: AGENTS_ONLY, isError: true };
           const requester = await personBehindCall(ctx);
           // A routine posts where its creator can post, as itself: never with their files.
           const routine = requester ? null : await actingRoutineOfCall(ctx);
@@ -231,6 +237,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       }),
       async execute(input, ctx) {
         try {
+          if (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId)) return { content: AGENTS_ONLY, isError: true };
           const requester = await personBehindCall(ctx);
           // A routine writes in its creator's DM with the agent, and no one else's.
           const routine = requester ? null : await actingRoutineOfCall(ctx);

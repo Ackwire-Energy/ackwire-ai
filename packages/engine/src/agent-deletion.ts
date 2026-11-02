@@ -91,6 +91,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
         monthlyBudgetNanoUsd: null,
         audienceMode: "everyone",
         audienceUserIds: [],
+        audienceRoleIds: [],
         machineId: null,
         missionCommandApproval: null,
         brain: "model",

@@ -331,7 +331,7 @@ scenario("S43", "a mention dispatch can't wake is recorded and told to the agent
   // Otto answers only Bia, its owner: Ana, behind Ada's run, may not talk to it.
   await w.db
     .update(schema.agents)
-    .set({ ownerUserId: w.people.bia?.id ?? "", audienceMode: "people", audienceUserIds: [] })
+    .set({ ownerUserId: w.people.bia?.id ?? "", audienceMode: "people", audienceUserIds: [], consultable: false })
     .where(eq(schema.agents.id, w.agents.otto?.id ?? ""));
   await w.say("@ada pede pro otto rodar o deploy 88");
   await w.settle();

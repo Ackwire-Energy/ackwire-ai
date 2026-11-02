@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { type AgentAi, type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
-import { audienceError, canTalkTo, talksToAgents } from "./audience";
+import { audienceError, canTalkTo, type Speaker, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
 import { mayStopRun, runRequester } from "./cancel";
 import { requireChannelAccess } from "./channels";
@@ -294,10 +294,12 @@ export async function answerNow(
     // turn on Atende outras pessoas, ADR 0059 §5):
     // a run starts again only for someone it still answers.
     // …and whose roles still let them talk to agents (`talk_to_agents`, ADR 0085).
-    const talks = new Map<string | null, boolean>();
+    const talks = new Map<string | null, Speaker>();
     for (const r of ready)
-      if (!talks.has(r.requester)) talks.set(r.requester, await talksToAgents(deps.db, orgId, r.requester));
-    const heard = ready.filter((r) => canTalkTo(r.agent, r.requester, talks.get(r.requester) ?? false));
+      if (!talks.has(r.requester)) talks.set(r.requester, await speakerFor(deps.db, orgId, r.requester));
+    const heard = ready.filter((r) =>
+      canTalkTo(r.agent, r.requester, talks.get(r.requester) ?? { talks: false, roleIds: [] }),
+    );
     const [first] = ready;
     if (heard.length === 0 && first) throw await audienceError(deps.db, first.agent);
     const runs: Answering = [];

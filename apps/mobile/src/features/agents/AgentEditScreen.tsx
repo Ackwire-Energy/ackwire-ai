@@ -1,4 +1,6 @@
 import { useUpdateAgent } from "@agenteschat/client";
+import { audienceOf, consultableLocked, offersConsultable } from "@agenteschat/client/lib/audience";
+import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
@@ -39,10 +41,9 @@ export function AgentEditScreen({ id }: { id: string }) {
   const agent = dir.agentById.get(id);
   const update = useUpdateAgent(useOrgId(), id);
   const admin = can(org, "manage_agents");
-  const fields = editableFields({
-    admin,
-    owner: Boolean(meId && agent?.ownerUserId === meId),
-  });
+  const owner = Boolean(meId && agent?.ownerUserId === meId);
+  const fields = editableFields({ admin, owner });
+  const onPlan = engineOfBrain(agent?.brain?.kind) !== "agent";
   const saved = useMemo<AgentDraft | null>(
     () =>
       agent
@@ -53,6 +54,7 @@ export function AgentEditScreen({ id }: { id: string }) {
             instructions: agent.instructions,
             look: fullLook(agent.appearance),
             coordinator: agent.coordinator === true,
+            audience: audienceOf(agent),
           }
         : null,
     [agent],
@@ -208,6 +210,28 @@ export function AgentEditScreen({ id }: { id: string }) {
             </Text>
           ) : null}
         </View>
+
+        {/* Only an audience that leaves someone out has anyone to be consulted for. */}
+        {offersConsultable(draft.audience, onPlan) ? (
+          <View style={styles.section}>
+            <GroupedList>
+              <GroupedRow
+                icon="agent"
+                label={t("audience.consultable", agentGrammar(t, agent.name))}
+                labelLines={2}
+                sub={t("audience.consultableHint", agentGrammar(t, agent.name))}
+                subLines={4}
+                toggle={draft.audience.consultable !== false}
+                disabled={
+                  !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
+                }
+                onPress={() =>
+                  set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
+                }
+              />
+            </GroupedList>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text variant="title" accessibilityRole="header">

@@ -6,7 +6,7 @@ import { fedByRoutine, type RunAuthority, runAuthorityById, UUID } from "../auth
 import { countToolCall } from "../connector-usage";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { missingConnectors, type ServerCatalog } from "../connectors/listing";
-import { consultationOrigin } from "../consultations";
+import { answersAgentsOnly, consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
@@ -899,7 +899,11 @@ export function createToolGateway(deps: {
         const owner = await ownerOf(ctx);
         // A routine's request goes to the conversation it reports to, never its room; one asked by another
         // agent (ADR 0034) where the person is, not in the agents' DM.
-        const deliverTo = authority?.kind === "routine" ? authority.brief?.deliverTo : undefined;
+        // Consulted for a creator outside its agent's audience: it stays in the agents' DM (`answersAgentsOnly`).
+        const deliverTo =
+          authority?.kind === "routine" && !(ctx.runId && (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId)))
+            ? authority.brief?.deliverTo
+            : undefined;
         const origin = deliverTo
           ? { channelId: deliverTo.channelId, threadRootId: deliverTo.threadId ?? ctx.threadRootId }
           : ctx.runId

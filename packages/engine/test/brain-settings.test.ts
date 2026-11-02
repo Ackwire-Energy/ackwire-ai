@@ -7,6 +7,7 @@ import {
   canTalkTo,
   ForbiddenError,
   getAgentBrain,
+  NO_PERSON,
   newAgentBrainMachines,
   releaseAgents,
   setAgentAudience,
@@ -235,8 +236,8 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(await row()).toMatchObject({ audienceMode: "owner", audienceUserIds: [bia.id] });
     const changes = async () => (await audits("agent.audience_changed")).map((a) => a.details);
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "people", userIds: [bia.id] },
-      to: { mode: "owner", userIds: [] },
+      from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
     });
 
     // On, it replies to whoever its "who can talk" list lets in: Bia, not the whole workspace.
@@ -245,8 +246,8 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(shared.onlyOwner).toBe(false);
     expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "owner", userIds: [bia.id] },
-      to: { mode: "people", userIds: [bia.id] },
+      from: { mode: "owner", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
     });
     // Nothing about what it thinks with changed: no brain entry for it.
     expect(await audits("agent.brain")).toHaveLength(brainAudits);
@@ -257,14 +258,14 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: true })).onlyOwner).toBe(true);
     expect(await row()).toMatchObject({ audienceMode: "owner", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "people", userIds: [bia.id] },
-      to: { mode: "owner", userIds: [] },
+      from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
     });
     // Off and on again never widens it: still Bia alone.
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
     const again = await row();
     expect(again).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
-    expect([canTalkTo(again, bia.id), canTalkTo(again, caio.id)]).toEqual([true, false]);
+    expect([canTalkTo(again, bia.id, NO_PERSON), canTalkTo(again, caio.id, NO_PERSON)]).toEqual([true, false]);
   });
 
   test("moved onto a plan with it on, an agent keeps its list as it was: nothing widens, nothing to record", async () => {
@@ -278,7 +279,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(moved).toMatchObject({ brain: "claude_code", onlyOwner: false });
     const after = await row();
     expect(after).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
-    expect([canTalkTo(after, bia.id), canTalkTo(after, caio.id)]).toEqual([true, false]);
+    expect([canTalkTo(after, bia.id, NO_PERSON), canTalkTo(after, caio.id, NO_PERSON)]).toEqual([true, false]);
     expect(await audits("agent.audience_changed")).toHaveLength(changes);
   });
 
@@ -289,7 +290,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code", onlyOwner: false });
     const moved = await row();
     expect(moved).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
-    expect([canTalkTo(moved, fx.owner.id), canTalkTo(moved, bia.id)]).toEqual([true, false]);
+    expect([canTalkTo(moved, fx.owner.id, NO_PERSON), canTalkTo(moved, bia.id, NO_PERSON)]).toEqual([true, false]);
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
     expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
   });

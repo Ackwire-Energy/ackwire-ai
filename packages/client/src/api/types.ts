@@ -481,6 +481,10 @@ export interface AgentAudience {
   mode: AudienceMode;
   /** For `people` (the owner can always talk to it). */
   userIds: string[];
+  /** For `people`: whoever holds one of these roles at the time (not `everyone`). Older servers leave it out. */
+  roleIds?: string[];
+  /** Other agents may consult it for people outside the audience (it answers them only). Absent = on. */
+  consultable?: boolean;
 }
 
 export interface Agent {
