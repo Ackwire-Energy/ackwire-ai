@@ -11,7 +11,8 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { fileSaver } from "@/components/artifacts/fileSaver";
 import { EXPORT_PROMPT } from "@/lib/import";
 import { zip } from "./archives";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, fakeAppsOf, ORG_ID, seedState } from "./fake-api";
+import { type FakeApps, SERVER_URL } from "./fakes/apps";
 import { renderApp, screen, settle } from "./render";
 
 const realSave = fileSaver.save;
@@ -247,6 +248,34 @@ describe("Configurações → Importar e exportar", () => {
     expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(more);
     await click(about, 2);
     expect(screen().getByRole("tooltip").textContent).toBe(more);
+  });
+
+  test("from your AI app, on top: the address to connect, how, and the request to paste with it", async () => {
+    await go();
+    const option = button(/Do seu app de IA \(mais confiável\)/);
+    expect(document.querySelector(".imp-pick")?.firstElementChild).toBe(option);
+    expect(option.getAttribute("aria-pressed")).toBe("false");
+    await click(option);
+    expect(option.getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector(".machine-command__code")?.textContent).toBe(SERVER_URL);
+    expect(screen().getByRole("link", { name: "Como conectar, app por app" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/settings/apps`,
+    );
+    expect(text()).toContain("Na tela de permissão, escolha Criar e editar agentes, rotinas e skills.");
+    expect((screen().getByLabelText("Pedido para o seu app de IA") as HTMLTextAreaElement).value).toBe(
+      `Conecte ${SERVER_URL} e, para cada agente, instrução, skill e rotina que você tem, crie o equivalente no agentes.chat. Antes, liste o que já existe lá para não duplicar.`,
+    );
+  });
+
+  test("a server apps on the internet can't reach: no AI app option, one line says why", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    (fakeAppsOf.get(api) as FakeApps).serverPublic = false;
+    await go(state, api);
+    expect(screen().queryByRole("button", { name: /Do seu app de IA/ })).toBeNull();
+    expect(text()).toContain(
+      "Do seu app de IA: indisponível neste servidor, porque apps como o Claude e o ChatGPT só conectam a um endereço https público.",
+    );
   });
 
   test("its notes and lists lead each line with an icon on the line's first row", async () => {

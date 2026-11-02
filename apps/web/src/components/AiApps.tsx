@@ -267,7 +267,9 @@ function TokenRow({ token, onRevoke }: { token: PersonalToken; onRevoke: () => v
 
 function AccessChip({ access }: { access: AppAccess }) {
   const { t } = useTranslation();
-  return <Chip icon={access === "write" ? "send" : "eye"}>{t(`apps.access.${access}`)}</Chip>;
+  return (
+    <Chip icon={access === "manage" ? "agent" : access === "write" ? "send" : "eye"}>{t(`apps.access.${access}`)}</Chip>
+  );
 }
 
 function RowMenu({ name, label, onSelect }: { name: string; label: string; onSelect: () => void }) {
@@ -745,6 +747,7 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
               value={access}
               onValueChange={setAccess}
               options={[
+                { value: "manage", title: t("apps.consent.manage"), description: t("apps.consent.manageHelp") },
                 { value: "write", title: t("apps.consent.write"), description: t("apps.consent.writeHelp") },
                 { value: "read", title: t("apps.consent.read"), description: t("apps.consent.readHelp") },
               ]}

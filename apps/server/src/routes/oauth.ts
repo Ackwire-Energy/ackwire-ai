@@ -213,6 +213,8 @@ function mcpHandler(deps: AppDeps, version: string) {
       judge: deps.extras?.context?.judge,
       talker: deps.extras?.talker,
       gifs: deps.adapters.gifs,
+      context: deps.extras?.context,
+      blobs: deps.extras?.artifacts?.blobs,
       wakeWorkers: deps.wakeWorkers,
       report: (error, context) => deps.log?.error("mcp tool failed", { ...context, error }),
       onRefused: (error) => deps.log?.warn("mcp request refused", { error }),

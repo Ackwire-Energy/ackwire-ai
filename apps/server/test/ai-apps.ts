@@ -54,7 +54,13 @@ export async function connectApp(
   t: TestServer,
   person: Browser,
   orgId: string,
-  options: { name?: string; redirectUri?: string; access?: "read" | "write"; clientId?: string } = {},
+  options: {
+    name?: string;
+    redirectUri?: string;
+    access?: "read" | "write" | "manage";
+    clientId?: string;
+    scope?: string;
+  } = {},
 ): Promise<Connected> {
   const redirectUri = options.redirectUri ?? LOOPBACK;
   let clientId = options.clientId;
@@ -71,7 +77,7 @@ export async function connectApp(
     code_challenge: challenge,
     code_challenge_method: "S256",
     state: "st4te",
-    scope: "read write",
+    scope: options.scope ?? "read write",
     resource: `${ORIGIN}/mcp`,
   });
   const req = requestIdOf(location);

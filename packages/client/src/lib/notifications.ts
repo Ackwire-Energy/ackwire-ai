@@ -292,6 +292,13 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       ? { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id } }
       : { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   }
+  // What an AI app created as me: the newest agent, else the newest routine.
+  if (n.kind === "app_created")
+    return s.agentId
+      ? { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } }
+      : s.routineId
+        ? { to: "/org/$orgId/routines", search: { open: s.routineId } }
+        : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
   // A server changed approved tools: accepted in Conectores.

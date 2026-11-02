@@ -19,7 +19,9 @@ import { revokeAppGrants, revokeGrantTokens, revokeMemberApps } from "./revoke";
 import {
   ACCESS_TOKEN_PREFIX,
   APP_LIMITS,
+  type AppAccess,
   type AppScope,
+  appScopesFor,
   appsUrls,
   normalizeResource,
   parseScopes,
@@ -160,7 +162,7 @@ export async function decideConsent(
   deps: OauthDeps,
   userId: string,
   requestId: string,
-  input: { decision: "allow" | "deny"; orgId?: string; access?: "read" | "write" },
+  input: { decision: "allow" | "deny"; orgId?: string; access?: AppAccess },
 ): Promise<{ redirectTo: string; grantId?: string; created?: boolean }> {
   const { db, publicUrl } = deps;
   const { issuer } = appsUrls(publicUrl);
@@ -180,7 +182,7 @@ export async function decideConsent(
   const membership = await getMembership(db, userId, input.orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this workspace", "not_member");
   if (workRefusal(membership.standing)) throw new ConflictError("This workspace is paused", "workspace_paused");
-  const allowed: AppScope[] = input.access === "read" ? ["read"] : ["read", "write"];
+  const allowed = appScopesFor(input.access ?? "write");
   const scopes = (request.scopes as AppScope[]).filter((s) => allowed.includes(s));
   const identity = appIdentity(client, request.redirectUri, new URL(publicUrl).hostname);
   const code = randomBase62(43);

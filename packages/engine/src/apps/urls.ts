@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { isPublicHostName, publicHostAddress, type ResolveHost, resolveHostDns } from "../net-guard";
 
 /**
  * AI apps (ADR 0119): the addresses, scopes and token shapes of this server as an MCP server and its own
@@ -6,8 +7,18 @@ import { randomBytes } from "node:crypto";
  * address shown in Settings never drift apart.
  */
 
-export const APP_SCOPES = ["read", "write"] as const;
+/** Each scope brings the ones before it: `write` sends tasks, `manage` creates agents, routines and skills. */
+export const APP_SCOPES = ["read", "write", "manage"] as const;
 export type AppScope = (typeof APP_SCOPES)[number];
+/** The access a person picks on the consent page or for a token: its widest scope. */
+export type AppAccess = AppScope;
+
+/** The scopes an access grants: itself and every scope before it. */
+export const appScopesFor = (access: AppAccess): AppScope[] => APP_SCOPES.slice(0, APP_SCOPES.indexOf(access) + 1);
+
+/** The widest scope held, as Settings shows it. */
+export const appAccessOf = (scopes: readonly string[]): AppAccess =>
+  [...APP_SCOPES].reverse().find((s) => scopes.includes(s)) ?? "read";
 
 export const ACCESS_TOKEN_PREFIX = "aga_";
 export const REFRESH_TOKEN_PREFIX = "agf_";
@@ -82,10 +93,39 @@ export function randomBase62(length = 43): string {
   return out;
 }
 
-/** Scopes as stored, from a space-separated request: unknown ones (and `offline_access`) dropped, none = both. */
+/**
+ * Scopes as stored, from a space-separated request: unknown ones (and `offline_access`) dropped, none = all. The
+ * widest one asked brings the ones before it (sending tasks without reading their replies is no use).
+ */
 export function parseScopes(raw: string | undefined | null): AppScope[] {
   const asked = new Set((raw ?? "").split(/\s+/).filter(Boolean));
   const known = APP_SCOPES.filter((s) => asked.has(s));
-  // Sending tasks without reading their replies is no use: write brings read along.
-  return known.length === 0 || known.includes("write") ? [...APP_SCOPES] : known;
+  return known.length === 0 ? [...APP_SCOPES] : appScopesFor(appAccessOf(known));
+}
+
+const reachable = new Map<string, boolean>();
+
+/**
+ * Whether apps that call from their own servers (claude.ai, ChatGPT) can reach this server: https on a public DNS
+ * name that doesn't resolve to a private address (split DNS). A self-hosted server on a private host can't take
+ * them, so what needs them is hidden there. Resolved once per process; a failed lookup is retried next time.
+ */
+export async function reachableFromInternet(
+  publicUrl: string,
+  resolve: ResolveHost = resolveHostDns,
+): Promise<boolean> {
+  const known = reachable.get(publicUrl);
+  if (known !== undefined) return known;
+  let host: string;
+  try {
+    const url = new URL(publicUrl);
+    if (url.protocol !== "https:" || !isPublicHostName(url.hostname)) return false;
+    host = url.hostname;
+  } catch {
+    return false;
+  }
+  const resolved = await publicHostAddress(host, resolve);
+  if (!resolved.ok && resolved.reason === "unreachable") return true;
+  reachable.set(publicUrl, resolved.ok);
+  return resolved.ok;
 }
