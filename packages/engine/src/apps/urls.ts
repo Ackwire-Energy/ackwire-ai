@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { isPublicHostName } from "../net-guard";
+import { isPublicHostName, publicHostAddress, type ResolveHost, resolveHostDns } from "../net-guard";
 
 /**
  * AI apps (ADR 0119): the addresses, scopes and token shapes of this server as an MCP server and its own
@@ -103,15 +103,29 @@ export function parseScopes(raw: string | undefined | null): AppScope[] {
   return known.length === 0 ? [...APP_SCOPES] : appScopesFor(appAccessOf(known));
 }
 
+const reachable = new Map<string, boolean>();
+
 /**
  * Whether apps that call from their own servers (claude.ai, ChatGPT) can reach this server: https on a public DNS
- * name. A self-hosted server on a private host can't take them, so what needs them is hidden there.
+ * name that doesn't resolve to a private address (split DNS). A self-hosted server on a private host can't take
+ * them, so what needs them is hidden there. Resolved once per process; a failed lookup is retried next time.
  */
-export function reachableFromInternet(publicUrl: string): boolean {
+export async function reachableFromInternet(
+  publicUrl: string,
+  resolve: ResolveHost = resolveHostDns,
+): Promise<boolean> {
+  const known = reachable.get(publicUrl);
+  if (known !== undefined) return known;
+  let host: string;
   try {
     const url = new URL(publicUrl);
-    return url.protocol === "https:" && isPublicHostName(url.hostname);
+    if (url.protocol !== "https:" || !isPublicHostName(url.hostname)) return false;
+    host = url.hostname;
   } catch {
     return false;
   }
+  const resolved = await publicHostAddress(host, resolve);
+  if (!resolved.ok && resolved.reason === "unreachable") return true;
+  reachable.set(publicUrl, resolved.ok);
+  return resolved.ok;
 }

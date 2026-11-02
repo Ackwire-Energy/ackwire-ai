@@ -15,11 +15,12 @@ import { createChannel, listChannels } from "../channels";
 import { addContextItemByPerson } from "../context/items";
 import { ConflictError, TooManyError, ValidationError } from "../errors";
 import { handleFromName } from "../imports";
+import { publishMachineAgentsChanged } from "../machines";
 import { notifyAppCreated } from "../notification-producers";
 import { createRoutine, listRoutines } from "../routines";
 import { listSkills, parseSkillMarkdown, SKILL_LIMITS, saveSkill, setAgentSkills, validateSkill } from "../skills";
 import type { AppPrincipal } from "./grants";
-import type { AppsToolDeps, RegisterTool } from "./tools";
+import { type AppsToolDeps, cleanUntrusted, type RegisterTool } from "./tools";
 import { appsUrls } from "./urls";
 
 const { auditLog } = schema;
@@ -59,6 +60,10 @@ type Kind = "agent" | "skill" | "routine" | "memory" | "channel";
 export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: RegisterTool) {
   const issuer = appsUrls(deps.publicUrl).issuer;
   const base = `${issuer}/org/${p.orgId}`;
+  /** Text others wrote (a skill installed from a link, an agent's role): fenced by `toolResult` as content. */
+  const fenced = (text: string | null | undefined, max: number) =>
+    text ? { untrusted_text: cleanUntrusted(text, max).text } : null;
+
   const agentOut = (a: Pick<Agent, "id" | "name" | "handle">, existing: boolean) => ({
     id: a.id,
     name: a.name,
@@ -141,7 +146,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
         listChannels(deps.db, p.userId, p.orgId),
       ]);
       return {
-        agents: agents.map((a) => ({ id: a.id, name: a.name, handle: a.handle, role: a.role })),
+        agents: agents.map((a) => ({ id: a.id, name: a.name, handle: a.handle, role: fenced(a.role, 200) })),
         skills: skills.map((s) => ({ id: s.id, name: s.name })),
         routines: routines.map((r) => ({ id: r.id, name: r.name, agent_id: r.agentId })),
         channels: channels.map((c) => ({ id: c.id, name: c.name })),
@@ -197,6 +202,8 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
           color: args.avatar_color,
           eyes: AGENT_LOOK.eyes[0],
         });
+      // Born on the workspace's own computer: it lists its agents again.
+      if (agent.machineId) await publishMachineAgentsChanged(deps.pubsub, p.orgId);
       await made("agent", agent.id, agent.name, args.idempotency_key);
       return agentOut(agent, false);
     },
@@ -255,7 +262,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
       skills: (await listSkills(deps.db, p.userId, p.orgId)).map((s) => ({
         id: s.id,
         name: s.name,
-        description: s.description,
+        description: fenced(s.description, 1024),
         agents_count: s.agentsCount,
       })),
     }),

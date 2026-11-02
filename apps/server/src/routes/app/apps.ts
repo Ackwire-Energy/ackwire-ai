@@ -196,7 +196,7 @@ export function appRoutes(deps: AppDeps) {
       return c.json(
         {
           serverUrl: appsUrls(deps.config.PUBLIC_URL).resource,
-          serverPublic: reachableFromInternet(deps.config.PUBLIC_URL),
+          serverPublic: await reachableFromInternet(deps.config.PUBLIC_URL),
           ...list,
         },
         200,
