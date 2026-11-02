@@ -288,6 +288,7 @@ describe("a pushed notification that can't be read", () => {
       "/org/$orgId/approvals",
     );
     expect(fallbackTarget(data({ kind: "routine_paused" }))?.to).toBe("/org/$orgId/routines");
+    expect(fallbackTarget(data({ kind: "browser_handoff", channelId: "dm1" }))).toBeNull();
     expect(fallbackTarget(data({ kind: "machine_connected" }))).toEqual({
       to: "/org/$orgId/settings/$section",
       params: { section: "computers" },

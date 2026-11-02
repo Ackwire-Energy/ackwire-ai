@@ -438,14 +438,14 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
 
   test("a brain turn that goes quiet fails; its own events and bridge calls keep a long one alive", async () => {
     f = await setup({ machines: true });
-    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-i", brainIdleMs: 60 });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-i", brainIdleMs: 200 });
     hubs.push(hub);
     const paired = await pair();
     const runner = fakeRunner(hub);
     await runner.hello(paired.token);
 
     const quiet = hub.call(paired.machineId, brainTurn());
-    const error = await within(quiet, 400);
+    const error = await within(quiet, 1000);
     expect(error).toBeInstanceOf(MachineRequestError);
     expect((error as MachineRequestError).code).toBe("timeout");
     expect(runner.sent.some((s) => s.type === "cancel")).toBe(true);
@@ -454,10 +454,12 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     const alive = hub.call(paired.machineId, brainTurn(runId));
     await Bun.sleep(5);
     const req = [...runner.sent].reverse().find((s) => s.type === "request" && s.op === "brain.turn") as Request;
+    // Frames 60ms apart for 480ms: each well inside the 200ms idle window (a busy CI runner adds tens of ms), the
+    // whole turn more than twice past it.
     for (let i = 0; i < 4; i++) {
-      await Bun.sleep(30);
+      await Bun.sleep(60);
       await runner.frame({ type: "brain.event", runId, event: { type: "text_delta", text: "." } });
-      await Bun.sleep(30);
+      await Bun.sleep(60);
       // A permission prompt waiting for a person polls the bridge with the turn's token.
       await runner.frame({
         type: "mcp.call",

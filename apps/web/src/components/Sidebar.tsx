@@ -905,16 +905,30 @@ function SidebarChannels({
   };
   const overChannel = (e: DragEvent, c: Channel) => {
     const d = drag.current;
-    if (d?.kind === "channel" && d.id !== c.id) over(e, `channel:${c.id}`, half(e));
+    if (d?.kind !== "channel") return;
+    if (d.id !== c.id) return over(e, `channel:${c.id}`, half(e));
+    // Over its own row it lands nowhere: not at the end of the section around it.
+    e.stopPropagation();
+    if (mark) setMark(null);
+  };
+  // "Into" the part the channel is already in lands nowhere: the server would move it to that part's end.
+  const intoPart = (e: DragEvent, key: string) => {
+    const d = drag.current;
+    if (d?.kind !== "channel") return;
+    const dragged = channels.find((c) => c.id === d.id);
+    const home = dragged && categoryOf(dragged);
+    if (home === undefined || key !== (home === null ? "loose" : `${CATEGORY_KEY}${home}`)) return over(e, key, "into");
+    e.stopPropagation();
+    if (mark) setMark(null);
   };
   const overCategory = (e: DragEvent, category: ChannelCategory) => {
     const d = drag.current;
-    if (d?.kind === "channel") over(e, `${CATEGORY_KEY}${category.id}`, "into");
+    if (d?.kind === "channel") intoPart(e, `${CATEGORY_KEY}${category.id}`);
     else if (d?.kind === "category" && d.id !== category.id) over(e, `${CATEGORY_KEY}${category.id}`, half(e));
   };
-  const overLoose = (e: DragEvent) => {
-    if (drag.current?.kind === "channel") over(e, "loose", "into");
-  };
+  const overLoose = (e: DragEvent) => intoPart(e, "loose");
+  // Anywhere in a category but on a row (its empty end, a row's hover buttons): a channel goes in, at its end.
+  const overCategoryBody = (e: DragEvent, category: ChannelCategory) => intoPart(e, `${CATEGORY_KEY}${category.id}`);
   const drop = (e: DragEvent) => {
     const d = drag.current;
     const m = mark;
@@ -1141,6 +1155,7 @@ function SidebarChannels({
             label={category.name}
             sections={sections}
             className="sidebar__section--category"
+            drop={{ onDragOver: (e) => overCategoryBody(e, category), onDrop: drop }}
             headProps={
               {
                 draggable: manages,

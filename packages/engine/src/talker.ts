@@ -81,7 +81,7 @@ export type TalkerSkip =
  * `TALKER_MIN_GAP_MS` or with no new person message since the last one.
  */
 export function talkerPolicy(input: {
-  run: Pick<AgentRun, "status" | "background">;
+  run: Pick<AgentRun, "status" | "background"> & Partial<Pick<AgentRun, "startedAt" | "createdAt">>;
   brain: string;
   message: Pick<Message, "body" | "createdAt">;
   waited: WaitMessageOutcome | null;
@@ -98,9 +98,14 @@ export function talkerPolicy(input: {
   // The message woke the run from its wait: the task itself reads it and answers now.
   if (input.waited?.outcome === "woke") return "reads_soon";
   const waiting = run.status === "waiting_input" || run.status === "waiting_approval" || input.waited !== null;
+  // A computer brain that only just started takes it with its first turn (the rest of a burst, `waitForBurst`) or
+  // live in it: "noted, after this step" would answer a request it is about to read.
+  const start = run.startedAt ?? run.createdAt;
   const busy =
     run.status === "running" &&
-    (input.brain !== "model" || now.getTime() - input.lastActivityAt.getTime() >= TALKER_QUIET_MS);
+    (input.brain !== "model"
+      ? !start || now.getTime() - start.getTime() >= TALKER_QUIET_MS
+      : now.getTime() - input.lastActivityAt.getTime() >= TALKER_QUIET_MS);
   if (!waiting && !busy) return "reads_soon";
   const last = input.lastReplyAt;
   if (last && (now.getTime() - last.getTime() < TALKER_MIN_GAP_MS || last >= input.message.createdAt)) {
