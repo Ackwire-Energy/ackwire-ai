@@ -914,7 +914,14 @@ const styles = StyleSheet.create({
   },
   continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
-  talkMore: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 4, marginTop: 6, minHeight: 28 },
+  talkMore: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    marginTop: 6,
+    minHeight: 28,
+  },
   pressedDim: { opacity: 0.6 },
   shrink: { flexShrink: 1 },
   // The chip's own shrink only works if what holds it can shrink too (a long routine name ends in "…").
