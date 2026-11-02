@@ -218,6 +218,8 @@ describe("costly work nobody asked for needs a go (§3)", () => {
     };
     // A person's request never meets the gate.
     expect(await costlyGate(f, at, { kind: "person", personId: f.owner.id }, "pr", "gh pr create")).toBeNull();
+    // Nor a routine's own run: its brief is its creator's go.
+    expect(await costlyGate(f, at, { kind: "routine", personId: null, brief: null }, "pr", "gh pr create")).toBeNull();
     const first = await costlyGate(f, at, UNATTENDED, "pr", "gh pr create --title fix");
     expect(first?.code).toBe("autonomy.needs_go");
     expect((await costlyGate(f, at, UNATTENDED, "pr", "gh pr create --title fix"))?.code).toBe("autonomy.needs_go");

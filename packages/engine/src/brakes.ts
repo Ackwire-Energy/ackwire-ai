@@ -80,8 +80,12 @@ export function costlyKind(name: string, input: Record<string, unknown>): CostKi
   return null;
 }
 
-/** Who is behind a run decides whether the brakes apply: a person's request never meets them. */
-export const unrequested = (authority: RunAuthority | null) => authority !== null && authority.kind !== "person";
+/**
+ * Who is behind a run decides whether the brakes apply: a person's request never meets them, nor a routine's own run
+ * (its brief, which every routine may act on, is its creator's go). What the brakes hold is the rest: work a routine's
+ * report, a webhook or an agent's own chain started (`unattended`).
+ */
+export const unrequested = (authority: RunAuthority | null) => authority?.kind === "unattended";
 
 /** A proposal card's meta (`meta.actionCard`). The card keeps its state; the signal row is the source of truth. */
 export interface ProposalCard {
