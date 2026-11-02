@@ -2413,6 +2413,12 @@ test("no room on the computer: the agent says so once, asks again quietly withou
   expect(seen.length).toBe(3);
   expect((await timeline(f)).at(-1)?.body).toBe("Pronto.");
   expect(run?.transcript).not.toHaveProperty("roomWaitSince");
+  // The wait ended when the computer took the turn: a step the operator's analytics end it at.
+  const after = await f.db
+    .select()
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, run?.id ?? ""));
+  expect(after.filter((s) => s.data.roomFound === true)).toHaveLength(1);
 });
 
 test("no room for the whole wait: the run fails with computer_busy, a reason the apps say in each language", async () => {
