@@ -911,6 +911,20 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__messages > .ac-msg--grouped {
   margin-top: -4px;
 }
+/* My own rows (`.ac-msg--own`): files and the thread line hang under the bubble on its right edge. */
+.ac-msg--own .artifact-cards {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+/* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
+.ac-msg--own .ac-msg__text .md__table {
+  background: var(--bg);
+}
+.ac-msg--own .thread-line {
+  align-self: flex-end;
+  margin: 4px -6px 0 0;
+  border-radius: 10px 10px 3px 10px;
+}
 .channel__composer {
   position: relative;
   padding: 8px 24px 20px;
@@ -1766,8 +1780,12 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   padding: 0 20px;
 }
 /* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
-   down. */
+   down. The kit's plate for a bare `pre` (its own background, margins and corners) stays off: the card is the plate. */
 .ac-msg__text .code-card__code {
+  margin: 0;
+  padding: 0 16px 14px;
+  background: none;
+  border-radius: 0;
   overflow-y: auto;
 }
 .md .code-card code,

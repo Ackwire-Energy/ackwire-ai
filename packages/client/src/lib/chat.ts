@@ -47,6 +47,17 @@ export function entersWithMotion(key: string, createdAt: string, initialKeys: Re
   return new Date(createdAt).getTime() >= mountedAt - ENTER_WINDOW_MS;
 }
 
+/**
+ * Where a row sits in a run of one author's rows that read as one turn (grouped under the first): its bubble squares
+ * the corners it shares with its neighbours, and the turn's time goes under its last row.
+ */
+export type RunPosition = "solo" | "start" | "mid" | "end";
+export const runPosition = (grouped: boolean, nextGrouped: boolean): RunPosition =>
+  grouped ? (nextGrouped ? "mid" : "end") : nextGrouped ? "start" : "solo";
+/** A run cut where something hangs under a bubble (reactions, files, a thread, a status): no corner points at it. */
+export const runAround = (run: RunPosition, aboveHangs: boolean, hangs: boolean): RunPosition =>
+  runPosition((run === "mid" || run === "end") && !aboveHangs, (run === "start" || run === "mid") && !hangs);
+
 /** Close enough to the bottom to keep following new messages. */
 export const NEAR_BOTTOM_PX = 120;
 export const nearBottom = (el: { scrollHeight: number; scrollTop: number; clientHeight: number }) =>
