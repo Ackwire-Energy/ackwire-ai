@@ -645,6 +645,10 @@ export const AgentBrain = z
     fallback: z
       .boolean()
       .openapi({ description: "When the computer can't answer, answer through the API (agent's budget)." }),
+    extraUsage: z.boolean().openapi({
+      description:
+        "Long work may go on into the plan's paid extra usage where the provider reports it on (ADR 0118); false: it pauses at 95%.",
+    }),
     computer: z.object({ machineId: z.uuid(), name: z.string(), online: z.boolean() }).nullable(),
     options: z.array(BrainOption),
     machines: z.array(BrainMachine).openapi({

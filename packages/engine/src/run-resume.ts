@@ -245,7 +245,7 @@ export async function resumeRunsWaitingForMachine(
         eq(agentRuns.waitingMachineId, machineId),
         eq(agentRuns.status, "waiting_input"),
         // The computer coming back says nothing about a plan's limit or a budget.
-        sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget')`,
+        sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget', 'usage_pause')`,
       ),
     )
     .limit(200);

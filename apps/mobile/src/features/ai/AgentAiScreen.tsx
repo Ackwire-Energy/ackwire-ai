@@ -8,7 +8,7 @@ import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { brainPlan, isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
-import { limitOffers, planState } from "@agenteschat/ui/plan-state";
+import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Fragment, useEffect, useState } from "react";
@@ -262,6 +262,15 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       onPress={() => choose(a)}
                     />
                   ))}
+                  {extraUsageOn(usage) ? (
+                    <GroupedRow
+                      label={t("usageCard.extraTitle")}
+                      labelLines={2}
+                      toggle={view.extraUsage}
+                      disabled={busy || !view.canUsePlans}
+                      onPress={() => void save({ extraUsage: !view.extraUsage }, t("usageCard.extraTitle"))}
+                    />
+                  ) : null}
                   {limited && view.canUsePlans && view.canManageAccounts ? (
                     <GroupedRow
                       icon="plus"

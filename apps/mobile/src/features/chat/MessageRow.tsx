@@ -53,6 +53,7 @@ import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
+import { UsagePauseCard } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
@@ -557,6 +558,7 @@ export const MessageRow = memo(function MessageRow({
         {/* What waits for a person's click comes last, after the words and the tools. */}
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
+        {isAgent ? <UsagePauseCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
         {isAgent ? <InstructionProposals message={m} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}

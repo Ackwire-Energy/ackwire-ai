@@ -1,4 +1,4 @@
-import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
+import { PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   count,
@@ -25,6 +25,7 @@ import {
   type SystemBlock,
   textOf,
 } from "@agenteschat/providers";
+import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { withTimeout } from "./agent-media";
@@ -32,7 +33,7 @@ import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } f
 import { type Agent, getAgentCached } from "./agents";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
-import { fedByRoutine, runAuthority } from "./authority";
+import { fedByRoutine, personOfMessage, runAuthority } from "./authority";
 import {
   type AutoChoice,
   type AutoModelRecord,
@@ -224,13 +225,20 @@ import {
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import {
+  budgetUsedPercent,
+  isLongWork,
   ladderDelay,
   nextMonthStart,
+  overrideHolds,
   planName,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
+  routineRunByHand,
   UNKNOWN_RESET_NOTICE_MS,
   USAGE_WAIT_CODES,
+  USAGE_WINDOW_WORDS,
+  usageCardResumed,
+  usageNoticeText,
   usageWaitKey,
   usageWaitPlace,
 } from "./usage-pause";
@@ -426,7 +434,16 @@ export interface Transcript {
     waitId?: string;
     waitKey?: string;
     until?: string;
+    /** A long-work pause (`usage_pause`): on the plan's window or the agent's budget. */
+    source?: "plan" | "budget";
+    /** When the limit resets, when known (Rotinas says "Pausada até…"; `until` is later by the stagger). */
+    resetsAt?: string;
   };
+  /**
+   * Long work paused near a limit (ADR 0118): `paused` once it was (it stays long work), `cardId` its card,
+   * `override` set by Continuar agora (`until` the window it was pressed on resets; it never pauses before).
+   */
+  usagePause?: { paused?: boolean; cardId?: string; override?: { until: string | null; by: string } };
   /**
    * Since when (ms) this run waits on usage, across its re-parks, and how far along the re-checks of an unknown
    * reset it is (`LIMIT_LADDER_MS`); `noticed`: its owner heard that the reset is still unknown. Gone once a turn runs.
@@ -707,6 +724,7 @@ async function executeRunInner(
           string | null
         >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'waitId', ${agentRuns.transcript}->'outage'->>'waitId')`,
         code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+        source: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
         cut: sql<string | null>`${agentRuns.transcript}->'interruptedTurn'->>'cause'`,
       })
       .from(agentRuns)
@@ -715,7 +733,7 @@ async function executeRunInner(
     // A routine's slot that waited on usage for more than 12 hours doesn't run late: it is missed. One the plan
     // cut mid-work finishes what it started (only the next slot replaces it).
     if (row.background && USAGE_WAIT_CODES.has(row.code ?? "") && row.cut !== "plan_limit") {
-      const late = row.code === "budget" ? "waiting_budget_late" : "waiting_plan_late";
+      const late = row.code === "budget" || row.source === "budget" ? "waiting_budget_late" : "waiting_plan_late";
       if (await missStaleRoutineRun({ db, pubsub: deps.pubsub }, runId, new Date(), late)) return;
     }
     // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
@@ -772,6 +790,8 @@ async function executeRunInner(
   prof.mark("claim");
   steerGate.close = answerNoTurn(deps.pubsub, run.id);
   const claimedAt = Date.now();
+  // Long work (ADR 0118) counts the calls of this claim: a person acting on the run starts a new one.
+  const turnsAtClaim = run.turns;
   // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
   // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
@@ -2262,6 +2282,54 @@ async function executeRunInner(
   };
 
   /**
+   * The card of long work paused near a limit (ADR 0118), posted as the agent where it answers: Continuar agora on
+   * it (`continueUsagePause`) is for the person behind the work (`forUserId`), the agent's owner and admins.
+   */
+  const postUsagePauseCard = async (
+    tx: Executor,
+    pause: { source: "plan" | "budget"; used: number; window?: string },
+    w: { waitId: string; plan: string; resetsAt?: string },
+  ) => {
+    const forUserId = await personOfMessage(tx, run.orgId, run.triggerMessageId).catch(() => null);
+    const window = pause.window ? (USAGE_WINDOW_WORDS[pause.window] ?? "") : "";
+    const text =
+      pause.source === "budget"
+        ? `${agent.name} paused this work · monthly budget at ${pause.used}%. It picks up when the budget renews, or sooner if it goes up. Quick replies keep going.`
+        : `${agent.name} paused this work · ${w.plan} plan at ${pause.used}%${window ? ` ${window}` : ""}. It picks up when the plan resets. Quick replies keep going.`;
+    return post(
+      tx,
+      replyThreadId,
+      text,
+      {
+        ...bodyCode(pause.source === "budget" ? "usage_paused_budget" : "usage_paused", {
+          agent: agent.name,
+          plan: w.plan,
+          percent: String(pause.used),
+          window: pause.window ?? "",
+        }),
+        usageWait: { code: "usage_pause", ...(w.resetsAt ? { resetsAt: w.resetsAt } : {}) },
+        actionCard: {
+          kind: "usage_paused",
+          state: "paused",
+          runId: run.id,
+          waitId: w.waitId,
+          agentId: agent.id,
+          forUserId,
+          source: pause.source,
+          percent: pause.used,
+          ...(pause.window ? { window: pause.window } : {}),
+          plan: w.plan,
+          ...(w.resetsAt ? { resetsAt: w.resetsAt } : {}),
+          continuedByUserId: null,
+          continuedAt: null,
+        },
+      },
+      undefined,
+      true,
+    );
+  };
+
+  /**
    * The plan's limit (`plan_limit`) or the agent's monthly budget (`budget`) stops the run: it parks in its own
    * session (no computer to wait for) and a job resumes it when the limit resets (the refusal's time, else the
    * stored window's, else the re-checks of `LIMIT_LADDER_MS`), at the next month, or when the budget goes up
@@ -2269,16 +2337,19 @@ async function executeRunInner(
    * wait). A turn cut mid-work (`interruptedTurn.cause: plan_limit`) is sent again in the same session.
    */
   const waitForUsage = async (u: {
-    code: "plan_limit" | "budget";
+    code: "plan_limit" | "budget" | "usage_pause";
     message: string;
     resetsAt?: string;
     /** A budget wall made only of other runs' reservations: looked at again soon (the ladder), quietly. */
     soon?: boolean;
+    /** Long work paused near a limit (ADR 0118): on what, how far along, and the plan's window. */
+    pause?: { source: "plan" | "budget"; used: number; window?: string };
   }) => {
     await deferred;
     const t = transcript as Transcript;
     const now = Date.now();
-    const budget = u.code === "budget";
+    const budget = u.code === "budget" || u.pause?.source === "budget";
+    const paused = u.code === "usage_pause";
     const machineId = plan.session?.machineId ?? agent.machineId ?? "";
     const wait = t.usageWait ?? { since: now, step: 0 };
     let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
@@ -2302,7 +2373,7 @@ async function executeRunInner(
       ? usageWaitKey({ code: "budget", agentId: agent.id })
       : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
     const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * (await usageWaitPlace(db, run, key)));
-    const tellOwner = !budget && !known && !wait.noticed && now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
+    const tellOwner = !budget && !paused && !known && !wait.noticed && now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
     if (tellOwner) wait.noticed = true;
     t.usageWait = wait;
     const cut = t.interruptedTurn?.cause === "plan_limit";
@@ -2310,8 +2381,15 @@ async function executeRunInner(
     // A routine's run waits quietly (Rotinas says so); any other says it once per wait.
     const firstPark = t.brainNotice !== u.code;
     const say = !(run.background || viaRoutine !== null || u.soon) && firstPark;
+    const waitId = Bun.randomUUIDv7();
     const note = say
       ? await db.transaction(async (tx) => {
+          if (u.pause) {
+            const card = await postUsagePauseCard(tx, u.pause, { waitId, plan: name, resetsAt });
+            t.usagePause = { ...t.usagePause, cardId: card.id };
+            t.postedCount++;
+            return card;
+          }
           const [code, text] = budget
             ? [
                 "budget_wait",
@@ -2342,7 +2420,13 @@ async function executeRunInner(
     t.postedUpTo = t.messages.length;
     if (!u.soon) t.brainNotice = u.code;
     delete t.roomWaitSince;
-    const waitId = Bun.randomUUIDv7();
+    if (paused) {
+      // An override that let it go on has run out (it parked again): this pause is a new one.
+      const { override: _, ...kept } = t.usagePause ?? {};
+      t.usagePause = { ...kept, paused: true };
+      // A computer brain's next prompt (a nudge, a steered message) is read when it picks up.
+      if (plan.kind !== "model" && nextPrompt) t.continued = { prompt: nextPrompt };
+    }
     t.waitingForBrain = {
       kind: plan.kind,
       machineId: "",
@@ -2350,11 +2434,13 @@ async function executeRunInner(
       waitId,
       waitKey: key,
       until: runAt.toISOString(),
+      ...(u.pause ? { source: u.pause.source, ...(resetsAt ? { resetsAt } : {}) } : {}),
     };
     await addRunStep(db, run, "error", {
       reason: "usage_wait",
       code: u.code,
       message: u.message,
+      ...(u.pause ? { pause: u.pause } : {}),
       until: runAt.toISOString(),
       ...(resetsAt ? { resetsAt } : {}),
     });
@@ -2406,6 +2492,73 @@ async function executeRunInner(
         code: plan.unavailable.code,
         detail: plan.unavailable.message,
       });
+    }
+  }
+
+  /**
+   * Where the limit that binds long work stands now (ADR 0118): the agent's monthly budget on the model brain, else
+   * the plan's tightest window for this model, read from what the runner last stored (a deploy, another replica and
+   * a turn's own readings agree). `extra`: long work may go on into the plan's paid extra usage. Null: nothing known.
+   */
+  const usageReading = async (stored?: PlanUsage | null) => {
+    if (plan.kind === "model") {
+      const { spent, held } = await budgetUsedPercent(db, agent).catch(() => ({ spent: 0, held: 0 }));
+      // Over the line only with other calls' reservations in flight: they're released in seconds, so it looks again
+      // soon instead of waiting for the month.
+      if (spent < PLAN_PAUSE && held >= PLAN_PAUSE) return { source: "budget" as const, used: held, soon: true };
+      return { source: "budget" as const, used: spent, resetsAt: new Date(nextMonthStart(Date.now())).toISOString() };
+    }
+    const machineId = plan.session?.machineId ?? agent.machineId;
+    const usage =
+      stored !== undefined
+        ? stored
+        : machineId
+          ? await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null)
+          : null;
+    const top = planBinding(usage, { model: plan.model ?? null });
+    if (!top) return null;
+    return {
+      source: "plan" as const,
+      used: top.used,
+      window: top.kind,
+      ...(top.resetsAt ? { resetsAt: top.resetsAt } : {}),
+      extra: agent.brainExtraUsage && extraUsageLeft(usage),
+    };
+  };
+  /** A routine's run started by Rodar agora isn't long by kind (a person just asked for it): read once. */
+  let byHand: boolean | null = null;
+  /**
+   * A mission's work is long by kind; a person's message in its thread starts a quick reply (it roots in that
+   * person), not more of the mission's work: read once.
+   */
+  let missionWork: boolean | null = null;
+  /** Long work at the pause line, unless Continuar agora let it go on or it may use the plan's extra usage. */
+  const longWorkPause = async () => {
+    const t = transcript as Transcript;
+    if (forum || overrideHolds(t.usagePause?.override)) return null;
+    if (run.background && byHand === null) byHand = await routineRunByHand(db, run.id).catch(() => false);
+    if (plan.missionId && missionWork === null)
+      missionWork = !(await personOfMessage(db, run.orgId, run.triggerMessageId).catch(() => null));
+    const long = isLongWork({
+      routine: run.background && !byHand,
+      mission: Boolean(missionWork),
+      pausedBefore: Boolean(t.usagePause?.paused),
+      computer: plan.kind !== "model",
+      calls: plan.kind === "model" ? run.turns - turnsAtClaim : computerTurns,
+      elapsedMs: Date.now() - claimedAt,
+    });
+    if (!long) return null;
+    const now = await usageReading();
+    if (!now || now.used < PLAN_PAUSE || ("extra" in now && now.extra)) return null;
+    return now;
+  };
+  // From 90% the agent reads where its plan stands, every turn, so it can tell people a long task may pause.
+  if (plan.kind !== "model") {
+    const reading = await usageReading(plan.usage ?? null);
+    transcript.system = transcript.system.filter((b) => !(b as ContextBlock).usage);
+    if (reading && reading.used >= PLAN_NOTICE) {
+      const name = planName(plan.kind, plan.account?.provider);
+      transcript.system.push({ turn: true, usage: true, text: usageNoticeText(name, reading) } as ContextBlock);
     }
   }
 
@@ -2466,6 +2619,23 @@ async function executeRunInner(
       const steered = await deliverSteering(firstTurn && run.turns === 0);
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
+      }
+      // Long work near its limit parks here, between steps: nothing is in flight and the next step reads on.
+      const pause = await longWorkPause();
+      if (pause) {
+        return waitForUsage({
+          code: "usage_pause",
+          message: `Long work paused at ${pause.used}% of the ${pause.source}.`,
+          ...("resetsAt" in pause && pause.resetsAt ? { resetsAt: pause.resetsAt } : {}),
+          ...("soon" in pause ? { soon: true } : {}),
+          pause: { source: pause.source, used: pause.used, ...("window" in pause ? { window: pause.window } : {}) },
+        });
+      }
+      // Back from a pause with room again: its card says it picked up.
+      const card = transcript.usagePause?.cardId;
+      if (card) {
+        delete transcript.usagePause?.cardId;
+        await usageCardResumed({ db, pubsub: deps.pubsub }, run.orgId, card).catch(() => {});
       }
       // Near the cap it is told once to wrap up: a routine's run hands off what it has (ADR 0053 §10), any other
       // but a forum's replies with where it stands.

@@ -1669,6 +1669,28 @@ export const en: Translations = {
     continued: "{{name}} let them go on · {{time}}",
     continuedByYou: "You let them go on · {{time}}",
   },
+  /** Long work paused near a plan's or a budget's limit (ADR 0118), and its Continuar agora. */
+  usageCard: {
+    window: {
+      five_hour: "of its 5 hours",
+      seven_day: "of its week",
+      seven_day_opus: "of its Opus week",
+      seven_day_sonnet: "of its Sonnet week",
+      monthly: "of its month",
+    },
+    line: "Picks up {{when}}, when the plan resets. Quick replies keep going.",
+    lineUnknown: "Picks up as soon as the plan resets. Quick replies keep going.",
+    lineBudget: "Picks up {{when}}, or sooner if the budget goes up. Quick replies keep going.",
+    continue: "Continue now",
+    hint: "Uses what's left of the plan",
+    hintBudget: "Uses what's left of the budget",
+    forbidden: "Only who asked, the agent's owner or an admin can continue now",
+    resumed: "{{agent}} picked the work back up",
+    ended: "This work ended before it picked up",
+    extraTitle: "Long work may use paid extra usage",
+    extraHint:
+      "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets.",
+  },
   actionCard: {
     connect_ai: {
       title: "Connect an AI for {{agents}}",
@@ -4426,6 +4448,10 @@ export const en: Translations = {
       failing_one: "Failing ({{count}} in a row)",
       failing_other: "Failing ({{count}} in a row)",
       needsWebhook: "Can't run yet: no {{provider}} webhook",
+      usagePaused: "Paused until {{until}} (plan limit)",
+      usagePausedUnknown: "Paused until the plan resets (plan limit)",
+      usagePausedBudget: "Paused until {{until}} (budget limit)",
+      usagePausedBudgetUnknown: "Paused until the budget renews (budget limit)",
     },
     pausedReason: {
       creator_left: "Paused: whoever created it left the workspace",
@@ -4530,6 +4556,13 @@ export const en: Translations = {
     stop: "Stop",
     stopName: "Stop {{name}}",
     stoppedToast: "Run stopped.",
+    /** A run paused near its plan's or budget's limit (state `usage_paused`). */
+    usagePause: {
+      line: "It picks up by itself when the limit resets. Nothing is posted in the conversation.",
+      continuedToast: "Run continuing.",
+      forbidden: "Only who created the routine, the agent's owner or an admin can continue it now",
+      extra_off: "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now",
+    },
     pausedRunningToast: "Routine paused. The run in progress stopped too.",
     deleteBodyRunning:
       "It stops running and leaves the list, and the run in progress stops too. Past runs stay in the history.",
@@ -8661,6 +8694,8 @@ export const en: Translations = {
       takeOverNoAccess: "Join the routine's conversation before taking it over.",
       agentNotInChannel: "Add the agent to the conversation first.",
       webhookPaused: "Turn the routine on to test it.",
+      continueExtraOff:
+        "This agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now.",
     },
     run: {
       notContinuable: "This answer can't be continued anymore.",
@@ -10054,6 +10089,8 @@ export const en: Translations = {
       plan_limit_wait: "The {{plan}} plan hit its limit. I'll answer {{when}}, when it resets.",
       plan_limit_wait_unknown: "The {{plan}} plan hit its limit. I'll answer as soon as it resets.",
       budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
+      usage_paused: "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}",
+      usage_paused_budget: "{{agent}} paused this work · monthly budget at {{percent}}%",
       no_ai: "I can't answer yet: I have no AI connected.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",

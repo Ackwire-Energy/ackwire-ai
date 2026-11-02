@@ -1687,6 +1687,28 @@ export const ptBR = {
     continued: "{{name}} deixou continuar · {{time}}",
     continuedByYou: "Você deixou continuar · {{time}}",
   },
+  /** Trabalho longo pausado perto do limite do plano ou do orçamento (ADR 0118), e o seu Continuar agora. */
+  usageCard: {
+    window: {
+      five_hour: "das 5 horas",
+      seven_day: "da semana",
+      seven_day_opus: "da semana do Opus",
+      seven_day_sonnet: "da semana do Sonnet",
+      monthly: "do mês",
+    },
+    line: "Retoma {{when}}, quando o plano renovar. Respostas rápidas continuam.",
+    lineUnknown: "Retoma assim que o plano renovar. Respostas rápidas continuam.",
+    lineBudget: "Retoma {{when}}, ou antes se o orçamento aumentar. Respostas rápidas continuam.",
+    continue: "Continuar agora",
+    hint: "Usa o que resta do plano",
+    hintBudget: "Usa o que resta do orçamento",
+    forbidden: "Só quem pediu, o dono do agente ou um admin pode continuar agora",
+    resumed: "{{agent}} retomou o trabalho",
+    ended: "Este trabalho terminou antes de retomar",
+    extraTitle: "Trabalho longo pode usar o uso extra pago",
+    extraHint:
+      "Com o uso extra ligado no plano, o trabalho longo segue depois de 95%. Desligado, ele pausa em 95% e retoma quando o plano renovar.",
+  },
   actionCard: {
     connect_ai: {
       title: "Conectar uma IA para {{agents}}",
@@ -4470,6 +4492,10 @@ export const ptBR = {
       failing_one: "Falhando ({{count}} seguida)",
       failing_other: "Falhando ({{count}} seguidas)",
       needsWebhook: "Ainda não roda: falta o webhook do {{provider}}",
+      usagePaused: "Pausada até {{until}} (limite do plano)",
+      usagePausedUnknown: "Pausada até o plano renovar (limite do plano)",
+      usagePausedBudget: "Pausada até {{until}} (limite do orçamento)",
+      usagePausedBudgetUnknown: "Pausada até o orçamento renovar (limite do orçamento)",
     },
     pausedReason: {
       creator_left: "Pausada: quem criou saiu do workspace",
@@ -4574,6 +4600,14 @@ export const ptBR = {
     stop: "Parar",
     stopName: "Parar {{name}}",
     stoppedToast: "Execução parada.",
+    /** A run paused near its plan's or budget's limit (state `usage_paused`). */
+    usagePause: {
+      line: "Retoma sozinha quando o limite renovar. Nada é postado na conversa.",
+      continuedToast: "Execução continuando.",
+      forbidden: "Só quem criou a rotina, o dono do agente ou um admin pode continuar agora",
+      extra_off:
+        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora",
+    },
     pausedRunningToast: "Rotina pausada. A execução em andamento também parou.",
     deleteBodyRunning:
       "Ela para de rodar e sai da lista, e a execução em andamento também para. As execuções passadas continuam no histórico.",
@@ -8724,6 +8758,8 @@ export const ptBR = {
       takeOverNoAccess: "Entre na conversa da rotina antes de assumi-la.",
       agentNotInChannel: "Adicione o agente à conversa antes.",
       webhookPaused: "Ligue a rotina para testar.",
+      continueExtraOff:
+        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora.",
     },
     run: {
       notContinuable: "Esta resposta não pode mais ser continuada.",
@@ -10138,6 +10174,8 @@ export const ptBR = {
       plan_limit_wait: "O plano do {{plan}} chegou ao limite. Respondo {{when}}, quando ele renovar.",
       plan_limit_wait_unknown: "O plano do {{plan}} chegou ao limite. Respondo assim que ele renovar.",
       budget_wait: "Meu orçamento do mês acabou. Continuo {{when}}, ou antes se um admin aumentar o limite.",
+      usage_paused: "{{agent}} pausou este trabalho · plano do {{plan}} em {{percent}}% {{window}}",
+      usage_paused_budget: "{{agent}} pausou este trabalho · orçamento do mês em {{percent}}%",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */

@@ -2742,7 +2742,7 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * or an answer), `usage_paused` (its run paused near its plan's or budget's limit: `usagePause`), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
  * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
 export type RoutineState =
@@ -2751,6 +2751,7 @@ export type RoutineState =
   | "running"
   | "waiting_computer"
   | "waiting_person"
+  | "usage_paused"
   | "failing"
   | "needs_webhook";
 
@@ -2783,6 +2784,12 @@ export interface Routine {
   state: RoutineState;
   /** Its run waits for this computer since `since` (state `waiting_computer`). */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
+  /**
+   * Its run paused near its plan's or budget's limit (state `usage_paused`, ADR 0118): it picks up at `resetsAt`
+   * (null: not known yet). `extraOff`: the agent's long work may not use paid extra usage, so Continuar agora is
+   * refused. Who may press it: `canManage`.
+   */
+  usagePause?: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -4419,6 +4426,8 @@ export interface AgentBrain {
   effectiveModel: string | null;
   /** If the computer isn't available, answer through the API (counts against the budget). */
   fallback: boolean;
+  /** Long work may go on into the plan's paid extra usage where the provider reports it on (ADR 0118). */
+  extraUsage: boolean;
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
@@ -4536,6 +4545,8 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
+  /** Off: long work pauses at 95% of the plan even with its paid extra usage on. */
+  extraUsage?: boolean;
   /**
    * "Atende outras pessoas" turned off: false lets in whoever its "who can talk" list allows (everyone with no list).
    */

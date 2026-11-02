@@ -25,6 +25,7 @@ import {
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import {
   capitalize,
@@ -41,15 +42,18 @@ import {
   busyOnComputer,
   healthWords,
   isRunAtWork,
+  isStoppable,
   pausedFix,
   type RoutineFix,
   routineChannelOf,
+  routineStateTime,
   routineStateWords,
   runMessageLink,
   runOutcome,
   runPixelStatus,
   runPixels,
   runsPerDay,
+  usageContinueBlock,
   usageParts,
   type Words,
   whereItRuns,
@@ -136,8 +140,9 @@ const mailTrouble = (r: Routine) =>
 
 /** A run of it is working now (Parar stops it). */
 const isRunning = (r: Routine) => r.state === "running";
-/** A run of it is at work: working, or waiting for a person or its computer. */
-const isAtWork = (r: Routine) => isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer";
+/** A run of it is at work: working, waiting for a person or its computer, or paused near its plan's limit. */
+const isAtWork = (r: Routine) =>
+  isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer" || r.state === "usage_paused";
 /** A one-off that already fired (or was cancelled): no switch, no "Rodar agora", nothing left to run. */
 const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
 /** A one-off that fired and whose run ended: shown muted, under "Concluídos" (while its run works, it is live). */
@@ -545,6 +550,15 @@ function useRoutineControls(r: Routine) {
       ),
     run: () => action.mutate({ type: "run", id: r.id }),
     stop: () => action.mutate({ type: "stop", id: r.id }, { onSuccess: () => toast.show(t("routines.stoppedToast")) }),
+    continueUsage: () =>
+      action.mutate(
+        { type: "continueUsage", id: r.id },
+        {
+          onSuccess: (saved) =>
+            (saved as Routine).state !== "usage_paused" && toast.show(t("routines.usagePause.continuedToast")),
+          onError: (error) => toast.show(errorText(t, error), "error"),
+        },
+      ),
     fix: (fix: RoutineFix) => {
       const channelId = routineChannelOf(r.target);
       if (fix === "add_agent" && channelId)
@@ -572,8 +586,7 @@ function RoutineStateChip({ routine: r, className }: { routine: Routine; classNa
   const { org } = useOrg();
   const say = useSay();
   const names = useNamesComputers(org.id);
-  const since = r.waitingFor ? whenAt(t, i18n.language, r.waitingFor.since) : "";
-  const state = routineStateWords(r, since, names);
+  const state = routineStateWords(r, routineStateTime(t, i18n.language, r), names);
   return (
     <Chip
       icon={state.icon}
@@ -583,6 +596,36 @@ function RoutineStateChip({ routine: r, className }: { routine: Routine; classNa
     >
       {say(state)}
     </Chip>
+  );
+}
+
+/**
+ * A run paused near its plan's or budget's limit: it picks up by itself, and Continuar agora lets it go on now for
+ * its creator, the agent's owner and admins. Everyone else sees the button greyed with the reason.
+ */
+function UsagePausedNote({ routine: r }: { routine: Routine }) {
+  const { t } = useTranslation();
+  const controls = useRoutineControls(r);
+  const blocked = usageContinueBlock(r);
+  const reason = blocked ? t(`routines.usagePause.${blocked}`) : null;
+  return (
+    <div className="routine-details__usage-pause">
+      <p className="small muted">{t("routines.usagePause.line")}</p>
+      <span className="routine-details__usage-pause-acts">
+        <Button
+          size="sm"
+          variant="primary"
+          icon="play"
+          disabled={blocked !== null}
+          loading={controls.action.isPending}
+          title={reason ?? t(r.usagePause?.source === "budget" ? "usageCard.hintBudget" : "usageCard.hint")}
+          onClick={controls.continueUsage}
+        >
+          {t("usageCard.continue")}
+        </Button>
+        {reason && <span className="small muted">{reason}</span>}
+      </span>
+    </div>
   );
 }
 
@@ -634,15 +677,18 @@ function RoutineRow({
   const fired = hasFired(r);
   const paused = isPaused(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const more = t("routines.more", { name: title });
   // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
   const needsLook = !done && routineStateWords(r).tone === "waiting";
   const fix = r.canManage && needsLook ? pausedFix(r) : null;
+  // Paused near its plan's limit: said quietly (it picks up by itself), with no fix.
+  const showState = needsLook || r.state === "usage_paused";
   // Its "…" and its right click: run or stop, pause or resume, then what the "…" always had.
   const entries = (): MenuEntry[] => [
-    ...(r.canManage && !reminder && (running || !fired)
+    ...(r.canManage && !reminder && (stoppable || !fired)
       ? ([
-          running
+          stoppable
             ? { kind: "item", id: "stop", label: t("routines.stop"), icon: "stop", run: controls.stop }
             : { kind: "item", id: "run", label: t("routines.runNow"), icon: "play", run: controls.run },
         ] satisfies MenuEntry[])
@@ -745,7 +791,7 @@ function RoutineRow({
               {t(mailTrouble(r) === "error" ? "mail.routine.error" : "mail.routine.needsReconnect")}
             </Chip>
           )}
-          {needsLook && <RoutineStateChip routine={r} className="routine-row__chip" />}
+          {showState && <RoutineStateChip routine={r} className="routine-row__chip" />}
           {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
         </span>
       </div>
@@ -788,8 +834,8 @@ function RoutineRow({
           />
         )}
         {/* Parar for a run at work, also a paused routine's or a fired one-off's; "Rodar agora" while it may run. */}
-        {(running || !fired) && !reminder && r.canManage ? (
-          running ? (
+        {(stoppable || !fired) && !reminder && r.canManage ? (
+          stoppable ? (
             <Button
               size="sm"
               variant="ghost"
@@ -1063,6 +1109,7 @@ function RoutineDetails({
   const done = isDoneOnce(r);
   const fired = hasFired(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const described = useRuleDescribe(
     org.id,
@@ -1130,9 +1177,9 @@ function RoutineDetails({
           <Button size="sm" icon="edit" onClick={onEdit}>
             {t("routines.edit")}
           </Button>
-          {(running || !fired) &&
+          {(stoppable || !fired) &&
             !reminder &&
-            (running ? (
+            (stoppable ? (
               <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
                 {t("routines.stop")}
               </Button>
@@ -1148,6 +1195,7 @@ function RoutineDetails({
           )}
         </div>
       )}
+      {r.state === "usage_paused" && <UsagePausedNote routine={r} />}
       {outage && outages.data && (
         <SwitchComputerDialog open={switching} onOpenChange={setSwitching} outage={outage} data={outages.data} />
       )}

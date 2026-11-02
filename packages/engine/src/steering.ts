@@ -80,10 +80,13 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     }
     let live = false;
     /** Parked waiting for its computer brain, its plan or its budget (`waitingForBrain`). */
-    const brainWait =
+    const parked =
       active.status === "waiting_input"
-        ? ((active.transcript as { waitingForBrain?: { waitId?: string } } | null)?.waitingForBrain ?? null)
+        ? ((active.transcript as { waitingForBrain?: { waitId?: string; code?: string } } | null)?.waitingForBrain ??
+          null)
         : null;
+    // Long work paused near a limit is no wait a message moves (`holdsMessages`): it isn't woken for it.
+    const brainWait = parked?.code === "usage_pause" ? null : parked;
     // Its model call stops and the loop reads the message at once (a running tool finishes first).
     // A computer brain (Claude Code, Codex) can't drop its turn halfway: one whose turn takes messages
     // gets it live and urgent (Claude Code reads it now or at its next tool boundary; Codex's app-server

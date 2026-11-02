@@ -223,6 +223,15 @@ export function useRoutineControls(r: Routine) {
     run: () => action.mutate({ type: "run", id: r.id }, { onSuccess: successHaptic, onError: failed }),
     stop: () =>
       action.mutate({ type: "stop", id: r.id }, { onSuccess: () => say(t("routines.stoppedToast")), onError: failed }),
+    continueUsage: () =>
+      action.mutate(
+        { type: "continueUsage", id: r.id },
+        {
+          onSuccess: (saved) =>
+            (saved as Routine).state !== "usage_paused" && say(t("routines.usagePause.continuedToast")),
+          onError: failed,
+        },
+      ),
     fix: (fix: RoutineFix) => {
       const channelId = routineChannelOf(r.target);
       if (fix === "add_agent" && channelId)
