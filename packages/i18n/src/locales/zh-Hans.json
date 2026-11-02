@@ -4843,7 +4843,7 @@
       "claude": "Claude Code",
       "claudeText": "Claude Code 在电脑上规划和编写代码。{{name}} 跟进并转达。",
       "codex": "Codex",
-      "codexText": "Codex 在电脑上编写代码。仍在测试中。",
+      "codexText": "Codex 在电脑上编写代码。",
       "agent": "{{name}}（智能体本身）",
       "agentText": "{{name}} 直接在电脑上用自己的工具编写代码。",
       "agentText_female": "{{name}} 直接在电脑上用自己的工具编写代码。"

@@ -12047,7 +12047,7 @@
     "value": "Codex"
   },
   "missions.executor.codexText": {
-    "value": "Codex codes on the computer. Still being tested."
+    "value": "Codex codes on the computer."
   },
   "missions.executor.agent": {
     "value": "{{name}} (the agent itself)"

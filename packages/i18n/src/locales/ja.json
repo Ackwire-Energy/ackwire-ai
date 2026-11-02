@@ -4793,7 +4793,7 @@
       "claude": "Claude Code",
       "claudeText": "Claude Codeがコンピューター上で計画を立ててコードを書きます。{{name}}は進行を見守り、伝えます。",
       "codex": "Codex",
-      "codexText": "Codexがコンピューター上でコードを書きます。まだテスト中です。",
+      "codexText": "Codexがコンピューター上でコードを書きます。",
       "agent": "{{name}}（エージェント本人）",
       "agentText": "{{name}}が自分のツールで、コンピューター上で直接コードを書きます。",
       "agentText_female": "{{name}}が自分のツールで、コンピューター上で直接コードを書きます。"

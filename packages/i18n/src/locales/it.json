@@ -5164,7 +5164,7 @@
       "claude": "Claude Code",
       "claudeText": "Claude Code pianifica e scrive codice sul computer. {{name}} segue e riferisce.",
       "codex": "Codex",
-      "codexText": "Codex scrive codice sul computer. È ancora in prova.",
+      "codexText": "Codex scrive codice sul computer.",
       "agent": "{{name}} (l'agente stesso)",
       "agentText": "{{name}} scrive codice direttamente sul computer, con i suoi strumenti.",
       "agentText_female": "{{name}} scrive codice direttamente sul computer, con i suoi strumenti."

@@ -4763,7 +4763,7 @@ export const en = {
       claude: "Claude Code",
       claudeText: "Claude Code plans and codes on the computer. {{name}} follows and relays.",
       codex: "Codex",
-      codexText: "Codex codes on the computer. Still being tested.",
+      codexText: "Codex codes on the computer.",
       agent: "{{name}} (the agent itself)",
       agentText: "{{name}} codes straight on the computer, with his own tools.",
       agentText_female: "{{name}} codes straight on the computer, with her own tools.",

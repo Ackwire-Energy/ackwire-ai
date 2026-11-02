@@ -4829,7 +4829,7 @@
       "claude": "Claude Code",
       "claudeText": "Claude Code merencanakan dan menulis kode di komputer. {{name}} mengikuti dan meneruskan.",
       "codex": "Codex",
-      "codexText": "Codex menulis kode di komputer. Masih diuji.",
+      "codexText": "Codex menulis kode di komputer.",
       "agent": "{{name}} (agen itu sendiri)",
       "agentText": "{{name}} menulis kode langsung di komputer, dengan alatnya sendiri.",
       "agentText_female": "{{name}} menulis kode langsung di komputer, dengan alatnya sendiri."

@@ -4789,7 +4789,7 @@
       "claude": "Claude Code",
       "claudeText": "Claude Code가 컴퓨터에서 계획하고 코드를 작성해요. {{name}}은(는) 진행을 지켜보며 전달해요.",
       "codex": "Codex",
-      "codexText": "Codex가 컴퓨터에서 코드를 작성해요. 아직 테스트 중이에요.",
+      "codexText": "Codex가 컴퓨터에서 코드를 작성해요.",
       "agent": "{{name}}(에이전트가 직접)",
       "agentText": "{{name}}이(가) 자기 도구로 컴퓨터에서 직접 코드를 작성해요."
     },

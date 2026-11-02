@@ -4905,7 +4905,7 @@ export const ptBR = {
       claude: "Claude Code",
       claudeText: "O Claude Code planeja e programa no computador. {{name}} acompanha e repassa.",
       codex: "Codex",
-      codexText: "O Codex programa no computador. Ainda em teste.",
+      codexText: "O Codex programa no computador.",
       agent: "{{name}} (o próprio agente)",
       agentText: "{{name}} programa direto no computador, com as próprias ferramentas.",
     },
