@@ -18,6 +18,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
+import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
@@ -912,16 +913,7 @@ export async function removeMember(
       .set({ audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})` })
       .where(and(eq(schema.wikiPages.orgId, orgId), sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds})`));
     // Their AI apps and personal tokens here stop now (ADR 0113).
-    await tx
-      .update(schema.appGrants)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(schema.appGrants.orgId, orgId),
-          eq(schema.appGrants.userId, targetUserId),
-          isNull(schema.appGrants.revokedAt),
-        ),
-      );
+    await revokeMemberApps(tx, orgId, targetUserId);
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).

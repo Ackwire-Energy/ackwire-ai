@@ -1,10 +1,11 @@
-import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, gt, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { can, getMembership, requireActiveMembership } from "../organizations";
 import { workRefusal } from "../standing";
 import { queueReceipt } from "./oauth";
+import { revokeAppGrants, revokeMemberApps } from "./revoke";
 import { ACCESS_TOKEN_PREFIX, APP_LIMITS, type AppScope, PERSONAL_TOKEN_PREFIX, randomBase62 } from "./urls";
 
 const { appGrants, appTokens, appSends, oauthAppRequests, oauthAppClients, users, organizations } = schema;
@@ -66,10 +67,7 @@ export async function appPrincipal(
   } else {
     const membership = await getMembership(db, grant.userId, grant.orgId);
     if (!membership) {
-      await db
-        .update(appGrants)
-        .set({ revokedAt: new Date() })
-        .where(and(eq(appGrants.id, grant.id), isNull(appGrants.revokedAt)));
+      await db.transaction((tx) => revokeMemberApps(tx, grant.orgId, grant.userId));
       return null;
     }
     if (workRefusal(membership.standing))
@@ -210,50 +208,8 @@ export async function revokeGrant(
     );
   if (!grant) throw new NotFoundError(kind === "oauth" ? "App not found" : "Token not found");
   if (grant.userId !== actorId && !can(membership, "manage_members")) throw new NotFoundError();
-  await db.transaction(async (tx) => {
-    await revokeGrants(tx, eq(appGrants.id, grant.id), actorId);
-    await recordAudit(tx, {
-      orgId,
-      actor: { type: "person", id: actorId },
-      action: kind === "oauth" ? "apps.disconnected" : "apps.token_revoked",
-      target: { type: "app_grant", id: grant.id },
-      details: {
-        app: grant.displayName,
-        ...(grant.userId !== actorId ? { personId: grant.userId } : {}),
-      },
-    });
-  });
+  await db.transaction((tx) => revokeAppGrants(tx, eq(appGrants.id, grant.id), { type: "person", id: actorId }));
 }
-
-/** Revokes the grants matching `where`, and their tokens. */
-async function revokeGrants(tx: Executor, where: ReturnType<typeof eq>, by: string | null) {
-  const revoked = await tx
-    .update(appGrants)
-    .set({ revokedAt: new Date(), revokedBy: by })
-    .where(and(where, isNull(appGrants.revokedAt)))
-    .returning({ id: appGrants.id });
-  if (revoked.length === 0) return 0;
-  await tx
-    .update(appTokens)
-    .set({ revokedAt: new Date() })
-    .where(
-      and(
-        inArray(
-          appTokens.grantId,
-          revoked.map((r) => r.id),
-        ),
-        isNull(appTokens.revokedAt),
-      ),
-    );
-  return revoked.length;
-}
-
-/** A new password: every app and token of the person, in every workspace, stops now. */
-export const revokeUserApps = (db: Executor, userId: string) => revokeGrants(db, eq(appGrants.userId, userId), null);
-
-/** A person removed from (or leaving) a workspace: their apps and tokens there stop now. */
-export const revokeMemberApps = (db: Executor, orgId: string, userId: string) =>
-  revokeGrants(db, and(eq(appGrants.orgId, orgId), eq(appGrants.userId, userId)) as ReturnType<typeof eq>, null);
 
 export const TOKEN_EXPIRY_DAYS = [30, 90, 365] as const;
 
@@ -335,13 +291,10 @@ export async function purgeApps(db: Database, now = new Date()) {
   const ago = (days: number) => new Date(now.getTime() - days * 86_400_000);
   await db.delete(oauthAppRequests).where(lt(oauthAppRequests.expiresAt, ago(1)));
   await db.delete(appTokens).where(or(lt(appTokens.expiresAt, ago(30)), lt(appTokens.revokedAt, ago(30))));
-  await revokeGrants(
+  await revokeAppGrants(
     db,
-    and(
-      eq(appGrants.kind, "oauth"),
-      lt(sql`coalesce(${appGrants.lastUsedAt}, ${appGrants.consentedAt})`, ago(90)),
-    ) as ReturnType<typeof eq>,
-    null,
+    and(eq(appGrants.kind, "oauth"), lt(sql`coalesce(${appGrants.lastUsedAt}, ${appGrants.consentedAt})`, ago(90))),
+    { type: "system", reason: "unused" },
   );
   await db
     .delete(appGrants)

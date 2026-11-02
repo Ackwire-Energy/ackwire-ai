@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, isNull, schema } from "@agenteschat/db";
 import { CURSOR_CALLBACK, pinnedLookup, purgeApps, resetAppDocumentFailures, sha256 } from "@agenteschat/engine";
 import { authorize, connectApp, LOOPBACK, mcp, pkce, registerClient, requestIdOf, token } from "./ai-apps";
 import { browser, createTestServer, joinByInvitation, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
@@ -592,6 +592,41 @@ describe("what ends a connection", () => {
     expect((await mcp(t, app.access, { jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(401);
     const [grant] = await t.db.select().from(schema.appGrants);
     expect(grant?.revokedAt).not.toBeNull();
+  });
+
+  test("removed, invited back and connected again: the tokens from before stay dead", async () => {
+    const { b, orgId } = await owner();
+    const ana = await joinByInvitation(t, b, orgId, "ana@example.com");
+    const before = await connectApp(t, ana, orgId);
+    const anaId = ((await (await ana("/api/app/me")).json()) as { user: { id: string } }).user.id;
+    expect((await b(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
+    const removed = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "apps.disconnected"));
+    expect(removed.map((a) => [a.actorType, (a.details as { reason?: string }).reason])).toEqual([
+      ["system", "left_workspace"],
+    ]);
+    await joinByInvitation(t, b, orgId, "ana@example.com", { as: ana });
+    const after = await connectApp(t, ana, orgId, { clientId: before.clientId });
+    expect((await mcp(t, before.access, { jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(401);
+    const refreshed = await token(t, {
+      grant_type: "refresh_token",
+      refresh_token: before.refresh,
+      client_id: before.clientId,
+    });
+    expect(refreshed.json.error).toBe("invalid_grant");
+    expect((await mcp(t, after.access, { jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(200);
+  });
+
+  test("a grant whose person left on its own is revoked with its tokens at the next call", async () => {
+    const { b, orgId } = await owner();
+    const ana = await joinByInvitation(t, b, orgId, "ana@example.com");
+    const app = await connectApp(t, ana, orgId);
+    const anaId = ((await (await ana("/api/app/me")).json()) as { user: { id: string } }).user.id;
+    await t.db
+      .delete(schema.organizationMembers)
+      .where(and(eq(schema.organizationMembers.orgId, orgId), eq(schema.organizationMembers.userId, anaId)));
+    expect((await mcp(t, app.access, { jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(401);
+    const live = await t.db.select().from(schema.appTokens).where(isNull(schema.appTokens.revokedAt));
+    expect(live).toEqual([]);
   });
 
   test("deleting the workspace takes its grants with it", async () => {

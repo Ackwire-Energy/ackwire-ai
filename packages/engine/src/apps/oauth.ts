@@ -15,6 +15,7 @@ import {
   resolveApp,
   touchApp,
 } from "./clients";
+import { revokeAppGrants, revokeGrantTokens, revokeMemberApps } from "./revoke";
 import {
   ACCESS_TOKEN_PREFIX,
   APP_LIMITS,
@@ -222,6 +223,8 @@ export async function decideConsent(
           .returning();
     if (!grant) throw new Error("grant not stored");
     const created = !before || before.revokedAt !== null;
+    // Connected again: whatever the old connection minted stays dead.
+    if (before?.revokedAt) await revokeGrantTokens(tx, [before.id]);
     if (created) {
       await recordAudit(tx, {
         orgId: grant.orgId,
@@ -347,10 +350,7 @@ async function grantUsable(db: Database, grant: schema.AppGrant) {
   if (grant.revokedAt) return false;
   const membership = await getMembership(db, grant.userId, grant.orgId);
   if (membership) return true;
-  await db
-    .update(appGrants)
-    .set({ revokedAt: new Date() })
-    .where(and(eq(appGrants.id, grant.id), isNull(appGrants.revokedAt)));
+  await db.transaction((tx) => revokeMemberApps(tx, grant.orgId, grant.userId));
   return false;
 }
 
@@ -514,8 +514,7 @@ export async function revokeToken(db: Database, raw: string) {
     .where(and(eq(appTokens.id, token.id), isNull(appTokens.revokedAt)));
   // A personal token is its grant: revoking it disconnects it from the list too.
   if (token.kind === "personal")
-    await db
-      .update(appGrants)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(appGrants.id, token.grantId), isNull(appGrants.revokedAt)));
+    await db.transaction((tx) =>
+      revokeAppGrants(tx, eq(appGrants.id, token.grantId), { type: "system", reason: "revoked_with_token" }),
+    );
 }
