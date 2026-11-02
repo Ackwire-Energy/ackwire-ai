@@ -434,7 +434,7 @@ describe("answering", () => {
       [waiting.invitation.id, [admin], later(7), sha256(url.split("/invite/")[1] ?? "")],
     ]);
     const [, invitedEmail] = await joinEmails("join_answer");
-    expect(invitedEmail?.template).toMatchObject({ outcome: "invited", url, role: "member", locale: "pt-BR" });
+    expect(invitedEmail?.template).toMatchObject({ outcome: "invited", url, role: "member", locale: "en" });
     const [fayAfter] = (await rows()).filter((r) => r.email === "fay@example.com");
     expect(fayAfter).toMatchObject({ status: "approved", role: "member", invitationId: waiting.invitation.id });
     // The invitation opens sign-up for that address only.

@@ -810,6 +810,6 @@ describe("outbox delivery", () => {
     expect(job?.payload).toMatchObject({ template: { kind: "invitation", inviterEmail, crew: [{}] } });
     const payload = job?.payload as { template: EmailTemplate } | undefined;
     const text = payload ? renderEmail(payload.template, art).text : "";
-    expect(text).toContain(`(${inviterEmail.replace(/([.@])/g, `$1${BREAK}`)}) invited you to join`);
+    expect(text).toContain(`(${inviterEmail.replace(/([.@])/g, `$1${BREAK}`)}) convidou você para entrar na`);
   });
 });

@@ -523,8 +523,6 @@ describe("external provisioning", () => {
 
   test("its name says a computer, in its first owner's language, and follows the workspace's until renamed", async () => {
     f = await setup();
-    // The first owner reads Portuguese (a person with no language reads English).
-    await f.db.update(schema.users).set({ locale: "pt-BR" }).where(eq(schema.users.id, f.owner.id));
     const issued = await issueManagedMachine(deps(), f.org.id);
     if (!issued) throw new Error("no org");
     const name = async (id = issued.machineId) => (await machineRow(id)).name;
@@ -564,8 +562,6 @@ describe("external provisioning", () => {
 
   test("the first hello makes it ready and gives it the agents with no computer, once", async () => {
     f = await setup();
-    // The first owner reads Portuguese (a person with no language reads English).
-    await f.db.update(schema.users).set({ locale: "pt-BR" }).where(eq(schema.users.id, f.owner.id));
     const events = heard("machine.provisioning", "agent.computer");
     // Created while it is being prepared: no computer yet, and the agent says it is on its way.
     await setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing" });
@@ -655,8 +651,6 @@ describe("external provisioning", () => {
 
   test("the ready email: to the owners by language, once, when promised; a wait counts from the removal", async () => {
     f = await setup();
-    // The first owner reads Portuguese (a person with no language reads English).
-    await f.db.update(schema.users).set({ locale: "pt-BR" }).where(eq(schema.users.id, f.owner.id));
     const readyEmail = { publicUrl: "https://chat.example.com/", gateway: { hasModelCredential: async () => true } };
     const emails = async () =>
       (await f.db.select().from(schema.outbox))

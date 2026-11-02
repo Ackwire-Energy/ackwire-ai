@@ -301,7 +301,7 @@ describe("creating a workspace while one is held", () => {
 
 describe("the person's language (ADR 0121)", () => {
   test("any language of the app, picked or detected; anything else refused", async () => {
-    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: null, localeAuto: true });
+    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "pt-BR", localeAuto: true });
     await setMyLocale(f.db, f.owner.id, "fr");
     expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "fr", localeAuto: false });
     await setMyLocale(f.db, f.owner.id, "ja", true);
