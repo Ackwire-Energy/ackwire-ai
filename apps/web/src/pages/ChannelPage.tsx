@@ -106,8 +106,8 @@ import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@
 import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
+import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
