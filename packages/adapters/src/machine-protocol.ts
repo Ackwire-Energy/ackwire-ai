@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 36;
+export const MACHINE_PROTOCOL_VERSION = 37;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -438,6 +438,12 @@ export const DESKTOP_SWITCH_PROTOCOL = 30;
 export const CURSOR_PROTOCOL = 36;
 /** `account` `begin`'s `provider` for a Cursor account made with an API key (`CURSOR_API_KEY`) instead of a sign-in. */
 export const CURSOR_KEY_PROVIDER = "cursor";
+/**
+ * From this protocol on (ADR 0057): in system mode the agents share the computer, none with memory or CPUs of its
+ * own, and `agentes-runner computer` shows who uses it. Agents are told so only from here; an older runner still caps
+ * each agent and has no such command.
+ */
+export const SHARED_COMPUTER_PROTOCOL = 37;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex" | "cursor";
