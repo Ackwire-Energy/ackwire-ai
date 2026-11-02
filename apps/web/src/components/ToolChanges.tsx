@@ -2,6 +2,7 @@ import type { ToolChange } from "@agenteschat/client";
 import { useAcceptConnectionToolChanges, useAcceptToolChange, useToolChanges } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Diff } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
@@ -178,7 +179,7 @@ function ChangeDetails({ diff }: { diff: ToolChangeDiff }) {
 }
 
 /** "O texto mudou · 2 campos mudaram": what changed, in a few words. */
-function summary(t: ReturnType<typeof useTranslation>["t"], diff: ToolChangeDiff): string {
+function summary(t: TFunction, diff: ToolChangeDiff): string {
   const parts: string[] = [];
   if (diff.description) parts.push(t("connectors.toolChanges.textChanged"));
   if (diff.fields.length > 0) parts.push(t("connectors.toolChanges.fieldsChanged", { count: diff.fields.length }));

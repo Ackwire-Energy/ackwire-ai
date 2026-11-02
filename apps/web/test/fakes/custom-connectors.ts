@@ -180,7 +180,10 @@ export function createMockCustomConnectors(
       const list = changesByOrg.get(orgId) ?? [];
       const accepted = list.filter((c) => c.connectionId === connectionId).length;
       if (accepted === 0) throw new MockNotFoundError("No change waits on this connection");
-      changesByOrg.set(orgId, list.filter((c) => c.connectionId !== connectionId));
+      changesByOrg.set(
+        orgId,
+        list.filter((c) => c.connectionId !== connectionId),
+      );
       return { accepted };
     },
     disconnect: async (orgId, id) => {
