@@ -918,7 +918,9 @@ export async function buildRunContext(
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
     sessionPrompt: [
-      ...system.filter((b) => b.cache).map((b) => b.text),
+      // Without the `ask_choices` line: it is there only when a person is behind the run, so it follows the
+      // requester like "# Your team" below.
+      ...system.filter((b) => b.cache).map((b) => b.text.replace(`\n${ASK_CHOICES_LINE}`, "")),
       // The roster, not "# Your team": that text follows the requester, so a person and an agent taking turns
       // would start a new session every turn.
       JSON.stringify(
