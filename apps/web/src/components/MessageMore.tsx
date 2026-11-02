@@ -1,5 +1,6 @@
 import { type Message, usePinMessage } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { Button, EmojiPickerPopover, Menu } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -142,7 +143,7 @@ export function useMessageMenu(
       return [copy(selected, "copy", t("contextMenu.copy")), ...reply, { kind: "separator" }, copyLink, wiki(selected)];
     }
     // A file with no words has no text to copy or save.
-    const words = message.body.trim() !== "";
+    const words = message.body.trim() !== "" && !voiceOf(message.meta);
     const pinned = Boolean(message.pinned);
     const pinEntry: MenuEntry | null =
       options.readOnly || !can(org, "post")

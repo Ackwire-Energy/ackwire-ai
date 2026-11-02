@@ -6,16 +6,73 @@ import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
-import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { agentOnlyNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
 import { getMembership, requirePermission } from "./organizations";
 
-const { channels, channelMembers, channelReads, messages, agents, users } = schema;
+const { channels, channelMembers, channelReads, messages, agents, users, organizationMembers } = schema;
 
 export type DmTarget = { userId: string } | { agentId: string };
 
 const keyOf = (participants: string[]) => [...new Set(participants)].sort().join("|");
+
+const namedPeople = (dmKey: string | null) =>
+  (dmKey ?? "").split("|").flatMap((p) => (p.startsWith("u:") ? [p.slice(2)] : []));
+
+/** Of these people, the ones who are members of the workspace and not blocked. */
+async function presentPeople(db: Executor, orgId: string, userIds: string[]) {
+  if (userIds.length === 0) return [];
+  const rows = await db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(
+      and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, userIds), isNull(users.blockedAt)),
+    );
+  return rows.map((r) => r.userId);
+}
+
+async function readmit(db: Executor, orgId: string, channelId: string, userIds: string[]) {
+  if (userIds.length === 0) return;
+  const back = await db
+    .insert(channelMembers)
+    .values(userIds.map((userId) => ({ orgId, channelId, userId })))
+    .onConflictDoNothing()
+    .returning({ id: channelMembers.id });
+  if (back.length) caches.channelMembers.delete(`${orgId}:${channelId}`);
+}
+
+/**
+ * An existing DM, opened again: the people its key names who are members of the workspace again come back into it.
+ * Removal takes someone out of their DMs and a DM can't be joined, so without this a person invited back would find
+ * every old DM closed to them for good.
+ */
+async function reopenDm(
+  db: Executor,
+  orgId: string,
+  dm: { id: string; dmKey: string | null; archivedAt: Date | null },
+) {
+  if (dm.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, dm.id));
+  await readmit(db, orgId, dm.id, await presentPeople(db, orgId, namedPeople(dm.dmKey)));
+}
+
+/**
+ * Someone joining the workspace again goes back into their old DMs whose other people are all still in it, so a
+ * colleague writing in the old DM from the sidebar reaches them without anyone opening it anew.
+ */
+export async function restoreDms(db: Executor, orgId: string, userId: string) {
+  const dms = await db
+    .select({ id: channels.id, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), eq(channels.kind, "dm"), sql`${channels.dmKey} like ${`%u:${userId}%`}`));
+  for (const dm of dms) {
+    const named = namedPeople(dm.dmKey);
+    if (!named.includes(userId)) continue;
+    const present = await presentPeople(db, orgId, named);
+    if (present.length === named.length) await readmit(db, orgId, dm.id, named);
+  }
+}
 
 /**
  * Opens a direct conversation with a person or an agent (creates it the
@@ -51,7 +108,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     )[0];
   const found = await existing();
   if (found) {
-    if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
+    await reopenDm(db, orgId, found);
     return found;
   }
   // A new DM with an agent this person can't talk to isn't started; an old one stays readable.
@@ -103,7 +160,7 @@ export async function openPersonAgentDm(db: Executor, orgId: string, userId: str
     )[0];
   const found = await existing();
   if (found) {
-    if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
+    await reopenDm(db, orgId, found);
     return found;
   }
   const [channel] = await db
@@ -188,7 +245,7 @@ export interface DmSummary {
     /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
     meta: PreviewMeta | null;
     /** A GIF or a sticker sent with no text (ADR 0091): the app says which where `body` is empty; else null. */
-    mediaKind: "gif" | "sticker" | null;
+    mediaKind: "gif" | "sticker" | "voice" | null;
     createdAt: Date;
     authorType: string;
   } | null;
@@ -290,7 +347,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
           lastMessage: m
             ? {
                 id: m.id,
-                body: m.body.slice(0, 200),
+                body: readableBody(m.body, m.meta as Record<string, unknown> | null).slice(0, 200),
                 meta: previewMeta(m.meta as Record<string, unknown> | null),
                 mediaKind: previewMediaKind(m.body, m.meta as Record<string, unknown> | null),
                 createdAt: m.createdAt,

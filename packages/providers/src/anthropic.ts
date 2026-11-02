@@ -16,6 +16,7 @@ import {
   type PartialUsage,
   ProviderError,
   type StopReason,
+  stableToolsFirst,
   type ToolSpec,
 } from "./types";
 
@@ -32,10 +33,14 @@ const API_ERROR_CHARS = 300;
  * Anthropic Messages API, streaming. A client is created per call with the
  * org's decrypted key (never cached or logged).
  *
- * - Prompt caching: every system block marked `cache` gets a breakpoint (the
- *   org context and the agent instructions are stable), and top-level
- *   automatic caching covers the growing conversation in tool loops. Tools
- *   are sorted by name so their prefix is deterministic.
+ * - Prompt caching: the stable tools go first (`ToolSpec.stable`) with a
+ *   breakpoint after the last one, so loading a tool group keeps them cached;
+ *   every system block marked `cache` gets a breakpoint (the latest ones when
+ *   the 4 allowed would be passed), and top-level automatic caching covers
+ *   the growing conversation in tool loops. Each part of the tools is sorted
+ *   by name so its prefix is deterministic. `cacheTtl: "1h"` makes the tool and
+ *   system breakpoints last an hour; the automatic one stays at 5 minutes
+ *   (longer entries must come first).
  * - Tool use: client tools with `eager_input_streaming`; inputs are validated
  *   by the Tool Gateway before anything runs. Thinking and other provider
  *   blocks come back as `opaque` and are replayed unchanged, only to the
@@ -95,7 +100,7 @@ export function createAnthropicProvider(
       const format = compat ? undefined : request.outputSchema;
       const answerSchema = compat ? request.outputSchema : undefined;
       const tools = [
-        ...toTools(request.tools ?? [], !compat),
+        ...toTools(request.tools ?? [], !compat, compat ? undefined : cacheControl(request)),
         ...(answerSchema
           ? [
               {
@@ -130,7 +135,7 @@ export function createAnthropicProvider(
           {
             model: request.model,
             max_tokens: request.maxTokens,
-            system: toSystem(request),
+            system: toSystem(request, compat ? undefined : room(request)),
             messages: toMessageParams(request.messages, id, withThinking),
             ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
             ...(tools.length > 0 ? { tools } : {}),
@@ -163,6 +168,8 @@ export function createAnthropicProvider(
             partial.inputTokens = event.message.usage.input_tokens;
             partial.cacheReadTokens = event.message.usage.cache_read_input_tokens ?? 0;
             partial.cacheWriteTokens = event.message.usage.cache_creation_input_tokens ?? 0;
+            const long = event.message.usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+            if (long > 0) partial.cacheWriteLongTokens = long;
           } else if (event.type === "message_delta") {
             partial.outputTokens = event.usage.output_tokens;
           } else if (event.type === "content_block_delta" && event.delta.type === "input_json_delta") {
@@ -196,6 +203,9 @@ export function createAnthropicProvider(
             outputTokens: message.usage.output_tokens,
             cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
             cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
+            ...((message.usage.cache_creation?.ephemeral_1h_input_tokens ?? 0) > 0
+              ? { cacheWriteLongTokens: message.usage.cache_creation?.ephemeral_1h_input_tokens }
+              : {}),
           },
           ...(Object.keys(dropped).length > 0 ? { thinking: { dropped } } : {}),
         };
@@ -248,28 +258,53 @@ export function createAnthropicProvider(
 const isAnswer = (b: ContentBlock): b is Extract<ContentBlock, { type: "tool_use" }> =>
   b.type === "tool_use" && b.name === STRUCTURED_OUTPUT;
 
-function toSystem(request: ModelRequest): BetaTextBlockParam[] {
+/** Breakpoints a request may carry. */
+const MAX_BREAKPOINTS = 4;
+
+type CacheControl = { type: "ephemeral"; ttl?: "1h" };
+
+const cacheControl = (request: ModelRequest): CacheControl =>
+  request.cacheTtl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+
+/** The system's breakpoints: what is left after the automatic one and the stable tools' one. */
+const room = (request: ModelRequest) => ({
+  control: cacheControl(request),
+  max: MAX_BREAKPOINTS - 1 - (request.tools?.some((t) => t.stable) ? 1 : 0),
+});
+
+/**
+ * The system as blocks, a breakpoint after each one marked `cache` (the latest `max` of them, so the request stays
+ * within the 4 allowed). Without `breakpoints` (another company's endpoint) they stay plain 5-minute ones.
+ */
+function toSystem(request: ModelRequest, breakpoints?: { control: CacheControl; max: number }): BetaTextBlockParam[] {
+  const control = breakpoints?.control ?? { type: "ephemeral" as const };
   if (typeof request.system === "string") {
-    return [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }];
+    return [{ type: "text", text: request.system, cache_control: control }];
   }
-  return request.system
-    .filter((b) => b.text.length > 0)
-    .map((b) => ({
-      type: "text" as const,
-      text: b.text,
-      ...(b.cache ? { cache_control: { type: "ephemeral" } } : {}),
-    }));
+  const blocks = request.system.filter((b) => b.text.length > 0);
+  const marked = blocks.filter((b) => b.cache);
+  const kept = new Set(breakpoints ? marked.slice(Math.max(0, marked.length - breakpoints.max)) : marked);
+  return blocks.map((b) => ({
+    type: "text" as const,
+    text: b.text,
+    ...(kept.has(b) ? { cache_control: control } : {}),
+  }));
 }
 
-function toTools(tools: ToolSpec[], eager: boolean): BetaTool[] {
-  return [...tools]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((t) => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.inputSchema as BetaTool["input_schema"],
-      ...(eager ? { eager_input_streaming: true } : {}),
-    }));
+/**
+ * The stable tools first, then the others, each part by name; `control`: a breakpoint after the last stable tool
+ * (another company's endpoint gets none).
+ */
+function toTools(tools: ToolSpec[], eager: boolean, control?: CacheControl): BetaTool[] {
+  const ordered = stableToolsFirst(tools);
+  const last = ordered.filter((t) => t.stable).length - 1;
+  return ordered.map((t, i) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.inputSchema as BetaTool["input_schema"],
+    ...(eager ? { eager_input_streaming: true } : {}),
+    ...(control && i === last ? { cache_control: control } : {}),
+  }));
 }
 
 const isThinking = (data: Record<string, unknown>) => data.type === "thinking" || data.type === "redacted_thinking";

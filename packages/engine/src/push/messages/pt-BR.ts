@@ -45,4 +45,5 @@ export const ptBR: PushStrings = {
   openBody: "Toque para abrir.",
   sentGif: "Mandou um GIF",
   sentSticker: "Mandou uma figurinha",
+  sentVoice: "Mandou uma mensagem de voz",
 };

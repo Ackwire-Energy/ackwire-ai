@@ -68,8 +68,9 @@ import { markName, threadFaces } from "./logic";
 // ── Consultation ─────────────────────────────────────────────────────────────
 
 /**
- * What the agent asked another agent before answering, in a private conversation: the two agents' pill opening it
- * ("Ada ⇄ Infra · respondeu"); with no conversation to open, "Infra respondeu" opening to the question and answer.
+ * What the agent asked another agent before answering, in a private conversation: with the conversation it was
+ * asked from (`channelId`), the two agents' pill ("Ada ⇄ Infra · respondeu") opening their talk on its own screen.
+ * Without it (already on that screen), or with no talk to open, "Infra respondeu" opening in place.
  */
 export function ConsultationCard({
   askerId,
@@ -78,7 +79,6 @@ export function ConsultationCard({
 }: {
   askerId: string;
   consultation: MessageConsultation;
-  /** The conversation it was asked from: the pill opens the two agents' talk from it. */
   channelId?: string;
 }) {
   const id = openableConsultation(cs.consultationId);

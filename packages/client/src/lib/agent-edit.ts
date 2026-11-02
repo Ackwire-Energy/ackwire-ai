@@ -110,10 +110,11 @@ export function channelsAfter(
 export type RunFilter = "all" | "failed" | "waiting" | "routines";
 
 /**
- * A run started by one of the agent's routines: the routine posts its prompt
- * (after `@handle` in a channel), so the run's text starts with it.
+ * A run started by one of the agent's routines: the server says so (`routine`); older servers only by its text,
+ * which starts with the routine's prompt (after `@handle` in a channel).
  */
-export function isRoutineRun(run: Pick<Run, "what">, prompts: string[], handle: string) {
+export function isRoutineRun(run: Pick<Run, "what" | "routine">, prompts: string[], handle: string) {
+  if (run.routine) return true;
   const text = run.what.trim().replace(new RegExp(`^@${handle}\\s+`, "i"), "");
   return prompts.some((p) => {
     const head = p.trim().slice(0, 80);

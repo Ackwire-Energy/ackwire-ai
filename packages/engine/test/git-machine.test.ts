@@ -368,11 +368,12 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
         "# Your code",
         `acme/app is checked out at ${FOLDER}/repos/acme/app (default branch main, updated before this turn).`,
         `acme/web is checked out at ${FOLDER}/repos/acme/web (default branch main; it couldn't be updated before this turn: network unreachable).`,
-        `You start in ${FOLDER}/repos/acme/web.`,
         "Read it freely; to change code, create a branch agentes/dev/<topic> there, push it (git push -u origin agentes/dev/<topic>) and open a PR with open_pull_request. Delete branches with delete_branches; to push to someone else's branch, ask with request_branch_push first.",
         "Not cloned yet: acme/infra. To work on one, call git_clone first; it needs no approval.",
       ].join("\n"),
     );
+    // Where it starts goes in the turn's prompt: the system text stays the same whichever checkout a turn is about.
+    expect(named?.start).toBe(`You start in ${FOLDER}/repos/acme/web.`);
     expect(named?.prompt).not.toContain("beta/old");
     // Nothing named: the agent's first repository.
     expect((await prepareAgentCode(w.machineDeps, turn("bom dia")))?.cwd).toBe("repos/acme/app");

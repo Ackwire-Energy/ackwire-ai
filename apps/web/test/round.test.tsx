@@ -157,7 +157,11 @@ describe("Criar canal", () => {
     await type(name, "Vendas Sul");
     expect((name as HTMLInputElement).value).toBe("vendas-sul");
     await type(within(dialog).getByLabelText("Descrição"), "Leads e propostas");
-    await click(within(dialog).getByRole("radio", { name: /Privado/ }));
+    // "Quem pode entrar" is a dropdown.
+    const access = within(dialog).getByRole("combobox", { name: "Quem pode entrar" });
+    access.focus();
+    await act(async () => fireEvent.keyDown(access, { key: "Enter" }));
+    await click(screen().getByRole("option", { name: /Privado/ }));
     await type(within(dialog).getByRole("searchbox", { name: "Buscar pessoa ou agente" }), "ada");
     await click(within(dialog).getByRole("checkbox", { name: /Ada/ }));
     expect(dialog.textContent).toContain("1 selecionado");

@@ -331,6 +331,23 @@ describe("the questions inside the reply that asked: one pill per agent (Consult
     expect(document.querySelector(".ac-consult-group")).toBeNull();
   });
 
+  test("the notice's card opens the two agents' conversation in the panel, never in place", async () => {
+    const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
+    const state = withTalk(withAsk([c], true), c);
+    state.messages = state.messages.filter((m) => m.id !== "msg-asked");
+    await open(state);
+    const card = document.querySelector(".ac-consult") as HTMLElement;
+    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
+    expect(head.getAttribute("aria-expanded")).toBeNull();
+    await act(async () => fireEvent.click(head));
+    await settle(3);
+    // A long answer reads beside the chat: the card stays one line.
+    expect(card.querySelector(".ac-consult__body")).toBeNull();
+    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
+    expect(panel()?.textContent).toContain("subiu 6 pb");
+    expect(head.getAttribute("aria-pressed")).toBe("true");
+  });
+
   test("an event reloads the list: an answer that came shows in place", async () => {
     const { socket, state } = await open(withAsk([consultation({})]));
     expect(group()?.textContent).toContain("conversando");

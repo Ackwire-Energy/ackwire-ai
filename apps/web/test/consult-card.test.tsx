@@ -3,19 +3,34 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
-const open = async (state = seedState()) => {
-  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+const open = async (state = seedState(), api = createFakeApi(state)) => {
+  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
   await settle(5);
   const socket = r.sockets.last();
   await act(async () => socket.open());
   await settle(2);
   return { ...r, socket, state };
+};
+/**
+ * The reply moved under João's post and that thread opened beside the channel: a thread view has no panel of its
+ * own, so the pill there opens in place (in the channel it opens the two agents' conversation in the panel).
+ */
+const openInThread = async (state: ReturnType<typeof seedState>) => {
+  const reply = state.messages.at(-1) as (typeof state.messages)[number];
+  reply.threadId = "m-1";
+  const api = createFakeApi(state);
+  await state.openThread?.(ORG_ID, "m-1", reply.createdAt);
+  const r = await open(state, api);
+  const channel = screen().getByRole("region", { name: /Mensagens/ });
+  await act(async () => fireEvent.click(within(channel).getByRole("button", { name: /1 resposta/ })));
+  await settle(6);
+  return { ...r, thread: screen().getByRole("complementary", { name: "Thread" }) };
 };
 const push = (socket: { push: (f: unknown) => void }, event: Record<string, unknown>, channelId = ENG_ID) =>
   act(async () => socket.push({ type: "event", channelId, event: { channelId, ...event } }));
@@ -69,6 +84,25 @@ describe("what another agent said before the reply (meta.consulted): the two age
     await settle(3);
     // The panel beside the channel opens on that conversation (the fake backend has none stored for it).
     expect(document.querySelector("aside.thread-panel")?.getAttribute("aria-label")).toMatch(/^Conversa entre /);
+  });
+
+  test("in a thread (no panel): the pill opens in place to the question, the answer and who saw it", async () => {
+    const { thread } = await openInThread(
+      withReply({
+        consulted: [
+          { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
+        ],
+      }),
+    );
+    const [pill] = pillsIn(thread);
+    expect(pill?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(pill as HTMLElement));
+    const body = thread.querySelector(".ac-talk-detail") as HTMLElement;
+    expect(body.textContent).toContain("Ada perguntou");
+    expect(body.textContent).toContain(QUESTION);
+    expect(body.textContent).toContain("Resposta do Atlas");
+    expect(body.querySelector("strong")?.textContent).toBe("Staging");
+    expect(body.textContent).toContain("Conversa só entre Ada e Atlas");
   });
 
   test("expired or failed: 'sem resposta'; one pill per agent asked", async () => {

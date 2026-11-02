@@ -2,6 +2,7 @@ import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest } from "@agen
 import { keys, useCardProposals, useDecideProposal, useDecideProposals } from "@agenteschat/client";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { undoesMemoryChange } from "@agenteschat/client/lib/permissions";
 import {
   appLabel,
   cardHead,
@@ -52,11 +53,20 @@ const hostOf = (site: string | null | undefined) => {
  * "Memória atualizada" in the chat (`memory.updated`): what the agent
  * remembered, forgot or updated because a person asked, a link to what it
  * knows (its page's Memória tab in the panel beside the conversation), and "Desfazer"
- * (`POST …/memories/{id}/revert`). A proposed change shows the proposal inline instead.
+ * (`POST …/memories/{id}/revert`) for who may still undo it. A proposed change shows the proposal inline instead.
  */
-export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; agentId: string }) {
+export function MemoryChangeCard({
+  update,
+  agentId,
+  sentAt,
+}: {
+  update: MemoryUpdate;
+  agentId: string;
+  /** When the reply carrying the card was sent; absent for a card that just arrived live. */
+  sentAt?: string;
+}) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
@@ -106,7 +116,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
             {t("memoryCard.open", g)}
           </Link>
         </Button>
-        {!undone && update.undo && (
+        {!undone && update.undo && undoesMemoryChange(update, dir.anyAgent(agentId), me.user.id, org, sentAt) && (
           <Button size="sm" disabled={revert.isPending} loading={revert.isPending} onClick={() => revert.mutate()}>
             {t("memoryCard.undo")}
           </Button>

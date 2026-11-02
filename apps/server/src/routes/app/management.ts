@@ -112,6 +112,12 @@ const Settings = z
       description:
         "How often agents follow a light reply with a sticker or a GIF on their own: `never`, `sometimes` (the default) or `often`. Needs `agentMediaAvailable`; each agent can be turned off (`mediaReplies`). When someone asks for one, agents send it at any level.",
     }),
+    voiceMessages: z.boolean().openapi({
+      description: "People can send voice messages (ADR 0100); they also need `voiceAvailable`. On by default.",
+    }),
+    voiceAvailable: z.boolean().openapi({
+      description: "Read only: this server has a speech engine now, from its environment or from its owner's Settings.",
+    }),
     gifsAvailable: z.boolean().openapi({
       description:
         "Read only: this server has a GIF provider with a key now (`GIPHY_API_KEY`, or the one the installation's owner added in Settings). Without it there are no GIFs at all.",
@@ -261,7 +267,12 @@ const Run = z
     error: z.string().nullable(),
     errorCode: z.string().optional().openapi({ description: "Stable code of `error` (translate with `errorParams`)." }),
     errorParams: z.record(z.string(), z.string()).optional(),
-    what: z.string().openapi({ description: "Start of the message that started the run." }),
+    what: z.string().openapi({ description: "Start of the message that started the run; empty when `private`." }),
+    private: z.boolean().openapi({
+      description:
+        "The viewer doesn't read the run's conversation (not in its channel or DM): no `what` and no steps, only its numbers.",
+    }),
+    routine: z.boolean().openapi({ description: "Started by one of the agent's routines (also when `private`)." }),
     turns: z.number(),
     inputTokens: z.number().openapi({ description: "Every input token, cache included." }),
     cachedTokens: z.number().openapi({ description: "How much of `inputTokens` was read from the prompt cache." }),
@@ -300,6 +311,7 @@ export function managementRoutes(deps: AppDeps) {
   const mediaAvailable = async () => ({
     // The provider follows the installation's key, which its owner may add or remove at any time.
     gifsAvailable: adapters.gifs?.available() ?? false,
+    voiceAvailable: deps.extras?.speech?.available() ?? false,
     agentMediaAvailable: Boolean((await deps.extras?.jevKey?.view())?.source),
   });
 
@@ -353,6 +365,10 @@ export function managementRoutes(deps: AppDeps) {
               description:
                 "Per provider and tier, one of that provider's models; null puts the tier back on its default.",
             }),
+            voiceMessages: z
+              .boolean()
+              .optional()
+              .openapi({ description: "People can send voice messages (ADR 0100)." }),
             gifs: z.boolean().optional().openapi({ description: "People can send GIFs in chat (ADR 0091)." }),
             gifRating: z.enum(GIF_RATINGS).optional(),
             agentStickers: z.boolean().optional(),

@@ -4,6 +4,7 @@ import { messageMediaOf } from "./media";
 import { answeredNotices, isAgentOnlyNotice, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
 import { quoteExcerpt } from "./reply";
 import { isRoutineCall, routineReplyOf } from "./routines";
+import { voiceOf } from "./voice";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
   a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1;
@@ -134,14 +135,15 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
       const away =
         root && lastShown && lastShown.id !== root.id && lastShown.threadId !== root.id && !replyQuotes(m, root.id);
       // A root that is a GIF or a sticker with no text: its quote names it (ADR 0091).
-      const rootMedia = away ? messageMediaOf(root.meta)?.kind : undefined;
+      const rootVoice = away && voiceOf(root.meta) !== null;
+      const rootMedia = rootVoice ? ("voice" as const) : away ? messageMediaOf(root.meta)?.kind : undefined;
       const context: ReplyRef | undefined = away
         ? {
             messageId: root.id,
             threadId: null,
             author: root.author,
             authorName: "",
-            excerpt: quoteExcerpt(root.body),
+            excerpt: rootVoice ? "" : quoteExcerpt(root.body),
             ...(rootMedia ? { media: rootMedia } : {}),
           }
         : undefined;

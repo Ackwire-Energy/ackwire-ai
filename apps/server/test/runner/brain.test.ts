@@ -1247,6 +1247,23 @@ test("the pinned env without a plan", () => {
   expect(accountSettingsEnv(undefined, "opus", own).ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
 });
 
+test("the computer's own API key on Anthropic's API keeps its conversation cached for an hour", () => {
+  const key = { ANTHROPIC_API_KEY: "sk-ant-fake-key" };
+  expect(accountSettingsEnv(undefined, "opus", key, true).CLAUDE_CODE_PROMPT_CACHE_TTL).toBe("1h");
+  // Not for an account's sign-in, another endpoint or cloud, or a TTL its owner chose.
+  expect(accountSettingsEnv(undefined, "opus", key).CLAUDE_CODE_PROMPT_CACHE_TTL).toBeUndefined();
+  expect(accountSettingsEnv(undefined, "opus", {}, true).CLAUDE_CODE_PROMPT_CACHE_TTL).toBeUndefined();
+  for (const more of [
+    { ANTHROPIC_BASE_URL: "https://llm.corp.test" },
+    { CLAUDE_CODE_USE_BEDROCK: "1" },
+    { CLAUDE_CODE_PROMPT_CACHE_TTL: "5m" },
+    { FORCE_PROMPT_CACHING_5M: "1" },
+  ])
+    expect(
+      accountSettingsEnv(undefined, "opus", { ...key, ...more }, true).CLAUDE_CODE_PROMPT_CACHE_TTL,
+    ).toBeUndefined();
+});
+
 test.if(posix)("an account that isn't on the computer is account_missing, never another account", async () => {
   const { spawns, turn } = setup({ accounts: { accountDir: () => null } });
   const r = await turn(1, "hi", { account: ACCOUNT });
