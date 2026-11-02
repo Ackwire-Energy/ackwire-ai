@@ -31,12 +31,14 @@ import {
   parseWikiLinks,
   syncWikiLinks,
   visibleWikiPageIds,
+  wikiPageRunVisibleSql,
   wikiPageVisibleSql,
   wikiSlug,
 } from "./wiki-links";
 
 const {
   wikiPages,
+  wikiFolderAudiences,
   orgRoles,
   organizationMembers,
   organizationMemberRoles,
@@ -54,10 +56,14 @@ const {
 
 type PageRow = typeof wikiPages.$inferSelect;
 
-/** Who writes: a person, or an agent on a person's request ("by Theo, at Walter's request"). */
+/**
+ * Who reads or writes: a person, or an agent for a person ("by Theo, at Walter's request"). An agent sees only what
+ * that person and whoever reads `channelId` see (`wikiPageRunVisibleSql`), so it can't hand a page to someone it was
+ * kept from; with nobody behind it, it sees no page limited to people.
+ */
 export type WikiActor =
   | { type: "person"; userId: string }
-  | { type: "agent"; agentId: string; requestedByUserId: string | null };
+  | { type: "agent"; agentId: string; requestedByUserId: string | null; channelId?: string | null };
 
 export interface WikiDeps {
   db: Database;
@@ -75,10 +81,23 @@ export interface WikiAuthor {
   onBehalfOf: string | null;
 }
 
-/** A restricted page's audience: the roles and the people who see it (owners and agents always do). */
+/** A restricted page's audience: the roles and the people who see it (owners always do). */
 export interface WikiAudience {
   roleIds: string[];
   userIds: string[];
+}
+
+/** Who edits, among those who see: `editors` null = all of them, `agentEditorIds` null = every agent that reads. */
+export interface WikiEditors {
+  editors: WikiAudience | null;
+  agentEditorIds: string[] | null;
+}
+
+/** A folder's audience: `audience` null = every member, `agentIds` null = every agent. */
+export interface WikiFolderAudience extends WikiEditors {
+  folder: string;
+  audience: WikiAudience | null;
+  agentIds: string[] | null;
 }
 
 export interface WikiPageSummary {
@@ -91,8 +110,16 @@ export interface WikiPageSummary {
   locked: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned: boolean;
-  /** Who sees it besides agents and owners; null = every member. */
+  /** Who sees it besides owners; null = every member. */
   audience: WikiAudience | null;
+  /** The agents that read it; null = every agent. */
+  agentIds: string[] | null;
+  /** The people who edit it, among those who see it and hold `edit_wiki`; null = all of them. */
+  editors: WikiAudience | null;
+  /** The agents that edit it, among those that read it; null = all of them. */
+  agentEditorIds: string[] | null;
+  /** The folder whose audience it follows; null = its own, or open. */
+  audienceFolder: string | null;
   /** The start of the text, plain (no markdown), for cards. */
   excerpt: string;
   /** Where it came from: `obsidian` for an imported page, `message`/`forum_topic` for "Save to wiki". */
@@ -119,6 +146,10 @@ export interface WikiPageView extends WikiPageSummary {
   source: WikiSource | null;
   /** Agents that used the page in the last 7 days. */
   reads: WikiPageReads;
+  /** The audience of the closest limited folder: this page can only be narrower. */
+  folderAudience: WikiFolderAudience | null;
+  /** Whether the editors' list lets this reader edit it (a locked page or a missing `edit_wiki` still stops them). */
+  canEdit: boolean;
   deletedAt: string | null;
 }
 
@@ -205,7 +236,7 @@ async function requireReader(db: Database, actor: WikiActor, orgId: string): Pro
 
 /**
  * Members create and edit; a locked page only admins (never agents). A restricted page only its audience, and an
- * agent only for someone in it: an agent reads every page, but doesn't write one for a person who can't see it.
+ * agent only for someone in it: an agent doesn't write a page for a person who can't see it.
  */
 async function requireWriter(db: Database, actor: WikiActor, orgId: string, page?: PageRow) {
   const membership = await requireReader(db, actor, orgId);
@@ -215,18 +246,67 @@ async function requireWriter(db: Database, actor: WikiActor, orgId: string, page
   }
   const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
   if (page && who && !(await sees(db, who, page))) throw noAccess();
+  if (page) await requireEditor(db, actor, page);
   return membership;
+}
+
+/** An agent edits only on its own list and for a person on theirs, so nobody edits through an agent what they can't. */
+async function requireEditor(db: Executor, actor: WikiActor, page: PageRow) {
+  const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
+  if ((who && !(await edits(db, who, page))) || (actor.type === "agent" && !agentEdits(actor.agentId, page))) {
+    throw new ForbiddenError("Only the people chosen edit this page", "wiki.edit_limited");
+  }
 }
 
 const noAccess = () => new ForbiddenError("You don't have access to this page", "wiki.no_access");
 
-/** Whether the person `userId` sees `page` (agents see every page). */
+/** Whether the person `userId` sees `page`. */
 async function sees(db: Executor, userId: string, page: Pick<PageRow, "id" | "restricted">) {
   return !page.restricted || (await visibleWikiPageIds(db, userId, [page.id])).has(page.id);
 }
 
-/** The condition that keeps a person to the pages they see; none for agents. */
-const visibleTo = (actor: WikiActor) => (actor.type === "person" ? wikiPageVisibleSql(actor.userId) : undefined);
+/** Whether the agent reads `page`. */
+const agentSees = (agentId: string, page: Pick<PageRow, "agentsLimited" | "audienceAgentIds">) =>
+  !page.agentsLimited || page.audienceAgentIds.includes(agentId);
+
+/** Whether the person `userId` is on the page's editors, if it has a list. Owners always are. */
+async function edits(
+  db: Executor,
+  userId: string,
+  page: Pick<PageRow, "orgId" | "editorsLimited" | "editorRoleIds" | "editorUserIds">,
+) {
+  if (!page.editorsLimited || page.editorUserIds.includes(userId)) return true;
+  if ((await roleHolders(db, page.orgId, page.editorRoleIds)).has(userId)) return true;
+  const [member] = await db
+    .select({ role: organizationMembers.role })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, page.orgId), eq(organizationMembers.userId, userId)));
+  return member?.role === "owner";
+}
+
+/** Whether the agent is on the page's editors, if it has a list. */
+const agentEdits = (agentId: string, page: Pick<PageRow, "agentEditorsLimited" | "agentEditorIds">) =>
+  !page.agentEditorsLimited || page.agentEditorIds.includes(agentId);
+
+/** The condition that keeps a person or an agent to the pages they see. */
+const visibleTo = (actor: WikiActor) =>
+  actor.type === "person"
+    ? wikiPageVisibleSql(actor.userId)
+    : wikiPageRunVisibleSql({
+        agentId: actor.agentId,
+        personId: actor.requestedByUserId,
+        channelId: actor.channelId ?? null,
+      });
+
+/** Of these page ids, the ones `actor` sees. */
+async function visibleIds(db: Executor, actor: WikiActor, ids: string[]) {
+  if (ids.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ id: wikiPages.id })
+    .from(wikiPages)
+    .where(and(inArray(wikiPages.id, [...new Set(ids)]), visibleTo(actor)));
+  return new Set(rows.map((r) => r.id));
+}
 
 const authorCols = (actor: WikiActor) =>
   actor.type === "person"
@@ -242,7 +322,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * A live page by id, slug or an earlier slug (or a deleted one with `deleted`), that `actor` sees: a restricted page
- * outside a person's audience is a plain `wiki.no_access`.
+ * outside a person's audience is a plain `wiki.no_access`, and for an agent that may not read it the page doesn't exist.
  */
 async function findPage(
   db: Executor,
@@ -253,8 +333,192 @@ async function findPage(
 ) {
   const row = await findAnyPage(db, orgId, ref, options);
   if (actor.type === "person" && !(await sees(db, actor.userId, row))) throw noAccess();
+  if (actor.type === "agent" && !(await visibleIds(db, actor, [row.id])).has(row.id)) {
+    throw new NotFoundError("Page not found", "wiki.page_not_found");
+  }
   return row;
 }
+
+// ── Folder audiences ─────────────────────────────────────────────────────────
+
+type AudienceCols = Pick<
+  PageRow,
+  | "restricted"
+  | "audienceRoleIds"
+  | "audienceUserIds"
+  | "agentsLimited"
+  | "audienceAgentIds"
+  | "editorsLimited"
+  | "editorRoleIds"
+  | "editorUserIds"
+  | "agentEditorsLimited"
+  | "agentEditorIds"
+>;
+type FolderRule = typeof wikiFolderAudiences.$inferSelect;
+
+const OPEN: AudienceCols = {
+  restricted: false,
+  audienceRoleIds: [],
+  audienceUserIds: [],
+  agentsLimited: false,
+  audienceAgentIds: [],
+  editorsLimited: false,
+  editorRoleIds: [],
+  editorUserIds: [],
+  agentEditorsLimited: false,
+  agentEditorIds: [],
+};
+
+const colsOf = (a: AudienceCols): AudienceCols => ({
+  restricted: a.restricted,
+  audienceRoleIds: a.audienceRoleIds,
+  audienceUserIds: a.audienceUserIds,
+  agentsLimited: a.agentsLimited,
+  audienceAgentIds: a.audienceAgentIds,
+  editorsLimited: a.editorsLimited,
+  editorRoleIds: a.editorRoleIds,
+  editorUserIds: a.editorUserIds,
+  agentEditorsLimited: a.agentEditorsLimited,
+  agentEditorIds: a.agentEditorIds,
+});
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+
+const sameAudience = (a: AudienceCols, b: AudienceCols) =>
+  a.restricted === b.restricted &&
+  a.agentsLimited === b.agentsLimited &&
+  a.editorsLimited === b.editorsLimited &&
+  a.agentEditorsLimited === b.agentEditorsLimited &&
+  sameSet(a.audienceRoleIds, b.audienceRoleIds) &&
+  sameSet(a.audienceUserIds, b.audienceUserIds) &&
+  sameSet(a.audienceAgentIds, b.audienceAgentIds) &&
+  sameSet(a.editorRoleIds, b.editorRoleIds) &&
+  sameSet(a.editorUserIds, b.editorUserIds) &&
+  sameSet(a.agentEditorIds, b.agentEditorIds);
+
+/** "A/B/C" → A/B/C, A/B, A: the folder and the ones above it, closest first. */
+function folderChain(folder: string) {
+  const parts = folder ? folder.split("/") : [];
+  return parts.map((_, i) => parts.slice(0, parts.length - i).join("/"));
+}
+
+const closestRule = (rules: FolderRule[], folder: string) => {
+  for (const path of folderChain(folder)) {
+    const rule = rules.find((r) => r.folder === path);
+    if (rule) return rule;
+  }
+  return null;
+};
+
+async function ruleFor(db: Executor, orgId: string, folder: string) {
+  const chain = folderChain(folder);
+  if (chain.length === 0) return null;
+  const rules = await db
+    .select()
+    .from(wikiFolderAudiences)
+    .where(and(eq(wikiFolderAudiences.orgId, orgId), inArray(wikiFolderAudiences.folder, chain)));
+  return closestRule(rules, folder);
+}
+
+/** The people holding any of these roles. */
+async function roleHolders(db: Executor, orgId: string, roleIds: string[]) {
+  if (roleIds.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ userId: organizationMemberRoles.userId })
+    .from(organizationMemberRoles)
+    .where(and(eq(organizationMemberRoles.orgId, orgId), inArray(organizationMemberRoles.roleId, roleIds)));
+  return new Set(rows.map((r) => r.userId));
+}
+
+/** Holders of a rule's roles: for its audience, and for its editors. */
+async function heldOf(db: Executor, orgId: string, rule: AudienceCols) {
+  const [audience, editors] = await Promise.all([
+    roleHolders(db, orgId, rule.audienceRoleIds),
+    roleHolders(db, orgId, rule.editorRoleIds),
+  ]);
+  return { audience, editors };
+}
+
+type People = { limited: boolean; roleIds: string[]; userIds: string[] };
+
+/** What `rule` leaves open stays as it was, what `a` leaves open takes the rule's list, two lists keep what they share. */
+function clampPeople(a: People, rule: People, held: Set<string>): People {
+  if (!rule.limited) return a;
+  if (!a.limited) return rule;
+  return {
+    limited: true,
+    roleIds: a.roleIds.filter((id) => rule.roleIds.includes(id)),
+    userIds: a.userIds.filter((id) => rule.userIds.includes(id) || held.has(id)),
+  };
+}
+
+function clampAgents(a: { limited: boolean; ids: string[] }, rule: { limited: boolean; ids: string[] }) {
+  if (!rule.limited) return a;
+  if (!a.limited) return rule;
+  return { limited: true, ids: a.ids.filter((id) => rule.ids.includes(id)) };
+}
+
+/** `a` kept inside `rule`, seeing and editing alike, so a page or a subfolder is never wider than its folder. */
+function clampTo(a: AudienceCols, rule: AudienceCols, held: { audience: Set<string>; editors: Set<string> }) {
+  const sees = clampPeople(
+    { limited: a.restricted, roleIds: a.audienceRoleIds, userIds: a.audienceUserIds },
+    { limited: rule.restricted, roleIds: rule.audienceRoleIds, userIds: rule.audienceUserIds },
+    held.audience,
+  );
+  const reads = clampAgents(
+    { limited: a.agentsLimited, ids: a.audienceAgentIds },
+    { limited: rule.agentsLimited, ids: rule.audienceAgentIds },
+  );
+  const writes = clampPeople(
+    { limited: a.editorsLimited, roleIds: a.editorRoleIds, userIds: a.editorUserIds },
+    { limited: rule.editorsLimited, roleIds: rule.editorRoleIds, userIds: rule.editorUserIds },
+    held.editors,
+  );
+  const agentWrites = clampAgents(
+    { limited: a.agentEditorsLimited, ids: a.agentEditorIds },
+    { limited: rule.agentEditorsLimited, ids: rule.agentEditorIds },
+  );
+  return {
+    restricted: sees.limited,
+    audienceRoleIds: sees.roleIds,
+    audienceUserIds: sees.userIds,
+    agentsLimited: reads.limited,
+    audienceAgentIds: reads.ids,
+    editorsLimited: writes.limited,
+    editorRoleIds: writes.roleIds,
+    editorUserIds: writes.userIds,
+    agentEditorsLimited: agentWrites.limited,
+    agentEditorIds: agentWrites.ids,
+  } satisfies AudienceCols;
+}
+
+/** The audience of a page landing in `folder`: what it had, kept inside the closest limited folder. */
+async function placement(tx: Executor, orgId: string, folder: string, current: AudienceCols = OPEN) {
+  const rule = await ruleFor(tx, orgId, folder);
+  if (!rule) return { ...colsOf(current), audienceFolder: null };
+  const kept = clampTo(current, rule, await heldOf(tx, orgId, rule));
+  return { ...kept, audienceFolder: sameAudience(kept, rule) ? rule.folder : null };
+}
+
+/** What a new page in a limited folder takes. */
+const inherited = (rule: FolderRule | null) => (rule ? { ...colsOf(rule), audienceFolder: rule.folder } : {});
+
+/** After a create or a move: the writer and the person asking keep the page, so nobody writes what they lose. */
+async function requireStaysVisible(tx: Executor, actor: WikiActor, page: PageRow) {
+  const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
+  if (who && !(await sees(tx, who, page))) throw noAccess();
+  if (actor.type === "agent" && !agentSees(actor.agentId, page)) throw noAccess();
+  await requireEditor(tx, actor, page);
+}
+
+const folderAudienceOf = (rule: FolderRule | null): WikiFolderAudience | null =>
+  rule && {
+    folder: rule.folder,
+    audience: rule.restricted ? { roleIds: rule.audienceRoleIds, userIds: rule.audienceUserIds } : null,
+    agentIds: rule.agentsLimited ? rule.audienceAgentIds : null,
+    editors: rule.editorsLimited ? { roleIds: rule.editorRoleIds, userIds: rule.editorUserIds } : null,
+    agentEditorIds: rule.agentEditorsLimited ? rule.agentEditorIds : null,
+  };
 
 async function findAnyPage(db: Executor, orgId: string, ref: string, options: { deleted?: boolean } = {}) {
   const key = ref.trim();
@@ -311,6 +575,10 @@ async function summaries(db: Executor, rows: PageRow[]): Promise<WikiPageSummary
     locked: r.locked,
     pinned: r.pinned,
     audience: r.restricted ? { roleIds: r.audienceRoleIds, userIds: r.audienceUserIds } : null,
+    agentIds: r.agentsLimited ? r.audienceAgentIds : null,
+    editors: r.editorsLimited ? { roleIds: r.editorRoleIds, userIds: r.editorUserIds } : null,
+    agentEditorIds: r.agentEditorsLimited ? r.agentEditorIds : null,
+    audienceFolder: r.audienceFolder,
     excerpt: plainExcerpt(r.body, r.title),
     sourceType: r.source?.type ?? null,
     updatedAt: r.updatedAt.toISOString(),
@@ -446,7 +714,7 @@ function excerpt(body: string, page: Pick<PageRow, "slug" | "aliases">) {
 }
 
 async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<WikiPageView> {
-  const [summary, versions, backlinks, links, reads] = await Promise.all([
+  const [summary, versions, backlinks, links, reads, rule, canEdit] = await Promise.all([
     summaryOf(db, row),
     db
       .select({
@@ -462,6 +730,8 @@ async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<Wik
     backlinksOf(db, actor, row),
     resolveOwnLinks(db, actor, row),
     pageReads(db, row),
+    ruleFor(db, row.orgId, row.folder),
+    actor.type === "agent" ? agentEdits(actor.agentId, row) : edits(db, actor.userId, row),
   ]);
   const authors: WikiAuthor[] = [];
   const seen = new Set<string>();
@@ -487,6 +757,8 @@ async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<Wik
     },
     authors,
     backlinks,
+    folderAudience: folderAudienceOf(rule),
+    canEdit,
     links,
     source: row.source ?? null,
     reads,
@@ -607,7 +879,7 @@ export async function topWikiReads(db: Database, actor: WikiActor, orgId: string
     .slice(0, limit);
 }
 
-/** The page's own links; a restricted page a person doesn't see shows as not written. */
+/** The page's own links; a limited page the reader doesn't see shows as not written. */
 async function resolveOwnLinks(db: Executor, actor: WikiActor, row: PageRow) {
   const refs = parseWikiLinks(row.body);
   const pages = await pagesBySlug(
@@ -619,6 +891,14 @@ async function resolveOwnLinks(db: Executor, actor: WikiActor, row: PageRow) {
   if (actor.type === "person" && hidden.length) {
     const seen = await visibleWikiPageIds(db, actor.userId, hidden);
     for (const [slug, p] of pages) if (p.restricted && !seen.has(p.id)) pages.delete(slug);
+  }
+  if (actor.type === "agent" && pages.size) {
+    const seen = await visibleIds(
+      db,
+      actor,
+      [...pages.values()].map((p) => p.id),
+    );
+    for (const [slug, p] of pages) if (!seen.has(p.id)) pages.delete(slug);
   }
   return refs.map((r) => {
     const p = pages.get(r.slug);
@@ -735,7 +1015,10 @@ export async function createWikiPage(
     const existing = (await pagesBySlug(tx, orgId, [wanted])).get(wanted);
     // A restricted page the writer doesn't see takes the next free slug instead of naming itself in the conflict.
     const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
-    const hidden = existing?.restricted && who && !(await sees(tx, who, existing));
+    const hidden =
+      existing &&
+      ((existing.restricted && who && !(await sees(tx, who, existing))) ||
+        (actor.type === "agent" && !(await visibleIds(tx, actor, [existing.id])).has(existing.id)));
     if (existing && existing.slug === wanted && !options.allowDuplicate && !hidden) {
       throw new ConflictError(`A page "${existing.title}" already exists`, "slug_taken", {
         title: existing.title,
@@ -752,6 +1035,7 @@ export async function createWikiPage(
         body,
         folder,
         tags: cleanTags(input.tags) ?? [],
+        ...(await placement(tx, orgId, folder)),
         source: input.source ?? null,
         createdByType: author.type,
         createdById: author.id,
@@ -760,6 +1044,7 @@ export async function createWikiPage(
       })
       .returning();
     if (!page) throw new Error("wiki insert returned nothing");
+    await requireStaysVisible(tx, actor, page);
     await addVersion(tx, page, actor, input.note ?? (await defaultNote(tx, actor, "created the page")));
     await syncWikiLinks(tx, orgId, { type: "page", id: page.id }, body);
     await claimLinks(tx, page);
@@ -841,6 +1126,7 @@ export async function importWikiPages(
   const note = `imported from "${sourceName}"`;
   const rows = await db.transaction(async (tx) => {
     const made: PageRow[] = [];
+    const rules = await tx.select().from(wikiFolderAudiences).where(eq(wikiFolderAudiences.orgId, orgId));
     for (const n of input.notes) {
       const raw = importTitle(n.title);
       const wanted = wikiSlug(raw);
@@ -885,6 +1171,7 @@ export async function importWikiPages(
           body: n.body,
           folder,
           tags: cleanTags(n.tags) ?? [],
+          ...inherited(closestRule(rules, folder)),
           source: {
             type: input.source.type,
             id: sourceName,
@@ -897,6 +1184,7 @@ export async function importWikiPages(
         })
         .returning();
       if (!page) throw new Error("wiki insert returned nothing");
+      if (page.restricted || page.editorsLimited) await requireStaysVisible(tx, actor, page);
       await addVersion(tx, page, actor, note);
       await syncWikiLinks(tx, orgId, { type: "page", id: page.id }, page.body);
       await claimLinks(tx, page);
@@ -1001,6 +1289,8 @@ export async function updateWikiPage(
       .update(wikiPages)
       .set({
         ...next,
+        // A move keeps the page's audience inside the folder it lands in; out of one it stays limited.
+        ...(next.folder !== current.folder ? await placement(tx, orgId, next.folder, current) : {}),
         version: sql`${wikiPages.version} + 1`,
         updatedByType: author.type,
         updatedById: author.id,
@@ -1012,6 +1302,7 @@ export async function updateWikiPage(
       const [now] = await tx.select({ version: wikiPages.version }).from(wikiPages).where(eq(wikiPages.id, current.id));
       throw new WikiVersionConflictError(now?.version ?? current.version);
     }
+    if (next.folder !== current.folder) await requireStaysVisible(tx, actor, page);
     await addVersion(tx, page, actor, patch.note?.trim() || (await defaultNote(tx, actor, "edited")));
     if (next.body !== current.body) await syncWikiLinks(tx, orgId, { type: "page", id: page.id }, next.body);
     await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: page.id });
@@ -1152,12 +1443,13 @@ export async function renameWikiPage(
     await claimLinks(tx, page);
     // Pages that link here: rewrite their `[[…]]` to the new title, as a new version each. Not for a restricted
     // page: its new title would land in pages its audience doesn't cover, and the old slug resolves as an alias.
-    const linking = current.restricted
-      ? []
-      : await tx
-          .select({ id: wikiLinks.fromId })
-          .from(wikiLinks)
-          .where(and(eq(wikiLinks.orgId, orgId), eq(wikiLinks.fromType, "page"), eq(wikiLinks.toPageId, page.id)));
+    const linking =
+      current.restricted || current.agentsLimited
+        ? []
+        : await tx
+            .select({ id: wikiLinks.fromId })
+            .from(wikiLinks)
+            .where(and(eq(wikiLinks.orgId, orgId), eq(wikiLinks.fromType, "page"), eq(wikiLinks.toPageId, page.id)));
     const touched: string[] = [];
     for (const { id } of linking) {
       const [other] = await tx
@@ -1342,20 +1634,8 @@ export async function setWikiPagePinned(deps: WikiDeps, userId: string, orgId: s
   return view;
 }
 
-/**
- * Limits a page to an audience (or opens it again with `null`): besides agents and owners, only the people holding
- * one of `roleIds` and the people in `userIds` see it. Who may: people who edit the wiki and manage roles, and only
- * an audience they stay in, so nobody hides a page from themselves.
- */
-export async function setWikiPageAudience(
-  deps: WikiDeps,
-  userId: string,
-  orgId: string,
-  ref: string,
-  audience: WikiAudience | null,
-) {
-  const { db } = deps;
-  const actor: WikiActor = { type: "person", userId };
+/** People who may choose who sees a page or a folder. */
+async function requireAudienceChooser(db: Database, userId: string, orgId: string) {
   const membership = await requireActiveMembership(db, userId, orgId);
   if (!(can(membership, "edit_wiki") && can(membership, "manage_roles"))) {
     throw new ForbiddenError(
@@ -1363,64 +1643,331 @@ export async function setWikiPageAudience(
       "wiki.audience_forbidden",
     );
   }
+  return membership;
+}
+
+/** Only the roles and people of this workspace. */
+async function cleanPeople(db: Executor, orgId: string, list: WikiAudience) {
+  const wantedRoles = [...new Set(list.roleIds)].filter((id) => UUID.test(id));
+  const wantedUsers = [...new Set(list.userIds)];
+  const roleIds = wantedRoles.length
+    ? (
+        await db
+          .select({ id: orgRoles.id })
+          .from(orgRoles)
+          .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, wantedRoles)))
+      ).map((r) => r.id)
+    : [];
+  const userIds = wantedUsers.length
+    ? (
+        await db
+          .select({ id: organizationMembers.userId })
+          .from(organizationMembers)
+          .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, wantedUsers)))
+      ).map((r) => r.id)
+    : [];
+  return { roleIds, userIds };
+}
+
+/** Only this workspace's active agents. */
+async function cleanAgents(db: Executor, orgId: string, ids: string[]) {
+  const wanted = [...new Set(ids)].filter((id) => UUID.test(id));
+  if (wanted.length === 0) return [];
+  const rows = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), inArray(agents.id, wanted)));
+  return rows.map((r) => r.id);
+}
+
+/** Whether the chooser is in this list, as a person or through a role. */
+async function includes(db: Executor, orgId: string, userId: string, list: { roleIds: string[]; userIds: string[] }) {
+  return list.userIds.includes(userId) || (await roleHolders(db, orgId, list.roleIds)).has(userId);
+}
+
+/**
+ * The columns for an audience, keeping only roles, people and agents of this workspace. Whoever sets it stays able to
+ * see and edit, so nobody takes a page from themselves. `agents` or `edit` undefined keeps `keep`'s (an older app
+ * doesn't send them).
+ */
+async function audienceCols(
+  db: Executor,
+  orgId: string,
+  chooser: { userId: string; owner: boolean },
+  audience: WikiAudience | null,
+  chosen: string[] | null | undefined,
+  edit: WikiEditors | undefined,
+  keep: AudienceCols,
+): Promise<AudienceCols> {
+  const people = audience ? await cleanPeople(db, orgId, audience) : { roleIds: [], userIds: [] };
+  if (audience && !chooser.owner && !(await includes(db, orgId, chooser.userId, people))) {
+    throw new ValidationError(
+      "Keep yourself in the audience (one of your roles, or you)",
+      "wiki.audience_excludes_you",
+    );
+  }
+  const limited = chosen === undefined ? keep.agentsLimited : chosen !== null;
+  const agentIds = limited
+    ? await cleanAgents(db, orgId, chosen === undefined ? keep.audienceAgentIds : (chosen ?? []))
+    : [];
+  const editorsChosen = edit === undefined ? keep.editorsLimited : edit.editors !== null;
+  const editors = !editorsChosen
+    ? { roleIds: [], userIds: [] }
+    : await cleanPeople(
+        db,
+        orgId,
+        edit === undefined
+          ? { roleIds: keep.editorRoleIds, userIds: keep.editorUserIds }
+          : (edit.editors ?? { roleIds: [], userIds: [] }),
+      );
+  if (editorsChosen && !chooser.owner && !(await includes(db, orgId, chooser.userId, editors))) {
+    throw new ValidationError("Keep yourself among the people who edit", "wiki.editors_exclude_you");
+  }
+  const agentEditorsChosen = edit === undefined ? keep.agentEditorsLimited : edit.agentEditorIds !== null;
+  const agentEditorIds = agentEditorsChosen
+    ? await cleanAgents(db, orgId, edit === undefined ? keep.agentEditorIds : (edit.agentEditorIds ?? []))
+    : [];
+  return {
+    restricted: Boolean(audience),
+    audienceRoleIds: people.roleIds,
+    audienceUserIds: people.userIds,
+    agentsLimited: limited,
+    audienceAgentIds: agentIds,
+    editorsLimited: editorsChosen,
+    editorRoleIds: editors.roleIds,
+    editorUserIds: editors.userIds,
+    agentEditorsLimited: agentEditorsChosen,
+    agentEditorIds,
+  };
+}
+
+/** `a` may only be narrower than the folder above it. */
+async function requireInsideFolder(db: Executor, orgId: string, a: AudienceCols, rule: FolderRule | null) {
+  if (!rule) return;
+  if (!sameAudience(clampTo(a, rule, await heldOf(db, orgId, rule)), a)) {
+    throw new ValidationError(
+      "A page or subfolder can only be narrower than its folder: change the folder instead",
+      "wiki.audience_wider_than_folder",
+      { folder: rule.folder },
+    );
+  }
+}
+
+/**
+ * Limits a page to an audience (or opens it again with `null`): besides owners, only the people holding one of
+ * `roleIds` and the people in `userIds` see it, with `agents` only those agents read it (`null` = every agent), and
+ * `edit` says who edits among them. Who may: people who edit the wiki and manage roles, and only an audience they stay in, so nobody hides a page from
+ * themselves. Inside a limited folder it can only be narrower.
+ */
+export async function setWikiPageAudience(
+  deps: WikiDeps,
+  userId: string,
+  orgId: string,
+  ref: string,
+  audience: WikiAudience | null,
+  agents?: string[] | null,
+  edit?: WikiEditors,
+) {
+  const { db } = deps;
+  const actor: WikiActor = { type: "person", userId };
+  const membership = await requireAudienceChooser(db, userId, orgId);
   const page = await findPage(db, actor, orgId, ref);
   await requireWriter(db, actor, orgId, page);
-  let roleIds: string[] = [];
-  let userIds: string[] = [];
-  if (audience) {
-    const wantedRoles = [...new Set(audience.roleIds)].filter((id) => UUID.test(id));
-    const wantedUsers = [...new Set(audience.userIds)];
-    roleIds = wantedRoles.length
-      ? (
-          await db
-            .select({ id: orgRoles.id })
-            .from(orgRoles)
-            .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, wantedRoles)))
-        ).map((r) => r.id)
-      : [];
-    userIds = wantedUsers.length
-      ? (
-          await db
-            .select({ id: organizationMembers.userId })
-            .from(organizationMembers)
-            .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, wantedUsers)))
-        ).map((r) => r.id)
-      : [];
-    const mine = roleIds.length
-      ? await db
-          .select({ id: organizationMemberRoles.roleId })
-          .from(organizationMemberRoles)
-          .where(
-            and(
-              eq(organizationMemberRoles.orgId, orgId),
-              eq(organizationMemberRoles.userId, userId),
-              inArray(organizationMemberRoles.roleId, roleIds),
-            ),
-          )
-      : [];
-    if (membership.role !== "owner" && !userIds.includes(userId) && mine.length === 0) {
-      throw new ValidationError(
-        "Keep yourself in the audience (one of your roles, or you)",
-        "wiki.audience_excludes_you",
-      );
-    }
-  }
+  const cols = await audienceCols(
+    db,
+    orgId,
+    { userId, owner: membership.role === "owner" },
+    audience,
+    agents,
+    edit,
+    page,
+  );
+  const rule = await ruleFor(db, orgId, page.folder);
+  await requireInsideFolder(db, orgId, cols, rule);
   const [row] = await db
     .update(wikiPages)
-    .set({ restricted: Boolean(audience), audienceRoleIds: roleIds, audienceUserIds: userIds })
+    .set({ ...cols, audienceFolder: rule && sameAudience(cols, rule) ? rule.folder : null })
     .where(eq(wikiPages.id, page.id))
     .returning();
   if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: userId },
-    action: audience ? "wiki.page_restricted" : "wiki.page_opened",
+    action: isLimited(cols) ? "wiki.page_restricted" : "wiki.page_opened",
     target: { type: "wiki_page", id: page.id },
-    details: { slug: page.slug, roleIds, userIds },
+    details: {
+      slug: page.slug,
+      roleIds: cols.audienceRoleIds,
+      userIds: cols.audienceUserIds,
+      agentIds: cols.agentsLimited ? cols.audienceAgentIds : null,
+      editors: cols.editorsLimited ? { roleIds: cols.editorRoleIds, userIds: cols.editorUserIds } : null,
+      agentEditorIds: cols.agentEditorsLimited ? cols.agentEditorIds : null,
+    },
   });
   const view = await detail(db, actor, row);
   await announce(deps, orgId, view, "audience");
   return view;
+}
+
+/** The audience set on `folder` itself, and the closest one above it (for the dialog). */
+export async function getWikiFolderAudience(db: Database, userId: string, orgId: string, folder: string) {
+  const membership = await requireAudienceChooser(db, userId, orgId);
+  const path = cleanFolder(folder);
+  if (!path) throw new ValidationError("Choose a folder", "wiki.folder_required");
+  const rules = await db
+    .select()
+    .from(wikiFolderAudiences)
+    .where(and(eq(wikiFolderAudiences.orgId, orgId), inArray(wikiFolderAudiences.folder, folderChain(path))));
+  await requireInsideRule(db, { userId, owner: membership.role === "owner" }, orgId, closestRule(rules, path));
+  return {
+    own: folderAudienceOf(rules.find((r) => r.folder === path) ?? null),
+    above: folderAudienceOf(closestRule(rules, parentFolder(path))),
+  };
+}
+
+const parentFolder = (folder: string) => folder.split("/").slice(0, -1).join("/");
+
+const isLimited = (a: AudienceCols) => a.restricted || a.agentsLimited || a.editorsLimited || a.agentEditorsLimited;
+
+/** A limited folder is only for people who see it, and changing it for those who edit it (and owners). */
+async function requireInsideRule(
+  db: Executor,
+  who: { userId: string; owner: boolean },
+  orgId: string,
+  rule: FolderRule | null,
+) {
+  if (who.owner || !rule) return;
+  const list = { roleIds: rule.audienceRoleIds, userIds: rule.audienceUserIds };
+  if (rule.restricted && !(await includes(db, orgId, who.userId, list))) throw noAccess();
+  const editors = { roleIds: rule.editorRoleIds, userIds: rule.editorUserIds };
+  if (rule.editorsLimited && !(await includes(db, orgId, who.userId, editors))) {
+    throw new ForbiddenError("Only the people chosen edit this folder", "wiki.edit_limited");
+  }
+}
+
+/**
+ * Sets a folder's audience (both `null` opens it): it reaches the pages in it and its subfolders, and a page created
+ * or moved in takes it. A page keeps its own narrower audience, cut to fit; opening a folder opens only the pages that
+ * followed it. Each page holds a copy, so one condition over `wiki_pages` keeps deciding who sees what.
+ */
+export async function setWikiFolderAudience(
+  deps: WikiDeps,
+  userId: string,
+  orgId: string,
+  folder: string,
+  audience: WikiAudience | null,
+  agents: string[] | null,
+  edit: WikiEditors = { editors: null, agentEditorIds: null },
+) {
+  const { db } = deps;
+  const membership = await requireAudienceChooser(db, userId, orgId);
+  const path = cleanFolder(folder);
+  if (!path) throw new ValidationError("Choose a folder", "wiki.folder_required");
+  const chooser = { userId, owner: membership.role === "owner" };
+  const cols = await audienceCols(db, orgId, chooser, audience, agents, edit, OPEN);
+  const limited = isLimited(cols);
+  const changed = await db.transaction(async (tx) => {
+    // One change at a time per workspace: two saves can't leave a page on a rule that was replaced.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`wiki-folders:${orgId}`}))`);
+    await requireInsideRule(tx, chooser, orgId, await ruleFor(tx, orgId, path));
+    if (limited) {
+      await requireInsideFolder(tx, orgId, cols, await ruleFor(tx, orgId, parentFolder(path)));
+      await tx
+        .insert(wikiFolderAudiences)
+        .values({ orgId, folder: path, ...cols, updatedById: userId })
+        .onConflictDoUpdate({
+          target: [wikiFolderAudiences.orgId, wikiFolderAudiences.folder],
+          set: { ...cols, updatedById: userId, updatedAt: new Date() },
+        });
+    } else {
+      await tx
+        .delete(wikiFolderAudiences)
+        .where(and(eq(wikiFolderAudiences.orgId, orgId), eq(wikiFolderAudiences.folder, path)));
+    }
+    const count = await reapplyFolder(tx, orgId, path);
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: limited ? "wiki.folder_restricted" : "wiki.folder_opened",
+      target: { type: "wiki_folder", id: path },
+      details: {
+        roleIds: cols.audienceRoleIds,
+        userIds: cols.audienceUserIds,
+        agentIds: cols.agentsLimited ? cols.audienceAgentIds : null,
+        editors: cols.editorsLimited ? { roleIds: cols.editorRoleIds, userIds: cols.editorUserIds } : null,
+        agentEditorIds: cols.agentEditorsLimited ? cols.agentEditorIds : null,
+        pages: count,
+      },
+    });
+    return count;
+  });
+  caches.contextPresence.delete(`${orgId}:wiki`);
+  // No page in it: this reaches every member, and the folder's name may be for some of them only.
+  await publishOrgEvent(deps.pubsub, {
+    type: "org.broadcast",
+    orgId,
+    event: { type: "wiki.page.updated", action: "audience", page: { id: "", restricted: true } },
+  });
+  return { folder: path, pages: changed };
+}
+
+/** After `path` changed: its subfolders' audiences and every page under it, deleted ones too, follow. */
+async function reapplyFolder(tx: Executor, orgId: string, path: string) {
+  const under = sql`(${wikiPages.folder} = ${path} or starts_with(${wikiPages.folder}, ${`${path}/`}))`;
+  const rules = await tx.select().from(wikiFolderAudiences).where(eq(wikiFolderAudiences.orgId, orgId));
+  const holders = new Map<string, { audience: Set<string>; editors: Set<string> }>();
+  const heldBy = async (rule: FolderRule) => {
+    const known = holders.get(rule.id);
+    if (known) return known;
+    const held = await heldOf(tx, orgId, rule);
+    holders.set(rule.id, held);
+    return held;
+  };
+  // Closest to `path` first, so a subfolder is cut to its already-cut parent.
+  const nested = rules
+    .filter((r) => r.folder.startsWith(`${path}/`))
+    .sort((a, b) => a.folder.split("/").length - b.folder.split("/").length);
+  for (const rule of nested) {
+    const above = closestRule(rules, parentFolder(rule.folder));
+    if (!above) continue;
+    const kept = clampTo(rule, above, await heldBy(above));
+    if (sameAudience(kept, rule)) continue;
+    Object.assign(rule, kept);
+    await tx.update(wikiFolderAudiences).set(kept).where(eq(wikiFolderAudiences.id, rule.id));
+  }
+  const pages = await tx
+    .select({
+      id: wikiPages.id,
+      folder: wikiPages.folder,
+      audienceFolder: wikiPages.audienceFolder,
+      restricted: wikiPages.restricted,
+      audienceRoleIds: wikiPages.audienceRoleIds,
+      audienceUserIds: wikiPages.audienceUserIds,
+      agentsLimited: wikiPages.agentsLimited,
+      audienceAgentIds: wikiPages.audienceAgentIds,
+      editorsLimited: wikiPages.editorsLimited,
+      editorRoleIds: wikiPages.editorRoleIds,
+      editorUserIds: wikiPages.editorUserIds,
+      agentEditorsLimited: wikiPages.agentEditorsLimited,
+      agentEditorIds: wikiPages.agentEditorIds,
+    })
+    .from(wikiPages)
+    .where(and(eq(wikiPages.orgId, orgId), under));
+  let changed = 0;
+  for (const page of pages) {
+    const rule = closestRule(rules, page.folder);
+    // A page that followed a folder has no audience of its own: it takes the closest one left, or opens.
+    const base = page.audienceFolder !== null ? OPEN : page;
+    const cols = rule ? clampTo(base, rule, await heldBy(rule)) : page.audienceFolder !== null ? OPEN : colsOf(page);
+    const audienceFolder = rule && sameAudience(cols, rule) ? rule.folder : null;
+    if (sameAudience(cols, page) && audienceFolder === page.audienceFolder) continue;
+    await tx
+      .update(wikiPages)
+      .set({ ...colsOf(cols), audienceFolder })
+      .where(eq(wikiPages.id, page.id));
+    changed++;
+  }
+  return changed;
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -1882,8 +2429,8 @@ export async function createPageFromSource(
  */
 export async function retrieveWikiForRun(
   deps: WikiDeps,
-  input: { orgId: string; agentId: string; text: string; budgetChars?: number; readers: WikiRunReaders },
-): Promise<{ text: string; pageIds: string[] }> {
+  input: { orgId: string; text: string; budgetChars?: number; reader: () => Promise<WikiActor> },
+): Promise<{ text: string; pageIds: string[]; held: boolean }> {
   const { db } = deps;
   const hasAny = (await caches.contextPresence.getOrLoad(`${input.orgId}:wiki`, async () => {
     const [row] = await db
@@ -1893,7 +2440,9 @@ export async function retrieveWikiForRun(
       .limit(1);
     return Boolean(row);
   })) as boolean;
-  if (!hasAny || !input.text.trim()) return { text: "", pageIds: [] };
+  if (!hasAny || !input.text.trim()) return { text: "", pageIds: [], held: false };
+  const actor = await input.reader();
+  const wide = withoutConversation(actor);
   const linked = parseWikiLinks(input.text);
   const named = linked.length
     ? [
@@ -1910,90 +2459,76 @@ export async function retrieveWikiForRun(
     ? await db
         .select()
         .from(wikiPages)
-        .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt)))
+        .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt), visibleTo(wide)))
     : [];
-  const found = await searchPages(
-    deps,
-    { type: "agent", agentId: input.agentId, requestedByUserId: null },
-    input.orgId,
-    input.text,
-    5,
-  ).catch(() => [] as PageRow[]);
+  const hits = await searchPages(deps, wide, input.orgId, input.text, 5).catch(() => [] as PageRow[]);
+  const seen = await visibleIds(db, actor, [...new Set([...namedRows, ...hits].map((p) => p.id))]);
+  // What the message names, or the best match, kept from this conversation only: it goes to the person's DM.
+  const held = [...namedRows, ...hits.slice(0, 1)].some((p) => !seen.has(p.id));
+  const namedSeen = namedRows.filter((p) => seen.has(p.id));
+  const found = hits.filter((p) => seen.has(p.id));
   const budget = input.budgetChars ?? 6000;
-  const outside = await restrictedOutsiders(
-    db,
-    [...namedRows, ...found].filter((p) => p.restricted).map((p) => p.id),
-    input.readers,
-  );
   const lines: string[] = [];
   const ids: string[] = [];
   let used = 0;
   // Context on demand (ADR 0043): pages the message names and the best match go in (cut at `WIKI_PAGE_CHARS`);
   // the other matches only as an index line, read with read_wiki_page when the run needs them.
-  const full = new Set([...namedRows.map((p) => p.id), ...found.slice(0, 1).map((p) => p.id)]);
-  for (const p of [...namedRows, ...found]) {
+  const full = new Set([...namedSeen.map((p) => p.id), ...found.slice(0, 1).map((p) => p.id)]);
+  for (const p of [...namedSeen, ...found]) {
     if (ids.includes(p.id)) continue;
     const room = Math.min(full.has(p.id) ? WIKI_PAGE_CHARS : WIKI_INDEX_CHARS, budget - used);
     if (room < 120) break;
     const body = p.body.trim();
     const where = `${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}`;
-    // The person the run acts for doesn't see it: no text in the prompt, only the rule and where to read it.
-    const text = outside.person.has(p.id)
-      ? `- [[${p.title}]] (${where}): ${RESTRICTED_WIKI_RULE} Read it with read_wiki_page only when you need it to decide.`
-      : outside.some.has(p.id)
-        ? `## [[${p.title}]] (${where})\n${RESTRICTED_WIKI_RULE}\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
-        : full.has(p.id)
-          ? `## [[${p.title}]] (${where})\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
-          : `- [[${p.title}]] (${where}): ${cutText(body.replace(/\s+/g, " "), room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
+    const text = full.has(p.id)
+      ? `## [[${p.title}]] (${where})\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
+      : `- [[${p.title}]] (${where}): ${cutText(body.replace(/\s+/g, " "), room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
     lines.push(text);
     ids.push(p.id);
     used += text.length;
   }
-  return { text: lines.join("\n\n"), pageIds: ids };
+  return { text: lines.join("\n\n"), pageIds: ids, held };
 }
 
-/** Who reads what a run writes: the person it acts for (null for nobody) and the channel it answers in. */
-export interface WikiRunReaders {
-  channelId: string | null;
-  person: () => Promise<string | null>;
-}
-
-/** Marks a restricted page in an agent's context when someone in the conversation can't see it. */
-export const RESTRICTED_WIKI_RULE =
-  "Restricted page: someone in this conversation can't see it. Use it to decide; never quote or summarize it, and never reveal its title, its text or that it exists.";
+/** The same reader away from any conversation: the agent and the person only. */
+const withoutConversation = (actor: WikiActor): WikiActor =>
+  actor.type === "agent" && actor.requestedByUserId ? { ...actor, channelId: null } : actor;
 
 /**
- * Of these restricted pages, the ones someone who reads the conversation doesn't see (`some`), and the ones the person
- * the run acts for doesn't see (`person`, a subset). The channel's readers are its members (a forum topic: the whole
- * workspace). With neither a channel nor a person, nobody can be told, so every page counts as unseen by someone.
+ * Whether only the conversation keeps `actor` from this page: the agent and the person behind it may read it, the
+ * others there may not. Never says what the page is.
  */
-export async function restrictedOutsiders(db: Executor, ids: string[], readers: WikiRunReaders) {
-  const out = { some: new Set<string>(), person: new Set<string>() };
-  if (ids.length === 0) return out;
-  const personId = await readers.person();
-  if (personId) {
-    const seen = await visibleWikiPageIds(db, personId, ids);
-    for (const id of ids) if (!seen.has(id)) out.person.add(id);
-  }
-  if (!readers.channelId && !personId) for (const id of ids) out.some.add(id);
-  if (readers.channelId) {
-    const rows = await db
-      .select({ id: wikiPages.id })
-      .from(wikiPages)
-      .where(
-        and(
-          inArray(wikiPages.id, ids),
-          sql`(exists (select 1 from ${channelMembers} where ${channelMembers.channelId} = ${readers.channelId}
-              and ${channelMembers.userId} is not null and not ${wikiPageVisibleSql(sql`${channelMembers.userId}`)})
-            or exists (select 1 from ${channels} join organization_members om on om.org_id = ${channels.orgId}
-              where ${channels.id} = ${readers.channelId} and ${channels.kind} = 'forum'
-              and not ${wikiPageVisibleSql(sql`om.user_id`)}))`,
-        ),
-      );
-    for (const r of rows) out.some.add(r.id);
-  }
-  for (const id of out.person) out.some.add(id);
-  return out;
+export async function wikiPageHeld(db: Database, actor: WikiActor, orgId: string, ref: string) {
+  const row = await findAnyPage(db, orgId, ref).catch(() => null);
+  if (!row) return false;
+  return (
+    !(await visibleIds(db, actor, [row.id])).has(row.id) &&
+    (await visibleIds(db, withoutConversation(actor), [row.id])).has(row.id)
+  );
+}
+
+/** `searchWiki` for a run: what it may read, and whether the best match is kept from this conversation only. */
+export async function searchWikiForRun(deps: WikiDeps, actor: WikiActor, orgId: string, text: string, limit = 8) {
+  const hits = await searchWiki(deps, withoutConversation(actor), orgId, text, limit);
+  const seen = await visibleIds(
+    deps.db,
+    actor,
+    hits.map((p) => p.id),
+  );
+  const best = hits[0];
+  return { pages: hits.filter((p) => seen.has(p.id)), held: Boolean(best && !seen.has(best.id)) };
+}
+
+/** What a search over everything hands an agent: wiki hits only for pages this run may read. */
+export async function wikiHitsForAgent<T extends { kind: string; sourceId: string }>(
+  db: Executor,
+  actor: WikiActor,
+  hits: T[],
+): Promise<T[]> {
+  const ids = hits.filter((h) => h.kind === "wiki").map((h) => h.sourceId);
+  if (ids.length === 0) return hits;
+  const seen = await visibleIds(db, actor, ids);
+  return hits.filter((h) => h.kind !== "wiki" || seen.has(h.sourceId));
 }
 
 /** A page the run's message names, or its best match, goes in up to this much (ADR 0043). */

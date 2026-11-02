@@ -191,4 +191,35 @@ test("wiki API: a page limited to admins and agents is out of reach for other me
   const reopened = await api(owner, "/wiki/pages/margens/audience", { method: "PUT", json: { audience: null } });
   expect(reopened.status).toBe(200);
   expect((await api(bia, "/wiki/pages/margens")).status).toBe(200);
+
+  // Everyone sees it; only the role edits.
+  const editors = await api(owner, "/wiki/pages/margens/audience", {
+    method: "PUT",
+    json: { audience: null, agentIds: null, editors: { roleIds: [adminRole], userIds: [] }, agentEditorIds: null },
+  });
+  expect(editors.status).toBe(200);
+  const asBia = (await (await api(bia, "/wiki/pages/margens")).json()) as { canEdit: boolean; version: number };
+  expect(asBia.canEdit).toBe(false);
+  const refused = await api(bia, "/wiki/pages/margens", {
+    method: "PUT",
+    json: { body: "x", baseVersion: asBia.version },
+  });
+  expect(refused.status).toBe(403);
+  expect(await errorCode(refused)).toBe("wiki.edit_limited");
+
+  // A folder reaches its pages, and what's inside it can only be narrower.
+  await api(owner, "/wiki/pages", { json: { title: "Contrato", folder: "Financeiro", body: "x" } });
+  const folder = await api(owner, "/wiki/folder-audience", {
+    method: "PUT",
+    json: { folder: "Financeiro", audience: { roleIds: [adminRole], userIds: [] }, agentIds: [] },
+  });
+  expect(folder.status).toBe(200);
+  expect(await folder.json()).toEqual({ folder: "Financeiro", pages: 1 });
+  expect((await api(bia, "/wiki/pages/contrato")).status).toBe(403);
+  const read = await api(ana, "/wiki/folder-audience?folder=Financeiro");
+  expect(((await read.json()) as { own: { agentIds: unknown } }).own.agentIds).toEqual([]);
+  const wider = await api(owner, "/wiki/pages/contrato/audience", { method: "PUT", json: { audience: null } });
+  expect(wider.status).toBe(400);
+  expect(await errorCode(wider)).toBe("wiki.audience_wider_than_folder");
+  expect((await api(bia, "/wiki/folder-audience?folder=Financeiro")).status).toBe(403);
 });

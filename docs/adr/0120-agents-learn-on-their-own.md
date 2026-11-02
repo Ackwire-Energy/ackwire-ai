@@ -3,7 +3,7 @@
 - Status: Accepted (built)
 - Date: 2026-11-01
 - Amends: 0017 (proactive writes and the trust rule), 0020 (agent-made skills, `update_skill`, promotion), 0097 §4 (the `remember` policy), 0028 (the background job only adds)
-- Code: `packages/engine/src/context/learn.ts` (`learnTrust`, `afterTurnDone`, `learnRun`), `context/learned-skills.ts` (`changeSkillAsAgent`, `revertSkillChange`, `promoteHowTos`, `shareAcrossAgents`, `decayAgentSkills`), `context/items.ts` (`mayReplace`, low trust never verifies, `person` scope), `context/tools.ts` (memory tools, retrieval), `context/consolidate.ts`, `continuation.ts` (the `learn` question, `runCalls`), `executor.ts` (`learnLater`), `jobs.ts` (`context.learn`), `skill-tools.ts` (`update_skill`, use counting), `skills.ts`, `context/proposals.ts` (target `skill`), `agent-actions.ts` / `agent-undo.ts` (`skill.created`, `skill.updated`), `message-memories.ts`, `context.ts` (`HOW_YOU_WORK`), `capabilities.ts`; routes `apps/server/src/routes/app/knowledge.ts`, `memory.ts`, `skills.ts`; web `apps/web/src/pages/agent/MemoryTab.tsx`; migration `0171_agent_learning.sql`
+- Code: `packages/engine/src/context/learn.ts` (`learnTrust`, `afterTurnDone`, `learnRun`), `context/learned-skills.ts` (`changeSkillAsAgent`, `revertSkillChange`, `promoteHowTos`, `shareAcrossAgents`, `decayAgentSkills`), `context/items.ts` (`mayReplace`, low trust never verifies, `person` scope), `context/tools.ts` (memory tools, retrieval), `context/consolidate.ts`, `continuation.ts` (the `learn` question, `runCalls`), `executor.ts` (`learnLater`), `jobs.ts` (`context.learn`), `skill-tools.ts` (`update_skill`, use counting), `skills.ts`, `context/proposals.ts` (target `skill`), `agent-actions.ts` / `agent-undo.ts` (`skill.created`, `skill.updated`), `message-memories.ts`, `context.ts` (`HOW_YOU_WORK`), `capabilities.ts`; routes `apps/server/src/routes/app/knowledge.ts`, `memory.ts`, `skills.ts`; web `apps/web/src/pages/agent/MemoryTab.tsx`; migration `0173_agent_learning.sql`
 
 ## Context
 
@@ -76,7 +76,7 @@ The agent page's Memory tab gets "Aprendizados" (What it learned): what the agen
 
 ### 8. Storage and config
 
-Migration `0171_agent_learning.sql`: `skills.origin`, `owner_agent_id`, `locked`, `use_count`, `last_used_at`; `proposal_target` value `skill` (a skill proposal keeps the skill in its one access line, the new body as the proposed text); `agent_learning_days`. Config: `LEARN_MAX_PER_AGENT_DAY` (20), `LEARN_MIN_TOOL_CALLS` (6), `LEARN_SKILL_AFTER` (3). All core and Postgres-only through the outbox: self-host and Cloud behave the same.
+Migration `0173_agent_learning.sql`: `skills.origin`, `owner_agent_id`, `locked`, `use_count`, `last_used_at`; `proposal_target` value `skill` (a skill proposal keeps the skill in its one access line, the new body as the proposed text); `agent_learning_days`. Config: `LEARN_MAX_PER_AGENT_DAY` (20), `LEARN_MIN_TOOL_CALLS` (6), `LEARN_SKILL_AFTER` (3). All core and Postgres-only through the outbox: self-host and Cloud behave the same.
 
 ### 9. Secrets
 

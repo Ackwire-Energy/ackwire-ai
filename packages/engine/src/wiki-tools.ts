@@ -1,20 +1,20 @@
 import { and, eq, schema } from "@agenteschat/db";
 import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { cutText } from "./format";
-import { personBehindCall } from "./requester";
+import { personBehindCall, wikiActorOfCall } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
   appendToWikiPage,
   createWikiPage,
   getWikiPage,
-  RESTRICTED_WIKI_RULE,
   recordWikiReads,
-  restrictedOutsiders,
-  searchWiki,
+  searchWikiForRun,
   updateWikiPage,
   type WikiActor,
   type WikiDeps,
+  wikiPageHeld,
 } from "./wiki";
+import { RESTRICTED_HERE, sendHeldToDm } from "./wiki-dm";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const failed = (error: unknown): ToolOutput => ({
@@ -60,11 +60,13 @@ const wikiEdit = (
         after: { version: p.version },
       };
 
-const reader = (ctx: ToolContext): WikiActor => ({ type: "agent", agentId: ctx.agentId, requestedByUserId: null });
-
-/** Of these restricted pages, the ones someone who reads this call's conversation doesn't see. */
-const unseen = async (ctx: ToolContext, ids: string[]) =>
-  (await restrictedOutsiders(ctx.db, ids, { channelId: ctx.channelId, person: () => personBehindCall(ctx) })).some;
+const heldRun = (ctx: ToolContext) => ({
+  orgId: ctx.orgId,
+  agentId: ctx.agentId,
+  channelId: ctx.channelId,
+  runId: ctx.runId,
+  triggerMessageId: ctx.triggerMessageId,
+});
 
 /**
  * The org wiki for agents (ADR 0023): `search_wiki` and `read_wiki_page`
@@ -78,7 +80,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
 
   async function writer(ctx: ToolContext): Promise<WikiActor | null> {
     const userId = await requester(ctx);
-    return userId ? { type: "agent", agentId: ctx.agentId, requestedByUserId: userId } : null;
+    return userId ? { type: "agent", agentId: ctx.agentId, requestedByUserId: userId, channelId: ctx.channelId } : null;
   }
 
   const tools: ToolDefinition[] = [
@@ -95,18 +97,20 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
       },
       async execute(input, ctx) {
         try {
-          const pages = await searchWiki(wiki(ctx), reader(ctx), ctx.orgId, str(input.query), 8);
-          if (pages.length === 0) return { content: "No wiki pages match." };
-          const hidden = await unseen(
-            ctx,
-            pages.filter((p) => p.restricted).map((p) => p.id),
-          );
+          const actor = await wikiActorOfCall(ctx);
+          const { pages, held } = await searchWikiForRun(wiki(ctx), actor, ctx.orgId, str(input.query), 8);
+          const note =
+            held && (await sendHeldToDm({ db: ctx.db, pubsub: deps.pubsub }, heldRun(ctx))) ? RESTRICTED_HERE : "";
+          if (pages.length === 0) return { content: note || "No wiki pages match." };
           return {
-            content: pages
-              .map(
+            content: [
+              note,
+              ...pages.map(
                 (p) =>
-                  `- [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}): ${hidden.has(p.id) ? RESTRICTED_WIKI_RULE : cutText(p.body.replace(/\s+/g, " "), 200)}`,
-              )
+                  `- [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}): ${cutText(p.body.replace(/\s+/g, " "), 200)}`,
+              ),
+            ]
+              .filter(Boolean)
               .join("\n"),
           };
         } catch (error) {
@@ -126,7 +130,14 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
       },
       async execute(input, ctx) {
         try {
-          const p = await getWikiPage(ctx.db, reader(ctx), ctx.orgId, str(input.page));
+          const actor = await wikiActorOfCall(ctx);
+          if (
+            (await wikiPageHeld(ctx.db, actor, ctx.orgId, str(input.page))) &&
+            (await sendHeldToDm({ db: ctx.db, pubsub: deps.pubsub }, heldRun(ctx)))
+          ) {
+            return { content: RESTRICTED_HERE };
+          }
+          const p = await getWikiPage(ctx.db, actor, ctx.orgId, str(input.page));
           await recordWikiReads(ctx.db, {
             orgId: ctx.orgId,
             agentId: ctx.agentId,
@@ -135,11 +146,9 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             pageIds: [p.id],
           });
           const backlinks = p.backlinks.filter((b) => b.kind === "page").map((b) => `[[${b.title}]]`);
-          const hidden = p.audience ? (await unseen(ctx, [p.id])).has(p.id) : false;
           return {
             content: [
-              `# ${p.title} (slug ${p.slug}, version ${p.version}${p.folder ? `, folder ${p.folder}` : ""}${p.locked ? ", locked" : ""})`,
-              hidden ? RESTRICTED_WIKI_RULE : "",
+              `# ${p.title} (slug ${p.slug}, version ${p.version}${p.folder ? `, folder ${p.folder}` : ""}${p.locked ? ", locked" : ""}${p.canEdit ? "" : ", read-only for you"})`,
               p.tags.length ? `Tags: ${p.tags.join(", ")}` : "",
               cutText(p.body, 40_000),
               backlinks.length ? `Linked from: ${backlinks.join(", ")}` : "",
@@ -234,7 +243,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             ctx,
             async (db) => {
               const deps = { ...wiki(ctx), db };
-              before = (await getWikiPage(db, reader(ctx), ctx.orgId, page)).version;
+              before = (await getWikiPage(db, actor, ctx.orgId, page)).version;
               return mode === "replace"
                 ? updateWikiPage(deps, actor, ctx.orgId, page, {
                     baseVersion: input.base_version as number,
@@ -283,7 +292,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
           const p = await actWithUndo(
             ctx,
             async (db) => {
-              before = (await getWikiPage(db, reader(ctx), ctx.orgId, str(input.page))).version;
+              before = (await getWikiPage(db, actor, ctx.orgId, str(input.page))).version;
               return appendToWikiPage({ ...wiki(ctx), db }, actor, ctx.orgId, str(input.page), {
                 text: targets.map((t) => `- [[${t}]]`).join("\n"),
                 section: str(input.section) || "See also",
