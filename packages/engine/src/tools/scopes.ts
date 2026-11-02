@@ -1,4 +1,16 @@
-import { and, asc, type Database, type Executor, eq, inArray, isNull, like, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  like,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
@@ -31,6 +43,28 @@ export async function mailConnectionIds(db: Executor, orgId: string, ids: (strin
   return new Set([...rows, ...dbs].map((r) => r.id));
 }
 
+/** Deletes the mail grants `where` picks, each mailbox taken from each agent audited with `reason`. */
+async function dropMailGrants(db: Executor, orgId: string, where: SQL, actorId: string, reason: string) {
+  const dropped = await db
+    .delete(agentScopes)
+    .where(and(eq(agentScopes.orgId, orgId), like(agentScopes.scope, "mail:%"), where))
+    .returning({ agentId: agentScopes.agentId, accountId: agentScopes.connectionId });
+  const pairs = new Map<string, { agentId: string; accountId: string }>();
+  for (const { agentId, accountId } of dropped)
+    if (accountId) pairs.set(`${agentId}:${accountId}`, { agentId, accountId });
+  for (const { agentId, accountId } of pairs.values()) {
+    caches.scopes.delete(`${orgId}:${agentId}`);
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.mail_access_changed",
+      target: { type: "agent", id: agentId },
+      details: { accountId, level: "none", reason },
+    });
+  }
+  return [...pairs.values()];
+}
+
 /**
  * Someone new can talk to the agent (its audience widened, or it has a new owner): it loses the mailboxes of everyone
  * but `keeperId`. Only a mailbox's owner gives an agent access to it, for the people the agent answered then (ADR 0038
@@ -43,37 +77,24 @@ export async function dropForeignMailGrants(
   keeperId: string | null,
   actorId: string,
 ) {
-  const dropped = await db
-    .delete(agentScopes)
-    .where(
-      and(
-        eq(agentScopes.orgId, orgId),
-        eq(agentScopes.agentId, agentId),
-        like(agentScopes.scope, "mail:%"),
-        inArray(
-          agentScopes.connectionId,
-          db
-            .select({ id: mailAccounts.id })
-            .from(mailAccounts)
-            .where(
-              and(eq(mailAccounts.orgId, orgId), sql`${mailAccounts.createdByUserId} is distinct from ${keeperId}`),
-            ),
-        ),
-      ),
-    )
-    .returning({ accountId: agentScopes.connectionId });
-  const accountIds = [...new Set(dropped.map((d) => d.accountId).filter((id): id is string => !!id))];
-  if (accountIds.length > 0) caches.scopes.delete(`${orgId}:${agentId}`);
-  for (const accountId of accountIds) {
-    await recordAudit(db, {
-      orgId,
-      actor: { type: "person", id: actorId },
-      action: "agent.mail_access_changed",
-      target: { type: "agent", id: agentId },
-      details: { accountId, level: "none", reason: "audience_widened" },
-    });
-  }
-  return accountIds;
+  const foreign = db
+    .select({ id: mailAccounts.id })
+    .from(mailAccounts)
+    .where(and(eq(mailAccounts.orgId, orgId), sql`${mailAccounts.createdByUserId} is distinct from ${keeperId}`));
+  const where = and(eq(agentScopes.agentId, agentId), inArray(agentScopes.connectionId, foreign)) as SQL;
+  return (await dropMailGrants(db, orgId, where, actorId, "audience_widened")).map((d) => d.accountId);
+}
+
+/**
+ * `ownerUserId` leaves the workspace: every agent loses their mailboxes, so none goes on reading or sending in the name
+ * of someone who left. Rejoining doesn't give them back; the owner grants them again.
+ */
+export async function dropMailOfOwner(db: Executor, orgId: string, ownerUserId: string, actorId: string) {
+  const theirs = db
+    .select({ id: mailAccounts.id })
+    .from(mailAccounts)
+    .where(and(eq(mailAccounts.orgId, orgId), eq(mailAccounts.createdByUserId, ownerUserId)));
+  return dropMailGrants(db, orgId, inArray(agentScopes.connectionId, theirs), actorId, "owner_left");
 }
 
 /**

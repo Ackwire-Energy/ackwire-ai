@@ -1029,7 +1029,7 @@ export async function removalPreview(
 
 /**
  * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass on (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
- * here go with them (`personalMachines`). Their messages stay.
+ * here go with them (`personalMachines`). Every agent loses their mailboxes (`dropMailOfOwner`). Their messages stay.
  */
 export async function removeMember(
   db: Database,
@@ -1044,7 +1044,9 @@ export async function removeMember(
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
   const { cancelSecretRequestsFor, publishSecret } = await import("./secrets");
-  const { released, removed, handed, changed, heir, secrets } = await db.transaction(async (tx) => {
+  const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
+  const { dropMailOfOwner } = await import("./tools/scopes");
+  const { released, removed, handed, changed, heir, secrets, mailActions } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -1112,6 +1114,9 @@ export async function removeMember(
       role: target.role,
       ...(handed.length ? { agentsTo: heir, agents: handed.map((a) => a.id) } : {}),
     });
+    // No agent goes on reading or sending in their name: their mailboxes leave every agent, and what waits to run there doesn't.
+    await dropMailOfOwner(tx, orgId, targetUserId, actorId);
+    const mailActions = await cancelMailboxApprovals(tx, orgId, targetUserId, actorId);
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
     const released = await releaseMemberAccounts(tx, targetUserId, orgId);
     const removed = [];
@@ -1136,16 +1141,15 @@ export async function removeMember(
           ),
         );
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
-    return { released, removed, handed, changed, heir, secrets };
+    return { released, removed, handed, changed, heir, secrets, mailActions };
   });
   for (const row of secrets) await publishSecret({ db, pubsub: options.pubsub }, row, "secret.updated");
+  for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
   forgetAgents(
     orgId,
     handed.map((a) => a.id),
   );
   if (handed.length) caches.agents.delete(`${orgId}:team`);
-  const { releaseRequiredApprovals } = await import("./approvals");
-  await releaseRequiredApprovals({ db, pubsub: options.pubsub }, orgId, targetUserId);
   if (heir && handed.length) {
     const { handOver } = await import("./agents");
     for (const agent of handed) {
@@ -1205,7 +1209,9 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
   const { announceRemovedMachine, detachMachine } = await import("./machines");
   const { accountDeletionPlan, afterClosing, closeForDeletion, queueAccountDeletedEmail, soleOwnerRefusal } =
     await import("./workspace-deletion");
-  const { plan, closed, released, removed } = await db.transaction(async (tx) => {
+  const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
+  const { dropMailOfOwner } = await import("./tools/scopes");
+  const { plan, closed, released, removed, mailActions } = await db.transaction(async (tx) => {
     // First, as creating a workspace does: one made in another tab meanwhile is in the plan below and closes with them.
     await lockWorkspacesOf(tx, userId);
     const mine = await tx
@@ -1227,6 +1233,12 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     }
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
+    // Their mailboxes leave every agent there too (`removeMember`); a mailbox without an owner would be anyone's.
+    const mailActions = [];
+    for (const m of mine) {
+      await dropMailOfOwner(tx, m.orgId, userId, userId);
+      mailActions.push(...(await cancelMailboxApprovals(tx, m.orgId, userId, userId)));
+    }
     for (const org of plan.leaves) {
       await auditMember(tx, org.id, userId, "member.left", userId, { role: org.role, accountDeleted: true });
     }
@@ -1252,8 +1264,9 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
       payload: { userId },
       maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
     });
-    return { plan, closed, released, removed };
+    return { plan, closed, released, removed, mailActions };
   });
+  for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: userId }, freed);

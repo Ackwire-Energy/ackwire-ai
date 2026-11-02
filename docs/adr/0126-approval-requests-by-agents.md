@@ -84,3 +84,7 @@ someone joining one of its audience roles (`addMemberRolesInTx`, `dropMailIfWide
 routine's run (or a consultation rooted in one) answers for the routine's creator, as the Tool Gateway's `requestedBy`
 does, and a mail watch stops feeding its routine once the agent can't read the mailbox. Whoever decides an approval
 also finds it in Aprovações and opens it, in a channel they aren't in too.
+
+A mailbox's owner who leaves the workspace (removed, leaving, or deleting their account) takes it from every agent in
+the same transaction (`dropMailOfOwner`, audited `owner_left`), and its actions waiting or approved and not run are
+canceled (`cancelMailboxApprovals`); rejoining doesn't give it back.

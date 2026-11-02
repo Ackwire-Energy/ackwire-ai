@@ -564,28 +564,38 @@ export async function repointApprovals(
 }
 
 /**
- * `userId` left the workspace: the waiting approvals only they could decide (their own mailbox, `required`) go back
- * to the usual rule (`mailboxApprovers`), and whoever decides now gets the inbox item.
+ * `userId` left the workspace: the actions in their mailboxes that may still run (waiting for a person, or approved and
+ * not run) never run, and a run waiting on one hears it. In the transaction that removes them; then `publishApproval`
+ * each row returned.
  */
-export async function releaseRequiredApprovals(deps: { db: Database; pubsub?: PubSub }, orgId: string, userId: string) {
-  const rows = await deps.db
+export async function cancelMailboxApprovals(tx: Executor, orgId: string, userId: string, actorId: string) {
+  const theirs = tx
+    .select({ id: mailAccounts.id })
+    .from(mailAccounts)
+    .where(and(eq(mailAccounts.orgId, orgId), eq(mailAccounts.createdByUserId, userId)));
+  const rows = await tx
     .update(approvals)
-    .set({ approvers: null })
+    .set({ status: "canceled", decidedByUserId: actorId, decidedAt: new Date() })
     .where(
       and(
         eq(approvals.orgId, orgId),
-        eq(approvals.status, "pending"),
-        sql`coalesce((${approvals.approvers} ->> 'required')::boolean, false)`,
-        sql`${approvals.approvers} -> 'userIds' @> to_jsonb(${userId}::text)`,
+        inArray(approvals.connectionId, theirs),
+        isNull(approvals.executedAt),
+        inArray(approvals.status, ["pending", "approved"]),
       ),
     )
     .returning();
-  for (const row of rows) await notifyApproval(deps, row, await approverIds(deps.db, row)).catch(() => {});
+  for (const row of rows) {
+    await enqueueResume(tx, row);
+    await settleAheadRoutine(tx, row);
+    await auditDecision(tx, row, actorId);
+  }
+  return rows;
 }
 
 /** Tells the channel and every approver about an approval (card in the chat, badge on the Approvals screen). */
 export async function publishApproval(
-  deps: { db: Database; pubsub: PubSub },
+  deps: { db: Database; pubsub?: PubSub },
   approval: Approval,
   type: "approval.created" | "approval.decided",
 ) {
