@@ -38,6 +38,7 @@ export async function applyToolPins(
   const fresh: (typeof pins.$inferInsert)[] = [];
   const changed: { name: string; fingerprint: string }[] = [];
   const out: McpTool[] = [];
+  let settled = false;
   for (const tool of tools) {
     if (!pinned(tool.name)) {
       out.push(tool);
@@ -58,8 +59,11 @@ export async function applyToolPins(
       continue;
     }
     if (pin.fingerprint === fingerprint) {
-      // Back to what was approved: nothing waits any more.
-      if (pin.pendingFingerprint) await clearPending(deps.db, pin.id);
+      // Back to what was approved: nothing of this tool waits any more.
+      if (pin.pendingFingerprint) {
+        await clearPending(deps.db, pin.id);
+        settled = true;
+      }
       out.push(tool);
       continue;
     }
@@ -79,7 +83,43 @@ export async function applyToolPins(
   }
   if (fresh.length > 0) await deps.db.insert(pins).values(fresh).onConflictDoNothing();
   if (changed.length > 0) await notifyToolChanged(deps, connection, changed).catch(() => {});
+  else if (settled) await resolveIfSettled(deps, connection.orgId, connection.id);
   return out;
+}
+
+/**
+ * The tools a custom server listed when an admin classified them, pinned as listed then (a tool already pinned
+ * keeps its pin): the text an agent first sees is the reviewed one, not whatever the server says at the first run.
+ */
+export async function seedToolPins(
+  db: Database,
+  connection: Pick<ConnectorConnection, "id" | "orgId">,
+  tools: McpTool[],
+) {
+  if (tools.length === 0) return;
+  await db
+    .insert(pins)
+    .values(
+      tools.map((t) => ({
+        orgId: connection.orgId,
+        connectionId: connection.id,
+        toolName: t.name,
+        fingerprint: toolFingerprint(t),
+        description: t.description ?? "",
+        inputSchema: t.inputSchema ?? {},
+      })),
+    )
+    .onConflictDoNothing();
+}
+
+/** The connection's change notice is resolved once none of its tools waits for an admin. */
+async function resolveIfSettled(deps: { db: Database; pubsub?: PubSub }, orgId: string, connectionId: string) {
+  const [left] = await deps.db
+    .select({ id: pins.id })
+    .from(pins)
+    .where(and(eq(pins.orgId, orgId), eq(pins.connectionId, connectionId), isNotNull(pins.pendingFingerprint)))
+    .limit(1);
+  if (!left) await resolveToolChanged(deps, orgId, connectionId);
 }
 
 const clearPending = (db: Database, id: string) =>
@@ -151,10 +191,5 @@ export async function acceptToolChange(
     .where(and(eq(schema.connectorConnections.id, connectionId), eq(schema.connectorConnections.orgId, orgId)));
   caches.connections.delete(`${orgId}:active`);
   await deps.resync?.(connectionId).catch(() => {});
-  const [left] = await deps.db
-    .select({ id: pins.id })
-    .from(pins)
-    .where(and(eq(pins.orgId, orgId), eq(pins.connectionId, connectionId), isNotNull(pins.pendingFingerprint)))
-    .limit(1);
-  if (!left) await resolveToolChanged(deps, orgId, connectionId);
+  await resolveIfSettled(deps, orgId, connectionId);
 }

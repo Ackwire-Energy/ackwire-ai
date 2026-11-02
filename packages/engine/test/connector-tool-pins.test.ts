@@ -117,3 +117,23 @@ test("an input-only change is caught too, and the tool stays callable with the a
   expect((await listToolChanges(f.db, f.owner.id, f.org.id)).map((c) => c.toolName)).toEqual(["search_articles"]);
   expect((await tool.execute({ q: "x" }, await runContext(f))).content).toContain("no articles");
 });
+
+test("the server changing a tool back to the approved text resolves the notice", async () => {
+  const w = await connected();
+  await w.seen();
+  w.mcp.state.description = V2;
+  await w.seen();
+  expect((await w.notices())[0]?.doneAt).toBeNull();
+  w.mcp.state.description = V1;
+  expect((await w.seen()).description).toContain(V1);
+  expect(await listToolChanges(f.db, f.owner.id, f.org.id)).toEqual([]);
+  expect((await w.notices())[0]?.doneAt).not.toBeNull();
+});
+
+test("the pin is the text the admin classified, not what the server says at the first run", async () => {
+  const w = await connected();
+  w.mcp.state.description = V2;
+  expect((await w.seen()).description).not.toContain("other_tool");
+  expect((await listToolChanges(f.db, f.owner.id, f.org.id)).map((c) => c.after.description)).toEqual([V2]);
+  expect(await w.notices()).toHaveLength(1);
+});

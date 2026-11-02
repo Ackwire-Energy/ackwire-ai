@@ -50,14 +50,16 @@ Four ways out stayed open after ADR 0109:
      `readOnlyCall`.
    - `web_search` queries aren't checked: they go to a fixed provider the attacker can't read.
 2. **MCP tools keep the text an admin approved** (`connector_tool_pins`, migration 0161; `connectors/pins.ts`).
-   When a connection's tools are listed (inside the 60 s listing cache), each tool's description and input schema
-   are pinned the first time, by sha256 of their canonical JSON. A later listing that differs serves the pinned
+   Each tool's description and input schema are pinned by sha256 of their canonical JSON: a custom server's from
+   the same listing its admin classifies (`syncCustomTools`), a catalog connector's (and a custom tool missed
+   there) the first time an agent lists it (inside the 60 s listing cache). Connections that exist at deploy are
+   pinned to whatever their server lists then. A later listing that differs serves the pinned
    version, keeps the new one as pending (`changed_at` from its first sighting), and tells who manages connectors
    once (`connector_tool_changed`, waiting). The tool stays callable. Settings › Conectores lists the changes side
    by side (`GET …/connectors/tool-changes`); Aceitar (`POST …/connectors/{id}/tools/{name}/accept-change`, admins)
    makes the new version the pin, lists the connection again so agents get it now, re-runs a custom server's
    classification, and resolves the notice once nothing of the connection waits. A change back to the pinned
-   version clears the pending one. Composio's tools (pinned by toolkit version) and the tools we serve ourselves
+   version clears the pending one, and resolves the notice once nothing of the connection waits. Composio's tools (pinned by toolkit version) and the tools we serve ourselves
    are never pinned. A custom server's admin classification gate is unchanged.
 3. **A chat card's preview loads nothing from the network** (`HtmlFrame.tsx`, `PREVIEW_CSP`). The thumbnail's page
    starts, right after its doctype and before anything of the page or our shim, with a CSP meta: `default-src
