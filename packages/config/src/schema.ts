@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parsePemKey } from "./pem";
+import { parseFirebaseServiceAccount, parsePemKey } from "./pem";
 
 /**
  * Every environment variable agentes.chat reads is declared here, exactly once.
@@ -745,7 +745,25 @@ export const envVars = {
   EXPO_ACCESS_TOKEN: {
     schema: z.string().optional(),
     description:
-      "Expo access token for push notifications to the phone app (only needed when “enhanced push security” is on in the Expo project). Pushes are sent through the Expo Push API either way.",
+      "Expo access token for push notifications to the iPhone app (only needed when “enhanced push security” is on in the Expo project). iPhone pushes are sent through the Expo Push API either way; Android pushes go straight to Firebase (`FIREBASE_SERVICE_ACCOUNT`).",
+    section: "Push",
+    secret: true,
+  },
+  FIREBASE_SERVICE_ACCOUNT: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value, ctx) => {
+        if (value === undefined) return value;
+        try {
+          return parseFirebaseServiceAccount(value);
+        } catch (error) {
+          ctx.addIssue({ code: "custom", message: (error as Error).message });
+          return z.NEVER;
+        }
+      }),
+    description:
+      "Push notifications to the Android app, sent straight to Firebase Cloud Messaging: the JSON key of a service account of the Firebase project the Android app is built with (Firebase console › Project settings › Service accounts), as the file's contents or base64 of the file. Without it, Android phones get no push.",
     section: "Push",
     secret: true,
   },

@@ -8,8 +8,9 @@ import { sessions, users } from "./auth";
  * to one person at a time: registering it again moves it to whoever is signed in. Tokens the push
  * service reports as gone are deleted.
  *
- * Phones carry their Expo push token. Browsers (`web`) carry their Web Push subscription: the endpoint
- * in `token` and its keys in `webKeys`, and belong to the session that turned them on (`sessionId`).
+ * Android phones carry their FCM registration token (ADR 0123), iPhones their Expo push token. Browsers
+ * (`web`) carry their Web Push subscription: the endpoint in `token` and its keys in `webKeys`, and belong
+ * to the session that turned them on (`sessionId`).
  */
 export const pushDevices = pgTable(
   "push_devices",
@@ -20,7 +21,7 @@ export const pushDevices = pgTable(
     userId: text()
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    /** Expo push token (`ExponentPushToken[…]`), or a browser's Web Push endpoint. */
+    /** An Android phone's FCM token, an iPhone's Expo push token (`ExponentPushToken[…]`), or a browser's endpoint. */
     token: text().notNull().unique(),
     /** `ios | android | web`, validated in code. */
     platform: text().$type<"ios" | "android" | "web">().notNull(),

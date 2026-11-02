@@ -31,6 +31,8 @@ afterEach(async () => {
 const MOBILE = { "x-agentes-client": "mobile" };
 /** The account's password, which the app sends to prove it's them (`DELETE /account`). */
 const TOKEN = "ExponentPushToken[phone-of-owner-01]";
+/** An Android phone's FCM registration token (ADR 0123). */
+const FCM_TOKEN = `phone-of-bia:APA91b${"b".repeat(140)}`;
 
 /** A request the way the app sends it: no Origin, the app header, the stored cookie. */
 const fromApp = (b: Browser, path: string, init: { method?: string; json?: unknown } = {}) =>
@@ -154,6 +156,10 @@ describe("push devices", () => {
 
     expect((await register(owner, { token: "not-a-token", platform: "ios", locale: "pt-BR" })).status).toBe(400);
     expect((await register(owner, { token: TOKEN, platform: "windows", locale: "pt-BR" })).status).toBe(400);
+    // Android sends its FCM token, the iPhone its Expo token: each refuses the other's.
+    expect((await register(owner, { token: TOKEN, platform: "android", locale: "pt-BR" })).status).toBe(400);
+    expect((await register(owner, { token: FCM_TOKEN, platform: "ios", locale: "pt-BR" })).status).toBe(400);
+    expect((await register(owner, { token: "short:APA91b", platform: "android", locale: "pt-BR" })).status).toBe(400);
     expect((await register(owner, { token: TOKEN, platform: "ios", locale: "pt-BR" })).status).toBe(204);
     expect((await register(owner, { token: TOKEN, platform: "ios", locale: "en" })).status).toBe(204);
     const rows = await t.db.select().from(schema.pushDevices);
@@ -231,7 +237,10 @@ describe("push devices", () => {
     const { orgId, channelId } = await seedOrg(owner);
     // Invited people join #general.
     const bia = await addPerson(owner, orgId, "bia@example.com");
-    await fromApp(bia, "/api/app/push/devices", { json: { token: TOKEN, platform: "android", locale: "pt-BR" } });
+    const registered = await fromApp(bia, "/api/app/push/devices", {
+      json: { token: FCM_TOKEN, platform: "android", locale: "pt-BR" },
+    });
+    expect(registered.status).toBe(204);
     const members = (await (await owner(`/api/app/organizations/${orgId}/members`)).json()) as {
       members: { email: string; handle: string }[];
     };
@@ -242,7 +251,8 @@ describe("push devices", () => {
     await t.drain();
     expect(t.push.sent).toHaveLength(1);
     expect(t.push.sent[0]).toMatchObject({
-      to: TOKEN,
+      to: FCM_TOKEN,
+      platform: "android",
       title: "owner mencionou você",
       data: { orgId, kind: "mention", channelId },
     });

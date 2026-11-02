@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
 import { ConfigError, envVars, loadConfig, redactConfig, testConfig } from "./index";
-import { parsePemKey } from "./pem";
+import { parseFirebaseServiceAccount, parsePemKey } from "./pem";
 
 const valid = {
   DATABASE_URL: "postgres://u:p@localhost:5432/db",
@@ -255,5 +255,48 @@ describe("GITHUB_APP_PRIVATE_KEY", () => {
   test("anything else fails the config with a clear message", () => {
     expect(() => parsePemKey("not-a-key")).toThrow("base64 of the PEM file");
     expect(() => loadConfig({ ...valid, GITHUB_APP_PRIVATE_KEY: "not-a-key" })).toThrow("GITHUB_APP_PRIVATE_KEY");
+  });
+});
+
+describe("FIREBASE_SERVICE_ACCOUNT", () => {
+  const key = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\n";
+  const file = JSON.stringify({
+    type: "service_account",
+    project_id: "acme-push",
+    private_key_id: "abc123",
+    private_key: key,
+    client_email: "firebase-adminsdk@acme-push.iam.gserviceaccount.com",
+    token_uri: "https://oauth2.googleapis.com/token",
+  });
+
+  test("takes the JSON file's contents or base64 of the file; masked when logged", () => {
+    const parsed = {
+      projectId: "acme-push",
+      clientEmail: "firebase-adminsdk@acme-push.iam.gserviceaccount.com",
+      privateKey: key,
+      tokenUri: "https://oauth2.googleapis.com/token",
+    };
+    expect(parseFirebaseServiceAccount(file)).toEqual(parsed);
+    expect(parseFirebaseServiceAccount(Buffer.from(file).toString("base64"))).toEqual(parsed);
+    const config = loadConfig({ ...valid, FIREBASE_SERVICE_ACCOUNT: file });
+    expect(config.FIREBASE_SERVICE_ACCOUNT).toEqual(parsed);
+    expect(redactConfig(config).FIREBASE_SERVICE_ACCOUNT).toBe("********");
+    expect(loadConfig(valid).FIREBASE_SERVICE_ACCOUNT).toBeUndefined();
+  });
+
+  test("anything else fails the config without echoing the key", () => {
+    expect(() => parseFirebaseServiceAccount("not-json")).toThrow("service account's JSON key");
+    const userKey = JSON.stringify({ type: "authorized_user", private_key: key });
+    expect(() => parseFirebaseServiceAccount(userKey)).toThrow('"type": "service_account"');
+    const noEmail = JSON.stringify({ type: "service_account", project_id: "p", private_key: key });
+    expect(() => parseFirebaseServiceAccount(noEmail)).toThrow("client_email");
+    let message = "";
+    try {
+      loadConfig({ ...valid, FIREBASE_SERVICE_ACCOUNT: noEmail });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain("FIREBASE_SERVICE_ACCOUNT");
+    expect(message).not.toContain("MIIEvQ");
   });
 });

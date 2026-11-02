@@ -1,11 +1,17 @@
 /**
- * Push notifications to the phone app (ADR 0035). Core sends only from an
- * outbox job (`push.send`), never inline in a request. Default: the Expo
- * Push API (the app registers Expo push tokens). Tests use the fake.
+ * Push notifications to the phone app (ADR 0035, ADR 0123). Core sends only from an
+ * outbox job (`push.send`), never inline in a request. Android phones are reached
+ * straight through Firebase Cloud Messaging (`push-fcm.ts`, the app registers its
+ * FCM token); iPhones through the Expo Push API (the app registers an Expo push
+ * token). `createPhonePushSender` sends each message to its platform's sender.
+ * Tests use the fake.
  */
+export type PushPlatform = "ios" | "android";
+
 export interface PushMessage {
-  /** Expo push token (`ExponentPushToken[…]`). */
+  /** The phone's token: FCM registration token (Android) or Expo push token (`ExponentPushToken[…]`, iOS). */
   to: string;
+  platform: PushPlatform;
   title: string;
   body: string;
   /** Deep link data for the app (`{ orgId, kind, notificationId, … }`). */
@@ -19,6 +25,8 @@ export interface PushResult {
   ok: boolean;
   /** The token no longer reaches a device (app uninstalled, notifications off): delete it. */
   unregistered: boolean;
+  /** Not taken now, but may be later (rate limited, the service unavailable): the outbox may try again. */
+  retryable?: boolean;
   /** Accepted: the ticket to ask about later (`receipts`), when the service gives one. */
   ticketId?: string;
   error?: string;
@@ -55,6 +63,55 @@ export class PushError extends Error {
     super(message);
     this.name = "PushError";
   }
+}
+
+/**
+ * The phone sender the server uses: each message goes to its platform's sender, in one `send` per
+ * platform, and the results come back in the messages' order. A platform with no sender (no
+ * `FIREBASE_SERVICE_ACCOUNT` for Android) answers its messages with a final failure: neither sent nor
+ * unregistered, so the device stays for when the server gets credentials. Receipts are the iOS sender's
+ * (only Expo gives tickets). A `PushError` from either sender is thrown as is.
+ */
+export function createPhonePushSender(senders: {
+  android?: PushSender | null;
+  ios?: PushSender | null;
+}): PushSender {
+  const of = (platform: PushPlatform) => senders[platform] ?? null;
+  const ios = of("ios");
+  return {
+    id: "phones",
+    async send(messages) {
+      const out = new Array<PushResult>(messages.length);
+      for (const platform of ["android", "ios"] as const) {
+        const at = messages.flatMap((m, i) => (m.platform === platform ? [i] : []));
+        if (at.length === 0) continue;
+        const sender = of(platform);
+        if (!sender) {
+          for (const i of at) {
+            out[i] = {
+              token: messages[i]?.to ?? "",
+              ok: false,
+              unregistered: false,
+              retryable: false,
+              error: `this server sends no ${platform} push`,
+            };
+          }
+          continue;
+        }
+        const results = await sender.send(at.map((i) => messages[i] as PushMessage));
+        at.forEach((i, n) => {
+          out[i] = results[n] ?? {
+            token: messages[i]?.to ?? "",
+            ok: false,
+            unregistered: false,
+            error: "no result",
+          };
+        });
+      }
+      return out;
+    },
+    ...(ios?.receipts ? { receipts: (ids: string[]) => ios.receipts?.(ids) ?? Promise.resolve([]) } : {}),
+  };
 }
 
 /** Expo accepts at most 100 messages per request. */
@@ -179,12 +236,16 @@ export function createExpoPushSender(
 
 /**
  * Test sender: records every message, never sends. Tokens in `unregistered`
- * come back unregistered at once; tokens in `goneLater` are accepted (a
+ * come back unregistered at once; tokens in `failing` as a failure that can be
+ * retried (as FCM's 429 and 5xx); tokens in `goneLater` are accepted (a
  * ticket) and their receipts say `DeviceNotRegistered`.
  */
-export function createFakePushSender(options: { unregistered?: Iterable<string>; goneLater?: Iterable<string> } = {}) {
+export function createFakePushSender(
+  options: { unregistered?: Iterable<string>; failing?: Iterable<string>; goneLater?: Iterable<string> } = {},
+) {
   const sent: PushMessage[] = [];
   const unregistered = new Set(options.unregistered ?? []);
+  const failing = new Set(options.failing ?? []);
   const goneLater = new Set(options.goneLater ?? []);
   /** Ticket id → token. */
   const tickets = new Map<string, string>();
@@ -192,6 +253,7 @@ export function createFakePushSender(options: { unregistered?: Iterable<string>;
   const sender: PushSender & {
     sent: PushMessage[];
     unregistered: Set<string>;
+    failing: Set<string>;
     goneLater: Set<string>;
     tickets: Map<string, string>;
     receiptRequests: string[][];
@@ -200,12 +262,15 @@ export function createFakePushSender(options: { unregistered?: Iterable<string>;
     id: "fake",
     sent,
     unregistered,
+    failing,
     goneLater,
     tickets,
     receiptRequests,
     async send(messages) {
-      return messages.map((m) => {
+      return messages.map((m): PushResult => {
         if (unregistered.has(m.to)) return { token: m.to, ok: false, unregistered: true, error: "DeviceNotRegistered" };
+        if (failing.has(m.to))
+          return { token: m.to, ok: false, unregistered: false, retryable: true, error: "unavailable" };
         sent.push(m);
         const ticketId = `fake-ticket-${tickets.size + 1}`;
         tickets.set(ticketId, m.to);

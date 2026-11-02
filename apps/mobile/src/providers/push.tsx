@@ -16,6 +16,7 @@ import {
   pushPermission,
   pushTurnedOff,
   registerForPush,
+  watchPushToken,
 } from "@/lib/push";
 import { readPushData } from "@/lib/push-payload";
 import { serverUrl } from "@/lib/server";
@@ -55,6 +56,8 @@ export function PushProvider({ children }: { children: ReactNode }) {
   const setOrgRef = useRef(setOrgId);
   setOrgRef.current = setOrgId;
   const locale = i18n.language;
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
   const api = useApi();
   const qc = useQueryClient();
   const [permission, setPermission] = useState<PushPermission | null>(null);
@@ -102,6 +105,12 @@ export function PushProvider({ children }: { children: ReactNode }) {
       sub.remove();
     };
   }, [ready, locale, t]);
+
+  // Android: FCM may hand the app a new token while it runs; it's registered again (ADR 0123).
+  useEffect(() => {
+    if (!ready) return;
+    return watchPushToken(() => localeRef.current);
+  }, [ready]);
 
   // A tapped notification opens its screen (after switching to its organization).
   useEffect(() => {

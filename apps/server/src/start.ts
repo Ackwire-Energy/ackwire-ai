@@ -8,6 +8,7 @@ import {
   createDiskBlobStore,
   createErrorReporter,
   createExpoPushSender,
+  createFcmPushSender,
   createGiphyGifs,
   createImapConnectionTester,
   createImapMailConnector,
@@ -19,6 +20,7 @@ import {
   createMemoryRateLimiter,
   createMillionSendSender,
   createOnePasswordSource,
+  createPhonePushSender,
   createPostgresBlobStore,
   createPostgresDatabaseDriver,
   createPostgresPubSub,
@@ -209,8 +211,14 @@ async function boot(
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
     platformBlobs: platformBlobStore(config, database.db),
-    // Phone app push (ADR 0035): only devices that registered get anything.
-    push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
+    // Phone app push (ADR 0035, ADR 0123): only devices that registered get anything. Android straight to
+    // Firebase with this server's service account (without it, Android phones get no push); iPhones through Expo.
+    push: createPhonePushSender({
+      android: config.FIREBASE_SERVICE_ACCOUNT
+        ? createFcmPushSender({ serviceAccount: config.FIREBASE_SERVICE_ACCOUNT })
+        : null,
+      ios: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
+    }),
     // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
     webPush: webPushSender(
       config,
@@ -254,6 +262,10 @@ async function boot(
     imap: Boolean(defaults.mail?.imap),
   });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
+  log.info("phone push", {
+    android: config.FIREBASE_SERVICE_ACCOUNT ? `firebase:${config.FIREBASE_SERVICE_ACCOUNT.projectId}` : "off",
+    ios: "expo",
+  });
   const base = { config, db: database.db, edition, version: release };
   const { adapters, modelProviders, overridden } = await resolveAdapters(
     modules,
