@@ -35,7 +35,7 @@ test("every toast glows softly from the right in its tone, as the sidebar's chos
   expect(last(top, '[data-theme="dark"] .ac-toast', "--toast-glow")).toBe("30%");
   expect(last(top, ".ac-toast", "--toast-tone")).toBe("var(--faint)");
   expect(last(top, ".ac-toast--success", "--toast-tone")).toBe("var(--ok)");
-  expect(last(top, ".ac-toast--info", "--toast-tone")).toBe("var(--agent)");
+  expect(last(top, ".ac-toast--info", "--toast-tone")).toBe("var(--info)");
   expect(last(top, ".ac-toast--warning", "--toast-tone")).toBe("var(--warn)");
   expect(last(top, ".ac-toast--error", "--toast-tone")).toBe("var(--danger)");
   expect(last(top, ".ac-toast > .ac-icon", "color")).toBe("var(--toast-tone)");

@@ -4532,7 +4532,7 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   --toast-tone: var(--ok);
 }
 .ac-toast--info {
-  --toast-tone: var(--agent);
+  --toast-tone: var(--info);
 }
 .ac-toast--warning {
   --toast-tone: var(--warn);
