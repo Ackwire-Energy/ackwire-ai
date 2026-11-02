@@ -21,6 +21,7 @@ import {
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
+  approvalGroupWaitsFor,
   approvalSummary,
   approvalWaitsFor,
   decisionOutcome,
@@ -247,7 +248,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const { ids, waiting: count, blocked } = approveAllScope(items);
   const high = items.some((a) => ids.includes(a.id) && approvalRisk(a) === "high");
   const ownerId = first.ownerUserId ?? dir.agentById.get(first.agentId)?.ownerUserId ?? null;
-  const owner = approvalWaitsFor(first, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
+  const owner = approvalGroupWaitsFor(items, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const deadline = cardDeadline(items);
   const leadItem = waiting[0] ?? first;
   const always = approveAlwaysOn(items);

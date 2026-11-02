@@ -3,6 +3,7 @@ import { approveAllScope, approveAlwaysOn, cardDeadline, itemOwnWords } from "@a
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
+  approvalGroupWaitsFor,
   approvalSummary,
   approvalTitle,
   approvalWaitsFor,
@@ -127,7 +128,7 @@ export function ApprovalGroupAsk({
   const waiting = items.filter((a) => a.status === "pending");
   const mine = waiting.some((a) => a.canDecide);
   const owner = members.get(first.ownerUserId ?? agent?.ownerUserId ?? "");
-  const waits = approvalWaitsFor(first, owner?.name);
+  const waits = approvalGroupWaitsFor(items, owner?.name);
   const leadItem = waiting[0] ?? first;
   const why = approvalWhy(leadItem);
   const always = approveAlwaysOn(items);

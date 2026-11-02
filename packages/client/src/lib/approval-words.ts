@@ -250,6 +250,17 @@ export const approvalWaitsFor = (approval: Pick<Approval, "approvers">, ownerNam
   approval.approvers?.label || ownerName;
 
 /**
+ * Who a shared card's requests wait for: one `request_approval` and an ordinary approval of the same agent can share
+ * a card while different people decide them, so every distinct name of the waiting requests (all of them once none
+ * waits).
+ */
+export function approvalGroupWaitsFor(items: Pick<Approval, "approvers" | "status">[], ownerName: string | undefined) {
+  const waiting = items.filter((a) => a.status === "pending");
+  const names = new Set((waiting.length > 0 ? waiting : items).map((a) => approvalWaitsFor(a, ownerName)));
+  return [...names].filter(Boolean).join(", ") || undefined;
+}
+
+/**
  * The line saying the person whose request it is decides it too, as an approver by role (ADR 0126): while it waits
  * and once they decided it. Null for any other approval.
  */

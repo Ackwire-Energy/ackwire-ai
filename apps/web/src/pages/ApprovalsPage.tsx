@@ -14,7 +14,12 @@ import {
 import { approvalCards, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { aheadEndLine, approvalWaitsFor, requesterDecidesLine } from "@agenteschat/client/lib/approval-words";
+import {
+  aheadEndLine,
+  approvalGroupWaitsFor,
+  approvalWaitsFor,
+  requesterDecidesLine,
+} from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { daysBetween, joinNames, nextLabel, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -377,7 +382,7 @@ export function ApprovalsPage() {
               const partial = approveAllPartial(
                 t,
                 items,
-                approvalWaitsFor(first, dir.memberById.get(first.ownerUserId ?? agent?.ownerUserId ?? "")?.name),
+                approvalGroupWaitsFor(items, dir.memberById.get(first.ownerUserId ?? agent?.ownerUserId ?? "")?.name),
               );
               return (
                 <section key={first.messageId ?? first.id} className="ap-group" aria-label={agent?.name}>

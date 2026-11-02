@@ -10,6 +10,7 @@ import { approvalOriginShort } from "../src/lib/approval-origin";
 import {
   actionName,
   aheadEndLine,
+  approvalGroupWaitsFor,
   approvalRuleWords,
   approvalSummary,
   approvalValues,
@@ -203,6 +204,37 @@ describe("approvals an agent asked of named people (ADR 0126)", () => {
   test("waits for the people asked, else the agent's owner", () => {
     expect(approvalWaitsFor({ approvers: asked }, "Ana")).toBe("Diretoria");
     expect(approvalWaitsFor({ approvers: null }, "Ana")).toBe("Ana");
+  });
+
+  test("a shared card names everyone its waiting requests wait for", () => {
+    const pending = "pending" as const;
+    expect(
+      approvalGroupWaitsFor(
+        [
+          { approvers: asked, status: pending },
+          { approvers: null, status: pending },
+        ],
+        "Ana",
+      ),
+    ).toBe("Diretoria, Ana");
+    expect(
+      approvalGroupWaitsFor(
+        [
+          { approvers: asked, status: pending },
+          { approvers: asked, status: pending },
+        ],
+        "Ana",
+      ),
+    ).toBe("Diretoria");
+    expect(
+      approvalGroupWaitsFor(
+        [
+          { approvers: asked, status: "approved" },
+          { approvers: null, status: pending },
+        ],
+        "Ana",
+      ),
+    ).toBe("Ana");
   });
 
   test("says the requester decides only while it waits or once they decided it", () => {
