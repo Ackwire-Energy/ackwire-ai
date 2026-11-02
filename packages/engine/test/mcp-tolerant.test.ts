@@ -85,9 +85,10 @@ describe("MCP servers that add their own members to JSON-RPC", () => {
       async () => new Response(open, { headers: { "content-type": "text/event-stream" } }),
     );
     const res = await fetch(SERVER);
-    const reader = (res.body as ReadableStream<Uint8Array>).pipeThrough(new TextDecoderStream()).getReader();
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    const decoder = new TextDecoder();
     let seen = "";
-    while (!seen.includes("\n\n")) seen += (await reader.read()).value;
+    while (!seen.includes("\n\n")) seen += decoder.decode((await reader.read()).value, { stream: true });
     expect(seen).toBe(`data: {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}\n\n`);
     await reader.cancel();
   });
