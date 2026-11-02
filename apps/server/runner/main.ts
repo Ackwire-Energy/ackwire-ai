@@ -34,6 +34,7 @@ import { browserPortsForUid } from "./browser-ports";
 import {
   configPath,
   DEFAULT_AGENT_UID_RANGE,
+  accessToStore,
   effectiveAccess,
   expandHome,
   normalizeServerUrl,
@@ -781,7 +782,7 @@ function pairedOrExit(home: string) {
 }
 
 function saveAccess(home: string, access: ReturnType<typeof effectiveAccess>) {
-  updateConfig((c) => ({ ...c, access, exec: access.tools.commands }), home);
+  updateConfig((c) => ({ ...c, access: accessToStore(c, access), exec: access.tools.commands }), home);
 }
 
 /** What `--agent <handle>` says when no agent by that handle uses this computer. */

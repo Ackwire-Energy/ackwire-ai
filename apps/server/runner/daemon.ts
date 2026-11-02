@@ -58,6 +58,7 @@ import {
   configPath,
   connectUrl,
   DEFAULT_AGENT_UID_RANGE,
+  accessToStore,
   effectiveAccess,
   expandHome,
   normalizeServerUrl,
@@ -582,7 +583,7 @@ export class RunnerDaemon implements RequestObserver {
   }
 
   private writeAccess(next: RunnerAccess) {
-    this.write({ ...(this.stored ?? {}), access: next, exec: next.tools.commands });
+    this.write({ ...(this.stored ?? {}), access: accessToStore(this.stored, next), exec: next.tools.commands });
   }
 
   private applyStored(next: StoredConfig | null, text: string | null, initial: boolean) {
