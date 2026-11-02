@@ -152,6 +152,7 @@ html[data-desktop] :is(button, [role="button"], [role="tab"], [role="menuitem"],
 }
 /* The rows that drag to reorder stay out: `draggable` is only a style hint (-webkit-user-drag: element) that this
    rule would beat, and the web view would never start their drag. */
-html[data-desktop] :is(.sidebar img, .sidebar a:not([draggable="true"]), .titlebar, svg, button) {
+html[data-desktop]
+:is(.sidebar img, .sidebar a:not([draggable="true"]), .titlebar, svg, button:not([draggable="true"])) {
   -webkit-user-drag: none;
 }

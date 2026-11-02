@@ -376,7 +376,10 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
     setOn(next);
     setBusy(true);
     try {
-      await api.agents.setBrain(org.id, agent.id, { onlyOwner: !next });
+      const saved = await api.agents.setBrain(org.id, agent.id, { onlyOwner: !next });
+      // The server keeps "Só algumas pessoas" with nobody picked as it is: the switch shows what it saved.
+      setOn(!saved.onlyOwner);
+      if (next && saved.onlyOwner) toast.show(t("aiAccounts.share.pickPeople", agentGrammar(t, agent.name)), "info");
       void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, agent.id) });
       void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
     } catch {
@@ -696,8 +699,15 @@ function PlanSteps({
     if (now.length === 0) return;
     setReplying(true);
     try {
-      for (const id of now) await api.agents.setBrain(org.id, id, { onlyOwner: !on });
+      const saved = [];
+      for (const id of now) saved.push(await api.agents.setBrain(org.id, id, { onlyOwner: !on }));
       refresh(now);
+      // The server keeps "Só algumas pessoas" with nobody picked as it is: the switch shows what it saved.
+      if (on && saved.every((s) => s.onlyOwner)) {
+        setReplies(false);
+        const one = now.length === 1 ? forWhom.find((a) => a.id === now[0]) : undefined;
+        if (one) toast.show(t("aiAccounts.share.pickPeople", agentGrammar(t, one.name)), "info");
+      }
     } catch {
       setReplies(!on);
       toast.show(t("agentPage.work.failed"), "error");

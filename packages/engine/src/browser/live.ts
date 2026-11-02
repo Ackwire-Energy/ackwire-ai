@@ -76,7 +76,9 @@ const ofBrowser = (screen: unknown) => (screen ?? "browser") === "browser";
 /**
  * One batch of a person's input, smaller: a run of plain mouse moves (no
  * button held) keeps only its last one; moves while dragging and everything
- * else stay, in order.
+ * else stay, in order. Typed text stays one text per key: fields that react to
+ * each character (a code split into one box per digit) need the page's input
+ * handler to run between them.
  */
 export function coalesceInput(events: BrowserInputEvent[]): BrowserInputEvent[] {
   const out: BrowserInputEvent[] = [];
@@ -84,7 +86,8 @@ export function coalesceInput(events: BrowserInputEvent[]): BrowserInputEvent[] 
   const plainMove = (e: BrowserInputEvent | undefined, held: boolean) =>
     e?.kind === "mouse" && e.type === "mouseMoved" && !held && (e.button === undefined || e.button === "none");
   for (const e of events) {
-    if (plainMove(e, dragging) && plainMove(out.at(-1), dragging)) out[out.length - 1] = e;
+    const last = out.at(-1);
+    if (plainMove(e, dragging) && plainMove(last, dragging)) out[out.length - 1] = e;
     else out.push(e);
     if (e.kind === "mouse" && e.type === "mousePressed") dragging = true;
     if (e.kind === "mouse" && e.type === "mouseReleased") dragging = false;
@@ -594,10 +597,16 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   /** The last batch sent per person and agent: the next waits for it, so a drag's press, moves and release reach the runner in order. */
   const sending = new Map<string, Promise<unknown>>();
 
-  function flushInput(key: string, batch: InputBatch) {
-    if (batches.get(key) === batch) batches.delete(key);
+  /**
+   * Sends a gathered batch. While the one before is still on its way, it keeps gathering instead (unless `now`:
+   * it is full, or shutting down) and goes as soon as that one is back: input typed during a slow round trip
+   * reaches the computer as one batch, not as a queue of small ones that each wait their turn.
+   */
+  function flushInput(key: string, batch: InputBatch, now = false) {
     if (batch.timer) clearTimeout(batch.timer);
     batch.timer = null;
+    if (!now && sending.has(key)) return;
+    if (batches.get(key) === batch) batches.delete(key);
     const events = coalesceInput(batch.events);
     const sent = (sending.get(key) ?? Promise.resolve())
       .catch(() => {})
@@ -612,7 +621,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       );
     sending.set(key, sent);
     void sent.finally(() => {
-      if (sending.get(key) === sent) sending.delete(key);
+      if (sending.get(key) !== sent) return;
+      sending.delete(key);
+      const next = batches.get(key);
+      if (next && !next.timer) flushInput(key, next);
     });
   }
 
@@ -756,7 +768,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       const key = `${userId}:${agentId}`;
       let batch = batches.get(key);
       if (batch && batch.events.length + events.length > BROWSER_LIMITS.inputEvents) {
-        flushInput(key, batch);
+        flushInput(key, batch, true);
         batch = undefined;
       }
       if (!batch) {
@@ -775,7 +787,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     /** Sends one gathered batch now (it filled up, or its time came). */
     flushInput: (key: string) => {
       const batch = batches.get(key);
-      if (batch) flushInput(key, batch);
+      if (batch) flushInput(key, batch, true);
     },
 
     /**
@@ -1006,7 +1018,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       unsubscribeHandoffs?.();
       unsubscribeComputers?.();
       for (const state of live.values()) cancelStop(state);
-      for (const [key, batch] of batches) flushInput(key, batch);
+      for (const [key, batch] of batches) flushInput(key, batch, true);
     },
   };
   return api;

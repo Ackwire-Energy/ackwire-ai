@@ -202,6 +202,7 @@ export function IssuesPage() {
                   {t("issues.columns.add")}
                 </MenuItem>
                 <MenuCheckboxItem
+                  icon="eye"
                   checked={showCanceled}
                   onCheckedChange={setShowCanceled}
                   hint={all.filter((i) => i.status === "canceled").length}

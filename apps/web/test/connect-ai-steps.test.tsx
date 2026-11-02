@@ -1070,6 +1070,21 @@ describe("Atende outras pessoas, in the plan's panel", () => {
     ]);
   });
 
+  test("Só algumas pessoas with nobody picked: on lets nobody in, so it goes back off and says to pick people", async () => {
+    const { state, dialog } = await connect({
+      ada: { brain: { kind: "claude_code", model: "Sonnet" }, audience: { mode: "people", userIds: [] } },
+    });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(replies(panel).getAttribute("aria-checked")).toBe("false");
+    await click(replies(panel));
+    await settle(4);
+    expect(calls(state, "agents.setBrain").at(-1)?.args).toEqual([ORG_ID, ADA_ID, { onlyOwner: false }]);
+    expect(replies(panel).getAttribute("aria-checked")).toBe("false");
+    expect(document.body.textContent).toContain(
+      "A Ada só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
+    );
+  });
+
   test("an agent on the computer's own sign-in, a Team seat there: the seat's words before anything is chosen", async () => {
     const { dialog } = await connect({
       brain: { brain: "claude_code", account: null, ownSignIn: true },

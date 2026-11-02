@@ -16,6 +16,7 @@ export type AppHref =
   | `/chat/${string}?handoff=${string}`
   | `/chat/${string}?thread=${string}&handoff=${string}`
   | `/agent/${string}`
+  | `/computer/${string}`
   | `/handoff/${string}`
   | `/issues/${number}`
   | `/routines/${string}`
@@ -168,8 +169,11 @@ export function notificationHref(
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.
-  if (n.kind === "browser_handoff" && isSafeId(s.handoffId))
+  if (n.kind === "browser_handoff" && isSafeId(s.handoffId)) {
+    // Sent to someone who can't open its conversation (it names none): the agent's computer, the request there.
+    if (!isSafeId(s.channelId ?? s.dmId) && isSafeId(s.agentId)) return `/computer/${s.agentId}`;
     return handoffHref(s.handoffId, s.channelId ?? s.dmId, s.threadId);
+  }
   if ((n.kind === "mission_finished" || n.kind === "mission_stopped") && isSafeId(s.missionId))
     return `/mission/${s.missionId}`;
   if (s.topicId || s.issueId || s.issueNumber != null) return null;

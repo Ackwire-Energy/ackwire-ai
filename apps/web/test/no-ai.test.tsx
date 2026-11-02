@@ -603,6 +603,20 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(dialog("Conectar uma IA para a Ada")).toBeNull();
   });
 
+  test("Só algumas pessoas with nobody picked: Atende outras pessoas lets nobody in, so it goes back off and says why", async () => {
+    const state = walters(withCard(), ADA_ID);
+    for (const a of state.agents) if (a.id === ADA_ID) a.audience = { mode: "people", userIds: [] };
+    const { box, picker } = await connectAda(state, { accounts: [team] });
+    await click(within(picker).getByRole("button", { name: /^Claude Team/ }), 8);
+    const replies = () => within(box).getByRole("switch", { name: "Atende outras pessoas" });
+    await click(replies(), 6);
+    expect(calls(state, "agents.setBrain").at(-1)?.args).toEqual([ORG_ID, ADA_ID, { onlyOwner: false }]);
+    expect(replies().getAttribute("aria-checked")).toBe("false");
+    expect(document.body.textContent).toContain(
+      "A Ada só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
+    );
+  });
+
   test("an account another agent thinks with: used here too, a sign-in of that account for her, its email Claude's hint", async () => {
     const state = walters(withCard(), ADA_ID);
     const { box, picker } = await connectAda(state, { accounts: [pessoal] });

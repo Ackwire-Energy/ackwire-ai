@@ -15,6 +15,7 @@ import {
   CardHeader,
   Chip,
   Composer,
+  FilterChip,
   Icon,
   type IconName,
   iconNames,
@@ -22,7 +23,9 @@ import {
   ListRow,
   Logo,
   Menu,
+  MenuCheckboxItem,
   MenuItem,
+  MenuRadioGroup,
   MenuReactions,
   Message,
   MessageText,
@@ -552,6 +555,63 @@ describe("Menu", () => {
     expect(body().queryByRole("menu")).toBeNull();
   });
 
+  test("checkable items keep their check at the row's end, after the label and the hint", async () => {
+    render(
+      <Menu trigger={<Button>Filtros</Button>} label="Filtros">
+        <MenuCheckboxItem checked={false} onCheckedChange={() => {}} hint={3}>
+          Mostrar canceladas
+        </MenuCheckboxItem>
+        <MenuRadioGroup
+          label="Ordem"
+          value="new"
+          onValueChange={() => {}}
+          options={[
+            { value: "new", label: "Mais novas", leading: <span>•</span> },
+            { value: "old", label: "Mais antigas" },
+          ]}
+        />
+      </Menu>,
+    );
+    const trigger = body().getByRole("button", { name: "Filtros" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const menu = body().getByRole("menu");
+    const box = within(menu).getByRole("menuitemcheckbox");
+    expect(box.getAttribute("aria-checked")).toBe("false");
+    expect([...box.children].map((c) => c.getAttribute("class"))).toEqual([
+      "ac-menu__label",
+      "ac-menu__hint",
+      "ac-menu__check",
+    ]);
+    const radios = within(menu).getAllByRole("menuitemradio");
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+    expect(radios.map((r) => [...r.children].map((c) => c.getAttribute("class")))).toEqual([
+      ["ac-menu__leading", "ac-menu__label", "ac-menu__check"],
+      ["ac-menu__label", "ac-menu__check"],
+    ]);
+  });
+
+  test("a checkable item with an icon starts with it, like the plain items around it", async () => {
+    render(
+      <Menu trigger={<Button>Mais</Button>} label="Mais">
+        <MenuItem icon="layers">Nova coluna</MenuItem>
+        <MenuCheckboxItem icon="eye" checked onCheckedChange={() => {}}>
+          Mostrar canceladas
+        </MenuCheckboxItem>
+      </Menu>,
+    );
+    const trigger = body().getByRole("button", { name: "Mais" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const box = within(body().getByRole("menu")).getByRole("menuitemcheckbox");
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    expect([...box.children].map((c) => c.getAttribute("class")?.split(" ")[0])).toEqual([
+      "ac-icon",
+      "ac-menu__label",
+      "ac-menu__check",
+    ]);
+  });
+
   test("quick reactions end with a cell that opens every emoji", async () => {
     let picked = "";
     let more = 0;
@@ -1006,5 +1066,33 @@ describe("text and faces that are never cut", () => {
     expect(initials?.querySelector("img")).toBeNull();
     expect(initials?.textContent).toBe("MA");
     expect(agent?.getAttribute("data-kind")).toBe("agent");
+  });
+});
+
+describe("FilterChip", () => {
+  test("each option starts with its face and name; the check sits at its end, kept empty when off", async () => {
+    render(
+      <FilterChip
+        label="Papel"
+        icon="person"
+        clearLabel="Limpar Papel"
+        multiple
+        value={["admin"]}
+        onChange={() => {}}
+        options={[
+          { value: "admin", label: "Admin", leading: <span className="face">A</span> },
+          { value: "member", label: "Membro" },
+        ]}
+      />,
+    );
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Papel: Admin" })));
+    const options = within(body().getByRole("listbox", { name: "Papel" })).getAllByRole("option");
+    expect(options.map((o) => o.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    expect(options.map((o) => [...o.children].map((c) => c.getAttribute("class")))).toEqual([
+      ["face", "ac-filter__label", "ac-tz__check"],
+      ["ac-filter__label", "ac-tz__check"],
+    ]);
+    expect(options[0]?.querySelector(".ac-tz__check svg")).not.toBeNull();
+    expect(options[1]?.querySelector(".ac-tz__check svg")).toBeNull();
   });
 });
