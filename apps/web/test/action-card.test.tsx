@@ -207,9 +207,19 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(within(done).queryByRole("button", { name: "Não rodar" })).toBeNull();
   });
 
+  test("back at work, the note offers nothing to cancel", async () => {
+    const state = seedState();
+    state.messages.push(note("w-back", { ended: true }));
+    await open(state);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
+    expect(within(row).queryByRole("button", { name: "Não rodar" })).toBeNull();
+  });
+
   test("a member who didn't ask and doesn't own the agent sees it greyed", async () => {
     const state = seedState();
-    const org = state.me.organizations[0];
+    const org = state.me?.organizations[0];
     if (org) org.role = "member";
     state.messages.push(note("w-theirs", {}));
     await open(state);
