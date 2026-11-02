@@ -264,7 +264,15 @@ async function boot(
     imap: Boolean(defaults.mail?.imap),
   });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
-  log.info("phone push", { android: androidPushMode(config), ios: "expo" });
+  const androidPush = androidPushMode(config);
+  log.info("phone push", { android: androidPush, ios: "expo" });
+  if (androidPush === "relay") {
+    // Said at every boot, so whoever runs the server knows what leaves it and how to stop it (ADR 0123).
+    log.info(
+      "Android pushes go through the push relay: each one's phone token, title, text and ids pass through it, which keeps none of them. PUSH_SENDER=off turns them off; FIREBASE_SERVICE_ACCOUNT sends them straight to Firebase.",
+      { relay: new URL(config.PUSH_RELAY_URL).host },
+    );
+  }
   if (config.PUSH_SENDER === "direct" && !config.FIREBASE_SERVICE_ACCOUNT) {
     log.warn("PUSH_SENDER=direct without FIREBASE_SERVICE_ACCOUNT: Android phones get no push");
   }
