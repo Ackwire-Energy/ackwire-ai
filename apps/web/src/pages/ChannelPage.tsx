@@ -3652,7 +3652,9 @@ export const TimelineMessage = memo(function TimelineMessage({
           {agent &&
             memoryUpdates
               .filter((u) => u.action !== "proposed")
-              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
+              .map((u) => (
+                <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} sentAt={m.createdAt} />
+              ))}
           {browserTrail.length > 0 && m.author.id && !m.local && (
             <BrowserTrailCard
               agentId={m.author.id}
