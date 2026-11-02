@@ -70,7 +70,9 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const c = useColors();
   const orgId = useOrgId();
   // Writing in the wiki is `edit_wiki` (ADR 0085; the server checks it again).
-  const writes = can(useOrg().org, "edit_wiki");
+  const { org } = useOrg();
+  const writes = can(org, "edit_wiki");
+  const choosesAudience = writes && can(org, "manage_roles");
   const dir = useDirectory();
   const insets = useSafeAreaInsets();
   const tree = useWikiTree(orgId);
@@ -114,6 +116,14 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             {t("wiki.subtitle")}
           </Text>
         )}
+        {folder && choosesAudience ? (
+          <Row
+            leading={<Tile icon="eye" />}
+            title={t("wiki.audience")}
+            chevron
+            onPress={() => router.push({ pathname: "/wiki-audience", params: { folder } })}
+          />
+        ) : null}
         <View style={styles.search}>
           <SearchField
             value={q}
@@ -344,11 +354,11 @@ function WikiPage({ slug }: { slug: string }) {
   const qc = useQueryClient();
   const { orgId, org } = useOrg();
   // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
-  const writes = can(org, "edit_wiki");
+  const page = useWikiPage(orgId, slug);
+  const writes = can(org, "edit_wiki") && page.data?.canEdit !== false;
   const admin = can(org, "configure");
   // Who sees a page: people who write the wiki and manage roles (the server checks the same).
   const choosesAudience = writes && can(org, "manage_roles");
-  const page = useWikiPage(orgId, slug);
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
   const graph = useWikiGraph(orgId, true);
@@ -543,9 +553,14 @@ function WikiPage({ slug }: { slug: string }) {
                   {by} · {relativeTime(t, i18n.language, p.updatedAt)} · v{p.version}
                 </Text>
               </View>
-              {p.audience ? (
+              {p.audience || p.agentIds ? (
                 <View style={styles.note}>
-                  <Note icon="eye">{t("wiki.restrictedHint")}</Note>
+                  <Note icon="eye">{p.audience ? t("wiki.restrictedHint") : t("wiki.audienceAgentsOnlyHint")}</Note>
+                </View>
+              ) : null}
+              {p.canEdit === false ? (
+                <View style={styles.note}>
+                  <Note icon="eye">{t("wiki.readOnlyHint")}</Note>
                 </View>
               ) : null}
               {p.locked ? (

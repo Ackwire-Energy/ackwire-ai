@@ -474,7 +474,7 @@ export function WikiReader({
   const p = page.data;
   const folders = [...new Set(pages.map((x) => x.folder).filter(Boolean))].sort();
   // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
-  const writes = can(org, "edit_wiki");
+  const writes = can(org, "edit_wiki") && p?.canEdit !== false;
   const admin = can(org, "configure");
   // Who sees a page: people who write the wiki and manage roles (the server checks the same).
   const choosesAudience = writes && can(org, "manage_roles");
@@ -673,9 +673,14 @@ export function WikiReader({
   } else if (p) {
     actions = (
       <>
-        {p.audience && (
-          <Chip icon="eye" title={t("wiki.restrictedHint")}>
-            {t("wiki.restricted")}
+        {(p.audience || p.agentIds) && (
+          <Chip icon="eye" title={p.audience ? t("wiki.restrictedHint") : t("wiki.audienceAgentsOnlyHint")}>
+            {p.audienceFolder ? t("wiki.audienceFollows", { folder: p.audienceFolder }) : t("wiki.restricted")}
+          </Chip>
+        )}
+        {p.canEdit === false && (
+          <Chip icon="eye" title={t("wiki.readOnlyHint")}>
+            {t("wiki.readOnly")}
           </Chip>
         )}
         {p.locked && (
