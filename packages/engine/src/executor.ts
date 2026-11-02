@@ -952,6 +952,8 @@ async function executeRunInner(
   if (backFromWait && channelRow && isAgentOnlyDm(channelRow)) {
     await announceConsultationChange({ db, pubsub: deps.pubsub }, run).catch(() => {});
   }
+  // Declared before `finished`: the early endings (standing, archived, no AI) read it before any turn.
+  let transcript = run.transcript as unknown as Transcript | null;
   /** Who thinks for this run (set before the first turn). */
   let brainPlan: BrainPlan | null = null;
   /** How its last turn ended (`decideTurnEnd`); every other way to `done` is recorded as `ended` (I2). */
@@ -1462,7 +1464,6 @@ async function executeRunInner(
       .set({ transcript: storedTranscript(t), updatedAt: new Date() })
       .where(eq(agentRuns.id, run.id));
 
-  let transcript = run.transcript as unknown as Transcript | null;
   // What the bridge kept stays on the row until taken (`takeBridgeEffects`); this copy never carries it.
   if (transcript) delete (transcript as unknown as Record<string, unknown>).bridgeEffects;
   // Resumed (its computer back, a decision, an answer): its teammates as they are after the wait.
