@@ -254,6 +254,29 @@ describe("messages in a row (ADR 0112)", () => {
     expect(Date.now() - fresh.createdAt.getTime()).toBeLessThan(1500);
   });
 
+  test("Parar or a shutdown during the quiet window ends the wait at once", async () => {
+    f = await setup();
+    const posted = await post("@dev oi");
+    const sent = await getMessage(f.db, f.org.id, posted.id);
+    if (!sent) throw new Error("not posted");
+    const stop = new AbortController();
+    setTimeout(() => stop.abort(), 100);
+    const start = Date.now();
+    await waitForBurst(f.db, sent, 5000, stop.signal);
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
+
+  test("a routed run never waits again: the router already waited for the burst", async () => {
+    f = await setup({ quietMs: 5000 });
+    await post("@dev oi");
+    const [queued] = await runs();
+    await f.db.update(schema.agentRuns).set({ trigger: "router" });
+    const start = Date.now();
+    await executeRun(f.jobDeps, queued?.id ?? "", { finalAttempt: true });
+    expect(Date.now() - start).toBeLessThan(2500);
+    expect((await runs())[0]?.status).toBe("done");
+  });
+
   test("an update sent while it works joins the run and becomes part of the request the judges hold the reply to", async () => {
     const requests: string[] = [];
     let dmId = "";

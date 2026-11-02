@@ -2417,8 +2417,15 @@ async function executeRunInner(
   });
   try {
     // A person who writes in a few messages gets one answer: what they add in the next seconds is read with the first.
-    if (deps.quietMs && run.turns === 0 && !run.background && triggerMessage?.authorType === "person") {
-      await waitForBurst(db, triggerMessage, deps.quietMs);
+    // A routed run skips it: the router already waited for the burst, its trigger is the last message of it.
+    if (
+      deps.quietMs &&
+      run.turns === 0 &&
+      !run.background &&
+      run.trigger !== "router" &&
+      triggerMessage?.authorType === "person"
+    ) {
+      await waitForBurst(db, triggerMessage, deps.quietMs, signal);
     }
     for (;;) {
       if (await isCanceled()) return stopCanceled("");

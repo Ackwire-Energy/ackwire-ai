@@ -17,12 +17,18 @@ export async function waitForBurst(
   db: Database,
   trigger: Pick<Message, "orgId" | "channelId" | "threadId" | "authorUserId" | "createdAt">,
   quietMs: number,
+  signal?: AbortSignal,
 ): Promise<void> {
   const author = trigger.authorUserId;
   if (!author || quietMs <= 0) return;
+  // Parar or a shutdown drain ends the wait at once: the run frees its slot instead of sitting out the window.
+  const aborted = signal
+    ? new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }))
+    : null;
   const from = trigger.createdAt.getTime();
   const cap = from + quietMs * BURST_MAX_WINDOWS;
   for (;;) {
+    if (signal?.aborted) return;
     // Message times come from the database's clock: the wait is measured on it too, never the app's.
     const [row] = await db
       .select({
@@ -44,6 +50,7 @@ export async function waitForBurst(
     const last = Math.max(from, row.latest || 0);
     const wait = Math.min(last + quietMs, cap) - row.now;
     if (wait <= 0) return;
-    await Bun.sleep(Math.min(wait, quietMs));
+    const nap = Bun.sleep(Math.min(wait, quietMs));
+    await (aborted ? Promise.race([nap, aborted]) : nap);
   }
 }
