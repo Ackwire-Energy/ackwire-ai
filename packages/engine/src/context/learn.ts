@@ -257,6 +257,8 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
         eq(agentRuns.threadRootId, run.threadRootId),
         inArray(agentRuns.status, [...ACTIVE]),
         sql`${agentRuns.id} <> ${run.id}`,
+        // Background work (ADR 0121) holds no conversation: a 40-minute work would block learning there.
+        isNull(agentRuns.workId),
       ),
     )
     .limit(1);

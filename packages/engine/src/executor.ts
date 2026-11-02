@@ -120,6 +120,7 @@ import {
   verdictRecord,
 } from "./continuation";
 import { modelInfoFor } from "./credentials";
+import { publishDelivery } from "./delivery";
 import { isAgentOnlyDm } from "./dms";
 import {
   BudgetExceededError,
@@ -138,7 +139,7 @@ import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
-import { answerNoTurn, listenLiveSteering, renderSteered } from "./live-steer";
+import { answerNoTurn, deliverLive, listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { MEDIA_TOOLS } from "./media";
@@ -168,6 +169,7 @@ import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
 import { type ReleaseReason, releaseHeldInbox, releaseInbox, takeInbox, whileHeld } from "./run-inbox";
+import { deliverNoticeToRun } from "./run-resume";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
   absorbBrowserCall,
@@ -247,6 +249,24 @@ import {
 } from "./usage-pause";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
+import { movedNote, queuedNote } from "./work-tools";
+import {
+  endWork,
+  moveToBackground,
+  pauseWorkTimer,
+  resumeWorkTimer,
+  takeLocalMove,
+  WORK_AUTO_AFTER_CALLS,
+  WORK_AUTO_AFTER_MS,
+  WORK_IN_BACKGROUND_TOOL,
+  WORK_JOB_YIELD_MS,
+  WORK_LIMITS,
+  wakeQueuedRun,
+  workEligible,
+  workQueued,
+  workQueueWaitId,
+  workTopic,
+} from "./works";
 
 const {
   agentActions,
@@ -290,6 +310,10 @@ export interface EngineDeps {
   tools?: ToolGateway;
   /** Model calls one run may make (tool loops). */
   maxToolTurns?: number;
+  /** Long work's safety net (ADR 0121 §1): active time and model calls before a person's run moves, and how often it looks. */
+  workAutoAfterMs?: number;
+  workAutoAfterCalls?: number;
+  workTickMs?: number;
   /**
    * How long a run started on a person's message waits for their next one before its first model call
    * (`waitForBurst`, `ROUTER_QUIET_MS` on a server); absent: no wait.
@@ -460,6 +484,8 @@ export interface Transcript {
   outage?: { since: number; n: number; waitId: string };
   /** When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else. */
   roomWaitSince?: number;
+  /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
+  activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
   /**
@@ -793,6 +819,16 @@ async function executeRunInner(
   prof.mark("claim");
   steerGate.close = answerNoTurn(deps.pubsub, run.id);
   const claimedAt = Date.now();
+  /** Active time across claims (waits excluded): what the long-work safety net counts (ADR 0121 §1). */
+  const activeBase = (run.transcript as unknown as Transcript | null)?.activeMs ?? 0;
+  const activeMs = () => activeBase + (Date.now() - claimedAt);
+  const saveActiveMs = () =>
+    db
+      .update(agentRuns)
+      .set({
+        transcript: sql`jsonb_set(coalesce(${agentRuns.transcript}, '{}'::jsonb), '{activeMs}', to_jsonb(${activeMs()}::bigint))`,
+      })
+      .where(eq(agentRuns.id, run.id));
   // Long work (ADR 0118) counts the calls of this claim: a person acting on the run starts a new one.
   const turnsAtClaim = run.turns;
   // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
@@ -802,10 +838,11 @@ async function executeRunInner(
     getChannelCached(db, run.orgId, run.channelId),
     topLevel ? getMessage(db, run.orgId, run.triggerMessageId) : Promise.resolve(null),
   ]);
-  const replyThreadId = replyThreadOf(run);
+  // Where it answers. Long work (ADR 0121) moves it to its anchor's thread mid-run (`adoptWork`).
+  let replyThreadId = replyThreadOf(run);
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
-  // Background work (a routine's run) says so: the apps keep it out of the conversation's "working" row.
-  const bg = run.background ? { background: true as const } : {};
+  // Background work (a routine's run, or long work) says so: the apps keep it out of the conversation's "working" row.
+  let bg: { background?: true } = run.background || run.workId ? { background: true as const } : {};
   if (!askingForRoom) {
     await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, {
@@ -864,6 +901,17 @@ async function executeRunInner(
       ...(error ? { error, ...runErrorDetail(error) } : {}),
       ...(outage ? { outage } : {}),
     });
+    // Long work (ADR 0121): a wait pauses its promise (the card that stopped it is the update); an end goes home.
+    if (run.workId) {
+      const workDeps = { db, pubsub: deps.pubsub };
+      if (status === "waiting_approval" || status === "waiting_input") {
+        await saveActiveMs().catch(() => {});
+        await pauseWorkTimer(workDeps, run).catch(() => {});
+      } else {
+        const [ended] = await db.select().from(agentRuns).where(eq(agentRuns.id, run.id));
+        if (ended) await endWork(workDeps, ended, status).catch(() => {});
+      }
+    }
     // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
     await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
     await publishChannelEvent(deps.pubsub, {
@@ -995,6 +1043,39 @@ async function executeRunInner(
     // A resumed run keeps the tools it started with (the list, and the prompt cache, stay the same).
     loadedGroups: (run.transcript as unknown as Transcript | null)?.toolGroups ?? null,
     ...(run.background ? { background: true } : {}),
+  };
+  /** Its long work (ADR 0121): where the report goes home. */
+  let workHome: { id: string; homeThreadId: string | null } | null = null;
+  const loadWorkHome = async () => {
+    if (!run.workId) return;
+    const [w] = await db
+      .select({ id: schema.agentWorks.id, homeThreadId: schema.agentWorks.homeThreadId })
+      .from(schema.agentWorks)
+      .where(eq(schema.agentWorks.id, run.workId));
+    workHome = w ?? null;
+  };
+  await loadWorkHome();
+  // Back to its long work after a wait (a person, its plan, its computer): the promise starts over (ADR 0121 §3).
+  if (backFromWait && run.workId) await resumeWorkTimer({ db, pubsub: deps.pubsub }, run).catch(() => {});
+  /**
+   * The run moved to the background (its own tool, the bridge's on another replica, or the safety net): from now on it
+   * answers in the work's thread, outside the conversation's working row, and its report goes home.
+   */
+  const adoptWork = async () => {
+    if (run.workId) return false;
+    const [row] = await db
+      .select({ workId: agentRuns.workId, threadRootId: agentRuns.threadRootId })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, run.id));
+    if (!row?.workId) return false;
+    run.workId = row.workId;
+    run.threadRootId = row.threadRootId;
+    ctx.threadRootId = row.threadRootId;
+    replyThreadId = replyThreadOf(run);
+    where.threadId = replyThreadId;
+    bg = { background: true };
+    await loadWorkHome();
+    return true;
   };
   const needsContext = !run.transcript;
   /** What the run's policy refused of the tools the agent's scopes grant: who is behind it held them back. */
@@ -1283,6 +1364,7 @@ async function executeRunInner(
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         react: tools.some((t) => t.name === REACT_TOOL),
         followUp: tools.some((t) => t.name === FOLLOW_UP_TOOL),
+        work: tools.some((t) => t.name === WORK_IN_BACKGROUND_TOOL),
         blocks: tools.some((t) => t.name === SHOW_BLOCK_TOOL),
         capabilities: [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
@@ -2557,6 +2639,36 @@ async function executeRunInner(
    * person), not more of the mission's work: read once.
    */
   let missionWork: boolean | null = null;
+  /** Long work past its caps (ADR 0121 §7) waits in line, parked like a usage wait; ending work releases it. */
+  const parkInWorkQueue = async () => {
+    const t = transcript as Transcript;
+    const workId = run.workId as string;
+    await deferred;
+    t.waitingForBrain = { kind: plan.kind, machineId: "", code: "work_queue", waitId: workQueueWaitId(workId) };
+    if (plan.kind !== "model" && nextPrompt) t.continued = { prompt: nextPrompt };
+    const moved = await transitionRun(db, run.id, "running", "waiting_input", {
+      transcript: storedTranscript(t),
+      waitingMachineId: null,
+    });
+    if (!moved) throw new PermanentJobError("run changed state while executing");
+    await publishChannelEvent(deps.pubsub, event("waiting_input"));
+    await finished("waiting_input");
+    // Released between the check and the park: it goes on now.
+    if (!(await workQueued(db, workId))) await wakeQueuedRun(db, run.orgId, run.id, workId, "parked");
+  };
+  /** An API-model work run hands its job back (the lease's ceiling): the next job resumes the transcript as it is. */
+  const yieldWorkJob = async () => {
+    await deferred;
+    await saveTranscript(db, transcript as Transcript);
+    await enqueue(db, {
+      orgId: run.orgId,
+      kind: "agent_run.execute",
+      payload: { runId: run.id },
+      dedupeKey: `agent_run.execute:${run.id}:yield:${Date.now()}`,
+      runAt: new Date(Date.now() + 10_000),
+      maxAttempts: 4,
+    });
+  };
   /** Long work at the pause line, unless Continuar agora let it go on or it may use the plan's extra usage. */
   const longWorkPause = async () => {
     const t = transcript as Transcript;
@@ -2566,7 +2678,8 @@ async function executeRunInner(
       missionWork = !(await personOfMessage(db, run.orgId, run.triggerMessageId).catch(() => null));
     const long = isLongWork({
       routine: run.background && !byHand,
-      mission: Boolean(missionWork),
+      // Background work (ADR 0121) is long work by kind.
+      mission: Boolean(missionWork) || Boolean(run.workId),
       pausedBefore: Boolean(t.usagePause?.paused),
       computer: plan.kind !== "model",
       calls: plan.kind === "model" ? run.turns - turnsAtClaim : computerTurns,
@@ -2619,6 +2732,49 @@ async function executeRunInner(
       }
     },
   });
+  // Long work (ADR 0121): a move made through the bridge on another replica is heard here; the safety net moves a
+  // person's run that is still in the conversation after a few minutes of work (or many calls), on every brain.
+  const offWork = deps.pubsub?.subscribe(workTopic(run.id), () => void adoptWork().catch(() => {}));
+  const autoAfterMs = deps.workAutoAfterMs ?? WORK_AUTO_AFTER_MS;
+  const autoAfterCalls = deps.workAutoAfterCalls ?? WORK_AUTO_AFTER_CALLS;
+  let autoMoving = false;
+  const autoMove = async () => {
+    if (autoMoving || run.workId) return;
+    if (activeMs() < autoAfterMs && run.turns < autoAfterCalls) return;
+    autoMoving = true;
+    if (autoTick) clearInterval(autoTick);
+    const [current] = await db.select().from(agentRuns).where(eq(agentRuns.id, run.id));
+    if (current?.status !== "running" || !(await workEligible(db, current))) return;
+    // No title given: the thread's, else the start of the ask.
+    const moved = await moveToBackground({ db, pubsub: deps.pubsub }, run.id, {
+      how: "auto",
+      title: "",
+      nextUpdateMin: WORK_LIMITS.nextDefault,
+    });
+    if (!moved) return;
+    await adoptWork();
+    later(() => addRunStep(db, run, "context", { work: { id: moved.work.id, how: "auto" } }));
+    // The note reaches the brain like a check-in: live on a steerable turn, else at its next step.
+    const at = { ...run, threadRootId: run.threadRootId };
+    const delivered = await db.transaction((tx) =>
+      deliverNoticeToRun(tx, at, {
+        kind: "work_check_in",
+        text: moved.queued ? queuedNote : movedNote(WORK_LIMITS.nextDefault),
+        refs: { workId: moved.work.id, kind: "moved" },
+      }),
+    );
+    await publishDelivery(deps.pubsub, delivered).catch(() => {});
+    if (deps.pubsub)
+      await deliverLive(
+        { db, pubsub: deps.pubsub },
+        { ...current, ...at },
+        { messageId: delivered.message.id, urgent: false },
+      );
+  };
+  const autoTick: ReturnType<typeof setInterval> | null =
+    run.background || run.workId || forum
+      ? null
+      : setInterval(() => void autoMove().catch(() => {}), deps.workTickMs ?? 5_000);
   try {
     // A person who writes in a few messages gets one answer: what they add in the next seconds is read with the first.
     // A routed run skips it: the router already waited for the burst, its trigger is the last message of it.
@@ -2645,6 +2801,11 @@ async function executeRunInner(
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
       }
+      // Long work (ADR 0121): a move its own tool made in this process is taken now; a work past its caps waits in
+      // line here, between steps; an API-model work hands its job back now and then (the job lease has a ceiling).
+      if (takeLocalMove(run.id)) await adoptWork();
+      if (run.workId && (await workQueued(db, run.workId))) return parkInWorkQueue();
+      if (run.workId && plan.kind === "model" && Date.now() - claimedAt > WORK_JOB_YIELD_MS) return yieldWorkJob();
       // Long work near its limit parks here, between steps: nothing is in flight and the next step reads on.
       const pause = await longWorkPause();
       if (pause) {
@@ -3462,13 +3623,22 @@ async function executeRunInner(
         }
         continue;
       }
+      // A move its tool made in this turn (a computer brain's, through the bridge): the report goes home.
+      if (takeLocalMove(run.id)) await adoptWork();
       const reply = await db.transaction(async (tx) => {
         // Told to wrap up near its cap, or found stuck twice: this is where it stands, and Continuar under it goes
         // on from here.
         const ended =
           t.stuck?.endAt !== undefined ? { stepLimit: { stuck: true } } : t.wrapUpNoted ? { stepLimit: {} } : {};
+        // Long work (ADR 0121): its report goes home, where it was asked, as a reply that notifies.
+        const home = workHome ? { workEnd: { id: workHome.id, status: "done" } } : {};
         const message = text
-          ? await post(tx, replyThreadId, text, withFallback(t, withCode({ ...takeMemoryUpdates(t), ...ended }, code)))
+          ? await post(
+              tx,
+              workHome ? workHome.homeThreadId : replyThreadId,
+              text,
+              withFallback(t, withCode({ ...takeMemoryUpdates(t), ...ended, ...home }, code)),
+            )
           : null;
         t.postedUpTo = t.messages.length;
         if (message) t.postedCount++;
@@ -3523,6 +3693,8 @@ async function executeRunInner(
     throw error;
   } finally {
     live.close();
+    offWork?.();
+    if (autoTick) clearInterval(autoTick);
   }
 }
 

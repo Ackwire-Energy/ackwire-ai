@@ -80,6 +80,7 @@ import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
+import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
 import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
@@ -640,6 +641,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A follow-up's time came: the agent is woken in its conversation (follow-through.ts).
     [FOLLOW_UP_JOB]: async (job) => {
       await wakeFollowUp(deps, orgOf(job), String(job.payload.messageId));
+    },
+    // A long work's promised update is due (ADR 0121 §3): a nudge, then the server's own line.
+    [WORK_CHECK_IN_JOB]: async (job) => {
+      await checkInWork(deps, orgOf(job), {
+        workId: String(job.payload.workId),
+        seq: Number(job.payload.seq),
+        phase: job.payload.phase === "fallback" ? "fallback" : "nudge",
+      });
     },
     "secret.activate": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");

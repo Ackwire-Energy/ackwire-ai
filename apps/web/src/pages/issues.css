@@ -360,6 +360,69 @@ html:not([data-pointer]) .issue-card:focus-visible {
 .issue-card[data-status="canceled"] .issue-card__title {
   color: var(--muted);
 }
+/* Background work on its card (ADR 0121): the blocked badge, the agent's plan and its last update. */
+.issue-card__work {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.issue-card__blocked {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
+}
+.issue-card__plan {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.issue-card__plan-head {
+  font-weight: 600;
+  color: var(--faint);
+}
+.issue-card__step {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  color: var(--ink2);
+}
+.issue-card__step[data-state="todo"] {
+  color: var(--muted);
+}
+.issue-card__step[data-state="done"] {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.issue-card__step-mark {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+  transform: translateY(-1px);
+}
+.issue-card__step[data-state="doing"] .issue-card__step-mark {
+  background: var(--agent);
+  box-shadow: none;
+}
+.issue-card__step[data-state="done"] .issue-card__step-mark {
+  background: var(--ok);
+  box-shadow: none;
+}
+.issue-card__update {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.issue-card__update b {
+  color: var(--ink2);
+  font-weight: 600;
+}
 .issue-card__foot {
   display: flex;
   align-items: center;

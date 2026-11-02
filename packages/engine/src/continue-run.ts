@@ -6,10 +6,12 @@ import { canceledBy, mayStopRun, runRequester } from "./cancel";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { continuedTranscript, type Transcript } from "./executor";
+import { setWorkIssueState } from "./issues";
 import { getMessage } from "./messages";
 import { requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { ACTIVE_RUN_STATUSES, takeInbox } from "./run-inbox";
+import { announceWork, reopenWork, updatesThreadOf } from "./works";
 
 const { agentRuns, agents, messages, channels, users } = schema;
 
@@ -62,8 +64,12 @@ export async function continueRun(
   const ended = reply?.meta[ending] as { continuedRunId?: unknown } | undefined;
   if (!reply || reply.deletedAt || !ended || ended.continuedRunId) throw notContinuable();
 
-  // The new run answers where the stopped reply is: its thread, or (flat: a DM) the reply itself.
-  const threadRootId = reply.threadId ?? reply.id;
+  // The new run answers where the stopped reply is: its thread, or (flat: a DM) the reply itself. Long work (ADR 0121)
+  // goes on in its own thread, as the same work.
+  const [work] = stopped.workId
+    ? await db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, stopped.workId))
+    : [];
+  const threadRootId = (work ? updatesThreadOf(work) : null) ?? reply.threadId ?? reply.id;
   const roots = [...new Set([stopped.threadRootId, threadRootId])];
   // A DM is one conversation; a channel's are its threads.
   const inConversation = row.channelKind === "dm" ? undefined : inArray(agentRuns.threadRootId, roots);
@@ -110,10 +116,12 @@ export async function continueRun(
         issueId: stopped.issueId,
         // A computer brain resumes the session it was stopped in.
         brainSessionId: stopped.brainSessionId,
+        workId: stopped.workId,
       })
       .onConflictDoNothing()
       .returning({ id: agentRuns.id });
     if (!inserted) return false;
+    if (work) await reopenWork(tx, work.id);
     const mark = JSON.stringify({ continuedRunId: newRunId, continuedByUserId: userId });
     await tx
       .update(messages)
@@ -138,6 +146,10 @@ export async function continueRun(
     return true;
   });
   if (!created) throw notContinuable();
+  if (work) {
+    if (work.issueId) await setWorkIssueState(deps, work, {}).catch(() => null);
+    await announceWork(deps.pubsub, db, orgId, work.id).catch(() => {});
+  }
 
   const where = { channelId: stopped.channelId, threadId: reply.threadId, agentId: stopped.agentId };
   await publishChannelEvent(deps.pubsub, {

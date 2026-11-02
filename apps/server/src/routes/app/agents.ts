@@ -508,12 +508,20 @@ export function agentRoutes(deps: AppDeps) {
                         "waiting_plan",
                         "waiting_budget",
                         "provider_down",
+                        "work",
                       ])
                       .nullable()
                       .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
                     subject: z.string().nullable(),
                     emoji: z.string().nullable(),
                     until: z.string().nullable(),
+                    since: z.string().optional().openapi({ description: "Background work: since when." }),
+                    count: z.number().optional().openapi({ description: "Background work: how many at once." }),
+                    second: z.string().nullable().optional().openapi({ description: "A second work's title." }),
+                    wait: z
+                      .enum(["approval", "answer", "plan", "computer", "line"])
+                      .optional()
+                      .openapi({ description: "One background work that waits: on what." }),
                   })
                   .nullable(),
                 activeAt: z.string().nullable(),

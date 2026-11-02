@@ -15,6 +15,7 @@ import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 import { standingErrorDetail } from "./standing";
+import { endWork } from "./works";
 
 const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels, machines } = schema;
 
@@ -310,6 +311,8 @@ export async function stopRun(
   // The worker running it (here or on another instance) aborts and posts what was written.
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
+  // Long work (ADR 0121): its end goes home now ("Parado por …"), whoever runs it; the card goes back to A fazer.
+  if (run.workId) await endWork(deps, run, "canceled").catch(() => null);
   // A routine's background run is stopped quietly (ADR 0053 §6.7): nothing in a conversation, its ledger
   // ends `canceled` with who stopped it. Any other stop of it (a pause, a delete, the next slot) is closed
   // by whoever stopped it, with its own reason.

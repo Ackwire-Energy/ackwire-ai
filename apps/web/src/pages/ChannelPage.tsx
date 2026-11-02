@@ -213,6 +213,7 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
+import { MessageWorkLine } from "@/components/BackgroundWork";
 import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/browser/BrowserCard";
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
@@ -3742,6 +3743,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
             />
           )}
+          {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
+          {m.longWork && !m.local && <MessageWorkLine message={m} />}
           {/* A "Responder" thread went on from here: its line (opens the panel). */}
           {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
           {feedback && (

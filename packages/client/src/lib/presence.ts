@@ -8,6 +8,7 @@ import type {
   MemberPresence,
   MemberStatus,
 } from "../api/types";
+import { workStatusText } from "./long-work";
 
 /**
  * Presence and written status (ADR 0084), platform-neutral: what you pick, the suggestions, when a status
@@ -103,12 +104,14 @@ export const AGENT_KIND_EMOJI: Record<AgentStatusKind, string> = {
   waiting_plan: "⏳",
   waiting_budget: "⏳",
   provider_down: "⚠️",
+  work: "🛠️",
 };
 
 /** An agent's line in words (its own, or the server's kind worded in the app's language), with its emoji. */
 export function agentStatusText(t: TFunction, line: AgentStatusLine): { emoji: string; text: string } | null {
   if (line.text) return { emoji: line.emoji ?? AGENT_KIND_EMOJI.task, text: line.text };
   if (!line.kind) return null;
+  if (line.kind === "work") return { emoji: line.emoji ?? AGENT_KIND_EMOJI.work, text: workStatusText(t, line) };
   return {
     emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind],
     text: t(`presence.agent.${line.kind}`, { subject: line.subject ?? "" }),

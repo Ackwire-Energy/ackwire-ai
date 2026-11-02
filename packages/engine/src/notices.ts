@@ -27,7 +27,8 @@ export type NoticeKind =
   | "proposal_result"
   | "poll_result"
   | "follow_up"
-  | "wake_skipped";
+  | "wake_skipped"
+  | "work_check_in";
 
 /**
  * Notices only for the agent they are for: another agent's note, the late result of a wait it stopped waiting on, what
@@ -40,6 +41,7 @@ export const AGENT_ONLY_NOTICES: readonly NoticeKind[] = [
   "wait_result",
   "proposal_result",
   "poll_result",
+  "work_check_in",
 ];
 
 /** Whether a message is a notice only its agent reads (`AGENT_ONLY_NOTICES`). */
@@ -141,6 +143,8 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       return `[You already told them, while you worked]: ${n.text}`;
     case "wake_skipped":
       return `[Not woken]: ${n.text}`;
+    case "work_check_in":
+      return `[Your background work]: ${n.text}`;
     case "follow_up": {
       const at = n.refs?.at ?? "";
       if (n.refs?.wake)

@@ -324,7 +324,8 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     background: boolean | string;
   }>(
     await db.execute(sql`select r.id, r.agent_id, r.status, r.thread_root_id, r.trigger_message_id, r.started_at,
-        r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending, r.background
+        r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending,
+        (r.background or r.work_id is not null) as background
       from ${agentRuns} r join ${channels} c on c.id = r.channel_id
       where r.org_id = ${orgId}::uuid and r.channel_id = ${channelId}::uuid
         and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
@@ -344,7 +345,7 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     createdAt: iso(r.created_at) as string,
     // Sent while it works and not read yet ("lê na próxima pausa"); the rest it already read.
     pendingMessageIds: pendingIds(r.pending),
-    // A routine's work: it holds no conversation (people's messages never go to it).
+    // A routine's work, or long work (ADR 0121): it holds no conversation's working row.
     background: r.background === true || r.background === "t",
   }));
 }

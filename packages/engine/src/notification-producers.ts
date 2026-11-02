@@ -139,6 +139,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
   // Only for its agent: people never see it.
   if (isAgentOnlyNotice(meta)) return;
+  // A long work's progress line (ADR 0121) never pushes: it counts as unread only for who follows its thread.
+  if (meta.workUpdate) return;
   const [channel] = await db
     .select({ kind: channels.kind, name: channels.name, visibility: channels.visibility })
     .from(channels)
@@ -182,13 +184,18 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (
     asker &&
     !message.mentionedUserIds.includes(asker) &&
+    // A work the person stopped themselves tells them nothing new.
+    (meta.workEnd as { byUserId?: unknown } | undefined)?.byUserId !== asker &&
     (ownerSees || (await inChannel(deps, message.channelId, [asker])).length > 0)
   ) {
+    // A long work's report (ADR 0121) is news of its own, never merged into the conversation's open reply.
+    const workEnd = (meta.workEnd as { id?: unknown } | undefined)?.id;
     await notify(deps, {
       orgId,
       userIds: [asker],
       kind: "agent_reply",
-      groupKey: agentReplyGroup(message.channelId, message.threadId),
+      groupKey:
+        typeof workEnd === "string" ? `work_end:${workEnd}` : agentReplyGroup(message.channelId, message.threadId),
       actor,
       source: { ...where, ...(label ? { label } : {}) },
       latest,

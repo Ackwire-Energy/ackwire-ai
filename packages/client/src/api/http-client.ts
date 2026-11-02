@@ -1064,6 +1064,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       get: (orgId, number) => request<Issue>(`${org(orgId)}/issues/by-number/${number}`),
       create: (orgId, input) => request<Issue>(`${org(orgId)}/issues`, { json: input }),
       update: (orgId, id, patch) => request<Issue>(`${org(orgId)}/issues/${enc(id)}`, { method: "PATCH", json: patch }),
+      share: (orgId, id) => request<Issue>(`${org(orgId)}/issues/${enc(id)}/share`, { method: "POST" }),
       setCriterion: (orgId, id, criterionId, done) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/criteria/${enc(criterionId)}`, {
           method: "PUT",
