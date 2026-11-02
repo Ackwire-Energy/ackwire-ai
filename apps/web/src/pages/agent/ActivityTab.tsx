@@ -308,7 +308,7 @@ export function ActivityTab() {
                       <li key={r.id} className="agp-run">
                         <time dateTime={r.createdAt}>{formatTime(locale, r.createdAt)}</time>
                         <span className="agp-run__t">
-                          <b>{r.what || t("agent.runNoText")}</b>
+                          <b>{r.private ? t("agent.runPrivate") : r.what || t("agent.runNoText")}</b>
                           <span className="agp-chips">
                             <RunChip run={r} />
                             <Chip icon={x.where.startsWith("#") ? "channel" : "person"}>

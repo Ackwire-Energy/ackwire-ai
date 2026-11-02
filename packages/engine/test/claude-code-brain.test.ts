@@ -169,7 +169,7 @@ test("before a chat turn: the agent's checkouts set where it starts and add # Yo
   const pubsub = createMemoryPubSub();
   const { hub, calls } = fakeHub(pubsub);
   const seen: BrainTurn[] = [];
-  const brain = (prepare: (t: BrainTurn) => Promise<{ cwd: string; prompt: string } | null>) =>
+  const brain = (prepare: (t: BrainTurn) => Promise<{ cwd: string; prompt: string; start?: string } | null>) =>
     createClaudeCodeBrain({
       hub,
       pubsub,
@@ -184,6 +184,7 @@ test("before a chat turn: the agent's checkouts set where it starts and add # Yo
     brain(async () => ({
       cwd: "repos/acme/app",
       prompt: "# Your code\nacme/app is checked out at /w/repos/acme/app",
+      start: "You start in /w/repos/acme/app.",
     })).run(turn(), io()),
   );
   expect(seen).toHaveLength(1);
@@ -191,12 +192,23 @@ test("before a chat turn: the agent's checkouts set where it starts and add # Yo
     cwd: "repos/acme/app",
     system: "You are dev.\n\n# Your code\nacme/app is checked out at /w/repos/acme/app",
   });
+  // Where it starts is the turn's, not the session's system text.
+  expect((calls[0]?.request as { prompt?: string } | undefined)?.prompt).toStartWith("You start in /w/repos/acme/app.");
+  // A sync the engine already started (during the quiet window) is used as it is: none starts here.
+  await collect(
+    brain(async () => null).run(
+      { ...turn(), code: Promise.resolve({ cwd: "repos/acme/web", prompt: "# Your code\nweb", start: "" }) },
+      io(),
+    ),
+  );
+  expect(seen).toHaveLength(1);
+  expect(calls[1]?.request).toMatchObject({ cwd: "repos/acme/web", system: "You are dev.\n\n# Your code\nweb" });
   await collect(
     brain(async () => {
       throw new Error("offline");
     }).run(turn(), io()),
   );
-  expect(calls[1]?.request).toMatchObject({ cwd: "", system: "You are dev." });
+  expect(calls[2]?.request).toMatchObject({ cwd: "", system: "You are dev." });
 });
 
 test("a new session reads the conversation so far, not only the message that called it", async () => {

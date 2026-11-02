@@ -83,8 +83,8 @@ export async function missingPermissions(ctx: Pick<ToolContext, "db" | "orgId" |
  * `request_permission`: an agent that lacks something a request needs asks
  * for it instead of failing. Always an approval (the existing card, "Esperando
  * você", push); approving turns it on for the agent (a connector: all its
- * tools, sensitive ones still ask every time). Only admins decide
- * (`adminsDecide` in approvals.ts), the same people who give it access. Always listed (an
+ * tools, sensitive ones still ask every time). Only those who give it access on the agent's page decide
+ * (`decidingKeys` in approvals.ts), and the grant is theirs. Always listed (an
  * approved card still finds it once nothing is missing), with what is.
  */
 export function createPermissionToolSource(): ToolSource {
@@ -130,13 +130,25 @@ export function createPermissionToolSource(): ToolSource {
             return {
               content: `Nothing to turn on: ${labels.get(id) ?? id} is already on for you, or no longer exists.`,
             };
+          // The person who approved the card gave it, as on the agent's page.
+          const [approval] = await c.db
+            .select({ by: schema.approvals.decidedByUserId })
+            .from(schema.approvals)
+            .where(and(eq(schema.approvals.runId, c.runId), eq(schema.approvals.toolUseId, c.toolUseId ?? "")));
+          const by = approval?.by ?? null;
           if (wanted.profileId) {
-            await grantBrowserProfile(c.db, c.orgId, wanted.profileId, c.agentId, { type: "agent", id: c.agentId });
+            await grantBrowserProfile(
+              c.db,
+              c.orgId,
+              wanted.profileId,
+              c.agentId,
+              by ? { type: "person", id: by } : { type: "agent", id: c.agentId },
+            );
             return {
               content: `Turned on: ${wanted.label}. Switch to it with browser_profile; carry on with the request.`,
             };
           }
-          await grantScopes(c.db, c.orgId, c.agentId, [{ connectionId: wanted.connectionId, scope: wanted.scope }]);
+          await grantScopes(c.db, c.orgId, c.agentId, [{ connectionId: wanted.connectionId, scope: wanted.scope }], by);
           return {
             content: `Turned on: ${wanted.label}. Its tools are yours from your next step; carry on with the request.`,
           };

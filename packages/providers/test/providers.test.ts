@@ -38,6 +38,15 @@ describe("pricing", () => {
     expect(costNanoUsd("claude-sonnet-5-5", usage(0, 0, 1_000_000))).toBe(usdToNanoUsd(0.1));
   });
 
+  test("1-hour cache writes cost twice the input price, and reservations allow for them", () => {
+    // Opus 5.5: $4 input, $5 per million for 5-minute writes, $8 for 1-hour ones.
+    const written = { ...usage(0, 0, 0, 1_000_000), cacheWriteLongTokens: 800_000 };
+    expect(costNanoUsd("claude-opus-5-5", written)).toBe(usdToNanoUsd(0.2 * 5 + 0.8 * 8));
+    expect(maxCostNanoUsd("claude-opus-5-5", 1000, 0)).toBe(1000 * 5000);
+    expect(maxCostNanoUsd("claude-opus-5-5", 1000, 0, true)).toBe(1000 * 8000);
+    expect(outputTokensWithin("claude-opus-5-5", 1000, 1000 * 8000, true)).toBe(0);
+  });
+
   test("Haiku 5.5 switches to long-context prices above 100K prompt tokens", () => {
     expect(costNanoUsd("claude-haiku-5-5", usage(100_000, 1000))).toBe(100_000 * 100 + 1000 * 500);
     expect(costNanoUsd("claude-haiku-5-5", usage(90_000, 1000, 20_000))).toBe(90_000 * 500 + 1000 * 2500 + 20_000 * 50);

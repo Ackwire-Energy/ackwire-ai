@@ -1,8 +1,9 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { managesChannel } from "./channels";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { can, requireActiveMembership, requirePermission } from "./organizations";
+import { requireActiveMembership, requirePermission } from "./organizations";
 
 const { channelCategories, channels } = schema;
 
@@ -272,7 +273,7 @@ export async function placeChannel(
       ),
     );
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+  if (!(await managesChannel(db, membership, actorId, channel))) {
     throw new ForbiddenError("Only the channel's creator or an admin can move it");
   }
   if (input.categoryId) await requireCategory(db, orgId, input.categoryId);

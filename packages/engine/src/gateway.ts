@@ -74,6 +74,8 @@ export interface GatewayCall {
   tools?: ToolSpec[];
   /** How hard the model thinks (set by "Automático"); absent: the provider's default. */
   effort?: ModelRequest["effort"];
+  /** How long the stable prefix stays cached (`ModelRequest.cacheTtl`); absent: 5 minutes. */
+  cacheTtl?: ModelRequest["cacheTtl"];
   onDelta(text: string): void;
   signal?: AbortSignal;
 }
@@ -271,6 +273,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       outputTokens: p.outputTokens ?? estimateTokens(p.outputChars),
       cacheReadTokens: p.cacheReadTokens,
       cacheWriteTokens: p.cacheWriteTokens,
+      ...(p.cacheWriteLongTokens ? { cacheWriteLongTokens: p.cacheWriteLongTokens } : {}),
     };
   }
 
@@ -328,6 +331,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     model: string,
     promptTokens: number,
     maxTokens: number,
+    longCache = false,
   ): Promise<{
     reservation: Pick<typeof budgetReservations.$inferSelect, "id" | "agentId" | "periodStart"> | null;
     maxTokens: number;
@@ -337,7 +341,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     const at = now();
     const period = periodOf(at);
     // Fast path, one statement: the worst case fits under the budget → reserve it atomically.
-    const amount = maxCostNanoUsd(model, promptTokens, maxTokens);
+    const amount = maxCostNanoUsd(model, promptTokens, maxTokens, longCache);
     const id = Bun.randomUUIDv7();
     const fast = rowsOf<{ ok: number }>(
       await db.execute(sql`with upd as (
@@ -394,7 +398,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       let cap = maxTokens;
       if (agent.monthlyBudgetNanoUsd !== null) {
         const left = agent.monthlyBudgetNanoUsd - row.spentNanoUsd - reserved;
-        cap = Math.min(maxTokens, outputTokensWithin(model, promptTokens, left));
+        cap = Math.min(maxTokens, outputTokensWithin(model, promptTokens, left, longCache));
         if (left <= 0 || cap < Math.min(MIN_OUTPUT_TOKENS, maxTokens)) {
           if (expired.length > 0)
             await tx
@@ -405,11 +409,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           const byReservations =
             reserved > 0 &&
             room > 0 &&
-            outputTokensWithin(model, promptTokens, room) >= Math.min(MIN_OUTPUT_TOKENS, maxTokens);
+            outputTokensWithin(model, promptTokens, room, longCache) >= Math.min(MIN_OUTPUT_TOKENS, maxTokens);
           throw new BudgetExceededError(agent.id, row.spentNanoUsd, agent.monthlyBudgetNanoUsd, byReservations);
         }
       }
-      const amount = maxCostNanoUsd(model, promptTokens, cap);
+      const amount = maxCostNanoUsd(model, promptTokens, cap, longCache);
       const [reservation] = await tx
         .insert(budgetReservations)
         .values({
@@ -601,18 +605,25 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         maxTokens: capOf(call.maxTokens, info),
         tools: call.tools,
         ...(call.effort ? { effort: call.effort } : {}),
+        ...(call.cacheTtl ? { cacheTtl: call.cacheTtl } : {}),
         signal: call.signal,
       };
       // Conservative prompt estimate (3 chars/token) so the reservation is an upper bound in practice.
       const promptTokens = Math.ceil(promptChars(request) / 3);
-      const { reservation, maxTokens } = await reserve(agent, agent.model, promptTokens, request.maxTokens).catch(
-        async (error: unknown) => {
-          // The refusal itself is when the budget ran out for the owner (spend rarely crosses it on a call).
-          if (error instanceof BudgetExceededError && !error.byReservations)
-            await budgetExhausted(agent, error.spentNanoUsd).catch(() => {});
-          throw error;
-        },
-      );
+      // Only Claude's own API is asked for (and bills) 1-hour writes at our catalog prices; OpenRouter reports its cost.
+      const longCache = request.cacheTtl === "1h" && providerId === "anthropic";
+      const { reservation, maxTokens } = await reserve(
+        agent,
+        agent.model,
+        promptTokens,
+        request.maxTokens,
+        longCache,
+      ).catch(async (error: unknown) => {
+        // The refusal itself is when the budget ran out for the owner (spend rarely crosses it on a call).
+        if (error instanceof BudgetExceededError && !error.byReservations)
+          await budgetExhausted(agent, error.spentNanoUsd).catch(() => {});
+        throw error;
+      });
       request.maxTokens = maxTokens;
 
       let result: ModelResult;
