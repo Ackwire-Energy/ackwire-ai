@@ -12,7 +12,7 @@ import { isAgentOnlyDm } from "./dms";
 import { ForbiddenError } from "./errors";
 import { cutText } from "./format";
 import { ROUTINE_REPORT, routineReportOf } from "./routine-brief";
-import { HOOK_METHODS } from "./routine-hooks";
+import { HOOK_METHODS, routineHookKeys } from "./routine-hooks";
 import {
   cancelReminder,
   createReminder,
@@ -120,15 +120,16 @@ const sameText = (a: string, b: string) =>
   a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
 
 /**
- * The agent's active routine in this conversation with the same instructions,
- * if any: asking twice (an interrupted run asked again, a repeated message)
- * must not schedule the same job twice.
+ * The agent's active routine in this conversation (or, `dmWith`, in a direct message with that person) with the
+ * same instructions, if any: asking twice (an interrupted run asked again, a repeated message) must not schedule
+ * the same job twice.
  */
 async function sameRoutine(
   ctx: ToolContext,
   agentId: string,
   conv: { channelId: string; threadId: string | null },
   prompt: string,
+  dmWith: string | null = null,
 ) {
   const { routines } = schema;
   const rows = await ctx.db
@@ -147,13 +148,16 @@ async function sameRoutine(
         eq(routines.agentId, agentId),
         eq(routines.active, true),
         isNull(routines.deletedAt),
-        sql`${routines.target}->>'channelId' = ${conv.channelId}`,
+        dmWith
+          ? and(sql`${routines.target}->>'type' = 'dm'`, eq(routines.createdByUserId, dmWith))
+          : sql`${routines.target}->>'channelId' = ${conv.channelId}`,
       ),
     );
   return (
     rows.find(
       (r) =>
-        ((r.target as { threadId?: string | null }).threadId ?? null) === conv.threadId && sameText(r.prompt, prompt),
+        (dmWith || ((r.target as { threadId?: string | null }).threadId ?? null) === conv.threadId) &&
+        sameText(r.prompt, prompt),
     ) ?? null
   );
 }
@@ -442,6 +446,10 @@ async function inConversation(ctx: ToolContext, agentId: string, channelId: stri
   return Boolean(row);
 }
 
+/** The refusals that mean the person doesn't manage the agent's routines (others, like taking it over first, say their own). */
+const notManager = (error: unknown) =>
+  error instanceof ForbiddenError && (error.code === "forbidden" || error.code === "routine.editor_only");
+
 /** Why the person may not set up or change another agent's routine, and what to offer instead. */
 const notTheirs = (handle: string, error: unknown): ToolOutput => ({
   content: `Not done: the person who asked can't manage @${handle}'s routines (${error instanceof Error ? error.message : String(error)}). Only an admin, @${handle}'s owner or, for an existing routine, who created it can. Tell the person that plainly and offer another way: a routine on you that asks @${handle} each run, or asking an admin or @${handle}'s owner to set it up.`,
@@ -621,7 +629,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               : await conversationOf(ctx);
           // Another agent that isn't in this conversation reports to the person directly.
           const direct = !channel && performer.handle && !(await inConversation(ctx, performer.id, conv.channelId));
-          const existing = await sameRoutine(ctx, performer.id, conv, str(input.prompt));
+          const existing = await sameRoutine(ctx, performer.id, conv, str(input.prompt), direct ? requester : null);
           if (existing) {
             const next = existing.nextRunAt ? describeWhen(existing.nextRunAt, existing.timezone ?? "UTC") : "";
             return {
@@ -641,7 +649,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             trigger,
             report: routineReportOf(input.report),
           }).catch((error) => {
-            if (performer.handle && error instanceof ForbiddenError) return notTheirs(performer.handle, error);
+            if (performer.handle && notManager(error)) return notTheirs(performer.handle, error);
             throw error;
           });
           if ("content" in routine) return routine;
@@ -678,7 +686,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "list_routines",
       description:
-        "List routines (recurring, not reminders): yours by default; another agent's with `agent` (its handle, e.g. @atlas), or every agent's with `agent: \"all\"`, to check what they do before you answer about them. Shows each one's state (active, paused and why, running, waiting for its computer, failing), when it runs and its next run, where it reports, its instructions and its last 5 runs with their coded outcome (reported, silent, failed, skipped… and why). `id` shows one in full. Read only: you change only your own routines, when a person asks.",
+        "List routines (recurring, not reminders): yours by default; another agent's with `agent` (its handle, e.g. @atlas), or every agent's with `agent: \"all\"`, to check what they do before you answer about them. Shows each one's state (active, paused and why, running, waiting for its computer, failing), when it runs and its next run, where it reports, its instructions and its last 5 runs with their coded outcome (reported, silent, failed, skipped… and why). `id` shows one in full. Read only: to change one when a person asks (yours, or another agent's the person may manage), use update_routine.",
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -805,6 +813,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           if (never) return never;
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
           const owner = own.row.agentId;
+          const methodsOf = async () => (await routineHookKeys(ctx.db, [id])).get(id)?.methods ?? null;
+          const methodsBefore = await methodsOf();
           const routine = await updateRoutine(routineDeps(ctx), requester, ctx.orgId, id, {
             ...(str(input.agent).trim() && performer.id !== owner ? { agentId: performer.id } : {}),
             ...(channel ? { target: channel.target } : {}),
@@ -814,7 +824,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ...(input.report !== undefined ? { report: routineReportOf(input.report) } : {}),
             ...(typeof input.active === "boolean" ? { active: input.active } : {}),
           }).catch(async (error) => {
-            if (!(error instanceof ForbiddenError)) throw error;
+            if (!notManager(error)) throw error;
             const [other] =
               owner === ctx.agentId
                 ? []
@@ -828,15 +838,23 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           });
           if ("content" in routine) return routine;
           const afterRow = await routineRow(ctx.db, ctx.orgId, id);
+          let receipt = false;
           if (afterRow) {
-            const was = routineSnapshot(own.row);
-            const now = routineSnapshot(afterRow);
+            const was: Record<string, unknown> = routineSnapshot(own.row);
+            const now: Record<string, unknown> = routineSnapshot(afterRow);
+            // The methods its address answers live with the address: compared (and undone) when it had one already.
+            const methodsAfter = await methodsOf();
+            if (methodsBefore && methodsAfter) {
+              was.methods = methodsBefore;
+              now.methods = methodsAfter;
+            }
             const fields = Object.keys(now).filter((k) => JSON.stringify(was[k]) !== JSON.stringify(now[k]));
             if (fields.length > 0) {
+              receipt = true;
               const words = [
                 ...new Set(
                   fields.map((f) =>
-                    ["triggerType", "phrase", "cron", "timezone", "description", "event", "rule"].includes(f)
+                    ["triggerType", "phrase", "cron", "timezone", "description", "event", "rule", "methods"].includes(f)
                       ? "schedule"
                       : f,
                   ),
@@ -863,7 +881,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           }
           return {
             content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${needsText(routine)}${
-              trigger?.type === "webhook" ? WEBHOOK_HINT : ""
+              trigger?.type === "webhook" && receipt ? WEBHOOK_HINT : ""
             }`,
             data: { routine: { id: routine.id } },
           };

@@ -45,15 +45,16 @@ export function canUndoAction(
 }
 
 /**
- * The webhook routine whose address a receipt offers to copy ("Copiar endereço do webhook"): one the agent created,
- * for the person it worked for or whoever manages routines (the server checks it again). Null for any other receipt.
+ * The webhook routine whose address a receipt offers to copy ("Copiar endereço do webhook"): one the agent created or
+ * changed into (or within) a webhook routine, for the person it worked for or whoever manages routines (the server
+ * checks it again). Null for any other receipt.
  */
 export function hookToCopy(
   a: Pick<AgentAction, "kind" | "params" | "target" | "requestedByUserId" | "undoneAt">,
   viewer: { userId: string | null; managesRoutines: boolean },
 ): string | null {
-  if (a.kind !== "routine.created" || a.params.trigger !== "webhook" || a.target.type !== "routine" || a.undoneAt)
-    return null;
+  const made = a.kind === "routine.created" || a.kind === "routine.updated";
+  if (!made || a.params.trigger !== "webhook" || a.target.type !== "routine" || a.undoneAt) return null;
   return a.requestedByUserId === viewer.userId || viewer.managesRoutines ? a.target.id : null;
 }
 

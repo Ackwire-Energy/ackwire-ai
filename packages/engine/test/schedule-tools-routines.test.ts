@@ -190,7 +190,8 @@ describe("schedule tools: routines", () => {
       prompt: "Poste works.",
       schedule: "toda segunda às 9h",
     });
-    expect(refused).toMatchObject({ isError: true, content: expect.stringContaining("can't manage @theo's routines") });
+    expect(refused.isError).toBe(true);
+    expect(refused.content).toContain("can't manage @theo's routines");
     expect(refused.content).toContain("offer another way");
     expect(
       await call("create_routine", { agent: "@nobody", prompt: "x", schedule: "toda segunda às 9h" }),
@@ -237,6 +238,73 @@ describe("schedule tools: routines", () => {
     const refused = await asked("update_routine", { id, title: "Outro nome" });
     expect(refused.isError).toBe(true);
     expect((await routineOf(id)).name).toBe("Avisar no general");
+  });
+
+  test("asked twice for another agent's routine that reports by DM, the first one is found, not a second made", async () => {
+    f = await setup();
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo", role: "Ops", instructions: "Post updates.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const call = await tools(f, await runContext(f));
+    const ask = { agent: "@theo", prompt: 'Poste "works" no #general.', trigger: { type: "webhook" } };
+    const made = await call("create_routine", ask);
+    const again = await call("create_routine", ask);
+    expect(again.content).toContain("already exists");
+    expect(again.data).toMatchObject({
+      existing: true,
+      routine: { id: (made.data?.routine as { id: string } | undefined)?.id },
+    });
+    expect(await f.db.select().from(schema.routines).where(eq(schema.routines.prompt, ask.prompt))).toHaveLength(1);
+  });
+
+  test("changing only the methods a webhook answers leaves a receipt with the copy button's data, and Undo brings them back", async () => {
+    f = await setup();
+    const ctx = await runContext(f);
+    const call = await tools(f, ctx);
+    const made = await call("create_routine", { prompt: "Poste works.", trigger: { type: "webhook" } });
+    const id = (made.data?.routine as { id: string } | undefined)?.id ?? "";
+    const out = await call("update_routine", { id, trigger: { type: "webhook", methods: ["GET", "POST"] } });
+    expect(out.content).toContain("copy it with the button");
+    const receipt = (await receipts(ctx.runId)).find((r) => r.kind === "routine.updated");
+    expect(receipt?.params).toMatchObject({ fields: ["schedule"], trigger: "webhook", methods: ["GET", "POST"] });
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, receipt?.id ?? "");
+    const [stored] = await f.db.select().from(schema.routineHooks).where(eq(schema.routineHooks.routineId, id));
+    expect(stored?.methods).toEqual(["POST"]);
+    // Nothing changed: no receipt, so no word about a button.
+    const same = await call("update_routine", { id, trigger: { type: "webhook", methods: ["POST"] } });
+    expect(same.content).not.toContain("copy it with the button");
+  });
+
+  test("an admin changing what a routine someone else created does is told to take it over, not that they can't manage it", async () => {
+    f = await setup();
+    const made = await (await tools(f, await runContext(f)))("create_routine", {
+      prompt: "Veja os PRs abertos.",
+      schedule: "toda segunda às 9h",
+    });
+    const id = (made.data?.routine as { id: string } | undefined)?.id ?? "";
+    expect(id).not.toBe("");
+    const ana = await addMember(f.db, f.org.id, "admin", "ana");
+    const out = await (await tools(f, await runContext(f, "person", ana.id)))("update_routine", {
+      id,
+      prompt: "Outra coisa.",
+    });
+    expect(out.isError).toBe(true);
+    expect(out.content).toContain("Take the routine over");
+    expect(out.content).not.toContain("can't manage");
+  });
+
+  test("list_routines doesn't tell the agent it changes only its own routines", async () => {
+    f = await setup();
+    const all = await createScheduleToolSource({ pubsub: f.pubsub, context: f.context, hooks: HOOKS }).tools(
+      await runContext(f),
+    );
+    const list = all.find((t) => t.name === "list_routines")?.description ?? "";
+    expect(list).not.toContain("you change only your own");
+    expect(list).toContain("update_routine");
   });
 
   test("an event no webhook brings here is refused with the setup step; one whose webhook goes away says it can't run", async () => {

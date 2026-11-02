@@ -59,6 +59,8 @@ describe("receipts", () => {
       hookToCopy({ ...made, params: { name: "Avisar", trigger: "schedule" } }, { userId: "u1", managesRoutines: true }),
     ).toBeNull();
     expect(hookToCopy(action(), { userId: "u1", managesRoutines: true })).toBeNull();
+    // Changed into a webhook routine (or its methods changed): the same button.
+    expect(hookToCopy({ ...made, kind: "routine.updated" }, { userId: "u1", managesRoutines: false })).toBe("rt1");
   });
 
   test("who sees the buttons", () => {

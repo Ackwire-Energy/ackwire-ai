@@ -9,6 +9,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { getIssue, type IssueView, setCriterion, updateIssue, type WorkActor } from "./issues";
 import { announceMessageMemories } from "./message-memories";
 import { assertActiveMembership, can, getMembership } from "./organizations";
+import { hookMethodsOf, routineHookKeys } from "./routine-hooks";
 import { nextRoutineTime } from "./routines";
 import { enqueueIndex } from "./search";
 import { writeSkillBody } from "./skills";
@@ -16,7 +17,8 @@ import { closeThread, getThread, reopenThread, updateThread } from "./threads";
 import { canonicalJson } from "./tools/json-schema";
 import { deleteWikiPage, getWikiPage, getWikiVersion, restoreWikiPage, updateWikiPage } from "./wiki";
 
-const { agentActions, contextItems, routines, channels, channelMembers, issueActivity, messages, users } = schema;
+const { agentActions, contextItems, routines, routineHooks, channels, channelMembers, issueActivity, messages, users } =
+  schema;
 
 type Row = typeof agentActions.$inferSelect;
 
@@ -345,9 +347,19 @@ const handlers: Record<string, Handler> = {
     const row = await routineRow(deps.db, a.orgId, a.targetId);
     if (!row || row.deletedAt) throw new NotFoundError("The routine is gone", "action.target_gone");
     const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
+    // The methods its webhook address answers are kept with the address, not on the routine.
+    const { methods: fromMethods, ...fromRow } = from;
+    const { methods: toMethods, ...toRow } = to;
     const now = routineSnapshot(row);
-    if (Object.keys(from).some((k) => !same(now[k], from[k]))) throw changedSince();
-    await setRoutine(deps.db, row, to);
+    if (Object.keys(fromRow).some((k) => !same(now[k], fromRow[k]))) throw changedSince();
+    if (Array.isArray(toMethods)) {
+      if (!same((await routineHookKeys(deps.db, [row.id])).get(row.id)?.methods, fromMethods)) throw changedSince();
+      await deps.db
+        .update(routineHooks)
+        .set({ methods: hookMethodsOf(toMethods.map(String)), updatedAt: new Date() })
+        .where(eq(routineHooks.routineId, row.id));
+    }
+    await setRoutine(deps.db, row, toRow);
     return undefined;
   },
 
