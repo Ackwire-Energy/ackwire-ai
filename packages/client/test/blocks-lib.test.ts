@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Poll } from "../src/api/types";
-import { BLOCK_KIT_JS } from "../src/lib/block-kit";
+import { BLOCK_KIT_CSS, BLOCK_KIT_JS } from "../src/lib/block-kit";
 import { blockEvent, blockPage, pollAnswered, pollIsOpen, pollTally, pollToggle } from "../src/lib/blocks";
 
 const HOST = {
@@ -29,6 +29,17 @@ describe("a block's page", () => {
     expect(BLOCK_KIT_JS).not.toContain("</script");
     expect(BLOCK_KIT_JS).toContain("window.ReactNativeWebView");
     expect(BLOCK_KIT_JS).toContain("parent.postMessage");
+  });
+
+  test("nothing in the kit outweighs a plain button's look", () => {
+    // That look sits in `:where`, which weighs nothing: a bare `button{...}` reset would take its padding and weight.
+    expect(BLOCK_KIT_CSS).toContain(":where(button){");
+    expect(BLOCK_KIT_CSS).not.toMatch(/(^|[\n}])button\{/);
+  });
+
+  test("the only plain button showing is the block's main action", () => {
+    expect(BLOCK_KIT_CSS).toContain(":where(button[data-lead]:not([class])){");
+    expect(BLOCK_KIT_JS).toContain('b.toggleAttribute("data-lead",live.length===1&&live[0]===b)');
   });
 });
 
