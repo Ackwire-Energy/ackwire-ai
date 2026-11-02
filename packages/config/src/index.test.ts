@@ -258,6 +258,21 @@ describe("GITHUB_APP_PRIVATE_KEY", () => {
   });
 });
 
+describe("Android push settings", () => {
+  test("auto by default, through agentes.chat's relay unless told otherwise; the relay only over https", () => {
+    const config = loadConfig(valid);
+    expect(config.PUSH_SENDER).toBe("auto");
+    expect(config.PUSH_RELAY_URL).toBe("https://app.agentes.chat/api/push-relay/v1");
+    expect(config.PUSH_RELAY_SERVE).toBe("off");
+    expect(loadConfig({ ...valid, PUSH_SENDER: "off", PUSH_RELAY_SERVE: "on" })).toMatchObject({
+      PUSH_SENDER: "off",
+      PUSH_RELAY_SERVE: "on",
+    });
+    expect(() => loadConfig({ ...valid, PUSH_SENDER: "expo" })).toThrow("PUSH_SENDER");
+    expect(() => loadConfig({ ...valid, PUSH_RELAY_URL: "http://relay.example/v1" })).toThrow("PUSH_RELAY_URL");
+  });
+});
+
 describe("FIREBASE_SERVICE_ACCOUNT", () => {
   const key = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\n";
   const file = JSON.stringify({

@@ -745,7 +745,7 @@ export const envVars = {
   EXPO_ACCESS_TOKEN: {
     schema: z.string().optional(),
     description:
-      "Expo access token for push notifications to the iPhone app (only needed when “enhanced push security” is on in the Expo project). iPhone pushes are sent through the Expo Push API either way; Android pushes go straight to Firebase (`FIREBASE_SERVICE_ACCOUNT`).",
+      "Expo access token for push notifications to the iPhone app (only needed when “enhanced push security” is on in the Expo project). iPhone pushes are sent through the Expo Push API either way; Android pushes don't use Expo (`PUSH_SENDER`).",
     section: "Push",
     secret: true,
   },
@@ -763,9 +763,32 @@ export const envVars = {
         }
       }),
     description:
-      "Push notifications to the Android app, sent straight to Firebase Cloud Messaging: the JSON key of a service account of the Firebase project the Android app is built with (Firebase console › Project settings › Service accounts), as the file's contents or base64 of the file. Without it, Android phones get no push.",
+      "Android pushes straight to Firebase Cloud Messaging: the JSON key of a service account of the Firebase project the Android app is built with (Firebase console › Project settings › Service accounts), as the file's contents or base64 of the file. Only for a server that sends with its own Firebase project (`PUSH_SENDER`) or runs the push relay (`PUSH_RELAY_SERVE`); the app from the stores is reached through the relay.",
     section: "Push",
     secret: true,
+  },
+  PUSH_SENDER: {
+    schema: z.enum(["auto", "direct", "relay", "off"]).default("auto"),
+    description:
+      "How Android pushes are sent (iPhones go through Expo for now). `auto` (default): straight to Firebase when `FIREBASE_SERVICE_ACCOUNT` is set, else through the push relay. `relay`: through the agentes.chat push relay (`PUSH_RELAY_URL`), which is what lets the Android app from the stores get this server's pushes; the server registers itself there on its first push, no account needed, and each push's text passes through it. `direct`: straight to Firebase with `FIREBASE_SERVICE_ACCOUNT`, for an Android app built with your own Firebase project. `off`: no Android pushes.",
+    section: "Push",
+  },
+  PUSH_RELAY_URL: {
+    schema: z
+      .url()
+      .refine((u) => u.startsWith("https://"), "must be an https URL")
+      .default("https://app.agentes.chat/api/push-relay/v1"),
+    description: "The push relay Android pushes go through with `PUSH_SENDER=relay` (or `auto` without Firebase).",
+    section: "Push",
+  },
+  PUSH_RELAY_SERVE: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("off"),
+    description:
+      "Runs the push relay at `/api/push-relay/v1` for other installations' Android pushes, sent with this server's `FIREBASE_SERVICE_ACCOUNT` (agentes.chat's own servers). `on` without the service account serves nothing.",
+    section: "Push",
   },
   WEB_PUSH: {
     schema: z

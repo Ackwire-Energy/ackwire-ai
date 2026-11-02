@@ -25,6 +25,7 @@ import {
   createPostgresDatabaseDriver,
   createPostgresPubSub,
   createPostgresSearchResolver,
+  createRelayPushSender,
   createS3BlobStore,
   createSmtpEmailSender,
   createTurnstileCheck,
@@ -37,6 +38,7 @@ import {
   MAIL_PRESETS,
   type MailAdapters,
   postgresJsNotifier,
+  type PushSender,
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, composioAuthConfigs, loadConfig, redactConfig } from "@agenteschat/config";
@@ -67,6 +69,7 @@ import {
   meterComposio,
   moveIssueComments,
   publicHttpsFetch,
+  relayCredentials,
   resolveHostDns,
   retireHostTokens,
   retireMillionSendMailboxes,
@@ -195,6 +198,8 @@ async function boot(
   // say (`resolved`, ADR 0071).
   const localKeyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
   let resolved: Adapters | null = null;
+  // The push relay's credentials are sealed the same way (ADR 0123).
+  const keyWrappers = () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])];
   // The GIPHY key its owner may add in Settings (ADR 0091, amended 2026-10-31), made below once modules had their
   // say on the key wrappers; the GIF provider asks it on every call.
   let gifKey: GifKey | null = null;
@@ -212,11 +217,9 @@ async function boot(
     }),
     platformBlobs: platformBlobStore(config, database.db),
     // Phone app push (ADR 0035, ADR 0123): only devices that registered get anything. Android straight to
-    // Firebase with this server's service account (without it, Android phones get no push); iPhones through Expo.
+    // Firebase or through the push relay (`PUSH_SENDER`); iPhones through Expo.
     push: createPhonePushSender({
-      android: config.FIREBASE_SERVICE_ACCOUNT
-        ? createFcmPushSender({ serviceAccount: config.FIREBASE_SERVICE_ACCOUNT })
-        : null,
+      android: androidPushSender(config, database.db, keyWrappers, release),
       ios: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
     }),
     // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
@@ -262,10 +265,14 @@ async function boot(
     imap: Boolean(defaults.mail?.imap),
   });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
-  log.info("phone push", {
-    android: config.FIREBASE_SERVICE_ACCOUNT ? `firebase:${config.FIREBASE_SERVICE_ACCOUNT.projectId}` : "off",
-    ios: "expo",
-  });
+  log.info("phone push", { android: androidPushMode(config), ios: "expo" });
+  if (config.PUSH_SENDER === "direct" && !config.FIREBASE_SERVICE_ACCOUNT) {
+    log.warn("PUSH_SENDER=direct without FIREBASE_SERVICE_ACCOUNT: Android phones get no push");
+  }
+  if (config.PUSH_RELAY_SERVE === "on") {
+    const serving = config.FIREBASE_SERVICE_ACCOUNT ? "/api/push-relay/v1" : "nothing (no FIREBASE_SERVICE_ACCOUNT)";
+    log.info("push relay", { serving });
+  }
   const base = { config, db: database.db, edition, version: release };
   const { adapters, modelProviders, overridden } = await resolveAdapters(
     modules,
@@ -609,6 +616,36 @@ function platformBlobStore(config: Config, db: Database) {
     accessKeyId: S3_ACCESS_KEY_ID,
     secretAccessKey: S3_SECRET_ACCESS_KEY,
     pathStyle: config.S3_PATH_STYLE,
+  });
+}
+
+/** How this server sends Android pushes (ADR 0123): `PUSH_SENDER`, with `auto` resolved. */
+function androidPushMode(config: Config): "direct" | "relay" | "off" {
+  if (config.PUSH_SENDER !== "auto") return config.PUSH_SENDER;
+  return config.FIREBASE_SERVICE_ACCOUNT ? "direct" : "relay";
+}
+
+/**
+ * Android pushes (ADR 0123): straight to Firebase with this server's service account, or through the push
+ * relay, which registers this installation on its first push and keeps its credentials sealed with
+ * `wrappers()`; null when off or `direct` has no account.
+ */
+function androidPushSender(
+  config: Config,
+  db: Database,
+  wrappers: () => KeyWrapper[],
+  version: string,
+): PushSender | null {
+  const mode = androidPushMode(config);
+  if (mode === "off") return null;
+  if (mode === "direct") {
+    const account = config.FIREBASE_SERVICE_ACCOUNT;
+    return account ? createFcmPushSender({ serviceAccount: account }) : null;
+  }
+  return createRelayPushSender({
+    url: config.PUSH_RELAY_URL,
+    credentials: relayCredentials(db, wrappers, config.PUSH_RELAY_URL),
+    version,
   });
 }
 

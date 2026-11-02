@@ -1,3 +1,4 @@
+import { createFcmPushSender } from "@agenteschat/adapters";
 import { requestLocale } from "@agenteschat/engine";
 import { helpDocsUrl } from "@agenteschat/i18n/help";
 import { appLocale } from "@agenteschat/i18n/locale";
@@ -74,6 +75,7 @@ import { registerHealth } from "./routes/health";
 import { registerInstance } from "./routes/instance";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
 import { type AppsRouteOptions, registerAppsRoot, registerOauthRoutes } from "./routes/oauth";
+import { pushRelayRoutes } from "./routes/push-relay";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerRoutineHooks, registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
@@ -115,6 +117,7 @@ export interface AppOptions {
  * - `/api/hooks/*`        public: a webhook routine's own address (its chosen methods, ADR 0106)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
  * - `/api/oauth/*`        public: the OAuth 2.1 authorization server for AI apps (ADR 0119)
+ * - `/api/push-relay/v1/*` other installations' Android pushes, server to server (only with PUSH_RELAY_SERVE, ADR 0123)
  * - `/mcp`                AI apps' MCP endpoint, bearer tokens only (ADR 0119); `/.well-known/oauth-*` its discovery
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
@@ -238,6 +241,25 @@ export function createApp(options: AppOptions) {
       }),
     );
     if (deps.config.LANDING_URL) registerWaitlist(api, deps);
+    // The push relay for other installations' Android pushes (ADR 0123), with this server's Firebase account.
+    if (deps.config.PUSH_RELAY_SERVE === "on") {
+      const account = deps.config.FIREBASE_SERVICE_ACCOUNT;
+      const fcm = account ? createFcmPushSender({ serviceAccount: account }) : null;
+      const override = deps.extras?.pushRelaySender;
+      const sender = override === undefined ? fcm : override;
+      if (sender) {
+        api.route(
+          "/push-relay/v1",
+          pushRelayRoutes({
+            db: deps.db,
+            sender,
+            rateLimiter: deps.adapters.rateLimiter,
+            trustedProxies: deps.config.TRUSTED_PROXIES,
+            log,
+          }),
+        );
+      }
+    }
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
 

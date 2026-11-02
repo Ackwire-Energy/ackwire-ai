@@ -34,7 +34,7 @@ We want a phone app with the same identity and behavior as the web. Today all cl
 **4. Push notifications.**
 - `push_devices` (migration 0066; per user, not per org: `user_id`, `token`, `platform` ios|android, `locale`, timestamps) with `POST /api/app/push/devices` (upsert, 204; the token moves to whoever is signed in; 10 devices per person, 30 registrations an hour) and `DELETE /api/app/push/devices/:token` (204, own tokens only).
 - Delivery goes through the outbox as a `push.send` job, via a `PushSender` adapter (Expo Push API; a fake in tests). Unregistered tokens are removed.
-  *Amended 2026-11-02 (ADR 0123):* Android phones register their FCM token and the server sends to Firebase Cloud Messaging directly (`FIREBASE_SERVICE_ACCOUNT`); iPhones stay on the Expo Push API.
+  *Amended 2026-11-02 (ADR 0123):* Android phones register their FCM token and the server sends to Firebase Cloud Messaging directly (`FIREBASE_SERVICE_ACCOUNT`) or through agentes.chat's push relay (`PUSH_SENDER`); iPhones stay on the Expo Push API.
 - What pushes (notification kinds): everything in "Esperando você" (approval, agent question), mention, DM from a person, an agent's answer to the person behind its run (ADR 0071 §7), and mission or routine stopped or failed. Muted or read items do not push. Grouped items push once per group while unread.
 - Push text is the one exception to "server strings in English": the OS shows it as is. A small catalog (`push-messages.ts`, pt-BR and en, picked by the device locale) renders it. The payload carries `{ orgId, kind, notificationId, channelId?, threadId?, approvalId?, missionId? }` for the deep link.
 - A high-risk approval is never approved from the notification. It opens the app, which asks to hold.
