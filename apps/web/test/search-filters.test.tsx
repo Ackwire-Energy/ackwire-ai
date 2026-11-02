@@ -165,4 +165,20 @@ describe("search filters (ADR 0123)", () => {
     await settle(6);
     expect(screen().queryByRole("button", { name: "Remover em: #eng" })).toBeNull();
   });
+
+  test("the empty box's filters and recent searches are picked from the keyboard", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await renderApp(`/org/${ORG_ID}/search`, { api });
+    await settle(4);
+    await act(async () => fireEvent.focus(box()));
+    // Enter with nothing highlighted just searches.
+    await act(async () => fireEvent.keyDown(box(), { key: "Enter" }));
+    expect(box().value).toBe("");
+    await act(async () => fireEvent.focus(box()));
+    await act(async () => fireEvent.keyDown(box(), { key: "ArrowDown" }));
+    expect(box().getAttribute("aria-activedescendant")).toBeTruthy();
+    await act(async () => fireEvent.keyDown(box(), { key: "Enter" }));
+    expect(box().value).toBe("de:");
+  });
 });

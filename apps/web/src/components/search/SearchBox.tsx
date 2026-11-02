@@ -66,12 +66,13 @@ export function SearchBox({
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  // -1: nothing highlighted yet (an operator being typed still highlights its first option).
+  const [active, setActive] = useState(-1);
 
   const addChip = (chip: SearchChip, rest: string) => {
     onChipsChange(dedupe([...chips, chip]));
     onTextChange(rest);
-    setActive(0);
+    setActive(-1);
     input.current?.focus();
   };
   const typing = typingOperator(text, words);
@@ -80,7 +81,7 @@ export function SearchBox({
   const withSpace = (s: string) => (s ? `${s} ` : "");
   const insertOp = (op: SearchOp) => {
     onTextChange(`${withSpace(text.trimEnd())}${words.ops[op]}:`);
-    setActive(0);
+    setActive(-1);
     input.current?.focus();
   };
 
@@ -153,7 +154,7 @@ export function SearchBox({
     }
   }
   const shown = open && (options.length > 0 || typing !== null);
-  const current = Math.min(active, Math.max(options.length - 1, 0));
+  const current = Math.min(typing ? Math.max(active, 0) : active, options.length - 1);
 
   const commit = (value: string) => {
     // Complete operators become chips once a space follows them.
@@ -170,10 +171,10 @@ export function SearchBox({
       setActive((current + 1) % options.length);
     } else if (e.key === "ArrowUp" && shown && options.length) {
       e.preventDefault();
-      setActive((current - 1 + options.length) % options.length);
+      setActive(current < 0 ? options.length - 1 : (current - 1 + options.length) % options.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const option = shown && typing ? options[current] : undefined;
+      const option = shown && current >= 0 ? options[current] : undefined;
       if (option) return option.pick();
       const parsed = parseSearch(text, directory, words);
       if (parsed.chips.length) {
@@ -223,7 +224,7 @@ export function SearchBox({
           aria-label={t("searchPage.label")}
           aria-expanded={Boolean(shown)}
           aria-controls={listId}
-          aria-activedescendant={shown && options.length ? `${listId}-${current}` : undefined}
+          aria-activedescendant={shown && current >= 0 ? `${listId}-${current}` : undefined}
           aria-autocomplete="list"
           autoComplete="off"
           // biome-ignore lint/a11y/noAutofocus: the search page is for typing.
@@ -233,7 +234,7 @@ export function SearchBox({
           onChange={(e) => {
             commit(e.target.value);
             setOpen(true);
-            setActive(0);
+            setActive(-1);
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
