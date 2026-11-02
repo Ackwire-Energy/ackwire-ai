@@ -32,9 +32,11 @@ import type {
   AgentUsage,
   AiAccounts,
   AiStatus,
+  AppConsent,
   AppNotification,
   Approval,
   ApprovalRule,
+  AppsList,
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
@@ -60,6 +62,7 @@ import type {
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
+  CreatedPersonalToken,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -97,6 +100,7 @@ import type {
   JoinApproval,
   JoinClaim,
   JoinRequest,
+  LearnedSkill,
   Machine,
   MachineAccess,
   MachineAccount,
@@ -910,6 +914,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       removeAccount: (orgId, machineId, accountId) =>
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, { method: "DELETE" }),
     },
+    apps: {
+      consent: (requestId) => request<AppConsent>(`/api/app/authorize/${enc(requestId)}`),
+      decide: (requestId, input) =>
+        request<{ redirectTo: string }>(`/api/app/authorize/${enc(requestId)}`, { json: input }),
+      list: (orgId, all = false) => request<AppsList>(`${org(orgId)}/apps`, { query: all ? { all: "1" } : {} }),
+      disconnect: (orgId, grantId) => request<void>(`${org(orgId)}/apps/${enc(grantId)}`, { method: "DELETE" }),
+      createToken: (orgId, input) => request<CreatedPersonalToken>(`${org(orgId)}/tokens`, { json: input }),
+      revokeToken: (orgId, grantId) => request<void>(`${org(orgId)}/tokens/${enc(grantId)}`, { method: "DELETE" }),
+    },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,
       get: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`),
@@ -930,6 +943,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: { skills },
           })
         ).skills,
+      learned: async (orgId, agentId) =>
+        (await request<{ skills: LearnedSkill[] }>(`${org(orgId)}/agents/${enc(agentId)}/learned-skills`)).skills,
+      revert: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/revert`, { json: {} }),
+      restore: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/restore`, { json: {} }),
     },
     access: {
       get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),
@@ -1229,6 +1246,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       runNow: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/run`, { json: {} }),
       stop: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/stop`, { json: {} }),
       takeOver: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/take-over`, { json: {} }),
+      continueUsage: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/continue`, { json: {} }),
       runs: async (orgId, id) => (await request<{ runs: RoutineRun[] }>(`${org(orgId)}/routines/${enc(id)}/runs`)).runs,
       parseRule: (orgId, phrase, timezone) =>
         request<RuleInfo>(`${org(orgId)}/routines/parse-rule`, { json: { phrase, ...(timezone ? { timezone } : {}) } }),

@@ -140,6 +140,9 @@ export function actionTextValues(
       return { name: str(p.name) || title };
     case "thread.closed":
       return { title };
+    case "skill.created":
+    case "skill.updated":
+      return { name: str(p.name) || title };
     default:
       // A kind the server knows and this build doesn't yet (an open tab, an older app): the key's own words.
       return {};

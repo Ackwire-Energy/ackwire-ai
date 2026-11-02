@@ -15,6 +15,7 @@ import {
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
+import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
@@ -28,18 +29,31 @@ import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
+import { appVia } from "@agenteschat/client/lib/via";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { memo, useEffect, useState } from "react";
+import { memo, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { CHROME_MAX_SCALE, Count, Icon, InkOrbit, PixelStopped, PressScale, Text, useTheme, useToast } from "@/ui";
+import {
+  CHROME_MAX_SCALE,
+  Count,
+  Icon,
+  InkOrbit,
+  PixelStopped,
+  PressScale,
+  ProviderLogo,
+  Text,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
+import { UsagePauseCard } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
@@ -161,6 +175,9 @@ export const MessageRow = memo(function MessageRow({
   const reminder = isReminderMessage(meta);
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = isAgent && isTalkerReply(meta);
+  // A person's message sent through a connected AI app (ADR 0119): "via Claude".
+  const via = m.author.type === "person" ? appVia(meta) : null;
+  const viaMark = via?.brand ? APP_BRANDS[via.brand] : undefined;
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a
   // task ran is said only where the workspace has more than one computer.
   const names = useNamesComputers();
@@ -385,6 +402,14 @@ export const MessageRow = memo(function MessageRow({
               {name}
             </Text>
             {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
+            {via ? (
+              <Tag
+                icon="sparkle"
+                lead={viaMark ? <ProviderLogo id={viaMark} size="xs" /> : undefined}
+                label={t("apps.via", { name: via.name })}
+                hint={t("apps.viaTip", { person: name, name: via.name })}
+              />
+            ) : null}
             {routine ? (
               // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
               <Tag
@@ -533,6 +558,7 @@ export const MessageRow = memo(function MessageRow({
         {/* What waits for a person's click comes last, after the words and the tools. */}
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
+        {isAgent ? <UsagePauseCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
         {isAgent ? <InstructionProposals message={m} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
@@ -667,19 +693,22 @@ function StoppedLine({
  */
 function Tag({
   icon,
+  lead,
   label,
   onPress,
   hint,
 }: {
-  icon: "bell" | "clock";
+  icon: "bell" | "clock" | "sparkle";
+  /** In place of the icon (an app's mark). */
+  lead?: ReactNode;
   label: string;
   onPress?: () => void;
   hint?: string;
 }) {
   const c = useColors();
   const chip = (
-    <View style={[styles.tag, { backgroundColor: c.sunken }]}>
-      <Icon name={icon} size={11} color={c.muted} />
+    <View style={[styles.tag, { backgroundColor: c.sunken }]} accessibilityHint={onPress ? undefined : hint}>
+      {lead ?? <Icon name={icon} size={11} color={c.muted} />}
       <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
         {label}
       </Text>

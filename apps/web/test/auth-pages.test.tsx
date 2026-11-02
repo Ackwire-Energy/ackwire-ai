@@ -348,6 +348,11 @@ describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
     await renderApp(at(`/org/${ORG_ID}/agents/new`), { api, auth: createFakeAuth().auth });
     expect(heading()).toBe("Oi. Qual é o seu e-mail?");
     expect(lead()).toBe("Para criar um agente.");
+    cleanup();
+
+    // An AI app's sign-in (ADR 0119): back to its consent page.
+    await renderApp(at("/autorizar?req=0192"), { api, auth: createFakeAuth().auth });
+    expect(lead()).toBe("Para conectar um app ao agentes.chat.");
   });
 
   test("a link that no longer works, an unknown one, or anywhere else: the general line", async () => {

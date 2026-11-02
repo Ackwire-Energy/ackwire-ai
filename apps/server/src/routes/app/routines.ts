@@ -1,5 +1,6 @@
 import {
   cancelReminder,
+  continueRoutineUsagePause,
   createReminderFromApp,
   createRoutine,
   deleteRoutine,
@@ -245,12 +246,34 @@ const Routine = z
     }),
     failuresInRow: z.number().int(),
     state: z
-      .enum(["active", "paused", "running", "waiting_computer", "waiting_person", "failing", "needs_webhook"])
-      .openapi({ description: "`needs_webhook`: its event comes through a webhook this workspace doesn't have yet." }),
+      .enum([
+        "active",
+        "paused",
+        "running",
+        "waiting_computer",
+        "waiting_person",
+        "usage_paused",
+        "failing",
+        "needs_webhook",
+      ])
+      .openapi({
+        description:
+          "`needs_webhook`: its event comes through a webhook this workspace doesn't have yet. `usage_paused`: its run paused near its plan's or budget's limit (`usagePause`).",
+      }),
     waitingFor: z
       .object({ machineId: z.uuid(), machineName: z.string(), since: z.string() })
       .nullable()
       .openapi({ description: "Its run waits for the agent's computer since then." }),
+    usagePause: z
+      .object({
+        source: z.enum(["plan", "budget"]),
+        resetsAt: z.string().nullable().openapi({ description: "When it picks up by itself; null: not known yet." }),
+        extraOff: z.boolean().openapi({
+          description: "A plan pause on an agent whose long work may not use paid extra usage: continuing is refused.",
+        }),
+      })
+      .nullable()
+      .openapi({ description: "Its run paused near a limit (ADR 0118); Continuar agora is `POST …/continue`." }),
     brain: z.object({
       kind: z.enum(["model", "claude_code", "codex", "cursor"]),
       machineName: z.string().nullable().openapi({ description: "The computer a computer brain runs on." }),
@@ -731,6 +754,27 @@ export function routineRoutes(deps: AppDeps) {
       const { orgId, routineId } = c.req.valid("param");
       const actor = c.get("user").id;
       await stopRoutineRun(routines, actor, orgId, routineId);
+      return c.json(await getRoutineView(db, actor, orgId, routineId, hooks), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/{routineId}/continue",
+      tags,
+      security,
+      summary: "Continue a run paused near its plan's or budget's limit now (its creator, admins or the agent's owner)",
+      description:
+        "The paused run goes on past the pause line until that window resets. Nothing is posted. Refused with `routine.continue_extra_off` (409) when the agent's long work may not use paid extra usage. Nothing paused: the routine as it is.",
+      request: { params: RoutineParams },
+      responses: { 200: json(Routine), ...errors },
+    }),
+    async (c) => {
+      const { orgId, routineId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      const { continued } = await continueRoutineUsagePause(routines, actor, orgId, routineId);
+      if (continued) deps.wakeWorkers?.();
       return c.json(await getRoutineView(db, actor, orgId, routineId, hooks), 200);
     },
   );

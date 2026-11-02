@@ -179,6 +179,11 @@ export function buildEngine(o: EngineOptions) {
       idleMinutes: config.REFLECT_IDLE_MINUTES,
       maxPerThread: config.REFLECT_MAX_PER_THREAD,
     },
+    learn: {
+      maxPerAgentDay: config.LEARN_MAX_PER_AGENT_DAY,
+      minToolCalls: config.LEARN_MIN_TOOL_CALLS,
+      skillAfter: config.LEARN_SKILL_AFTER,
+    },
   };
   // The installation's Jev key (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in Settings.
   const jevKey = createJevKey({
@@ -316,7 +321,7 @@ export function buildEngine(o: EngineOptions) {
       // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.
       createSetupToolSource({ pubsub: adapters.pubsub, ai: { gateway }, context }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
-      createSkillToolSource({ db, blobs: artifacts.blobs }),
+      createSkillToolSource({ db, blobs: artifacts.blobs, pubsub: adapters.pubsub, judge: context.judge }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
       createScheduleToolSource({
         pubsub: adapters.pubsub,

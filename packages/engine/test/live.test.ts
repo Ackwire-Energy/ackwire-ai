@@ -351,7 +351,7 @@ describe("memory changes on request", () => {
     expect(back?.content).toBe("João revisa pagamentos");
   });
 
-  test("not on its own: a run started by another agent can't change memory; secrets and permission rules are refused", async () => {
+  test("a run started by another agent keeps only low-trust notes of its own", async () => {
     f = await setup({
       contextTools: true,
       // QA's "@dev remember this" needs Dev (so Dev runs); the run still can't change memory.
@@ -375,9 +375,12 @@ describe("memory changes on request", () => {
       }),
     );
     await drainOutbox(f.db, f.handlers);
-    const results = (await f.db.select().from(schema.agentRunSteps)).filter((s) => s.kind === "tool_result");
-    expect(JSON.stringify(results[0]?.data)).toContain("need a person");
-    expect(await f.db.select().from(schema.contextItems)).toEqual([]);
+    // With no person behind the run it may still keep a note of its own (ADR 0120), only as low-trust data: never
+    // verified, never a person's words, never shared.
+    const saved = await f.db.select().from(schema.contextItems);
+    expect(saved.map((i) => [i.trust, i.verified, i.createdByKind, i.agentId])).toEqual([
+      ["low", false, "agent", f.agent.id],
+    ]);
   });
 
   test("instructions are never edited directly: a proposal is shown inline and the owner accepts it", async () => {

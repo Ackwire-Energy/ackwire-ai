@@ -127,6 +127,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   remember: "updatingMemory",
   forget: "updatingMemory",
   update_memory: "updatingMemory",
+  save_how_to: "updatingMemory",
   propose_instruction_change: "updatingMemory",
   list_events: "checkingCalendar",
   find_free_time: "checkingCalendar",
@@ -154,6 +155,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   post_in_forum: "postingInForum",
   read_forum_topic: "readingForum",
   read_skill_file: "consultingSkill",
+  update_skill: "consultingSkill",
   // Missions (the agent's tools and the executor's MCP tools).
   propose_mission: "proposingMission",
   send_to_mission: "messagingMission",

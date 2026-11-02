@@ -1222,7 +1222,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     await say("@dev lista os itens");
     expect(asks).toHaveLength(1);
     expect(systemText(f.provider.calls.at(-1)?.request.system ?? "")).toContain(
-      "# Your keys on your computer\nGiven to you through request_secret; use them by name, never print them: TYPESAFE_API_KEY (a variable).",
+      "- TYPESAFE_API_KEY: an environment variable in your commands",
     );
 
     // Refused while a member who didn't give it asked: the owner's key isn't swapped for the member's.

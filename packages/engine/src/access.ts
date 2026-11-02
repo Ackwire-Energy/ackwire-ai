@@ -38,14 +38,14 @@ const { agentScopes, connectorConnections, agents } = schema;
 export const BUILTIN_TOOLS: Record<string, string[]> = {
   "": ["ask_user", "react", "show_block", "start_poll", "web_search", "web_fetch"],
   "context:read": ["search_context", "get_summary", "expand"],
-  "memory:write": ["remember", "update_memory", "forget", "propose_instruction_change"],
+  "memory:write": ["remember", "update_memory", "forget", "save_how_to", "propose_instruction_change"],
   "drive:read": ["read_artifact", "list_artifacts", "share_artifact"],
   "drive:write": ["create_artifact", "update_artifact"],
   "issues:read": ["list_issues"],
   "issues:write": ["create_issue", "update_issue", "comment_issue"],
   "calendar:read": ["list_events", "find_free_time"],
   "calendar:write": ["propose_event"],
-  "skills:read": ["load_skill", "read_skill_file"],
+  "skills:read": ["load_skill", "read_skill_file", "update_skill"],
   "schedule:write": [
     "schedule_reminder",
     "create_routine",

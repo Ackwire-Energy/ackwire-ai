@@ -3,6 +3,7 @@ import type { Agent, AgentDraft, AgentProposalCard, AiStatus, ProposedRoutine, S
 import type { Level } from "./access-levels";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
+import { type UsagePauseCard, usagePauseCardOf } from "./usage-pause";
 
 /**
  * An agent's action card (ADR 0061, `meta.actionCard`): its button opens the app's own dialog, filled in.
@@ -87,7 +88,7 @@ export const mayContinueStretch = (
   admin: boolean,
 ) => admin || (meId !== null && (card.forUserId === meId || card.agentIds.some((id) => ownerOf(id) === meId)));
 
-export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard;
+export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard | UsagePauseCard;
 
 /** An agent's proposal of a new agent (ADR 0081), or null. Unlike the Connect card, it keeps its state. */
 export function agentProposalOf(meta: Record<string, unknown> | null | undefined): AgentProposalCard | null {
@@ -194,7 +195,7 @@ function routineLine(
 }
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
-  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta);
+  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta) ?? usagePauseCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;

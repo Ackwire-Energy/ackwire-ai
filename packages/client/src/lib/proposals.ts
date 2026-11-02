@@ -129,6 +129,7 @@ export function proposalTarget(t: TFunction, p: Proposal, agentName: (id: string
   const g = agentGrammar(t, agentName(p.target.agentId));
   if (p.target.type === "agent_role") return t("proposals.targetRole", g);
   if (p.target.type === "agent_access") return t("proposals.targetAccess", g);
+  if (p.target.type === "skill") return t("proposals.targetSkill", { skill: p.target.name });
   return t("proposals.targetInstructions", g);
 }
 
@@ -167,11 +168,16 @@ const TITLE_KEY = {
   agent_instructions: "proposals.titleInstructions",
   agent_role: "proposals.titleRole",
   agent_access: "proposals.titleAccess",
+  skill: "proposals.titleSkill",
 } as const;
 
 /** Its title in the person's language (the server's is English). */
 export function proposalTitle(t: TFunction, p: Proposal, orgName: string, agentName: (id: string) => string) {
   const tt = t as unknown as (key: string, options: Record<string, string>) => string;
   if (p.target.type === "org_context") return tt("proposals.titleContext", { org: orgName, defaultValue: p.title });
-  return tt(TITLE_KEY[p.target.type], { ...agentGrammar(t, agentName(p.target.agentId)), defaultValue: p.title });
+  return tt(TITLE_KEY[p.target.type], {
+    ...agentGrammar(t, agentName(p.target.agentId)),
+    skill: p.target.type === "skill" ? p.target.name : "",
+    defaultValue: p.title,
+  });
 }

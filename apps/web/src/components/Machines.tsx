@@ -125,14 +125,29 @@ function useCopy() {
     try {
       await navigator.clipboard?.writeText(text);
       toast.show(done);
+      return true;
     } catch {
       toast.show(t("common.unknownError"), "error");
+      return false;
     }
   };
 }
 
-/** A terminal command (or anything to paste) in a code block, with Copiar; `copied`: what the toast says. */
-export function CommandBlock({ command, copied }: { command: string; copied?: string }) {
+/**
+ * A terminal command (or anything to paste) in a code block, with Copiar; `copied`: what the toast says, `onCopied`:
+ * after it reached the clipboard.
+ */
+export function CommandBlock({
+  command,
+  copied,
+  copyLabel,
+  onCopied,
+}: {
+  command: string;
+  copied?: string;
+  copyLabel?: string;
+  onCopied?: () => void;
+}) {
   const { t } = useTranslation();
   const copy = useCopy();
   return (
@@ -146,9 +161,13 @@ export function CommandBlock({ command, copied }: { command: string; copied?: st
         iconOnly
         icon="copy"
         className="machine-command__copy"
-        aria-label={t("common.copy")}
-        title={t("common.copy")}
-        onClick={() => void copy(command, copied ?? t("machines.commandCopied"))}
+        aria-label={copyLabel ?? t("common.copy")}
+        title={copyLabel ?? t("common.copy")}
+        onClick={() =>
+          void copy(command, copied ?? t("machines.commandCopied")).then((ok) => {
+            if (ok) onCopied?.();
+          })
+        }
       />
     </div>
   );

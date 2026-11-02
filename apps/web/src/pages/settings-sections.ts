@@ -8,6 +8,7 @@ import type { IconName } from "@agenteschat/ui";
 export type SettingsSection =
   | "account"
   | "notifications"
+  | "apps"
   | "general"
   | "members"
   | "roles"
@@ -36,6 +37,8 @@ export const SETTINGS_SECTIONS: {
   { id: "account", icon: "person", group: "you", allowed: () => true },
   // What reaches my devices as a notification here (ADR 0071 §8).
   { id: "notifications", icon: "bell", group: "you", allowed: () => true },
+  // AI apps (ADR 0119): each person connects their own, in this workspace.
+  { id: "apps", icon: "link", group: "you", allowed: () => true },
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
   // Every member reads what each role allows (ADR 0085); who manages roles changes the ones below theirs.

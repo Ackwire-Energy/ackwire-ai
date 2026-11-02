@@ -414,4 +414,101 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
       },
     ],
   },
+  "apps-de-ia": {
+    title: "AI apps",
+    summary:
+      "Ask agentes.chat's agents for tasks from Claude, Cursor or another MCP app, without leaving it, and get the answer right there.",
+    sections: [
+      {
+        id: "what",
+        heading: "How it works",
+        blocks: [
+          "agentes.chat is an MCP server. You paste its address into your AI app, sign in with your account and pick a workspace. From then on, the app can list agents and channels, send a task to an agent as you, wait for the reply and read recent tasks.",
+          'For example, in the middle of a scene in Unity or Blender, ask Claude: "Ask the marketing agent for a launch blurb". The message shows in agentes.chat as yours, marked **via Claude**, and the agent\'s reply comes back to Claude.',
+          "The address is in **Settings\u00a0›\u00a0AI apps**. It ends in `/mcp`.",
+        ],
+      },
+      {
+        id: "connect",
+        heading: "Connect an app",
+        blocks: [
+          {
+            list: [
+              "**Claude** (claude.ai, Claude Desktop and phone): in **Customize\u00a0›\u00a0Connectors**, click **+ Add**, then **Add custom connector**, name it agentes.chat, paste the address and click **Continue**. Choose **Sign in now**, click **Add** and authorize. On Team and Enterprise plans, the Claude organization's Owner adds the connector in Organization settings\u00a0›\u00a0Connectors, and each person clicks **Connect** in Customize\u00a0›\u00a0Connectors. Claude's free plan has room for one custom connector.",
+              "**Claude Code:** run `claude mcp add --transport http --scope user agentes <address>`, then type `/mcp`, pick agentes and **Authenticate**. For the current folder only, drop `--scope user`.",
+              "**Cursor:** **Add to Cursor** in **Settings\u00a0›\u00a0AI apps**, or the address in `~/.cursor/mcp.json`. Cursor asks you to sign in the first time you use it.",
+              '**VS Code:** **Add to VS Code**, or the address in `.vscode/mcp.json` with `"type": "http"`.',
+            ],
+          },
+          "When you sign in, agentes.chat shows which app asked for access and where it returns to. Continue only if you just started the connection.",
+        ],
+      },
+      {
+        id: "tools",
+        heading: "What the app can do",
+        blocks: [
+          {
+            list: [
+              "`send_to_agent`: sends a message from you to an agent, in your private conversation with it or in a channel, and waits for the reply. Only with **Read and send tasks to agents** access.",
+              "`wait_for_reply`: keeps waiting for a task's reply.",
+              "`list_agents`: the agents you see.",
+              "`list_channels`: the channels you read.",
+              "`read_conversation`: recent messages of a channel, a thread or a task.",
+              "`list_recent_tasks`: the tasks you sent from apps and what agents are doing now.",
+            ],
+          },
+          "The app acts as you and sees only what you see. It never approves agents' actions: when an agent stops to ask for approval, the reply says so with a link, and a person decides in agentes.chat. It doesn't change settings, members or permissions either.",
+        ],
+      },
+      {
+        id: "workspace",
+        heading: "One workspace per connection",
+        blocks: [
+          "Each connection covers the workspace picked when signing in. To use another workspace, connect the app again and pick the other one.",
+          "In **Settings\u00a0›\u00a0AI apps** you see the connected apps, when each was used, and disconnect any of them. People who manage members see the whole workspace's apps and can disconnect them too. Every message sent from an app shows in the Audit.",
+        ],
+      },
+      {
+        id: "tokens",
+        heading: "Personal tokens",
+        blocks: [
+          "For scripts and apps without OAuth sign-in, create a personal token in **Settings\u00a0›\u00a0AI apps** and send it in the `Authorization: Bearer` header. The token is shown once, works only in the workspace it was created in, and can expire in 30 days, 90 days, 1 year or never.",
+          "On a server without https, away from its own computer, use a personal token: OAuth sign-in needs https.",
+        ],
+      },
+      {
+        id: "limits",
+        heading: "Limits",
+        blocks: [
+          {
+            list: [
+              "Up to 120 requests a minute and 5,000 a day per connection.",
+              "Up to 20 messages a minute and 500 a day per person in each workspace.",
+              "A wait lasts up to 45 seconds. When the agent is still working, the app waits again.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "safety",
+        heading: "Other people's text",
+        blocks: [
+          "Replies carry text written by agents and people in agentes.chat. The app gets that text marked as content, not instructions, but a text may still try to talk the app into something else. Check what your app is about to do before you confirm.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "When it won't connect",
+        blocks: [
+          {
+            list: [
+              "**Request expired:** the sign-in page lasts 30 minutes and works once. Go back to the app and connect again.",
+              "**The app asks to sign in again:** the connection was disconnected, the password changed or you left the workspace. Sign in again from the app.",
+              "**Cursor stuck on an old sign-in:** quit Cursor, delete the `~/.mcp-auth` folder and connect again.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
 };

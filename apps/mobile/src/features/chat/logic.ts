@@ -27,6 +27,7 @@ import {
 } from "@agenteschat/client/lib/notices";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
+import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
 import { previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
 
@@ -310,6 +311,7 @@ export const hidesBody = (m: Message) =>
       secretRequestOf(m.meta) ||
       agentProposalOf(m.meta) ||
       stretchCardOf(m.meta) ||
+      usagePauseCardOf(m.meta) ||
       m.meta?.missionStart ||
       m.meta?.threadStart ||
       m.meta?.issueWork ||

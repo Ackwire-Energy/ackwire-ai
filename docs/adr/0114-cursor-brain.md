@@ -24,7 +24,7 @@ Nothing documents mid-turn input in print mode, a prompt on standard input, usag
 
 ### 2. The runner: one `agent -p` per turn (`apps/server/runner/brain-cursor.ts`)
 
-- `agent -p --output-format stream-json --stream-partial-output --workspace <cwd> --trust --approve-mcps [--model m] [--resume <chat>] <prompt>`, an argv, nothing through a shell. The CLI documents no prompt on standard input, so the prompt is the last argument; the first turn of a chat leads it with the engine's context (Cursor has no system prompt flag), cut in its middle past 120,000 characters (Linux refuses one argument past 128 KiB).
+- `agent -p --output-format stream-json --stream-partial-output --workspace <cwd> --trust --disable-auto-update --approve-mcps [--model m] [--resume <chat>] <prompt>`, an argv, nothing through a shell. The CLI documents no prompt on standard input, so the prompt is the last argument; the first turn of a chat leads it with the engine's context (Cursor has no system prompt flag), cut in its middle past 120,000 characters (Linux refuses one argument past 128 KiB).
 - Our session → Cursor's chat id (`system`/`init`'s `session_id`) lives in `<runner home>/brain/cursor-chats.json`, per account like Codex's threads. A runner that lost it starts a new chat, with the context again.
 - Events: the deltas become `text_delta`; a completed Cursor tool call becomes an executed `tool_call` for the transcript (MCP calls are left out: the engine ran ours); `result` ends the turn (its whole answer sent as one delta when nothing streamed, a CLI without partial output); `usage` when `result` carries it, as the plan's (`source: "plan"`, cost zero). A usage limit in the failure is `limit` then `plan_limit`; a sign-in that ended is `not_logged_in` (the account reads as signed out); anything else `cursor_failed`, retryable.
 - No live steering: `brain.steer` answers `unsupported` for a Cursor turn, so a person's messages wait for its end, as with `codex exec`.
@@ -68,6 +68,7 @@ Nothing installs Claude Code or Codex in the core: whoever runs a computer insta
 ## Risks we accept
 
 - The flags, the stream and the account folder rest on Cursor's documentation and one community reading, not yet a run on a real machine with a real plan: a probe on a Cloud computer comes before the brain leaves "Testing". Where the sign-in isn't kept in the folder after all, two accounts on one computer could share one.
+- `--disable-auto-update` keeps a turn from downloading the CLI's self-updates into each agent's home (`CURSOR_CONFIG_DIR`). It is a hidden flag found by reading the CLI's bundle, not documented: it needs confirming on a real machine with that probe. `agent models` and `agent status` run without it until the probe shows whether they check for updates too.
 - `--force` inside the sandbox replaces the command policy for Cursor's own commands.
 - A first turn's context loses its middle past the argument limit.
 - Cursor's plan terms, like the others', make answering other people a gray area; the same switch and words apply (ADR 0059 §5).

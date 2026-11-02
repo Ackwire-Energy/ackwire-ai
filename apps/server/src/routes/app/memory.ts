@@ -5,6 +5,7 @@ import {
   decideProposal,
   editContextItem,
   getAgent,
+  isHowTo,
   itemVisibleIn,
   listAgentMemoryRows,
   listOrgMemoryRows,
@@ -47,6 +48,13 @@ const Memory = z
     verified: z.boolean().openapi({ description: "Backed by an outcome or a person; agent claims alone are not." }),
     supersedes: z.string().nullable().openapi({ description: "The text this one replaced." }),
     editedByUserId: z.string().nullable(),
+    learned: z.boolean().optional().openapi({
+      description:
+        'What the agent learned itself ("What it learned", ADR 0120): its own saves, its learning job\'s, and what a person said that it kept.',
+    }),
+    howTo: z.boolean().optional().openapi({ description: "A how-to the agent worked out (`save_how_to`)." }),
+    disputed: z.boolean().optional().openapi({ description: "Another memory says otherwise, until a person decides." }),
+    channelId: z.uuid().nullable().optional().openapi({ description: "Where it was learned." }),
     updatedAt: z.string(),
     from: z
       .object({
@@ -77,6 +85,14 @@ const Proposal = z
       z.object({ type: z.literal("org_context") }),
       z.object({ type: z.literal("agent_role"), agentId: z.string() }),
       z.object({ type: z.literal("agent_access"), agentId: z.string() }),
+      z
+        .object({
+          type: z.literal("skill"),
+          agentId: z.string(),
+          skillId: z.string(),
+          name: z.string(),
+        })
+        .openapi({ description: "A fix to a skill a person made, from the agent `agentId` that used it." }),
     ]),
     access: z
       .array(z.object({ id: z.string(), label: z.string(), on: z.boolean() }))
@@ -197,6 +213,10 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
       verified: i.verified,
       supersedes: previous.get(i.id) ?? null,
       editedByUserId: i.createdByKind === "person" ? i.createdById : null,
+      learned: i.createdByKind !== "person" || i.sourceIds.length > 0,
+      howTo: isHowTo(i),
+      disputed: i.disputed,
+      channelId: i.channelIds[0] ?? null,
       updatedAt: i.updatedAt.toISOString(),
     };
   });
@@ -254,6 +274,7 @@ const TITLE: Record<ProposalRow["target"], (name: string) => string> = {
   agent_role: (name) => `Change ${name}'s role`,
   agent_access: (name) => `Change ${name}'s access`,
   org_context: () => "Update the organization context",
+  skill: (name) => `Fix the skill ${name}`,
 };
 
 const beforeOf = (diff: string) =>
@@ -305,11 +326,18 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
       agentId: r.agentId ?? "",
       proposedByAgentId: r.proposedByAgentId ?? r.agentId ?? "",
       target:
-        r.target !== "org_context" && r.agentId
-          ? { type: r.target, agentId: r.agentId }
-          : { type: "org_context" as const },
+        r.target === "skill" && r.agentId
+          ? {
+              type: "skill" as const,
+              agentId: r.agentId,
+              skillId: r.access?.[0]?.id ?? "",
+              name: r.access?.[0]?.label ?? "",
+            }
+          : r.target !== "org_context" && r.target !== "skill" && r.agentId
+            ? { type: r.target, agentId: r.agentId }
+            : { type: "org_context" as const },
       access: r.target === "agent_access" ? (r.access ?? []) : null,
-      title: TITLE[r.target](name),
+      title: TITLE[r.target](r.target === "skill" ? (r.access?.[0]?.label ?? "") : name),
       why: sourceItems.map((i) => i.content).join(" ") || r.rationale,
       evidence: sourceItems.flatMap((i) =>
         i.evidence.map((e) => ({

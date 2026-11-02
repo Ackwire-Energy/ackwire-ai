@@ -196,8 +196,13 @@ export async function makeWayForRun(deps: FiringDeps, routine: RoutineRow, run: 
     if (ar.status === "queued" || ar.status === "running") return blocked("previous_running");
     if (event) return blocked("previous_running");
     // Waiting for its plan's limit or its budget: the freshest slot runs once there's room again.
-    const usageCode = (ar.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain?.code;
-    if (ar.status === "waiting_input" && (usageCode === "plan_limit" || usageCode === "budget")) {
+    const usageWait = (ar.transcript as { waitingForBrain?: { code?: string; source?: string } } | null)
+      ?.waitingForBrain;
+    const usageCode = usageWait?.code === "usage_pause" ? usageWait.source : usageWait?.code;
+    if (
+      ar.status === "waiting_input" &&
+      (usageCode === "plan_limit" || usageCode === "plan" || usageCode === "budget")
+    ) {
       await endWithRun(deps, rr, ar, {
         status: "superseded",
         code: usageCode === "budget" ? "waiting_budget" : "waiting_plan",

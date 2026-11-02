@@ -146,6 +146,11 @@ export const agents = pgTable(
     /** When the computer brain can't answer, answer through the API (counts against the budget). */
     brainFallback: boolean().notNull().default(true),
     /**
+     * Long work may go on into the plan's paid extra usage, where the provider reports it on (ADR 0118); off, it
+     * pauses at 95% of the plan like any other.
+     */
+    brainExtraUsage: boolean().notNull().default(true),
+    /**
      * The account its computer brain runs with (ADR 0041), on its machine and
      * of its brain's kind (checked in code); null = the computer's own sign-in.
      * Cleared when the agent changes computer or brain kind, or the account goes.
