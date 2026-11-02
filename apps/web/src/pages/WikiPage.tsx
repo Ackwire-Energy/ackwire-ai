@@ -1,13 +1,13 @@
 import type { WikiPageSummary } from "@agenteschat/client";
-import { keys, useWikiReads, useWikiTree } from "@agenteschat/client";
+import { keys, useWikiPage, useWikiReads, useWikiTree } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { type WikiFolder, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
+import { outlineOf, type WikiFolder, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
 import { Button, EmptyState, Icon, Kbd, SearchField } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -18,7 +18,7 @@ import { WikiGraphView } from "@/components/WikiGraph";
 import { ObsidianMark } from "@/components/wiki/ObsidianMark";
 import { WikiAudienceDialog } from "@/components/wiki/WikiAudience";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
-import { AuthorAvatar, typingIn, WikiReader } from "@/components/wiki/WikiReader";
+import { AuthorAvatar, PageOutline, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
@@ -68,6 +68,13 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
   const [navOpen, setNavOpen] = useState(false);
   const [tag, setTag] = useState<string | null>(null);
   const current = pages.find((p) => p.slug === slug);
+  // The open page's outline goes in the tree, under its row (the page itself reads in one column).
+  const openPage = useWikiPage(org.id, slug ?? null).data;
+  const outline = useMemo(() => {
+    if (!openPage) return [];
+    const title = openPage.title.trim();
+    return outlineOf(openPage.body).filter((h) => !(h.level === 1 && h.text.trim() === title));
+  }, [openPage]);
 
   useEffect(() => {
     if (newTitle === undefined) return;
@@ -137,6 +144,7 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
         pages={pages}
         loading={tree.isLoading}
         current={writing ? undefined : slug}
+        outline={writing || view === "graph" ? [] : outline}
         view={writing ? null : view}
         open={navOpen}
         tag={tag}
@@ -182,6 +190,7 @@ function WikiNav({
   pages,
   loading,
   current,
+  outline,
   view,
   open,
   tag,
@@ -195,6 +204,7 @@ function WikiNav({
   pages: WikiPageSummary[];
   loading: boolean;
   current?: string;
+  outline: { level: number; text: string; id: string }[];
   view: View | null;
   open: boolean;
   tag: string | null;
@@ -250,25 +260,28 @@ function WikiNav({
   const count = (f: WikiFolder<WikiPageSummary>): number =>
     f.pages.length + f.folders.reduce((n, sub) => n + count(sub), 0);
 
-  const PageRow = ({ p }: { p: WikiPageSummary }) => (
-    <Link
-      to="/org/$orgId/wiki/$slug"
-      params={{ orgId: org.id, slug: p.slug }}
-      className="wiki-row"
-      aria-current={p.slug === current ? "page" : undefined}
-      onClick={onClose}
-      {...rowMenu(p)}
-    >
-      <Icon name={p.locked ? "lock" : "document"} size={14} />
-      <span className="wiki-row__t">{p.title}</span>
-      {isFresh(p) && <span className="wiki-row__new">{t("wiki.fresh")}</span>}
-    </Link>
+  const pageRow = (p: WikiPageSummary, inTree = true) => (
+    <Fragment key={p.slug}>
+      <Link
+        to="/org/$orgId/wiki/$slug"
+        params={{ orgId: org.id, slug: p.slug }}
+        className="wiki-row"
+        aria-current={p.slug === current ? "page" : undefined}
+        onClick={onClose}
+        {...rowMenu(p)}
+      >
+        <Icon name={p.locked ? "lock" : "document"} size={14} />
+        <span className="wiki-row__t">{p.title}</span>
+        {isFresh(p) && <span className="wiki-row__new">{t("wiki.fresh")}</span>}
+      </Link>
+      {inTree && p.slug === current && outline.length > 0 && <PageOutline items={outline} />}
+    </Fragment>
   );
-  const Folder = ({ f }: { f: WikiFolder<WikiPageSummary> }) => {
+  const folderRows = (f: WikiFolder<WikiPageSummary>): ReactNode => {
     const isOpen = filtering || !closed.has(f.path);
     const limited = f.pages.some((p) => p.audienceFolder === f.path);
     return (
-      <>
+      <Fragment key={f.path}>
         <div className="wiki-folder-row">
           <button
             type="button"
@@ -305,15 +318,11 @@ function WikiNav({
         </div>
         {isOpen && (
           <div className="wiki-sub">
-            {f.folders.map((sub) => (
-              <Folder key={sub.path} f={sub} />
-            ))}
-            {f.pages.map((p) => (
-              <PageRow key={p.slug} p={p} />
-            ))}
+            {f.folders.map((sub) => folderRows(sub))}
+            {f.pages.map((p) => pageRow(p))}
           </div>
         )}
-      </>
+      </Fragment>
     );
   };
 
@@ -368,9 +377,7 @@ function WikiNav({
         <section className="wiki-nav__section" aria-label={t("wiki.pinnedPages")}>
           <span className="wiki-label">{t("wiki.pinnedPages")}</span>
           <div className="wiki-nav__list">
-            {pinned.map((p) => (
-              <PageRow key={p.slug} p={p} />
-            ))}
+            {pinned.map((p) => pageRow(p, false))}
           </div>
         </section>
       )}
@@ -380,12 +387,8 @@ function WikiNav({
           <LoadingList count={5} avatar={false} />
         ) : (
           <div className="wiki-nav__list">
-            {root.folders.map((f) => (
-              <Folder key={f.path} f={f} />
-            ))}
-            {root.pages.map((p) => (
-              <PageRow key={p.slug} p={p} />
-            ))}
+            {root.folders.map((f) => folderRows(f))}
+            {root.pages.map((p) => pageRow(p))}
             {shown.length === 0 && <p className="small muted wiki-nav__empty">{t("wiki.noMatch")}</p>}
           </div>
         )}

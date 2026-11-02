@@ -100,6 +100,10 @@ const Backlink = z
       channelId: z.uuid(),
       messageId: z.uuid(),
       channelName: z.string(),
+      dm: z
+        .object({ type: z.enum(["agent", "person"]), id: z.string() })
+        .nullable()
+        .openapi({ description: "In a direct conversation: who it is with (a DM's name is an internal key)." }),
       excerpt: z.string(),
       at: z.string(),
     }),

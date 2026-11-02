@@ -16,7 +16,7 @@ const maxWidth = (selector: string) => declarations(css, selector).findLast(([p]
 
 test("pages use the width they have: no column capped short of the work area, sidebar open or collapsed", () => {
   for (const selector of [
-    // The wiki: home, a page read and edited (its side column sits at the right edge), the graph, the text.
+    // The wiki: home, a page read and edited (one column, its outline in the tree), the graph, the text.
     ".wiki-home",
     ".wiki-doc",
     ".wiki-doc[data-editing]",

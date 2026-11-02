@@ -20,6 +20,7 @@ import {
   listMessages,
   listWikiVersions,
   NotFoundError,
+  openDm,
   parseWikiLinks,
   postPersonMessage,
   renameWikiPage,
@@ -80,6 +81,29 @@ describe("links", () => {
       },
     ]);
     expect(wikiSlug("Ação & Reação")).toBe("acao-reacao");
+  });
+
+  test("a title keeps its slashes when its folder comes apart; a mention in a DM says who it is with", async () => {
+    f = await setup();
+    const deps = wikiDeps();
+    const me = person(f.owner.id);
+    // An agent wrote the folder apart and dates in the title: the title stays whole (a "/" would name a folder).
+    const page = await createWikiPage(deps, me, f.org.id, {
+      title: "Changelog (30/out e 1/nov)",
+      folder: "Engenharia",
+      body: "O que mudou.",
+    });
+    expect(page).toMatchObject({ title: "Changelog (30\u2215out e 1\u2215nov)", folder: "Engenharia" });
+    const renamed = await renameWikiPage(deps, me, f.org.id, page.slug, { title: "Mudanças de 1/nov" });
+    expect(renamed).toMatchObject({ title: "Mudanças de 1\u2215nov", folder: "Engenharia" });
+
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    if (!dm) throw new Error("no DM");
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, {
+      body: `Atualiza a [[${renamed.title}]], por favor`,
+    });
+    const read = await getWikiPage(f.db, me, f.org.id, renamed.slug);
+    expect(read.backlinks).toMatchObject([{ kind: "message", channelId: dm.id, dm: { type: "agent", id: f.agent.id } }]);
   });
 
   test("backlinks from pages, messages and issues; unresolved links resolve when the page appears", async () => {

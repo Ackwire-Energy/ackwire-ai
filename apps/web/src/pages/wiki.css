@@ -575,18 +575,52 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
 }
 
 /* ── Reading page ───────────────────────────────────────────────────────── */
+/* One column, the work area's width (pages use the width they have): the page's outline is in the tree, what is
+   around the page comes after its text. */
 .wiki-doc {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 272px;
-  gap: 40px;
-  align-items: start;
+  /* The page's bar: 40px controls and its padding; the editor's toolbar sticks right under it. */
+  --wiki-top-h: 64px;
   animation: wiki-in 0.25s var(--out) both;
-}
-.wiki-doc[data-editing] {
-  grid-template-columns: minmax(0, 1fr);
 }
 .wiki-doc__main {
   min-width: 0;
+}
+/* The trail and the page's actions on one bar that stays on top while the page scrolls, so the title never shares
+   its line with buttons. The scroll area's top padding is pulled under it (sticky counts from inside the padding). */
+.wiki-top {
+  position: sticky;
+  top: -26px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  margin-top: -26px;
+  padding: 14px 0 10px;
+  background: var(--bg);
+}
+.wiki-top .wiki-crumbs {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: nowrap;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.wiki-top__acts {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wiki-top__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  color: var(--faint);
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 .wiki-crumbs {
   display: flex;
@@ -609,25 +643,8 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
   color: var(--ink);
   background: var(--plate);
 }
-.wiki-doc__head {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-.wiki-doc__titles {
-  flex: 1;
-  min-width: 0;
-}
-.wiki-doc__actions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex: none;
-  padding-top: 6px;
-}
 .wiki-title {
-  margin: 0;
+  margin: 10px 0 0;
   font-family: var(--font-display);
   font-weight: var(--font-display-weight, 300);
   font-size: clamp(34px, 4.4vw, 50px);
@@ -635,19 +652,23 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
   line-height: 1.04;
   overflow-wrap: anywhere;
 }
+/* The title while editing: the page's own type, and it wraps like the title (a textarea that grows). */
 .wiki-title-input {
   display: block;
   width: 100%;
+  margin: 10px 0 0;
   padding: 0;
   border: 0;
   outline: 0;
+  resize: none;
+  overflow: hidden;
   background: transparent;
   color: var(--ink);
   font-family: var(--font-display);
   font-weight: var(--font-display-weight, 300);
   font-size: clamp(34px, 4.4vw, 50px);
   letter-spacing: -0.035em;
-  line-height: 1.1;
+  line-height: 1.04;
 }
 .wiki-title-input::placeholder {
   color: var(--faint);
@@ -661,8 +682,44 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
   color: var(--muted);
   font-size: 13px;
 }
-.wiki-meta--edit {
-  margin: 14px 0 18px;
+/* "editou ontem": opens the history. */
+.wiki-meta__when {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.wiki-meta__when:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.wiki-meta__tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+/* A tag in the line: words that filter the tree (not a channel, so no "#" icon). */
+.wiki-tagword {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.wiki-tagword:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+html:not([data-pointer]) .wiki-tagword:focus-visible,
+html:not([data-pointer]) .wiki-meta__when:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
 }
 .wiki-meta__dot {
   width: 3px;
@@ -670,22 +727,6 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
   border-radius: 50%;
   background: var(--faint);
   opacity: 0.6;
-}
-.wiki-meta__field {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--faint);
-}
-.wiki-meta__field .ac-input {
-  height: var(--control-h-sm);
-  padding: 0 var(--control-px-sm);
-  font-size: var(--control-fs-sm);
-  border-radius: var(--control-r-sm);
-  min-width: 180px;
-}
-.wiki-meta__hash {
-  font-weight: 700;
 }
 .wiki-by {
   display: inline-flex;
@@ -721,6 +762,36 @@ button.wiki-chip {
 button.wiki-chip:hover {
   color: var(--ink);
 }
+/* Who sees the page, who uses it, its folder while editing: the ruler's control on a hairline. */
+.wiki-chip--line {
+  gap: 7px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  color: var(--ink2);
+  font-size: var(--control-fs-sm);
+}
+button.wiki-chip--line:hover {
+  background: var(--plate);
+}
+.wiki-chip--line .ac-icon {
+  color: var(--faint);
+}
+.wiki-chip--line[data-limited] .ac-icon {
+  color: var(--ink2);
+}
+html:not([data-pointer]) button.wiki-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.wiki-chip__crew {
+  display: inline-flex;
+}
+.wiki-chip__crew > * + * {
+  margin-left: -5px;
+}
 
 /* The text of a page */
 .wiki-prose .md {
@@ -739,7 +810,7 @@ button.wiki-chip:hover {
   letter-spacing: -0.02em;
   line-height: 1.2;
   color: var(--ink);
-  scroll-margin-top: 20px;
+  scroll-margin-top: 84px;
 }
 .wiki-prose .md h3,
 .wiki-prose .md h4 {
@@ -748,7 +819,7 @@ button.wiki-chip:hover {
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--ink);
-  scroll-margin-top: 20px;
+  scroll-margin-top: 84px;
 }
 .wiki-prose .md > h2:first-child,
 .wiki-prose .md > h3:first-child {
@@ -884,40 +955,155 @@ a.wiki-embed:hover {
   display: none;
 }
 
-/* Side column */
-.wiki-aside {
-  position: sticky;
-  top: 0;
+/* The pixel sky behind the import's "done" (WikiSky). */
+.wiki-sky {
+  display: block;
+  pointer-events: none;
+}
+.wiki-sky .ac-sky,
+.wiki-sky canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+/* "Sobre a página", after the text: three columns on a hairline, no cards. */
+.wiki-about {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  margin-top: 44px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.wiki-about__block {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  font-size: 13.5px;
+  min-width: 0;
 }
-.wiki-aside__block {
-  display: flex;
-  flex-direction: column;
+.wiki-about__empty,
+.wiki-about__note {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 12.5px;
+  line-height: 1.45;
 }
-.wiki-aside__authors {
+.wiki-about__empty {
   margin: 0;
+  color: var(--muted);
 }
-.wiki-outline__list {
+.wiki-about__more {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+/* An agent that used the page: its share of the week's reads. */
+.wiki-use {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  color: var(--muted);
+}
+.wiki-use b {
+  color: var(--ink2);
+  font-weight: 600;
+}
+.wiki-use__bar {
+  flex: 1;
+  min-width: 30px;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+.wiki-use__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--agent) 70%, var(--raised));
+}
+.wiki-use__n {
+  min-width: 22px;
+  text-align: right;
+  color: var(--ink2);
+  font-weight: 600;
+}
+.wiki-uses-pop {
+  min-width: 260px;
+}
+.wiki-uses-pop .wiki-label {
+  margin: 4px 4px 6px;
+}
+.wiki-uses-pop .wiki-use,
+.wiki-uses-pop .wiki-about__note,
+.wiki-uses-pop .wiki-about__empty {
+  padding-inline: 4px;
+}
+/* Where the page is mentioned: one row each (a conversation shows who it is with). */
+.wiki-refs {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+  margin: 0 -8px;
+}
+.wiki-ref {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  color: var(--ink2);
+  text-decoration: none;
+  line-height: 1.4;
+}
+.wiki-ref:hover {
+  background: var(--plate);
+}
+html:not([data-pointer]) .wiki-ref:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.wiki-ref > .ac-icon,
+.wiki-ref > .ac-avatar {
+  flex: none;
+  margin-top: 1px;
+  color: var(--faint);
+}
+.wiki-ref > span {
+  min-width: 0;
+}
+.wiki-ref b {
+  display: block;
+  font-weight: 600;
+}
+.wiki-ref small {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+/* The open page's outline, under its row in the tree. */
+.wiki-toc {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 6px 15px;
   border-left: 1px solid var(--line2);
 }
 .wiki-outline__item {
   margin-left: -1px;
-  padding: 4px 0 4px 12px;
+  padding: 3px 0 3px 12px;
   border-left: 2px solid transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.35;
   text-decoration: none;
 }
 .wiki-outline__item[data-level="3"],
 .wiki-outline__item[data-level="4"] {
-  padding-left: 24px;
-  font-size: 12.5px;
+  padding-left: 22px;
 }
 .wiki-outline__item:hover {
   color: var(--ink);
@@ -927,92 +1113,10 @@ a.wiki-embed:hover {
   color: var(--ink);
   font-weight: 600;
 }
-.wiki-uses {
-  position: relative;
-  border-radius: 18px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  overflow: hidden;
-}
-.wiki-sky {
-  display: block;
-  pointer-events: none;
-}
-.wiki-sky--strip {
-  height: 34px;
-}
-.wiki-sky .ac-sky,
-.wiki-sky canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
-}
-.wiki-uses__crew {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  display: flex;
-  gap: 2px;
-}
-.wiki-uses__in {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px 12px;
-}
-.wiki-uses__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-.wiki-uses__big {
-  color: var(--ink);
-  font-size: 30px;
-  line-height: 1;
-}
-.wiki-backlinks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.wiki-backlink {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 12px;
-  border-radius: 14px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  color: var(--ink);
-  text-decoration: none;
-  transition: box-shadow 0.15s;
-}
-.wiki-backlink:hover {
-  box-shadow: var(--e2), var(--top);
-}
-html:not([data-pointer]) .wiki-backlink:focus-visible {
+html:not([data-pointer]) .wiki-outline__item:focus-visible {
   outline: none;
+  border-radius: 4px;
   box-shadow: var(--focus-ring);
-}
-.wiki-backlink b {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-}
-.wiki-backlink span {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.45;
 }
 .wiki-hist {
   display: flex;
@@ -1095,13 +1199,213 @@ html:not([data-pointer]) .wiki-backlink:focus-visible {
   max-height: 60vh;
 }
 
-/* The editor in place: a glass toolbar that stays on top. */
+/* The editor in place: a glass toolbar that stays on top, right under the page's bar. */
 .wiki-doc .wiki-editor__bar {
   position: sticky;
-  top: 0;
+  top: calc(var(--wiki-top-h) - 26px);
   z-index: 3;
   padding: 6px;
   border-radius: 16px;
+}
+/* Folder and tags while editing, under the title. */
+.wiki-props {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 20px;
+}
+.wiki-tagchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--control-h-sm);
+  padding: 0 4px 0 10px;
+  border-radius: var(--control-r-sm);
+  background: var(--sunken);
+  color: var(--ink2);
+  font-size: var(--control-fs-sm);
+  font-weight: 600;
+}
+.wiki-tagchip button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+.wiki-tagchip button:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.wiki-props .wiki-tag-input {
+  width: 160px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
+  font-size: var(--control-fs-sm);
+}
+.wiki-folders-pop {
+  min-width: 260px;
+}
+.wiki-folders-pop__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 260px;
+  margin-top: 6px;
+  overflow-y: auto;
+}
+.wiki-folders-pop__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.wiki-folders-pop__row[data-depth="1"] {
+  padding-left: 30px;
+}
+.wiki-folders-pop__row[data-depth="2"] {
+  padding-left: 50px;
+}
+.wiki-folders-pop__row:hover {
+  background: var(--plate);
+}
+.wiki-folders-pop__row[aria-selected="true"] {
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  color: var(--ink);
+  font-weight: 600;
+}
+.wiki-folders-pop__row .ac-icon {
+  flex: none;
+  color: var(--faint);
+}
+/* The visual editor's toolbar: the block it is in, marks, lists, then what goes in a page; the agent at the end. */
+.wiki-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 18px;
+}
+.wiki-bar > * {
+  flex: none;
+}
+.wiki-bar__sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--line2);
+}
+.wiki-bar__end {
+  margin-left: auto;
+}
+.wiki-bar__block {
+  width: 140px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
+  font-size: var(--control-fs-sm);
+}
+.wiki-bar .ac-btn[aria-pressed="true"],
+.wiki-top__acts .ac-btn[aria-pressed="true"] {
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  color: var(--ink);
+}
+/* The text being edited reads like the page; its pieces that stay whole (links, files) are chips. */
+.wiki-rich-wrap {
+  position: relative;
+}
+.wiki-rich {
+  min-height: 240px;
+  outline: none;
+  caret-color: var(--ink);
+}
+.wiki-rich:empty::before {
+  content: attr(data-placeholder);
+  color: var(--faint);
+}
+.wiki-rich .md__task-box {
+  cursor: pointer;
+}
+.wiki-rich td,
+.wiki-rich th {
+  min-width: 64px;
+}
+.wiki-rich .wiki-link {
+  cursor: default;
+}
+.wiki-rich__raw {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 0.9em;
+  user-select: all;
+}
+p.wiki-rich__raw {
+  display: flex;
+  width: fit-content;
+}
+.wiki-rich__table-acts {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+/* Over selected words: send them to an agent. */
+.wiki-rich__float {
+  position: fixed;
+  z-index: var(--z-floating);
+  padding: 4px;
+  border-radius: 14px;
+  box-shadow: var(--e3), var(--top);
+  transform: translate(-50%, calc(-100% - 8px));
+}
+.wiki-suggest--float {
+  position: fixed;
+  z-index: var(--z-floating);
+  width: 300px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.wiki-hintline {
+  margin: 22px 0 0;
+}
+/* "Pedir a um agente": the words it is about. */
+.wiki-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wiki-ask__quote {
+  margin: 0;
+  max-height: 96px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 .wiki-doc .wiki-editor__text {
   border: 0;
@@ -1245,29 +1549,12 @@ html:not([data-pointer]) .wiki-graph__node:focus-visible {
 }
 
 /* ── Smaller screens ────────────────────────────────────────────────────── */
-@media (max-width: 1240px) {
-  .wiki-doc {
-    grid-template-columns: minmax(0, 1fr) 240px;
-    gap: 28px;
-  }
-}
 @media (max-width: 1080px) {
-  .wiki-doc {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .wiki-aside {
-    position: static;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 18px;
-    padding-top: 22px;
-    border-top: 1px solid var(--line);
-  }
-  .wiki-aside .wiki-outline {
-    display: none;
-  }
   .wiki-home__two {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .wiki-about {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 900px) {
@@ -1303,6 +1590,10 @@ html:not([data-pointer]) .wiki-graph__node:focus-visible {
   .wiki__center > .wiki__navbtn {
     margin-bottom: 10px;
   }
+  /* "Páginas" sits above the page here: the bar starts under it. */
+  .wiki__navbtn + .wiki-doc .wiki-top {
+    margin-top: 0;
+  }
 }
 @media (max-width: 720px) {
   .wiki__center {
@@ -1320,8 +1611,23 @@ html:not([data-pointer]) .wiki-graph__node:focus-visible {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .wiki-doc__head {
-    flex-wrap: wrap;
+  .wiki-top {
+    top: -18px;
+  }
+  .wiki-top:first-child {
+    margin-top: -18px;
+  }
+  .wiki-doc .wiki-editor__bar {
+    top: calc(var(--wiki-top-h) - 18px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .wiki-top__status-text,
+  .wiki-top__md {
+    display: none;
+  }
+  .wiki-about {
+    grid-template-columns: minmax(0, 1fr);
   }
   .wiki-row {
     min-height: 40px;
