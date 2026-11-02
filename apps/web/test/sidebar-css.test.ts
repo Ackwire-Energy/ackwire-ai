@@ -93,3 +93,44 @@ test("over a row's hover button the row keeps its plate, and the button lights i
   const lit = '.sidebar__row-acts .ac-btn--ghost:is(:hover, [data-state="open"])';
   expect([value(lit, "background"), value(lit, "color")]).toEqual(["transparent", "var(--ink)"]);
 });
+
+test("the open row is one solid plate (no sky, no glow), hover its lighter step, both from the sidebar's tokens", () => {
+  const active = '.sidebar__item[data-status="active"]';
+  expect(value(active, "background")).toBe("var(--side-chosen)");
+  const all = declarations(css, active).concat(declarations(css, `${active}::before`));
+  expect(
+    all.some(([p, v]) => p.startsWith("background-image") || v.includes("--sel-sky") || v.includes("--sel-glow")),
+  ).toBe(false);
+  expect(value(".sidebar__item:hover", "background")).toBe("var(--side-hover)");
+  // The open channel's own buttons stay in sight on it.
+  expect(value('.sidebar__row:has(> [data-status="active"]) > .sidebar__row-acts', "opacity")).toBe("1");
+});
+
+test("a channel: gray when read, full ink and bold with the edge pill when unread, the red count only for mentions", () => {
+  const channel = '.sidebar__item[data-kind="channel"]';
+  expect(value(`${channel} .sidebar__item-label`, "color")).toBe("var(--faint)");
+  const unread = `${channel}[data-unread="true"]`;
+  expect([
+    value(`${unread} .sidebar__item-label`, "color"),
+    value(`${unread} .sidebar__item-label`, "font-weight"),
+  ]).toEqual(["var(--ink)", "650"]);
+  const pill = `${unread}::before`;
+  expect([value(pill, "left"), value(pill, "width"), value(pill, "height"), value(pill, "background")]).toEqual([
+    "-12px",
+    "4px",
+    "8px",
+    "var(--ink)",
+  ]);
+  expect([value(".sidebar__unread", "background"), value(".sidebar__unread", "color")]).toEqual([
+    "var(--danger)",
+    "var(--raised)",
+  ]);
+  // A category's name is small and gray, quieter than any unread channel.
+  const label = ".sidebar__section--category .sidebar__section-head .sidebar__label";
+  expect([value(label, "font-size"), value(label, "color")]).toEqual(["12.5px", "var(--faint)"]);
+});
+
+test("every role mark is a full circle", async () => {
+  const ui = await Bun.file(join(import.meta.dir, "../../../packages/ui/src/styles/components.css")).text();
+  expect(declarations(ui, ".ac-rolemark").findLast(([p]) => p === "border-radius")?.[1]).toBe("50%");
+});

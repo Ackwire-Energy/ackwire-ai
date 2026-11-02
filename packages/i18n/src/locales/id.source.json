@@ -3200,6 +3200,9 @@
   "shell.notifications": {
     "value": "Notifications"
   },
+  "shell.unreadMark": {
+    "value": "Unread"
+  },
   "shell.unreadMentions": {
     "value": {
       "one": "{{count}} mention of you",

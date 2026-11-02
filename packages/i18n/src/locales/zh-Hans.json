@@ -1263,6 +1263,7 @@
     "pendingApprovals_other": "{{count}} 个待审批",
     "home": "首页",
     "notifications": "通知",
+    "unreadMark": "未读",
     "unreadMentions_other": "{{count}} 条提及你的消息",
     "unreadThreads_other": "话题：{{count}} 个有未读回复",
     "unreadNotifications_other": "{{count}} 条未读通知"

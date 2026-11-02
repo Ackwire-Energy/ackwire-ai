@@ -1263,6 +1263,7 @@
     "pendingApprovals_other": "대기 중인 승인 {{count}}개",
     "home": "홈",
     "notifications": "알림",
+    "unreadMark": "읽지 않음",
     "unreadMentions_other": "나를 언급한 메시지 {{count}}개",
     "unreadThreads_other": "스레드: 읽지 않은 답글이 있는 스레드 {{count}}개",
     "unreadNotifications_other": "읽지 않은 알림 {{count}}개"

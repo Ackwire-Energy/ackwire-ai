@@ -242,29 +242,12 @@ describe("dragging in the sidebar", () => {
 });
 
 describe("the open row's highlight", () => {
-  test("the active row's plate has a soft glow from the right: the accent's, an agent's in its own color", async () => {
+  test("the open channel and the open agent are the active row (one plate, sidebar-css.test.ts has its look)", async () => {
     const { router } = await go();
     const active = () => nav().querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
     expect(active()?.textContent).toContain("eng");
-    const css = readFileSync(new URL("../src/layout.css", import.meta.url), "utf8");
-    const start = css.indexOf('.sidebar__item[data-status="active"]::before {\n  background:\n    linear-gradient(');
-    const rule = css.slice(start, css.indexOf("}", start));
-    expect(start).toBeGreaterThan(-1);
-    expect(rule).toContain("to left");
-    expect(rule).toContain("var(--sel-glow-color, var(--agent))");
-    expect(rule).toContain("transparent var(--sel-glow-reach, 45%)");
-    // Strong enough to see at a glance, in both themes (the app always sets data-theme, the system's included).
-    expect(Number(rule.match(/var\(--sel-glow, (\d+)%\)/)?.[1])).toBeGreaterThanOrEqual(20);
-    expect(
-      Number(
-        css.match(/\[data-theme="dark"\] \.sidebar__item\[data-status="active"\] \{\n {2}--sel-glow: (\d+)%/)?.[1],
-      ),
-    ).toBeGreaterThanOrEqual(26);
-    // No agent row is left out of it.
-    expect(css).not.toContain('.sidebar__row[data-agent-row] > .sidebar__item[data-status="active"]::before');
     await act(() => router.navigate({ to: `/org/${ORG_ID}/dm/agent/${seedState().agents[0]?.id}` }));
     await settle(4);
     expect(active()?.closest("[data-agent-row]")).not.toBeNull();
-    expect(active()?.style.getPropertyValue("--sel-glow-color")).toMatch(/^#[0-9a-f]{6}$/i);
   });
 });

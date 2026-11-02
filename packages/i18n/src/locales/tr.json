@@ -1303,6 +1303,7 @@
     "pendingApprovals_other": "{{count}} bekleyen onay",
     "home": "Ana sayfa",
     "notifications": "Bildirimler",
+    "unreadMark": "Okunmadı",
     "unreadMentions_one": "Sizden {{count}} bahsetme",
     "unreadMentions_other": "Sizden {{count}} bahsetme",
     "unreadThreads_one": "Konular: okunmamış yanıtı olan {{count}} konu",

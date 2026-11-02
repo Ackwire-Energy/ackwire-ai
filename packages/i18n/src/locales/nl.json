@@ -1303,6 +1303,7 @@
     "pendingApprovals_other": "{{count}} goedkeuringen open",
     "home": "Start",
     "notifications": "Meldingen",
+    "unreadMark": "Ongelezen",
     "unreadMentions_one": "{{count}} vermelding van jou",
     "unreadMentions_other": "{{count}} vermeldingen van jou",
     "unreadThreads_one": "Threads: {{count}} met ongelezen antwoorden",

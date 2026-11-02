@@ -1343,6 +1343,7 @@
     "pendingApprovals_other": "{{count}} approbations en attente",
     "home": "Accueil",
     "notifications": "Notifications",
+    "unreadMark": "Non lu",
     "unreadMentions_one": "{{count}} mention de vous",
     "unreadMentions_many": "{{count}} mentions de vous",
     "unreadMentions_other": "{{count}} mentions de vous",

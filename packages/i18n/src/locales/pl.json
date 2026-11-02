@@ -1383,6 +1383,7 @@
     "pendingApprovals_other": "{{count}} oczekujące zatwierdzenia",
     "home": "Start",
     "notifications": "Powiadomienia",
+    "unreadMark": "Nieprzeczytane",
     "unreadMentions_one": "{{count}} wzmianka o tobie",
     "unreadMentions_few": "{{count}} wzmianki o tobie",
     "unreadMentions_many": "{{count}} wzmianek o tobie",

@@ -1282,6 +1282,7 @@ export const ptBR = {
     pendingApprovals_other: "{{count}} aprovações pendentes",
     home: "Início",
     notifications: "Notificações",
+    unreadMark: "Não lida",
     unreadMentions_one: "{{count}} menção a você",
     unreadMentions_other: "{{count}} menções a você",
     unreadThreads_one: "Threads: {{count}} com respostas não lidas",

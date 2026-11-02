@@ -1263,6 +1263,7 @@
     "pendingApprovals_other": "{{count}}件の承認待ち",
     "home": "ホーム",
     "notifications": "通知",
+    "unreadMark": "未読",
     "unreadMentions_other": "あなたへのメンション {{count}} 件",
     "unreadThreads_other": "スレッド: 未読の返信あり {{count}} 件",
     "unreadNotifications_other": "{{count}}件の未読の通知"

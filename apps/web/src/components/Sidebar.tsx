@@ -132,8 +132,8 @@ import { SIDEBAR_TOOLS, SidebarSetupDialog } from "./SidebarSetup";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { SetStatusDialog, useSaveStatus } from "./StatusDialog";
 
-/** The chosen item's sky: both themes, the CSS picks one. */
-const selectionSky = (color: AgentColor = "sky") =>
+/** An agent's sky for its busy chip (`.sidebar__busy`): both themes, the CSS picks one. */
+const selectionSky = (color: AgentColor) =>
   ({ "--sel-sky": selectionSkyUrl(color), "--sel-sky-dark": selectionSkyUrl(color, true) }) as CSSProperties;
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
@@ -599,7 +599,7 @@ export function Sidebar() {
   };
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
+    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
       <div className="sidebar__top">
         <WorkspaceSky part="side" rail={rail} />
         <div className="sidebar__org">
@@ -1097,7 +1097,7 @@ function SidebarChannels({
         params={{ orgId, channelId: c.id }}
         className="sidebar__item"
         title={`#${c.name}`}
-        data-conv
+        data-kind="channel"
         data-unread={unread}
         data-muted={c.muted || undefined}
         data-drop={dropMark(`channel:${c.id}`)}
@@ -1116,7 +1116,11 @@ function SidebarChannels({
           {channelInitials(c.name)}
         </span>
         <span className="sidebar__item-label">{c.name}</span>
-        {mentions > 0 && <UnreadCount count={mentions} mentions />}
+        {mentions > 0 ? (
+          <UnreadCount count={mentions} mentions />
+        ) : (
+          unread && <span className="ac-visually-hidden">{t("shell.unreadMark")}</span>
+        )}
       </Link>
     );
     // On hover or focus, like Discord's invite and settings: who manages the channel adds members or opens its details.
@@ -1130,7 +1134,7 @@ function SidebarChannels({
         {link}
         <span className="sidebar__row-acts">
           <RowAction icon="personAdd" label={t("shell.sidebarMenu.addMembers")} onClick={open("add")} />
-          <RowAction icon="settings" label={t("shell.sidebarMenu.channelSettings")} onClick={open("details")} />
+          <RowAction icon="cog" label={t("shell.sidebarMenu.channelSettings")} onClick={open("details")} />
         </span>
       </div>
     );
@@ -1368,7 +1372,6 @@ function AgentRow({
         onMouseEnter={onPrefetch}
         onFocus={onPrefetch}
         onClick={onOpen}
-        data-conv
         data-unread={unread > 0}
         data-busy={busy}
         data-presence={shown?.presence}
@@ -1422,7 +1425,7 @@ function AgentRow({
         <span className="sidebar__row-acts">
           {edits && (
             <RowAction
-              icon="settings"
+              icon="cog"
               label={t("shell.sidebarMenu.agentSettings", { name: a.name })}
               onClick={() => {
                 if (requestAgentPanel(a.id, "settings")) return;
@@ -1463,7 +1466,6 @@ function PersonRow({
       params={{ orgId: org.id, userId: m.userId }}
       className="sidebar__item"
       title={[m.name, word, line?.text].filter(Boolean).join(" · ")}
-      data-conv
       data-unread={unread > 0}
       data-presence={shown?.presence}
       onMouseEnter={onPrefetch}

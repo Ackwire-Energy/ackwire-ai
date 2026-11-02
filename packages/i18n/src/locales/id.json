@@ -1263,6 +1263,7 @@
     "pendingApprovals_other": "{{count}} persetujuan tertunda",
     "home": "Beranda",
     "notifications": "Notifikasi",
+    "unreadMark": "Belum dibaca",
     "unreadMentions_other": "{{count}} sebutan untuk Anda",
     "unreadThreads_other": "Thread: {{count}} dengan balasan belum dibaca",
     "unreadNotifications_other": "{{count}} notifikasi belum dibaca"

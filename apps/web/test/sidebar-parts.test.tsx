@@ -320,3 +320,55 @@ describe("a row's buttons on hover or focus", () => {
     expect(within(nav()).queryByRole("button", { name: "Configurações de Ada" })).toBeNull();
   });
 });
+
+describe("unread marks, Discord's way", () => {
+  const RANDOM = "00000000-0000-4000-8000-0000000000c9";
+  const withRandom = (state: State = seedState()) => {
+    state.channels.push({
+      id: RANDOM,
+      name: "random",
+      topic: "",
+      visibility: "public",
+      isMember: true,
+      createdAt: new Date().toISOString(),
+    });
+    return state;
+  };
+
+  test("something new lights the row with no number, only a mention of me gets the red count, muted never lights", async () => {
+    const state = withRandom();
+    for (const c of state.channels) {
+      if (c.id === ENG_ID) Object.assign(c, { unreadCount: 4, mentionCount: 0 });
+      if (c.id === RANDOM) Object.assign(c, { unreadCount: 3, mentionCount: 2 });
+    }
+    await go(state);
+    const link = (name: string) => nav().querySelector(`a.sidebar__item[title="#${name}"]`) as HTMLElement;
+    expect(link("eng").dataset.kind).toBe("channel");
+    expect(link("eng").dataset.unread).toBe("true");
+    expect(link("eng").querySelector(".sidebar__unread")).toBeNull();
+    // No number, so screen readers hear it.
+    expect(link("eng").querySelector(".ac-visually-hidden")?.textContent).toBe("Não lida");
+    const count = link("random").querySelector(".sidebar__unread") as HTMLElement;
+    expect(count.textContent).toBe("2");
+    expect(count.getAttribute("aria-label")).toBe("2 menções a você");
+    expect(link("general").dataset.unread).toBe("false");
+    cleanup();
+
+    // Muted: it rests gray whatever comes, but a mention of me still shows.
+    const muted = withRandom();
+    for (const c of muted.channels)
+      if (c.id === RANDOM) Object.assign(c, { unreadCount: 3, mentionCount: 1, muted: true });
+    await go(muted);
+    expect(link("random").dataset.unread).toBe("false");
+    expect(link("random").dataset.muted).toBe("true");
+    expect(link("random").querySelector(".sidebar__unread")?.textContent).toBe("1");
+  });
+
+  test("the open channel keeps its own buttons, the cog for its settings", async () => {
+    await go();
+    const row = channelRow("general");
+    expect((row.querySelector("a.sidebar__item") as HTMLElement).dataset.status).toBe("active");
+    const cog = within(row).getByRole("button", { name: "Configurações do canal" });
+    expect(cog.querySelector("svg path")?.getAttribute("d")).toStartWith("M15.26 8.39");
+  });
+});

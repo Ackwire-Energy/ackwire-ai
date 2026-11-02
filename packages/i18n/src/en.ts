@@ -1284,6 +1284,8 @@ export const en = {
     pendingApprovals_other: "{{count}} pending approvals",
     home: "Home",
     notifications: "Notifications",
+    /** Read by screen readers on an unread channel with no number (the pill at its edge). */
+    unreadMark: "Unread",
     unreadMentions_one: "{{count}} mention of you",
     unreadMentions_other: "{{count}} mentions of you",
     unreadThreads_one: "Threads: {{count}} with unread replies",
