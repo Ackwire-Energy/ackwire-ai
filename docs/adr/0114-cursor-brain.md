@@ -57,7 +57,7 @@ The runner lists what `agent models` says for the computer's own sign-in (in `he
 
 ### 8. In the apps
 
-Cursor is a plan next to Claude and ChatGPT everywhere a plan is chosen (`PLAN_CHOICES`: Claude, ChatGPT, Cursor, then the coding plans): Connect an AI, the setup's AI step, New agent's plan cards, and "Quem pensa" on the agent's page, marked "Testing" like ChatGPT. Its sign-in steps open Cursor's page and wait; "Use a Cursor API key instead" turns them into the key steps. Cursor's official cube (cursor.com/brand) is its mark wherever it is named, in the ink of the theme, as the brand draws it. Both languages, both themes. The engine portrait reuses Codex's terminal until Cursor gets a drawing of its own.
+Cursor is a plan next to Claude and ChatGPT everywhere a plan is chosen (`PLAN_CHOICES`: Claude, ChatGPT, Cursor, then the coding plans): Connect an AI and the setup's AI step always (dimmed, with why, where it can't run), New agent's plan cards and "Quem pensa" on the agent's page where a computer runs it (or the agent already thinks with it), marked "Testing" like ChatGPT. Its sign-in steps open Cursor's page and wait; "Use a Cursor API key instead" turns them into the key steps. Cursor's official cube (cursor.com/brand) is its mark wherever it is named, in the ink of the theme, as the brand draws it. Both languages, both themes. The engine portrait reuses Codex's terminal until Cursor gets a drawing of its own.
 
 ### 9. Installing the CLI
 
