@@ -94,6 +94,11 @@ export function AiAppImport({ orgId }: { orgId: string }) {
         <Text variant="footnote" tone="ink2">
           {`3. ${t("onboarding.import.aiApp.paste")}`}
         </Text>
+        <View style={[styles.prompt, { backgroundColor: c.sunken, borderColor: c.line }]}>
+          <Text selectable variant="footnote" tone="ink2">
+            {option.prompt}
+          </Text>
+        </View>
         <Button
           variant="secondary"
           size="sm"
@@ -519,6 +524,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
   failure: { gap: 8, alignItems: "flex-start" },
   request: { gap: 8, padding: 14, alignItems: "flex-start" },
+  prompt: { alignSelf: "stretch", padding: 10, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
   previewHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   agent: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
   kindRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 },

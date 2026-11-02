@@ -109,6 +109,12 @@ describe("Apps de IA on the phone (ADR 0119)", () => {
     expect(aiAppImport(pt, { serverUrl: "http://10.0.0.5/mcp", serverPublic: false })).toEqual({ available: false });
     const ready = aiAppImport(pt, { serverUrl: "https://app.agentes.chat/mcp", serverPublic: true });
     expect(ready?.available && ready.prompt).toStartWith("Conecte https://app.agentes.chat/mcp e, para cada agente");
+    // The phone shows the request itself, selectable, not only a Copiar button.
+    const card = readFileSync(
+      join(import.meta.dir, "..", "..", "src", "features", "agents", "ImportAgents.tsx"),
+      "utf8",
+    );
+    expect(card).toMatch(/<Text selectable[^>]*>\s*\{option\.prompt\}/);
   });
 
   test("the consent picks write when asked, never manage: that one is opt-in", () => {
