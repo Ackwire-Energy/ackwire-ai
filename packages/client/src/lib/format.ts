@@ -41,9 +41,24 @@ export function formatTokensShort(t: TFunction, locale: string, value: number) {
   return formatInt(locale, value);
 }
 
-/** "10:42" */
+/** Whether the locale writes 12-hour times ("1 PM") rather than 24-hour ("13:00"). */
+export function uses12h(locale: string) {
+  try {
+    return new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hour12 === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The `hour` option for a clock time: "8:39 PM" in 12-hour locales (no leading zero), "08:39" / "20:39" in 24-hour
+ * ones. Not plain "numeric" everywhere: some ICU builds then drop the 24-hour zero too ("8:39").
+ */
+export const clockHour = (locale: string): "numeric" | "2-digit" => (uses12h(locale) ? "numeric" : "2-digit");
+
+/** "10:42", "8:39 PM" */
 export const formatTime = (locale: string, iso: string) =>
-  new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  new Intl.DateTimeFormat(locale, { hour: clockHour(locale), minute: "2-digit" }).format(new Date(iso));
 
 /** "14:05" today, "24 out 14:05" another day (a pause's end, when a computer went offline). */
 export const clockAt = (locale: string, iso: string, now = new Date()) =>
@@ -115,7 +130,7 @@ export const nextLabel = (locale: string, iso: string) =>
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "2-digit",
+    hour: clockHour(locale),
     minute: "2-digit",
   })
     .format(new Date(iso))

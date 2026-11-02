@@ -1,4 +1,5 @@
 import type { Message, ThreadInfo, ThreadStartMeta } from "../api/types";
+import { clockHour } from "./format";
 
 /**
  * Threads in the web (ADR 0029): the range suggested by "Criar thread a partir daqui", the
@@ -69,13 +70,18 @@ const sameDay = (a: Date, b: Date) =>
 export function timeSpan(locale: string, fromIso: string, toIso: string): string {
   const from = new Date(fromIso);
   const to = new Date(toIso);
-  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
+  const time = new Intl.DateTimeFormat(locale, { hour: clockHour(locale), minute: "2-digit" });
   if (sameDay(from, to)) {
     const a = time.format(from);
     const b = time.format(to);
     return a === b ? a : `${a}–${b}`;
   }
-  const full = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const full = new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    hour: clockHour(locale),
+    minute: "2-digit",
+  });
   return `${full.format(from)} – ${full.format(to)}`;
 }
 

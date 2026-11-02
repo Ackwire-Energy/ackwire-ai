@@ -96,8 +96,11 @@ import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
-/** The room beside my bubble for its receipt's mark: my row's 64px left padding past the screen's 16px edge. */
-const MARK_ROOM = 48;
+/**
+ * The room my bubble's last line keeps at its end for the time and the receipt's mark ("8:39 PM ✓✓"): a run's last
+ * row shows both, the rows before it the mark alone. Kept with or without a mark, so one that comes never rewraps.
+ */
+const META_ROOM = { withTime: 92, markOnly: 40 } as const;
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
@@ -105,9 +108,9 @@ const MARK_ROOM = 48;
  * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
  * line under its words and what it changed ("Usou N ferramentas"), the same place live, kept and saved, and a
  * stopped one says so with "Continuar". A person's message's
- * receipt is a mark in room the row already has (`ReceiptMark`), so it never changes the row's height: beside my
- * bubble, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of someone
- * else's name line, the agents' receipt of their latest message.
+ * receipt is a mark in room the row already has (`ReceiptMark`), so it never changes the row's height: at the end of
+ * my bubble's last line after its time, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a
+ * DM; at the end of someone else's name line, the agents' receipt of their latest message.
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
@@ -308,8 +311,20 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // The bubble, or the GIF or sticker or the files of a message with no words, leads; the receipt's mark stands
-    // beside it.
+    // The bubble, or the GIF or sticker or the files of a message with no words, leads. The time (one per run of my
+    // rows: they group a few minutes apart, so on its last) and then the receipt's mark end the bubble's last line,
+    // as WhatsApp has them; with no bubble they are a line under what it sent. A send in flight says so instead.
+    const runEnd = run === "end" || run === "solo";
+    const meta = (
+      <>
+        {!m.local && runEnd ? (
+          <Text variant="caption" tone="faint">
+            {when.time(m.createdAt)}
+          </Text>
+        ) : null}
+        {m.local ? null : <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />}
+      </>
+    );
     const lead = body ? (
       <View style={[styles.bubble, BUBBLE_RUN[run], styles.lead, { backgroundColor: c.bubble }]}>
         <MessageText
@@ -318,14 +333,16 @@ export const MessageRow = memo(function MessageRow({
           selectable={false}
           accent={accent}
           channelRefs={channelRefsOf(m.meta)}
+          tail={<View style={{ width: runEnd ? META_ROOM.withTime : META_ROOM.markOnly, height: 1 }} />}
         />
+        <View style={styles.meMeta}>{meta}</View>
       </View>
     ) : media ? (
-      <View style={styles.grow}>
+      <View style={styles.meFiles}>
         <ChatMedia media={media} align="end" liveId={m.id} />
       </View>
     ) : files.length > 0 ? (
-      <View style={styles.grow}>
+      <View style={styles.meFiles}>
         <MessageFiles files={files} align="end" />
       </View>
     ) : null;
@@ -349,14 +366,7 @@ export const MessageRow = memo(function MessageRow({
             </Text>
           </View>
         ) : null}
-        {lead ? (
-          <View style={styles.meLine}>
-            <View style={styles.meMark}>
-              {m.local ? null : <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />}
-            </View>
-            {lead}
-          </View>
-        ) : null}
+        {lead}
         {body && media ? (
           <View style={styles.meFiles}>
             <ChatMedia media={media} align="end" liveId={m.id} />
@@ -372,12 +382,7 @@ export const MessageRow = memo(function MessageRow({
           {missionDecision}
           {foot}
         </View>
-        {/* One time per run of my rows (they group a few minutes apart), under its last; a send in flight says so. */}
-        {!m.local && (run === "end" || run === "solo") ? (
-          <Text variant="caption" tone="faint" style={styles.meTime}>
-            {when.time(m.createdAt)}
-          </Text>
-        ) : null}
+        {body ? null : <View style={styles.meMetaLine}>{meta}</View>}
       </Pressable>
     );
   }
@@ -849,7 +854,10 @@ const styles = StyleSheet.create({
   meCont: { paddingTop: 1, marginTop: 0 },
   // A run of my rows sits 2px apart (1 under this one, 1 over the next).
   meRunOn: { paddingBottom: 1 },
-  meTime: { marginTop: 4, textAlign: "right" },
+  // The bubble's bottom-right corner, on its last line (10px under the text, 24px lines): the caption's baseline on
+  // the text's.
+  meMeta: { position: "absolute", right: 12, bottom: 12, flexDirection: "row", alignItems: "center", gap: 3 },
+  meMetaLine: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 4 },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
@@ -858,18 +866,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 18,
   },
-  // My row keeps 64px free on the left, 48 of them past the screen's 16px edge: the receipt's mark stands there, on
-  // the bubble's last line (10px under the text, 24px lines), so it never adds a line.
-  meLine: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "flex-end",
-    marginLeft: -MARK_ROOM,
-  },
-  meMark: { width: MARK_ROOM, alignItems: "flex-end", paddingRight: 6, paddingBottom: 14 },
   lead: { flexShrink: 1 },
-  grow: { flex: 1 },
   meFiles: { alignSelf: "stretch" },
   meCards: { alignSelf: "stretch" },
   meStatus: { marginTop: 4, textAlign: "right" },

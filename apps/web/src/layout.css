@@ -10414,33 +10414,28 @@ html[data-menu-overlay] .shell {
   margin: 0 2px;
   color: var(--faint);
 }
-/* Faces in the lists: a step up from the kit's small (24px), here and on the rail. */
+/* Faces on the rail: a step up from the kit's small (24px), inside the rail's 40px tile with room for its badges. */
 .sidebar__item > .ac-avatar--sm {
   width: 28px;
   height: 28px;
   font-size: 12px;
 }
+/*
+ * Faces in the full list: as tall as a name and a one-line role together (20px + 16px), centred on the text beside
+ * them (a name alone, or a name over a role of one or two lines), with 3px over and under (42px rows).
+ */
+.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+}
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-left: 6px;
+  padding-block: 3px;
   gap: 8px;
-}
-/* An agent with a role: the face at the top beside the name (20px line, 4px down, centred on the 28px face), the role
-   under the name, 4px above the face and below the role (48px with a one-line role, 64px with two); the count, lock or
-   state stays centred at the end. */
-.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) {
-  align-items: flex-start;
-  padding-block: 4px;
-}
-.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__item-text {
-  padding-top: 4px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label {
   line-height: 20px;
-}
-.sidebar:not([data-rail="true"])
-  .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role)
-  > :not(.ac-avatar, .sidebar__item-text, .sidebar__trail, .sidebar__glow) {
-  align-self: center;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__more-chevron {
   width: 16px;
@@ -10669,9 +10664,19 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__row[data-acts="2"] {
   --acts-room: 56px;
 }
-.sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-acts {
-  top: 4px;
-  translate: none;
+/*
+ * Over one of those buttons the row keeps its hover plate (the pointer is still on the row), and the button shows
+ * its own hover in its ink only, like Discord's: no square plate of its own over the row's.
+ */
+.sidebar__row:hover > .sidebar__item:not([data-status="active"], .sidebar__item--unshown) {
+  background: var(--plate);
+}
+.sidebar__row-acts .ac-btn--ghost {
+  color: var(--ink-muted);
+}
+.sidebar__row-acts .ac-btn--ghost:is(:hover, [data-state="open"]) {
+  background: transparent;
+  color: var(--ink);
 }
 .sidebar[data-rail="true"] .sidebar__row-acts {
   display: none;
