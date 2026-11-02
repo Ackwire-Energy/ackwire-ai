@@ -95,6 +95,16 @@ export const cursorGain = (speed: number, s: number) => {
   return (AIM_GAIN + (TRAVEL_GAIN - AIM_GAIN) * fast) / s;
 };
 
+/**
+ * A finger rolling the view sideways: the camera goes as far as it can, and what it couldn't take is left for the page
+ * under the finger, in points, positive going down it.
+ */
+export const dragView = (camera: Point, s: number, change: Point, box: Size, desk: Size) => {
+  "worklet";
+  const to = boundCamera(camera.x - change.x / s, camera.y - change.y / s, s, box, desk);
+  return { camera: to, left: -change.y - (to.y - camera.y) * s };
+};
+
 /** Whether the cursor stands on the desktop's edge: it can go no further that way. */
 export const atDesktopEdge = (cursor: Point, desk: Size) => {
   "worklet";

@@ -16,6 +16,7 @@ import {
   controlScale,
   cursorGain,
   DEFAULT_DESKTOP,
+  dragView,
   fitScale,
   followCursor,
   lookAt,
@@ -207,6 +208,20 @@ describe("the camera over the agent's screen", () => {
   test("an easy swipe across the trackpad crosses the view", () => {
     const s = controlScale(PHONE, desk);
     expect(300 * cursorGain(0.6, s) * s).toBeGreaterThan(PHONE.width);
+  });
+
+  test("a finger rolls the view first, and what's left goes to the page", () => {
+    const wide = { width: 932, height: 430 };
+    const s = controlScale(wide, desk);
+    const middle = { x: 0, y: 100 };
+    const inside = dragView(middle, s, { x: 0, y: -30 }, wide, desk);
+    expect(inside.camera.y).toBeCloseTo(100 + 30 / s);
+    expect(inside.left).toBeCloseTo(0);
+    const bottom = { x: 0, y: 900 - 430 / s };
+    const past = dragView(bottom, s, { x: 0, y: -30 }, wide, desk);
+    expect(past.camera.y).toBeCloseTo(bottom.y);
+    expect(past.left).toBeCloseTo(30);
+    expect(dragView({ x: 0, y: 0 }, s, { x: 0, y: 30 }, wide, desk).left).toBeCloseTo(-30);
   });
 
   test("the cursor knows when it has reached the desktop's edge", () => {

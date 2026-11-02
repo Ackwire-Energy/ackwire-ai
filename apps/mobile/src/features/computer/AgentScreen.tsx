@@ -35,6 +35,7 @@ import Animated, {
   useDerivedValue,
   useFrameCallback,
   useSharedValue,
+  withDelay,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -47,7 +48,18 @@ import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { rgba } from "@/sky/math";
 import { TRACKPAD_SHADER } from "@/sky/shaders";
-import { Button, haptics, Icon, IconButton, Text, useReducedMotion, useToast } from "@/ui";
+import {
+  Button,
+  Glass,
+  haptics,
+  Icon,
+  IconButton,
+  PressScale,
+  Text,
+  useReducedMotion,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useInfoHint } from "@/ui/InfoHint";
 import { type LiveKey, stepText } from "../browser/logic";
 import { TypeBar } from "../browser/parts";
@@ -74,6 +86,7 @@ import {
   controlScale,
   cursorGain,
   DEFAULT_DESKTOP,
+  dragView,
   fitScale,
   followCursor,
   lookAt,
@@ -83,6 +96,7 @@ import {
   WHEEL_STEP,
   zoomCamera,
 } from "./screen-view";
+import { useSideways } from "./useSideways";
 import { type PadLesson, padLesson } from "./trackpad";
 import type { AgentComputerView } from "./useAgentComputer";
 
@@ -98,6 +112,11 @@ const HOLD_MS = 320;
 const SWIPE_START = 3;
 /** The closest two ticks of the wheel come under the fingers: faster, the phone only buzzes. */
 const NOTCH_HAPTIC_MS = 45;
+/** How long the sideways dock stays clear after a touch, and how faint it rests over the picture. */
+const DOCK_AWAKE_MS = 2600;
+const DOCK_REST = 0.32;
+/** Where the finger's ring grows to around a click. */
+const RING_GROWTH = 3.2;
 const CAMERA = { duration: 260 };
 
 /** Everything the camera and the cursor share across the gestures, on the UI thread. */
@@ -144,8 +163,9 @@ function useAppActive() {
 /**
  * The agent's screen on the phone (ADR 0098), as the web's `DesktopView`: live, watched, or in this person's control.
  * The server's page draws it in a WebView as large as the desktop, moved and zoomed by the UI thread; no touch ever
- * reaches the page. In control the trackpad moves a cursor the app draws, and the view follows it. Leaving the app
- * lets go of the stream and the control's 2 minutes run, as for any person who drops; coming back opens it again.
+ * reaches the page. In control the trackpad moves a cursor the app draws, and the view follows it; with the phone
+ * sideways the picture fills it and the finger is the mouse. Leaving the app lets go of the stream and the control's 2
+ * minutes run, as for any person who drops; coming back opens it again.
  */
 export function AgentScreen({
   agentId,
@@ -195,6 +215,9 @@ export function AgentScreen({
   const blocked = status ? desktopStatusState(status, userId) : "connecting";
   const mode = status ? desktopMode(status, userId) : "watch";
   const inControl = mode === "control";
+  const sideways = useSideways(inControl);
+  const wide = sideways.wide;
+  const reduced = useReducedMotion();
   const connect = blocked === null && active;
   const shown: DesktopViewState = blocked ?? page;
   const live = shown === "live";
@@ -299,6 +322,7 @@ export function AgentScreen({
   };
   const again = <Button variant="secondary" size="sm" label={t("desktop.retry")} onPress={retry} />;
   const { color } = agentLook(agent);
+  const tones = bodyTones(color);
   const opening = <Cover fill sky spinner color={color} text={t("agentComputer.state.opening", g)} />;
   const cantShow = (
     <Cover
@@ -358,6 +382,12 @@ export function AgentScreen({
     else haptics.light();
     line.press(cursorX.value, cursorY.value, down ? BUTTON.left : BUTTON.none);
   };
+  /** A tap with the finger as the mouse: the cursor goes there, then clicks. */
+  const touched = (px: number, py: number) => {
+    tapHaptic();
+    line.move(px, py);
+    line.click(px, py);
+  };
   const lastNotch = useRef(0);
   const wheeled = (down: boolean) => {
     const at = Date.now();
@@ -390,24 +420,23 @@ export function AgentScreen({
       y.value = to.y;
     },
   });
+  const moveCamera = (changeX: number, changeY: number) => {
+    "worklet";
+    const to = boundCamera(x.value - changeX / s.value, y.value - changeY / s.value, s.value, box.value, desk.value);
+    x.value = to.x;
+    y.value = to.y;
+  };
   const panView = usePanGesture({
+    enabled: !wide,
     maxPointers: 2,
     onUpdate: (e) => {
       "worklet";
-      const to = boundCamera(
-        x.value - e.changeX / s.value,
-        y.value - e.changeY / s.value,
-        s.value,
-        box.value,
-        desk.value,
-      );
-      x.value = to.x;
-      y.value = to.y;
+      moveCamera(e.changeX, e.changeY);
     },
   });
   // A tap on the screen brings the cursor there; the trackpad clicks.
   const tapView = useTapGesture({
-    enabled: inControl,
+    enabled: inControl && !wide,
     onDeactivate: (e) => {
       "worklet";
       if (e.canceled) return;
@@ -417,7 +446,130 @@ export function AgentScreen({
       scheduleOnRN(pointed, to.x, to.y);
     },
   });
-  const viewGestures = useSimultaneousGestures(pinch, panView, tapView);
+
+  // Sideways the finger is the mouse: it acts where it touches, and the cursor stays out of its way.
+  const dockShown = useSharedValue(1);
+  const spotX = useSharedValue(0);
+  const spotY = useSharedValue(0);
+  const spotOn = useSharedValue(0);
+  const spotHeld = useSharedValue(0);
+  const ringX = useSharedValue(0);
+  const ringY = useSharedValue(0);
+  const ringT = useSharedValue(1);
+  const dragging = useSharedValue(false);
+  const notches = useSharedValue(0);
+  const wake = () => {
+    "worklet";
+    if (reduced) return;
+    dockShown.value = withSequence(
+      withTiming(1, { duration: 160 }),
+      withDelay(DOCK_AWAKE_MS, withTiming(DOCK_REST, { duration: 250 })),
+    );
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the dock wakes as the view lies down
+  useEffect(() => {
+    if (wide) wake();
+  }, [wide]);
+  const pointAt = (px: number, py: number) => {
+    "worklet";
+    const to = toDesktop({ x: px, y: py }, { x: x.value, y: y.value }, s.value, desk.value);
+    cursorX.value = to.x;
+    cursorY.value = to.y;
+    scheduleOnRN(moved, to.x, to.y);
+  };
+  const touchTap = useTapGesture({
+    enabled: wide,
+    maxDuration: 260,
+    maxDistance: 8,
+    onDeactivate: (e) => {
+      "worklet";
+      if (e.canceled) return;
+      const to = toDesktop({ x: e.x, y: e.y }, { x: x.value, y: y.value }, s.value, desk.value);
+      cursorX.value = to.x;
+      cursorY.value = to.y;
+      ringX.value = e.x;
+      ringY.value = e.y;
+      ringT.value = 0;
+      ringT.value = withTiming(1, { duration: 420 });
+      scheduleOnRN(touched, to.x, to.y);
+    },
+  });
+  const touchHold = useLongPressGesture({
+    enabled: wide,
+    minDuration: HOLD_MS,
+    maxDistance: 8,
+    onActivate: (e) => {
+      "worklet";
+      pointAt(e.x, e.y);
+      dragging.value = true;
+      spotHeld.value = withTiming(1, { duration: 120 });
+      scheduleOnRN(held, true);
+    },
+    onDeactivate: () => {
+      "worklet";
+      dragging.value = false;
+      spotHeld.value = withTiming(0, { duration: 120 });
+      scheduleOnRN(held, false);
+    },
+  });
+  // One finger rolls what it touches: the view first, then the page, wherever the finger came down.
+  const touchPan = usePanGesture({
+    enabled: wide,
+    maxPointers: 1,
+    minDistance: SWIPE_START,
+    onBegin: (e) => {
+      "worklet";
+      wake();
+      spotX.value = e.x;
+      spotY.value = e.y;
+      spotOn.value = withTiming(1, { duration: 80 });
+    },
+    onActivate: (e) => {
+      "worklet";
+      notches.value = 0;
+      pointAt(e.x, e.y);
+    },
+    onUpdate: (e) => {
+      "worklet";
+      spotX.value = e.x;
+      spotY.value = e.y;
+      if (dragging.value) return pointAt(e.x, e.y);
+      const went = dragView({ x: x.value, y: y.value }, s.value, { x: e.changeX, y: e.changeY }, box.value, desk.value);
+      x.value = went.camera.x;
+      y.value = went.camera.y;
+      notches.value += went.left;
+      if (Math.abs(notches.value) < WHEEL_STEP) return;
+      const down = notches.value > 0;
+      notches.value += down ? -WHEEL_STEP : WHEEL_STEP;
+      scheduleOnRN(wheeled, down);
+    },
+    onFinalize: () => {
+      "worklet";
+      spotOn.value = withTiming(0, { duration: 160 });
+    },
+  });
+  const touchMove = usePanGesture({
+    enabled: wide,
+    minPointers: 2,
+    maxPointers: 2,
+    onBegin: () => {
+      "worklet";
+      wake();
+    },
+    onUpdate: (e) => {
+      "worklet";
+      moveCamera(e.changeX, e.changeY);
+    },
+  });
+  const viewGestures = useSimultaneousGestures(pinch, panView, tapView, touchTap, touchHold, touchPan, touchMove);
+  const spot = useAnimatedStyle(() => ({
+    opacity: spotOn.value,
+    transform: [{ translateX: spotX.value }, { translateY: spotY.value }, { scale: 1 + 0.28 * spotHeld.value }],
+  }));
+  const ring = useAnimatedStyle(() => ({
+    opacity: 1 - ringT.value,
+    transform: [{ translateX: ringX.value }, { translateY: ringY.value }, { scale: 1 + (RING_GROWTH - 1) * ringT.value }],
+  }));
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -433,10 +585,10 @@ export function AgentScreen({
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.fill}>
-      {top(sub, action, inControl ? notice.button : undefined)}
-      {inControl ? <View style={styles.notice}>{notice.text}</View> : null}
-      {banner}
-      {waiting ? (
+      {wide ? null : top(sub, action, inControl ? notice.button : undefined)}
+      {inControl && !wide ? <View style={styles.notice}>{notice.text}</View> : null}
+      {wide ? null : banner}
+      {waiting && !wide ? (
         <View style={[styles.ask, { backgroundColor: c.sunken }]}>
           <Text variant="small" tone="ink2">
             {t(asked ? "agentComputer.ask.banner" : "agentComputer.ask.bannerOther", {
@@ -453,9 +605,11 @@ export function AgentScreen({
         style={[
           styles.box,
           inControl ? styles.fill : { aspectRatio: deskSize.width / deskSize.height, flexGrow: 0, flexShrink: 1 },
+          wide && styles.boxWide,
         ]}
         accessibilityRole="image"
         accessibilityLabel={t("agentComputer.screen", g)}
+        accessibilityHint={wide ? t("agentComputer.phone.touchHint") : undefined}
       >
         <GestureDetector gesture={viewGestures}>
           <Animated.View style={StyleSheet.absoluteFill} collapsable={false}>
@@ -497,7 +651,7 @@ export function AgentScreen({
                 }}
               />
             </Animated.View>
-            {inControl ? (
+            {inControl && !wide ? (
               <Animated.View pointerEvents="none" style={[styles.cursor, pointer]}>
                 <PixelCursor />
               </Animated.View>
@@ -512,11 +666,31 @@ export function AgentScreen({
             </Text>
           </View>
         ) : null}
+        {wide ? (
+          <>
+            <Animated.View pointerEvents="none" style={[styles.spot, { borderColor: tones[3] }, spot]}>
+              <View style={[styles.spotFill, { backgroundColor: tones[3] }]} />
+            </Animated.View>
+            <Animated.View pointerEvents="none" style={[styles.ring, { borderColor: tones[3] }, ring]} />
+            {banner ? <View style={[styles.wideBanner, { left: insets.left + 10 }]}>{banner}</View> : null}
+            <TouchDock
+              shown={dockShown}
+              right={insets.right + 10}
+              notice={notice}
+              onKeyboard={() => setTyping(true)}
+              onUpright={sideways.forced ? sideways.standUp : undefined}
+              onCouldnt={ask ? couldnt : undefined}
+              onDone={handBack}
+              doneLabel={doneLabel}
+            />
+          </>
+        ) : null}
       </View>
       {inControl ? (
         typing ? (
           <TypingBar
             bottom={insets.bottom}
+            sides={wide ? Math.max(insets.left, insets.right) : 0}
             onText={(text) => call(screenCall("type", text))}
             onKey={(k) => call(screenCall("key", k))}
             onClose={() => {
@@ -524,7 +698,7 @@ export function AgentScreen({
               Keyboard.dismiss();
             }}
           />
-        ) : (
+        ) : wide ? null : (
           <View style={[styles.control, { paddingBottom: insets.bottom + 12 }]}>
             <Trackpad
               camera={camera}
@@ -537,6 +711,7 @@ export function AgentScreen({
               onWheel={wheeled}
               onEdge={haptics.firm}
               onKeyboard={() => setTyping(true)}
+              onTurn={sideways.lieDown}
             />
             {ask ? (
               <Button variant="ghost" size="sm" label={t("mobile.browser.live.couldnt")} onPress={couldnt} />
@@ -565,6 +740,7 @@ function Trackpad({
   onWheel,
   onEdge,
   onKeyboard,
+  onTurn,
 }: {
   camera: Camera;
   /** The cursor's scale: it answers a click or a hold. */
@@ -579,6 +755,8 @@ function Trackpad({
   /** The cursor just reached the desktop's edge. */
   onEdge: () => void;
   onKeyboard: () => void;
+  /** Lies the view down: with the phone's rotation lock on, turning it won't. */
+  onTurn: () => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -789,6 +967,9 @@ function Trackpad({
             </Fill>
           </Canvas>
         ) : null}
+        <View style={styles.padTurn}>
+          <IconButton icon="expand" plate label={t("agentComputer.phone.turn")} onPress={onTurn} />
+        </View>
         <View style={styles.padKeyboard}>
           <IconButton icon="keyboard" plate label={t("desktop.keyboard.label")} onPress={onKeyboard} />
         </View>
@@ -797,21 +978,86 @@ function Trackpad({
   );
 }
 
+/** What stays at hand sideways, over the picture: it rests faint and wakes with every touch. */
+function TouchDock({
+  shown,
+  right,
+  notice,
+  onKeyboard,
+  onUpright,
+  onCouldnt,
+  onDone,
+  doneLabel,
+}: {
+  shown: SharedValue<number>;
+  right: number;
+  notice: { button: ReactNode; text: ReactNode; open: boolean };
+  onKeyboard: () => void;
+  /** Only when the button laid the view down: otherwise turning the phone does it. */
+  onUpright?: () => void;
+  /** The agent asked for help and this person can't. */
+  onCouldnt?: () => void;
+  onDone: () => void;
+  doneLabel: string;
+}) {
+  const { t } = useTranslation();
+  const { colors, shadows } = useTheme();
+  const rest = useAnimatedStyle(() => ({ opacity: shown.value }));
+  return (
+    <>
+      <Animated.View style={[styles.dock, { right, boxShadow: shadows.e2 }, rest]}>
+        <Glass liquid intensity={70} style={[styles.dockGlass, { borderColor: colors.line2 }]}>
+          <View style={styles.dockInfo}>{notice.button}</View>
+          <IconButton icon="keyboard" label={t("desktop.keyboard.label")} onPress={onKeyboard} />
+          {onUpright ? <IconButton icon="expand" label={t("agentComputer.phone.upright")} onPress={onUpright} /> : null}
+          {onCouldnt ? <IconButton icon="x" label={t("mobile.browser.live.couldnt")} onPress={onCouldnt} /> : null}
+          <PressScale
+            to={0.9}
+            onPress={() => {
+              tapHaptic();
+              onDone();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={doneLabel}
+            hitSlop={4}
+            style={[styles.dockDone, { backgroundColor: colors.ink }]}
+          >
+            <Icon name="check" size={20} color={colors.bg} />
+          </PressScale>
+        </Glass>
+      </Animated.View>
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.dockNotice,
+          { right },
+          notice.open && [styles.dockNoticeOpen, { backgroundColor: colors.raised, boxShadow: shadows.e2 }],
+        ]}
+      >
+        {notice.text}
+      </View>
+    </>
+  );
+}
+
 /** The app's own field on the screen, whole texts into the field in focus there, with the keyboard's way back. */
 function TypingBar({
   bottom,
+  sides,
   onText,
   onKey,
   onClose,
 }: {
   bottom: number;
+  /** Clear of the phone's sides, sideways. */
+  sides: number;
   onText: (text: string) => void;
   onKey: (key: LiveKey) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   return (
-    <View style={[styles.typing, { paddingBottom: Math.max(bottom, 8) }]}>
+    <View style={[styles.typing, { paddingBottom: Math.max(bottom, 8), paddingHorizontal: 12 + sides }]}>
       <View style={styles.grow}>
         <TypeBar autoFocus onText={onText} onKey={onKey} />
       </View>
@@ -897,6 +1143,7 @@ const styles = StyleSheet.create({
   notice: { paddingHorizontal: 14 },
   ask: { marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
   box: { marginHorizontal: 12, borderRadius: 18, overflow: "hidden", backgroundColor: "#101010" },
+  boxWide: { marginHorizontal: 0, borderRadius: 0 },
   frame: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
   web: { flex: 1, backgroundColor: "transparent" },
   cursor: {
@@ -924,7 +1171,44 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   padKeyboard: { position: "absolute", right: 10, bottom: 10 },
-  typing: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 12, paddingTop: 8 },
+  padTurn: { position: "absolute", left: 10, bottom: 10 },
+  spot: {
+    position: "absolute",
+    left: -23,
+    top: -23,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    opacity: 0,
+  },
+  spotFill: { ...StyleSheet.absoluteFill, borderRadius: 23, opacity: 0.22 },
+  ring: {
+    position: "absolute",
+    left: -7,
+    top: -7,
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 2,
+    opacity: 0,
+  },
+  wideBanner: { position: "absolute", top: 12, maxWidth: 320 },
+  dock: { position: "absolute", top: 12, borderRadius: 26 },
+  dockGlass: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    padding: 4,
+    borderRadius: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  dockInfo: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  dockDone: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  dockNotice: { position: "absolute", top: 70 },
+  dockNoticeOpen: { width: 300, paddingHorizontal: 14, paddingBottom: 12, paddingTop: 8, borderRadius: 16 },
+  typing: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingTop: 8 },
   under: { flex: 1, paddingHorizontal: 14, paddingTop: 12, gap: 12 },
   steps: { gap: 7 },
   step: { flexDirection: "row", alignItems: "center", gap: 9 },
