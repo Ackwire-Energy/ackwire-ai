@@ -234,6 +234,13 @@ const NO_NETWORK =
 export const MACHINE_NETWORK_NOTE =
   "network failure: this is a connected computer, on that machine's own network (we block nothing there), so the problem is the address, the site or that machine's network. Tell the person.";
 
+/**
+ * A command killed by SIGKILL (128 + 9) that no person or timeout stopped: on a computer, the kernel stopping the
+ * process using the most memory, which may be another agent's work that left this one no room.
+ */
+export const KILLED_NOTE =
+  "exit code 137: the system killed it, most likely because the computer ran out of memory. Check what is using the computer before trying again, and tell the person what happened and why.";
+
 /** Which computer the agent's tools act on (from `agentComputerInfo`). */
 type ComputerInfo = Awaited<ReturnType<typeof agentComputerInfo>>;
 
@@ -302,6 +309,7 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
     out.length > 0 ? untrustedBlock(`${label.split(" ")[0]} output`, out.join("\n"), MAX_RESULT_CHARS) : "(no output)",
   );
   if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) parts.push(MACHINE_NETWORK_NOTE);
+  if (r.exitCode === 137 && !r.canceled && !r.timedOut) parts.push(KILLED_NOTE);
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,
