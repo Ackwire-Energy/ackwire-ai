@@ -2755,6 +2755,7 @@
     "runsEmpty": "Tidak ada proses yang cocok dengan “{{q}}”.",
     "runsNone": "Belum ada proses.",
     "runNoText": "Tanpa teks",
+    "runPrivate": "Dalam percakapan yang tidak kamu ikuti",
     "runTokens": "{{input}} masuk · {{cached}} dari cache · {{output}} keluar",
     "runTokensTip": "{{input}} token input baru, {{cached}} dibaca dari cache (lebih murah), {{output}} output",
     "budgetHelp": "Saat mencapai batas, {{name}} berhenti dan memberi tahu di kanal. {{ownerNote}}",

@@ -2794,6 +2794,7 @@ export const ptBR = {
     runsEmpty: "Nenhuma execução com “{{q}}”.",
     runsNone: "Nenhuma execução ainda.",
     runNoText: "Sem texto",
+    runPrivate: "Em uma conversa da qual você não participa",
     runTokens: "{{input}} entrada · {{cached}} cache · {{output}} saída",
     runTokensTip: "{{input}} tokens novos de entrada, {{cached}} relidos do cache (mais baratos), {{output}} de saída",
     budgetHelp: "Ao atingir o limite, o {{name}} para e avisa no canal. {{ownerNote}}",

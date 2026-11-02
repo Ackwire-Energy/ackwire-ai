@@ -2835,6 +2835,7 @@
     "runsEmpty": "Keine Ausführungen zu „{{q}}“.",
     "runsNone": "Noch keine Ausführungen.",
     "runNoText": "Kein Text",
+    "runPrivate": "In einem Gespräch, an dem du nicht teilnimmst",
     "runTokens": "{{input}} rein · {{cached}} im Cache · {{output}} raus",
     "runTokensTip": "{{input}} neue Eingabe-Token, {{cached}} aus dem Cache gelesen (günstiger), {{output}} Ausgabe",
     "budgetHelp": "Am Limit hört {{name}} auf und sagt es im Kanal. {{ownerNote}}",

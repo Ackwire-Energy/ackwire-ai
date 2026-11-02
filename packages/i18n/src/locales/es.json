@@ -2925,6 +2925,7 @@
     "runsEmpty": "No hay ejecuciones que coincidan con “{{q}}”.",
     "runsNone": "Todavía no hay ejecuciones.",
     "runNoText": "Sin texto",
+    "runPrivate": "En una conversación de la que no formas parte",
     "runTokens": "{{input}} de entrada · {{cached}} en caché · {{output}} de salida",
     "runTokensTip": "{{input}} tokens de entrada nuevos, {{cached}} leídos de la caché (más baratos), {{output}} de salida",
     "budgetHelp": "Al llegar al límite, {{name}} se detiene y lo avisa en el canal. {{ownerNote}}",

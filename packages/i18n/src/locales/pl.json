@@ -3010,6 +3010,7 @@
     "runsEmpty": "Brak uruchomień pasujących do „{{q}}”.",
     "runsNone": "Brak uruchomień.",
     "runNoText": "Bez tekstu",
+    "runPrivate": "W rozmowie, w której nie uczestniczysz",
     "runTokens": "{{input}} wej. · {{cached}} z cache · {{output}} wyj.",
     "runTokensTip": "{{input}} nowych tokenów wejściowych, {{cached}} odczytanych z cache (taniej), {{output}} wyjściowych",
     "budgetHelp": "Po osiągnięciu limitu {{name}} przerywa pracę i informuje o tym na kanale. {{ownerNote}}",

@@ -6938,6 +6938,9 @@
   "agent.runNoText": {
     "value": "No text"
   },
+  "agent.runPrivate": {
+    "value": "In a conversation you're not in"
+  },
   "agent.runTokens": {
     "value": "{{input}} in · {{cached}} cached · {{output}} out"
   },
