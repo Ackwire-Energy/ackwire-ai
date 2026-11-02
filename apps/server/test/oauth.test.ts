@@ -289,9 +289,23 @@ describe("authorize", () => {
     expect(bad.location).toBe(`${CONSENT}?erro=endereco_de_retorno`);
   });
 
-  test("parameter errors go back to the app with state and iss", async () => {
+  test("a new app's parameter errors stay on our page: no bounce to an address anyone can register", async () => {
+    const { json } = await register(["https://evil.example/login"]);
+    const id = String(json.client_id);
+    for (const over of [
+      { response_type: "x" },
+      { code_challenge: undefined },
+      { resource: "https://other.example/" },
+    ]) {
+      const { location } = await authorize(t, { ...baseParams(id, "https://evil.example/login"), ...over });
+      expect(location).toBe(`${CONSENT}?erro=pedido_invalido`);
+    }
+  });
+
+  test("an app that has connected before gets its parameter errors back with state and iss", async () => {
     const { json } = await register([LOOPBACK]);
     const id = String(json.client_id);
+    await t.db.update(schema.oauthAppClients).set({ lastUsedAt: new Date() }).where(eq(schema.oauthAppClients.id, id));
     const back = async (over: Record<string, string | undefined>) =>
       new URL((await authorize(t, { ...baseParams(id), ...over })).location).searchParams;
     let q = await back({ response_type: "token" });

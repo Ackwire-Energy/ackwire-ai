@@ -9122,6 +9122,9 @@ export const ptBR = {
         endereco_de_retorno: "Endereço de retorno não registrado",
         endereco_de_retornoText:
           "Este app pediu para voltar a um endereço que ele não registrou. Por segurança, paramos aqui.",
+        pedido_invalido: "Não deu para usar este pedido",
+        pedido_invalidoText:
+          "O app mandou um pedido de conexão incompleto. Volte ao app e conecte de novo. Se acontecer de novo, avise quem faz o app.",
         expirado: "Este pedido expirou",
         expiradoText: "Volte ao app e conecte de novo.",
         indisponivel: "Não foi possível continuar agora",

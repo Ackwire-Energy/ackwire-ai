@@ -57,6 +57,7 @@ export const defaultWorkspace = (consent: AppConsent) =>
 export type ConsentError =
   | "app_desconhecido"
   | "endereco_de_retorno"
+  | "pedido_invalido"
   | "expirado"
   | "indisponivel"
   | "muitas_tentativas"
@@ -66,6 +67,7 @@ export type ConsentError =
 const SPA_ERRORS = [
   "app_desconhecido",
   "endereco_de_retorno",
+  "pedido_invalido",
   "expirado",
   "indisponivel",
   "muitas_tentativas",

@@ -9056,6 +9056,9 @@ export const en: Translations = {
         endereco_de_retorno: "Return address not registered",
         endereco_de_retornoText:
           "This app asked to return to an address it didn't register. For safety, we stopped here.",
+        pedido_invalido: "We couldn't use this request",
+        pedido_invalidoText:
+          "The app sent an incomplete connection request. Go back to the app and connect again. If it happens again, tell whoever makes the app.",
         expirado: "This request expired",
         expiradoText: "Go back to the app and connect again.",
         indisponivel: "We couldn't continue right now",

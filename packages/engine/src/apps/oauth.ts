@@ -49,13 +49,15 @@ const withQuery = (base: string, params: Record<string, string | undefined | nul
   return url.toString();
 };
 
-/** The consent page with an error code it explains (`app_desconhecido`, `endereco_de_retorno`, `indisponivel`). */
+/** The consent page with an error code it explains (`app_desconhecido`, `endereco_de_retorno`, `pedido_invalido`, `indisponivel`). */
 const consentError = (publicUrl: string, code: string) => `${appsUrls(publicUrl).consentPage}?erro=${code}`;
 
 /**
- * `GET /api/oauth/authorize`: where the browser goes next. Until the app and its return address are confirmed,
- * errors stay on our own consent page (redirecting would make this an open redirector, and nothing the request
- * carries is echoed); after that, parameter errors go back to the app with `state` and `iss` (RFC 9207).
+ * `GET /api/oauth/authorize`: where the browser goes next. Errors stay on our own consent page, echoing nothing the
+ * request carries, until the app has been issued a token once: anyone can register any https return address (or
+ * host a metadata document), so sending a new app's parameter errors straight back would bounce a link through
+ * this domain to any address, with no page seen (RFC 9700 §4.11.2). An app that has connected before gets them
+ * back with `state` and `iss` (RFC 9207).
  */
 export async function startAuthorization(deps: OauthDeps, query: Record<string, string | undefined>): Promise<string> {
   const { db, publicUrl } = deps;
@@ -69,7 +71,9 @@ export async function startAuthorization(deps: OauthDeps, query: Record<string, 
     return consentError(publicUrl, "endereco_de_retorno");
   const state = query.state;
   const fail = (error: string, description?: string) =>
-    withQuery(redirectUri, { error, error_description: description, state, iss: urls.issuer });
+    client.lastUsedAt
+      ? withQuery(redirectUri, { error, error_description: description, state, iss: urls.issuer })
+      : consentError(publicUrl, "pedido_invalido");
   if (query.response_type !== "code") return fail("unsupported_response_type");
   if (query.code_challenge_method !== "S256") return fail("invalid_request", "code_challenge_method must be S256");
   const challenge = query.code_challenge ?? "";
