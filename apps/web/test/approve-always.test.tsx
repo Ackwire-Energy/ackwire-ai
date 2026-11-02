@@ -82,7 +82,7 @@ describe("Aprovar sempre on a request", () => {
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.textContent).toContain(
-      "Cobre só leituras de Execute sql, neste projeto (project_id=proj-a), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da Ada.",
+      "Cobre só leituras de Executar sql, neste projeto (project_id=proj-a), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     await click(within(card).getByRole("button", { name: "Aprovar sempre leituras" }));
