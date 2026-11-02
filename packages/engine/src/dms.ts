@@ -11,11 +11,40 @@ import { agentOnlyNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
 import { getMembership, requirePermission } from "./organizations";
 
-const { channels, channelMembers, channelReads, messages, agents, users } = schema;
+const { channels, channelMembers, channelReads, messages, agents, users, organizationMembers } = schema;
 
 export type DmTarget = { userId: string } | { agentId: string };
 
 const keyOf = (participants: string[]) => [...new Set(participants)].sort().join("|");
+
+/**
+ * An existing DM, opened again: the people its key names who are members of the workspace again come back into it.
+ * Removal takes someone out of their DMs and a DM can't be joined, so without this a person invited back would find
+ * every old DM closed to them for good.
+ */
+async function reopenDm(
+  db: Executor,
+  orgId: string,
+  dm: { id: string; dmKey: string | null; archivedAt: Date | null },
+) {
+  if (dm.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, dm.id));
+  const named = (dm.dmKey ?? "").split("|").flatMap((p) => (p.startsWith("u:") ? [p.slice(2)] : []));
+  if (named.length === 0) return;
+  const members = await db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(
+      and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, named), isNull(users.blockedAt)),
+    );
+  if (members.length === 0) return;
+  const back = await db
+    .insert(channelMembers)
+    .values(members.map((m) => ({ orgId, channelId: dm.id, userId: m.userId })))
+    .onConflictDoNothing()
+    .returning({ id: channelMembers.id });
+  if (back.length) caches.channelMembers.delete(`${orgId}:${dm.id}`);
+}
 
 /**
  * Opens a direct conversation with a person or an agent (creates it the
@@ -51,7 +80,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     )[0];
   const found = await existing();
   if (found) {
-    if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
+    await reopenDm(db, orgId, found);
     return found;
   }
   // A new DM with an agent this person can't talk to isn't started; an old one stays readable.
@@ -103,7 +132,7 @@ export async function openPersonAgentDm(db: Executor, orgId: string, userId: str
     )[0];
   const found = await existing();
   if (found) {
-    if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
+    await reopenDm(db, orgId, found);
     return found;
   }
   const [channel] = await db

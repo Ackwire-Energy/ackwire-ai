@@ -3,7 +3,7 @@ import { MODEL_TIERS, type ModelTier } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import type { AutoModels } from "./auto-model";
 import { caches } from "./cache";
-import { CHANNEL_NAME_PATTERN, placesAgentsIn } from "./channels";
+import { CHANNEL_NAME_PATTERN, managesChannel, placesAgentsIn } from "./channels";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
@@ -470,7 +470,7 @@ export async function updateChannel(
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+  if (!(await managesChannel(db, membership, actorId, channel))) {
     throw new ForbiddenError("Only the channel's creator or an admin can change it");
   }
   const name = input.name?.trim().toLowerCase();

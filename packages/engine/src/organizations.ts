@@ -33,7 +33,7 @@ import { addressDomain } from "./mail/text";
 import { recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } from "./permissions";
-import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere } from "./roles";
+import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere, stillGivableRoleIds } from "./roles";
 import {
   assertCanWork,
   type BillingHold,
@@ -162,7 +162,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
  * refuses it at once; `includeBlocked` is for acting on them (removing them, changing their role).
  */
 export async function getMembership(
-  db: Database,
+  db: Executor,
   userId: string,
   orgId: string,
   options: { includeBlocked?: boolean } = {},
@@ -928,11 +928,12 @@ async function removableMember(db: Database, actorId: string, orgId: string, tar
 }
 
 /**
- * Who answers for the agents of someone leaving: whoever removes them, or, when they leave themselves, the workspace's
- * longest-standing other owner, one who can still sign in first (the last owner can't leave, so one is there).
+ * Who answers for the agents of someone leaving: whoever removes them when they may manage agents, else (or when they
+ * leave themselves) the workspace's longest-standing other owner, one who can still sign in first (the last owner
+ * can't leave, so one is there). Removing someone never hands their agents to a remover who couldn't take them.
  */
 async function heirOf(db: Executor, actorId: string, orgId: string, targetUserId: string) {
-  if (actorId !== targetUserId) return actorId;
+  if (actorId !== targetUserId && can(await getMembership(db, actorId, orgId), "manage_agents")) return actorId;
   const [owner] = await db
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
@@ -1026,8 +1027,7 @@ export async function removalPreview(
 }
 
 /**
- * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass to whoever removes them
- * (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
+ * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass on (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
  * here go with them (`personalMachines`). Their messages stay.
  */
 export async function removeMember(
@@ -1042,7 +1042,8 @@ export async function removeMember(
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
-  const { released, removed, handed, changed } = await db.transaction(async (tx) => {
+  const { cancelSecretRequestsFor, publishSecret } = await import("./secrets");
+  const { released, removed, handed, changed, secrets } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -1089,6 +1090,8 @@ export async function removeMember(
     if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
     // Their AI apps and personal tokens here stop now (ADR 0119).
     await revokeMemberApps(tx, orgId, targetUserId);
+    // The secrets agents are waiting on from them won't come.
+    const secrets = await cancelSecretRequestsFor(tx, orgId, targetUserId);
     // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an
     // agent on a computer of theirs then goes back to the API too (`releaseAgents`).
     const heir = await heirOf(tx, actorId, orgId, targetUserId);
@@ -1128,8 +1131,9 @@ export async function removeMember(
           ),
         );
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
-    return { released, removed, handed, changed };
+    return { released, removed, handed, changed, secrets };
   });
+  for (const row of secrets) await publishSecret({ db, pubsub: options.pubsub }, row, "secret.updated");
   forgetAgents(
     orgId,
     handed.map((a) => a.id),
@@ -1871,7 +1875,15 @@ export async function acceptInvitation(
       );
     }
     await assertCanWork(tx, invitation.orgId);
-    await joinOrganization(tx, invitation.orgId, user.id, invitation.role, invitation.roleIds);
+    // What it gives is what whoever sent it could still give now: removing or demoting them takes back the roles they
+    // handed out, as with private channels below. Someone already in gets no roles from an old invitation.
+    const inviter = invitation.invitedByUserId
+      ? await getMembership(tx, invitation.invitedByUserId, invitation.orgId)
+      : null;
+    const already = await getMembership(tx, user.id, invitation.orgId, { includeBlocked: true });
+    const role = invitation.role === "owner" && can(inviter, "manage_owners") ? "owner" : "member";
+    const roleIds = already ? [] : await stillGivableRoleIds(tx, inviter, invitation.orgId, invitation.roleIds);
+    await joinOrganization(tx, invitation.orgId, user.id, role, roleIds);
     // The channels it named, besides `general` (ADR 0090): those still there. A private one only while whoever sent
     // the invitation is still in it, as when it was sent (`invitableChannelIds`): leaving it, or the workspace, takes
     // back what they could give.
@@ -1909,8 +1921,8 @@ export async function acceptInvitation(
         .where(and(eq(users.id, user.id), eq(users.emailVerified, false)));
     }
     await auditMember(tx, invitation.orgId, user.id, "member.joined", user.id, {
-      role: invitation.role,
-      roleIds: invitation.roleIds,
+      role,
+      roleIds,
       invitedBy: invitation.invitedByUserId,
     });
     await tx
