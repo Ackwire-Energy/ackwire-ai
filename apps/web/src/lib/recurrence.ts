@@ -1,5 +1,5 @@
 import type { ApiRule, ProposedRoutine } from "@agenteschat/client";
-import { joinNames, toYmd } from "@agenteschat/client/lib/format";
+import { clockHour, joinNames, toYmd } from "@agenteschat/client/lib/format";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import {
   BUSINESS_DAYS,
@@ -175,7 +175,7 @@ export function upcomingLabels(locale: string, rule: RecurrenceRule, from = new 
       .replace(/\./g, "")
       .replace(/ de /g, " ");
     const time = new Intl.DateTimeFormat(locale, {
-      hour: "2-digit",
+      hour: clockHour(locale),
       minute: "2-digit",
       timeZone: rule.timezone,
     }).format(d);
