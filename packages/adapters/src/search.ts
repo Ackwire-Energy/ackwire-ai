@@ -130,7 +130,13 @@ function messageConditions(f: MessageFilter) {
   if (mentions.length) parts.push(sql`(${sql.join(mentions, sql` or `)})`);
   for (const has of new Set(f.has ?? [])) {
     if (has === "link") parts.push(sql`${m.body} ~* 'https?://'`);
-    if (has === "file") parts.push(sql`jsonb_path_exists(${m.meta}, '$.artifacts[*]')`);
+    // A deleted file stays in `meta.artifacts` (only `artifacts.deleted_at` says it is gone).
+    if (has === "file") {
+      const a = schema.artifacts;
+      parts.push(sql`exists (select 1 from jsonb_path_query(${m.meta}, '$.artifacts[*].id') as f(id)
+        where not exists (select 1 from ${a} where ${a.orgId} = ${m.orgId} and ${a.id}::text = f.id #>> '{}'
+          and ${a.deletedAt} is not null))`);
+    }
     if (has === "card")
       parts.push(sql`jsonb_exists_any(${m.meta}, ${sql`${`{${CARD_META_KEYS.join(",")}}`}::text[]`})`);
     if (has === "image") {
@@ -138,7 +144,7 @@ function messageConditions(f: MessageFilter) {
       const v = schema.artifactVersions;
       parts.push(sql`(jsonb_path_exists(${m.meta}, '$.media.kind') or exists (
         select 1 from ${a} join ${v} on ${v.artifactId} = ${a.id} and ${v.version} = ${a.currentVersion}
-        where ${a.orgId} = ${m.orgId} and ${v.contentType} like 'image/%'
+        where ${a.orgId} = ${m.orgId} and ${a.deletedAt} is null and ${v.contentType} like 'image/%'
           and ${a.id}::text in (select jsonb_path_query(${m.meta}, '$.artifacts[*].id') #>> '{}')))`);
     }
   }
@@ -206,14 +212,24 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
               : undefined;
           const m = schema.messages;
           const onMessage = q.messages ? messageConditions(q.messages) : null;
+          const pins = schema.messagePins;
           const scope = and(
             eq(t.orgId, orgId),
             visible,
             kinds,
             q.after ? gte(t.sourceCreatedAt, q.after) : undefined,
             q.before ? lt(t.sourceCreatedAt, q.before) : undefined,
+            // `messages` is partitioned on `created_at` (ADR 0009): bounding it prunes the probe to one partition.
+            // The document's copy went through a JS Date, so it is the message's time cut to the millisecond.
             onMessage
-              ? sql`exists (select 1 from ${m} where ${m.orgId} = ${t.orgId} and ${m.id} = ${t.sourceId} and ${onMessage})`
+              ? sql`exists (select 1 from ${m} where ${m.orgId} = ${t.orgId} and ${m.id} = ${t.sourceId}
+                  and ${m.createdAt} >= ${t.sourceCreatedAt}
+                  and ${m.createdAt} < ${t.sourceCreatedAt} + interval '1 millisecond' and ${onMessage})`
+              : undefined,
+            // Pins are few: the search starts from them instead of walking every message document.
+            q.messages?.pinned
+              ? sql`${t.sourceId} in (select ${pins.messageId} from ${pins}
+                  where ${pins.channelId} = any(${uuids(q.visibleChannelIds)}) and ${pins.orgId} = ${orgId})`
               : undefined,
           );
           const anyWords = [...new Set(text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])].slice(0, 30);

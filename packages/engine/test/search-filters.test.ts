@@ -177,4 +177,63 @@ describe("search filters (ADR 0123)", () => {
       [],
     );
   });
+
+  test("has:file leaves out a message whose only file was deleted", async () => {
+    f = await setup();
+    const [file] = await f.db
+      .insert(schema.artifacts)
+      .values({
+        orgId: f.org.id,
+        kind: "file",
+        title: "old.pdf",
+        channelId: f.general.id,
+        createdByType: "person",
+        createdById: f.owner.id,
+        updatedByType: "person",
+        updatedById: f.owner.id,
+        deletedAt: new Date(),
+      })
+      .returning();
+    await message(f, { body: "gone file", meta: { artifacts: [{ id: file?.id, version: 1, title: "old.pdf" }] } });
+    await message(f, {
+      body: "kept file",
+      meta: { artifacts: [{ id: crypto.randomUUID(), version: 1, title: "a.pdf" }] },
+    });
+    const hits = await searchForUser(deps(f), f.owner.id, f.org.id, { text: "", messages: { has: ["file"] } });
+    expect(bodies(hits)).toEqual(["kept file"]);
+  });
+
+  test("a filter probes only the message's own partition, also for a message stamped by the database", async () => {
+    f = await setup();
+    // `created_at` from `now()`: microseconds, which the document's copy loses.
+    const rows = await f.db
+      .insert(schema.messages)
+      .values([
+        { orgId: f.org.id, channelId: f.general.id, authorType: "person", authorUserId: f.owner.id, body: "now" },
+        // Left out by the filter: its probe must still stop at its own partition.
+        { orgId: f.org.id, channelId: f.general.id, authorType: "agent", authorAgentId: f.agent.id, body: "agent" },
+      ])
+      .returning();
+    for (const r of rows) await indexSource(deps(f), { orgId: f.org.id, kind: "message", sourceId: r.id });
+    const client = (f.db as unknown as { $client: { query: Query } }).$client;
+    const query = client.query.bind(client);
+    const seen: { sql: string; params?: unknown[] }[] = [];
+    client.query = (sql, params, opts) => {
+      seen.push({ sql, params });
+      return query(sql, params, opts);
+    };
+    const hits = await searchForUser(deps(f), f.owner.id, f.org.id, { text: "", messages: { authorType: "person" } });
+    client.query = query;
+    expect(bodies(hits)).toEqual(["now"]);
+    const search = seen.find((s) => s.sql.includes("search_documents"));
+    const plan = (await query(`explain (analyze, costs off) ${search?.sql}`, search?.params)) as {
+      rows: { "QUERY PLAN": string }[];
+    };
+    const lines = plan.rows.map((r) => r["QUERY PLAN"]);
+    const partitions = lines.filter((l) => / on messages_\w+ /.test(l));
+    expect(partitions.length).toBeGreaterThan(1);
+    expect(partitions.filter((l) => !l.includes("never executed"))).toHaveLength(1);
+  });
 });
+
+type Query = (sql: string, params?: unknown[], opts?: unknown) => Promise<unknown>;
