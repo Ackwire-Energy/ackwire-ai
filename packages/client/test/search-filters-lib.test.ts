@@ -102,6 +102,10 @@ describe("search filters", () => {
     expect(typingOperator("de:li", pt)).toEqual({ op: "from", value: "li", start: 0 });
     expect(typingOperator("deploy from:dev ")).toBeNull();
     expect(typingOperator("http:")).toBeNull();
+    // The full-width colon CJK input methods type.
+    expect(typingOperator("deploy from\uFF1Ali")).toEqual({ op: "from", value: "li", start: 7 });
+    expect(searchFilterInput(parseSearch("de\uFF1A@lia", dir, pt).chips)).toEqual({ fromUsers: ["u1"] });
+    expect(parseSearch("nota\uFF1Afim", dir, pt).text).toBe("nota\uFF1Afim");
     expect(suggestActors("mor", dir.actors).map((a) => a.id)).toEqual(["u1"]);
     expect(suggestActors("@d", dir.actors).map((a) => a.id)).toEqual(["a1"]);
   });

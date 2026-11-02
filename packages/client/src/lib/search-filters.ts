@@ -155,6 +155,9 @@ function chipFor(op: SearchOp, raw: string, dir: SearchDirectory, words: SearchW
 }
 
 /** The operator `word` names, in English or the person's language. */
+// Chinese, Japanese and Korean IMEs type the full-width colon by default; same length, so offsets hold.
+const asciiColon = (s: string) => s.replace(/\uFF1A/g, ":");
+
 const opOf = (word: string, words: SearchWords[]) =>
   lookup(
     word,
@@ -174,9 +177,10 @@ export function parseSearch(
   const chips: SearchChip[] = [];
   const text: string[] = [];
   for (const token of tokens(input)) {
-    const at = token.indexOf(":");
-    const op = at > 0 ? opOf(token.slice(0, at), words) : null;
-    const chip = op ? chipFor(op, token.slice(at + 1), dir, words) : null;
+    const t = asciiColon(token);
+    const at = t.indexOf(":");
+    const op = at > 0 ? opOf(t.slice(0, at), words) : null;
+    const chip = op ? chipFor(op, t.slice(at + 1), dir, words) : null;
     if (chip) chips.push(chip);
     else text.push(token);
   }
@@ -291,7 +295,7 @@ export function typingOperator(
   input: string,
   local?: SearchWords,
 ): { op: SearchOp; value: string; start: number } | null {
-  const m = /(?:^|\s)([^\s:"]+):("?[^\s"]*)$/.exec(input);
+  const m = /(?:^|\s)([^\s:"]+):("?[^\s"]*)$/.exec(asciiColon(input));
   if (!m?.[1]) return null;
   const op = opOf(m[1], local ? [ENGLISH_SEARCH_WORDS, local] : [ENGLISH_SEARCH_WORDS]);
   if (!op) return null;

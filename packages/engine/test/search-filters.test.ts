@@ -203,6 +203,36 @@ describe("search filters (ADR 0123)", () => {
     expect(bodies(hits)).toEqual(["kept file"]);
   });
 
+  test("a choice card or a poll is a card, not a file", async () => {
+    f = await setup();
+    const card = async (kind: "choices" | "poll", body: string) => {
+      const [a] = await f.db
+        .insert(schema.artifacts)
+        .values({
+          orgId: f.org.id,
+          kind,
+          title: body,
+          channelId: f.general.id,
+          createdByType: "agent",
+          createdById: f.agent.id,
+          updatedByType: "agent",
+          updatedById: f.agent.id,
+        })
+        .returning();
+      await message(f, { body, agent: true, meta: { artifacts: [{ id: a?.id, version: 1 }] } });
+    };
+    await card("choices", "pick a plan");
+    await card("poll", "lunch poll");
+    await message(f, {
+      body: "a file",
+      meta: { artifacts: [{ id: crypto.randomUUID(), version: 1, title: "a.pdf" }] },
+    });
+    const has = async (h: "file" | "card") =>
+      bodies(await searchForUser(deps(f), f.owner.id, f.org.id, { text: "", messages: { has: [h] } }));
+    expect(await has("file")).toEqual(["a file"]);
+    expect(await has("card")).toEqual(["lunch poll", "pick a plan"]);
+  });
+
   test("a filter probes only the message's own partition, also for a message stamped by the database", async () => {
     f = await setup();
     // `created_at` from `now()`: microseconds, which the document's copy loses.

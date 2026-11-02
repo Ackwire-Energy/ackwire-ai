@@ -130,15 +130,20 @@ function messageConditions(f: MessageFilter) {
   if (mentions.length) parts.push(sql`(${sql.join(mentions, sql` or `)})`);
   for (const has of new Set(f.has ?? [])) {
     if (has === "link") parts.push(sql`${m.body} ~* 'https?://'`);
-    // A deleted file stays in `meta.artifacts` (only `artifacts.deleted_at` says it is gone).
+    // A deleted file stays in `meta.artifacts` (only `artifacts.deleted_at` says it is gone). Polls, choice cards
+    // and blocks ride in `meta.artifacts` too, and they are not files.
     if (has === "file") {
       const a = schema.artifacts;
       parts.push(sql`exists (select 1 from jsonb_path_query(${m.meta}, '$.artifacts[*].id') as f(id)
         where not exists (select 1 from ${a} where ${a.orgId} = ${m.orgId} and ${a.id}::text = f.id #>> '{}'
-          and ${a.deletedAt} is not null))`);
+          and (${a.deletedAt} is not null or ${a.kind} in ('block', 'poll', 'choices'))))`);
     }
-    if (has === "card")
-      parts.push(sql`jsonb_exists_any(${m.meta}, ${sql`${`{${CARD_META_KEYS.join(",")}}`}::text[]`})`);
+    if (has === "card") {
+      const a = schema.artifacts;
+      parts.push(sql`(jsonb_exists_any(${m.meta}, ${sql`${`{${CARD_META_KEYS.join(",")}}`}::text[]`}) or exists (
+        select 1 from ${a} where ${a.orgId} = ${m.orgId} and ${a.deletedAt} is null and ${a.kind} in ('poll', 'choices')
+          and ${a.id}::text in (select jsonb_path_query(${m.meta}, '$.artifacts[*].id') #>> '{}')))`);
+    }
     if (has === "image") {
       const a = schema.artifacts;
       const v = schema.artifactVersions;
