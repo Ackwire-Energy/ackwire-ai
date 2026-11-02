@@ -316,7 +316,7 @@ describe("# This turn", () => {
       protocol: MACHINE_PROTOCOL_VERSION,
       executors: {
         claude: { version: "2.1.300", loggedIn: true },
-        cursor: { version: "2026.10.1", loggedIn: true },
+        cursor: { version: "2026.10.1" },
         detectedAt: new Date().toISOString(),
       },
     });
