@@ -573,10 +573,21 @@ export async function editContextItem(
       }),
     );
   }
-  if (input.pinned !== undefined || input.archived !== undefined) {
+  // Saving an app-sent item's text unchanged is a person confirming it (ADR 0119 item 5).
+  const confirms =
+    input.content !== undefined &&
+    current === item &&
+    item.trust !== "low" &&
+    item.evidence.some((e) => e.type === "app") &&
+    !isVerified(item.evidence);
+  if (confirms || input.pinned !== undefined || input.archived !== undefined) {
+    const evidence = confirms
+      ? mergeEvidence(item.evidence, [{ type: "human", ref: actorId, at: new Date().toISOString() }])
+      : undefined;
     const [row] = await db
       .update(contextItems)
       .set({
+        ...(evidence ? { evidence, verified: true, confidence: Math.max(item.confidence, 0.9) } : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.archived !== undefined
           ? { status: input.archived ? ("archived" as const) : ("active" as const) }

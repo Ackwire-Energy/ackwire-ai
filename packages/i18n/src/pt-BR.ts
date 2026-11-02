@@ -3427,6 +3427,7 @@ export const ptBR = {
       human: "Uma pessoa",
       agent: "Outro agente",
       self: "O próprio agente",
+      app: "Enviado por um app de IA",
     },
   },
   newAgent: {

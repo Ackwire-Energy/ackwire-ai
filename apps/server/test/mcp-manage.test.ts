@@ -391,6 +391,27 @@ describe("add_memory and create_channel", () => {
     expect(after.verified).toBe(true);
   });
 
+  test("saving an app-sent memory with its text unchanged confirms it in place", async () => {
+    const { b, orgId, agentId } = await setup();
+    const app = await connectApp(t, b, orgId, MANAGE);
+    const text = "Deploys go out after the standup.";
+    const made = data(await callTool(t, app.access, "add_memory", { agent: "dev", text, idempotency_key: "m-same" }));
+    const saved = await b(`/api/app/organizations/${orgId}/memories/${made.id}`, { method: "PATCH", json: { text } });
+    const after = (await saved.json()) as { id: string; origin?: { by: string }; verified: boolean };
+    expect(after.id).toBe(made.id as string);
+    expect(after.origin?.by).toBe("person");
+    expect(after.verified).toBe(true);
+    const [row] = await t.db
+      .select()
+      .from(schema.contextItems)
+      .where(eq(schema.contextItems.id, made.id as string));
+    expect(row?.evidence.map((e) => e.type)).toEqual(["app", "human"]);
+    expect(row?.agentId).toBe(agentId);
+    expect(isPromotable({ ...(row as NonNullable<typeof row>), recurrence: 5, confidence: 1, relevance: 1 })).toBe(
+      true,
+    );
+  });
+
   test("a member can't write the memory of an agent they don't own", async () => {
     const { b, orgId } = await setup();
     const member = await joinByInvitation(t, b, orgId, "member@example.com");

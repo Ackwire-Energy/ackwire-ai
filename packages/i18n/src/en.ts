@@ -3394,6 +3394,7 @@ export const en: Translations = {
       human: "A person",
       agent: "Another agent",
       self: "The agent itself",
+      app: "Sent through an AI app",
     },
   },
   newAgent: {
