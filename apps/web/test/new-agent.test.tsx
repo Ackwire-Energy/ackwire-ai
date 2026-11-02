@@ -787,6 +787,75 @@ describe("Criar agente: what gets created", () => {
     ]);
   });
 
+  test("the last setup's plan with another model of it picked: that model is saved, not the last one's", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_mini",
+        name: "Mac mini",
+        online: true,
+        options: [
+          {
+            ...plan("claude_code", true),
+            models: [
+              { value: "opus", label: "Opus" },
+              { value: "sonnet", label: "Sonnet" },
+            ],
+            defaultModel: "sonnet",
+          },
+          plan("codex", false),
+        ],
+      },
+    ];
+    state.newAgentSetup = {
+      brain: "claude_code",
+      model: "opus",
+      key: null,
+      contextTokens: null,
+      computer: { machineId: "machine_mini", name: "Mac mini" },
+      account: null,
+      ownSignIn: true,
+      effort: "high",
+      fallback: true,
+    };
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [],
+      computers: [
+        {
+          machineId: "machine_mini",
+          name: "Mac mini",
+          online: true,
+          mine: true,
+          canAdd: true,
+          keys: true,
+          brains: { claude_code: true, codex: false },
+          own: { claude_code: {} },
+        },
+      ],
+    });
+    await open(state, api);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(screen().queryByText(/^Começa com a última escolha/)).toBeTruthy();
+    // The last setup's model is the one checked, not the plan's Automático.
+    const list = await openBrain();
+    const opus = optionsIn(list, "Plano do Claude").find((o) => o.textContent?.startsWith("Opus"));
+    expect(opus?.getAttribute("aria-selected")).toBe("true");
+    await click(optionsIn(list, "Plano do Claude").find((o) => o.textContent?.startsWith("Sonnet")) as HTMLElement);
+    // Another model: no longer the last setup.
+    expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code", model: "sonnet" },
+    ]);
+  });
+
   test("the last setup still arriving when the role is picked: it starts there once it comes", async () => {
     const state = seedState();
     state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: null, contextTokens: null };

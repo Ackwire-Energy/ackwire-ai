@@ -1,6 +1,7 @@
 import type {
   AgentBrain,
   AgentBrainInput,
+  AiAccounts,
   BrainKind,
   Credential,
   MachineAccount,
@@ -17,9 +18,9 @@ import {
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts } from "@agenteschat/client/lib/brain-advanced";
-import { type BrainPick, brainModelLine, brainPickInput } from "@agenteschat/client/lib/brain-picker";
+import { type BrainPick, brainModelLine, brainPickInput, needsOwnSignIn } from "@agenteschat/client/lib/brain-picker";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiChoiceOf, type PlanChoice, type PlanGate, planOfAccount } from "@agenteschat/client/lib/no-ai";
+import { aiChoiceOf, type PlanChoice, type PlanGate, planOfAccount, planOfKind } from "@agenteschat/client/lib/no-ai";
 import {
   brainModelChoice,
   brainModelChoices,
@@ -286,11 +287,20 @@ export function newAgentAi(thinks: NewAgentStart | null): {
 
 /**
  * What a pick in the phone's "Quem pensa" sends, as the web's step: an API model at creation; or Automático there and
- * the plan saved right after; or, for a plan with nothing to think with yet, Connect on it once the agent exists.
+ * the plan saved right after; or, for a plan with nothing to think with yet, Connect on it once the agent exists (also
+ * a computer's own sign-in that can't think for the person's agent yet: `computers`, `useAiAccounts`).
  */
-export function pickedAi(pick: BrainPick): ReturnType<typeof newAgentAi> {
+export function pickedAi(
+  pick: BrainPick,
+  computers: AiAccounts["computers"] | undefined,
+): ReturnType<typeof newAgentAi> {
   const none = { credentialId: null, contextTokens: null, plan: null, autonomy: undefined, connect: null };
   if (pick.kind === "model") return { ...none, model: pick.model };
   if (pick.kind === "connect") return { ...none, model: AUTO, connect: pick.choice };
-  return { ...none, model: AUTO, plan: { machineId: pick.machineId, input: brainPickInput(pick) } };
+  return {
+    ...none,
+    model: AUTO,
+    plan: { machineId: pick.machineId, input: brainPickInput(pick) },
+    connect: needsOwnSignIn(computers, pick) ? planOfKind(pick.kind) : null,
+  };
 }

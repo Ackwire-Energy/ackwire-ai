@@ -804,24 +804,33 @@ describe("the agent's AI", () => {
   });
 
   test("Criar agente on the phone: anything Quem pensa offers, as the web's step sends it", async () => {
-    expect(pickedAi({ kind: "model", model: "claude-sonnet-5-5" })).toMatchObject({
+    expect(pickedAi({ kind: "model", model: "claude-sonnet-5-5" }, [])).toMatchObject({
       model: "claude-sonnet-5-5",
       plan: null,
       connect: null,
     });
     expect(
-      pickedAi({ kind: "claude_code", choice: "opencode", machineId: "m1", accountId: "acc-go", model: "glm-5.3" }),
+      pickedAi({ kind: "claude_code", choice: "opencode", machineId: "m1", accountId: "acc-go", model: "glm-5.3" }, []),
     ).toMatchObject({
       model: "auto",
+      connect: null,
       plan: { machineId: "m1", input: { brain: "claude_code", account: "acc-go", model: "glm-5.3" } },
     });
-    // Automático on a plan is the agent's own already: only the brain is saved.
-    expect(pickedAi({ kind: "codex", choice: "chatgpt", machineId: "m1", model: "auto" }).plan).toEqual({
-      machineId: "m1",
-      input: { brain: "codex" },
-    });
+    // Automático on a plan is the agent's own already: only the brain is saved. The computer's own ChatGPT sign-in
+    // thinks for my agents there: nothing to connect.
+    const signedIn = [
+      { machineId: "m1", name: "Mac", online: true, mine: true, canAdd: true, keys: true, own: { codex: {} } },
+    ] as never;
+    const codex = pickedAi({ kind: "codex", choice: "chatgpt", machineId: "m1", model: "auto" }, signedIn);
+    expect(codex.plan).toEqual({ machineId: "m1", input: { brain: "codex" } });
+    expect(codex.connect).toBeNull();
+    // Not signed in there (or not my computer): the plan is saved, then ChatGPT's sign-in opens, as on the web.
+    expect(pickedAi({ kind: "codex", choice: "chatgpt", machineId: "m1", model: "auto" }, []).connect).toBe("chatgpt");
+    expect(pickedAi({ kind: "claude_code", choice: "claude", machineId: "m1", model: "auto" }, signedIn).connect).toBe(
+      "claude",
+    );
     // A coding plan with no key yet: made on Automático, Connect opens on that plan once it exists.
-    expect(pickedAi({ kind: "connect", choice: "opencode" })).toMatchObject({
+    expect(pickedAi({ kind: "connect", choice: "opencode" }, [])).toMatchObject({
       model: "auto",
       plan: null,
       connect: "opencode",

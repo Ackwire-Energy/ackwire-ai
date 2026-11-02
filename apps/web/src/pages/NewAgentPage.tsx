@@ -29,13 +29,13 @@ import {
   newAgentStart,
   newAgentStartText,
 } from "@agenteschat/client/lib/agent-setup";
-import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import {
   type BrainPickOption,
   brainPickInput,
   brainPickOptions,
   brainPickValue,
+  needsOwnSignIn,
 } from "@agenteschat/client/lib/brain-picker";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
@@ -345,8 +345,9 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
         api: choices,
         machines: brainMachines.data ?? [],
         accounts: aiAccounts.data?.accounts ?? [],
+        ownerIsMe: owner === me.user.id,
       }),
-    [t, locale, choices, brainMachines.data, aiAccounts.data],
+    [t, locale, choices, brainMachines.data, aiAccounts.data, owner, me.user.id],
   );
   const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
 
@@ -371,6 +372,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
             kind: start.brain,
             machineId: start.machineId,
             ...(start.account ? { accountId: start.account.id, label: start.account.label } : {}),
+            model: start.input.model ?? AUTO,
           }
         : null,
     );
@@ -411,7 +413,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const rolePreset = role ? ROLE_PRESETS[role] : null;
   const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText || null;
   // A proposed agent with nothing to think with yet is created all the same, and Connect opens for it after.
-  const connectAfter = Boolean(from) && plan === null && usable.size === 0;
+  const connectAfter = Boolean(from) && plan === null && connectPlan === null && usable.size === 0;
   const check: DraftCheck = {
     role,
     name,
@@ -449,7 +451,10 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const onStart = start
     ? start.brain === "model"
       ? !plan && model === start.model
-      : plan?.kind === start.brain && plan.machineId === start.machineId && plan.accountId === start.account?.id
+      : plan?.kind === start.brain &&
+        plan.machineId === start.machineId &&
+        plan.accountId === start.account?.id &&
+        (plan.model ?? AUTO) === (start.input.model ?? AUTO)
     : false;
   const autonomy = onStart && withAutonomy ? start?.autonomy : undefined;
   // Its Autonomia has a switch of its own under it.
@@ -564,11 +569,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
         // Saved with no account, it thinks with that computer's own sign-in, which thinks only for agents of whoever
         // connected it, where that CLI is signed in (never on the workspace's computer). Else, for an agent of the
         // person's own, its plan's sign-in opens once it's created: only the owner signs a plan in for it.
-        const row = aiAccounts.data?.computers.find((c) => c.machineId === plan.machineId);
-        signIn =
-          !plan.accountId &&
-          ownerId === me.user.id &&
-          !ownSignInReady({ ownSignIn: row?.mine === true }, row, plan.kind);
+        signIn = ownerId === me.user.id && needsOwnSignIn(aiAccounts.data?.computers, plan);
       } catch {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }

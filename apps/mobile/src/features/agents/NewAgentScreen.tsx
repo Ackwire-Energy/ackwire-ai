@@ -188,10 +188,13 @@ function NewAgentForm({
     api: choices,
     machines: brainMachines.data ?? [],
     accounts: aiAccounts.data?.accounts ?? [],
+    ownerIsMe: true,
   });
   const [picked, setPicked] = useState<BrainPickOption | null>(null);
   const [picking, setPicking] = useState(false);
-  const thinks = picked ? pickedAi(picked.pick) : newAgentAi(start && useLast ? start : null);
+  const thinks = picked
+    ? pickedAi(picked.pick, aiAccounts.data?.computers)
+    : newAgentAi(start && useLast ? start : null);
   const startText = start
     ? newAgentStartText(t, i18n.language, start, {
         models: models.data?.models ?? [],

@@ -1,9 +1,10 @@
 import type { TFunction } from "i18next";
 import type { AgentBrainInput, AiAccounts, BrainMachine, MachineAccountKind, Model } from "../api/types";
+import { accountChoices, accountTitle, ownSignInReady } from "./ai-accounts";
 import { thinksWith } from "./brain";
 import { isClaudeAlias } from "./brain-advanced";
 import { namesComputers } from "./machines";
-import { kindOf, PLAN_CHOICES, type PlanChoice, planLabel, planMark } from "./no-ai";
+import { kindOf, PLAN_CHOICES, type PlanChoice, planLabel, planMark, planOfAccount } from "./no-ai";
 import { type BrainModelChoice, brainModelChoices, type CodingPlan, type PlanModelNeed, planOf } from "./plans";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "./providers";
 
@@ -110,6 +111,7 @@ export function brainPickOptions(
     api,
     machines,
     accounts,
+    ownerIsMe,
   }: {
     /** `modelChoices(…)`. */
     api: [string, ModelChoice[]][];
@@ -117,6 +119,8 @@ export function brainPickOptions(
     machines: readonly BrainMachine[];
     /** The person's AI accounts (`useAiAccounts`). */
     accounts: AiAccounts["accounts"];
+    /** The new agent is the viewer's: only the owner of both the agent and an account chooses it. */
+    ownerIsMe: boolean;
   },
 ): BrainPickOption[] {
   const auto: BrainPickOption = {
@@ -131,6 +135,14 @@ export function brainPickOptions(
     pick: { kind: "model", model: AUTO },
   };
   const names = namesComputers(machines);
+  // The accounts it can think with at once, one per account as the agent's page lists them (`accountChoices`): the
+  // viewer's, signed in, and free or made for all of their agents. One in use moves, or signs in once more, only from
+  // the agent's page; the server refuses it here (`account.in_use`, `account.not_owner`).
+  const ready = ownerIsMe
+    ? accountChoices(accounts, [])
+        .map((c) => c.login)
+        .filter((a) => a.mine && a.status === "active" && (a.shared === true || a.usedBy.length === 0))
+    : [];
   const plans = PLAN_CHOICES.flatMap((choice): BrainPickOption[] => {
     const kind = kindOf(choice);
     const coding = planOf(choice);
@@ -143,11 +155,13 @@ export function brainPickOptions(
     ): BrainPickOption[] => {
       const cursorSays = kind === "cursor" && models.some((m) => m.inPlan);
       const key = `${choice}@${base.machineId}${base.accountId ? `#${base.accountId}` : ""}`;
+      // Claude's, ChatGPT's or Cursor's account names itself; a coding plan's key is already its plan's name.
+      const of = base.account && !coding ? ` · ${base.account}` : "";
       return [
         {
           value: `${key}/${AUTO}`,
           label: t("brain.auto.label"),
-          title: name,
+          title: `${name}${of}`,
           group,
           mark: planMark(choice),
           // Claude's, ChatGPT's and Cursor's say whose plan it is; a coding plan is the person's own key.
@@ -162,7 +176,7 @@ export function brainPickOptions(
           return {
             value: `${key}/${m.value}`,
             label: m.label,
-            title: thinksWith(t, choice, m.label),
+            title: `${thinksWith(t, choice, m.label)}${of}`,
             group,
             mark: m.maker ?? planMark(choice),
             ...(line ? { description: line } : {}),
@@ -175,10 +189,9 @@ export function brainPickOptions(
         }),
       ];
     };
+    const mine = ready.filter((a) => planOfAccount(a) === choice && on.some((m) => m.machineId === a.machineId));
     if (coding) {
-      const keys = accounts.filter(
-        (a) => a.mine && a.provider === choice && a.status === "active" && on.some((m) => m.machineId === a.machineId),
-      );
+      const keys = mine;
       if (keys.length === 0) {
         const needs = t("newAgent.brainPick.needsKey", { plan: coding.label });
         return [
@@ -234,13 +247,29 @@ export function brainPickOptions(
         },
       ];
     }
-    return on.flatMap((m) =>
-      rows(
-        { kind, choice, machineId: m.machineId },
-        names || !m.online ? `${name} · ${m.online ? m.name : t("brain.foot.offline", { computer: m.name })}` : name,
-        brainModelChoices(undefined, m.options.find((o) => o.kind === kind)?.models ?? []),
+    const modelsOn = (machineId: string) =>
+      brainModelChoices(
+        undefined,
+        on.find((m) => m.machineId === machineId)?.options.find((o) => o.kind === kind)?.models ?? [],
+      );
+    return [
+      ...on.flatMap((m) =>
+        rows(
+          { kind, choice, machineId: m.machineId },
+          names || !m.online ? `${name} · ${m.online ? m.name : t("brain.foot.offline", { computer: m.name })}` : name,
+          modelsOn(m.machineId),
+        ),
       ),
-    );
+      ...mine
+        .map((a) => ({ ...a, label: accountTitle(a) }))
+        .flatMap((a) =>
+          rows(
+            { kind, choice, machineId: a.machineId, accountId: a.id, account: a.label },
+            names ? `${name} · ${a.label} · ${a.computer}` : `${name} · ${a.label}`,
+            modelsOn(a.machineId),
+          ),
+        ),
+    ];
   });
   return [auto, ...apiPickOptions(t, locale, api), ...plans];
 }
@@ -280,6 +309,19 @@ export const brainPickInput = (p: {
   ...(p.accountId ? { account: p.accountId } : {}),
   ...(p.model && !isAuto(p.model) ? { model: p.model } : {}),
 });
+
+/**
+ * A plan picked on a computer's own sign-in that thinks for nobody yet: its sign-in opens once the agent exists (web
+ * and phone). Only for an agent of the person's own: only its owner signs a plan in for it.
+ */
+export function needsOwnSignIn(
+  computers: AiAccounts["computers"] | undefined,
+  p: { kind: MachineAccountKind; machineId: string; accountId?: string },
+) {
+  if (p.accountId) return false;
+  const row = computers?.find((c) => c.machineId === p.machineId);
+  return !ownSignInReady({ ownSignIn: row?.mine === true }, row, p.kind);
+}
 
 /** The list's runs of options under one heading, in order (the phone draws each as a group). */
 export function pickGroups(options: readonly BrainPickOption[]) {

@@ -7,6 +7,7 @@ import {
   brainPickOptions,
   brainPickText,
   brainPickValue,
+  needsOwnSignIn,
   pickGroups,
 } from "../src/lib/brain-picker";
 import { brainModelChoices, CODING_PLANS } from "../src/lib/plans";
@@ -57,7 +58,7 @@ const goKey: AiAccounts["accounts"][number] = {
   computer: "Mac mini",
 };
 
-const build = (accounts: AiAccounts["accounts"] = [], withKey = ["anthropic"]) =>
+const build = (accounts: AiAccounts["accounts"] = [], withKey = ["anthropic"], ownerIsMe = true) =>
   brainPickOptions(t, "pt-BR", {
     api: modelChoices(
       MODELS,
@@ -66,6 +67,7 @@ const build = (accounts: AiAccounts["accounts"] = [], withKey = ["anthropic"]) =
     ),
     machines: [MAC],
     accounts,
+    ownerIsMe,
   });
 const finds = (options: ReturnType<typeof build>, q: string) =>
   options.filter((o) => brainPickText(o).toLowerCase().includes(q)).map((o) => o.value);
@@ -161,5 +163,48 @@ describe("Quem pensa as one list (the new agent's step)", () => {
       "agentPage.work.brain.modelLine.opus",
     );
     expect(brainModelLine(t, "codex", undefined, { value: "gpt", label: "GPT" })).toBeUndefined();
+  });
+
+  test("the accounts the agent's page offers: one row per account of mine that can think for it at once", () => {
+    const work = { ...goKey, id: "acc-work", label: "Trabalho", plan: "max", provider: null, email: "a@example.test" };
+    // Two logins of one account: one row, the free one.
+    const options = build([{ ...work, id: "acc-work-0", usedBy: ["Ada"] }, work]);
+    const rows = options.filter((o) => "accountId" in o.pick && o.pick.accountId?.startsWith("acc-work"));
+    expect(rows.map((o) => (o.pick as { model: string }).model)).toEqual([
+      AUTO,
+      ...brainModelChoices(undefined, claudeCode.models).map((m) => m.value),
+    ]);
+    expect(rows.every((o) => (o.pick as { accountId: string }).accountId === "acc-work")).toBe(true);
+    expect(rows[0]?.group).toStartWith("brain.line.claudeAuto");
+    expect(rows[0]?.group).toEndWith(" · Trabalho · Max");
+    expect(rows[1]?.title).toEndWith(" · Trabalho · Max");
+    // A proposal's or the last setup's account is a choice to show, with its model.
+    expect(
+      brainPickValue(options, { kind: "claude_code", machineId: "m1", accountId: "acc-work", model: "opus" }),
+    ).toBe("claude@m1#acc-work/opus");
+  });
+
+  test("no account the server would refuse: in use by another agent, someone else's, or for another person's agent", () => {
+    const has = (accounts: AiAccounts["accounts"], ownerIsMe = true) =>
+      build(accounts, ["anthropic"], ownerIsMe).some((o) => "accountId" in o.pick && o.pick.accountId);
+    expect(has([goKey])).toBe(true);
+    expect(has([{ ...goKey, usedBy: ["Ada"] }])).toBe(false);
+    // Made for all of its owner's agents there: it thinks for this one too.
+    expect(has([{ ...goKey, usedBy: ["Ada"], shared: true }])).toBe(true);
+    expect(has([{ ...goKey, mine: false }])).toBe(false);
+    expect(has([{ ...goKey, status: "signed_out" }])).toBe(false);
+    expect(has([goKey], false)).toBe(false);
+    // With no key it can use, the coding plan is one pick that connects one.
+    expect(build([{ ...goKey, usedBy: ["Ada"] }]).some((o) => o.value === "connect:opencode")).toBe(true);
+  });
+
+  test("a computer's own sign-in that can't think for the person's agent yet opens its sign-in once it exists", () => {
+    const mine = { machineId: "m1", name: "Mac", online: true, mine: true, canAdd: true, keys: true };
+    const plan = { kind: "claude_code" as const, machineId: "m1" };
+    expect(needsOwnSignIn([{ ...mine, own: { claude_code: {} } }] as never, plan)).toBe(false);
+    expect(needsOwnSignIn([{ ...mine, own: {} }] as never, plan)).toBe(true);
+    expect(needsOwnSignIn([{ ...mine, mine: false, own: { claude_code: {} } }] as never, plan)).toBe(true);
+    expect(needsOwnSignIn(undefined, plan)).toBe(true);
+    expect(needsOwnSignIn([], { ...plan, accountId: "acc-1" })).toBe(false);
   });
 });
