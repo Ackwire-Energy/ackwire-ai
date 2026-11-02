@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ComputerQueue, QueueWaiting } from "@agenteschat/client";
-import { fanOutOf, queueLiveText, queueWhereText } from "@agenteschat/client/lib/computer-queue";
-import { fanShows, machineOfAgents, queuePlace, waitingFor } from "../../src/features/queue/logic";
+import { queueLiveText, queueWhereText, waitingFor } from "@agenteschat/client/lib/computer-queue";
+import { machineOfAgents, queuePlace } from "../../src/features/queue/logic";
 import { translator } from "./fixtures";
 
 const NOW = Date.parse("2026-11-02T12:00:00Z");
@@ -80,15 +80,5 @@ describe("a shared computer's line on the phone", () => {
     const name = (id: string) => names[id];
     expect(queueLiveText(en, "en", queue, "q1", name, NOW)).toBe("Waiting for the computer. Next up, in about 1 min");
     expect(queueLiveText(en, "en", queue, "q2", name, NOW)).toBe("In line, 2nd. After Nova");
-  });
-
-  test("the strip stays while some called agent works or waits, and goes once all answered", () => {
-    type Phase = "handled" | "claimed" | "picked";
-    const shows = (...phases: [string, Phase][]) =>
-      fanShows(fanOutOf({ routed: true, agents: phases, mentioned: phases.map(([id]) => id) }, queue));
-    expect(shows(["ada", "handled"], ["rio", "claimed"])).toBe(true);
-    expect(shows(["ada", "handled"], ["rio", "handled"])).toBe(false);
-    // One agent called: no strip.
-    expect(shows(["rio", "picked"])).toBe(false);
   });
 });

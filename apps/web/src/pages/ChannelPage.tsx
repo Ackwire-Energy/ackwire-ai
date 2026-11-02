@@ -224,7 +224,7 @@ import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelM
 import { ChannelPinsButton } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
-import { QueueButton, useAgentsMachineId } from "@/components/ComputerQueue";
+import { QueueButton, QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -2421,6 +2421,9 @@ const Timeline = memo(function Timeline({
         />
       ),
     );
+    // Its agents in line for their computer: each one's turn right after it, where "thinking" shows otherwise.
+    if ((m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local)
+      rows.push(<QueueWaitTurns key={`queue-${item.key}`} message={m} />);
   }
   drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);

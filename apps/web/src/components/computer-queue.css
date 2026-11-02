@@ -105,31 +105,19 @@ html:not([data-pointer]) .cq-link:focus-visible {
   white-space: nowrap;
 }
 
-/* The waiting agent's row under the message it answers, a row per agent in the receipt's words. */
-.cq-lives {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+/* The waiting agent's turn after the message it answers, where "thinking" shows otherwise. */
+.cq-turn__say {
+  margin: 0;
+  color: var(--ink-muted);
 }
-.cq-lives > :first-child {
-  margin-inline-end: 0;
-}
-.cq-live {
+.cq-turn__acts {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 2px 6px;
-  line-height: 18px;
+  align-items: center;
+  gap: 4px 12px;
 }
-.cq-live > .ac-avatar {
-  flex: none;
-}
-.cq-live__text {
-  min-width: 0;
-}
-.cq-live__text b {
-  color: var(--ink);
-  font-weight: 600;
+.cq-turn__acts:empty {
+  display: none;
 }
 
 /* Under a message that called several agents. */

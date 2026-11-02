@@ -1,18 +1,10 @@
-import type {
-  Channel,
-  ComputerQueue,
-  DirectMessage,
-  Machine,
-  MessageReceipt,
-  QueueWaiting,
-  QueueWhere,
-} from "@agenteschat/client";
-import type { FanOut, QueuePlace } from "@agenteschat/client/lib/computer-queue";
+import type { Channel, DirectMessage, Machine, QueueWhere } from "@agenteschat/client";
+import type { QueuePlace } from "@agenteschat/client/lib/computer-queue";
 
 /**
- * A shared computer's line on the phone (ADR 0032, "Calm waits"): which computer a conversation's agents share, where
- * a turn answers as this person knows the conversation, and which run of a message waits in line. The words come
- * from the shared `computer-queue` lib, as on the web.
+ * A shared computer's line on the phone (ADR 0032, "Calm waits"): which computer a conversation's agents share and
+ * where a turn answers as this person knows the conversation. The rest comes from the shared `computer-queue` lib,
+ * as on the web.
  */
 
 /** The computer the first of these agents thinks on: a Cloud workspace has one, shared by all of them. */
@@ -38,25 +30,3 @@ export function queuePlace(
   if (!ch || (ch.visibility === "private" && !ch.isMember)) return { kind: "hidden" };
   return { kind: "channel", name: ch.name, thread: where.threadId !== null };
 }
-
-/**
- * An agent's place in line for a message: its run as the receipt follows it, else its one waiting turn in this
- * conversation (a new mention joins the turn already waiting).
- */
-export function waitingFor(
-  queue: ComputerQueue | null | undefined,
-  receipt: Pick<MessageReceipt, "runOf"> | undefined,
-  agentId: string,
-  channelId: string,
-): QueueWaiting | null {
-  const runId = receipt?.runOf?.[agentId];
-  const waiting = queue?.waiting ?? [];
-  return (
-    (runId ? waiting.find((w) => w.runId === runId) : undefined) ??
-    waiting.find((w) => w.agentId === agentId && w.where.channelId === channelId) ??
-    null
-  );
-}
-
-/** The strip stays while some called agent still works or waits; once all are done their replies say it. */
-export const fanShows = (fan: FanOut | null): fan is FanOut => fan !== null && fan.working + fan.inLine > 0;

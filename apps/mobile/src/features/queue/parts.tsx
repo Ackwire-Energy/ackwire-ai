@@ -1,12 +1,18 @@
 import type { Message, MessageReceipt, QueueWaiting } from "@agenteschat/client";
-import { fanChipText, fanOutOf, fanOutText, queueLiveText } from "@agenteschat/client/lib/computer-queue";
+import {
+  fanChipText,
+  fanOutOf,
+  fanOutText,
+  fanShows,
+  queueLiveText,
+  waitingFor,
+} from "@agenteschat/client/lib/computer-queue";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Chip, Icon, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
-import { fanShows, waitingFor } from "./logic";
 import { useAgentsQueue, useOpenQueue } from "./QueueSheet";
 
 /**
@@ -46,7 +52,7 @@ export function QueueWaitRows({
           waiting={w}
           name={name(w.agentId) ?? t("channel.unknownAgent")}
           text={text}
-          mine={w.purpose.kind === "person" && w.purpose.userId === meId}
+          first={w.people && w.purpose.kind === "person" && w.purpose.userId === meId}
           onSee={() => openQueue(machineId)}
         />
       ))}
@@ -58,13 +64,13 @@ function WaitRow({
   waiting: w,
   name,
   text,
-  mine,
+  first,
   onSee,
 }: {
   waiting: QueueWaiting;
   name: string;
   text: string;
-  mine: boolean;
+  first: boolean;
   onSee: () => void;
 }) {
   const { t } = useTranslation();
@@ -87,7 +93,7 @@ function WaitRow({
           </Text>
         </View>
         <View style={styles.acts}>
-          {mine ? <Chip icon="person" label={t("queue.youFirst")} /> : null}
+          {first ? <Chip icon="person" label={t("queue.youFirst")} /> : null}
           <Button variant="ghost" size="sm" label={t("queue.see")} onPress={onSee} />
         </View>
       </View>
@@ -107,7 +113,7 @@ export function FanStrip({ message: m, receipt }: { message: Message; receipt: M
   const openQueue = useOpenQueue();
   const { machineId, queue } = useAgentsQueue(m.mentionedAgentIds);
   const fan = fanOutOf(receipt, queue);
-  if (!fanShows(fan)) return null;
+  if (!fanShows(m, fan, receipt)) return null;
   const summary = fanOutText(t, fan);
   return (
     <View style={[styles.fan, { borderColor: c.line2 }]} accessibilityLiveRegion="polite">
@@ -124,7 +130,8 @@ export function FanStrip({ message: m, receipt }: { message: Message; receipt: M
           <Chip
             key={a.agentId}
             leading={<AgentFace agentId={a.agentId} size={14} live={false} framed={false} />}
-            label={`${dir.anyAgent(a.agentId)?.name ?? t("channel.unknownAgent")} · ${fanChipText(t, i18n.language, a)}`}
+            label={dir.anyAgent(a.agentId)?.name ?? t("channel.unknownAgent")}
+            trailing={`· ${fanChipText(t, i18n.language, a)}`}
           />
         ))}
       </View>

@@ -186,18 +186,23 @@ function WaitingRow({ row: w, words, now }: { row: QueueRow<QueueWaiting>; words
       line={words.line(w)}
       time={queueStartText(t, w, words.names.agent, now)}
       mine={w.mine}
+      first={w.mine && w.people}
     />
   );
 }
 
-/** One turn: its place (in line), the agent's face on the first line, who and what for (wrapping), the time. */
-function QueueLine({
+/**
+ * One turn: its place (in line), the agent's face on the first line, who and what for (wrapping), the time. `mine`
+ * highlights my own request; `first` (waiting, a person waits on it) also says "You go first".
+ */
+export function QueueLine({
   agentId,
   position,
   name,
   line,
   time,
   mine,
+  first = false,
 }: {
   agentId: string;
   position: number | null;
@@ -205,6 +210,7 @@ function QueueLine({
   line: string;
   time: string | null;
   mine: boolean;
+  first?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -212,7 +218,7 @@ function QueueLine({
     <View
       style={[styles.row, mine && { backgroundColor: c.sunken }]}
       accessible
-      accessibilityLabel={[position, name, line, mine ? t("queue.youFirst") : null, time].filter(Boolean).join(", ")}
+      accessibilityLabel={[position, name, line, first ? t("queue.youFirst") : null, time].filter(Boolean).join(", ")}
     >
       {position !== null ? (
         <Text variant="footnote" tone="faint" style={styles.pos} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
@@ -227,7 +233,7 @@ function QueueLine({
           </Text>
           {` ${line}`}
         </Text>
-        {mine ? <Chip icon="person" label={t("queue.youFirst")} /> : null}
+        {first ? <Chip icon="person" label={t("queue.youFirst")} /> : null}
       </View>
       {time ? (
         <Text variant="caption" tone="faint" numberOfLines={1} style={styles.time}>

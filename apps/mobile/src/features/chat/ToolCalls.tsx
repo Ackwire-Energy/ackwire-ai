@@ -378,7 +378,8 @@ function Line({
             {line.label}
           </Text>
         </Breathing>
-        {line.preview ? (
+        {/* Opened, the whole answer shows below: the preview would repeat its start. */}
+        {line.preview && (!open || line.onOpen) ? (
           <Text variant="footnote" tone="muted" numberOfLines={2}>
             {line.preview}
           </Text>

@@ -5,7 +5,6 @@ import {
   isWaitingHandoff,
   useBrowserHandoffMutations,
   useMachineOutages,
-  useMachineQueue,
 } from "@agenteschat/client";
 import {
   asksMe,
@@ -31,7 +30,6 @@ import { useNow } from "@/hooks/useNow";
 import { lookOf } from "@/lib/look";
 import { useSaid, useToast } from "@/lib/toast";
 import { BrowserCard, Cover, stepText } from "../browser/BrowserCard";
-import { QueueButton, useAgentMachineId } from "../ComputerQueue";
 import { DesktopView } from "../desktop/DesktopView";
 import { SwitchComputerDialog } from "../MachineOutages";
 import { useOrg } from "../org-context";
@@ -613,10 +611,6 @@ export function ComputerButton({ agent }: { agent: Agent }) {
   const dir = useDirectory(org.id);
   const view = useAgentComputer(agent);
   const openComputer = useOpenComputer();
-  const machineId = useAgentMachineId(agent.id);
-  const queue = useMachineQueue(org.id, machineId);
-  // While anyone waits for this computer, the button opens its line (every member may see it).
-  if (queue.data?.waiting.length) return <QueueButton machineId={machineId} />;
   if (!view.ready || view.forbidden || !view.facts) return null;
   const f = view.facts;
   const entry = entryState(f);

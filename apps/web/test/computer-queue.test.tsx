@@ -16,6 +16,8 @@ const RIO_ID = "00000000-0000-4000-8000-0000000000a8";
 const in_ = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const row = (id: string) => document.querySelector(`article[data-message-id="${id}"]`) as HTMLElement;
+const turns = () => [...document.querySelectorAll<HTMLElement>(".cq-turn")];
+const orgEvent = (event: Record<string, unknown>) => ({ type: "event", scope: "org", event });
 
 function setup() {
   const state = seedState();
@@ -71,7 +73,7 @@ function setup() {
     ],
   };
   machines?.setQueue(queue);
-  return { state, api, me };
+  return { state, api, me, machines, queue };
 }
 
 const said = (over: Partial<Message>) =>
@@ -114,7 +116,7 @@ describe("a computer's line", () => {
     expect(text).toContain("Pessoas vão primeiro.");
   });
 
-  test("the waiting agent's row under my message says where it is in line, and See queue opens the line", async () => {
+  test("the waiting agent's turn after my message says where it is in line, and See queue opens the line", async () => {
     const { api, state, me } = setup();
     state.messages.push(
       said({
@@ -129,11 +131,17 @@ describe("a computer's line", () => {
     );
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
+    // The receipt under my message keeps its words; the agent's turn is its own row, where "thinking" shows.
     const foot = row("m-ask").querySelector(".ac-msg__foot") as HTMLElement;
-    expect(foot.textContent).toContain("Atlas · Aguardando o computador. É o próximo, em cerca de 2 min");
-    expect(foot.textContent).toContain("Você vai primeiro");
-    expect(foot.textContent).not.toContain("está na fila do computador");
-    await click(within(foot).getByRole("button", { name: "Ver fila" }));
+    expect(foot.textContent).toContain("Atlas está na fila do computador · é o próximo");
+    const [turn, ...more] = turns();
+    expect(more).toEqual([]);
+    expect(turn?.closest(".ac-receipt")).toBeNull();
+    expect(turn?.querySelector(".ac-msg__avatar")).not.toBeNull();
+    expect(turn?.textContent).toContain("Atlas");
+    expect(turn?.textContent).toContain("Aguardando o computador. É o próximo, em cerca de 2 min");
+    expect(turn?.textContent).toContain("Você vai primeiro");
+    await click(within(turn as HTMLElement).getByRole("button", { name: "Ver fila" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: "Fila de Studio" })).toBeTruthy();
   });
@@ -155,12 +163,41 @@ describe("a computer's line", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
     const foot = row("m-ask").querySelector(".ac-msg__foot") as HTMLElement;
-    expect(foot.textContent).toContain("Rio · Na fila, 2º. Depois de Atlas");
-    expect(foot.textContent).not.toContain("Você vai primeiro");
+    expect(foot.textContent).toContain("Rio está na fila do computador");
+    expect(foot.textContent).not.toContain("próximo");
+    expect(turns()[0]?.textContent).toContain("Na fila, 2º. Depois de Atlas");
+    expect(turns()[0]?.textContent).not.toContain("Você vai primeiro");
   });
 
-  test("a message that called several agents gets one strip: each agent's state, live", async () => {
+  test("two agents in line: one receipt line, a turn each, none repeating the receipt", async () => {
     const { api, state } = setup();
+    state.messages.push(
+      said({
+        body: "@atlas @rio confiram",
+        mentionedAgentIds: [ATLAS_ID, RIO_ID],
+        receipts: {
+          seenBy: [ATLAS_ID, RIO_ID],
+          pickedBy: [ATLAS_ID, RIO_ID],
+          handled: [
+            { agentId: ATLAS_ID, runId: "r-atlas", status: "waiting_input", computer: "queued" },
+            { agentId: RIO_ID, runId: "r-rio", status: "waiting_input", computer: "queued" },
+          ],
+          blocked: [],
+        },
+      }),
+    );
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const foot = row("m-ask").querySelector(".ac-msg__foot") as HTMLElement;
+    expect(foot.textContent?.match(/estão na fila do computador/g)).toHaveLength(1);
+    expect(turns().map((t) => t.querySelector(".ac-msg__head")?.textContent)).toEqual([
+      expect.stringContaining("Atlas"),
+      expect.stringContaining("Rio"),
+    ]);
+  });
+
+  test("an agent's message that called several agents gets one strip: each agent's state, live", async () => {
+    const { api, state, machines, queue } = setup();
     state.messages.push(
       said({
         author: { type: "agent", id: NOVA_ID },
@@ -179,16 +216,70 @@ describe("a computer's line", () => {
         },
       }),
     );
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
     await settle(10);
     const strip = row("m-ask").querySelector(".cq-fan") as HTMLElement;
     expect(strip).not.toBeNull();
     expect(strip.textContent).toContain("3 agentes chamados · 1 trabalhando · 2 na fila");
     const chips = [...strip.querySelectorAll(".cq-fan__chip")].map((c) => c.textContent);
     expect(chips).toEqual(["Ada trabalhando", "Atlas 1º", "Rio 2º"]);
-    // One strip, no line per agent in line.
-    expect(row("m-ask").querySelector(".cq-live")).toBeNull();
+    // One strip, no turn per agent in line.
+    expect(turns()).toEqual([]);
     expect(within(strip).getByRole("button", { name: "Ver fila" })).toBeTruthy();
+    expect(screen().getByRole("button", { name: "Computador · 2 aguardando" })).toBeTruthy();
+
+    // Atlas got the computer: the line says so and everyone's app reads it again.
+    const [atlas, rio] = queue.waiting;
+    machines?.setQueue({
+      ...queue,
+      working: [
+        ...queue.working,
+        {
+          runId: "r-atlas",
+          agentId: ATLAS_ID,
+          purpose: atlas?.purpose ?? { kind: "routine" },
+          where: atlas?.where ?? { channelId: ENG_ID, threadId: null },
+          startedAt: in_(0),
+          estimatedEndAt: in_(3),
+        },
+      ],
+      waiting: rio ? [{ ...rio, position: 1, after: [ADA_ID] }] : [],
+    });
+    await act(async () => socket.push(orgEvent({ type: "computer.queue", machineId: queue.machineId })));
+    await settle(6);
+    const live = row("m-ask").querySelector(".cq-fan") as HTMLElement;
+    expect([...live.querySelectorAll(".cq-fan__chip")].map((c) => c.textContent)).toEqual([
+      "Ada trabalhando",
+      "Atlas trabalhando",
+      "Rio 1º",
+    ]);
+    expect(screen().getByRole("button", { name: "Computador · 1 aguardando" })).toBeTruthy();
+  });
+
+  test("the dialog stays open as the line empties, live", async () => {
+    const { api, machines, queue } = setup();
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(10);
+    await click(screen().getByRole("button", { name: "Computador · 2 aguardando" }));
+    await settle(4);
+    machines?.setQueue({ ...queue, working: [], waiting: [] });
+    await act(async () => socket.push(orgEvent({ type: "computer.queue", machineId: queue.machineId })));
+    await settle(6);
+    const dialog = screen().getByRole("dialog", { name: "Fila de Studio" });
+    expect(dialog.textContent).toContain("Ninguém na fila");
+    expect(screen().queryByRole("button", { name: /aguardando/ })).toBeNull();
+  });
+
+  test("in an agent's DM the line's button sits beside the Computer button", async () => {
+    const { api } = setup();
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ATLAS_ID}`, { api });
+    await settle(10);
+    expect(screen().getByRole("button", { name: "Computador · 2 aguardando" })).toBeTruthy();
+    expect(screen().getByRole("button", { name: "Computador" })).toBeTruthy();
   });
 });
 

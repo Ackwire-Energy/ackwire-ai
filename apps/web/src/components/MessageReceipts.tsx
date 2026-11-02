@@ -6,7 +6,7 @@ import { Icon, type IconName, InfoHint, PixelSpinner, Popover, ProviderLogo } fr
 import { type ReactNode, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { FanOutStrip, QueueLiveRow } from "@/components/ComputerQueue";
+import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
 import { useConnectAi } from "@/components/ConnectAi";
 import { HelpLink } from "@/components/HelpLink";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -121,8 +121,8 @@ export function MessageReceipts({
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
-  // Several agents called and started: one strip says where each stands, in place of a line per agent in line.
-  const fanned = part === "line" && message.mentionedAgentIds.length > 1;
+  // An agent's message that called several: one strip says where each stands once they start (`fanShows`).
+  const fanned = part === "line" && message.author.type === "agent" && message.mentionedAgentIds.length > 1;
   // The mark stays where a line says the rest (a failure, nobody): what became of it in the task is its own news.
   if (part === "line" ? !worded && !fanned : worded && !steered) return null;
   const marked = view.seen.length > 0 || view.picking === true || steered !== null;
@@ -251,13 +251,6 @@ export function MessageReceipts({
       </div>
     );
   }
-  const lives = status?.kind === "queued" && (
-    <span className="ac-receipt__words cq-lives">
-      {status.agents.map((id) => (
-        <QueueLiveRow key={id} agentId={id} runId={receipt?.runOf?.[id]} fallback={statusText} />
-      ))}
-    </span>
-  );
   const words = (
     <div className="ac-receipt">
       {check}
@@ -266,7 +259,11 @@ export function MessageReceipts({
           <span>{statusText}</span>
         </span>
       )}
-      {lives}
+      {status?.kind === "queued" && (
+        <span className="ac-receipt__words">
+          <QueuedWords message={message} fallback={statusText} />
+        </span>
+      )}
       {status?.kind === "failed" && actions && (
         <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>

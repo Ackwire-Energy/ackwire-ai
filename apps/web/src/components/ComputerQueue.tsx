@@ -1,14 +1,16 @@
-import type { Message, ComputerQueue as Queue, QueueWhere } from "@agenteschat/client";
-import { useChannels, useDms, useMachineQueue, useMachines } from "@agenteschat/client";
+import type { Message, ComputerQueue as Queue, QueueWaiting, QueueWhere } from "@agenteschat/client";
+import { receiptView, useChannels, useDms, useMachineQueue, useMachines } from "@agenteschat/client";
 import {
   durationText,
   fanChipText,
   fanOutOf,
   fanOutText,
+  fanShows,
   type QueueNames,
   type QueuePlace,
   queueAllStartedText,
   queueButtonText,
+  queuedNextText,
   queueLeftText,
   queueLiveText,
   queuePurposeText,
@@ -16,11 +18,13 @@ import {
   queueStatusText,
   queueView,
   queueWhereText,
+  waitingFor,
 } from "@agenteschat/client/lib/computer-queue";
-import { Button, Chip, Dialog, DialogBody, useNow } from "@agenteschat/ui";
+import { Button, Chip, Dialog, DialogBody, Icon, Message as MessageRow, useNow } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useLive } from "@/realtime/context";
@@ -28,8 +32,8 @@ import "./computer-queue.css";
 
 /**
  * A shared computer's line (ADR 0032, "Calm waits"): the dialog every member can open in place, the waiting agent's
- * row under the message it answers, the strip under a message that called several agents, and the conversation
- * header's button while anyone waits. Every time is an estimate ("~N min").
+ * turn after the message it answers, the strip under an agent's message that called several agents, and the
+ * conversation header's button while anyone waits. Every time is an estimate ("~N min").
  */
 
 /** The computer an agent runs on, from the computers list (every member reads it). */
@@ -117,7 +121,15 @@ export function QueueDialog({
       className="cq-dialog"
       subtitle={queue ? queueStatusText(t, queueView(queue, names.viewerId), now) : undefined}
     >
-      <DialogBody>{queue && <QueueLists queue={queue} names={names} now={now} />}</DialogBody>
+      <DialogBody>
+        {queue ? (
+          <QueueLists queue={queue} names={names} now={now} />
+        ) : q.isError ? (
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+        ) : (
+          <LoadingList count={3} />
+        )}
+      </DialogBody>
     </Dialog>
   );
 }
@@ -183,46 +195,86 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
   );
 }
 
+/** The waiting turns of a message's agents in their computer's line, resolved as `waitingFor` finds them. */
+function useQueueWaits(message: Message) {
+  const { org } = useOrg();
+  const receipt = useLive((s) => s.receipts[message.id]);
+  const status = receiptView(receipt).status;
+  const agents = status?.kind === "queued" ? status.agents : [];
+  const machineId = useAgentsMachineId(agents);
+  const q = useMachineQueue(org.id, machineId, agents.length > 0);
+  const rows = agents.flatMap((id) => waitingFor(q.data, receipt, id, message.channelId) ?? []);
+  // The fan-out strip says where each stands instead.
+  const fanned = fanShows(message, fanOutOf(receipt, q.data), receipt);
+  return { agents, machineId, queue: q.data, rows: fanned ? [] : rows };
+}
+
 /**
- * Under the message an agent waits to answer, in place of "in line for the computer": where it is in line and who
- * is ahead ("In line, 4th. After Ada, Kai and Ravi"), "You go first" when the viewer asked, and "See queue". Falls
- * back to `fallback` until the line says where the run is.
+ * The receipt of a message whose agents wait in line: "Theo is in line for the computer · next" when its one agent
+ * is next, else `fallback` (the plain queued line). Once, whatever the number of agents.
  */
-export function QueueLiveRow({
-  agentId,
-  runId,
-  fallback,
+export function QueuedWords({ message, fallback }: { message: Message; fallback: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const { agents, rows } = useQueueWaits(message);
+  const next = agents.length === 1 && rows[0]?.position === 1 ? dir.agentById.get(rows[0].agentId)?.name : undefined;
+  return <span>{next ? queuedNextText(t, next) : fallback}</span>;
+}
+
+/**
+ * Where "thinking" shows otherwise, for each agent of a message that waits in line for its computer: the agent's turn
+ * (its face, its name), "Waiting for the computer. Next up, in about 1 min" or "In line, 4th. After Ada, Kai and
+ * Ravi", "You go first" on the viewer's own request, and "See queue". Nothing while the line doesn't know the turn
+ * (the receipt says it) or while the fan-out strip shows.
+ */
+export function QueueWaitTurns({ message }: { message: Message }) {
+  const { machineId, queue, rows } = useQueueWaits(message);
+  if (!machineId || rows.length === 0) return null;
+  return (
+    <>
+      {rows.map((w) => (
+        <QueueWaitTurn key={w.runId} waiting={w} queue={queue} machineId={machineId} />
+      ))}
+    </>
+  );
+}
+
+function QueueWaitTurn({
+  waiting: w,
+  queue,
+  machineId,
 }: {
-  agentId: string;
-  runId: string | undefined;
-  fallback: string;
+  waiting: QueueWaiting;
+  queue: Queue | undefined;
+  machineId: string;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const machineId = useAgentMachineId(agentId);
-  const q = useMachineQueue(org.id, machineId);
   const now = useNow(30_000);
   const agentName = (id: string) => dir.agentById.get(id)?.name;
-  const text = runId ? queueLiveText(t, i18n.language, q.data, runId, agentName, now) : null;
-  const row = runId ? q.data?.waiting.find((w) => w.runId === runId) : undefined;
-  const first = row?.people && row.purpose.kind === "person" && row.purpose.userId === me.user.id;
-  const name = agentName(agentId) ?? t("channel.unknownAgent");
+  const name = agentName(w.agentId) ?? t("channel.unknownAgent");
+  const text = queueLiveText(t, i18n.language, queue, w.runId, agentName, now);
+  const first = w.people && w.purpose.kind === "person" && w.purpose.userId === me.user.id;
   return (
-    <span className="cq-live">
-      <AgentAvatar agentId={agentId} name={name} size="xs" state="idle" />
-      <span className="cq-live__text">
-        {text ? (
-          <>
-            <b>{name}</b> · {text}
-          </>
-        ) : (
-          fallback
-        )}
+    <MessageRow
+      agent
+      stacked
+      className="cq-turn"
+      avatar={<AgentAvatar agentId={w.agentId} name={name} state="idle" />}
+      author={name}
+      time={null}
+    >
+      <p className="cq-turn__say ac-iconline" aria-live="polite">
+        <Icon name="waiting" size={14} />
+        <span>{text}</span>
+      </p>
+      <span className="cq-turn__acts">
+        {first && <Chip className="cq-first">{t("queue.youFirst")}</Chip>}
+        <SeeQueue machineId={machineId} />
       </span>
-      {first && <Chip className="cq-first">{t("queue.youFirst")}</Chip>}
-      {machineId && text && <SeeQueue machineId={machineId} />}
-    </span>
+    </MessageRow>
   );
 }
 
@@ -240,8 +292,7 @@ export function FanOutStrip({ message, otherwise = null }: { message: Message; o
   const machineId = useAgentMachineId(open[0]?.agentId);
   const q = useMachineQueue(org.id, machineId, open.length > 0);
   const fan = fanOutOf(receipt, q.data);
-  const started = fan?.agents.filter((a) => receipt?.runOf?.[a.agentId]).length ?? 0;
-  if (!fan || started < 2 || open.length === 0) return otherwise;
+  if (!fanShows(message, fan, receipt)) return otherwise;
   return (
     <section className="cq-fan" aria-label={fanOutText(t, fan)}>
       <p className="cq-fan__head">
