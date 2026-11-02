@@ -319,7 +319,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           await recordSave(ctx, res);
           if (res.action === "disputed")
             return {
-              content: `Saved as ${res.item.id}, beside memory ${res.previous?.id} ("${cutText(res.previous?.content ?? "", 200)}"), which a person wrote and says otherwise: both are marked disputed until a person decides. Ask them which is right.`,
+              content: `Saved as ${res.item.id}, beside memory ${res.previous?.id} ("${cutText(res.previous?.content ?? "", 200)}"), which a person wrote and says otherwise: yours is marked disputed until a person decides. Ask them which is right.`,
             };
           return { content: `Saved (${res.action}) as ${res.item.id}.` };
         } catch (error) {

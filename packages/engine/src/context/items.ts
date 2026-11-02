@@ -308,7 +308,10 @@ export async function consolidateItem(
   });
 }
 
-/** A write that may not replace `old`: both stay current, linked and disputed, until a person decides. */
+/**
+ * A write that may not replace `old`: both stay current, linked and disputed, until a person decides. A low-trust
+ * write (read from a page, mail or a connected app) never weakens `old`: only the new one is disputed.
+ */
 async function keepBeside(tx: Executor, old: ContextItem, input: NewContextItem): Promise<ConsolidateResult> {
   const item = await insertContextItem(tx, {
     ...input,
@@ -316,7 +319,7 @@ async function keepBeside(tx: Executor, old: ContextItem, input: NewContextItem)
     relatedIds: [old.id],
     disputed: true,
   });
-  await tx.update(contextItems).set({ disputed: true }).where(eq(contextItems.id, old.id));
+  if (input.trust !== "low") await tx.update(contextItems).set({ disputed: true }).where(eq(contextItems.id, old.id));
   await linkBack(tx, [old.id], item.id);
   return { action: "disputed", item, previous: old };
 }
