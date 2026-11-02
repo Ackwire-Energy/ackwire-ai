@@ -2076,6 +2076,7 @@ export const ptBR = {
     targetEnv: "Vai como a variável {{name}} no computador de {{agent}}.",
     targetFile: "Vai para o arquivo {{path}} no computador de {{agent}}.",
     targetSite: "Só o navegador de {{agent}} digita, em {{host}}. Fica fora dos comandos de {{agent}}.",
+    replaces: "Substitui a chave com esse nome que {{agent}} já tem.",
     label: "Valor de {{name}}",
     private: "Vai cifrado direto para o computador. Não fica no chat nem com o agente.",
     send: "Enviar",

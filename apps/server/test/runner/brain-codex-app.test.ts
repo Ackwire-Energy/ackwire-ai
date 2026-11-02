@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
+import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import {
   type CodexBrainEvent,
   CodexEventMapper,
@@ -201,6 +202,45 @@ test.skipIf(!posix)(
     // The computer's own sign-in has a process open: a plan's route there waits (`brain-route.ts`).
     expect(t.app.holds(null)).toBe(true);
     expect(t.app.holds("0193aaaa-bbbb-7ccc-8ddd-eeeeffff0001")).toBe(false);
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "a secret quoted across two streamed batches leaves redacted, never in halves",
+  async () => {
+    const t = await setup();
+    const secretsDir = path.join(t.home, "secrets");
+    const call = (req: MachineRequest) =>
+      handleRequest({ workspaceReal: t.root, exec: true, token: "agm_x", secretsDir }, req, {
+        signal: new AbortController().signal,
+        output: () => {},
+      });
+    const [requestId, name, target, value] = [
+      "req-0001-leak",
+      "FAKE_SECRET",
+      { kind: "env" as const },
+      "tok_SECRET_123456",
+    ];
+    const { publicKey } = (await call({ agent: AGENT, op: "secret", action: "keypair", requestId })) as {
+      publicKey: string;
+    };
+    const aad = secretAad({ requestId, orgId: "org-1", name, target });
+    const box = await sealSecret(publicKey, value, aad);
+    await call({ agent: AGENT, op: "secret", action: "deliver", requestId, name, target, aad, box });
+    await call({
+      agent: AGENT,
+      op: "secret",
+      action: "activate",
+      requestId,
+      order: `2026-11-01T00:00:00.000Z|${requestId}`,
+    });
+    const turn = start({ ...t.ctx, secretsDir }, request(1, "LEAK"));
+    await turn.done;
+    const streamed = turn.events.flatMap((e) => (e.type === "text_delta" ? [e.text] : []));
+    expect(streamed.length).toBeGreaterThan(1);
+    expect(streamed.join("")).toBe("The key you asked about: [secret:FAKE_SECRET] ok");
+    expect(JSON.stringify(turn.events)).not.toContain(value.slice(0, 5));
   },
   20_000,
 );

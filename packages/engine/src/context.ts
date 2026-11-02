@@ -79,6 +79,7 @@ export const HOW_YOU_WORK = [
   "- Before saying you can't or don't have a tool, check your means (listed under Your means): your tools and find_tools, your computer, browser and terminal, and the teammates whose role covers it. The public web is always yours to read.",
   "- A real blocker is only something a person must give: a code, a sign-in, a payment, a permission, a decision. Only then stop, and say in one line what you tried and the one thing a person must do. Never say you haven't looked yet or that you will check later.",
   "- Before asking a person, find what you can (an API's docs and address on the web, a name the person uses in the workspace, a fact in the files), and ask only for what only they can give: a key, a decision, a preference, an approval, a payment. When something stays unclear, state your assumption and go on. A secret or a key always through `request_secret`, never as a chat question; with no `request_secret`, say which key is needed and where it is set up.",
+  "- When a key you were given is refused (a 401, or a 403 saying the key is invalid or expired), first check you sent it as the API's docs say (header, prefix, test or live address). If you did, ask once for a new one with `request_secret` under the same name (one of your keys, listed with your computer), its purpose saying in one line, in the person's language, what failed ('TYPESAFE_API_KEY was refused (401). Can you send a new one?'; in Portuguese: 'A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?'): the new one replaces the old. Not when the call works; if the new one is refused too, don't ask again: say what failed and stop.",
   "- Lead with the answer. When asked why you couldn't do something, skip the why and the apology: do it now and give the answer. Match the length asked for; when the person asked for an internal change (an issue created, a routine changed), confirm it in one or two lines: the details show under your reply. A change you made on your own doesn't shorten the answer to the question asked, and findings you also recorded somewhere (an issue, a comment, memory) are still said in the reply: the numbers, ids and times, with the link as an extra, never instead. A thanks or an ok asks nothing: answer in a line or react, without looking anything up.",
   "- Work in one go: chain tool calls in the same turn until you can give a real answer.",
   "- Say a proposal, a recommendation or a question once. If you already made it in this conversation and nobody took it up, don't bring it up again: no reminders, no 'still waiting for your ok', no new card about it. The people saw it; silence is their answer for now. Raise it again only when something new changes it, and then lead with what changed.",
@@ -350,6 +351,8 @@ export async function buildRunContext(
   const machineAccess = agent.machineId
     ? machineAccessOf(db, run.orgId, agent.id, agent.machineId).catch(() => null)
     : null;
+  // The keys it holds there by name (never values): a refused one is asked for again under that name.
+  const heldKeys = agent.machineId ? heldKeysOf(db, run.orgId, agent.id, agent.machineId).catch(() => []) : null;
   // A routine's run keeps to its own task, as with "Your recent work" below.
   const openTasks =
     options.routine || run.background
@@ -748,6 +751,7 @@ export async function buildRunContext(
     ...(briefing ? await briefing.then((text) => (text ? [{ text }] : [])) : []),
     ...(issueBrief ? [{ text: issueBrief }] : []),
     ...(machineAccess ? await machineAccess.then((a) => (a ? [{ text: machineAccessText(a) }] : [])) : []),
+    ...(heldKeys ? await heldKeys.then((k) => (k.length > 0 ? [{ text: heldKeysText(k) }] : [])) : []),
     // A routine's background run (ADR 0053 §4): its routine and what people said where it reports.
     ...(routine ? [{ text: routine.block }, { text: routine.deliverToView }] : []),
     // Per turn from here on: a computer brain reads these in "# This turn" (`thisTurnText`).
@@ -1382,6 +1386,37 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
     folders: m.access.folders.filter((f) => f.agents.includes(agentId)).map((f) => f.path),
     tools: m.access.tools,
   };
+}
+
+/** The keys delivered to the agent on its computer and still there: names and where they go, never values. */
+async function heldKeysOf(db: Database, orgId: string, agentId: string, machineId: string) {
+  const r = schema.secretRequests;
+  return db
+    .select({ name: r.name, kind: r.targetKind, path: r.targetPath, site: r.site })
+    .from(r)
+    .where(
+      and(
+        eq(r.orgId, orgId),
+        eq(r.agentId, agentId),
+        eq(r.status, "delivered"),
+        isNull(r.removedAt),
+        eq(r.machineId, machineId),
+      ),
+    )
+    .orderBy(r.name);
+}
+
+export function heldKeysText(keys: { name: string; kind: string; path: string | null; site: string | null }[]) {
+  const where = (k: (typeof keys)[number]) =>
+    k.kind === "file"
+      ? `the file ${k.path}`
+      : k.kind === "site" && k.site
+        ? `typed on ${new URL(k.site).host}`
+        : "a variable";
+  return `# Your keys on your computer\nGiven to you through request_secret; use them by name, never print them: ${keys
+    .slice(0, 50)
+    .map((k) => `${k.name} (${where(k)})`)
+    .join(", ")}.`;
 }
 
 /** The block about the agent's connected computer: the folders the machine allows it and the tools that are off. */

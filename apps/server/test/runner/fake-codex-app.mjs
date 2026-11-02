@@ -11,7 +11,7 @@
 // (exits mid-turn), "APPROVE <command>" (asks the runner to approve the
 // command, answers with the decision), "APPROVE_FILE <path>" (the same for a
 // change of that file), "RATE" (the plan's windows moved:
-// `account/rateLimits/updated`); anything else answers "pong".
+// `account/rateLimits/updated`), "LEAK" (quotes $FAKE_SECRET in two deltas apart); anything else answers "pong".
 // `account/rateLimits/read` answers the 5 hours at 12% and the week at 55%.
 import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -175,6 +175,29 @@ function appServer() {
         };
         item("item/started", user);
         item("item/completed", user);
+        if (/\bLEAK\b/.test(prompt)) {
+          // Quotes $FAKE_SECRET in two deltas far enough apart that the runner sends a batch between them.
+          const value = process.env.FAKE_SECRET ?? "";
+          const text = `The key you asked about: ${value} ok`;
+          item("item/started", { type: "agentMessage", id: "m-leak", text: "", phase: null });
+          note("item/agentMessage/delta", {
+            threadId: THREAD,
+            turnId: active.id,
+            itemId: "m-leak",
+            delta: text.slice(0, 30),
+          });
+          return setTimeout(() => {
+            note("item/agentMessage/delta", {
+              threadId: THREAD,
+              turnId: active.id,
+              itemId: "m-leak",
+              delta: text.slice(30),
+            });
+            item("item/completed", { type: "agentMessage", id: "m-leak", text, phase: null });
+            usage(10, 0, 3);
+            complete("completed");
+          }, 60);
+        }
         if (/\bCRASH\b/.test(prompt)) {
           message("m-crash", "half an answ", true);
           return setTimeout(() => process.exit(1), 20);

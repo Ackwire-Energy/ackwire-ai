@@ -2303,6 +2303,8 @@ export interface SecretRequest {
   removed: boolean;
   /** The agent took it back: it no longer needs it. */
   withdrawn?: true;
+  /** The agent already held this name on this computer: a delivery replaces that value. */
+  replaces?: boolean;
 }
 
 /** A secret on an agent's computer, by name (the agent page). */

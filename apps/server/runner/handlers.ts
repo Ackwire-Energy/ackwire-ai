@@ -32,7 +32,7 @@ import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
 import { isGitInternalPath, touchesGitInternals } from "./git-guard";
-import type { McpTaskInfo } from "./mcp";
+import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
@@ -335,6 +335,7 @@ async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested
 async function doRead(
   ctx: HandlerContext,
   req: Extract<MachineRequest, { op: "read" }>,
+  secrets: Secrets,
 ): Promise<MachineReplies["read"]> {
   const target = await resolvePath(ctx, requireString(req.path, "path"));
   if (!target.exists) return { base64: null, size: 0 };
@@ -348,6 +349,12 @@ async function doRead(
   if (st.size > limit) throw new RunnerError("too_large", `The file has ${st.size} bytes (max ${limit})`);
   const data = await readFile(target.abs);
   if (data.byteLength > limit) throw new RunnerError("too_large", `The file is larger than ${limit} bytes`);
+  // A file a command wrote a value into (`env > dump.txt`) goes back to the model like command output: redacted.
+  if (secrets) {
+    const text = data.toString("utf8");
+    const clean = secrets.redact(text);
+    if (clean !== text) return { base64: Buffer.from(clean).toString("base64"), size: Buffer.byteLength(clean) };
+  }
   return { base64: data.toString("base64"), size: data.byteLength };
 }
 
@@ -545,7 +552,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       return doExec(ctx, req, scope, secrets);
     case "read":
       await refuseSecretFile(ctx, secrets, requireString(req.path, "path"));
-      return doRead(ctx, req);
+      return doRead(ctx, req, secrets);
     case "write":
       return doWrite(ctx, req);
     case "list":
@@ -703,10 +710,18 @@ async function handleBrowser(
       return browser.streamStop(req.agent);
     case "browser.act":
       requireTool(ctx, "browser");
-      return browser.act(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
+      return redacted(
+        ctx,
+        req.agent,
+        await browser.act(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal),
+      );
     case "browser.batch":
       requireTool(ctx, "browser");
-      return browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
+      return redacted(
+        ctx,
+        req.agent,
+        await browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal),
+      );
     case "browser.capture":
       requireTool(ctx, "browser");
       return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
@@ -720,6 +735,12 @@ async function handleBrowser(
       requireTool(ctx, "browser");
       return browser.input(req.agent, Array.isArray(req.events) ? req.events : []);
   }
+}
+
+/** A browser answer (a snapshot, a page's text, a code field just typed into) with the agent's secrets redacted. */
+async function redacted<T>(ctx: HandlerContext, agent: AgentScope, reply: T): Promise<T> {
+  const secrets = await agentSecrets(ctx.secretsDir, agent);
+  return secrets ? (redactDeep(reply, secrets.redact) as T) : reply;
 }
 
 export const PROFILES_SYSTEM_MODE =

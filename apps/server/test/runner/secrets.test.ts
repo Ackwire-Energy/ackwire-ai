@@ -86,6 +86,21 @@ test("an env secret reaches the agent's commands, never their output; other agen
   expect(await errorCode(() => sent.deliver())).toBe("not_found");
 });
 
+test("a file a command wrote the value into is read back redacted; other files come back as they are", async () => {
+  const { call, give } = setup();
+  await (await give(dev, "req-0002-dump", "AGENTES_DEMO_TOKEN", { kind: "env" })).commit();
+  await call({
+    agent: dev,
+    ...exec('printf "token=%s\\n" "$AGENTES_DEMO_TOKEN" > dump.txt; printf "plain" > plain.txt'),
+  });
+  const read = async (p: string) => {
+    const out = (await call({ agent: dev, op: "read", path: p, maxBytes: 1024 })) as { base64: string; size: number };
+    return Buffer.from(out.base64, "base64").toString("utf8");
+  };
+  expect(await read("dump.txt")).toBe("token=[secret:AGENTES_DEMO_TOKEN]\n");
+  expect(await read("plain.txt")).toBe("plain");
+});
+
 test("a file secret is written 600 in the agent's folder and can't be read or uploaded from there", async () => {
   const { ws, call, give } = setup();
   const sent = await give(

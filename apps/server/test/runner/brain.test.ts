@@ -1143,6 +1143,21 @@ test.if(posix)(
   },
 );
 
+test.if(posix)("a secret in a tool call's input leaves redacted, quotes and backslashes in it too", async () => {
+  const PW = 'p@ss\\"w0rd\nx';
+  const { turn } = setup();
+  const secrets = {
+    env: { AGENT_PW: PW },
+    files: [],
+    hold: PW.length - 1,
+    redact: (t: string) => t.split(PW).join("[secret:AGENT_PW]"),
+  };
+  const r = await turn(1, "PWTOOL", {}, undefined, { secrets });
+  const call = r.events.find((e) => e.type === "tool_call" && e.name === "Bash");
+  expect(call).toMatchObject({ input: { command: "login --pw '[secret:AGENT_PW]'" } });
+  expect(JSON.stringify(r.events)).not.toContain("p@ss");
+});
+
 test.if(posix)(
   "the agent thinks with another account now: its processes on any other close, a busy one once its turn ends",
   async () => {
