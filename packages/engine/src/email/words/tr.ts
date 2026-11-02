@@ -8,7 +8,9 @@ import type { EmailWords } from "./index";
  */
 export const words: EmailWords = {
   sentBy: (host) =>
-    host ? atHost("agentes.chat sunucusu tarafından gönderildi.", "Sunucu:", host) : "agentes.chat tarafından gönderildi.",
+    host
+      ? atHost("agentes.chat sunucusu tarafından gönderildi.", "Sunucu:", host)
+      : "agentes.chat tarafından gönderildi.",
   fallback: "Düğme çalışmıyor mu? Bu adresi tarayıcınıza kopyalayın:",
   role: { owner: "sahip", member: "üye" },
   anAgent: "Bir ajan",
@@ -38,7 +40,12 @@ export const words: EmailWords = {
     headline: "Bir çalışma alanına davet edildiniz",
     body: (inviter, email, org, role) =>
       inviter
-        ? [{ b: inviter }, `${email ? ` (${email})` : ""} sizi `, { b: org }, ` çalışma alanına ${role} olarak davet etti.`]
+        ? [
+            { b: inviter },
+            `${email ? ` (${email})` : ""} sizi `,
+            { b: org },
+            ` çalışma alanına ${role} olarak davet etti.`,
+          ]
         : [{ b: org }, ` çalışma alanına ${role} olarak davet edildiniz.`],
     what: "agentes.chat, kişilerin ve yapay zeka ajanlarının birlikte çalıştığı yer.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Davet notu: " }, `“${note}”`],
@@ -79,7 +86,8 @@ export const words: EmailWords = {
         : "Bu adresi agentes.chat bekleme listesine eklemek için bir istek aldık.",
     approve: "Burada önemli hiçbir şey bir kişi onaylamadan olmaz. Bu istek de öyle.",
     button: "E-postamı onayla",
-    small: "Bağlantı 48 saat geçerli. Siz değil miydiniz? Bu e-postayı yok sayın. Tıklamazsanız adres listeye hiç eklenmez.",
+    small:
+      "Bağlantı 48 saat geçerli. Siz değil miydiniz? Bu e-postayı yok sayın. Tıklamazsanız adres listeye hiç eklenmez.",
     why: "Bu e-postayı, bu adres agentes.chat bekleme listesine yazıldığı için aldınız.",
   },
   earlyAccess: {
@@ -193,7 +201,11 @@ export const words: EmailWords = {
       subject: "Katılma isteğiniz onaylandı",
       preheader: "Artık içeridesiniz. Başlamak için çalışma alanını açın.",
       headline: "Artık içeridesiniz",
-      body: (who, org, role) => [`${who} isteğinizi onayladı. `, { b: org }, ` çalışma alanına ${role} olarak katıldınız.`],
+      body: (who, org, role) => [
+        `${who} isteğinizi onayladı. `,
+        { b: org },
+        ` çalışma alanına ${role} olarak katıldınız.`,
+      ],
       button: "Çalışma alanını aç",
     },
     invited: {
@@ -212,7 +224,8 @@ export const words: EmailWords = {
       reason: (reason) => [{ b: "Gerekçe: " }, `“${reason}”`],
       small: "Bir yanlışlık olduğunu düşünüyorsanız oradan birinden sizi e-postayla davet etmesini isteyin.",
     },
-    why: (org) => `Bu e-postayı, bu adresle agentes.chat'te ${org} çalışma alanına katılma isteği gönderildiği için aldınız.`,
+    why: (org) =>
+      `Bu e-postayı, bu adresle agentes.chat'te ${org} çalışma alanına katılma isteği gönderildiği için aldınız.`,
   },
   joinCode: {
     subject: (code) => `agentes.chat kodunuz: ${code}`,

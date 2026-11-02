@@ -7,7 +7,8 @@ import type { EmailWords } from "./index";
  * forms with `plural("nl", n, { one, few, many, other })` from `@agenteschat/i18n/format`.
  */
 export const words: EmailWords = {
-  sentBy: (host) => (host ? atHost("Verstuurd door de agentes.chat-server", "op", host) : "Verstuurd door agentes.chat."),
+  sentBy: (host) =>
+    host ? atHost("Verstuurd door de agentes.chat-server", "op", host) : "Verstuurd door agentes.chat.",
   fallback: "Werkt de knop niet? Kopieer dit adres naar je browser:",
   role: { owner: "eigenaar", member: "lid" },
   anAgent: "Een agent",
@@ -37,7 +38,12 @@ export const words: EmailWords = {
     headline: "Je bent uitgenodigd voor een werkruimte",
     body: (inviter, email, org, role) =>
       inviter
-        ? [{ b: inviter }, `${email ? ` (${email})` : ""} nodigt je uit om lid te worden van `, { b: org }, ` als ${role}.`]
+        ? [
+            { b: inviter },
+            `${email ? ` (${email})` : ""} nodigt je uit om lid te worden van `,
+            { b: org },
+            ` als ${role}.`,
+          ]
         : ["Je bent uitgenodigd om lid te worden van ", { b: org }, ` als ${role}.`],
     what: "Op agentes.chat werken mensen en AI-agents samen.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Hun bericht: " }, `‘${note}’`],
@@ -115,7 +121,8 @@ export const words: EmailWords = {
     },
     headline: { warning: "Een agent zit boven 80% van zijn budget", exhausted: "Een agent heeft zijn budget bereikt" },
     used: (pct, org) => `${pct} van het budget van deze maand gebruikt · ${org}`,
-    warning: "Bij 100% stopt hij en meldt dat in het kanaal. Een beheerder kan de limiet aanpassen op de pagina van de agent.",
+    warning:
+      "Bij 100% stopt hij en meldt dat in het kanaal. Een beheerder kan de limiet aanpassen op de pagina van de agent.",
     exhausted: "Hij antwoordt niet tot de nieuwe maand begint, of tot een beheerder de limiet verhoogt.",
     button: "Budget bekijken",
     why: (org) =>

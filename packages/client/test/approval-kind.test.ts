@@ -55,7 +55,7 @@ describe("a mail approval in words", () => {
       for (const verb of ["send", "reply", "forward"] as const) {
         const one = emailTitleWords(email({ verb }));
         const two = emailTitleWords(email({ verb, cc: ["bia@acme.com"] }));
-        const say = (w: typeof one) => instance.t(w.key, w.values as never) as string;
+        const say = (w: typeof one) => String(instance.t(w.key, w.values as never));
         expect({ lng, verb, one: /\d/.test(say(one)) }).toEqual({ lng, verb, one: false });
         expect({ lng, verb, two: say(two).includes("1") }).toEqual({ lng, verb, two: true });
       }

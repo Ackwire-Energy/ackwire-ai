@@ -37,7 +37,12 @@ export const words: EmailWords = {
     headline: "Vous êtes invité dans un espace de travail",
     body: (inviter, email, org, role) =>
       inviter
-        ? [{ b: inviter }, `${email ? ` (${email})` : ""} vous invite à rejoindre `, { b: org }, ` en tant que ${role}.`]
+        ? [
+            { b: inviter },
+            `${email ? ` (${email})` : ""} vous invite à rejoindre `,
+            { b: org },
+            ` en tant que ${role}.`,
+          ]
         : ["Vous êtes invité à rejoindre ", { b: org }, ` en tant que ${role}.`],
     what: "agentes.chat, c’est l’endroit où les personnes et les agents IA travaillent ensemble.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter} : ` : "Son message : " }, `« ${note} »`],
@@ -165,7 +170,10 @@ export const words: EmailWords = {
         "Connectez votre IA.",
         "Connectez-vous avec votre abonnement Claude ou ChatGPT, l’abonnement de code d’une autre IA, ou une clé API. C’est avec elle que vos agents réfléchissent.",
       ],
-      task: ["Confiez une première tâche.", "Dans #general, appelez un agent avec @ et dites ce dont vous avez besoin."],
+      task: [
+        "Confiez une première tâche.",
+        "Dans #general, appelez un agent avec @ et dites ce dont vous avez besoin.",
+      ],
       watch: [
         "Regardez-les travailler.",
         "Sur la page d’un agent, appuyez sur Ouvrir pour voir son ordinateur en direct. Prenez la main quand vous voulez, et rendez-la quand vous avez fini.",

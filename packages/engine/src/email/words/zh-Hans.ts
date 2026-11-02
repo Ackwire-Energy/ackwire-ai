@@ -147,15 +147,9 @@ export const words: EmailWords = {
     facts: { cpus: "CPU", memory: "内存", disk: "磁盘" },
     next: "下一步",
     steps: {
-      ai: [
-        "连接你的 AI。",
-        "用你的 Claude 或 ChatGPT 套餐、其他 AI 的编程套餐或 API 密钥登录。你的智能体用它来思考。",
-      ],
+      ai: ["连接你的 AI。", "用你的 Claude 或 ChatGPT 套餐、其他 AI 的编程套餐或 API 密钥登录。你的智能体用它来思考。"],
       task: ["布置第一个任务。", "在 #general 中用 @ 叫一个智能体，说出你需要什么。"],
-      watch: [
-        "看它们工作。",
-        "在智能体页面上点“打开”，就能实时看到它的电脑。你随时可以接管操作，用完再交还给它。",
-      ],
+      watch: ["看它们工作。", "在智能体页面上点“打开”，就能实时看到它的电脑。你随时可以接管操作，用完再交还给它。"],
       create: ["创建一个智能体。", "它从一开始就在这台电脑上工作。"],
     },
     button: { ai: "连接你的 AI", task: "布置第一个任务", create: "创建智能体" },
@@ -213,7 +207,11 @@ export const words: EmailWords = {
     preheader: "在 agentes.chat 中输入它来确认。10 分钟内有效。",
     headline: "你的验证码",
     workspace: (org) => ["输入这个验证码即可删除工作区 ", { b: org }, "。它会立即对所有人关闭，7 天后被永久删除。"],
-    account: (email) => ["输入这个验证码即可删除账号 ", { b: email }, "。账号会立即删除，只有你一人的工作区也会随之关闭。"],
+    account: (email) => [
+      "输入这个验证码即可删除账号 ",
+      { b: email },
+      "。账号会立即删除，只有你一人的工作区也会随之关闭。",
+    ],
     support: (address) => [
       "验证码 10 分钟内有效，没有它什么都不会被删除。如果不是你本人操作，请不要告诉任何人，并写信至 ",
       { mail: address },
@@ -228,7 +226,12 @@ export const words: EmailWords = {
     subject: (day) => `你所在的一个工作区将于 ${day} 删除`,
     preheader: "它现在已关闭。在那之前，所有者仍可恢复它。",
     headline: "一个工作区正在被删除",
-    body: (by, org, day, time) => [{ b: by }, " 删除了工作区 ", { b: org }, `。它现在已关闭，将于 ${day} ${time} 被永久删除。`],
+    body: (by, org, day, time) => [
+      { b: by },
+      " 删除了工作区 ",
+      { b: org },
+      `。它现在已关闭，将于 ${day} ${time} 被永久删除。`,
+    ],
     owner: "改变主意了？在那之前恢复它。",
     button: "恢复工作区",
     member: "如果这是误操作，请让所有者恢复它。",

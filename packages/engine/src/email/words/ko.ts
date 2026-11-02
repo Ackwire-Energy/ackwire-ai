@@ -9,7 +9,9 @@ import type { EmailWords } from "./index";
  */
 export const words: EmailWords = {
   sentBy: (host) =>
-    host ? ["이 메일은 ", { nobr: host }, "의 agentes.chat 서버에서 보냈어요."] : "이 메일은 agentes.chat에서 보냈어요.",
+    host
+      ? ["이 메일은 ", { nobr: host }, "의 agentes.chat 서버에서 보냈어요."]
+      : "이 메일은 agentes.chat에서 보냈어요.",
   fallback: "버튼이 작동하지 않나요? 이 주소를 브라우저에 복사해 붙여넣으세요.",
   role: { owner: "소유자", member: "멤버" },
   anAgent: "에이전트",
@@ -79,7 +81,8 @@ export const words: EmailWords = {
         : "이 주소를 agentes.chat 대기자 명단에 올려 달라는 요청을 받았어요.",
     approve: "여기서는 중요한 일은 사람이 승인해야만 일어나요. 이 요청도 마찬가지예요.",
     button: "이메일 확인",
-    small: "링크는 48시간 동안 유효해요. 본인이 아닌가요? 이 메일은 무시하세요. 클릭하지 않으면 명단에 올라가지 않아요.",
+    small:
+      "링크는 48시간 동안 유효해요. 본인이 아닌가요? 이 메일은 무시하세요. 클릭하지 않으면 명단에 올라가지 않아요.",
     why: "이 주소가 agentes.chat 대기자 명단에 입력되어 이 메일을 보내 드렸어요.",
   },
   earlyAccess: {
@@ -97,7 +100,11 @@ export const words: EmailWords = {
     subject: "이제 나만의 워크스페이스를 만들 수 있어요",
     preheader: "지금 쓰는 계정으로 로그인해서 만들어 보세요.",
     headline: "나만의 워크스페이스 만들기",
-    body: (email) => ["이제 지금 쓰는 계정 ", { b: email }, "(으)로 agentes.chat에서 나만의 워크스페이스를 만들 수 있어요."],
+    body: (email) => [
+      "이제 지금 쓰는 계정 ",
+      { b: email },
+      "(으)로 agentes.chat에서 나만의 워크스페이스를 만들 수 있어요.",
+    ],
     button: "워크스페이스 만들기",
     why: "이 계정에 agentes.chat 얼리 액세스가 열려서 이 메일을 보내 드렸어요.",
   },
@@ -274,11 +281,7 @@ export const words: EmailWords = {
     preheader: "모든 기기에서 로그아웃됐고 다시 로그인할 수 없어요.",
     headline: "계정이 삭제됐어요",
     body: (email) => ["계정 ", { b: email }, "을(를) 삭제했어요."],
-    closes: (_count, day, names) => [
-      `나만 있던 워크스페이스는 닫혔고 ${day}에 완전히 삭제돼요: `,
-      ...names,
-      ".",
-    ],
+    closes: (_count, day, names) => [`나만 있던 워크스페이스는 닫혔고 ${day}에 완전히 삭제돼요: `, ...names, "."],
     support: (address) => ["본인이 아니라면 ", { mail: address }, "(으)로 연락해 주세요."],
     noSupport: "본인이 아니라면 이 서버 운영자에게 알려 주세요.",
     why: "이 주소로 agentes.chat 계정이 있어서 이 메일을 보내 드렸어요.",
