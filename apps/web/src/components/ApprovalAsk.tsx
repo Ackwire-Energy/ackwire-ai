@@ -1,6 +1,6 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
 import { approveAllScope, approveAlwaysOn, cardDeadline, itemOwnWords } from "@agenteschat/client/lib/approval-card";
-import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
+import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
   approvalGroupWaitsFor,
@@ -32,9 +32,9 @@ const DAY_MS = 24 * 3_600_000;
 
 /**
  * An approval waiting in the conversation, as a request card: the agent's words, the exact action in the well
- * with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it whole (with "Aprovar sempre" and where it came
- * from), then Approve (held for high risk) and "Agora não" (which asks why, kept as a lesson), and the fuse to its
- * expiry. Who can't decide sees who it waits for.
+ * with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it whole (with where it came from), then Approve
+ * (held for high risk), "Agora não" (which asks why, kept as a lesson) and, where offered, "Aprovar sempre" with what
+ * it covers, and the fuse to its expiry. Who can't decide sees who it waits for.
  */
 export function ApprovalAsk({
   approval,
@@ -81,11 +81,6 @@ export function ApprovalAsk({
           <ExactAction approval={approval} />
           {origin && <p className="rq__origin">{tt(origin.key, origin.values)}</p>}
           {requester && <p className="rq__origin">{requester}</p>}
-          {approval.canDecide && !refusing && approveAlwaysOffered(approval) && (
-            <div className="rq__always">
-              <ApproveAlways approval={approval} agent={agent} />
-            </div>
-          )}
         </>
       }
       body={<AheadLine approval={approval} className="ap-ask__ahead" />}
@@ -98,6 +93,7 @@ export function ApprovalAsk({
             <Button size="sm" onClick={() => setRefusing(true)}>
               {t("approval.notNow")}
             </Button>
+            <ApproveAlways approval={approval} agent={agent} />
           </>
         )
       }
@@ -172,8 +168,7 @@ export function ApprovalGroupAsk({
 
 /**
  * One request on a shared card: its values (and its own why and origin where they differ from the card's lead),
- * its own decision while it waits ("Aprovar sempre" under "Ver detalhes" on the first of its kind), how it
- * ended once decided.
+ * its own decision while it waits ("Aprovar sempre" beside it on the first of its kind), how it ended once decided.
  */
 function GroupItem({
   approval,
@@ -238,14 +233,14 @@ function GroupItem({
           {email ? t("approval.seeEmail") : t("approval.seeDetails")}
         </button>
       </div>
+      {pending && always && approval.canDecide && !refusing && (
+        <div className="rq__always">
+          <ApproveAlways approval={approval} agent={agent} />
+        </div>
+      )}
       {open && (
         <div className="rq__details">
           <ExactAction approval={approval} />
-          {always && !refusing && (
-            <div className="rq__always">
-              <ApproveAlways approval={approval} agent={agent} />
-            </div>
-          )}
         </div>
       )}
       {refusing && <RefuseBox approval={approval} agent={agent} onCancel={() => setRefusing(false)} />}

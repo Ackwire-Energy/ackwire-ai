@@ -31,6 +31,7 @@ import {
   setAgentAccess,
   setAgentScopes,
   type ToolContext,
+  updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -649,5 +650,111 @@ describe("Aprovar sempre", () => {
     expect((await rules(f)).map((r) => r.agentId)).toEqual([f.agent.id]);
     await revokeConnection(f.db, f.owner.id, f.org.id, serverId);
     expect(await rules(f)).toEqual([]);
+  });
+});
+
+// ── "Aprovar sempre leituras": a server's tool that runs SQL (shaped like Supabase's execute_sql) ──────────────
+
+function sqlMcp() {
+  const calls: Record<string, unknown>[] = [];
+  const connect: McpConnect = async () => {
+    const server = new McpServer({ name: "db", version: "1" });
+    server.registerTool(
+      "execute_sql",
+      { description: "Runs SQL on a project", inputSchema: { project_id: z.string(), query: z.string() } },
+      async (args) => {
+        calls.push(args);
+        return { content: [{ type: "text" as const, text: "[]" }] };
+      },
+    );
+    const [client, transport] = InMemoryTransport.createLinkedPair();
+    await server.connect(transport);
+    return mcpSessionOver(client);
+  };
+  return { connect, calls };
+}
+
+async function sqlWorld(fx: Fixture) {
+  const mcp = sqlMcp();
+  const deps: CustomDeps = {
+    db: fx.db,
+    keyWrappers: [fx.keyWrapper],
+    publicUrl: "https://chat.example.com",
+    resolveHost: async () => ["93.184.216.34"],
+    connect: mcp.connect,
+  };
+  const started = await connectCustomServer(deps, fx.owner.id, fx.org.id, {
+    serverUrl: "https://db.example.com/mcp",
+    apiKey: "fake-key-for-tests",
+    label: "Banco",
+  });
+  if (started.status !== "connected") throw new Error(`expected connected, got ${started.status}`);
+  await acceptCustomSuggestion(deps, fx.owner.id, fx.org.id, started.server.id);
+  const gateway = createToolGateway({ sources: [createConnectorToolSource(deps)] });
+  return { mcp, gateway, serverId: started.server.id, name: "banco_execute_sql" };
+}
+
+const READ = "select status, count(*) from orders group by 1";
+const sql = (query: string, project_id = "proj-a") => ({ project_id, query, why: WHY });
+
+describe("Aprovar sempre leituras", () => {
+  test("offered only on SQL proven read-only; it then runs that project's reads and still asks for anything else", async () => {
+    f = await setup();
+    const { mcp, gateway, serverId, name } = await sqlWorld(f);
+    const ctx = await runOf(f);
+    const write = asked(await invoke(gateway, ctx, name, sql("delete from orders")));
+    expect(write.approveAlways).toBeNull();
+    const read = asked(await invoke(gateway, ctx, name, sql(READ)));
+    expect(read.approveAlways).toEqual({ tool: "execute_sql", actions: ["sql-read:project_id=proj-a"] });
+    await decide(f, f.owner.id, read.id, { decision: "approve", always: true });
+    expect((await rules(f)).map((r) => [r.connectionId, r.tool, r.action, r.createdByUserId])).toEqual([
+      [serverId, "execute_sql", "sql-read:project_id=proj-a", f.owner.id],
+    ]);
+
+    // Another read of that project, without a why: it runs, and its line says who approved reads for good.
+    const ran = await invoke(gateway, ctx, name, { project_id: "proj-a", query: "select count(*) from customers" });
+    expect(ran.type).toBe("result");
+    expect(mcp.calls).toEqual([{ project_id: "proj-a", query: "select count(*) from customers" }]);
+    const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, ctx.runId));
+    const result = steps.filter((s) => s.kind === "tool_result").at(-1);
+    expect(result?.data.autoApproved).toEqual({ by: f.owner.name, reads: true });
+
+    // A write, a read with a side effect, or another project: it asks.
+    for (const input of [
+      sql("with d as (delete from orders returning id) select count(*) from d"),
+      sql("select nextval('orders_id_seq')"),
+      sql("select 1; update orders set status = 'x'"),
+      sql(READ, "proj-b"),
+    ]) {
+      expect((await invoke(gateway, ctx, name, input)).type).toBe("approval");
+    }
+    expect(mcp.calls).toHaveLength(1);
+  });
+
+  test("only who decides makes or removes it; a new owner is asked again", async () => {
+    f = await setup();
+    const { gateway, name } = await sqlWorld(f);
+    const member = await addMember(f.db, f.org.id, "member", "bia");
+    const ctx = await runOf(f);
+    const ask = asked(await invoke(gateway, ctx, name, sql(READ)));
+    await expect(decide(f, member.id, ask.id, { decision: "approve", always: true })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await decide(f, f.owner.id, ask.id, { decision: "approve", always: true });
+    const [rule] = await listApprovalRules(f.db, f.owner.id, f.org.id, f.agent.id);
+    expect(rule?.action).toBe("sql-read:project_id=proj-a");
+    await expect(removeApprovalRule(f.db, member.id, f.org.id, f.agent.id, rule?.id ?? "")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+
+    // Handing the agent to someone else drops what the old owner approved for good, and says so in the audit.
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { ownerUserId: member.id });
+    expect(await rules(f)).toEqual([]);
+    const removed = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "agent.approval_rule_removed"));
+    expect(removed.map((r) => r.details.reason)).toEqual(["owner_changed"]);
+    expect((await invoke(gateway, ctx, name, sql(READ))).type).toBe("approval");
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { guardSql, normalizeDatabasePolicy, type SqlRules } from "../src";
+import { guardSql, normalizeDatabasePolicy, provenReadOnly, type SqlRules } from "../src";
 
 const open: SqlRules = { tables: [], hiddenColumns: [] };
 const reason = async (sql: string, rules = open) => {
@@ -176,4 +176,39 @@ test("a table allowlist saved lowercase still allows the table with capitals", a
   expect(
     await reason('select * from dbo."ClientesNFSe"', { tables: ['dbo."clientesNFSe"'], hiddenColumns: [] }),
   ).toContain("may only read the tables");
+});
+
+test("proven read-only (Aprovar sempre leituras): SELECTs and EXPLAINs calling only computing built-ins", async () => {
+  const cases: [string, boolean][] = [
+    ["select count(*) from orders where created_at > now() - interval '7 days'", true],
+    ["-- weekly\nselect status, count(*) from orders /* all */ group by 1;", true],
+    ["select count(*) from orders; select count(*) from customers;", true],
+    ["with x as (select id from orders) select date_trunc('day', now()), count(*) from x", true],
+    ["explain select * from orders", true],
+    ["select pg_catalog.count(*) from orders", true],
+    // Writes, in a CTE or after a read; DDL, COPY, state-changing SET, transactions.
+    ["with d as (insert into orders default values returning id) select * from d", false],
+    ["select 1; delete from orders", false],
+    ["select count(*) from orders; drop table orders", false],
+    ["copy orders to stdout", false],
+    ["set role postgres", false],
+    ["begin; select 1; commit", false],
+    ["explain analyze select 1", false],
+    ["select * from orders for update", false],
+    ["select * into backup from orders", false],
+    // Functions with side effects, or that aren't known to only compute (the workspace's own may write).
+    ["select nextval('orders_id_seq')", false],
+    ["select setval('orders_id_seq', 1)", false],
+    ["select pg_sleep(5)", false],
+    ["select lo_import('/etc/passwd')", false],
+    ["select archive_old_orders()", false],
+    ["select public.count(*) from orders", false],
+    ["select 1 operator(public.+) 2", false],
+    ["", false],
+    ["-- nothing here", false],
+    ["select from where", false],
+  ];
+  const got: [string, boolean][] = [];
+  for (const [sql] of cases) got.push([sql, await provenReadOnly(sql)]);
+  expect(got).toEqual(cases);
 });

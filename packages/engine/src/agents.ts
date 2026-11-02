@@ -16,6 +16,7 @@ import {
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
+import { dropAgentRules } from "./approval-rules";
 import { answersOthers, audienceOf } from "./audience";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
@@ -363,6 +364,9 @@ export async function updateAgent(
   if (!agent) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
+  // What its old owner approved for good was theirs to decide: the new owner is asked again.
+  if (before && before.ownerUserId !== owner)
+    await dropAgentRules(db, orgId, [agentId], { type: "person", id: actorId });
   if (input.name !== undefined || handle !== undefined) {
     // What other runs read of it (who is in a channel, archived and old handles) names it as it is now.
     caches.agents.delete(`${orgId}:archived`);

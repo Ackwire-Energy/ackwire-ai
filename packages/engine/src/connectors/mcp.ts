@@ -11,6 +11,7 @@ import { replyThreadOf } from "../runs";
 import { alwaysAsks, MAX_RESULT_CHARS } from "../tools/gateway";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
+import { sqlArgOf } from "./classify";
 import { composioFailure, composioServiceOf } from "./composio";
 import {
   activeConnections,
@@ -195,6 +196,7 @@ export function createConnectorToolSource(
       const access = row.access as ToolAccess;
       if (!tool) return [];
       const executor = tool.name === COMPOSIO_EXECUTOR;
+      const sqlArg = composio ? null : sqlArgOf(tool);
       const action = composio ? composioAction(composio.way, tool.name) : null;
       // Our rules for a Composio action as they are now (its entry's `ask`, its tags at the pinned version), not only
       // as the row stored them at the last sync: an action they make ask asks on every connection at once.
@@ -229,6 +231,7 @@ export function createConnectorToolSource(
             : action && !row.sensitive && !asks && !alwaysAsks(action)
               ? { rememberAs: tool.name }
               : {}),
+          ...(sqlArg ? { sqlReads: { tool: tool.name, arg: sqlArg } } : {}),
           describe: (input) => {
             const actions = executor ? composioActions(input) : null;
             return {

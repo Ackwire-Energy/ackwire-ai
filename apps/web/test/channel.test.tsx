@@ -262,6 +262,8 @@ describe("Canal", () => {
     // The lead's why is the card's; the one asked for another reason says its own on its line.
     expect(items[1]?.querySelector(".rq__item-why")).toBeNull();
     expect(items[2]?.querySelector(".rq__item-why")?.textContent).toBe("Branch velha, já mergeada.");
+    // On the item's face, without opening its details.
+    expect(within(items[0] as HTMLElement).queryByRole("button", { name: "Aprovar sempre" })).not.toBeNull();
     for (const item of items) {
       const more = within(item).getByRole("button", { name: "Ver detalhes" });
       await act(async () => fireEvent.click(more));

@@ -301,3 +301,77 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
     .replace(/;+\s*$/, "");
   return { ok: true, kind, body, relations: [...new Set(resolved.map((r) => r.name))] };
 }
+
+/**
+ * Built-in functions that only compute (aggregates, windows, text, numbers, dates, JSON, sizes): with no read-only
+ * transaction around it, a call of anything else (a sequence's `nextval`, the workspace's own functions, which can
+ * write) keeps a query from being proven read-only.
+ */
+const COMPUTING_FUNCTIONS = new Set(
+  `
+  count sum avg min max array_agg string_agg json_agg jsonb_agg json_object_agg jsonb_object_agg bool_and bool_or
+  every bit_and bit_or stddev stddev_samp stddev_pop variance var_samp var_pop corr covar_pop covar_samp
+  regr_slope regr_intercept percentile_cont percentile_disc mode row_number rank dense_rank percent_rank
+  cume_dist ntile lag lead first_value last_value nth_value coalesce nullif greatest least
+  now current_date current_timestamp localtimestamp statement_timestamp transaction_timestamp clock_timestamp
+  date_trunc date_part date_bin extract age make_date make_time make_timestamp make_timestamptz make_interval
+  to_char to_date to_timestamp to_number timezone justify_days justify_hours justify_interval isfinite
+  lower upper initcap length char_length octet_length bit_length trim btrim ltrim rtrim lpad rpad substring
+  substr replace translate concat concat_ws left right position strpos split_part repeat reverse starts_with
+  regexp_replace regexp_match regexp_matches regexp_split_to_array regexp_split_to_table regexp_like
+  regexp_count regexp_substr format quote_ident quote_literal quote_nullable md5 sha256 encode decode
+  string_to_array array_to_string unaccent
+  abs round ceil ceiling floor trunc mod power pow sqrt cbrt exp ln log log10 sign div pi random width_bucket
+  generate_series generate_subscripts unnest array_length array_lower array_upper array_position
+  array_positions array_remove array_append array_prepend array_cat cardinality
+  to_json to_jsonb row_to_json array_to_json json_build_object jsonb_build_object json_build_array
+  jsonb_build_array json_object jsonb_object json_array_length jsonb_array_length json_typeof jsonb_typeof
+  json_extract_path json_extract_path_text jsonb_extract_path jsonb_extract_path_text json_object_keys
+  jsonb_object_keys json_each json_each_text jsonb_each jsonb_each_text json_array_elements
+  json_array_elements_text jsonb_array_elements jsonb_array_elements_text jsonb_pretty jsonb_set jsonb_insert
+  jsonb_strip_nulls jsonb_path_query jsonb_path_query_array jsonb_path_query_first jsonb_path_exists
+  jsonb_path_match
+  pg_size_pretty pg_total_relation_size pg_relation_size pg_table_size pg_indexes_size pg_database_size
+  pg_column_size current_database current_schema current_schemas current_user session_user version
+  format_type pg_get_indexdef pg_get_viewdef pg_get_constraintdef pg_get_functiondef pg_get_triggerdef
+  pg_get_expr pg_get_userbyid pg_get_serial_sequence obj_description col_description shobj_description
+  pg_table_is_visible pg_typeof has_table_privilege has_schema_privilege has_column_privilege
+  gen_random_uuid uuid_generate_v4
+  `
+    .trim()
+    .split(/\s+/),
+);
+
+/**
+ * Whether Postgres's own parser shows this SQL can't change anything (ADR 0015, "Aprovar sempre leituras"): one or
+ * more statements, each a `SELECT` or an `EXPLAIN` of one that `guardSql` lets through (no data-changing CTE, no
+ * `SELECT INTO`, no lock), calling only built-in functions that compute, and no operator from another schema. Comments
+ * and trailing semicolons are fine. Anything it can't parse is not proven.
+ * ponytail: what a view runs when read is not seen (a view that calls a writing function); a workspace that has one
+ * removes the rule, or the database's own read-only role covers it.
+ */
+export async function provenReadOnly(text: string): Promise<boolean> {
+  const sqlText = text.trim();
+  if (!sqlText || sqlText.length > 20_000) return false;
+  let tree: { stmts?: { stmt: Node; stmt_location?: number; stmt_len?: number }[] };
+  try {
+    tree = await parse(sqlText);
+  } catch {
+    return false;
+  }
+  const stmts = tree.stmts ?? [];
+  if (stmts.length === 0) return false;
+  for (const s of stmts) {
+    const start = s.stmt_location ?? 0;
+    const one = s.stmt_len ? sqlText.slice(start, start + s.stmt_len) : sqlText.slice(start);
+    if (!(await guardSql(one, { tables: [], hiddenColumns: [] })).ok) return false;
+  }
+  let computes = true;
+  walk(stmts, (key, node) => {
+    if (key !== "FuncCall" && key !== "A_Expr") return;
+    const names = svalsOf(key === "FuncCall" ? node.funcname : node.name).map(lower);
+    if (names.length > 1 && names[0] !== "pg_catalog") computes = false;
+    if (key === "FuncCall" && !COMPUTING_FUNCTIONS.has(names.at(-1) ?? "")) computes = false;
+  });
+  return computes;
+}

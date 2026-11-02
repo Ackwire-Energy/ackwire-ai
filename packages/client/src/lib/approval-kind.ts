@@ -40,6 +40,14 @@ export function approvalRisk(a: Pick<Approval, "tool" | "scope">): "high" | "nor
   return action === "deploy" || action === "rollback" || action === "delete" || action === "send" ? "high" : "normal";
 }
 
+/** An "Aprovar sempre leituras" rule's action prefix; mirrors engine `approval-rules.ts` `SQL_READS`. */
+const SQL_READS = "sql-read:";
+
+/** What an "Aprovar sempre leituras" kind or rule is kept by (`project_id=abc`), or null when it isn't one. */
+export function sqlReadsTarget(action: string | undefined): string | null {
+  return action?.startsWith(SQL_READS) ? action.slice(SQL_READS.length) : null;
+}
+
 /**
  * "Aprovar sempre" shows on the card: the server offers it on this request, the person may decide it, and approving
  * takes no hold (what is high risk is never approved for good).

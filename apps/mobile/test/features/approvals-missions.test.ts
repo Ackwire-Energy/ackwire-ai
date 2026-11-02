@@ -17,6 +17,7 @@ import {
   approvalTable,
   approvalTraits,
   approveAlwaysHint,
+  approveAlwaysLabel,
   approveAlwaysOffered,
   approveAlwaysToast,
   waitingApprovals,
@@ -89,13 +90,33 @@ describe("Aprovar sempre on the phone", () => {
     expect(approveAlwaysOffered({ ...offered, tool: "deploy_production", scope: "vercel:deploy" })).toBe(false);
   });
 
-  test("under the button, before the tap: what it approves for good, with any values, in both languages", async () => {
+  test("under the button, before the tap: what it approves for good, with any values, and where to undo it", async () => {
     expect(approveAlwaysHint(await translator("pt-BR"), offered, "Ada")).toBe(
-      "Aprova este e os próximos iguais da Ada: Criar comentário da issue (Github), com qualquer valor.",
+      "Cobre Criar comentário da issue (Github), de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(approveAlwaysHint(await translator("en"), offered, "Theo")).toBe(
-      "Approves this one and the next ones like it from Theo: Create issue comment (Github), with any values.",
+      "Covers Create issue comment (Github) from now on, with any values. To undo: Tools and access, on Theo's page.",
     );
+  });
+
+  test("a SQL read: Aprovar sempre leituras, that project's reads only, in both languages", async () => {
+    const reads = {
+      ...offered,
+      tool: "db_execute_sql",
+      approveAlways: { tool: "execute_sql", actions: ["sql-read:project_id=p1"] },
+    };
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    expect(approveAlwaysLabel(pt, reads)).toBe("Aprovar sempre leituras");
+    expect(approveAlwaysLabel(en, offered)).toBe("Always approve");
+    expect(approveAlwaysHint(pt, reads, "Theo")).toBe(
+      "Cobre só leituras de Execute sql, neste projeto (project_id=p1), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
+    );
+    expect(approveAlwaysHint(en, reads, "Ada")).toBe(
+      "Covers only reads by Execute sql in this project (project_id=p1) from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
+    );
+    const rule = { tool: "execute_sql", action: "sql-read:project_id=p1", toolLabel: "Execute sql" };
+    expect(approvalRuleWords(pt, rule)).toBe("Leituras de Execute sql · project_id=p1");
   });
 
   test("its toast: it won't ask again, and where to undo it, in both languages", async () => {
@@ -144,10 +165,10 @@ describe("git requests on the phone", () => {
     expect(approvalTitle(pt, push)).toBe("Enviar para ana/fix em acme/app (24 h, sem force push)");
     expect(approvalTitle(en, push)).toBe("Push to ana/fix in acme/app (24 h, no force push)");
     expect(approveAlwaysHint(pt, push, "Ada")).toBe(
-      "Aprova este e os próximos iguais da Ada: enviar para ana/fix em acme/app.",
+      "Cobre enviar para ana/fix em acme/app, de agora em diante. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(approveAlwaysHint(en, push, "Theo")).toBe(
-      "Approves this one and the next ones like it from Theo: push to ana/fix in acme/app.",
+      "Covers push to ana/fix in acme/app from now on. To undo: Tools and access, on Theo's page.",
     );
     expect(approvalRuleWords(pt, rule)).toBe("enviar para ana/fix em acme/app");
     expect(approvalRuleWords(en, rule)).toBe("push to ana/fix in acme/app");

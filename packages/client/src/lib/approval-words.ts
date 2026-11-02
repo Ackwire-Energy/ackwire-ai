@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Approval, ApprovalRule } from "../api/types";
-import { aheadPhase, approvalAction, emailTitleWords } from "./approval-kind";
+import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
 import { lowerFirst } from "./format";
 import { agentGrammar } from "./grammar";
@@ -198,27 +198,37 @@ export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "appro
   const kind = approval.approveAlways;
   if (!kind) return "";
   if (kind.tool === BRANCH_PUSH) return kind.actions.map((target) => pushWords(t, target)).join(", ");
-  return kind.actions.length > 0
-    ? kind.actions.map((slug) => actionName(t, slug)).join(", ")
-    : toolName(t, partsOf(kind.tool), kind.tool);
+  const tool = toolName(t, partsOf(kind.tool), kind.tool);
+  if (sqlReadsTarget(kind.actions[0]) !== null) return tool;
+  return kind.actions.length > 0 ? kind.actions.map((slug) => actionName(t, slug)).join(", ") : tool;
 }
 
+/** "Aprovar sempre", or "Aprovar sempre leituras" where only the SQL reads of one project would be covered. */
+export const approveAlwaysLabel = (t: TFunction, approval: Pick<Approval, "approveAlways">) =>
+  t(sqlReadsTarget(approval.approveAlways?.actions[0]) === null ? "approval.always.button" : "approval.always.reads");
+
 /**
- * The line under "Aprovar sempre", on every card that offers it: what approving for good covers, with any values
- * (a remembered push covers that one branch, so it says no more).
+ * The line under "Aprovar sempre", on the card's face: exactly what approving for good covers (with any values, one
+ * branch, or only the reads of one project) and where to undo it.
  */
 export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approveAlways">, agentName: string) {
-  const key = approval.approveAlways?.tool === BRANCH_PUSH ? "approval.always.hintTarget" : "approval.always.hint";
-  return t(key, { ...agentGrammar(agentName), actions: approveAlwaysWords(t, approval) });
+  const target = sqlReadsTarget(approval.approveAlways?.actions[0]);
+  const key =
+    target !== null
+      ? "approval.always.noteReads"
+      : approval.approveAlways?.tool === BRANCH_PUSH
+        ? "approval.always.noteTarget"
+        : "approval.always.note";
+  return t(key, { ...agentGrammar(agentName), actions: approveAlwaysWords(t, approval), target: target ?? "" });
 }
 
 /** A rule the agent runs without asking, in words: a push by its branch, its action, else the tool as labelled. */
-export const approvalRuleWords = (t: TFunction, rule: Pick<ApprovalRule, "tool" | "action" | "toolLabel">) =>
-  rule.tool === BRANCH_PUSH && rule.action
-    ? pushWords(t, rule.action)
-    : rule.action
-      ? actionName(t, rule.action)
-      : rule.toolLabel;
+export function approvalRuleWords(t: TFunction, rule: Pick<ApprovalRule, "tool" | "action" | "toolLabel">) {
+  const target = sqlReadsTarget(rule.action);
+  if (target !== null) return t("approval.always.readsRule", { tool: rule.toolLabel, target });
+  if (rule.tool === BRANCH_PUSH && rule.action) return pushWords(t, rule.action);
+  return rule.action ? actionName(t, rule.action) : rule.toolLabel;
+}
 
 /** How an action prepared ahead ended without running, in a line (its card, Aprovações, the phone's sheet). */
 export function aheadEndLine(t: TFunction, a: Pick<Approval, "runAt" | "status" | "executedAt" | "decidedAt">) {

@@ -15,6 +15,7 @@ import {
   approvalTitle,
   approvalWaitsFor,
   approveAlwaysHint,
+  approveAlwaysLabel,
   decisionOutcome,
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
@@ -76,8 +77,8 @@ function waitingFor(t: TFunction, approval: Approval, agent: Agent | undefined, 
 }
 
 /**
- * "Aprovar sempre", where the request offers it: approves this one and the agent's next calls of its kind, with
- * any values. The line under it says what that covers; the toast, where to undo it.
+ * "Aprovar sempre" ("Aprovar sempre leituras" for a SQL tool's reads), where the request offers it: approves this one
+ * and the agent's next calls of its kind. The line under it says exactly what that covers and where to undo it.
  */
 export function ApproveAlways({ approval, agent }: { approval: Approval; agent: Agent | undefined }) {
   const { t } = useTranslation();
@@ -125,7 +126,7 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
         loading={decide.isPending}
         onClick={(e) => always(e.currentTarget)}
       >
-        {t("approval.always.button")}
+        {approveAlwaysLabel(t, approval)}
       </Button>
       <p className="small muted ap-always" title={kind?.actions.join(", ") || kind?.tool}>
         {approveAlwaysHint(t, approval, g.name)}

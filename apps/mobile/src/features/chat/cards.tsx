@@ -546,9 +546,6 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
                   {requester}
                 </Text>
               ) : null}
-              {a.canDecide ? (
-                <ApproveAlways approval={a} name={name} disabled={decide.isPending} onPress={() => approve(true)} />
-              ) : null}
             </>
           ),
         },
@@ -593,6 +590,9 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
               {t("approval.waitingAdmin")}
             </Text>
           )}
+          {a.canDecide ? (
+            <ApproveAlways approval={a} name={name} disabled={decide.isPending} onPress={() => approve(true)} />
+          ) : null}
         </AskFoot>
       }
     />

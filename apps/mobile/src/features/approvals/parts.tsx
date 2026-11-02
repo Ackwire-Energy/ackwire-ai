@@ -20,7 +20,14 @@ import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
-import { approvalSaid, approvalTable, approvalTraits, approveAlwaysHint, approveAlwaysOffered } from "./logic";
+import {
+  approvalSaid,
+  approvalTable,
+  approvalTraits,
+  approveAlwaysHint,
+  approveAlwaysLabel,
+  approveAlwaysOffered,
+} from "./logic";
 
 /**
  * The exact request, in reading order: the action in words, the action itself (an email as it will be,
@@ -353,7 +360,10 @@ export function useCancelAhead() {
   };
 }
 
-/** "Aprovar sempre" where the request offers it, and under it what one tap approves for good, as on the web. */
+/**
+ * "Aprovar sempre" ("Aprovar sempre leituras" for a SQL tool's reads) where the request offers it, and under it
+ * exactly what one tap approves for good and where to undo it, as on the web.
+ */
 export function ApproveAlways({
   approval: a,
   name,
@@ -369,7 +379,7 @@ export function ApproveAlways({
   if (!approveAlwaysOffered(a)) return null;
   return (
     <View style={styles.always}>
-      <Button variant="ghost" wide label={t("approval.always.button")} disabled={disabled} onPress={onPress} />
+      <Button variant="ghost" wide label={approveAlwaysLabel(t, a)} disabled={disabled} onPress={onPress} />
       <Text variant="caption" tone="faint" style={styles.alwaysHint}>
         {approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}
       </Text>

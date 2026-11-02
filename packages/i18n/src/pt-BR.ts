@@ -2279,10 +2279,21 @@ export const ptBR = {
     /** "Aprovar sempre": the agent's next calls of this kind run without asking. */
     always: {
       button: "Aprovar sempre",
-      hint: "Aprova este e os próximos iguais do {{name}}: {{actions}}, com qualquer valor.",
-      hint_female: "Aprova este e os próximos iguais da {{name}}: {{actions}}, com qualquer valor.",
-      hintTarget: "Aprova este e os próximos iguais do {{name}}: {{actions}}.",
-      hintTarget_female: "Aprova este e os próximos iguais da {{name}}: {{actions}}.",
+      /** The SQL tool's reads of one project only (anything else it runs still asks). */
+      reads: "Aprovar sempre leituras",
+      note: "Cobre {{actions}}, de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      note_female:
+        "Cobre {{actions}}, de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      noteTarget: "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      noteTarget_female:
+        "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      /** `target`: the call's other arguments, as `project_id=abc`. */
+      noteReads:
+        "Cobre só leituras de {{actions}}, neste projeto ({{target}}), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      noteReads_female:
+        "Cobre só leituras de {{actions}}, neste projeto ({{target}}), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      /** A remembered SQL reads rule in Tools and access. */
+      readsRule: "Leituras de {{tool}} · {{target}}",
       pushTo: "enviar para {{branch}} em {{repo}}",
       done: "Aprovado. {{name}} não pede mais para isso.",
       undoHere: "Para desfazer, vá em Ferramentas e acesso, na página do {{name}}.",
@@ -10459,6 +10470,10 @@ export const ptBR = {
       },
       gave: "recebeu",
       answered: "devolveu",
+      /** A call that ran without asking under "Aprovar sempre": who approved it for good. */
+      autoApproved: "Aprovado automaticamente (sempre aprovado por {{name}})",
+      autoApprovedReads: "Aprovado automaticamente (leitura sempre aprovada por {{name}})",
+      autoApprovedNobody: "Aprovado automaticamente",
       error: "erro",
       seconds: "{{n}} s",
       minutes: "{{n}} min",

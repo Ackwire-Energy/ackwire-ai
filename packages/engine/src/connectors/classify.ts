@@ -225,6 +225,26 @@ export function openEnded(slug: string): boolean {
   return words.at(-1) === "query" || words.some((w) => OPEN_ENDED.has(w));
 }
 
+/** Servers' tools known to run the SQL in one argument, by the server's own tool name. */
+const SQL_TOOLS: Record<string, string> = { execute_sql: "query", run_sql: "sql", query: "sql" };
+
+/**
+ * The argument holding the SQL a server's tool runs (Supabase's `execute_sql`: `query`), or null when it runs none:
+ * a known tool whose schema has that argument, else a tool whose name says SQL (or ends in query, GraphQL aside)
+ * with one string argument named `sql` or `query`.
+ */
+export function sqlArgOf(tool: { name: string; inputSchema?: { properties?: unknown } }): string | null {
+  const props = (tool.inputSchema?.properties ?? {}) as Record<string, { type?: unknown } | undefined>;
+  const isText = (arg: string) => props[arg]?.type === "string";
+  const known = SQL_TOOLS[tool.name];
+  if (known) return isText(known) ? known : null;
+  const words = nameWords(tool.name);
+  const graph = words.some((w) => w === "graph" || w === "ql" || w === "graphql");
+  if (!words.includes("sql") && (words.at(-1) !== "query" || graph)) return null;
+  const args = ["sql", "query"].filter(isText);
+  return args.length === 1 ? (args[0] ?? null) : null;
+}
+
 /**
  * What an action named by its slug does (`GITHUB_LIST_PULL_REQUESTS`), when a tool runs it for us (Composio's
  * executor), by every word rather than the first verb: `sensitive` when any word sends, deletes or pays, in any
