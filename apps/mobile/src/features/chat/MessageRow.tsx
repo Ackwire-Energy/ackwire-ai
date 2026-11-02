@@ -15,9 +15,11 @@ import {
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
+import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib/agent-talk";
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
+import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -33,7 +35,7 @@ import { appVia } from "@agenteschat/client/lib/via";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { memo, type ReactNode, useEffect, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -57,7 +59,7 @@ import { UsagePauseCard } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
-import { consultationHref, routineHref } from "../links/logic";
+import { chatHref, consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
@@ -118,6 +120,7 @@ export const MessageRow = memo(function MessageRow({
   receipt,
   seenBy,
   readOnly = false,
+  inThread = false,
   run: runAt = "solo",
   above,
   aboveThread = false,
@@ -141,6 +144,8 @@ export const MessageRow = memo(function MessageRow({
   seenBy?: string;
   /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
   readOnly?: boolean;
+  /** On its thread's own screen: a long message between agents is read whole there. */
+  inThread?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
@@ -184,6 +189,19 @@ export const MessageRow = memo(function MessageRow({
     ? ""
     : reminderBody(splitCanceled(serverBody(t, m.body, meta, i18n.language, names), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
+  // A long message from one agent to another (ADR 0034): its first paragraph and "Ler tudo", which pushes its
+  // thread's screen with it whole. On that screen, and where it is read only, it stays whole.
+  const talk = useMemo(
+    () =>
+      isAgent &&
+      !inThread &&
+      !readOnly &&
+      !m.local &&
+      talksToAgent(m, (handle) => agentsByAnyHandle(dir.agents).get(handle)?.id)
+        ? foldTalk(body, TALK_LINE_CHARS.phone)
+        : null,
+    [isAgent, inThread, readOnly, m, body, dir.agents],
+  );
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);
   // The one an agent adds after its own reply carries the reply's run: the run's tools, questions and stop line
@@ -494,12 +512,31 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : body ? (
           <MessageText
-            body={body}
+            body={talk ? talk.lead : body}
             muted={m.local === "pending"}
             selectable={false}
             accent={accent}
             channelRefs={channelRefsOf(m.meta)}
           />
+        ) : null}
+        {talk && !brainWait ? (
+          <Pressable
+            onPress={() => {
+              tapHaptic();
+              router.push(chatHref(m.channelId, m.threadId ?? m.id));
+            }}
+            accessibilityRole="button"
+            hitSlop={8}
+            style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
+          >
+            <Text variant="footnote" tone="muted" style={styles.medium}>
+              {t("chat.talk.readAll")}
+            </Text>
+            <Text variant="footnote" tone="faint">
+              · {t("chat.talk.more", { count: talk.more })}
+            </Text>
+            <Icon name="right" size={14} color={c.faint} />
+          </Pressable>
         ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
         {(stopped || atLimit) && m.agentRunId ? (
@@ -877,6 +914,8 @@ const styles = StyleSheet.create({
   },
   continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
+  talkMore: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 4, marginTop: 6, minHeight: 28 },
+  pressedDim: { opacity: 0.6 },
   shrink: { flexShrink: 1 },
   // The chip's own shrink only works if what holds it can shrink too (a long routine name ends in "…").
   tagPress: { flexShrink: 1, maxWidth: "100%", alignSelf: "center" },

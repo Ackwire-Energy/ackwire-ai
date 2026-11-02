@@ -1397,6 +1397,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 aboveThread={item.above && !isThread ? linkThreads.has(item.above.id) : false}
                 meId={meId}
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
+                inThread={isThread}
                 onLongPress={onLongPress}
                 onRetry={onRetry}
                 receipt={item.message.id === markAt ? receipt : undefined}

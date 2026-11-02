@@ -585,6 +585,9 @@ describe("LLM strategy (end to end through the outbox)", () => {
     const byQa = main.find((m) => m.author.id === qa.id);
     expect(byDev?.meta.joined).toBeUndefined();
     expect(byQa?.meta.joined).toBe(true);
+    // QA answers Dev's message: the apps fold a long one (`toAgent`); Dev answers a person.
+    expect(byQa?.meta.toAgent).toBe(f.agent.id);
+    expect(byDev?.meta.toAgent).toBeUndefined();
     // QA's answer to an answer brings in nobody else.
     expect(main.filter((m) => m.author.type === "agent")).toHaveLength(2);
   });
