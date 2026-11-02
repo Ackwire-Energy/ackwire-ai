@@ -13,11 +13,11 @@ import { agentLook } from "../shared/logic";
 import { isHeld, type RowState, stateText, usingNow } from "./logic";
 
 /**
- * The pieces the task manager's list, a task's screen and an agent's tasks share (ADR 0125): a task's mark and state,
+ * The pieces the task manager's list, a task's screen and an agent's tasks share (ADR 0127): a task's mark and state,
  * what it uses now, its "Parar", and the confirmation that stopping several asks for.
  */
 
-/** A reason's length at most: the server's (ADR 0125). */
+/** A reason's length at most: the server's (ADR 0127). */
 const REASON_MAX = 500;
 
 /** A task's mark: the agent's orbit while it works, the waiting clock (amber: it waits on you), queued, stopping. */

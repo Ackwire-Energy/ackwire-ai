@@ -26,6 +26,18 @@ test("knowledge API: search, context items (add, pin, edit), reactions, correcti
   expect(replyHit?.messageId).toBeTruthy();
   // Asked in the channel: the reply is in the main timeline.
   expect(replyHit?.threadId).toBeNull();
+  // Filters (ADR 0123): no words needed; a channel the person can't read finds nothing; bad ids are refused.
+  const filtered = (await (await api(`/search?fromAgents=${agentId}&author=agent&sort=newest`)).json()) as {
+    hits: { snippet: string }[];
+  };
+  expect(filtered.hits.map((h) => h.snippet)).toEqual(["Builds run on Jenkins."]);
+  const linked = (await (await api(`/search?q=builds&in=${channelId}&has=link,nonsense`)).json()) as {
+    hits: unknown[];
+  };
+  expect(linked.hits).toEqual([]);
+  const elsewhere = (await (await api(`/search?q=builds&in=${crypto.randomUUID()}`)).json()) as { hits: unknown[] };
+  expect(elsewhere.hits).toEqual([]);
+  expect((await api("/search?fromAgents=not-an-id")).status).toBe(400);
 
   const created = await api("/context-items", { json: { kind: "fact", content: "Our CI is Buildkite", pinned: true } });
   expect(created.status).toBe(201);

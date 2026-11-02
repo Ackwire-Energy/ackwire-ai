@@ -293,7 +293,7 @@ function Section({
   count?: number;
   /** More than the rows shown: "Ver tudo" opens the inbox. */
   more?: boolean;
-  /** "Ver tudo" opens this page instead; the agents at work, "Abrir no gerenciador" (the task manager, ADR 0125). */
+  /** "Ver tudo" opens this page instead; the agents at work, "Abrir no gerenciador" (the task manager, ADR 0127). */
   to?: "routines" | "taskManager";
   children: ReactNode;
 }) {

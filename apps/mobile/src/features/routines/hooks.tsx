@@ -222,7 +222,14 @@ export function useRoutineControls(r: Routine) {
       ),
     run: () => action.mutate({ type: "run", id: r.id }, { onSuccess: successHaptic, onError: failed }),
     stop: () =>
-      action.mutate({ type: "stop", id: r.id }, { onSuccess: () => say(t("routines.stoppedToast")), onError: failed }),
+      action.mutate(
+        { type: "stop", id: r.id },
+        {
+          onSuccess: () =>
+            say(t(r.state === "usage_paused" ? "routines.usagePause.canceledToast" : "routines.stoppedToast")),
+          onError: failed,
+        },
+      ),
     continueUsage: () =>
       action.mutate(
         { type: "continueUsage", id: r.id },

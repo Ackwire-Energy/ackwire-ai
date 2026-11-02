@@ -37,7 +37,7 @@ export function EventLine({
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
-  // A person stopped one of the agent's tasks (ADR 0125): its own line, with the reason, or a way to give one.
+  // A person stopped one of the agent's tasks (ADR 0127): its own line, with the reason, or a way to give one.
   const stopped = stoppedNoticeOf(message.meta);
   if (stopped) return <StoppedLine message={message} notice={stopped} />;
   if (fold?.fold === "hide") return null;
@@ -89,7 +89,11 @@ export function EventLine({
   if (consulted)
     return (
       <View style={styles.line}>
-        <ConsultationCard askerId={consulted.askerId} consultation={consulted.consultation} />
+        <ConsultationCard
+          askerId={consulted.askerId}
+          consultation={consulted.consultation}
+          channelId={message.channelId}
+        />
       </View>
     );
   if (!line) return null;

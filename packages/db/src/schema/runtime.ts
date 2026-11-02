@@ -409,6 +409,18 @@ export const approvalStatusEnum = pgEnum("approval_status", [
   "canceled",
 ]);
 
+/** Who decides an approval an agent asked with `request_approval` (ADR 0126). */
+export interface ApprovalApprovers {
+  /** The people asked: those named and the holders of the role named; empty: the agent's owner and admins. */
+  userIds: string[];
+  /** Who decides, as the card says it ("Diretoria", "Ana, Bruno"). */
+  label: string;
+  /** The person behind the run that asked: never decides it, unless `requesterDecides`. */
+  requestedBy: string | null;
+  /** The requester holds the role named: they may decide it, and the card says so. */
+  requesterDecides: boolean;
+}
+
 /**
  * A sensitive action an agent wants to take (docs/adr/0015). Bound to the
  * exact action: `action_hash` = SHA-256 of the canonical JSON of (tool,
@@ -473,6 +485,11 @@ export const approvals = pgTable(
      */
     routineId: uuid(),
     runAt: timestamp({ withTimezone: true }),
+    /**
+     * Asked with `request_approval` (ADR 0126): who decides it, snapshot when it was asked. Null: the agent's owner
+     * and whoever may approve actions, as for any other approval.
+     */
+    approvers: jsonb().$type<ApprovalApprovers>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

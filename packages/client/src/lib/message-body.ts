@@ -60,7 +60,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     m.bodyParams && typeof m.bodyParams === "object" ? (m.bodyParams as Record<string, unknown>) : ({} as const);
   // Waiting for room on a busy computer, not for one that went away; no AI because its sign-in ended, or because the
   // computer's own sign-in of that CLI isn't there (`own`), not none at all.
-  const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
+  const waitNote =
+    code === "brain_unavailable" ? (m.brainUnavailable as { code?: unknown; long?: unknown } | undefined) : undefined;
+  const busy = waitNote?.code === "busy";
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
   const own =
@@ -72,7 +74,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   if (USAGE_NOTES.has(code)) {
     const resetsAt = (m.usageWait as { resetsAt?: unknown } | undefined)?.resetsAt;
     const when = typeof resetsAt === "string" ? usageWhen(t, locale, resetsAt) : "";
-    return t(`chat.body.${code}`, { ...params, when, defaultValue: body });
+    const text = t(`chat.body.${code}`, { ...params, when, defaultValue: body });
+    // Someone said not to run it: the promise above no longer holds.
+    if ((m.usageWait as { canceled?: unknown } | undefined)?.canceled !== true) return text;
+    return `${text}\n\n_${t("chat.body.usage_wait_canceled", { defaultValue: "Canceled. It won't run when the limit is back." })}_`;
   }
   // Long work paused near a limit (ADR 0118): its window in the reader's words.
   if (code === "usage_paused" || code === "usage_paused_budget") {
@@ -90,7 +95,16 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   }
   // A secret request posted before the body named its agent.
   const anon = code === "secret_request" && typeof params.agent !== "string";
-  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : anon ? "secret_requestAnon" : code;
+  // Still in line after a long while (the only busy note posted now); older notes keep their words.
+  const shown = busy
+    ? waitNote?.long
+      ? "brain_queued"
+      : "brain_busy"
+    : signedOut
+      ? "no_ai_signed_out"
+      : anon
+        ? "secret_requestAnon"
+        : code;
   const key = `chat.body.${shown}`;
   // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
   return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });

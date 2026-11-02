@@ -9,7 +9,7 @@ import { untrustedBlock } from "./untrusted";
  * stopped waiting on (`wait_result`), a fast reply it gave while it worked
  * (`talker_reply`), what people decided on its proposal of a new agent or of
  * a change (`proposal_result`), how a vote it started came out (`poll_result`), its own follow-up (`follow_up`: the line it set, and at
- * its time the notice that wakes it, `refs.wake`), agents its @mention couldn't wake (`wake_skipped`, ADR 0097), a person stopping one of its tasks (`run_stopped`, ADR 0125). Stored on the notice
+ * its time the notice that wakes it, `refs.wake`), agents its @mention couldn't wake (`wake_skipped`, ADR 0097), a person stopping one of its tasks (`run_stopped`, ADR 0127). Stored on the notice
  * message as `meta.notice`; the agent's context reads it as an event, never
  * as a person's words.
  *
@@ -57,7 +57,7 @@ export const agentOnlyNoticeSql = (meta: SQL): SQL =>
   )})`;
 
 /**
- * Notices people see in the conversation but that are never news (ADR 0125): a person stopping a task is a receipt.
+ * Notices people see in the conversation but that are never news (ADR 0127): a person stopping a task is a receipt.
  * Conversation previews, unread counts and a thread's activity skip them, like the agent-only ones.
  */
 export const QUIET_NOTICES: readonly NoticeKind[] = ["run_stopped"];
@@ -159,7 +159,7 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       return `[Not woken]: ${n.text}`;
     case "work_check_in":
       return `[Your background work]: ${n.text}`;
-    // A person stopped one of its tasks (ADR 0125); the reason is that person's words.
+    // A person stopped one of its tasks (ADR 0127); the reason is that person's words.
     case "run_stopped":
       return `[A person stopped your task]: ${n.text}`;
     case "follow_up": {

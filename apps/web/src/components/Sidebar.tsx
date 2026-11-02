@@ -1272,7 +1272,7 @@ function MoreTools({
             {countOf(id)}
           </Link>
         ))}
-        {/* The task manager (ADR 0125): always here, not one of the tools a person places (`SIDEBAR_ITEMS`). */}
+        {/* The task manager (ADR 0127): always here, not one of the tools a person places (`SIDEBAR_ITEMS`). */}
         <Link
           to="/org/$orgId/task-manager"
           params={{ orgId: org.id }}

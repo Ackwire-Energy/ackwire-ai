@@ -359,7 +359,7 @@ export interface FakeState {
   /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
   sidebarOrder?: SidebarSection[];
   /**
-   * The task manager (ADR 0125, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
+   * The task manager (ADR 0127, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
    * task (`agents.cancelRun`) moves it to `ended`, stopped by me.
    */
   taskManager?: TaskManagerView;
@@ -1761,6 +1761,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           capabilities: ["drive", "issues"],
           busy: false,
           canTalk: true,
+          ...(a.seesDetails === false ? { capabilities: [], canTalk: false, seesDetails: false } : {}),
         })),
         people: state.members
           .filter((m) => state.agents.some((a) => a.ownerUserId === m.userId))
@@ -1777,12 +1778,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             a.ownerUserId === me ||
             (mode === "people" && (a.audience?.userIds ?? []).includes(me));
           const { monthlyBudgetUsd, ...rest } = a;
+          // Same rule as the backend: how it works only for who it answers, its owner and admins.
+          const seesDetails = canTalk || seesCost();
           return {
             ...rest,
             ...(seesCost() ? { monthlyBudgetUsd } : {}),
+            ...(seesDetails ? {} : { instructions: "" }),
             budgetUsedPercent: percentOf(a),
             audienceMode: mode,
             canTalk,
+            seesDetails,
           };
         }),
       create: async (orgId, input) => {
@@ -2670,20 +2675,31 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       query: async (orgId, input) => {
         log("search.query", orgId, input);
         const q = input.q.toLowerCase();
+        const f = input.filters;
+        // The filters the fake reads (ADR 0123): `in:` and `from:`.
+        const from = [...(f?.fromUsers ?? []), ...(f?.fromAgents ?? [])];
         const messages = state.messages
           .filter((m) => m.body.toLowerCase().includes(q))
-          .map((m) => ({
-            kind: "message" as const,
-            sourceId: m.id,
-            channelIds: [m.channelId],
-            title:
+          .filter((m) => !f?.in?.length || f.in.includes(m.channelId))
+          .filter((m) => !from.length || from.includes(m.author.id ?? ""))
+          .map((m) => {
+            const name =
               m.author.type === "agent"
                 ? (state.agents.find((a) => a.id === m.author.id)?.name ?? "")
-                : (state.members.find((p) => p.userId === m.author.id)?.name ?? ""),
-            snippet: m.body,
-            score: 1,
-            createdAt: m.createdAt,
-          }));
+                : (state.members.find((p) => p.userId === m.author.id)?.name ?? "");
+            return {
+              kind: "message" as const,
+              sourceId: m.id,
+              channelIds: [m.channelId],
+              title: name,
+              snippet: m.body,
+              score: 1,
+              createdAt: m.createdAt,
+              messageId: m.id,
+              threadId: m.threadId,
+              author: m.author.id ? { type: m.author.type, id: m.author.id, name } : null,
+            };
+          });
         const items = state.memories
           .filter((m) => m.text.toLowerCase().includes(q))
           .map((m) => ({
@@ -2696,7 +2712,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             createdAt: m.updatedAt,
           }));
         const actions = (state.teamActions ?? []).filter((h) => h.snippet.toLowerCase().includes(q));
-        return [...actions, ...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
+        const all = f && Object.keys(f).some((k) => k !== "sort") ? messages : [...actions, ...messages, ...items];
+        return all.filter((h) => !input.kinds || input.kinds.includes(h.kind));
       },
     },
     memory: {

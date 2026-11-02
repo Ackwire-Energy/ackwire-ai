@@ -5,7 +5,7 @@ import { can, requireActiveMembership } from "./organizations";
 import { pendingIds } from "./recovery";
 
 /**
- * The task manager (ADR 0125): every task the caller may see, what each one uses right now, each agent's activity
+ * The task manager (ADR 0127): every task the caller may see, what each one uses right now, each agent's activity
  * over the last hour and what ended since `since`. Who sees what is the "Trabalhando agora" rule (the conversations
  * the caller is in, `listWorkingRuns`), plus the routines' background runs for admins (`manage_agents`) and for the
  * agent's owner. No cost: people stop work here, they don't audit spend.
@@ -344,7 +344,7 @@ export interface TaskStep {
 const PERMISSION_TOOL = "permission_prompt";
 
 /**
- * A task's steps for the task manager's "Ver passos" (ADR 0125), to whoever sees the task there: what each call was
+ * A task's steps for the task manager's "Ver passos" (ADR 0127), to whoever sees the task there: what each call was
  * (the chat chip's fields) and how it ended, never a connector's input or a tool's output (only a permission check's
  * answer, which says whether it ran). The full trail (`getRun`) stays with usage access.
  */

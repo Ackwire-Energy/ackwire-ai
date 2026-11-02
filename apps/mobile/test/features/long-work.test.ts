@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentStatusLine, WorkView } from "@agenteschat/client";
-import { autoUpdateText, blockedText, workLine, workStatusText } from "@agenteschat/client/lib/long-work";
+import {
+  autoUpdateText,
+  blockedText,
+  workAnchorBody,
+  workContinuable,
+  workLine,
+  workStatusText,
+} from "@agenteschat/client/lib/long-work";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { workingNow } from "@agenteschat/client/lib/working";
 import { translator } from "./fixtures";
@@ -55,7 +62,7 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
     );
     expect(workLine(t, work({ state: "paused", pausedUntil: null }), ctx).text).toBe("Pausado no limite do plano");
     const done = workLine(t, work({ status: "done", state: null, finishedAt: ago(-26), resultMessageId: "r" }), ctx);
-    expect(done.text).toBe("Concluído em 38 min");
+    expect(done.text).toBe("Terminou em 38 min");
     expect(done.result?.label).toBe("Ver resultado");
     expect(done.stop).toBeNull();
     expect(workLine(t, work({ status: "failed", state: null, resultMessageId: "e" }), ctx).result?.label).toBe(
@@ -187,5 +194,38 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
       [],
     );
     expect(items[0]).toMatchObject({ kind: "work", what: "Migrar a cobrança", plan: { done: 1, total: 3 } });
+  });
+});
+
+describe("a finished work's anchor (ADR 0121, owner decisions)", () => {
+  test("keeps no promise once it's over: the server's words and the agent's last sentence with a time", async () => {
+    const t = await translator("pt-BR");
+    const said = "Vou cuidar disso em segundo plano. Te aviso aqui. O próximo update deve sair em ~10 min.";
+    const auto = { bodyCode: "work_auto_moved", bodyParams: { minutes: "10" } };
+    expect(workAnchorBody(t, said, {}, work())).toBe(said);
+    for (const status of ["done", "failed", "canceled"] as const) {
+      expect(workAnchorBody(t, said, {}, work({ status, state: null }))).toBe(
+        "Vou cuidar disso em segundo plano. Te aviso aqui.",
+      );
+      expect(workAnchorBody(t, serverBody(t, "x", auto), auto, work({ status, state: null }))).toBe(
+        "Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui.",
+      );
+    }
+    // Nothing else of the agent's words goes.
+    expect(workAnchorBody(t, "Vou cuidar disso.", {}, work({ status: "done", state: null }))).toBe("Vou cuidar disso.");
+    expect(workLine(t, work({ status: "done", state: null, finishedAt: ago(-26) }), ctx).text).toBe(
+      "Terminou em 38 min",
+    );
+  });
+
+  test("Continuar only under the end of a work its AI provider failed, until it was continued", () => {
+    const end = (over: Record<string, unknown>) => ({ workEnd: { id: "w1", status: "failed", ...over } });
+    expect(workContinuable(end({ errorCode: "run.provider_error" }))).toEqual({ continuedRunId: null });
+    expect(workContinuable(end({ errorCode: "run.provider_unavailable", continuedRunId: "r2" }))).toEqual({
+      continuedRunId: "r2",
+    });
+    expect(workContinuable(end({ errorCode: "run.budget_exceeded" }))).toBeNull();
+    expect(workContinuable({ workEnd: { id: "w1", status: "done" } })).toBeNull();
+    expect(workContinuable({})).toBeNull();
   });
 });

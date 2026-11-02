@@ -31,7 +31,7 @@ const stoppedNotices = async () =>
     (m) => (m.meta as { notice?: { kind?: string } }).notice?.kind === "run_stopped",
   );
 
-describe("stopping a task tells the agent (ADR 0125)", () => {
+describe("stopping a task tells the agent (ADR 0127)", () => {
   test("a notice in that conversation, with the reason, which wakes nothing; the next turn reads it", async () => {
     f = await setup({ reply: () => ({ chunks: ["Ok."] }) });
     await ask("@dev prepara o relatório de vendas");

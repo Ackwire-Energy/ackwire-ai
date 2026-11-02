@@ -11,6 +11,7 @@ import { getMessage } from "./messages";
 import { requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { ACTIVE_RUN_STATUSES, takeInbox } from "./run-inbox";
+import { runErrorDetail } from "./runs";
 import { announceWork, reopenWork, updatesThreadOf } from "./works";
 
 const { agentRuns, agents, messages, channels, users } = schema;
@@ -20,10 +21,11 @@ const { agentRuns, agents, messages, channels, users } = schema;
  * a new run of the same agent, in the same conversation, picks up from the
  * stopped run's conversation plus "[Ana asked you to continue from where you
  * stopped.]". Same people as stopping it (`mayStopRun`). Only a run a person
- * stopped while it ran, or one that ended at its step limit (its reply has
- * `meta.stepLimit`); its reply is the new run's trigger, so it continues once,
+ * stopped while it ran, one that ended at its step limit (its reply has
+ * `meta.stepLimit`), or long work its AI provider cut off (its end home has
+ * `meta.workEnd`); that reply is the new run's trigger, so it continues once,
  * and never while the agent already works in that conversation. The reply gets
- * `continuedRunId` in that meta (`meta.canceled` or `meta.stepLimit`) and the
+ * `continuedRunId` in that meta (`meta.canceled`, `stepLimit` or `workEnd`) and the
  * app hears `run.continued`. Audited.
  */
 export async function continueRun(
@@ -55,20 +57,24 @@ export async function continueRun(
   const notContinuable = () => new ConflictError("This task can't be continued", "run.not_continuable");
   // A forum turn belongs to the topic's order (ADR 0022): it is never picked up by hand.
   const byPerson = stopped.status === "canceled" && Boolean(canceledBy(stopped.error));
-  if (!(byPerson || stopped.status === "done") || row.channelKind === "forum" || !stopped.transcript)
+  // Long work its AI provider cut off (ADR 0121): its end, posted home, is where it goes on from.
+  const providerCut = stopped.status === "failed" && Boolean(stopped.workId) && providerFailure(stopped.error);
+  if (!(byPerson || providerCut || stopped.status === "done") || row.channelKind === "forum" || !stopped.transcript)
     throw notContinuable();
-  if (!stopped.replyMessageId) throw notContinuable();
-  const reply = await getMessage(db, orgId, stopped.replyMessageId);
-  // Its reply says how it ended: stopped by a person (`meta.canceled`), or at its step limit (`meta.stepLimit`).
-  const ending = byPerson ? "canceled" : "stepLimit";
+  const [work] = stopped.workId
+    ? await db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, stopped.workId))
+    : [];
+  const replyId = providerCut ? work?.resultMessageId : stopped.replyMessageId;
+  if (!replyId) throw notContinuable();
+  const reply = await getMessage(db, orgId, replyId);
+  // Its reply says how it ended: stopped by a person (`meta.canceled`), at its step limit (`meta.stepLimit`), or its
+  // work's end after a provider error (`meta.workEnd`).
+  const ending = byPerson ? "canceled" : providerCut ? "workEnd" : "stepLimit";
   const ended = reply?.meta[ending] as { continuedRunId?: unknown } | undefined;
   if (!reply || reply.deletedAt || !ended || ended.continuedRunId) throw notContinuable();
 
   // The new run answers where the stopped reply is: its thread, or (flat: a DM) the reply itself. Long work (ADR 0121)
   // goes on in its own thread, as the same work.
-  const [work] = stopped.workId
-    ? await db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, stopped.workId))
-    : [];
   const threadRootId = (work ? updatesThreadOf(work) : null) ?? reply.threadId ?? reply.id;
   const roots = [...new Set([stopped.threadRootId, threadRootId])];
   // A DM is one conversation; a channel's are its threads.
@@ -163,6 +169,10 @@ export async function continueRun(
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, runId: newRunId });
   return { runId: newRunId };
 }
+
+/** A run error its AI provider caused (an error it returned, or no answer after the retries): worth another try. */
+export const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_unavailable"]);
+export const providerFailure = (error: string | null) => PROVIDER_ERRORS.has(runErrorDetail(error)?.errorCode ?? "");
 
 /** The stop-and-send message left the stopped run's inbox before the restart (handed on already). */
 class AlreadyHandedOn extends Error {}

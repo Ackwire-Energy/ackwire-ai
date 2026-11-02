@@ -86,6 +86,8 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     paused?: unknown;
     access?: unknown;
     accounts?: unknown;
+    egress?: unknown;
+    networkTransition?: unknown;
   };
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;
@@ -111,7 +113,9 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       const online = e.online === true;
       const now = new Date().toISOString();
       qc.setQueryData<Machine[]>(list, (old) =>
-        old?.map((m) => (m.id === machineId ? { ...m, online, lastSeenAt: online ? now : m.lastSeenAt } : m)),
+        old?.map((m) =>
+          m.id === machineId ? { ...m, online, egress: null, lastSeenAt: online ? now : m.lastSeenAt } : m,
+        ),
       );
       patchTargets(qc, orgId, machineId, { online });
       // A machine we don't know yet (paired in another tab): fetch it.
@@ -128,13 +132,47 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     case "machine.access": {
       // A rename, a pause on the machine, or what it allows now (ADR 0036): patch what came, refetch otherwise.
       const patch: Partial<Machine> = {};
+      if (e.networkTransition === null) patch.networkTransition = null;
+      else if (
+        isObject(e.networkTransition) &&
+        (e.networkTransition.state === "draining" || e.networkTransition.state === "restart_required") &&
+        typeof e.networkTransition.deadline === "string" &&
+        Number.isFinite(Date.parse(e.networkTransition.deadline)) &&
+        Array.isArray(e.networkTransition.agents) &&
+        e.networkTransition.agents.every((id) => typeof id === "string")
+      ) {
+        patch.networkTransition = e.networkTransition as NonNullable<Machine["networkTransition"]>;
+      }
+      if (e.egress === null) patch.egress = null;
+      else if (
+        isObject(e.egress) &&
+        typeof e.egress.ip === "string" &&
+        e.egress.ip.length <= 45 &&
+        /^[0-9a-f:.]+$/i.test(e.egress.ip) &&
+        typeof e.egress.at === "string" &&
+        Number.isFinite(Date.parse(e.egress.at))
+      ) {
+        patch.egress = {
+          ip: e.egress.ip,
+          at: e.egress.at,
+          ...(typeof e.egress.country === "string" && /^[A-Z]{2}$/.test(e.egress.country)
+            ? { country: e.egress.country }
+            : {}),
+        };
+      }
       if (typeof e.name === "string") patch.name = e.name;
       const paused = pauseOf(e.paused);
       if (paused) patch.paused = paused;
       const access = accessOf(e.access);
       if (access !== undefined) patch.access = access;
       if (Object.keys(patch).length > 0) {
-        qc.setQueryData<Machine[]>(list, (old) => old?.map((m) => (m.id === machineId ? { ...m, ...patch } : m)));
+        qc.setQueryData<Machine[]>(list, (old) =>
+          old?.map((m) =>
+            m.id === machineId
+              ? { ...m, ...patch, ...(m.kind !== "managed" ? { egress: null, networkTransition: null } : {}) }
+              : m,
+          ),
+        );
         if (patch.name) patchTargets(qc, orgId, machineId, { name: patch.name });
       }
       // Nothing to patch, or `access: true` (it changed, and who may see it differs per person): refetch.
@@ -203,8 +241,8 @@ const SETUP_FIELDS = [
  * workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they are
  * read again, and `agent.coordinator` (ADR 0093) that another agent coordinates the team, or none: the agents are.
  * `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. `org.members` (someone
- * joined or left, or a role changed, ADR 0085) refetches the people, Members, the roles, `me`, the agents and the
- * routines (roles decide whom an agent answers), and the pages of the agents it names (their owner or brain changed
+ * joined or left, or a role changed, ADR 0085) refetches the people, Members, the roles, `me`, the agents, the
+ * routines (roles decide whom an agent answers) and the channels (roles decide which ones are listed, ADR 0125), and the pages of the agents it names (their owner or brain changed
  * when someone left). Returns whether the
  * event was one of these.
  */
@@ -219,6 +257,7 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
       keys.me,
       keys.agents(orgId),
       keys.routines(orgId),
+      keys.channels(orgId),
     ])
       void qc.invalidateQueries({ queryKey: key });
     const agents = (event as { agents?: unknown }).agents;

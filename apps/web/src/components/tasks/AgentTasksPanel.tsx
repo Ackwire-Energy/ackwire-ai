@@ -26,7 +26,7 @@ import { StopAllInline, StopTaskButton, TaskMark, taskAge, useTaskStop } from ".
 import "@/components/threads/threads.css";
 
 /**
- * In a DM's header (ADR 0125), while the agent has tasks the person can see: the orbit (or the waiting mark),
+ * In a DM's header (ADR 0127), while the agent has tasks the person can see: the orbit (or the waiting mark),
  * "3 tarefas · 1 espera você" and a chevron. It opens and closes the agent's tasks in the side panel.
  */
 export function AgentTasksPill() {
@@ -49,7 +49,7 @@ export function AgentTasksPill() {
 }
 
 /**
- * An agent's tasks beside its DM (ADR 0125), in the side panel a thread opens in: how many now, waiting for you and
+ * An agent's tasks beside its DM (ADR 0127), in the side panel a thread opens in: how many now, waiting for you and
  * done today, then a card per task (people's first, then its routines') with its state, where and how long, "Passos"
  * (its steps, as a reply's block lists them) and Parar. At the foot, "Abrir no gerenciador" and "Parar todas", which
  * turns the foot into its confirmation. Esc and a click beside it close it.

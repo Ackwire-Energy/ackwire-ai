@@ -52,6 +52,16 @@ export const featureKeysPtBR = {
     pollAnswered_other: "{{count}} de {{total}} responderam",
     voteFailed: "Não deu para registrar seu voto.",
   },
+  choices: {
+    step: "{{step}} de {{total}}",
+    back: "Voltar",
+    next: "Próxima",
+    close: "Fechar",
+    closed: "{{title}} · fechado",
+    reopen: "Mostrar de novo",
+    answeredBy: "{{name}} escolheu",
+    failed: "Não deu para mandar sua escolha. Tente de novo.",
+  },
   chart: {
     pending: "Montando o gráfico…",
     table: "Tabela",
@@ -519,6 +529,9 @@ export const featureKeysPtBR = {
     mark: "Fixada",
     none: "Nada fixado ainda",
     empty: "Nada fixado aqui ainda. Segure uma mensagem e toque em Fixar.",
+    bar_one: "Mensagens fixadas ({{count}})",
+    bar_other: "Mensagens fixadas ({{count}})",
+    unpinOf: "Desafixar a mensagem de {{name}}",
   },
   thread: {
     threadIn: "Thread em #{{channel}}",
@@ -753,6 +766,7 @@ export const featureKeysPtBR = {
     filter: {
       all: "Tudo",
       waiting: "Esperando você",
+      done: "Concluídas",
     },
     day: {
       today: "Hoje",
@@ -832,6 +846,8 @@ export const featureKeysPtBR = {
     markUnread: "Marcar como não lida",
     unread: "Não lida",
     done: "Feito",
+    restore: "Mover de volta",
+    noneDone: "Nada concluído nos últimos 30 dias.",
     more: "Ver mais",
     empty: "Nada esperando você. Pode respirar.",
   },
@@ -1167,7 +1183,7 @@ export const featureKeysPtBR = {
     anyAgent: "Todos os agentes",
     create: "Criar",
   },
-  // The task manager (ADR 0125; the rest of its words are shared, `taskManager.*`).
+  // The task manager (ADR 0127; the rest of its words are shared, `taskManager.*`).
   taskManager: {
     loadFailed: "Não deu para carregar as tarefas.",
     steps: "Passos",

@@ -16,7 +16,7 @@ import { SayWhy, StopTaskButton, TaskStateChip, taskAge, UsingNow, useOpenTask }
 import "@/components/threads/threads.css";
 
 /**
- * A task opened from the task manager ("Ver passos", ADR 0125), over the page like a thread beside its channel: the
+ * A task opened from the task manager ("Ver passos", ADR 0127), over the page like a thread beside its channel: the
  * agent and what the task is, what it does now, its state, time, what it uses and where it runs (no cost), its steps
  * as a reply's block lists them (asked again every 3 s while it works), "Abrir na conversa" and "Parar tarefa". Once
  * stopped it says so, and who stopped it can still say why.

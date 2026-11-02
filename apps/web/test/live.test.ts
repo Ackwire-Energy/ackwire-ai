@@ -7,6 +7,7 @@ import {
   emptyStreams,
   expectReply,
   expireTyping,
+  receiptTicks,
   receiptView,
   runsInChannel,
   seedReceipt,
@@ -15,6 +16,7 @@ import {
   typingIn,
   typingThrottle,
 } from "@agenteschat/client";
+import { createStreamsStore } from "@/realtime/context";
 
 const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "ada" };
 
@@ -515,5 +517,175 @@ describe("receipts when the mention doesn't start a new run", () => {
     s = applyReceiptEvent(s, ev({ type: "message.created", messageId: "m5", message: reply }));
     expect(receiptView(s.m2).status).toEqual({ kind: "handled", agents: ["theo"] });
     expect(s.m1?.agents).toEqual([["ada", "handled"]]);
+  });
+});
+
+describe("a run waiting for its computer", () => {
+  const person = {
+    id: "m1",
+    channelId: "c1",
+    threadId: null,
+    author: { type: "person", id: "u1" },
+    body: "@nova @rio oi",
+    mentionedAgentIds: ["nova", "rio"],
+    mentionedUserIds: [],
+    agentRunId: null,
+    meta: {},
+    createdAt: "2026-11-02T10:00:00.000Z",
+  } as unknown as Message;
+  const handled = (agentId: string, runId: string, computer: "queued" | "away") =>
+    ({
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId,
+      runId,
+      status: "waiting_input",
+      computer,
+    }) as ChannelEvent;
+
+  test("in line for room or for the computer to come back: never 'waiting for your answer'", () => {
+    let s = seedReceipt({}, person);
+    s = applyReceiptEvent(s, handled("nova", "r1", "queued"));
+    expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+    s = applyReceiptEvent(s, handled("rio", "r2", "away"));
+    expect(receiptView(s.m1).status).toEqual({ kind: "away", agents: ["rio"] });
+  });
+
+  test("the list's receipts say the same", () => {
+    const s = seedReceipt({}, {
+      ...person,
+      receipts: {
+        seenBy: ["nova"],
+        pickedBy: ["nova"],
+        handled: [{ agentId: "nova", runId: "r1", status: "waiting_input", computer: "queued" }],
+        blocked: [],
+      },
+    } as Message);
+    expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+  });
+
+  test("a message that went into a run in line says so live, as a reload would", () => {
+    let s = seedReceipt({}, person);
+    s = applyReceiptEvent(s, {
+      type: "agent.run.steered",
+      channelId: "c1",
+      runId: "r1",
+      agentId: "nova",
+      messageId: "m1",
+      computer: "queued",
+    } as unknown as ChannelEvent);
+    expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+  });
+});
+
+describe("live memory cards", () => {
+  const update = { action: "proposed", itemId: "i1", text: "Prefere respostas curtas", requestedByUserId: "u1" };
+  const reply = {
+    id: "a1",
+    channelId: "c1",
+    threadId: "m1",
+    author: { type: "agent", id: "nova" },
+    body: "Anotado.",
+    mentionedAgentIds: [],
+    mentionedUserIds: [],
+    agentRunId: "r1",
+    meta: { memoryUpdates: [update] },
+    createdAt: "2026-11-02T10:00:00.000Z",
+  } as unknown as Message;
+
+  test("a big message's event comes without it: the card stays until the read that has the message", () => {
+    const store = createStreamsStore();
+    store.apply({
+      type: "memory.updated",
+      channelId: "c1",
+      threadId: "m1",
+      agentId: "nova",
+      runId: "r1",
+      update,
+    } as ChannelEvent);
+    // Another card of the same run, not on this message, stays.
+    store.apply({
+      type: "memory.updated",
+      channelId: "c1",
+      threadId: "m1",
+      agentId: "nova",
+      runId: "r1",
+      update: { ...update, itemId: "i2" },
+    } as ChannelEvent);
+    store.apply({ type: "message.created", channelId: "c1", messageId: "a1" } as ChannelEvent);
+    expect(store.get().memory.c1?.map((c) => c.key)).toEqual(["r1:i1", "r1:i2"]);
+    store.seed([reply]);
+    expect(store.get().memory.c1?.map((c) => c.key)).toEqual(["r1:i2"]);
+    const memory = store.get().memory;
+    store.seed([reply]);
+    expect(store.get().memory).toBe(memory);
+  });
+
+  test("an event that carries the message drops its cards at once", () => {
+    const store = createStreamsStore();
+    store.apply({
+      type: "memory.updated",
+      channelId: "c1",
+      threadId: "m1",
+      agentId: "nova",
+      runId: "r1",
+      update,
+    } as ChannelEvent);
+    store.apply({ type: "message.created", channelId: "c1", messageId: "a1", message: reply } as ChannelEvent);
+    expect(store.get().memory.c1).toEqual([]);
+  });
+});
+
+describe("receipt ticks: clock, one, two", () => {
+  const ev = (e: Record<string, unknown>) => e as unknown as ChannelEvent;
+  const routed = (pickedBy: string[], seenBy = ["ada", "atlas"]) =>
+    applyReceiptEvent({}, ev({ type: "message.routed", channelId: "c1", messageId: "m1", seenBy, pickedBy }));
+
+  test("clock until an agent takes it; one tick while anyone it was for is on it; two once all of them acted", () => {
+    expect(receiptTicks(undefined)).toBe("clock");
+    expect(receiptTicks(applyReceiptEvent({}, ev({ type: "message.routing", messageId: "m1", step: "plan" })).m1)).toBe(
+      "clock",
+    );
+    let s = routed(["ada", "atlas"]);
+    // Picked, both still in line: nobody picked it up yet.
+    expect(receiptTicks(s.m1)).toBe("clock");
+    s = applyReceiptEvent(s, ev({ type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r1" }));
+    expect(receiptTicks(s.m1)).toBe("check");
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "message.handled", messageId: "m1", agentId: "ada", runId: "r1", status: "done" }),
+    );
+    // Ada answered, Atlas hasn't yet: still one.
+    expect(receiptTicks(s.m1)).toBe("check");
+    s = applyReceiptEvent(s, ev({ type: "message.claimed", messageId: "m1", agentId: "atlas", runId: "r2" }));
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "run.finished", ...base, runId: "r2", agentId: "atlas", status: "waiting_approval" }),
+    );
+    expect(receiptTicks(s.m1)).toBe("check");
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "message.handled", messageId: "m1", agentId: "atlas", runId: "r2", status: "done" }),
+    );
+    expect(receiptTicks(s.m1)).toBe("checks");
+  });
+
+  test("routed to nobody: everyone it reached decided not to answer, two ticks", () => {
+    expect(receiptTicks(routed([]).m1)).toBe("checks");
+  });
+
+  test("a mention guessed before the server confirms is still the clock", () => {
+    const s = seedReceipt({}, {
+      id: "m1",
+      channelId: "c1",
+      threadId: null,
+      author: { type: "person", id: "u1" },
+      body: "@ada oi",
+      mentionedAgentIds: ["ada"],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    } as Message);
+    expect(receiptTicks(s.m1)).toBe("clock");
   });
 });

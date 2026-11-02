@@ -200,13 +200,13 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(row.textContent).toContain(`Pausada até ${clock} (limite do plano)`);
     // Quiet: no chip asking for a look, no fix on the row.
     expect(row.querySelector(".ac-chip--waiting")).toBeNull();
-    // Its run is still at work: Parar stops it, not "Rodar agora" (which would throw its progress away).
-    expect(within(row).getByRole("button", { name: "Parar Revisar deploys" })).toBeTruthy();
+    // Its run is still at work: "Não rodar" cancels it, not "Rodar agora" (which would throw its progress away).
+    expect(within(row).getByRole("button", { name: "Não rodar Revisar deploys quando o limite voltar" })).toBeTruthy();
     expect(within(row).queryByRole("button", { name: "Rodar agora" })).toBeNull();
 
     const mine = await details("Revisar deploys");
     expect(mine.textContent).toContain(`Pausada até ${clock} (limite do plano)`);
-    expect(within(mine).getByRole("button", { name: "Parar" })).toBeTruthy();
+    expect(within(mine).getByRole("button", { name: "Não rodar" })).toBeTruthy();
     expect(within(mine).queryByRole("button", { name: "Rodar agora" })).toBeNull();
     const go = within(mine).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement;
     expect(go.disabled).toBe(false);
@@ -230,6 +230,30 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(off.textContent).toContain(
       "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago",
     );
+  });
+
+  test("waiting at the plan's own limit: which plan and when it runs, no Continuar agora, and Não rodar cancels it", async () => {
+    const resetsAt = new Date(Date.now() + 25 * 60_000).toISOString();
+    const clock = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(resetsAt));
+    const { calls } = await open([
+      routine({
+        id: "rt-limit",
+        name: "Resumo da manhã",
+        state: "usage_paused",
+        usagePause: { source: "plan", resetsAt, limit: true, plan: "Claude", extraOff: false },
+        brain: { kind: "claude_code", machineName: null },
+      }),
+    ]);
+    const row = card("Resumo da manhã");
+    expect(row.textContent).toContain(`Esperando o plano do Claude · roda às ${clock}`);
+    expect(row.textContent).not.toContain("Rodando");
+    const panel = await details("Resumo da manhã");
+    expect(panel.textContent).toContain("Roda sozinha quando o limite voltar");
+    expect(within(panel).queryByRole("button", { name: "Continuar agora" })).toBeNull();
+    await click(within(panel).getByRole("button", { name: "Não rodar" }));
+    await settle(6);
+    expect(calls).toEqual(["stop:rt-limit"]);
+    expect(screen().getByText("Cancelado. Não vai rodar quando o limite voltar.")).toBeTruthy();
   });
 
   test("Continuar agora on a run its timed job already holds: no 'Execução continuando.'", async () => {
@@ -647,7 +671,7 @@ describe("Chat: what a routine found", () => {
       body: "Bom dia, time!",
       mentionedAgentIds: [],
       agentRunId: null,
-      meta: { routine: { id: "rt-bd", name: "Bom dia diário", runId: "rr-1" } },
+      meta: { routine: { id: "rt-bd", name: "Resumo da manhã", runId: "rr-1" } },
       createdAt: ago(2),
     });
     const runs = {
@@ -655,21 +679,21 @@ describe("Chat: what a routine found", () => {
         routineRun({
           at: ago(2),
           status: "reported",
-          summary: "Bom dia",
+          summary: "Resumo da manhã",
           link: { channelId: ENG_ID, threadId: null, messageId: "m-told" },
         }),
       ],
     };
-    const { api } = withRoutines([routine({ id: "rt-bd", name: "Bom dia diário" })], runs, state);
+    const { api } = withRoutines([routine({ id: "rt-bd", name: "Resumo da manhã" })], runs, state);
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
-    await click(screen().getByRole("link", { name: "Rotina «Bom dia diário»" }));
+    await click(screen().getByRole("link", { name: "Rotina «Resumo da manhã»" }));
     await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Bom dia diário" });
+    const dialog = screen().getByRole("dialog", { name: "Resumo da manhã" });
     await click(within(dialog).getByRole("link", { name: "Abrir na conversa" }));
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     expect(router.state.location.search).toEqual({ m: "m-told" });
-    expect(screen().queryByRole("dialog", { name: "Bom dia diário" })).toBeNull();
+    expect(screen().queryByRole("dialog", { name: "Resumo da manhã" })).toBeNull();
   });
 });

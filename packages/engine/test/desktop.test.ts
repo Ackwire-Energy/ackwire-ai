@@ -456,7 +456,13 @@ describe("the agents frame (protocol 9)", () => {
     expect(runner.agentsFrames().at(-1)).toEqual({
       type: "agents",
       agents: [
-        { id: f.agent.id, handle: "dev", name: "Dev", look: { color: "rose", eyes: "happy", accessory: "crown" } },
+        {
+          id: f.agent.id,
+          handle: "dev",
+          name: "Dev",
+          locale: "pt-BR",
+          look: { color: "rose", eyes: "happy", accessory: "crown" },
+        },
       ],
     });
 

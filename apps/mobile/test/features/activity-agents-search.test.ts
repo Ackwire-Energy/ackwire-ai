@@ -69,6 +69,19 @@ describe("Atividade", () => {
     expect(s.days).toEqual([]);
   });
 
+  test("Concluídas: only what is done, by when it was marked done, waiting or not", () => {
+    const done = [
+      notification({ id: "asked", kind: "approval", waiting: true, updatedAt: ago(1), doneAt: ago(30) }),
+      notification({ id: "recent", updatedAt: ago(24 * 9), doneAt: ago(2) }),
+    ];
+    const s = activitySections([...items, ...done], "done", NOW);
+    expect(s.waiting).toEqual([]);
+    expect(s.days.map(([g, list]) => [g, list.map((n) => n.id)])).toEqual([
+      ["today", ["done", "recent"]],
+      ["yesterday", ["asked"]],
+    ]);
+  });
+
   test("day groups in local time", () => {
     expect(dayGroupOf(ago(2), NOW)).toBe("today");
     expect(dayGroupOf(ago(20), NOW)).toBe("yesterday");

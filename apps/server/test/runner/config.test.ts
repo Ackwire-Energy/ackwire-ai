@@ -215,3 +215,27 @@ test("activity log: newest first, pages with before, filters by agent, rotates, 
   // Limits: default 50, at most 200.
   expect(log.page({ limit: 10_000 }).entries.length).toBeLessThanOrEqual(200);
 });
+
+test("a configured network helper is preserved or refused, never silently disabled", () => {
+  expect(normalizeStored({ ...base, networkLauncher: "/opt/network/launcher" }).networkLauncher).toBe(
+    "/opt/network/launcher",
+  );
+  for (const networkLauncher of ["relative", "", "/opt/a\0b", false, 123])
+    expect(() => normalizeStored({ ...base, networkLauncher })).toThrow("networkLauncher");
+  expect(normalizeStored(base).networkLauncher).toBeUndefined();
+});
+
+test("networkMark is absent by default and rejects malformed or reserved packet bits", () => {
+  expect(normalizeStored({}).networkMark).toBeUndefined();
+  expect(normalizeStored({ networkMark: 0x08000000 }).networkMark).toBe(0x08000000);
+  expect(normalizeStored({ networkMark: 0x80000000 }).networkMark).toBe(0x80000000);
+  for (const mark of [0, -1, 1.5, "134217728", 0x100000000, 3, 0x01000000, 0x40000000]) {
+    expect(() => normalizeStored({ networkMark: mark })).toThrow("networkMark");
+  }
+});
+
+test("only an explicit bounded root policy enables forced network draining", () => {
+  expect(normalizeStored({ networkDrainSeconds: 60 }).networkDrainSeconds).toBe(60);
+  for (const value of [undefined, 0, 29, 3601, 1.5, "60"])
+    expect(normalizeStored({ networkDrainSeconds: value }).networkDrainSeconds).toBeUndefined();
+});

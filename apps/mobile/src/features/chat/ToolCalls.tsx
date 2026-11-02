@@ -139,7 +139,7 @@ const LOGOS_MAX = 4;
 
 /**
  * A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools.
- * The task manager draws what a task uses now with it too (ADR 0125).
+ * The task manager draws what a task uses now with it too (ADR 0127).
  */
 export function useCallLogo() {
   const catalog = useCatalog();
@@ -776,7 +776,7 @@ export function SavedTools({
 }
 
 /**
- * A task's steps on its own screen (ADR 0125): every call of the run so far, open, each opening again on what it ran
+ * A task's steps on its own screen (ADR 0127): every call of the run so far, open, each opening again on what it ran
  * or was given and answered. `calls` is how many calls the task made: when it grows, the steps load again. While it
  * works (`live`) its last call still waiting on an answer is the one running.
  */
@@ -794,7 +794,7 @@ export function RunSteps({
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
-  // The task manager's own read (ADR 0125): whoever sees the task sees its steps, without usage access.
+  // The task manager's own read (ADR 0127): whoever sees the task sees its steps, without usage access.
   const run = useTaskSteps(orgId, runId);
   const { refetch } = run;
   const seen = useRef(calls);

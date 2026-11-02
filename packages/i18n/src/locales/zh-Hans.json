@@ -1368,7 +1368,6 @@
       "button_other": "置顶消息（{{count}}）",
       "label": "#{{channel}} 中的置顶消息",
       "in": "置顶于 #{{channel}}",
-      "empty": "这里还没有置顶内容。可以从消息菜单中置顶。",
       "unpin": "取消置顶 {{name}} 的消息"
     },
     "membersButton_other": "频道成员（{{count}}）",
@@ -1482,6 +1481,8 @@
     "failed_other": "{{names}} 无法回答",
     "asking_other": "{{names}} 正在等你回答",
     "outage_other": "{{names}}：AI 服务商出现故障 · 会自动重试",
+    "queued_other": "{{names}} 正在排队等待电脑",
+    "away_other": "{{names}} 正在等待电脑",
     "nobody": "没有智能体会回答",
     "status": {
       "seen": "已看到",
@@ -1490,9 +1491,12 @@
       "waiting": "等待审批",
       "asking": "等你回答",
       "outage": "AI 服务商出现故障 · 会自动重试",
+      "queued": "排队等待电脑",
+      "away": "等待电脑",
       "handled": "已回答",
       "failed": "失败",
-      "referenced": "仅被提及"
+      "referenced": "仅被提及",
+      "reacted": "已回应"
     },
     "failedShort": "无法回答",
     "popoverTitle": "智能体",
@@ -1708,6 +1712,10 @@
     "forbidden": "现在只有提出请求的人、智能体的负责人或管理员可以让它继续",
     "resumed": "{{agent}} 已重新开始工作",
     "ended": "这项工作在继续之前就已结束",
+    "canceled": "已取消。限额重置后不会运行。",
+    "dontRun": "不运行",
+    "dontRunHint": "取消后，限额重置时不会运行任何内容",
+    "dontRunForbidden": "只有提出请求的人、智能体的负责人或管理员可以取消",
     "extraTitle": "长时间工作可以使用付费的额外用量",
     "extraHint": "如果套餐开启了额外用量，长时间工作在超过 95% 后仍会继续。关闭时，会在 95% 时暂停，并在套餐重置后继续。"
   },
@@ -1896,6 +1904,18 @@
     "publicDesc": "工作区中的任何人都能看到并加入。",
     "private": "私密",
     "privateDesc": "只有被添加的人。",
+    "roles": "部门或角色",
+    "rolesDesc": "拥有所选角色之一的人可以看到并加入，包括之后获得角色的人。",
+    "rolesPick": "可以看到频道的角色",
+    "rolesNone": "工作区还没有角色。",
+    "rolesNeeded": "请至少选择一个角色。",
+    "rolesLeave": "失去该角色的人会离开频道。",
+    "rolesChoose": "选择角色",
+    "rolesChange": "更改角色",
+    "rolesDone": "完成",
+    "publicTitle": "将 #{{channel}} 设为公开?",
+    "publicBody": "工作区中的所有人都可以加入并阅读所有消息,包括以前的消息。",
+    "publicConfirm": "设为公开",
     "members": "初始成员",
     "membersSearch": "搜索成员或智能体",
     "membersEmpty": "没有找到“{{q}}”。",
@@ -1999,7 +2019,10 @@
     "can": "可以",
     "budgetUsed": "本月已用预算的 {{percent}}",
     "spendLabel": "本月已用预算",
-    "former": "已不在此工作区"
+    "former": "已不在此工作区",
+    "askAccess": "申请访问",
+    "detailsHiddenTitle": "工作方式",
+    "detailsHidden": "只有 {{name}} 回复的人、负责人和管理员能看到它的指令、工具、记忆和用量。"
   },
   "presence": {
     "online": "在线",
@@ -2070,6 +2093,7 @@
       "waiting_approval": "等待审批",
       "waiting_answer": "等待回复",
       "waiting_computer": "等待电脑",
+      "queued_computer": "排队等待电脑",
       "waiting_plan": "等待套餐额度重置",
       "waiting_budget": "等待预算重置",
       "provider_down": "AI 服务商出现故障 · 会自动重试",
@@ -2274,6 +2298,7 @@
     "refusedBy": "由 {{name}} 拒绝 · {{when}}",
     "approvedByYou": "由你批准 · {{when}}",
     "outcomeApprovedBy": "由 {{name}} 批准",
+    "requesterDecides": "由按角色审批的人提出，因此其本人也可以决定",
     "outcomeApprovedByYou": "由你批准",
     "outcomeRefusedBy": "由 {{name}} 拒绝",
     "outcomeRefusedByYou": "由你拒绝",
@@ -2398,7 +2423,8 @@
       "mentions": "提及",
       "waiting": "等你处理",
       "unread": "未读",
-      "reactions": "表情回应"
+      "reactions": "表情回应",
+      "done": "已完成"
     },
     "keys": {
       "title": "快捷键",
@@ -2529,6 +2555,8 @@
     "replyTip": "回复 · R",
     "done": "已处理",
     "doneTip": "已处理 · E",
+    "restore": "移回",
+    "restoreTip": "移回 · E",
     "snooze": "稍后提醒我",
     "snoozeShort": "提醒",
     "open": "打开",
@@ -2560,6 +2588,7 @@
       "done": "已标为已处理",
       "doneQuestion": "{{name}} 仍在等待。问题会保留在对话中。",
       "doneApproval": "请求会保留在“审批”中。",
+      "restored": "已移回收件箱",
       "undo": "撤销",
       "readAll_other": "已将 {{count}} 条标为已读",
       "sent": "回复已发送",
@@ -2575,6 +2604,7 @@
     "noneWaiting": "没有人在等你。",
     "noneUnread": "全部已读。",
     "noneHere": "这里暂时没有内容。",
+    "noneDone": "过去 30 天内没有标记为完成的内容。",
     "more": "显示更多"
   },
   "approvals": {
@@ -3707,6 +3737,13 @@
     "defaultKeyDesc": "{{provider}} · 尾号 {{hint}}",
     "otherKeyDesc": "{{provider}} · 尾号 {{hint}}",
     "modelNeedsKey": "需要 {{provider}} API 密钥",
+    "brainPick": {
+      "searchPlaceholder": "模型、套餐或厂商",
+      "connect": "连接 {{plan}}",
+      "connectText": "需要 {{plan}} 密钥。创建智能体后马上添加。",
+      "needsKey": "需要 {{plan}} 密钥",
+      "other": "选择其他"
+    },
     "noKeys": "还没有密钥",
     "budgetTitle": "每月预算",
     "budget": "每月预算（US$）",
@@ -4654,7 +4691,9 @@
       "usagePaused": "暂停至 {{until}}（套餐限额）",
       "usagePausedUnknown": "暂停至套餐重置（套餐限额）",
       "usagePausedBudget": "暂停至 {{until}}（预算限额）",
-      "usagePausedBudgetUnknown": "暂停至预算更新（预算限额）"
+      "usagePausedBudgetUnknown": "暂停至预算更新（预算限额）",
+      "waitingPlan": "等待 {{plan}} 套餐 · {{until}} 运行",
+      "waitingPlanUnknown": "等待 {{plan}} 套餐重置"
     },
     "pausedReason": {
       "creator_left": "已暂停：创建者已离开工作区",
@@ -4699,6 +4738,8 @@
       "waiting": "等待有人回答",
       "waitingApproval": "等待你审批",
       "waitingComputer": "等待电脑",
+      "waitingPlan": "等待套餐重置",
+      "waitingBudget": "等待预算更新",
       "reported": "已告知发现的内容",
       "silent": "没有新内容，保持安静",
       "failed": "失败",
@@ -4756,6 +4797,10 @@
     "stoppedToast": "运行已停止。",
     "usagePause": {
       "line": "限额重置后会自动继续。不会在对话中发布任何内容。",
+      "lineLimit": "限额重置后会自动运行。不会在对话中发布任何内容。",
+      "dontRun": "不运行",
+      "dontRunName": "限额重置后不运行 {{name}}",
+      "canceledToast": "已取消。限额重置后不会运行。",
       "continuedToast": "运行继续中。",
       "forbidden": "现在只有例行工作的创建者、智能体的负责人或管理员可以让它继续",
       "extra_off": "这个套餐的时段额度已用完，而这个智能体的长时间工作不使用付费的额外用量。在它的 AI 设置中开启后即可立即继续，否则会在重置后继续",
@@ -7358,6 +7403,7 @@
       "freeTraining": "这个模型的服务商可能会用请求内容训练模型。在 OpenCode 的 设置 › 隐私 中开启免费模型的该权限。否则这个模型不会回答。"
     },
     "recommended": "推荐",
+    "free": "免费",
     "modelHelp": "模型越大，思考越多，套餐额度消耗也越快。",
     "hidden": "由 {{owner}} 或管理员选择思考方式。",
     "hiddenAdmins": "只有管理员可以选择思考方式。",
@@ -7515,7 +7561,8 @@
       "html": "HTML 页面",
       "file": "文件",
       "block": "区块",
-      "poll": "投票"
+      "poll": "投票",
+      "choices": "选项"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · 由 {{name}} 创建",
@@ -7593,6 +7640,16 @@
     "pollAnswered_other": "{{count}} / {{total}} 人已回答",
     "voteFailed": "你的投票没有成功提交。"
   },
+  "choices": {
+    "step": "{{step}} / {{total}}",
+    "back": "上一步",
+    "next": "下一步",
+    "close": "关闭",
+    "closed": "{{title}} · 已关闭",
+    "reopen": "再次显示",
+    "answeredBy": "{{name}} 已选择",
+    "failed": "你的选择没有发送成功。请重试。"
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "成员和智能体创建或上传的所有内容。",
@@ -7629,7 +7686,8 @@
       "html": "HTML 页面",
       "file": "文件",
       "block": "区块",
-      "poll": "投票"
+      "poll": "投票",
+      "choices": "选项"
     },
     "kindCount": "{{kind}}：{{count}}",
     "view": "视图",
@@ -9063,7 +9121,71 @@
     "empty": "没有找到“{{q}}”相关内容。",
     "hint": "搜索你所在的频道。",
     "inChannel": "在 #{{channel}}",
-    "count_other": "{{count}} 个结果"
+    "count_other": "{{count}} 个结果",
+    "countMore": "{{count}}+ 个结果",
+    "words": {
+      "ops": {
+        "from": "来自",
+        "in": "位于",
+        "has": "包含",
+        "mentions": "提及",
+        "before": "之前",
+        "after": "之后",
+        "during": "期间",
+        "author": "作者",
+        "pinned": "置顶"
+      },
+      "has": {
+        "link": "链接",
+        "file": "文件",
+        "image": "图片",
+        "card": "卡片"
+      },
+      "author": {
+        "person": "成员",
+        "agent": "智能体"
+      }
+    },
+    "options": "搜索选项",
+    "option": {
+      "from": "来自特定成员或智能体",
+      "in": "发送在特定频道或私信中",
+      "has": "包含链接、文件、图片或卡片",
+      "mentions": "提及特定成员或智能体",
+      "before": "某日期之前",
+      "after": "某日期之后",
+      "during": "某天、某月或某年",
+      "author": "由成员或智能体撰写",
+      "pinned": "置顶消息"
+    },
+    "moreFilters": "更多筛选",
+    "hasLabel": {
+      "link": "链接",
+      "file": "文件",
+      "image": "图片",
+      "card": "卡片"
+    },
+    "authorLabel": {
+      "person": "成员",
+      "agent": "智能体"
+    },
+    "pinnedChip": "已置顶",
+    "removeFilter": "移除 {{filter}}",
+    "filtersApplied_other": "{{count}} 个筛选条件",
+    "recent": "最近搜索",
+    "clearRecent": "清除",
+    "pickDate": "日期",
+    "dateHint": "输入日期，例如 2026-10-05、2026-10 或 2026",
+    "noMatch": "这里没有叫这个名字的人。",
+    "noPlace": "没有这个名字的频道或私信。",
+    "sort": {
+      "label": "排序",
+      "newest": "最新",
+      "oldest": "最早",
+      "relevance": "最相关"
+    },
+    "searchHere": "在此对话中搜索",
+    "dm": "与 {{name}} 的私信"
   },
   "files": {
     "upload": "上传文件",
@@ -9276,6 +9398,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "网络正在变更。电脑上打开的会话将在 {{when}} 重启。",
+      "restart": "电脑会话正在重启以应用网络设置。新工作会等到完成后再开始。",
+      "line": "出口 IP {{ip}}",
+      "hint": "智能体浏览网页时网站看到的地址。电脑的网络变化时会随之更新。"
+    },
     "online": "在线",
     "offline": "离线",
     "execOff": "命令已关闭",
@@ -10246,7 +10374,7 @@
       "waitingComputer": "等待电脑",
       "paused": "已达套餐限额，已暂停",
       "pausedUntil": "已达套餐限额，已暂停 · {{time}} 恢复",
-      "done": "用时 {{duration}} 完成",
+      "done": "用时 {{duration}} 结束",
       "failed": "未完成",
       "canceled": "{{duration}}后被 {{name}} 停止",
       "canceledAnon": "{{duration}}后停止"
@@ -10356,6 +10484,10 @@
       "answeredRequestFar": "{{to}} 回应了 {{from}} 的请求",
       "answeredRequestFar_female": "{{to}} 回应了 {{from}} 的请求",
       "see": "查看"
+    },
+    "talk": {
+      "readAll": "阅读全部",
+      "more_other": "还有 {{count}} 行"
     },
     "consultPanel": {
       "label": "{{from}} 和 {{to}} 之间的对话",
@@ -10659,15 +10791,18 @@
       "brain_unavailable": "{{brain}} 暂时无法回答。恢复后我会回复。",
       "provider_unavailable": "我的 AI 服务商暂时没有响应。恢复后我会尽快回复。",
       "brain_busy": "我的电脑正忙于其他任务。空闲后我会尽快回复。",
+      "brain_queued": "我仍在排队等待电脑。一有空位我就会回复。",
       "brain_interrupted": "{{brain}} 在完成前停止了。已完成的不会重复：{{tools}}。",
       "plan_limit_cut": "我在 {{plan}} 套餐的限额处停了下来。{{when}}重置后，我会从停下的地方继续。",
       "plan_limit_cut_unknown": "我在 {{plan}} 套餐的限额处停了下来。重置后我会立即从停下的地方继续。",
       "plan_limit_wait": "{{plan}} 套餐已达限额。{{when}}重置后我会回复。",
       "plan_limit_wait_unknown": "{{plan}} 套餐已达限额。重置后我会立即回复。",
       "budget_wait": "我本月的预算用完了。我会在{{when}}继续，如果管理员提高预算会更早。",
+      "usage_wait_canceled": "已取消。限额重置后不会运行。",
       "usage_paused": "{{agent}} 暂停了这项工作 · {{plan}} 套餐已用 {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} 暂停了这项工作 · 每月预算已用 {{percent}}%",
       "work_auto_moved": "这需要一些时间，所以我会在后台继续。我会在这里发布进展，下一次大约在 {{minutes}} 分钟后。",
+      "work_auto_movedOver": "这需要一些时间，所以我会在后台继续。我会在这里发布进展。",
       "work_end_done": "完成（{{minutes}} 分钟）。",
       "work_end_failed": "这项后台工作没有完成（{{minutes}} 分钟）。",
       "work_end_failedWhy": "这项后台工作没有完成（{{minutes}} 分钟）：{{why}}。",
@@ -11668,6 +11803,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "你只是在观看。",
+      "title": "要接管控制吗？",
+      "working": "你控制期间，{{name}} 会暂停。"
+    },
     "sub": {
       "control": "由你控制 · {{name}} 等待中",
       "control_female": "由你控制 · {{name}} 等待中",

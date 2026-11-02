@@ -16,12 +16,13 @@ import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { AgentTasksPill } from "@/components/tasks/AgentTasksPanel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
-export function DmPage({ target }: { target: DmTarget }) {
+export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMessageId?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -93,8 +94,9 @@ export function DmPage({ target }: { target: DmTarget }) {
         )}
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
-      {/* Its tasks (ADR 0125), while it has any: they open in the side panel. */}
+      {/* Its tasks (ADR 0127), while it has any: they open in the side panel. */}
       {agent && <AgentTasksPill />}
+      <SearchHereButton channelId={dm.data.channelId} />
       {agent && <ComputerButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
     </header>
@@ -102,6 +104,7 @@ export function DmPage({ target }: { target: DmTarget }) {
   return (
     <ChannelPage
       channelId={dm.data.channelId}
+      focusMessageId={focusMessageId}
       fallback={{
         id: dm.data.channelId,
         name,

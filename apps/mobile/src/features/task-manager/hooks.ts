@@ -17,7 +17,7 @@ const STOPPING_HOLD_MS = 8_000;
 const NO_STOPS: ReadonlySet<string> = new Set();
 
 /**
- * The task manager with what ended today (ADR 0125), asked again while this screen is on top: every screen that
+ * The task manager with what ended today (ADR 0127), asked again while this screen is on top: every screen that
  * shows it (the list, a task, an agent's tasks, Agentes' row, a DM's header) reads the same entry, so moving between
  * them is instant.
  */

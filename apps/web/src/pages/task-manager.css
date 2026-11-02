@@ -1,4 +1,4 @@
-/* The task manager (ADR 0125): the agents' cards, the tasks now and what ended today, on one page. */
+/* The task manager (ADR 0127): the agents' cards, the tasks now and what ended today, on one page. */
 .tm {
   gap: 18px;
   /* "Tempo" warms as a task goes on (full at 40 min), like an operating system's task manager. */

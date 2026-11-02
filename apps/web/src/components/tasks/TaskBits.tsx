@@ -30,7 +30,7 @@ import { useLiveStore } from "@/realtime/context";
 import "./tasks.css";
 
 /*
- * The task manager's pieces (ADR 0125), the same on its page and in an agent's panel beside its DM: a task's state,
+ * The task manager's pieces (ADR 0127), the same on its page and in an agent's panel beside its DM: a task's state,
  * what it uses now, its stop and the confirmation that stops several at once.
  */
 

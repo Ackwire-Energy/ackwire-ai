@@ -14,7 +14,7 @@ import { type Place, rowState, stateText } from "./logic";
 import { StopButton, StopConfirm, TaskMark, useAgentColor, UsingLine } from "./parts";
 
 /**
- * An agent's tasks (ADR 0125), pushed from its DM's header the way a thread opens: how many it has now and how many
+ * An agent's tasks (ADR 0127), pushed from its DM's header the way a thread opens: how many it has now and how many
  * wait on you, three wells (Agora, Esperam você, Feitas hoje), then its tasks (people's first, then its routines'),
  * the ones asked in that conversation tagged "aqui", each with its state, what it uses now and "Parar"; a task opens
  * its own screen. At the end, "Abrir no gerenciador" and "Parar todas", which asks first, in place.

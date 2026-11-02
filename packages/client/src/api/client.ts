@@ -63,7 +63,9 @@ import type {
   Channel,
   ChannelCard,
   ChannelCategory,
+  ChannelInput,
   ChannelMember,
+  Choices,
   CodeSent,
   CommandApproval,
   ComposioUsage,
@@ -211,6 +213,7 @@ import type {
   ScheduleParse,
   ScopeGrant,
   ScreenKind,
+  SearchFilterInput,
   SearchHit,
   SearchKind,
   SecretBox,
@@ -550,7 +553,7 @@ export interface ApiClient {
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /**
      * "Parar": stops a run (the person who started it, the agent's owner, admins). The agent is told, with `reason`
-     * when given (ADR 0125).
+     * when given (ADR 0127).
      */
     cancelRun(orgId: string, runId: string, reason?: string): Promise<void>;
     /** "Dizer por quê" after stopping a task (only who stopped it, once): the agent reads it. */
@@ -586,10 +589,7 @@ export interface ApiClient {
   };
   chat: {
     channels(orgId: string): Promise<Channel[]>;
-    createChannel(
-      orgId: string,
-      input: { name: string; topic?: string; visibility?: "public" | "private"; categoryId?: string | null },
-    ): Promise<Channel>;
+    createChannel(orgId: string, input: ChannelInput & { name: string; categoryId?: string | null }): Promise<Channel>;
     /** The sidebar's categories, in order (ADR 0080). */
     categories(orgId: string): Promise<ChannelCategory[]>;
     /** Admins: a category at the end, optionally taking `channelIds` along. */
@@ -608,11 +608,7 @@ export interface ApiClient {
     join(orgId: string, channelId: string): Promise<void>;
     /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
     card(orgId: string, channelId: string): Promise<ChannelCard>;
-    update(
-      orgId: string,
-      channelId: string,
-      input: { name?: string; topic?: string; visibility?: "public" | "private" },
-    ): Promise<Channel>;
+    update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;
     /** "Desfazer" right after archiving. */
@@ -726,7 +722,10 @@ export interface ApiClient {
     repositories(orgId: string): Promise<GitHubRepositories>;
   };
   search: {
-    query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;
+    query(
+      orgId: string,
+      input: { q: string; kinds?: SearchKind[]; limit?: number; filters?: SearchFilterInput },
+    ): Promise<SearchHit[]>;
   };
   sandbox: {
     settings(orgId: string): Promise<SandboxSettings>;
@@ -1238,6 +1237,15 @@ export interface ApiClient {
     poll(orgId: string, id: string): Promise<Poll>;
     /** Replaces the viewer's marks in a vote; empty takes them back. */
     vote(orgId: string, id: string, options: number[]): Promise<Poll>;
+    /** A choice card's answer (ADR 0124). */
+    choices(orgId: string, id: string): Promise<Choices>;
+    /** Answers a choice card: one option per question, sent to its agent as the person's own message. */
+    answerChoices(
+      orgId: string,
+      id: string,
+      picks: number[],
+      clientId: string,
+    ): Promise<{ choices: Choices; messageId: string }>;
     versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
     /** Short-lived signed URL for the stored file. */
     download(orgId: string, id: string, version?: number): Promise<{ url: string; expiresAt: string }>;
@@ -1369,7 +1377,7 @@ export interface ApiClient {
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {
     list(orgId: string): Promise<WorkingRun[]>;
-    /** The task manager (ADR 0125): tasks now, what each uses, each agent's last hour, what ended since `since`. */
+    /** The task manager (ADR 0127): tasks now, what each uses, each agent's last hour, what ended since `since`. */
     taskManager?(orgId: string, since?: string): Promise<TaskManagerView>;
     /** A task's steps for "Ver passos", to whoever sees it in the task manager (no inputs, no outputs). */
     taskSteps?(orgId: string, runId: string): Promise<TaskSteps>;

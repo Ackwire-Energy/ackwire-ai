@@ -17,7 +17,7 @@ import { endedText, rowState, taskSubline } from "./logic";
 import { StateLine, UsingLine } from "./parts";
 
 /**
- * A task's screen (ADR 0125), pushed from the task manager or an agent's tasks: whose it is, where and who asked, how
+ * A task's screen (ADR 0127), pushed from the task manager or an agent's tasks: whose it is, where and who asked, how
  * it stands, for how long, what it uses now and where it runs, its steps so far, "Abrir na conversa" and "Parar
  * tarefa". Once it ends, how it ended (the list it came from keeps what ended today).
  */

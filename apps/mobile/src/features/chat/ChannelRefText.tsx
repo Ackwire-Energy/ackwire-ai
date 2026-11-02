@@ -1,4 +1,5 @@
 import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
+import { joinable } from "@agenteschat/client/lib/channel-access";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -89,7 +90,7 @@ function ChannelCardSheet({ channelId, onDone }: { channelId: string; onDone: ()
       {c.topic ? <Text variant="body">{c.topic}</Text> : null}
       {c.archived ? null : (
         <View style={styles.actions}>
-          {!c.isMember && c.visibility === "public" ? (
+          {joinable(c) ? (
             <Button
               variant="primary"
               wide

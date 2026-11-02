@@ -20,7 +20,13 @@ import {
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalSummary, decisionOutcome } from "@agenteschat/client/lib/approval-words";
+import {
+  approvalGroupWaitsFor,
+  approvalSummary,
+  approvalWaitsFor,
+  decisionOutcome,
+  requesterDecidesLine,
+} from "@agenteschat/client/lib/approval-words";
 import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -41,7 +47,7 @@ import {
   useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
-import { chatHref } from "../links/logic";
+import { chatHref, consultationHref } from "../links/logic";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
@@ -59,13 +65,20 @@ import { markName, threadFaces } from "./logic";
 
 // ── Consultation ─────────────────────────────────────────────────────────────
 
-/** "Infra respondeu": what the agent asked another agent before answering, in a private conversation. */
+/**
+ * "Infra respondeu": what the agent asked another agent before answering, in a private conversation. With the
+ * conversation it was asked from (`channelId`), a tap opens the two agents' conversation on its own screen, as the
+ * reply's block lines do: a long question or answer reads there, never stretching the chat. Without it (already
+ * on that screen) it opens in place.
+ */
 export function ConsultationCard({
   askerId,
   consultation: cs,
+  channelId,
 }: {
   askerId: string;
   consultation: MessageConsultation;
+  channelId?: string;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -87,9 +100,16 @@ export function ConsultationCard({
   return (
     <View style={[styles.box, styles.cs, surface]}>
       <Pressable
-        onPress={() => setOpen((v) => !v)}
+        onPress={
+          channelId
+            ? () => {
+                tapHaptic();
+                router.push(consultationHref(cs.consultationId, channelId));
+              }
+            : () => setOpen((v) => !v)
+        }
         accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
+        accessibilityState={channelId ? undefined : { expanded: open }}
         style={styles.head}
       >
         <AgentFace agentId={cs.agentId} size={18} live={false} />
@@ -99,11 +119,15 @@ export function ConsultationCard({
         <Text variant="small" tone="faint" numberOfLines={1} style={[styles.grow, open && styles.hidden]}>
           {cs.answer ? previewOf(cs.answer) : ""}
         </Text>
-        <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={16} color={c.faint} />
-        </View>
+        {channelId ? (
+          <Icon name="right" size={16} color={c.faint} />
+        ) : (
+          <View style={open ? styles.flip : undefined}>
+            <Icon name="chev" size={16} color={c.faint} />
+          </View>
+        )}
       </Pressable>
-      {open ? (
+      {open && !channelId ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
             {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
@@ -242,7 +266,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const { ids, waiting: count, blocked } = approveAllScope(items);
   const high = items.some((a) => ids.includes(a.id) && approvalRisk(a) === "high");
   const ownerId = first.ownerUserId ?? dir.agentById.get(first.agentId)?.ownerUserId ?? null;
-  const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
+  const owner = approvalGroupWaitsFor(items, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const deadline = cardDeadline(items);
   const leadItem = waiting[0] ?? first;
   const always = approveAlwaysOn(items);
@@ -473,7 +497,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const g = genderOf(name);
   const high = approvalRisk(a) === "high";
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
-  const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
+  const owner = approvalWaitsFor(a, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
+  const requester = requesterDecidesLine(t, a);
   const approve = (always = false) =>
     decide.mutate(
       { id: a.id, decision: "approve", always },
@@ -533,6 +558,11 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
                     {origin}
                   </Text>
                 </View>
+              ) : null}
+              {requester ? (
+                <Text variant="footnote" tone="muted">
+                  {requester}
+                </Text>
               ) : null}
               {a.canDecide ? (
                 <ApproveAlways approval={a} name={name} disabled={decide.isPending} onPress={() => approve(true)} />

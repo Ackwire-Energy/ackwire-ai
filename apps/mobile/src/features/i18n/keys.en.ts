@@ -46,6 +46,16 @@ export const featureKeysEn = {
     pollAnswered_other: "{{count}} of {{total}} answered",
     voteFailed: "Your vote didn't go through.",
   },
+  choices: {
+    step: "{{step}} of {{total}}",
+    back: "Back",
+    next: "Next",
+    close: "Close",
+    closed: "{{title}} · closed",
+    reopen: "Show again",
+    answeredBy: "{{name}} picked",
+    failed: "Your pick didn't go through. Try again.",
+  },
   chart: {
     pending: "Building the chart…",
     table: "Table",
@@ -511,6 +521,9 @@ export const featureKeysEn = {
     mark: "Pinned",
     none: "Nothing pinned yet",
     empty: "Nothing pinned here yet. Hold a message and tap Pin.",
+    bar_one: "Pinned messages ({{count}})",
+    bar_other: "Pinned messages ({{count}})",
+    unpinOf: "Unpin the message from {{name}}",
   },
   thread: {
     threadIn: "Thread in #{{channel}}",
@@ -745,6 +758,7 @@ export const featureKeysEn = {
     filter: {
       all: "All",
       waiting: "Waiting for you",
+      done: "Done",
     },
     day: {
       today: "Today",
@@ -824,6 +838,8 @@ export const featureKeysEn = {
     markUnread: "Mark as unread",
     unread: "Unread",
     done: "Done",
+    restore: "Move back",
+    noneDone: "Nothing marked done in the last 30 days.",
     more: "See more",
     empty: "Nothing is waiting for you. Breathe.",
   },
@@ -1162,7 +1178,7 @@ export const featureKeysEn = {
     anyAgent: "All agents",
     create: "Create",
   },
-  // The task manager (ADR 0125; the rest of its words are shared, `taskManager.*`).
+  // The task manager (ADR 0127; the rest of its words are shared, `taskManager.*`).
   taskManager: {
     loadFailed: "Couldn't load the tasks.",
     steps: "Steps",

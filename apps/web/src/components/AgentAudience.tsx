@@ -26,6 +26,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { RoleChecklist } from "./roles/RoleChecklist";
 
 /** A picture per choice: the whole workspace, the people you pick, only the person responsible. */
 const AUDIENCE_ICON: Record<AudienceMode, IconName> = {
@@ -225,23 +226,12 @@ export function AudienceChoice({
                   <>
                     <span className="ac-field__label">{t("audience.roles")}</span>
                     <span className="small muted">{t("audience.rolesHint")}</span>
-                    {roleRows.map((r) => {
-                      const id = `${idPrefix}-r-${r.id}`;
-                      return (
-                        <label key={r.id} htmlFor={id} className="scope-row">
-                          <Checkbox
-                            id={id}
-                            checked={pickedRoles.has(r.id)}
-                            onCheckedChange={(on) => toggle("roleIds", r.id, on)}
-                          />
-                          <RoleMark color={r.color} icon={r.icon} size={26} />
-                          <span className="scope-row__text">
-                            <span>{r.name}</span>
-                            <span className="small muted">{t("audience.roleMembers", { count: r.people })}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
+                    <RoleChecklist
+                      roles={roleRows}
+                      picked={pickedRoles}
+                      onToggle={(id, on) => toggle("roleIds", id, on)}
+                      idPrefix={idPrefix}
+                    />
                   </>
                 )}
                 {rows.length > 0 && (

@@ -228,11 +228,11 @@ export function stepLimitOf(
 }
 
 /**
- * The reply's meta once it was continued (the `run.continued` event; also optimistic): `meta.canceled`, or
- * `meta.stepLimit` on a reply at the step limit.
+ * The reply's meta once it was continued (the `run.continued` event; also optimistic): `meta.canceled`,
+ * `meta.stepLimit` on a reply at the step limit, or `meta.workEnd` on a long work's end.
  */
 export function withContinued(meta: Record<string, unknown> | undefined, newRunId: string): Record<string, unknown> {
-  const key = !meta?.canceled && meta?.stepLimit ? "stepLimit" : "canceled";
+  const key = meta?.canceled ? "canceled" : meta?.stepLimit ? "stepLimit" : meta?.workEnd ? "workEnd" : "canceled";
   const c = meta?.[key];
   const base = c && typeof c === "object" ? (c as Record<string, unknown>) : {};
   return { ...(meta ?? {}), [key]: { ...base, continuedRunId: newRunId } };

@@ -1,4 +1,4 @@
-# 0125. The task manager: see every agent's tasks, stop them, and the agent is told
+# 0127. The task manager: see every agent's tasks, stop them, and the agent is told
 
 - Status: Accepted (built)
 - Date: 2026-11-02

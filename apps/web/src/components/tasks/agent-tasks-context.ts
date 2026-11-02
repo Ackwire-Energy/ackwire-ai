@@ -2,7 +2,7 @@ import type { ManagedTask } from "@agenteschat/client";
 import { createContext, useContext } from "react";
 
 /**
- * A DM with an agent (ADR 0125): the agent's tasks and its side panel, held by the conversation (ChannelPage) and read
+ * A DM with an agent (ADR 0127): the agent's tasks and its side panel, held by the conversation (ChannelPage) and read
  * by the pill in the DM's header (`AgentTasksPill`).
  */
 export interface AgentTasksControl {

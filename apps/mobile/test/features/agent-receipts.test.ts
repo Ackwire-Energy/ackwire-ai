@@ -55,37 +55,38 @@ describe("the agents' receipt line under a person's message", () => {
     expect(receiptLine({ routed: true, agents: [] })).toBeNull();
   });
 
-  test("seen only: the faces and who saw it, in words", () => {
+  test("seen only, nothing decided yet: the faces, the clock and who saw it, in words", () => {
     const line = receiptLine({ routed: false, agents: [["ada", "seen"]] });
     expect(line?.faces).toEqual(["ada"]);
-    expect(line?.mark).toBe("seen");
+    expect(line?.mark).toBe("clock");
     expect(line?.words).toEqual({ key: "receipts.seenBy", agents: ["ada"] });
     expect(line?.action).toBeNull();
   });
 
-  test("picked and answering: faces and the orbit only (the live block says it), words for screen readers", () => {
+  test("picked, then answering: the clock until Ada is on it, then one tick; words for screen readers", () => {
     const picked = receiptLine(routed({}).m1);
     expect(picked?.faces).toEqual(["ada"]);
-    expect(picked?.mark).toBe("working");
+    expect(picked?.mark).toBe("clock");
     expect(picked?.words).toBeNull();
     expect(picked?.label).toEqual({ key: "receipts.picked", agents: ["ada"] });
     const claimed = receiptLine(
       applyReceiptEvent(routed({}), { type: "message.claimed", channelId: "c1", messageId: "m1", agentId: "ada" }).m1,
     );
     expect(claimed?.label.key).toBe("receipts.claimed");
+    expect(claimed?.mark).toBe("check");
   });
 
-  test("answered: the faces of who answered and a check, no words", () => {
+  test("answered: the faces of who answered and two ticks, no words", () => {
     const line = receiptLine(handled(routed({}), "ada", "done").m1);
     expect(line?.faces).toEqual(["ada"]);
-    expect(line?.mark).toBe("done");
+    expect(line?.mark).toBe("checks");
     expect(line?.words).toBeNull();
     expect(line?.label.key).toBe("receipts.handled");
   });
 
-  test("waiting for an approval says so", () => {
+  test("waiting for an approval: one tick (Ada is on it), and says so", () => {
     const line = receiptLine(handled(routed({}), "ada", "waiting_approval").m1);
-    expect(line?.mark).toBe("waiting");
+    expect(line?.mark).toBe("check");
     expect(line?.words?.key).toBe("receipts.waiting");
   });
 
@@ -118,6 +119,27 @@ describe("the agents' receipt line under a person's message", () => {
     expect(en("receipts.outage", { count: 1, names: "Ada" })).toBe("Ada: the AI provider is down · retries by itself");
   });
 
+  test("a run waiting for its computer: in line, or until it is back, on its own line", async () => {
+    const waiting = (computer: "queued" | "away") =>
+      receiptLine(
+        applyReceiptEvent(routed({}), {
+          type: "message.handled",
+          channelId: "c1",
+          messageId: "m1",
+          agentId: "ada",
+          status: "waiting_input",
+          computer,
+        }).m1,
+      );
+    expect(waiting("queued")?.words).toEqual({ key: "receipts.queued", agents: ["ada"] });
+    expect(waiting("away")?.words).toEqual({ key: "receipts.away", agents: ["ada"] });
+    expect(waiting("queued")?.alert).toBe(false);
+    const pt = await translator("pt-BR");
+    expect(pt("receipts.queued", { count: 1, names: "Ada" })).toBe("Ada está na fila do computador");
+    const en = await translator("en");
+    expect(en("receipts.away", { count: 2, names: "Ada and Theo" })).toBe("Ada and Theo are waiting for the computer");
+  });
+
   test("a failure is the danger tone with Retry", () => {
     const line = receiptLine(handled(routed({}), "ada", "failed").m1);
     expect(line?.words).toEqual({ key: "receipts.failed", agents: ["ada"] });
@@ -125,11 +147,14 @@ describe("the agents' receipt line under a person's message", () => {
     expect(line?.alert).toBe(true);
   });
 
-  test("routed to nobody: no faces, 'No agent will answer'", () => {
+  test("routed to nobody: two ticks, no line; 'No agent will answer' is its label (the sheet says it)", () => {
     const line = receiptLine(routed({}, { pickedBy: [] }).m1);
     expect(line?.faces).toEqual([]);
-    expect(line?.words?.key).toBe("receipts.nobody");
+    expect(line?.mark).toBe("checks");
+    expect(line?.words).toBeNull();
+    expect(line?.label.key).toBe("receipts.nobody");
     expect(line?.action).toBeNull();
+    expect(line && keepsLine(line)).toBe(false);
   });
 
   test("past the workspace's platform AI nobody is asked: to mention an agent, nothing to tap", () => {
@@ -140,7 +165,7 @@ describe("the agents' receipt line under a person's message", () => {
   test("nothing could pick: 'without an @', muted, and a tap opens the agents it reached, also after a reload", () => {
     const live = routed({}, { pickedBy: [], reason: "mention_needed" }).m1;
     const line = receiptLine(live);
-    expect(line?.words).toEqual({ key: "receipts.mentionNeeded", agents: [] });
+    expect(line?.label).toEqual({ key: "receipts.mentionNeeded", agents: [] });
     expect(line?.alert).toBe(false);
     expect(line?.action).toBeNull();
     expect(receiptRows(live)).toHaveLength(2);
@@ -148,19 +173,19 @@ describe("the agents' receipt line under a person's message", () => {
       ...message({ id: "m1" }),
       receipts: { seenBy: ["ada", "theo"], pickedBy: [], handled: [], reason: "mention_needed" as const },
     };
-    expect(receiptLine(seedReceipt({}, listed).m1)?.words?.key).toBe("receipts.mentionNeeded");
+    expect(receiptLine(seedReceipt({}, listed).m1)?.label.key).toBe("receipts.mentionNeeded");
   });
 
   test("the author's own plan picking: the clock and 'Picking who answers', until the decision", () => {
     const seeded = seedReceipt({}, message({ id: "m1" }));
     const line = receiptLine(picking(seeded).m1);
-    expect(line).toMatchObject({ faces: [], mark: "picking", action: null, alert: false });
+    expect(line).toMatchObject({ faces: [], mark: "clock", action: null, alert: false });
     expect(line?.words).toEqual({ key: "receipts.picking", agents: [] });
     expect(receiptRows(picking(seeded).m1)).toEqual([]);
     const decided = routed(picking(seeded), { decidedBy: { step: "plan", brand: "claude", ownerId: "u1" } });
-    expect(receiptLine(decided.m1)?.mark).toBe("working");
+    expect(receiptLine(decided.m1)?.label.key).toBe("receipts.picked");
     // A late `message.routing` doesn't bring it back.
-    expect(receiptLine(picking(decided).m1)?.mark).toBe("working");
+    expect(receiptLine(picking(decided).m1)?.label.key).toBe("receipts.picked");
   });
 
   test("the sheet's last line: who picked the agents, with its mark; nothing for nobody or a decision from before", async () => {
@@ -229,9 +254,18 @@ describe("the agents' receipt line under a person's message", () => {
   });
 
   test("a message that went into a task gives way to the steer mark, unless there is something to tap", () => {
-    const nobody = receiptLine(routed({}, { pickedBy: [] }).m1);
-    expect(receiptShows(nobody, false)).toBe(true);
-    expect(receiptShows(nobody, true)).toBe(false);
+    const outage = receiptLine(
+      applyReceiptEvent(routed({}), {
+        type: "message.handled",
+        channelId: "c1",
+        messageId: "m1",
+        agentId: "ada",
+        status: "waiting_input",
+        outage: true,
+      }).m1,
+    );
+    expect(receiptShows(outage, false)).toBe(true);
+    expect(receiptShows(outage, true)).toBe(false);
     expect(receiptShows(receiptLine(handled(routed({}), "ada", "failed").m1), true)).toBe(true);
     expect(receiptShows(null, false)).toBe(false);
   });
@@ -246,6 +280,9 @@ describe("the agents' receipt line under a person's message", () => {
       approval: handled(routed({}), "ada", "waiting_approval").m1,
       // It lasts as long as the plan's call: a line would come and go under the message.
       picking: plan,
+      // Nobody will answer: never a line (an agent's reaction beside it read as wrong), the sheet says it.
+      nobody: routed({}, { pickedBy: [] }).m1,
+      mentionNeeded: routed({}, { pickedBy: [], reason: "mention_needed" }).m1,
     };
     for (const receipt of Object.values(marks)) {
       expect(receiptShows(receiptLine(receipt), false)).toBe(false);
@@ -254,21 +291,19 @@ describe("the agents' receipt line under a person's message", () => {
     expect(markOf(null, null, answered)).toEqual({
       kind: "agents",
       agentId: "ada",
-      mark: "done",
+      mark: "checks",
       label: { key: "receipts.handled", agents: ["ada"] },
     });
     // No agent yet: the clock alone, and a tap says its words (no sheet of agents to list).
     expect(markOf(null, null, plan)).toEqual({
       kind: "agents",
       agentId: null,
-      mark: "picking",
+      mark: "clock",
       label: { key: "receipts.picking", agents: [] },
     });
     expect(receiptRows(plan)).toEqual([]);
     const lines = {
       failed: handled(routed({}), "ada", "failed").m1,
-      nobody: routed({}, { pickedBy: [] }).m1,
-      mentionNeeded: routed({}, { pickedBy: [], reason: "mention_needed" }).m1,
       noAi: routed({}, { seenBy: [], pickedBy: [], reason: "no_ai" }).m1,
       platformCap: routed({}, { seenBy: [], pickedBy: [], reason: "platform_cap" }).m1,
     };
@@ -337,13 +372,25 @@ describe("the agents' receipt line under a person's message", () => {
     expect(phaseKey("claimed")).toBe("receipts.status.claimed");
   });
 
+  test("the sheet: an agent whose reaction was its answer says it reacted", async () => {
+    const nobody = routed({}, { pickedBy: [] }).m1;
+    expect(receiptRows(nobody, ["ada"])).toEqual([
+      { agentId: "ada", phase: "reacted" },
+      { agentId: "theo", phase: "seen" },
+    ]);
+    expect(phaseKey("reacted")).toBe("receipts.status.reacted");
+    const [en, pt] = await Promise.all([translator("en"), translator("pt-BR")]);
+    expect(en(phaseKey("reacted"))).toBe("Reacted");
+    expect(pt(phaseKey("reacted"))).toBe("Reagiu");
+  });
+
   test("seeded from the list: a person's message starts its receipt, an agent's only when it mentions agents", () => {
     const listed = {
       ...message({ id: "m1" }),
       receipts: { seenBy: ["ada"], pickedBy: [], handled: [{ agentId: "ada", status: "done" as const }] },
     };
     const seeded = seedReceipt({}, listed);
-    expect(receiptLine(seeded.m1)?.mark).toBe("done");
+    expect(receiptLine(seeded.m1)?.mark).toBe("checks");
     const agent = seedReceipt({}, message({ id: "m2", author: { type: "agent", id: "ada" } }));
     expect(agent.m2).toBeUndefined();
     // Theo thanked Ada, read as no hand-off (ADR 0089): she is only mentioned, and that asks nothing of you.
@@ -355,7 +402,7 @@ describe("the agents' receipt line under a person's message", () => {
       },
     );
     expect(receiptRows(thanks.m3)).toEqual([{ agentId: "ada", phase: "referenced" }]);
-    expect(receiptLine(thanks.m3)?.mark).toBe("seen");
+    expect(receiptLine(thanks.m3)?.mark).toBe("checks");
   });
 });
 
@@ -382,13 +429,13 @@ describe("which message carries the line", () => {
     ];
     const asks = {
       failed: handled(routed({}), "ada", "failed").m1,
-      nobody: routed({}, { pickedBy: [] }).m1,
       noAi: routed({}, { seenBy: [], pickedBy: [], reason: "no_ai" }).m1,
       platformCap: routed({}, { seenBy: [], pickedBy: [], reason: "platform_cap" }).m1,
     };
     for (const receipt of Object.values(asks)) expect(receiptMessageId(list, { b: receipt })).toBe("b");
     // Answered, or still nothing to say: the hand-off carries it.
     expect(receiptMessageId(list, { b: handled(routed({}), "ada", "done").m1 })).toBe("e");
+    expect(receiptMessageId(list, { b: routed({}, { pickedBy: [] }).m1 })).toBe("e");
     expect(receiptMessageId(list)).toBe("e");
   });
 });

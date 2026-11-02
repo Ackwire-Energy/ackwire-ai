@@ -4,11 +4,13 @@ import {
   agentView,
   audienceOf,
   availableProviders,
+  can,
   cancelRun,
   canTalkTo,
   canViewCost,
   continueRun,
   GIF_RATINGS,
+  getMembership,
   getOrgSettings,
   getRun,
   INVITE_NOTE_MAX,
@@ -37,6 +39,7 @@ import {
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
   STOP_REASON_MAX,
+  seesAgentDetails,
   setAgentChannels,
   setInvitationRoles,
   setMySidebarItem,
@@ -47,7 +50,7 @@ import {
   setStartPage,
   setStopReason,
   sidebarPlaceAllowed,
-  speakerFor,
+  speakerOf,
   taskManager,
   taskSteps,
   updateMyProfile,
@@ -75,9 +78,10 @@ const SidebarItems = z
 const Settings = z
   .object({
     name: z.string(),
-    context: z
-      .string()
-      .openapi({ description: "Shared with every agent of the organization (start of every prompt)." }),
+    context: z.string().openapi({
+      description:
+        "Shared with every agent of the organization (start of every prompt). Only for who may `configure`; empty for everyone else.",
+    }),
     defaultCredentialId: z
       .uuid()
       .nullable()
@@ -141,10 +145,14 @@ const personView = (
   };
 };
 
-/** Settings as this person may see them: the default budget is money, so admins only. */
-const settingsFor = (s: Awaited<ReturnType<typeof getOrgSettings>>, seesCost: boolean) => {
+/**
+ * Settings as this person may see them: the default budget is money, so admins only; what the agents know of the
+ * workspace (`context`) only for who configures it (empty for everyone else).
+ */
+const settingsFor = (s: Awaited<ReturnType<typeof getOrgSettings>>, seesCost: boolean, configures: boolean) => {
   const { defaultAgentBudgetNanoUsd, ...rest } = s;
-  return seesCost ? { ...rest, defaultAgentBudgetUsd: nanoUsdToUsd(defaultAgentBudgetNanoUsd) } : rest;
+  const shown = configures ? rest : { ...rest, context: "" };
+  return seesCost ? { ...shown, defaultAgentBudgetUsd: nanoUsdToUsd(defaultAgentBudgetNanoUsd) } : shown;
 };
 
 const MemberStatus = z
@@ -234,6 +242,10 @@ const AgentDetail = z
     audience: AgentAudience,
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean(),
+    seesDetails: z.boolean().openapi({
+      description:
+        "Whether the current person sees how it works (its owner, who manages agents, whoever it answers). Without it the instructions are empty and the month's numbers zero: only its public card.",
+    }),
     appearance: AgentAppearance.nullable(),
     mediaReplies: z.boolean().openapi({
       description:
@@ -381,8 +393,8 @@ export function managementRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const settings = await getOrgSettings(db, actor, orgId);
-      const seesCost = await canViewCost(db, actor, orgId);
-      return c.json({ ...settingsFor(settings, seesCost), ...(await mediaAvailable()) }, 200);
+      const [seesCost, viewer] = await Promise.all([canViewCost(db, actor, orgId), getMembership(db, actor, orgId)]);
+      return c.json({ ...settingsFor(settings, seesCost, can(viewer, "configure")), ...(await mediaAvailable()) }, 200);
     },
   );
 
@@ -436,7 +448,8 @@ export function managementRoutes(deps: AppDeps) {
           : {}),
       });
       const seesCost = await canViewCost(db, actor, orgId);
-      return c.json({ ...settingsFor(settings, seesCost), ...(await mediaAvailable()) }, 200);
+      // Only who configures the workspace gets here (`updateOrgSettings`).
+      return c.json({ ...settingsFor(settings, seesCost, true), ...(await mediaAvailable()) }, 200);
     },
   );
 
@@ -1051,34 +1064,40 @@ export function managementRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const d = await agentDetail(db, c.get("user").id, orgId, agentId);
+      const userId = c.get("user").id;
+      const d = await agentDetail(db, userId, orgId, agentId);
       const v = agentView(d.agent);
-      const seesCost = await canViewCost(db, c.get("user").id, orgId);
+      const [seesCost, viewer] = await Promise.all([canViewCost(db, userId, orgId), getMembership(db, userId, orgId)]);
+      const seesDetails = seesAgentDetails(d.agent, userId, viewer);
+      const month = seesDetails
+        ? d.month
+        : { ...d.month, budgetUsedPercent: 0, tokens: 0, runs: 0, failures: 0, byDay: [] };
       return c.json(
         {
           id: v.id,
           name: v.name,
           handle: v.handle,
           role: v.role,
-          instructions: v.instructions,
+          instructions: seesDetails ? v.instructions : "",
           model: v.model,
           ownerUserId: v.ownerUserId,
-          credentialId: d.agent.credentialId,
-          budgetUsedPercent: d.month.budgetUsedPercent,
+          credentialId: seesDetails ? d.agent.credentialId : null,
+          budgetUsedPercent: month.budgetUsedPercent,
           ...(seesCost
             ? {
                 monthlyBudgetUsd: usd(v.monthlyBudgetNanoUsd),
                 defaultBudgetUsd: v.monthlyBudgetNanoUsd === null ? nanoUsdToUsd(d.month.budgetNanoUsd) : undefined,
               }
             : {}),
-          tokensThisMonth: d.month.tokens,
-          runsThisMonth: d.month.runs,
-          failuresThisMonth: d.month.failures,
-          runsByDay: d.month.byDay,
-          pendingApprovals: d.pendingApprovals,
+          tokensThisMonth: month.tokens,
+          runsThisMonth: month.runs,
+          failuresThisMonth: month.failures,
+          runsByDay: month.byDay,
+          pendingApprovals: seesDetails ? d.pendingApprovals : 0,
           audience: audienceOf(d.agent),
           audienceMode: d.agent.audienceMode,
-          canTalk: canTalkTo(d.agent, c.get("user").id, await speakerFor(db, orgId, c.get("user").id)),
+          canTalk: canTalkTo(d.agent, userId, speakerOf(viewer)),
+          seesDetails,
           appearance: v.appearance,
           mediaReplies: v.mediaReplies,
           channels: d.channels,
@@ -1215,7 +1234,7 @@ export function managementRoutes(deps: AppDeps) {
       summary:
         "Stop an agent's run (the person who asked, the agent's owner or an admin). Its text so far is kept; a queued run never starts",
       description:
-        "The agent is told in that conversation (a routine's room for a routine), with `reason` when given (ADR 0125): a notice it reads before its next turn there, which wakes nothing.",
+        "The agent is told in that conversation (a routine's room for a routine), with `reason` when given (ADR 0127): a notice it reads before its next turn there, which wakes nothing.",
       request: {
         params: OrgParams.extend({ runId: z.uuid() }),
         body: {
@@ -1265,7 +1284,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/runs/{runId}/stop-reason",
       tags: ["Usage"],
       security,
-      summary: "Say why you stopped an agent's task (ADR 0125): the agent reads it",
+      summary: "Say why you stopped an agent's task (ADR 0127): the agent reads it",
       description:
         "Only who stopped it, once. The notice in that conversation (`meta.notice.kind = run_stopped`) gets the reason; 404 when the task wasn't stopped by a person.",
       request: {
@@ -1288,7 +1307,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/task-manager/{runId}/steps",
       tags: ["Usage"],
       security,
-      summary: "A task's steps for the task manager (ADR 0125): what each call was and how it ended",
+      summary: "A task's steps for the task manager (ADR 0127): what each call was and how it ended",
       description:
         "To whoever sees the task in the task manager. Never a connector's input or a tool's output (only a permission check's answer); the full trail (`GET …/runs/{runId}`) needs usage access. 404 when you don't see it.",
       request: { params: OrgParams.extend({ runId: z.uuid() }) },
@@ -1321,7 +1340,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/task-manager",
       tags: ["Usage"],
       security,
-      summary: "The task manager (ADR 0125): what the agents are doing now, what each uses, and what ended",
+      summary: "The task manager (ADR 0127): what the agents are doing now, what each uses, and what ended",
       description:
         "Tasks in the conversations you are in (the `active-runs` rule), plus routines' background runs for admins and the agent's owner. No cost. `since` (default: the last 24 h) bounds `ended`.",
       request: { params: OrgParams, query: z.object({ since: z.iso.datetime().optional() }) },

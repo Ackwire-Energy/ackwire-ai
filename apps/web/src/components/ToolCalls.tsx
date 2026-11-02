@@ -290,7 +290,7 @@ export function LiveTools({
 }
 
 /**
- * A task's steps in the task manager's panel (ADR 0125): the same block and lines as a reply's, open, from the task's
+ * A task's steps in the task manager's panel (ADR 0127): the same block and lines as a reply's, open, from the task's
  * own steps (`useTaskSteps`). While it works, its last call still waiting for a result is the one running.
  */
 export function TaskStepsBlock({

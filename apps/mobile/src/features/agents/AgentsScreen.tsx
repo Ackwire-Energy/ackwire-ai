@@ -43,7 +43,7 @@ const LIVE_ROWS = 8;
  * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
  * ones waiting for their offline computer: "Esperando o MacBook Air"), split by the workspace's groups of agents
  * when it has some. Tapping an agent opens its profile (Conversar is one tap there); "Novo agente" at the end, for who
- * may create one. Agents move between groups on the web. Above them, the way into the task manager (ADR 0125).
+ * may create one. Agents move between groups on the web. Above them, the way into the task manager (ADR 0127).
  */
 export function AgentsScreen() {
   const { t } = useTranslation();
@@ -83,7 +83,7 @@ export function AgentsScreen() {
       ) : total === 0 ? (
         <EmptyState title={t("mobile.agents.noneForYou")} subtitle={t("mobile.agents.noneForYouHint")} sky />
       ) : null}
-      {/* What every agent is doing, task by task, and a way to stop it (ADR 0125). */}
+      {/* What every agent is doing, task by task, and a way to stop it (ADR 0127). */}
       {total > 0 ? <TaskManagerEntry /> : null}
       {waiting.length > 0 ? (
         <>

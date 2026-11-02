@@ -98,7 +98,12 @@ export class Picture {
     pv.setUint32(0, perMeter);
     pv.setUint32(4, perMeter);
     phys[8] = 1; // meters
-    const chunks = [chunk("IHDR", ihdr), chunk("pHYs", phys), chunk("IDAT", deflateSync(raw)), chunk("IEND", new Uint8Array())];
+    const chunks = [
+      chunk("IHDR", ihdr),
+      chunk("pHYs", phys),
+      chunk("IDAT", deflateSync(raw)),
+      chunk("IEND", new Uint8Array()),
+    ];
     const sig = [137, 80, 78, 71, 13, 10, 26, 10];
     const out = new Uint8Array(sig.length + chunks.reduce((n, c) => n + c.length, 0));
     out.set(sig);

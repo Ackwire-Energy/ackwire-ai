@@ -1512,7 +1512,6 @@
       "button_other": "Przypięte wiadomości ({{count}})",
       "label": "Przypięte wiadomości na #{{channel}}",
       "in": "Przypięte na #{{channel}}",
-      "empty": "Nic tu jeszcze nie przypięto. Przypnij wiadomość z jej menu.",
       "unpin": "Odepnij wiadomość od: {{name}}"
     },
     "membersButton_one": "Członkowie kanału ({{count}})",
@@ -1659,6 +1658,14 @@
     "outage_few": "{{names}}: dostawca AI nie działa · ponowią sami",
     "outage_many": "{{names}}: dostawca AI nie działa · ponowią sami",
     "outage_other": "{{names}}: dostawca AI nie działa · ponowią sami",
+    "queued_one": "{{names}} czeka w kolejce do komputera",
+    "queued_few": "{{names}} czekają w kolejce do komputera",
+    "queued_many": "{{names}} czekają w kolejce do komputera",
+    "queued_other": "{{names}} czekają w kolejce do komputera",
+    "away_one": "{{names}} czeka na komputer",
+    "away_few": "{{names}} czekają na komputer",
+    "away_many": "{{names}} czekają na komputer",
+    "away_other": "{{names}} czekają na komputer",
     "nobody": "Żaden agent nie odpowie",
     "status": {
       "seen": "Widzi",
@@ -1667,9 +1674,12 @@
       "waiting": "Czeka na zatwierdzenie",
       "asking": "Czeka na twoją odpowiedź",
       "outage": "Dostawca AI nie działa · ponowi sam",
+      "queued": "W kolejce do komputera",
+      "away": "Czeka na komputer",
       "handled": "Odpowiedź wysłana",
       "failed": "Błąd",
-      "referenced": "Tylko wspomniany"
+      "referenced": "Tylko wspomniany",
+      "reacted": "Dodano reakcję"
     },
     "failedShort": "Nie udało się odpowiedzieć",
     "popoverTitle": "Agenci",
@@ -1879,6 +1889,10 @@
     "forbidden": "Teraz kontynuować może tylko osoba, która prosiła, właściciel agenta albo administrator",
     "resumed": "{{agent}} wraca do pracy",
     "ended": "Ta praca zakończyła się przed wznowieniem",
+    "canceled": "Anulowano. Nie uruchomi się, gdy limit się odnowi.",
+    "dontRun": "Nie uruchamiaj",
+    "dontRunHint": "Anuluj: nic się nie uruchomi, gdy limit się odnowi",
+    "dontRunForbidden": "Anulować może tylko osoba, która prosiła, właściciel agenta albo administrator",
     "extraTitle": "Długa praca może korzystać z płatnego dodatkowego użycia",
     "extraHint": "Przy włączonym dodatkowym użyciu w planie długa praca trwa dalej po przekroczeniu 95%. Gdy jest wyłączone, zatrzymuje się na 95% i wznawia po odnowieniu planu."
   },
@@ -2076,6 +2090,18 @@
     "publicDesc": "Każdy w przestrzeni roboczej go widzi i może dołączyć.",
     "private": "Prywatny",
     "privateDesc": "Tylko dodane osoby i agenci.",
+    "roles": "Działy lub role",
+    "rolesDesc": "Każdy z jedną z wybranych ról widzi kanał i może dołączyć, teraz lub później.",
+    "rolesPick": "Role, które widzą kanał",
+    "rolesNone": "Workspace nie ma jeszcze ról.",
+    "rolesNeeded": "Wybierz co najmniej jedną rolę.",
+    "rolesLeave": "Kto traci rolę, opuszcza kanał.",
+    "rolesChoose": "Wybierz role",
+    "rolesChange": "Zmień role",
+    "rolesDone": "Gotowe",
+    "publicTitle": "Ustawić #{{channel}} jako publiczny?",
+    "publicBody": "Każdy w workspace będzie mógł dołączyć i czytać wszystkie wiadomości, także starsze.",
+    "publicConfirm": "Ustaw jako publiczny",
     "members": "Początkowi członkowie",
     "membersSearch": "Szukaj osób lub agentów",
     "membersEmpty": "Nikogo nie znaleziono dla „{{q}}”.",
@@ -2191,7 +2217,10 @@
     "can": "Może",
     "budgetUsed": "{{percent}} budżetu wykorzystane w tym miesiącu",
     "spendLabel": "Budżet wykorzystany w tym miesiącu",
-    "former": "Nie należy już do tej przestrzeni roboczej"
+    "former": "Nie należy już do tej przestrzeni roboczej",
+    "askAccess": "Poproś o dostęp",
+    "detailsHiddenTitle": "Jak działa",
+    "detailsHidden": "Instrukcje, narzędzia, pamięć i użycie {{name}} widzą tylko osoby, którym {{name}} odpowiada, osoba odpowiedzialna i administratorzy."
   },
   "presence": {
     "online": "Online",
@@ -2262,6 +2291,7 @@
       "waiting_approval": "Czeka na zatwierdzenie",
       "waiting_answer": "Czeka na odpowiedź",
       "waiting_computer": "Czeka na komputer",
+      "queued_computer": "W kolejce do komputera",
       "waiting_plan": "Czeka na odnowienie planu",
       "waiting_budget": "Czeka na odnowienie budżetu",
       "provider_down": "Dostawca AI nie działa · ponowi sam",
@@ -2478,6 +2508,7 @@
     "refusedBy": "Odrzucił(a) {{name}} · {{when}}",
     "approvedByYou": "Zatwierdzone przez ciebie · {{when}}",
     "outcomeApprovedBy": "Zatwierdził(a) {{name}}",
+    "requesterDecides": "Prośba od osoby, która zatwierdza to w ramach swojej roli, więc też może zdecydować",
     "outcomeApprovedByYou": "Zatwierdzone przez ciebie",
     "outcomeRefusedBy": "Odrzucił(a) {{name}}",
     "outcomeRefusedByYou": "Odrzucone przez ciebie",
@@ -2612,7 +2643,8 @@
       "mentions": "Wzmianki",
       "waiting": "Czeka na ciebie",
       "unread": "Nieprzeczytane",
-      "reactions": "Reakcje"
+      "reactions": "Reakcje",
+      "done": "Zakończone"
     },
     "keys": {
       "title": "Skróty",
@@ -2770,6 +2802,8 @@
     "replyTip": "Odpowiedz · R",
     "done": "Załatwione",
     "doneTip": "Załatwione · E",
+    "restore": "Przywróć",
+    "restoreTip": "Przywróć · E",
     "snooze": "Przypomnij mi później",
     "snoozeShort": "Przypomnij",
     "open": "Otwórz",
@@ -2801,6 +2835,7 @@
       "done": "Oznaczono jako załatwione",
       "doneQuestion": "{{name}} nadal czeka. Pytanie zostaje w rozmowie.",
       "doneApproval": "Prośba zostaje w Zatwierdzeniach.",
+      "restored": "Z powrotem w Odebranych",
       "undo": "Cofnij",
       "readAll_one": "Oznaczono {{count}} jako przeczytane",
       "readAll_few": "Oznaczono {{count}} jako przeczytane",
@@ -2819,6 +2854,7 @@
     "noneWaiting": "Nikt na ciebie nie czeka.",
     "noneUnread": "Wszystko przeczytane.",
     "noneHere": "Na razie nic tu nie ma.",
+    "noneDone": "Nic nie oznaczono jako zakończone w ciągu ostatnich 30 dni.",
     "more": "Pokaż więcej"
   },
   "approvals": {
@@ -4049,6 +4085,13 @@
     "defaultKeyDesc": "{{provider}} · kończy się na {{hint}}",
     "otherKeyDesc": "{{provider}} · kończy się na {{hint}}",
     "modelNeedsKey": "Potrzebny klucz API {{provider}}",
+    "brainPick": {
+      "searchPlaceholder": "Model, plan lub twórca",
+      "connect": "Połącz {{plan}}",
+      "connectText": "Potrzebny klucz {{plan}}. Dodasz go zaraz po utworzeniu agenta.",
+      "needsKey": "Potrzebny klucz {{plan}}",
+      "other": "Wybierz inny"
+    },
     "noKeys": "Na razie brak kluczy",
     "budgetTitle": "Miesięczny budżet",
     "budget": "Miesięczny budżet (USD)",
@@ -5062,7 +5105,9 @@
       "usagePaused": "Wstrzymana do {{until}} (limit planu)",
       "usagePausedUnknown": "Wstrzymana do odnowienia planu (limit planu)",
       "usagePausedBudget": "Wstrzymana do {{until}} (limit budżetu)",
-      "usagePausedBudgetUnknown": "Wstrzymana do odnowienia budżetu (limit budżetu)"
+      "usagePausedBudgetUnknown": "Wstrzymana do odnowienia budżetu (limit budżetu)",
+      "waitingPlan": "Czeka na plan {{plan}} · uruchomi się o {{until}}",
+      "waitingPlanUnknown": "Czeka na odnowienie planu {{plan}}"
     },
     "pausedReason": {
       "creator_left": "Wstrzymana: twórca opuścił przestrzeń roboczą",
@@ -5122,6 +5167,8 @@
       "waiting": "Czeka na czyjąś odpowiedź",
       "waitingApproval": "Czeka na twoje zatwierdzenie",
       "waitingComputer": "Czeka na komputer",
+      "waitingPlan": "Czeka na odnowienie planu",
+      "waitingBudget": "Czeka na odnowienie budżetu",
       "reported": "Przekazano, co znalazła",
       "silent": "Nic nowego, bez wiadomości",
       "failed": "Nie zadziałało",
@@ -5179,6 +5226,10 @@
     "stoppedToast": "Uruchomienie zatrzymane.",
     "usagePause": {
       "line": "Wznowi się samo, gdy limit się odnowi. W rozmowie nic się nie pojawi.",
+      "lineLimit": "Uruchomi się sama, gdy limit się odnowi. W rozmowie nic się nie pojawi.",
+      "dontRun": "Nie uruchamiaj",
+      "dontRunName": "Nie uruchamiaj {{name}}, gdy limit się odnowi",
+      "canceledToast": "Anulowano. Nie uruchomi się, gdy limit się odnowi.",
       "continuedToast": "Uruchomienie trwa dalej.",
       "forbidden": "Teraz kontynuować może tylko twórca rutyny, właściciel agenta albo administrator",
       "extra_off": "Okno tego planu jest wykorzystane, a długa praca tego agenta nie korzysta z płatnego dodatkowego użycia. Włącz to w jego ustawieniach AI, aby kontynuować teraz, albo poczekaj, aż wznowi się po odnowieniu",
@@ -8164,6 +8215,7 @@
       "freeTraining": "Dostawca tego modelu może używać zapytań do jego trenowania. W OpenCode, w Settings › Privacy, włącz uprawnienie dla darmowych modeli. Bez tego ten model nie odpowiada."
     },
     "recommended": "Zalecany",
+    "free": "Darmowy",
     "modelHelp": "Większe modele myślą więcej i szybciej zużywają plan.",
     "hidden": "Kto myśli, wybiera {{owner}} lub administrator.",
     "hiddenAdmins": "Kto myśli, wybierają tylko administratorzy.",
@@ -8335,7 +8387,8 @@
       "html": "Strona HTML",
       "file": "Plik",
       "block": "Blok",
-      "poll": "Ankieta"
+      "poll": "Ankieta",
+      "choices": "Karta wyboru"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · autor: {{name}}",
@@ -8422,6 +8475,16 @@
     "pollAnswered_other": "Odpowiedziało {{count}} z {{total}}",
     "voteFailed": "Twój głos nie został zapisany."
   },
+  "choices": {
+    "step": "{{step}} z {{total}}",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "close": "Zamknij",
+    "closed": "{{title}} · zamknięte",
+    "reopen": "Pokaż ponownie",
+    "answeredBy": "Wybór: {{name}}",
+    "failed": "Twój wybór nie został wysłany. Spróbuj ponownie."
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "Wszystko, co stworzyli lub przesłali ludzie i agenci.",
@@ -8461,7 +8524,8 @@
       "html": "Strony HTML",
       "file": "Pliki",
       "block": "Bloki",
-      "poll": "Ankiety"
+      "poll": "Ankiety",
+      "choices": "Karty wyboru"
     },
     "kindCount": "{{kind}}: {{count}}",
     "view": "Widok",
@@ -10012,7 +10076,74 @@
     "count_one": "{{count}} wynik",
     "count_few": "{{count}} wyniki",
     "count_many": "{{count}} wyników",
-    "count_other": "{{count}} wyniki"
+    "count_other": "{{count}} wyniki",
+    "countMore": "{{count}}+ wyników",
+    "words": {
+      "ops": {
+        "from": "od",
+        "in": "w",
+        "has": "ma",
+        "mentions": "wspomina",
+        "before": "przed",
+        "after": "po",
+        "during": "podczas",
+        "author": "autor",
+        "pinned": "przypięte"
+      },
+      "has": {
+        "link": "link",
+        "file": "plik",
+        "image": "obraz",
+        "card": "karta"
+      },
+      "author": {
+        "person": "osoba",
+        "agent": "agent"
+      }
+    },
+    "options": "Opcje wyszukiwania",
+    "option": {
+      "from": "Od konkretnej osoby lub agenta",
+      "in": "Wysłane na konkretnym kanale lub w wiadomości bezpośredniej",
+      "has": "Zawiera link, plik, obraz lub kartę",
+      "mentions": "Wspomina konkretną osobę lub agenta",
+      "before": "Przed datą",
+      "after": "Po dacie",
+      "during": "W dniu, miesiącu lub roku",
+      "author": "Napisane przez osoby lub agentów",
+      "pinned": "Przypięte wiadomości"
+    },
+    "moreFilters": "Więcej filtrów",
+    "hasLabel": {
+      "link": "Link",
+      "file": "Plik",
+      "image": "Obraz",
+      "card": "Karta"
+    },
+    "authorLabel": {
+      "person": "Osoby",
+      "agent": "Agenci"
+    },
+    "pinnedChip": "Przypięte",
+    "removeFilter": "Usuń {{filter}}",
+    "filtersApplied_one": "{{count}} filtr",
+    "filtersApplied_few": "{{count}} filtry",
+    "filtersApplied_many": "{{count}} filtrów",
+    "filtersApplied_other": "{{count}} filtra",
+    "recent": "Ostatnie wyszukiwania",
+    "clearRecent": "Wyczyść",
+    "pickDate": "Data",
+    "dateHint": "Wpisz datę: 2026-10-05, 2026-10 lub 2026",
+    "noMatch": "Nikt tutaj tak się nie nazywa.",
+    "noPlace": "Nie ma kanału ani wiadomości bezpośredniej o tej nazwie.",
+    "sort": {
+      "label": "Sortuj",
+      "newest": "Najnowsze",
+      "oldest": "Najstarsze",
+      "relevance": "Najtrafniejsze"
+    },
+    "searchHere": "Szukaj w tej rozmowie",
+    "dm": "Wiadomość bezpośrednia z: {{name}}"
   },
   "files": {
     "upload": "Prześlij plik",
@@ -10228,6 +10359,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Sieć się zmienia. Otwarte sesje komputera uruchomią się ponownie o {{when}}.",
+      "restart": "Sesje komputera uruchamiają się ponownie, aby zastosować sieć. Nowa praca czeka, aż to się skończy.",
+      "line": "IP wyjściowe {{ip}}",
+      "hint": "Adres, który widzą strony, gdy agenci przeglądają sieć. Zmienia się razem z siecią komputera."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Polecenia wyłączone",
@@ -11280,7 +11417,7 @@
       "waitingComputer": "Czeka na komputer",
       "paused": "Wstrzymane na limicie planu",
       "pausedUntil": "Wstrzymane na limicie planu · wznowi się o {{time}}",
-      "done": "Gotowe w {{duration}}",
+      "done": "Ukończono w {{duration}}",
       "failed": "Nie zakończono",
       "canceled": "Zatrzymane przez: {{name}} po {{duration}}",
       "canceledAnon": "Zatrzymane po {{duration}}"
@@ -11405,6 +11542,13 @@
       "answeredRequestFar": "Odpowiedź od {{to}} na prośbę od {{from}}",
       "answeredRequestFar_female": "Odpowiedź od {{to}} na prośbę od {{from}}",
       "see": "Zobacz"
+    },
+    "talk": {
+      "readAll": "Czytaj całość",
+      "more_one": "jeszcze {{count}} wiersz",
+      "more_few": "jeszcze {{count}} wiersze",
+      "more_many": "jeszcze {{count}} wierszy",
+      "more_other": "jeszcze {{count}} wiersza"
     },
     "consultPanel": {
       "label": "Rozmowa między {{from}} a {{to}}",
@@ -11717,15 +11861,18 @@
       "brain_unavailable": "{{brain}} nie może teraz odpowiedzieć. Odpowiem, gdy wróci.",
       "provider_unavailable": "Mój dostawca AI teraz nie odpowiada. Odpowiem, gdy tylko wróci.",
       "brain_busy": "Mój komputer jest teraz zajęty innymi zadaniami. Odpowiem, gdy tylko się zwolni.",
+      "brain_queued": "Wciąż czekam w kolejce do komputera. Odpowiem, gdy tylko zwolni się miejsce.",
       "brain_interrupted": "{{brain}} przerwał przed zakończeniem. Już zrobione, bez powtarzania: {{tools}}.",
       "plan_limit_cut": "Praca zatrzymana na limicie planu {{plan}}. Wrócę do niej w tym samym miejscu {{when}}, gdy limit się odnowi.",
       "plan_limit_cut_unknown": "Praca zatrzymana na limicie planu {{plan}}. Wrócę do niej w tym samym miejscu, gdy tylko limit się odnowi.",
       "plan_limit_wait": "Plan {{plan}} osiągnął limit. Odpowiem {{when}}, gdy się odnowi.",
       "plan_limit_wait_unknown": "Plan {{plan}} osiągnął limit. Odpowiem, gdy tylko się odnowi.",
       "budget_wait": "Skończył mi się budżet na ten miesiąc. Będę kontynuować {{when}} albo wcześniej, jeśli administrator go zwiększy.",
+      "usage_wait_canceled": "Anulowano. Nie uruchomi się, gdy limit się odnowi.",
       "usage_paused": "{{agent}}: praca wstrzymana · plan {{plan}} na {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}}: praca wstrzymana · budżet miesięczny na {{percent}}%",
       "work_auto_moved": "To trochę potrwa, więc będę kontynuować w tle. Będę tu wrzucać aktualizacje, następną za około {{minutes}} min.",
+      "work_auto_movedOver": "To trochę potrwa, więc będę kontynuować w tle. Będę tu wrzucać aktualizacje.",
       "work_end_done": "Gotowe ({{minutes}} min).",
       "work_end_failed": "Ta praca w tle się nie zakończyła ({{minutes}} min).",
       "work_end_failedWhy": "Ta praca w tle się nie zakończyła ({{minutes}} min): {{why}}.",
@@ -12724,6 +12871,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Tylko oglądasz.",
+      "title": "Chcesz przejąć kontrolę?",
+      "working": "{{name}} wstrzymuje pracę, gdy masz kontrolę."
+    },
     "sub": {
       "control": "Masz kontrolę · {{name}} czeka",
       "controlAsked": "Masz kontrolę · {{name}} o to prosi",

@@ -13,7 +13,7 @@ import { groupLine } from "./logic";
 const ENTRY_POLL_MS = 15_000;
 
 /**
- * Agentes' way into the task manager (ADR 0125): its name, how the tasks stand ("3 trabalhando · 1 espera você") and
+ * Agentes' way into the task manager (ADR 0127): its name, how the tasks stand ("3 trabalhando · 1 espera você") and
  * how many there are. A server without the task manager shows no row.
  */
 export function TaskManagerEntry() {

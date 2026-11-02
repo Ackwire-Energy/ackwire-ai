@@ -3,6 +3,7 @@ import {
   type ArtifactDeps,
   type ArtifactView,
   addFileVersion,
+  answerChoices,
   artifactDownload,
   artifactFile,
   attachmentDisposition,
@@ -11,6 +12,7 @@ import {
   createFileArtifact,
   deleteArtifact,
   getArtifact,
+  getChoices,
   getPoll,
   keepBlock,
   listArtifacts,
@@ -41,7 +43,7 @@ import {
 } from "./context";
 
 const tags = ["Drive"];
-const Kind = z.enum(["document", "table", "diff", "html", "diagram", "file", "block", "poll"]);
+const Kind = z.enum(["document", "table", "diff", "html", "diagram", "file", "block", "poll", "choices"]);
 const Author = z.object({ type: z.enum(["agent", "person"]), id: z.string() });
 
 const textContents = [
@@ -78,6 +80,15 @@ const Content = z
       question: z.string(),
       options: z.array(z.string()),
       multiple: z.boolean(),
+    }),
+    z.object({
+      kind: z.literal("choices"),
+      questions: z.array(
+        z.object({
+          question: z.string(),
+          options: z.array(z.object({ label: z.string(), description: z.string().optional() })),
+        }),
+      ),
     }),
   ])
   .openapi("ArtifactContent");
@@ -135,6 +146,20 @@ const Poll = z
     votes: z.array(z.object({ userId: z.string(), option: z.number() })),
   })
   .openapi("Poll");
+
+const Choices = z
+  .object({
+    id: z.string(),
+    answer: z
+      .object({
+        userId: z.string(),
+        picks: z.array(z.number()).openapi({ description: "The option picked for each question, in order." }),
+        messageId: z.string().nullable(),
+        at: z.string(),
+      })
+      .nullable(),
+  })
+  .openapi("Choices");
 
 const ArtifactDetail = Artifact.extend({ shownVersion: z.number(), content: Content }).openapi("ArtifactDetail");
 
@@ -515,6 +540,67 @@ export function artifactRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, artifactId } = c.req.valid("param");
       return c.json(await votePoll(artifacts(), c.get("user").id, orgId, artifactId, c.req.valid("json").options), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/choices/{artifactId}",
+      tags,
+      security,
+      summary: "A choice card in a conversation: its answer, once someone picked (ADR 0124)",
+      request: { params: ArtifactParams },
+      responses: { 200: json(Choices), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      return c.json(await getChoices(artifacts(), c.get("user").id, orgId, artifactId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/choices/{artifactId}/answer",
+      tags,
+      security,
+      summary: "Answer a choice card: one option per question, sent to its agent as the person's own message",
+      description: "Once: the first answer in wins (409 `choices.answered` after that).",
+      request: {
+        params: ArtifactParams,
+        body: body(
+          z.object({
+            picks: z.array(z.number().int().min(0)).min(1).max(ARTIFACT_LIMITS.choiceQuestions),
+            clientId: z.string().max(64).nullable().optional(),
+          }),
+        ),
+      },
+      responses: {
+        200: json(z.object({ choices: Choices, messageId: z.string() })),
+        ...errors,
+        429: errorResponse("Too many messages (`rate_limited`)"),
+      },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      const user = c.get("user");
+      const limit = await deps.adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
+      const out = await answerChoices(
+        {
+          ...artifacts(),
+          pubsub: deps.adapters.pubsub,
+          judge: deps.extras?.context?.judge,
+          talker: deps.extras?.talker,
+        },
+        user.id,
+        orgId,
+        artifactId,
+        c.req.valid("json"),
+      );
+      deps.wakeWorkers?.();
+      return c.json({ choices: out.choices, messageId: out.message.id }, 200);
     },
   );
 

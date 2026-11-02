@@ -62,7 +62,7 @@ const ended = (over: Partial<EndedTask> & { runId: string }): EndedTask => ({
 
 const NONE: ReadonlySet<string> = new Set();
 
-describe("a task's row (ADR 0125)", () => {
+describe("a task's row (ADR 0127)", () => {
   test("its state: working, waiting on an ok or an answer, queued, and stopping once asked here", async () => {
     const t = await translator("pt-BR");
     const said = (over: Partial<ManagedTask>, stopping = NONE) =>

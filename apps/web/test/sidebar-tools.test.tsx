@@ -87,7 +87,7 @@ describe("the tools on top", () => {
     expect(rows()[0]).toBe("Início");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
     const more = await openMore();
-    // The task manager (ADR 0125) is always there, after the tools a person places.
+    // The task manager (ADR 0127) is always there, after the tools a person places.
     expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum", "Gerenciador de tarefas"]);
     expect(
       within(more)

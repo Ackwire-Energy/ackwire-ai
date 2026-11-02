@@ -16,7 +16,7 @@ export function useDmAgentTasks(agentId: string | null) {
 }
 
 /**
- * An agent's tasks in its DM's header (ADR 0125), beside its computer: the orbit while it works (the waiting mark
+ * An agent's tasks in its DM's header (ADR 0127), beside its computer: the orbit while it works (the waiting mark
  * while it only waits on you) and how many tasks it has, with how many wait on you when some also work. A tap opens
  * the agent's tasks, pushed, the way a thread opens.
  */

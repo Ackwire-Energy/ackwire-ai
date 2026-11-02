@@ -11,6 +11,7 @@ import {
   denySchedulers,
   readAgentUsers,
   systemLauncher,
+  trustedNetworkLauncher,
 } from "../../runner/agent-users";
 import { agentCategorySlice, agentSlice, type RunCommand } from "../../runner/service";
 import { errorCode, removeDirs, tempDir } from "./helpers";
@@ -259,6 +260,8 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     AGENTES_SHARED_BIN: "/home/ag-a1b2c3d4/shared/bin",
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: "31627",
+    // A finished build's Gradle and Kotlin daemons give the memory back after 5 idle minutes, not 3 hours.
+    GRADLE_OPTS: "-Dorg.gradle.daemon.idletimeout=300000",
   };
   const launcher = systemLauncher(user, true, false);
   const p = launcher.prefix;
@@ -283,6 +286,7 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     "/bin/sh",
     "-c",
   ]);
+  expect(p.join("\n")).not.toContain("hidepid=");
   expect(p.slice(19)).toEqual(["sh", "21003", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
   expect(launcher).toMatchObject({ env, home: "/home/ag-a1b2c3d4", tmp: "/run/agentes-runner-tmp/21003/tmp" });
   // Root on the computer: the agent's own tmpfs, mounted once (a lock, so two first launches don't stack two).
@@ -389,4 +393,49 @@ test("an agent user's group, as the computer says it (`id -g`): never root's, ne
   expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(1, "id: 'ag-a1b2c3d4': no such user")))).toBe("internal");
   expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(0, "0")))).toBe("internal");
   expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(0, "21007 21008")))).toBe("internal");
+});
+
+test("a privileged network hook rejects writable ancestors, symlinks and non-executables", () => {
+  const file = "/opt/network/launch";
+  const stats = (bad?: string, mode = 0o755, uid = 0, link = false) =>
+    ((p: string) => ({
+      uid: p === bad ? uid : 0,
+      mode: p === bad ? mode : 0o755,
+      isFile: () => p === file,
+      isDirectory: () => p !== file,
+      isSymbolicLink: () => p === bad && link,
+    })) as unknown as Parameters<typeof trustedNetworkLauncher>[1];
+  expect(trustedNetworkLauncher(file, stats())).toEqual([file]);
+  expect(() => trustedNetworkLauncher(file, stats("/opt", 0o777))).toThrow();
+  expect(() => trustedNetworkLauncher(file, stats(file, 0o644))).toThrow();
+  expect(() => trustedNetworkLauncher(file, stats(file, 0o755, 1000))).toThrow();
+  expect(() => trustedNetworkLauncher(file, stats(file, 0o755, 0, true))).toThrow();
+  expect(() => trustedNetworkLauncher("launch", stats())).toThrow();
+});
+
+test.if(process.platform !== "win32")("the optional namespace launcher precedes runuser for every agent launch", () => {
+  const prefix = systemLauncher(
+    { id: ANA.id, user: "ag-a1b2c3d4", uid: 21000, networkLauncher: "/usr/bin/true" },
+    false,
+  ).prefix;
+  expect(prefix).toEqual(["/usr/bin/true", "21000", "--", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
+});
+
+test("a configured routing mark drops network capabilities even without a namespace hook", () => {
+  const user = { id: "a1b2c3d4", user: "ag-a1b2c3d4", uid: 21000, networkMark: 0x08000000 };
+  expect(systemLauncher(user, false).prefix).toEqual([
+    "/usr/bin/setpriv",
+    "--no-new-privs",
+    "--bounding-set=-net_admin,-net_raw",
+    "--",
+    "/usr/sbin/runuser",
+    "-u",
+    user.user,
+    "--",
+  ]);
+  const scoped = systemLauncher({ ...user, networkLauncher: "/usr/bin/true" }, true).prefix;
+  expect(scoped.indexOf("/usr/bin/true")).toBeLessThan(scoped.indexOf("/usr/bin/setpriv"));
+  expect(scoped.join("\n")).toContain("mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc");
+  expect(scoped.indexOf("/usr/bin/setpriv")).toBeLessThan(scoped.indexOf("/usr/sbin/runuser"));
+  expect(systemLauncher({ ...user, networkMark: undefined }, false).prefix[0]).toBe("/usr/sbin/runuser");
 });

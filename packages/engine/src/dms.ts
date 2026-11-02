@@ -245,7 +245,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
           isNull(messages.deletedAt),
           // A routine's call is hidden in the chat (only the agent's answer shows), so not the preview either.
           sql`not (${messages.authorType} = 'person' and ${messages.meta}->'routine' is not null)`,
-          // Nor what only its agent reads, nor a receipt like a stopped task (ADR 0125).
+          // Nor what only its agent reads, nor a receipt like a stopped task (ADR 0127).
           sql`not ${quietNoticeSql(sql`${messages.meta}`)}`,
           // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: the reply is the preview.
           sql`${messages.meta}->>'mediaAfter' is null`,

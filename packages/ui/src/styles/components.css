@@ -1627,6 +1627,11 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-menu__reaction--more[data-highlighted] {
   color: var(--ink);
 }
+/* Its two icons are wider than an emoji: the cell grows to fit them with its siblings' room on each side. */
+.ac-menu__reaction.ac-menu__reaction--more {
+  width: auto;
+  padding-inline: 6px;
+}
 .ac-menu__note {
   margin: 0;
   max-width: 260px;
@@ -2535,9 +2540,6 @@ html:not([data-pointer]) .ac-row:focus-visible {
   line-height: 20px;
   /* Over a modal dialog too, which turns the page's own off. */
   pointer-events: auto;
-}
-.ac-toast--error .ac-icon {
-  color: var(--danger);
 }
 .ac-toast__text {
   flex: 1;
@@ -4512,6 +4514,35 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   gap: 12px;
   padding: 12px 14px 12px 12px;
 }
+/* Each tone's soft glow from the right edge over the glass, as the sidebar's chosen row has (layout.css,
+   `.sidebar__item[data-status="active"]::before`); its icon in the tone. After the glass rules: their `background`
+   shorthand would clear it. */
+.ac-toast {
+  --toast-tone: var(--faint);
+  background-image: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--toast-tone) var(--toast-glow, 24%), transparent),
+    transparent 45%
+  );
+}
+[data-theme="dark"] .ac-toast {
+  --toast-glow: 30%;
+}
+.ac-toast--success {
+  --toast-tone: var(--ok);
+}
+.ac-toast--info {
+  --toast-tone: var(--info);
+}
+.ac-toast--warning {
+  --toast-tone: var(--warn);
+}
+.ac-toast--error {
+  --toast-tone: var(--danger);
+}
+.ac-toast > .ac-icon {
+  color: var(--toast-tone);
+}
 
 /* Dialogs and sheets: e3 + top light, larger radius */
 .ac-dialog {
@@ -5163,12 +5194,35 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   width: 14px;
   height: 14px;
 }
-/* Left of the bubble, on hover: the action bar, its middle on the bubble's top edge, as on everyone's rows. */
-.ac-msg--own > .ac-msg__body > .ac-msg__actions,
-.ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-  top: 0;
-  right: calc(100% + 8px);
-  left: auto;
+/*
+ * Off touch (the exact opposite of the touch block below, so no pointer setup falls between them), on hover: three
+ * flat icons 2px left of the bubble, on its first line, reversed on screen so Reagir is nearest it, as
+ * Messenger and Instagram do. No plate, so they read as the bubble's; inside the row, so they never cover the one
+ * above. Their middle on the first line's capitals, as an `.ac-iconline` lead: the bubble's 7px padding, half its
+ * 15.5px / 1.7 line, minus half a 30px button. 84px wide, so the row's 96px left padding holds them at any width.
+ */
+@media not ((hover: none) or (pointer: coarse)) {
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions,
+  .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 15px);
+    right: calc(100% + 2px);
+    flex-direction: row-reverse;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm {
+    min-width: 28px;
+    width: 28px;
+    height: 30px;
+    border-radius: 15px;
+    color: var(--faint);
+  }
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm:is(:hover, [aria-expanded="true"]) {
+    color: var(--ink);
+    background: var(--plate);
+  }
 }
 /*
  * A touch screen's bar (a keyboard's there: a tap opens the menu) has no room left of a phone-width bubble, and a
@@ -6667,7 +6721,14 @@ html:not([data-pointer]) button.ac-tools__row:focus-visible {
 .ac-tools__label b {
   font-weight: 500;
 }
+/* The grey words after it (a tool's name, the start of another agent's answer) never grow the line: two lines at
+   most, as on the phone; the whole answer reads where the line opens. */
 .ac-tools__label small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   font-size: 12px;
   color: var(--faint);
 }
@@ -7617,6 +7678,9 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-menu__reaction {
     width: 40px;
   }
+  .ac-menu__reaction.ac-menu__reaction--more {
+    padding-inline: 10px;
+  }
 }
 
 /* Floating things fit the screen. */
@@ -8459,6 +8523,10 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
 }
 .ac-consult__head:hover {
   background: rgba(127, 127, 127, 0.05);
+}
+/* Opens beside the chat (the two agents' conversation in the panel) while it shows there: like the block's line. */
+.ac-consult__head[aria-pressed="true"] {
+  background: var(--plate);
 }
 html:not([data-pointer]) .ac-consult__head:focus-visible {
   outline: none;

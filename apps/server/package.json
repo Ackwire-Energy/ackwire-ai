@@ -27,7 +27,8 @@
     "@scalar/hono-api-reference": "^0.12.9",
     "better-auth": "^1.7.7",
     "hono": "^4.13.13",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@agenteschat/ui": "workspace:*"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

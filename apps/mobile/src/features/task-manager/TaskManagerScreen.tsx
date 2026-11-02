@@ -43,7 +43,7 @@ const LIVE_ROWS = 8;
 const taskHref = (runId: string) => `/task-manager/${runId}` as const;
 
 /**
- * The task manager (ADR 0125), pushed from Agentes: what the agents are doing now. The tasks people asked for, by
+ * The task manager (ADR 0127), pushed from Agentes: what the agents are doing now. The tasks people asked for, by
  * agent (its row folds, says how its tasks stand and stops them all, asking first), each with its state, what it uses
  * now and "Parar"; then the routines' work in the background and what ended today. A task opens its own screen.
  */

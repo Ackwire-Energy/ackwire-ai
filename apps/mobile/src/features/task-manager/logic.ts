@@ -15,7 +15,7 @@ import {
 import type { TFunction } from "i18next";
 
 /**
- * What the phone's task manager says (ADR 0125): its list, a task's screen, an agent's tasks screen and the count in
+ * What the phone's task manager says (ADR 0127): its list, a task's screen, an agent's tasks screen and the count in
  * its DM's header, from the shared model (`@agenteschat/client/lib/task-manager`).
  */
 
@@ -190,7 +190,7 @@ export function usingNow(
   }
 }
 
-/** One agent's tasks now: its DM header's count and its tasks screen (ADR 0125). */
+/** One agent's tasks now: its DM header's count and its tasks screen (ADR 0127). */
 export interface AgentTaskView {
   /** People's first, then its routines', oldest first; `here`: asked in the conversation it was opened from. */
   rows: { task: ManagedTask; here: boolean }[];

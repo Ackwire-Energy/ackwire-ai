@@ -182,7 +182,7 @@ export function routineReportText(messages: readonly Said[], noticeId: string | 
 }
 
 /**
- * A person stopped one of the agent's tasks (ADR 0125): the line "Você parou esta tarefa · Dev foi avisado", with the
+ * A person stopped one of the agent's tasks (ADR 0127): the line "Você parou esta tarefa · Dev foi avisado", with the
  * reason when one was said. `runId` lets who stopped it add a reason later ("Dizer por quê").
  */
 export interface StoppedNotice {

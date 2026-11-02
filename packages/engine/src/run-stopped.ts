@@ -9,7 +9,7 @@ import { requireActiveMembership } from "./organizations";
 import { type AgentRun, type RunStatus, replyThreadOf } from "./runs";
 
 /**
- * A person stopped an agent's task (ADR 0125): the agent is told, in the conversation the task belonged to (a
+ * A person stopped an agent's task (ADR 0127): the agent is told, in the conversation the task belonged to (a
  * routine's room for a routine), with why when the person says it. The notice wakes nothing (stopping means stop):
  * the agent reads it before its next turn there. People see it as one line ("You stopped this task · Dev was told").
  */

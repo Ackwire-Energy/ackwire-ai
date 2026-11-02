@@ -68,16 +68,13 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     );
   });
 
-  test("members read it as it is: nothing changes, and it says who changes it", async () => {
+  test("members don't open it: the workspace's switches are for who configures it", async () => {
     const { state } = await go(asMember());
-    expect(screen().getByText("Só admins mudam as configurações.")).toBeTruthy();
-    for (const name of ["GIFs", "Figurinhas dos agentes", "Ada manda GIFs e figurinhas"])
-      expect(disabled(screen().getByRole("switch", { name }))).toBe(true);
-    for (const name of ["Qualquer idade", "Até 13 anos", "Nunca", "Às vezes", "Bastante"])
-      expect(disabled(screen().getByRole("radio", { name }))).toBe(true);
-    // Still what the workspace chose.
-    expect(screen().getByRole("switch", { name: "GIFs" }).getAttribute("aria-checked")).toBe("true");
-    await act(async () => fireEvent.click(screen().getByRole("radio", { name: "Bastante" })));
+    const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
+    expect(within(nav).queryByRole("link", { name: "GIFs e figurinhas" })).toBeNull();
+    // Their own section instead, nothing of the workspace's.
+    expect(section().queryByRole("region", { name: "Na conversa" })).toBeNull();
+    expect(screen().queryByRole("switch", { name: "GIFs" })).toBeNull();
     expect(lastSettings(state)).toBeUndefined();
   });
 

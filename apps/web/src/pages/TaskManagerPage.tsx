@@ -56,7 +56,7 @@ import { useNow } from "@/hooks/useNow";
 import "./task-manager.css";
 
 /*
- * The task manager (ADR 0125), one page: the agents as cards with their last half hour (one chosen shows only its
+ * The task manager (ADR 0127), one page: the agents as cards with their last half hour (one chosen shows only its
  * tasks), the tasks now (asked by people, grouped by agent, then the routines' background runs) with their state,
  * what each uses, its time, where it runs and Parar, and what ended today at the end. No cost anywhere: here people
  * stop work. A row or an agent chosen gives the toolbar "Ver passos" and "Parar tarefa" / "Parar tudo de Dev".
