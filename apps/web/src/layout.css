@@ -10611,9 +10611,12 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   display: flex;
   opacity: 0;
   transition: opacity 0.15s;
+  /* Hidden, they don't catch the pointer: a drag over another row's end lands before/after it, not in its part. */
+  pointer-events: none;
 }
 .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__row-acts {
   opacity: 1;
+  pointer-events: auto;
 }
 .sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
   > .sidebar__item

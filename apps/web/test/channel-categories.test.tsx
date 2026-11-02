@@ -351,4 +351,12 @@ describe("dragging a channel into, out of and between categories (ADR 0080)", ()
     expect(await dragInto(channel("general"), category("Engenharia").body, () => head("Engenharia"))).toBe("into");
     expect(places(state)).toEqual([[GENERAL_ID, { categoryId: ENGINEERING }]]);
   });
+
+  test("into the part it's already in, a channel stays put: its category's header or body, Canais' body for one in none", async () => {
+    const state = await go(withCategory());
+    expect(await dragOnto(channel("eng"), head("Engenharia"), "top")).toBeNull();
+    expect(await dragInto(channel("eng"), category("Engenharia").body, () => head("Engenharia"))).toBeNull();
+    expect(await dragInto(channel("general"), category("Canais").body, () => category("Canais").root)).toBeNull();
+    expect(places(state)).toEqual([]);
+  });
 });
