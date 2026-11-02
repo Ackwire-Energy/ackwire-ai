@@ -125,7 +125,10 @@ const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
 describe("Notificações", () => {
   test("waiting on top with the agent looking up, the rest by day, filters with counts, the badge and the tab title", async () => {
     await go();
-    expect(screen().getByRole("heading", { level: 1, name: "Notificações" })).toBeTruthy();
+    const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
+    // How many are unread: on the title's row, right after it.
+    expect(title.parentElement?.className).toBe("nt-title");
+    expect(title.nextElementSibling?.textContent).toContain("3 não lidas");
     const waiting = screen().getByRole("region", { name: "Esperando você" });
     expect(waiting.textContent).toContain("Ada está parada até você responder.");
     expect(waiting.textContent).toContain(question.text);

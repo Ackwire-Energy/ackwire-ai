@@ -1924,9 +1924,10 @@ export function NotificationsPage() {
   return (
     <div className="page page--list nt">
       <header className="list-head">
-        <div>
+        {/* How many are unread sits on the title's row, on its right. */}
+        <div className="nt-title">
           <h1>{t("notifications.title")}</h1>
-          {list.isSuccess && <p className="list-head__sub">{summary}</p>}
+          {list.isSuccess && <p className="nt-title__count">{summary}</p>}
         </div>
         <div className="list-head__acts">
           <Menu
