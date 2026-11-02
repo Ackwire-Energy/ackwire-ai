@@ -476,7 +476,10 @@ describe("consent", () => {
       body: new URLSearchParams({ token: secret }).toString(),
     });
     const [row] = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "apps.token_revoked"));
-    expect([row?.actorType, (row?.details as { reason?: string }).reason]).toEqual(["system", "revoked_with_token"]);
+    expect([row?.actorType, (row?.details as { reason?: string } | undefined)?.reason]).toEqual([
+      "system",
+      "revoked_with_token",
+    ]);
   });
 
   test("a request expires after 30 minutes (410)", async () => {
