@@ -15,6 +15,7 @@ import { type Agent, listAgents } from "../agents";
 import { audienceError, canTalkTo } from "../audience";
 import { recordAudit } from "../audit";
 import { listChannels, requireChannelAccess } from "../channels";
+import { consultationWait } from "../consultations";
 import { sha256 } from "../crypto";
 import { openDm } from "../dms";
 import { ConflictError, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "../errors";
@@ -65,7 +66,9 @@ const RECHECK_MS = 3_000;
 const REPLY_CHARS = 8_000;
 const CONVERSATION_BUDGET = 48_000;
 const OLDER_MESSAGE_CHARS = 2_000;
-const WAITS_PER_GRANT = 3;
+/** Open waits per person (personal tokens are cheap to make, so not per connection) and per workspace. */
+const WAITS_PER_PERSON = 3;
+const WAITS_PER_ORG = 20;
 const WAITS_PER_PROCESS = 200;
 
 export const UNTRUSTED_NOTICE =
@@ -270,6 +273,18 @@ async function taskState(deps: AppsToolDeps, p: AppPrincipal, message: Message, 
       return { status: "done" as TaskStatus, run, ...(reply ? { reply: replyOf(deps, p.orgId, reply) } : {}) };
     }
     case "waiting_input": {
+      // Also held, with nobody to answer, while its computer is away or its AI provider is down: it carries on
+      // by itself, and an "answer" sent now would land in the middle of it.
+      const wait = consultationWait({ ...run, outage: !!run.transcript?.outage });
+      if (wait === "computer" || wait === "outage")
+        return {
+          status: "still_running" as TaskStatus,
+          run,
+          detail:
+            wait === "computer"
+              ? "The agent is waiting for its computer to come back. It carries on by itself."
+              : "The agent's AI provider is down. The task resumes by itself once it is back.",
+        };
       const question = await agentMessage(deps.db, p.orgId, run);
       return {
         status: "waiting_input" as TaskStatus,
@@ -302,6 +317,7 @@ async function taskState(deps: AppsToolDeps, p: AppPrincipal, message: Message, 
   }
 }
 
+/** Open waits by `person:<userId>` and `org:<orgId>`. */
 const waits = new Map<string, number>();
 let waitsTotal = 0;
 
@@ -311,7 +327,7 @@ export const openWaits = () => waitsTotal;
 /**
  * Waits for the run of a message to reach a state the app can act on, up to `seconds` (45 at most): subscribed
  * to the channel before reading, so no change is missed, with a check every 3 s in case an event is. Three waits
- * per connection and 200 per server: past that, `still_running` at once.
+ * per person, 20 per workspace and 200 per server: past that, `still_running` at once.
  */
 async function waitForTask(
   deps: AppsToolDeps,
@@ -322,13 +338,16 @@ async function waitForTask(
   signal: AbortSignal | undefined,
 ) {
   const deadline = Date.now() + Math.min(seconds, WAIT_MAX_S) * 1000;
-  const grantWaits = waits.get(p.grantId) ?? 0;
-  if (seconds > 0 && (grantWaits >= WAITS_PER_GRANT || waitsTotal >= WAITS_PER_PROCESS)) {
+  const slots = [
+    [`person:${p.userId}`, WAITS_PER_PERSON],
+    [`org:${p.orgId}`, WAITS_PER_ORG],
+  ] as const;
+  if (seconds > 0 && (slots.some(([key, max]) => (waits.get(key) ?? 0) >= max) || waitsTotal >= WAITS_PER_PROCESS)) {
     const state = await taskState(deps, p, message, await runFor(deps.db, message, agentId));
     return state.status === "still_running" ? { ...state, retry_after_seconds: 5 } : state;
   }
   if (seconds > 0) {
-    waits.set(p.grantId, grantWaits + 1);
+    for (const [key] of slots) waits.set(key, (waits.get(key) ?? 0) + 1);
     waitsTotal++;
   }
   let wake: () => void = () => {};
@@ -356,9 +375,11 @@ async function waitForTask(
     unsubscribe();
     signal?.removeEventListener("abort", onAbort);
     if (seconds > 0) {
-      const n = (waits.get(p.grantId) ?? 1) - 1;
-      if (n <= 0) waits.delete(p.grantId);
-      else waits.set(p.grantId, n);
+      for (const [key] of slots) {
+        const n = (waits.get(key) ?? 1) - 1;
+        if (n <= 0) waits.delete(key);
+        else waits.set(key, n);
+      }
       waitsTotal--;
     }
   }

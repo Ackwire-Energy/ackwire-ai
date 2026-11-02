@@ -427,9 +427,36 @@ describe("tools", () => {
     expect((await listTools(app.access)).map((x) => x.name).join(" ")).not.toMatch(/approv/);
   });
 
-  test("three waits per connection: a fourth is answered at once", async () => {
+  test("a run parked on a provider outage is still running, not a question to answer", async () => {
     const { b, orgId } = await setup();
     const app = await connectApp(t, b, orgId);
+    const sent = (await callTool(t, app.access, "send_to_agent", { agent: "dev", message: "hi", wait_seconds: 0 }))
+      .structuredContent as { task_id: string };
+    await t.drain();
+    const park = (transcript: Record<string, unknown>) =>
+      t.db
+        .update(schema.agentRuns)
+        .set({ status: "waiting_input", transcript })
+        .where(eq(schema.agentRuns.triggerMessageId, sent.task_id));
+    await park({ outage: { since: new Date().toISOString() } });
+    const parked = (await callTool(t, app.access, "wait_for_reply", { task_id: sent.task_id, timeout_seconds: 1 }))
+      .structuredContent as { status: string; detail: string; reply?: unknown };
+    expect(parked.status).toBe("still_running");
+    expect(parked.detail).toContain("resumes by itself");
+    expect(parked.reply).toBeUndefined();
+    await park({});
+    const asked = (await callTool(t, app.access, "wait_for_reply", { task_id: sent.task_id, timeout_seconds: 1 }))
+      .structuredContent as { status: string };
+    expect(asked.status).toBe("waiting_input");
+  });
+
+  test("three waits per person, whatever connection: a fourth is answered at once", async () => {
+    const { b, orgId } = await setup();
+    const app = await connectApp(t, b, orgId);
+    const created = await b(`/api/app/organizations/${orgId}/tokens`, {
+      json: { name: "Script", access: "read", expiresInDays: 30 },
+    });
+    const { secret } = (await created.json()) as { secret: string };
     const sent = (await callTool(t, app.access, "send_to_agent", { agent: "dev", message: "hi", wait_seconds: 0 }))
       .structuredContent as { task_id: string };
     const long = [1, 2, 3].map(() =>
@@ -437,7 +464,7 @@ describe("tools", () => {
     );
     await Bun.sleep(100);
     const started = Date.now();
-    const fourth = (await callTool(t, app.access, "wait_for_reply", { task_id: sent.task_id, timeout_seconds: 3 }))
+    const fourth = (await callTool(t, secret, "wait_for_reply", { task_id: sent.task_id, timeout_seconds: 3 }))
       .structuredContent as { status: string; retry_after_seconds: number };
     expect(Date.now() - started).toBeLessThan(1000);
     expect([fourth.status, fourth.retry_after_seconds]).toEqual(["still_running", 5]);
