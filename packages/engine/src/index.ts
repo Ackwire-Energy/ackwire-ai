@@ -248,6 +248,8 @@ export * from "./wiki-tools";
 export * from "./withdraw-request-tool";
 export * from "./work-tools";
 export * from "./working";
+export * from "./task-manager";
+export { STOP_REASON_MAX, setStopReason, stoppedText, tellAgentStopped } from "./run-stopped";
 export * from "./works";
 export * from "./workspace-deletion";
 export * from "./workspace-tools";

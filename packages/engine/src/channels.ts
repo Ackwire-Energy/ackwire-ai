@@ -6,7 +6,7 @@ import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, Valida
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
-import { agentOnlyNoticeSql } from "./notices";
+import { quietNoticeSql } from "./notices";
 import { notificationSnippet } from "./notifications";
 import {
   can,
@@ -157,7 +157,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
         where cm.id is not null and m.org_id = ${orgId}::uuid and m.channel_id = c.id
           and m.thread_id is null and m.deleted_at is null
           and not (m.author_type = 'person' and m.meta->'routine' is not null)
-          and not ${agentOnlyNoticeSql(sql`m.meta`)}
+          and not ${quietNoticeSql(sql`m.meta`)}
           -- An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: the reply is the preview.
           and m.meta->>'mediaAfter' is null
         order by m.created_at desc, m.id desc
@@ -171,7 +171,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
           where cm.id is not null and u.org_id = ${orgId}::uuid and u.channel_id = c.id and u.deleted_at is null
             and u.created_at > coalesce(cr.last_read_at, cm.created_at)
             and (u.author_user_id is null or u.author_user_id <> ${userId})
-            and not ${agentOnlyNoticeSql(sql`u.meta`)}
+            and not ${quietNoticeSql(sql`u.meta`)}
             and (u.thread_id is null or ${followsThreadSql(orgId, userId, sql`u.thread_id`)})
             -- Nor one more unread (ADR 0091): it is silent.
             and u.meta->>'mediaAfter' is null

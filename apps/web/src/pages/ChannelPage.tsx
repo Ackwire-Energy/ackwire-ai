@@ -60,6 +60,7 @@ import {
   usePostMessage,
   useRoster,
   usesBrowser,
+  useTaskManager,
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
@@ -126,6 +127,7 @@ import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
+import { tasksOf, todayStart } from "@agenteschat/client/lib/task-manager";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
@@ -293,6 +295,7 @@ import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { TeamChecks } from "@/components/TeamChecks";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
+import { TaskStrip } from "@/components/tasks/TaskStrip";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -1199,6 +1202,20 @@ function ChannelView({
   const [askRegistry] = useState(createAskRegistry);
   const asksOut = useAsksOutOfView(scroller, askRegistry, isMember);
   const seeAsk = (id: string) => showRequest(scroller.current, id, !reducedMotion);
+  // A DM with an agent: the agent's tasks (ADR 0125) in the strip above the composer while it has any. The strip is
+  // the one place for its work here (the activity pill gives way to it); a request out of view still goes first.
+  const stripAgentId = chrome?.dmAgentId && !thread ? chrome.dmAgentId : null;
+  // Asked every 5 s: a line beside the conversation, not the page that follows every task (3 s).
+  const taskView = useTaskManager(org.id, {
+    since: todayStart(),
+    enabled: Boolean(stripAgentId) && isMember,
+    pollMs: 5_000,
+  });
+  const stripTasks = useMemo(
+    () => (stripAgentId ? tasksOf(taskView.data?.tasks ?? [], stripAgentId) : []),
+    [taskView.data, stripAgentId],
+  );
+  const stripShown = Boolean(stripAgentId) && stripTasks.length > 0 && asksOut.length === 0 && !adjustThreadId;
   /** "Ver" on that line: back to the agent's block. */
   const seeRun = (runId: string) => {
     const row = Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-run-id]") ?? []).find(
@@ -1978,7 +1995,11 @@ function ChannelView({
                     onSeeAsk={seeAsk}
                     stoppable={stopTarget?.runId}
                     consultBlocks={consultGroups.nearEnd}
+                    strip={stripShown}
                   />
+                  {stripShown && stripAgentId && (
+                    <TaskStrip agentId={stripAgentId} channelId={channel.id} tasks={stripTasks} />
+                  )}
                   {adjustThreadId ? (
                     <RangeBar adjust={adjust} />
                   ) : chrome?.composerReplacement ? (
@@ -2919,6 +2940,7 @@ function ActivityBar({
   onSeeAsk,
   stoppable,
   consultBlocks,
+  strip = false,
 }: {
   channelId: string;
   /** A thread view: who types there (null: who types in the conversation itself). */
@@ -2937,6 +2959,8 @@ function ActivityBar({
   stoppable?: string;
   /** Runs whose questions a block near the end shows (`ConsultGroup`): the line doesn't say them again. */
   consultBlocks: ReadonlySet<string>;
+  /** An agent DM's task strip shows (`TaskStrip`): it stands for the work here, so no pill says it again. */
+  strip?: boolean;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -2986,7 +3010,7 @@ function ActivityBar({
   // A request waiting for you, out of view: the bar says that instead (waiting beats working).
   const ask = asks[0];
   const askName = ask ? (dir.anyAgent(ask.agentId)?.name ?? t("channel.unknownAgent")) : "";
-  const pill = !ask && active;
+  const pill = !ask && active && !strip;
   return (
     <>
       {coding.map((r) =>
@@ -3004,7 +3028,7 @@ function ActivityBar({
       <div
         className="ac-typing"
         aria-live="polite"
-        data-active={active || Boolean(ask)}
+        data-active={pill || Boolean(ask)}
         data-ask={ask ? true : undefined}
         data-browser={pill && openBrowser ? true : undefined}
         onClick={

@@ -15,7 +15,8 @@ export type NoticeKind =
   | "poll_result"
   | "follow_up"
   | "wake_skipped"
-  | "work_check_in";
+  | "work_check_in"
+  | "run_stopped";
 
 /**
  * An event an agent's conversation got (`meta.notice`): its routine's report,
@@ -178,4 +179,34 @@ export function routineReportText(messages: readonly Said[], noticeId: string | 
   const notice = found ? noticeOf(found.meta) : null;
   if (!found || !notice) return null;
   return found.body.trim() || notice.text.trim() || null;
+}
+
+/**
+ * A person stopped one of the agent's tasks (ADR 0125): the line "Você parou esta tarefa · Dev foi avisado", with the
+ * reason when one was said. `runId` lets who stopped it add a reason later ("Dizer por quê").
+ */
+export interface StoppedNotice {
+  runId: string;
+  byUserId: string;
+  byName: string;
+  label: string;
+  was: "working" | "waiting" | "queued";
+  reason: string | null;
+}
+
+export function stoppedNoticeOf(meta: Meta): StoppedNotice | null {
+  const n = meta?.notice as { kind?: unknown; refs?: Record<string, unknown> } | undefined;
+  if (n?.kind !== "run_stopped" || !n.refs) return null;
+  const r = n.refs;
+  const s = (v: unknown) => (typeof v === "string" ? v : "");
+  if (!s(r.runId)) return null;
+  const was = r.was === "working" || r.was === "queued" ? r.was : "waiting";
+  return {
+    runId: s(r.runId),
+    byUserId: s(r.byUserId),
+    byName: s(r.byName),
+    label: s(r.label),
+    was,
+    reason: s(r.reason) || null,
+  };
 }

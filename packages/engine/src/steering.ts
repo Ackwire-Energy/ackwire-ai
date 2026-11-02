@@ -101,7 +101,7 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     if (now && active.status === "running") {
       if (computer) {
         live = await deliverLive(deps, active, { messageId: message.id, urgent: true }).catch(() => false);
-        if (!live) await cancelRun(deps, userId, orgId, runId).catch(() => undefined);
+        if (!live) await cancelRun(deps, userId, orgId, runId, { tell: false }).catch(() => undefined);
       } else await interruptRun(deps.pubsub, runId, message.id);
     } else if (computer) {
       live = await deliverLive(deps, active, { messageId: message.id, urgent: false }).catch(() => false);

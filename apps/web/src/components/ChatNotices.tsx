@@ -1,4 +1,5 @@
 import type { Message } from "@agenteschat/client";
+import { keys } from "@agenteschat/client";
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { formatTime } from "@agenteschat/client/lib/format";
 import {
@@ -8,11 +9,14 @@ import {
   noticeAgentHandle,
   noticeOf,
   noticeRoutineName,
+  type StoppedNotice,
   skippedHandles,
+  stoppedNoticeOf,
 } from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
 import type { AppVia } from "@agenteschat/client/lib/via";
-import { cx, Icon, type IconName, ProviderLogo } from "@agenteschat/ui";
+import { cx, Icon, type IconName, PixelStop, ProviderLogo } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +25,7 @@ import { MessageBody } from "@/chat/MessageBody";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
+import { SayWhy } from "@/components/tasks/TaskBits";
 import { useDirectory } from "@/hooks/useDirectory";
 import "./chat-notices.css";
 
@@ -143,6 +148,9 @@ export function NoticeLine({ message }: { message: Message }) {
   const dir = useDirectory(org.id);
   const notice = noticeOf(message.meta);
   if (!notice) return null;
+  // A person stopped one of the agent's tasks (ADR 0125): its own calm line, with "Dizer por quê" for who stopped it.
+  const stopped = stoppedNoticeOf(message.meta);
+  if (stopped) return <StoppedLine message={message} notice={stopped} />;
   // Another agent's answer with its consultation: the same card as a reply that waited for it (who asked
   // whom, the question and the answer), not the text written for the asking agent.
   const consulted = consultationOfNotice(message.meta);
@@ -164,6 +172,56 @@ export function NoticeLine({ message }: { message: Message }) {
       labels={{ show: t("chat.notice.show"), hide: t("chat.notice.hide") }}
       action={followUp?.pending ? <CancelFollowUp messageId={message.id} /> : undefined}
     />
+  );
+}
+
+/**
+ * "Você parou esta tarefa · Dev recebeu o aviso e só retoma se alguém pedir." and the reason when one was said. Who
+ * stopped it can still say why ("Dizer por quê": a field and Mandar, in the line); the agent reads it on its next turn.
+ */
+function StoppedLine({ message, notice }: { message: Message; notice: StoppedNotice }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const qc = useQueryClient();
+  const [asking, setAsking] = useState(false);
+  // Shown at once; the notice's own copy follows when the conversation hears of it.
+  const [sent, setSent] = useState<string | null>(null);
+  const mine = notice.byUserId === me.user.id;
+  const reason = notice.reason ?? sent;
+  const stopper = notice.byName || dir.memberById.get(notice.byUserId)?.name || "";
+  const agent = message.author.type === "agent" ? dir.authorName(message.author) : t("channel.unknownAgent");
+  return (
+    <div className="cn-line ac-iconline cn-stopped" data-message-id={message.id}>
+      <PixelStop size={12} dim />
+      <span className="cn-line__text">
+        <b>{mine ? t("taskManager.stopped.line") : t("taskManager.stopped.lineBy", { name: stopper })}</b>
+        {" · "}
+        {t("taskManager.stopped.told", { agent })}
+        {reason && ` ${t("taskManager.stopped.reason", { reason })}`}
+        {mine && !reason && !asking && (
+          <>
+            {" · "}
+            <button type="button" className="cn-line__toggle" onClick={() => setAsking(true)}>
+              {t("taskManager.stopped.sayWhy")}
+            </button>
+          </>
+        )}
+      </span>
+      {asking && !reason && (
+        <SayWhy
+          runId={notice.runId}
+          className="cn-stopped__why"
+          autoFocus
+          onCancel={() => setAsking(false)}
+          onSent={(why) => {
+            setSent(why);
+            setAsking(false);
+            void qc.invalidateQueries({ queryKey: keys.messages(org.id, message.channelId) });
+          }}
+        />
+      )}
+    </div>
   );
 }
 

@@ -137,6 +137,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (isMediaAfterReply(meta)) return;
   // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
   if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
+  // A person stopped a task (ADR 0125): the line is a receipt, never news.
+  if ((meta.notice as { kind?: unknown } | undefined)?.kind === "run_stopped") return;
   // Only for its agent: people never see it.
   if (isAgentOnlyNotice(meta)) return;
   // A long work's progress line (ADR 0121) never pushes: it counts as unread only for who follows its thread.

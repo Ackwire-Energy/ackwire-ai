@@ -177,6 +177,8 @@
       "storage.endpoint",
       "storage.onedrive",
       "storage.secret",
+      "taskManager.program.agentes",
+      "taskManager.program.terminal",
       "team.cap.linear",
       "team.cap.mail",
       "team.cap.sentry",

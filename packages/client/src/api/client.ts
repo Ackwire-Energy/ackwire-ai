@@ -234,7 +234,9 @@ import type {
   StorageMigration,
   StorageTestResult,
   SuggestedAi,
+  TaskManagerView,
   TaskOutput,
+  TaskSteps,
   Team,
   ThreadAction,
   ThreadCreateInput,
@@ -546,8 +548,13 @@ export interface ApiClient {
       filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },
     ): Promise<Run[]>;
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
-    /** "Parar": stops a run (the person who started it, the agent's owner, admins). */
-    cancelRun(orgId: string, runId: string): Promise<void>;
+    /**
+     * "Parar": stops a run (the person who started it, the agent's owner, admins). The agent is told, with `reason`
+     * when given (ADR 0125).
+     */
+    cancelRun(orgId: string, runId: string, reason?: string): Promise<void>;
+    /** "Dizer por quê" after stopping a task (only who stopped it, once): the agent reads it. */
+    stopReason?(orgId: string, runId: string, reason: string): Promise<void>;
     /**
      * "Continuar" under a reply a person stopped (same people as `cancelRun`): a new run picks up
      * where it stopped. 409 `run.not_continuable` (already continued, not stopped by a person) or
@@ -1360,6 +1367,10 @@ export interface ApiClient {
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {
     list(orgId: string): Promise<WorkingRun[]>;
+    /** The task manager (ADR 0125): tasks now, what each uses, each agent's last hour, what ended since `since`. */
+    taskManager?(orgId: string, since?: string): Promise<TaskManagerView>;
+    /** A task's steps for "Ver passos", to whoever sees it in the task manager (no inputs, no outputs). */
+    taskSteps?(orgId: string, runId: string): Promise<TaskSteps>;
   };
   /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio, the rest by IMAP/SMTP. */
   mail: {

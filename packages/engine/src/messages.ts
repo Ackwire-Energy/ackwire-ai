@@ -35,7 +35,7 @@ import { type Judge, personMentionAddressees } from "./judge";
 import { PLATFORM_CAP } from "./limits";
 import { isMediaAfterReply, isStickerMood, type MessageMedia, mediaOf, mediaSettings, type StickerMood } from "./media";
 import { type MessageMemory, memoriesFor } from "./message-memories";
-import { agentOnlyNoticeSql } from "./notices";
+import { quietNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun, workKeepsThread } from "./run-scope";
@@ -1424,7 +1424,7 @@ async function withReplies(db: Database, orgId: string, roots: MessageView[]): P
         isNull(messages.deletedAt),
         // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: not one more.
         sql`${messages.meta}->>'mediaAfter' is null`,
-        sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+        sql`not ${quietNoticeSql(sql`${messages.meta}`)}`,
       ),
     )
     .groupBy(messages.threadId);
@@ -1436,7 +1436,7 @@ async function withReplies(db: Database, orgId: string, roots: MessageView[]): P
         eq(messages.orgId, orgId),
         inArray(messages.threadId, ids),
         isNull(messages.deletedAt),
-        sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+        sql`not ${quietNoticeSql(sql`${messages.meta}`)}`,
       ),
     )
     .orderBy(desc(messages.createdAt), desc(messages.id))

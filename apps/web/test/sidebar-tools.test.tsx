@@ -87,12 +87,25 @@ describe("the tools on top", () => {
     expect(rows()[0]).toBe("Início");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
     const more = await openMore();
-    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum"]);
+    // The task manager (ADR 0125) is always there, after the tools a person places.
+    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum", "Gerenciador de tarefas"]);
+    expect(
+      within(more)
+        .getByRole("link", { name: /Gerenciador de tarefas/ })
+        .getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/task-manager`);
     expect(within(more).getByRole("button", { name: "Personalizar a barra lateral" })).toBeTruthy();
     cleanup();
     await go(noneWaiting());
     expect(listed()).toEqual(["Threads", "Tarefas", "Drive"]);
-    expect(inMore(await openMore())).toEqual(["Aprovações", "Wiki", "Rotinas", "Calendário", "Fórum"]);
+    expect(inMore(await openMore())).toEqual([
+      "Aprovações",
+      "Wiki",
+      "Rotinas",
+      "Calendário",
+      "Fórum",
+      "Gerenciador de tarefas",
+    ]);
   });
 
   test("Personalizar: each choice moves the tool at once and is saved for me; Restaurar o padrão undoes them", async () => {
@@ -168,7 +181,14 @@ describe("the tools on top", () => {
   test("the choices are the server's: the same sidebar on every device", async () => {
     await go(seedState({ sidebarItems: { drive: "more", routines: "always", approvals: "more" } }));
     expect(listed()).toEqual(["Threads", "Tarefas", "Rotinas"]);
-    expect(inMore(await openMore())).toEqual(["Aprovações", "Wiki", "Drive", "Calendário", "Fórum"]);
+    expect(inMore(await openMore())).toEqual([
+      "Aprovações",
+      "Wiki",
+      "Drive",
+      "Calendário",
+      "Fórum",
+      "Gerenciador de tarefas",
+    ]);
   });
 
   test("the server refuses: the tool goes back where it was", async () => {

@@ -158,7 +158,7 @@ export function HomePage() {
       )}
 
       {working.length > 0 && (
-        <Section title={t("home.working.title")} count={working.length}>
+        <Section title={t("home.working.title")} count={working.length} to="taskManager">
           {working.slice(0, HOME_ROWS).map((w) => (
             <WorkRow key={w.key} w={w} dir={dir} now={now} />
           ))}
@@ -293,8 +293,8 @@ function Section({
   count?: number;
   /** More than the rows shown: "Ver tudo" opens the inbox. */
   more?: boolean;
-  /** "Ver tudo" opens this page instead. */
-  to?: "routines";
+  /** "Ver tudo" opens this page instead; the agents at work, "Abrir no gerenciador" (the task manager, ADR 0125). */
+  to?: "routines" | "taskManager";
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -304,7 +304,11 @@ function Section({
       <div className="list-group-head">
         <h2>{title}</h2>
         {count !== undefined && <span className="list-group-head__count">{count}</span>}
-        {to === "routines" ? (
+        {to === "taskManager" ? (
+          <Link className="home-sec__more" to="/org/$orgId/task-manager" params={{ orgId: org.id }}>
+            {t("taskManager.actions.openManager")}
+          </Link>
+        ) : to === "routines" ? (
           <Link className="home-sec__more" to="/org/$orgId/routines" params={{ orgId: org.id }}>
             {t("home.seeAll")}
           </Link>

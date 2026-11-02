@@ -1,0 +1,57 @@
+# 0125. The task manager: see every agent's tasks, stop them, and the agent is told
+
+- Status: Accepted (built)
+- Date: 2026-11-02
+- Extends: ADR 0008 (runs), 0015 (tool gateway: `tool_call` steps), 0053 (routines' background runs), 0084 (agent status), 0121 (long work)
+- Code: engine `packages/engine/src/task-manager.ts` (`taskManager`, `agentActivity`, `taskSteps`), `run-stopped.ts` (`tellAgentStopped`, `setStopReason`, `stoppedText`), `cancel.ts` (`cancelRun` takes `reason` and `tell`), `notices.ts` (`run_stopped`), `notification-producers.ts`; server `routes/app/management.ts` (`GET …/task-manager`, `GET …/task-manager/{id}/steps`, `POST …/runs/{id}/stop-reason`, `reason` on `POST …/runs/{id}/cancel`); client `lib/task-manager.ts`, `lib/notices.ts` (`stoppedNoticeOf`), `api/queries.ts` (`useTaskManager`, `useStopTasks`, `useStopReason`); web and phone screens and the chat's strip
+
+## Context
+
+People wanted one place, like an operating system's task manager, to see what every agent is doing right now, what each task is using, and to stop any of it; and, inside a conversation with an agent, the same view for that agent alone.
+
+Most of it existed in pieces: `GET …/active-runs` lists the runs in progress in the conversations a person is in, the gateway records every tool call as a `tool_call` step with its app, service and a short label (what the chat's live chip shows), and `cancelRun` stops a run of any kind. Two things were missing:
+
+- **The agent wasn't told.** A running run that was stopped posts what it wrote with "_Stopped by …_", but a queued or waiting run ended silently, a routine's background run ended silently (ADR 0053 §6.7), and nobody could say why. The next turn didn't know its task had been taken away, so an agent could pick it up again on its own.
+- **One view across conversations.** The live events go to each channel's subscribers; a page that follows every conversation at once can't subscribe to all of them without sending a private DM's activity to people who don't read it.
+
+## Decision
+
+### 1. One read: `GET …/task-manager`
+
+`taskManager(db, userId, orgId, { since })` returns:
+
+- `tasks`: runs still on (queued, running, waiting for an ok or an answer; not those waiting for their computer), newest first, at most 100. Visibility is the `active-runs` rule (the conversations the caller is in, never someone else's DM or a private channel they're not in) plus the routines' background runs for admins (`manage_agents`) and for the agent's owner, who could not see them anywhere before. Each task carries its label (the long work's title, the thread's title, else its first message), the routine behind it, the long work's plan, who asked, its brain, the agent's computer, `now` (its latest `tool_call` step: tool, label, app, service, icon, when), how many tool calls so far, and `canStop` (who asked, the agent's owner, an admin; `cancelRun` checks again).
+- `ended`: what ended since `since` (default the last 24 h; the apps ask for today), at most 50, with who stopped it.
+- `activity`: per agent, tool calls per minute over the last 60 minutes, counts only, for the line on each agent's card.
+
+No cost and no tokens: this is where people stop work, not where they audit spend (that stays in Usage).
+
+A task's steps ("Ver passos") come from `taskSteps` (`GET …/task-manager/{runId}/steps`), with the same visibility: each call with the chat chip's fields and how it ended, never a connector's input or a tool's output (only a permission check's answer, which says whether a command ran). The full trail (`GET …/runs/{runId}`) still needs usage access.
+
+The page asks again every 3 s while it is shown (`TASK_MANAGER_POLL_MS`). Polling an authorized read keeps the visibility rule in one SQL query; per-person real-time fan-out can come later if the poll turns out too slow.
+
+### 2. "Using now" comes from the gateway's own record
+
+The program a task uses is its latest `tool_call` step, mapped by the same `toolActivity` the chat's chips use: the agent's browser, its desktop, a terminal (code and commands), an app (a connector, a mailbox, a database, with its logo), or one of our own tools. A computer brain's turn shows the brain (Claude Code, Codex, Cursor) with what it last called through the bridge inside it; its own built-in tools (its shell, its file edits) aren't recorded as steps, so between bridge calls the line just says the brain.
+
+There is no per-task CPU: computers report only their own load, sampled every few minutes. The column says where a task runs (the agent's computer, or our servers) instead.
+
+### 3. Stopping tells the agent
+
+`cancelRun(…, { reason })`, after `stopRun`, calls `tellAgentStopped`: a `run_stopped` notice in the conversation the task belonged to (where it answers; a routine's room for a routine), through `deliverNotice` with `wake: false`. Stopping means stop, so nothing starts; the agent reads the notice as an event before its next turn there ("[A person stopped your task]: Ana stopped your task «…» while you worked on it. What you already did or posted stays as it is. Their reason, in their words: «…». Don't pick it up again on your own: only when someone asks you to."). People see one line ("You stopped this task · Dev was told"); it never notifies, and conversation previews, unread counts and a thread's activity skip it (`QUIET_NOTICES`, `quietNoticeSql`).
+
+Two stops tell nothing: "stop and send" (the message sent with it says what to do, `stopMessageId` or `tell: false` in `steering.ts`) and an agent stopping its own background work on a person's word (`work-tools.ts`).
+
+The reason can come with the stop (the "stop all" confirmation) or after it: `setStopReason` (`POST …/runs/{id}/stop-reason`) lets whoever stopped it add one, once; the notice's text changes and the agent reads it on its next turn.
+
+### 4. Where people see it
+
+- **The page** (web; on the phone, a pushed screen with the list): the agents as cards with their last half hour, a table of tasks grouped by agent with state, what each uses, how long, where it runs and Stop, the routines' background runs apart, and what ended today. Stopping several asks first, with an optional reason.
+- **The chat's strip**: in a DM with an agent, a line above the composer with that agent's tasks (the one of this conversation marked), each with Stop; "Stop all" turns the strip into its confirmation.
+
+## Consequences
+
+- An agent always knows when a person took a task away, and why when they said it, including a routine's run and a task stopped before it started.
+- Admins and owners finally see routines' background runs while they run.
+- The page costs one query every 3 s per open page; its subqueries are bounded (100 runs, the run's own steps by `run_id`, the last hour of steps).
+- A computer brain's own tool use between bridge calls isn't visible in "using now".

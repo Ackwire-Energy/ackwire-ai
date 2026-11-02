@@ -180,7 +180,7 @@ export function createWorkToolSource(deps: { pubsub?: PubSub }): ToolSource {
       const target = await workRunId(ctx.db, run.orgId, run.agentId, str(input.work_id));
       if (!target) return refused("No background work of yours here has that id, or it already ended.");
       try {
-        await cancelRun({ db: ctx.db, pubsub: deps.pubsub }, personId, run.orgId, target);
+        await cancelRun({ db: ctx.db, pubsub: deps.pubsub }, personId, run.orgId, target, { tell: false });
       } catch (error) {
         return refused(
           (error as { code?: string }).code === "run.cancel_forbidden"

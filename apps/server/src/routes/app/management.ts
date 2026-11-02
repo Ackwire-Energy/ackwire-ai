@@ -36,6 +36,7 @@ import {
   START_PAGES,
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
+  STOP_REASON_MAX,
   setAgentChannels,
   setInvitationRoles,
   setMySidebarItem,
@@ -44,8 +45,11 @@ import {
   setMyStatus,
   setShowActivity,
   setStartPage,
+  setStopReason,
   sidebarPlaceAllowed,
   speakerFor,
+  taskManager,
+  taskSteps,
   updateMyProfile,
   updateOrgSettings,
   usageReport,
@@ -279,6 +283,71 @@ const stepData = (data: Record<string, unknown>) => {
 };
 
 /** Management screens: settings, people, invitations, credential rotation, agent detail, runs and usage. */
+const Where = {
+  channelId: z.uuid(),
+  channelKind: z.enum(["channel", "dm"]),
+  channelName: z.string().nullable().openapi({ description: "Null for a DM (and a routine's room)." }),
+  threadId: z.uuid().nullable().openapi({ description: "Null: the main timeline." }),
+};
+const Routine = z.object({ id: z.uuid(), name: z.string() }).nullable();
+
+const ManagedTask = z
+  .object({
+    runId: z.uuid(),
+    agentId: z.uuid(),
+    ...Where,
+    status: z.enum(["queued", "running", "waiting_approval", "waiting_input"]),
+    startedAt: z.string().nullable(),
+    createdAt: z.string(),
+    label: z.string().nullable(),
+    background: z.boolean(),
+    routine: Routine,
+    plan: z.object({ done: z.number().int(), total: z.number().int() }).nullable(),
+    requester: z.object({ userId: z.string(), name: z.string() }).nullable(),
+    brain: z.string().nullable(),
+    machine: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    now: z
+      .object({
+        tool: z.string(),
+        detail: z.string().nullable(),
+        connector: z.string().nullable(),
+        service: z.string().nullable(),
+        serviceIcon: z.string().nullable(),
+        at: z.string(),
+      })
+      .nullable()
+      .openapi({ description: "What it uses right now: its latest tool call (the chat's live chip)." }),
+    steps: z.number().int(),
+    pendingMessageIds: z.array(z.uuid()),
+    canStop: z.boolean(),
+  })
+  .openapi("ManagedTask");
+
+const EndedTask = z
+  .object({
+    runId: z.uuid(),
+    agentId: z.uuid(),
+    ...Where,
+    status: z.enum(["done", "failed", "canceled"]),
+    label: z.string().nullable(),
+    background: z.boolean(),
+    routine: Routine,
+    startedAt: z.string().nullable(),
+    finishedAt: z.string(),
+    stoppedBy: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  })
+  .openapi("EndedTask");
+
+const TaskManagerView = z
+  .object({
+    tasks: z.array(ManagedTask),
+    ended: z.array(EndedTask),
+    activity: z
+      .record(z.string(), z.array(z.number().int()))
+      .openapi({ description: "Per agent: tool calls per minute over the last 60 minutes, oldest first." }),
+  })
+  .openapi("TaskManagerView");
+
 export function managementRoutes(deps: AppDeps) {
   const { db, adapters, config } = deps;
   const app = createAppRouter(deps);
@@ -1139,7 +1208,23 @@ export function managementRoutes(deps: AppDeps) {
       security,
       summary:
         "Stop an agent's run (the person who asked, the agent's owner or an admin). Its text so far is kept; a queued run never starts",
-      request: { params: OrgParams.extend({ runId: z.uuid() }) },
+      description:
+        "The agent is told in that conversation (a routine's room for a routine), with `reason` when given (ADR 0125): a notice it reads before its next turn there, which wakes nothing.",
+      request: {
+        params: OrgParams.extend({ runId: z.uuid() }),
+        body: {
+          ...body(
+            z.object({
+              reason: z
+                .string()
+                .max(STOP_REASON_MAX)
+                .optional()
+                .openapi({ description: "Why, in the person's words: the agent reads it." }),
+            }),
+          ),
+          required: false,
+        },
+      },
       responses: {
         200: json(
           z.object({
@@ -1153,7 +1238,10 @@ export function managementRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, runId } = c.req.valid("param");
-      const result = await cancelRun({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runId);
+      const reason = (c.req.valid("json") as { reason?: string } | undefined)?.reason;
+      const result = await cancelRun({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runId, {
+        ...(reason ? { reason } : {}),
+      });
       return c.json(
         {
           id: result.id,
@@ -1162,6 +1250,83 @@ export function managementRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/runs/{runId}/stop-reason",
+      tags: ["Usage"],
+      security,
+      summary: "Say why you stopped an agent's task (ADR 0125): the agent reads it",
+      description:
+        "Only who stopped it, once. The notice in that conversation (`meta.notice.kind = run_stopped`) gets the reason; 404 when the task wasn't stopped by a person.",
+      request: {
+        params: OrgParams.extend({ runId: z.uuid() }),
+        body: body(z.object({ reason: z.string().min(1).max(STOP_REASON_MAX) })),
+      },
+      responses: { 200: json(z.object({ messageId: z.uuid() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, runId } = c.req.valid("param");
+      const { reason } = c.req.valid("json");
+      const out = await setStopReason({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runId, reason);
+      return c.json(out, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/task-manager/{runId}/steps",
+      tags: ["Usage"],
+      security,
+      summary: "A task's steps for the task manager (ADR 0125): what each call was and how it ended",
+      description:
+        "To whoever sees the task in the task manager. Never a connector's input or a tool's output (only a permission check's answer); the full trail (`GET …/runs/{runId}`) needs usage access. 404 when you don't see it.",
+      request: { params: OrgParams.extend({ runId: z.uuid() }) },
+      responses: {
+        200: json(
+          z.object({
+            run: z.object({ createdAt: z.string(), finishedAt: z.string().nullable() }),
+            steps: z.array(
+              z.object({
+                seq: z.number().int(),
+                kind: z.enum(["tool_call", "tool_result", "model_call"]),
+                data: z.record(z.string(), z.unknown()),
+                createdAt: z.string(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, runId } = c.req.valid("param");
+      return c.json(await taskSteps(db, c.get("user").id, orgId, runId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/task-manager",
+      tags: ["Usage"],
+      security,
+      summary: "The task manager (ADR 0125): what the agents are doing now, what each uses, and what ended",
+      description:
+        "Tasks in the conversations you are in (the `active-runs` rule), plus routines' background runs for admins and the agent's owner. No cost. `since` (default: the last 24 h) bounds `ended`.",
+      request: { params: OrgParams, query: z.object({ since: z.iso.datetime().optional() }) },
+      responses: { 200: json(TaskManagerView), ...errors },
+    }),
+    async (c) => {
+      const since = c.req.valid("query").since;
+      const view = await taskManager(db, c.get("user").id, c.req.valid("param").orgId, {
+        ...(since ? { since: new Date(since) } : {}),
+      });
+      return c.json(view, 200);
     },
   );
 

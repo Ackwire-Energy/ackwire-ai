@@ -105,6 +105,8 @@ function AppStack() {
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/zone" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="task-manager/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/tools" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/[id]" options={{ ...pushed, ...coverBarOptions }} />

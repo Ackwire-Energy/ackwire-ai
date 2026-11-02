@@ -1,0 +1,422 @@
+/* The task manager (ADR 0125): the agents' cards, the tasks now and what ended today, on one page. */
+.tm {
+  gap: 18px;
+  /* "Tempo" warms as a task goes on (full at 40 min), like an operating system's task manager. */
+  --tm-heat: color-mix(in srgb, var(--warn) 22%, var(--warn-soft));
+}
+.tm-search {
+  flex: 0 1 360px;
+  min-width: 220px;
+}
+.tm-search > .ac-searchfield {
+  width: 100%;
+}
+.tm-sum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.tm-sum__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.tm-sum__item--wait {
+  color: var(--warn);
+}
+
+/* The agents' cards: a row that slides, a card at a time, its line edge to edge under its head. */
+.tm-cards .ac-carousel__track {
+  gap: 12px;
+  padding: 4px 2px 8px;
+}
+.tm-card.ac-card {
+  --card-pad: 0;
+  gap: 8px;
+  width: 184px;
+  overflow: hidden;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.tm-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 12px 0;
+}
+.tm-card__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.tm-card__text b,
+.tm-card__text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-card__text b {
+  font-size: 14px;
+  font-weight: 650;
+}
+.tm-card__text small {
+  font-size: 12px;
+  color: var(--faint);
+}
+.tm-card__n {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-agent);
+  background: var(--plate);
+  font-size: 15px;
+  font-weight: 650;
+}
+.tm-card__wait.ac-chip {
+  flex: none;
+}
+/* No room around the line: it runs to the card's sides and bottom, and the card's own corners clip it. */
+.tm-card > .chart-spark {
+  margin-top: auto;
+}
+.tm-card[aria-pressed="true"],
+.tm-card[aria-pressed="true"]:hover {
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  transform: var(--chosen-lift);
+}
+html:not([data-pointer]) .tm-card:focus-visible {
+  outline: none;
+  box-shadow: var(--card-shadow), var(--focus-ring);
+}
+
+/* The tasks now: its toolbar ("Ver passos", "Parar tarefa"), then the table. */
+.tm-now {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tm-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--control-h-sm);
+}
+.tm-tools h2 {
+  margin: 0 6px 0 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.tm-tool-stop.ac-btn:not(:disabled) {
+  color: var(--danger);
+}
+
+.tm-table.ac-card,
+.tm-list--ended.ac-card {
+  --card-pad: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.tm-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tm-row {
+  /* Where the name starts (the agent's rows nest under it) and how wide its mark is (the lines under it align). */
+  --tm-indent: 14px;
+  --tm-lead: 24px;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px minmax(0, 240px) 84px minmax(0, 150px) 128px;
+  align-items: stretch;
+  min-height: 52px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+.tm-row[data-look="grouped"] {
+  --tm-indent: 46px;
+}
+.tm-row[data-look="flat"] {
+  --tm-lead: 30px;
+}
+.tm-row--agent {
+  --tm-indent: 8px;
+  --tm-lead: 72px;
+}
+.tm-row--head {
+  min-height: 0;
+  border-top: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.tm-row--head > span {
+  padding: 14px 14px 10px;
+}
+.tm-row--head > .tm-cell--time {
+  text-align: right;
+}
+.tm-list > .tm-row:hover {
+  background: var(--plate-soft);
+}
+.tm-list > .tm-row[data-selected] {
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+}
+html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--focus-color);
+}
+.tm-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 14px;
+}
+.tm-cell--name {
+  gap: 10px;
+  padding: 6px 12px 6px var(--tm-indent);
+}
+.tm-cell--time {
+  justify-content: flex-end;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--tm-heat) calc(var(--h, 0) * 100%), transparent);
+}
+.tm-cell--where {
+  color: var(--muted);
+}
+.tm-cell--act {
+  justify-content: flex-end;
+  gap: 4px;
+  padding-right: 12px;
+}
+.tm-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A row's name: the whole row picks it (its button reaches every edge); the buttons on it stay on top. */
+.tm-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+.tm-hit,
+.tm-name__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-hit {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.tm-hit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+html:not([data-pointer]) .tm-hit:focus-visible {
+  outline: none;
+}
+.tm-row--agent .tm-hit {
+  font-weight: 650;
+}
+.tm-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--faint);
+}
+.tm-twist,
+.tm-cell--act > * {
+  position: relative;
+  z-index: 1;
+}
+.tm-twist {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tm-twist:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+html:not([data-pointer]) .tm-twist:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tm-twist > .ac-icon {
+  transition: transform 0.15s var(--out);
+}
+.tm-twist[aria-expanded="false"] > .ac-icon {
+  transform: rotate(-90deg);
+}
+/* With a pointer, a task's Parar shows on its row's hover, choice or focus (an agent's "Parar 2" always). */
+.tm-cell--act > * {
+  transition: opacity 0.12s;
+}
+@media (hover: hover) {
+  .tm-row:not(.tm-row--agent, :hover, [data-selected], :focus-within) .tm-cell--act > :not(:disabled) {
+    opacity: 0;
+  }
+}
+
+/* "Pedidas por pessoas 6": a section's line inside the table. */
+.tm-sec {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 16px 14px 8px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--faint);
+}
+.tm-sec__count {
+  font-weight: 500;
+}
+.tm-sec + .tm-list > .tm-row:first-child {
+  border-top: 0;
+}
+.tm-none {
+  margin: 0;
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+/* "Terminadas hoje": folded until opened, at the end. */
+.tm-ended {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tm-more {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 8px;
+  height: var(--control-h-sm);
+  margin-left: -6px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: var(--control-r-sm);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tm-more:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+html:not([data-pointer]) .tm-more:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tm-more__chevron {
+  transition: transform 0.15s var(--out);
+}
+.tm-more[aria-expanded="true"] .tm-more__chevron {
+  transform: rotate(90deg);
+}
+.tm-row--ended {
+  grid-template-columns: minmax(0, 1fr) 190px 96px;
+}
+.tm-row--ended:first-child {
+  border-top: 0;
+}
+.tm-row--ended .tm-name__title {
+  font-weight: 500;
+  color: var(--ink2);
+}
+
+/* A phone: no column names; each row stacks its name, state and what it uses, Parar at its side. */
+@media (max-width: 760px) {
+  .tm-search {
+    flex-basis: 100%;
+  }
+  .tm-card.ac-card {
+    width: 156px;
+  }
+  .tm-cards .ac-carousel__arrow {
+    display: none;
+  }
+  .tm-row--head {
+    display: none;
+  }
+  .tm-row,
+  .tm-row--ended {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 4px;
+    padding: 8px 0;
+  }
+  .tm-row[data-look="grouped"] {
+    --tm-indent: 26px;
+  }
+  .tm-cell--name {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .tm-cell--state {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .tm-cell--use {
+    grid-row: 3;
+    grid-column: 1;
+  }
+  .tm-cell--state,
+  .tm-cell--use {
+    padding-left: calc(var(--tm-indent) + var(--tm-lead));
+  }
+  .tm-cell--act {
+    grid-row: 1 / span 3;
+    grid-column: 2;
+  }
+  .tm-row:not(.tm-row--ended) > .tm-cell--time,
+  .tm-cell--where,
+  .tm-cell--use:empty {
+    display: none;
+  }
+  .tm-row--ended > .tm-cell--time {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    background: none;
+  }
+}
