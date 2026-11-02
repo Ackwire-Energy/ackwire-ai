@@ -1523,6 +1523,7 @@ export const en = {
       handled: "Answered",
       failed: "Failed",
       referenced: "Only mentioned",
+      reacted: "Reacted",
     },
     failedShort: "Couldn't answer",
     popoverTitle: "Agents",

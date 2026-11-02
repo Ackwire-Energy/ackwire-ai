@@ -1523,6 +1523,7 @@ export const ptBR = {
       handled: "Respondeu",
       failed: "Falhou",
       referenced: "Só mencionado",
+      reacted: "Reagiu",
     },
     failedShort: "Não conseguiu responder",
     popoverTitle: "Agentes",

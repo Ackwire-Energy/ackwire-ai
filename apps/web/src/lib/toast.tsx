@@ -13,13 +13,12 @@ import {
 import { AgentAvatar } from "@/components/AgentAvatar";
 
 /**
- * Minimal toasts in the design language (neutral surface, overlay shadow,
- * icon + words). Failed writes show the server's message; confirmations are
- * rare and short.
+ * Minimal toasts in the design language (glass, overlay shadow, icon + words, the tone's soft glow from the right).
+ * Failed writes show the server's message; confirmations are rare and short.
  */
 export interface Toast {
   id: number;
-  tone: "error" | "info";
+  tone: "success" | "info" | "warning" | "error" | "neutral";
   text: string;
   /** A second, smaller line ("Salvo" → "Autonomia: Pergunta sempre"). */
   detail?: string;
@@ -128,7 +127,7 @@ export function ToastProvider({
             className={`ac-toast ac-toast--${toast.tone}`}
             role={toast.tone === "error" ? "alert" : "status"}
           >
-            <Icon name={toast.tone === "error" ? "alert" : "check"} />
+            <Icon name={toast.tone === "error" || toast.tone === "warning" ? "alert" : "check"} />
             <span className="ac-toast__text">
               {toast.detail ? (
                 <>

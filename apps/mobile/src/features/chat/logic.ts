@@ -727,3 +727,16 @@ function textBlocks(chunk: string, out: Block[]) {
   }
   flush();
 }
+
+/**
+ * The day of the topmost row in view that has one (a day line, a message), for the floating date while the list
+ * scrolls; null with none.
+ */
+export function dayInView(
+  rows: readonly { index: number; item: { kind: string; iso?: string; message?: Pick<Message, "createdAt"> } }[],
+): string | null {
+  const top = [...rows]
+    .sort((a, b) => a.index - b.index)
+    .find(({ item }) => (item.kind === "day" && item.iso) || (item.kind === "message" && item.message));
+  return top ? (top.item.kind === "day" ? (top.item.iso ?? null) : (top.item.message?.createdAt ?? null)) : null;
+}

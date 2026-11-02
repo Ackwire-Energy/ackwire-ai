@@ -546,20 +546,21 @@ describe("receipts: a check with a popover", () => {
   const checkOf = (text: string) => rowsWith(text)[0]?.querySelector(".ac-receipt__check") as HTMLButtonElement;
   const icon = (b: HTMLElement) => b.querySelector("path")?.getAttribute("d");
 
-  test("one check (will answer) → clock (answering, waiting) → two checks (answered); popover lists each agent", async () => {
+  test("clock (nobody picked it up yet) → one check (on it, waiting) → two checks (answered); popover lists each agent", async () => {
     const { socket, state } = await open();
     await sendText("@ada e o login?");
     await settle(4);
     const root = lastPerson(state);
     const check = () => checkOf("e o login?");
     expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada vai responder");
-    expect(icon(check())).toBe("m5.5 10.5 3 3 6-7");
+    expect(icon(check())).toBe("M10 6v4l2.6 1.8");
     const run = { threadId: root?.id, runId: "r-rc", agentId: ADA_ID };
     await push(socket, { type: "agent.run", ...run, status: "running" });
     expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
+    expect(icon(check())).toBe("m5.5 10.5 3 3 6-7");
     await push(socket, { type: "agent.run", ...run, status: "waiting_approval" });
     expect(check().getAttribute("aria-label")).toBe("Vista por Ada. Ada está esperando aprovação");
-    expect(icon(check())).toBe("M10 6v4l2.6 1.8");
+    expect(icon(check())).toBe("m5.5 10.5 3 3 6-7");
     await push(socket, {
       type: "message.handled",
       messageId: root?.id,
@@ -581,7 +582,7 @@ describe("receipts: a check with a popover", () => {
     expect(screen().queryByRole("dialog", { name: "Agentes" })).toBeNull();
   });
 
-  test("failure: alert icon + 'Não conseguiu responder · Tentar de novo'; nobody: 'Chamar um agente', each by its face", async () => {
+  test("failure: alert icon + 'Não conseguiu responder · Tentar de novo'; nobody: two checks, its popover says it with 'Chamar um agente', each by its face", async () => {
     const seeded = seedState();
     const [ada, atlas] = seeded.agents;
     if (ada) ada.appearance = { color: "green", eyes: "happy", accessory: "headphones" };
@@ -595,9 +596,15 @@ describe("receipts: a check with a popover", () => {
     expect(checkOf("alguém viu o erro?").getAttribute("aria-label")).toBe(
       "Vista por Ada e Atlas. Nenhum agente vai responder",
     );
-    expect(receipt().textContent).toContain("Nenhum agente vai responder·Chamar um agente");
+    // Everyone it was for decided: two checks, and no line in the timeline.
+    expect(icon(checkOf("alguém viu o erro?"))).toBe("m2 10.5 3 3 6-7M10 12.5l1 1 7-8");
+    expect(receipt().textContent).toBe("");
+    expect(rowsWith("alguém viu o erro?")[0]?.querySelector(".ac-msg__foot")?.textContent ?? "").toBe("");
+    await act(async () => fireEvent.click(checkOf("alguém viu o erro?")));
+    const pop = screen().getByRole("dialog", { name: "Agentes" });
+    expect(pop.querySelector(".who-by")?.textContent).toBe("Nenhum agente vai responder·Chamar um agente");
     await act(async () => {
-      const call = within(receipt()).getByRole("button", { name: "Chamar um agente" });
+      const call = within(pop).getByRole("button", { name: "Chamar um agente" });
       call.focus();
       fireEvent.keyDown(call, { key: "Enter" });
     });
@@ -630,6 +637,37 @@ describe("receipts: a check with a popover", () => {
   });
 });
 
+describe("receipts: an agent's reaction is its answer", () => {
+  test("'bom dia amigos' that Ada reacted to: two checks, no line in the timeline, the popover says Reagiu and nobody will answer", async () => {
+    const { socket, state } = await open();
+    await sendText("bom dia amigos");
+    await settle(4);
+    const root = lastPerson(state);
+    await push(socket, {
+      type: "message.routed",
+      messageId: root?.id,
+      seenBy: [ADA_ID],
+      pickedBy: [],
+      strategy: "router",
+    });
+    await push(socket, {
+      type: "message.reactions",
+      messageId: root?.id,
+      reactions: [{ reaction: "☀️", count: 1, userIds: [], agentIds: [ADA_ID] }],
+    });
+    await settle();
+    const row = rowsWith("bom dia amigos")[0] as HTMLElement;
+    expect(row.textContent).not.toContain("Nenhum agente vai responder");
+    expect(row.textContent).not.toContain("Chamar um agente");
+    const check = row.querySelector(".ac-receipt__check") as HTMLElement;
+    expect(check.querySelector("path")?.getAttribute("d")).toBe("m2 10.5 3 3 6-7M10 12.5l1 1 7-8");
+    await act(async () => fireEvent.click(check));
+    const pop = screen().getByRole("dialog", { name: "Agentes" });
+    expect(pop.querySelector(".ac-popover__row-status")?.textContent).toBe("Reagiu");
+    expect(pop.querySelector(".who-by")?.textContent).toBe("Nenhum agente vai responder·Chamar um agente");
+  });
+});
+
 describe("receipts: who picked the agents for a message nobody mentioned", () => {
   const receiptOf = (text: string) => rowsWith(text)[0]?.querySelector(".ac-receipt") as HTMLElement;
   const popoverOf = async (text: string) => {
@@ -641,7 +679,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     await act(() => new Promise((r) => setTimeout(r, 0)));
   };
 
-  test("no step could pick: 'sem @' with why behind its ⓘ and Chamar um agente; the popover says how agents are picked", async () => {
+  test("no step could pick: its popover says 'sem @', why, Chamar um agente and how agents are picked", async () => {
     const { socket, state } = await open();
     await sendText("alguém sabe?");
     await settle(4);
@@ -658,21 +696,18 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
       "Vista por Ada e Atlas. Nenhum agente vai responder sem @",
     );
-    const hint = within(receipt).getByRole("button", { name: "Sobre Quem escolhe os agentes" });
-    expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
-      "Nenhuma IA aqui conseguiu escolher um agente para esta mensagem. Mencione um agente para chamá-lo.",
-    );
-    expect(within(receipt).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
-    expect(receipt.textContent).toContain("Nenhum agente vai responder sem @");
-    // The dot right after the ⓘ's line, which the kit draws closer (its circle stops inside its box), one piece with
-    // its action.
-    expect(receipt.querySelector(".ac-hintline + .ac-receipt__then > .ac-receipt__dot")?.textContent).toBe("·");
+    // Nothing in the timeline: the words are the mark's popover's.
+    expect(receipt.textContent).toBe("");
     const pop = await popoverOf("alguém sabe?");
+    const lines = [...pop.querySelectorAll(".who-by")];
+    expect(lines.map((l) => l.textContent)).toEqual([
+      "Nenhum agente vai responder sem @·Chamar um agente",
+      "Nenhuma IA aqui conseguiu escolher um agente para esta mensagem. Mencione um agente para chamá-lo.Como os agentes são escolhidos",
+    ]);
+    expect(within(pop).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
     expect(within(pop).getByRole("link", { name: "Como os agentes são escolhidos" }).getAttribute("href")).toBe(
       "https://app.agentes.chat/help/who-answers?lang=pt-BR",
     );
-    // Nobody picked: no line naming who did.
-    expect(pop.querySelectorAll(".who-by")).toHaveLength(1);
   });
 
   test("'Escolhendo quem responde': the clock where the check goes while the author's plan reads it, then who picked", async () => {
@@ -705,10 +740,10 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       strategy: "router",
       decidedBy: { step: "plan", brand: "claude", ownerId: "u-walter" },
     });
-    // The check takes the clock's place.
+    // Picked, still in line: the clock stays until Ada is on it.
     const check = receiptOf("revisa o PR?").querySelector(".ac-receipt__check") as HTMLElement;
     expect(check.getAttribute("aria-label")).toBe("Vista por Ada e Atlas. Ada vai responder");
-    expect(check.querySelector("path")?.getAttribute("d")).toBe("m5.5 10.5 3 3 6-7");
+    expect(check.querySelector("path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
     const pop = await popoverOf("revisa o PR?");
     expect(pop.textContent).not.toContain("Escolhendo");
     const by = pop.querySelector(".who-by") as HTMLElement;
@@ -764,15 +799,14 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       await settle(4);
       await push(socket, { type: "message.routed", messageId: lastPerson(state)?.id, seenBy: [ADA_ID], ...routed });
       const pop = await popoverOf(text);
-      expect([text, pop.querySelector(".who-by")]).toEqual([text, null]);
+      // Nobody picked: the line says so, never who picked.
+      expect([text, [...pop.querySelectorAll(".who-by")].map((l) => l.textContent)]).toEqual([
+        text,
+        text === "ninguém pegou" ? ["Nenhum agente vai responder·Chamar um agente"] : [],
+      ]);
       await closePopover(pop);
     }
-    expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder·Chamar um agente");
-    // Only the newest message says it in words; an older bubble of the same turn has no time line, so no check.
-    await sendText("e depois");
-    await settle(4);
     expect(rowsWith("ninguém pegou")[0]?.textContent).not.toContain("Nenhum agente vai responder");
-    expect(rowsWith("ninguém pegou")[0]?.querySelector(".ac-receipt__check")).toBeNull();
   });
 });
 
@@ -822,7 +856,7 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     await settle();
     expect(bar().textContent).toBe("");
     const receipt = rowsWith("oi").at(-1)?.querySelector(".ac-receipt") as HTMLElement;
-    expect(receipt.textContent).toContain("Nenhum agente vai responder");
+    expect(rowsWith("oi").at(-1)?.textContent).not.toContain("Nenhum agente vai responder");
     expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
       "Vista por Ada. Nenhum agente vai responder",
     );
