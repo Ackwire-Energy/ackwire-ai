@@ -1611,8 +1611,10 @@ function outboundUrls(toolName: string, input: Record<string, unknown> | null | 
 }
 
 /**
- * An address a call would open that carries a key or is long enough to carry data out (`outboundUrlProblem`
- * without the run's reads, which only the server knows): refused before anything allows the call.
+ * An address a call would open that carries a key (`outboundUrlProblem` without the run's reads, which only the
+ * server knows): refused before anything allows the call. Length alone refuses nothing here: presigned download
+ * links (S3 session tokens, GCS signatures) run past a thousand characters, and with no reads known nothing could
+ * tell a person's link from a smuggling one.
  */
 export function outboundCallProblem(
   toolName: string,
@@ -1620,7 +1622,7 @@ export function outboundCallProblem(
 ): { code: OutboundCode; message: string } | null {
   for (const url of outboundUrls(toolName, input)) {
     const problem = outboundUrlProblem(url);
-    if (problem) return problem;
+    if (problem && problem.code !== "outbound.long") return problem;
   }
   return null;
 }

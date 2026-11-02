@@ -427,10 +427,12 @@ describe("prompt text and permissions", () => {
       behavior: "deny",
       code: "outbound.credential",
     });
-    expect(ask("WebFetch", { url: `https://x.io/v?d=${"q".repeat(600)}` })).toMatchObject({
+    expect(ask("WebFetch", { url: `https://x.io/v?t=ghp_${"A".repeat(36)}` })).toMatchObject({
       behavior: "deny",
-      code: "outbound.long",
+      code: "outbound.credential",
     });
+    const presigned = `https://bucket.s3.amazonaws.com/a.pdf?X-Amz-Security-Token=${"FwoGZXIv".repeat(120)}`;
+    expect(ask("WebFetch", { url: presigned }).code).toBeUndefined();
     expect(ask("Bash", { command: "curl -s https://docs.example.dev/api?state=open" }).behavior).toBe("allow");
   });
 });

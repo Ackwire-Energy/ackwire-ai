@@ -42,8 +42,10 @@ Four ways out stayed open after ADR 0109:
    - Each refusal says how to finish the job (search, or open the link as it appeared) and comes back as a tool
      error with `data.code`. The run's reads are cached per run and read again only past the last step seen.
    - Where: `web_fetch` before its GET; the browser's `open` steps (`browser_open`, `browser_do`) and
-     `browser_tabs` open; on the computer, `localVerdict` refuses WebFetch and curl/wget addresses with a key or a
-     long query before a read could allow them (`outboundCallProblem`, no private text there); the server's
+     `browser_tabs` open; on the computer, `localVerdict` refuses WebFetch and curl/wget addresses with a key
+     before a read could allow them (`outboundCallProblem`). The computer applies no length limit: with no reads
+     known there, a presigned download link a person gave (S3 session tokens, GCS signatures, a thousand characters
+     and more) couldn't be told from a smuggling one; the server's
      `permission_prompt` (`runPermissionPrompt` and a mission's `handlePermissionPrompt`) does the same before
      `readOnlyCall`.
    - `web_search` queries aren't checked: they go to a fixed provider the attacker can't read.
