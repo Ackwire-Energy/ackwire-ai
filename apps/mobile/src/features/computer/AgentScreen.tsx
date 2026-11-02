@@ -1013,10 +1013,7 @@ function TouchDock({
           {onCouldnt ? <IconButton icon="x" label={t("mobile.browser.live.couldnt")} onPress={onCouldnt} /> : null}
           <PressScale
             to={0.9}
-            onPress={() => {
-              tapHaptic();
-              onDone();
-            }}
+            onPress={onDone}
             accessibilityRole="button"
             accessibilityLabel={doneLabel}
             hitSlop={4}
