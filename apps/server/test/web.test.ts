@@ -83,6 +83,14 @@ describe("web app serving", () => {
     }
   });
 
+  test("a frame on our pages can't navigate to another site", async () => {
+    const policy = (await app.request("/")).headers.get("content-security-policy") ?? "";
+    const frames = policy.split(";").find((d) => d.trim().startsWith("frame-src")) ?? "";
+    expect(frames).toContain("blob:");
+    expect(frames).not.toContain("*");
+    expect(frames).not.toContain("https: ");
+  });
+
   test("the runner bundle: JavaScript, revalidated, and never index.html when missing", async () => {
     const res = await app.request("/runner/agentes-runner.mjs");
     expect(res.status).toBe(200);
