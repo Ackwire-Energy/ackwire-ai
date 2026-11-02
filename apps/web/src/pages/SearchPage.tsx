@@ -1,6 +1,7 @@
 import type { SearchHit, SearchKind, SearchSort } from "@agenteschat/client";
 import { useChannels, useDms, useSearch } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { hitText } from "@agenteschat/client/lib/media";
 import {
   formatSearch,
   groupByChannel,
@@ -287,7 +288,7 @@ function HitRow({
       {hit.kind === "message" && hit.author && <ActorAvatar actor={hit.author} name={hit.author.name} size="sm" />}
       <span className="list-col">
         <span className="small muted">{meta}</span>
-        <span>{hit.snippet}</span>
+        <span>{hitText(t, hit)}</span>
       </span>
     </span>
   );

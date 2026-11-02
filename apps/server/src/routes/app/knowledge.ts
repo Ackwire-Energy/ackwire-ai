@@ -225,6 +225,9 @@ export function knowledgeRoutes(deps: AppDeps) {
                 messageId: z.uuid().nullable().openapi({ description: "Message hits: open it here." }),
                 threadId: z.uuid().nullable(),
                 author: z.object({ type: z.enum(["person", "agent"]), id: z.string(), name: z.string() }).nullable(),
+                mediaKind: z.enum(["voice", "gif", "sticker"]).optional().openapi({
+                  description: "Message hits: a voice message (its snippet is empty), a GIF or a sticker.",
+                }),
               }),
             ),
           }),

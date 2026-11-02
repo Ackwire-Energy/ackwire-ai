@@ -150,7 +150,7 @@ test("the import step names the three most used apps, in the web's order, each b
   // Each mark is the web's SVG (a dark one where the maker has one), rendered for the phone at 96 px (the PNG
   // header's width and height). Create agent's import step shows the rest. No other import logo is left in the folder (Gemini's mark there is the AI
   // pickers', VS Code's the AI apps').
-  const notImports = new Set(["gemini.png", "vscode.png"]);
+  const notImports = new Set(["gemini.png", "soniox.png", "vscode.png"]);
   const rendered: [phone: string, web: string][] = [
     ["chatgpt-dots.png", "chatgpt-dots.svg"],
     ["grok-bot-dark.png", "grok-bot-dark.svg"],

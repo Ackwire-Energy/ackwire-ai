@@ -15761,6 +15761,180 @@
   "emoji.categories.symbols": {
     "value": "Symbols"
   },
+  "voice.word": {
+    "value": "Voice message"
+  },
+  "voice.wordTime": {
+    "value": "Voice message · {{time}}"
+  },
+  "voice.holdToRecord": {
+    "value": "Hold to record"
+  },
+  "voice.slideToDelete": {
+    "value": "Slide to delete"
+  },
+  "voice.send": {
+    "value": "Send audio"
+  },
+  "voice.delete": {
+    "value": "Delete recording"
+  },
+  "voice.deleted": {
+    "value": "Recording deleted."
+  },
+  "voice.pause": {
+    "value": "Pause"
+  },
+  "voice.resume": {
+    "value": "Keep recording"
+  },
+  "voice.listen": {
+    "value": "Listen to your recording"
+  },
+  "voice.play": {
+    "value": "Play"
+  },
+  "voice.stop": {
+    "value": "Stop"
+  },
+  "voice.speed": {
+    "value": "Speed"
+  },
+  "voice.left": {
+    "value": "{{seconds}} s left"
+  },
+  "voice.tooShort": {
+    "value": "Too short. Say a little more."
+  },
+  "voice.silent": {
+    "value": "Didn't hear anything. Nothing was sent."
+  },
+  "voice.notSent": {
+    "value": "Couldn't send the audio."
+  },
+  "voice.limit": {
+    "value": "That's a lot of audio for today. Write here and try again tomorrow."
+  },
+  "voice.micBlocked": {
+    "value": "The microphone is blocked"
+  },
+  "voice.micBlockedHint": {
+    "value": "Allow the microphone in your device settings to record."
+  },
+  "voice.openSettings": {
+    "value": "Open settings"
+  },
+  "voice.notNow": {
+    "value": "Not now"
+  },
+  "voice.expired": {
+    "value": "Audio expired"
+  },
+  "voice.showText": {
+    "value": "Show text"
+  },
+  "voice.hideText": {
+    "value": "Hide text"
+  },
+  "voice.record": {
+    "value": "Record audio"
+  },
+  "voice.recording": {
+    "value": "Recording audio"
+  },
+  "voice.discard": {
+    "value": "Delete recording"
+  },
+  "voice.stopListening": {
+    "value": "Stop listening"
+  },
+  "voice.keys": {
+    "value": "Enter sends · Esc deletes"
+  },
+  "voice.keysHold": {
+    "value": "Release to send · Esc deletes"
+  },
+  "voice.keysPaused": {
+    "value": "Paused · Space listens · Enter sends · Esc deletes"
+  },
+  "voice.pausePlay": {
+    "value": "Pause"
+  },
+  "voice.seek": {
+    "value": "Audio position"
+  },
+  "voice.speedAt": {
+    "value": "Speed {{speed}}×"
+  },
+  "voice.waiting": {
+    "value": "Goes as soon as you're back online"
+  },
+  "voice.notUnderstood": {
+    "value": "Couldn't make out the audio. Nothing was sent."
+  },
+  "voice.refused": {
+    "value": "The audio couldn't be sent in this conversation."
+  },
+  "voice.blockedMac": {
+    "value": "The microphone is blocked. On a Mac: System Settings › Privacy › Microphone."
+  },
+  "voice.blockedWeb": {
+    "value": "The microphone is blocked. Allow it from the lock next to the site's address."
+  },
+  "voice.noMic": {
+    "value": "No microphone found."
+  },
+  "voice.failed": {
+    "value": "Couldn't open the microphone. Try again."
+  },
+  "voice.noPlayback": {
+    "value": "Can't play it right now. You can still send it or keep recording."
+  },
+  "voice.settings.title": {
+    "value": "Voice messages"
+  },
+  "voice.settings.on": {
+    "value": "Voice messages"
+  },
+  "voice.settings.onHelp": {
+    "value": "People in this workspace can send audio in conversations."
+  },
+  "voice.settings.noEngine": {
+    "value": "Voice messages aren't available here yet."
+  },
+  "voice.settings.engineTitle": {
+    "value": "What turns voice into text"
+  },
+  "voice.settings.own": {
+    "value": "Your own server"
+  },
+  "voice.settings.ownHelp": {
+    "value": "Whisper or Parakeet on your machine. The audio stays there."
+  },
+  "voice.settings.address": {
+    "value": "Server address"
+  },
+  "voice.settings.key": {
+    "value": "{{name}} key"
+  },
+  "voice.settings.keyPlaceholder": {
+    "value": "Paste here"
+  },
+  "voice.settings.test": {
+    "value": "Test"
+  },
+  "voice.settings.tested": {
+    "value": "It works. Everyone now sees the microphone."
+  },
+  "voice.settings.sealed": {
+    "value": "Kept encrypted on your server and never shown again."
+  },
+  "voice.settings.leaves": {
+    "value": "Audio from voice messages goes to {{name}} to become text."
+  },
+  "voice.settings.invalid": {
+    "value": "The saved key doesn't open on this server. Paste it again."
+  },
   "media.word.gif": {
     "value": "GIF"
   },
@@ -25222,6 +25396,9 @@
   "settings.section.media": {
     "value": "GIFs and stickers"
   },
+  "settings.section.voice": {
+    "value": "Voice"
+  },
   "settings.section.apps": {
     "value": "AI apps"
   },
@@ -25269,6 +25446,9 @@
   },
   "settings.sectionText.media": {
     "value": "What people can send in a conversation, and when agents send a GIF or a sticker."
+  },
+  "settings.sectionText.voice": {
+    "value": "Voice messages in conversations, and who turns voice into text."
   },
   "settings.sectionText.apps": {
     "value": "Ask this workspace's agents for tasks from Claude, Cursor and other apps."

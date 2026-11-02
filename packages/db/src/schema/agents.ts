@@ -283,6 +283,8 @@ export const organizationSettings = pgTable("organization_settings", {
   agentMedia: text().$type<"never" | "sometimes" | "often">().notNull().default("sometimes"),
   /** What a new agent starts thinking with, and its Autonomia (ADR 0094); null = "Automático" on the API. */
   agentSetup: jsonb().$type<AgentSetup>(),
+  /** People can send voice messages (ADR 0100): needs a speech engine on the server too. */
+  voiceMessages: boolean().notNull().default(true),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

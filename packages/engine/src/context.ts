@@ -1478,6 +1478,9 @@ export function quotedLine(meta: Record<string, unknown> | null | undefined): st
   if ((typeof r.excerpt !== "string" || !r.excerpt) && (r.mediaKind === "gif" || r.mediaKind === "sticker")) {
     return `(replying to ${who}'s ${r.mediaKind === "gif" ? "GIF" : "sticker"})\n`;
   }
+  if ((typeof r.excerpt !== "string" || !r.excerpt) && r.mediaKind === "voice") {
+    return `(replying to ${who}'s voice message)\n`;
+  }
   if (typeof r.excerpt !== "string" || !r.excerpt) return "";
   return `(replying to ${who}: "${r.excerpt}")\n`;
 }

@@ -54,6 +54,7 @@ import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
 import { telemetryRoutes } from "./routes/app/telemetry";
 import { threadRoutes } from "./routes/app/threads";
+import { speechKeyRoutes, voiceRoutes } from "./routes/app/voice";
 import { wikiRoutes } from "./routes/app/wiki";
 import {
   createDesktopReleases,
@@ -200,6 +201,8 @@ export function createApp(options: AppOptions) {
     api.route("/app", telemetryRoutes(deps));
     api.route("/app", jevRoutes(deps));
     api.route("/app", gifKeyRoutes(deps));
+    api.route("/app", speechKeyRoutes(deps));
+    api.route("/app", voiceRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerOauthRoutes(api, deps, { version, fetchDocument: options.appsFetchDocument });

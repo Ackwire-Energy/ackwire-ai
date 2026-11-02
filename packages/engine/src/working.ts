@@ -1,4 +1,5 @@
 import { type Database, rowsOf, schema, sql } from "@agenteschat/db";
+import { readableBody } from "./message-preview";
 import { replyExcerpt } from "./messages";
 import { requirePermission } from "./organizations";
 import { pendingIds } from "./recovery";
@@ -55,6 +56,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
     name: string;
     title: string | null;
     root_body: string | null;
+    root_meta: Record<string, unknown> | null;
     pending: string[] | string | null;
     background: boolean | string;
     work_id: string | null;
@@ -63,7 +65,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
     work_started: string | Date | null;
   }>(
     await db.execute(sql`select r.id, r.agent_id, r.channel_id, r.status, r.thread_root_id, r.trigger_message_id,
-        r.started_at, r.created_at, c.kind, c.name, t.title, root.body as root_body,
+        r.started_at, r.created_at, c.kind, c.name, t.title, root.body as root_body, root.meta as root_meta,
         array_to_json(r.pending_message_ids) as pending, r.background,
         w.id as work_id, w.title as work_title, w.plan as work_plan, w.started_at as work_started
       from ${agentRuns} r
@@ -73,7 +75,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
       join ${channelMembers} cm on cm.org_id = ${orgId}::uuid and cm.channel_id = c.id and cm.user_id = ${userId}
       left join ${threads} t on t.org_id = ${orgId}::uuid and t.root_message_id = r.thread_root_id
       left join lateral (
-        select m.body from ${messages} m
+        select m.body, m.meta from ${messages} m
         where m.org_id = ${orgId}::uuid and m.id = r.thread_root_id and m.deleted_at is null
         limit 1
       ) root on true
@@ -84,7 +86,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
   );
   const iso = (v: string | Date | null) => (v === null ? null : new Date(v).toISOString());
   return rows.map((r) => {
-    const label = replyExcerpt(r.title?.trim() || r.root_body || "", WORKING_LABEL_LENGTH);
+    const label = replyExcerpt(r.title?.trim() || readableBody(r.root_body ?? "", r.root_meta), WORKING_LABEL_LENGTH);
     return {
       runId: r.id,
       agentId: r.agent_id,

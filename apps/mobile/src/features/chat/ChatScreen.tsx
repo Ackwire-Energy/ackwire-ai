@@ -59,6 +59,7 @@ import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { pinsIn } from "@agenteschat/client/lib/pins";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { isIdHandle } from "@agenteschat/ui/names";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef, OnViewableItemsChanged } from "@legendapp/list/react-native";
@@ -112,6 +113,7 @@ import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { useDmStatusLine, usePresenceWord } from "../status/hooks";
 import { PersonStatusCard } from "../status/StatusCard";
+import { useVoiceComposer } from "../voice/useVoiceComposer";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { AskStore } from "./ask-store";
@@ -200,6 +202,7 @@ const rowType = (r: Row) => {
   if (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-"))) return "turn";
   if (r.kind !== "message") return r.kind;
   // A GIF or a sticker alone (ADR 0091) is about its picture's size, not a text's.
+  if (voiceOf(r.message.meta)) return "message-voice";
   const media = r.message.body.trim() ? null : messageMediaOf(r.message.meta);
   if (media) return `message-${media.kind}`;
   const n = r.message.body.length;
@@ -774,6 +777,8 @@ function Chat({
   sendRef.current = send;
   const onResend = useCallback(
     (m: Message) => {
+      // Sent again as text, a voice message's words would show: it is sent by recording it again.
+      if (voiceOf(m.meta)) return;
       sendRef.current(m.body, threadId);
       toEnd();
     },
@@ -871,6 +876,14 @@ function Chat({
   // mine. The list is aimed at the end before the sheet closes: the place it held under the sheet doesn't come back.
   const settings = useSettings(orgId).data;
   const mediaTabs = mediaTabsOf(settings, dir.agents.length, Boolean(api.gifs));
+  const voice = useVoiceComposer({
+    orgId,
+    channelId,
+    threadId,
+    authorId: meId ?? "",
+    enabled: Boolean(meId && settings?.voiceAvailable && settings.voiceMessages),
+    afterSend: toEnd,
+  });
   const sendMedia = (media: MessageMedia) => {
     send("", threadId, { media });
     toEnd();
@@ -1862,6 +1875,7 @@ function Chat({
                     )
                   }
                   onType={() => sendTyping(threadId)}
+                  voice={voice}
                 />
               ) : (
                 <Button
