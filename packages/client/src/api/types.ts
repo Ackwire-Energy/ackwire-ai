@@ -5706,6 +5706,7 @@ export interface PersonalTokenInput {
 export interface CreatedPersonalToken {
   token: { id: string; name: string; access: AppAccess; expiresAt: string | null };
   secret: string;
+}
 
 /** Who has a shared browser profile now (ADR 0110): an agent's run or a person in control. */
 export type BrowserProfileHolder =
