@@ -1924,6 +1924,14 @@ html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
   gap: var(--space-1);
   border-bottom: 1px solid var(--line);
 }
+.ac-tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ac-tabpanel[hidden] {
+  display: none;
+}
 .ac-tab {
   font: inherit;
   font-size: 14px;
