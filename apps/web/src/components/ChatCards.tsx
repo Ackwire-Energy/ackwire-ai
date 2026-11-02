@@ -605,7 +605,9 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
     <>
       <MessageText>{current.text}</MessageText>
       <RequestDone done label={t("question.group", { agent: name })}>
-        {current.answer === null ? (
+        {current.withdrawn ? (
+          t("question.withdrawn", agentGrammar(t, name))
+        ) : current.answer === null ? (
           t("question.closed")
         ) : who ? (
           <Trans

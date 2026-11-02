@@ -367,9 +367,11 @@ export async function buildRunContext(
   const flat = rootIsTrigger;
   const heldElsewhere = run.background ? null : heldHere(db, run).catch(() => null);
   // What it asked people for and still stands, so it can take back what it no longer needs (`withdraw_request`).
-  const openRequests = options.toolsAvailable
-    ? openRequestsOf(db, run.orgId, agent.id).then(openRequestsBlock, () => null)
-    : null;
+  // This conversation's only, and like the hand-offs not for a routine's task nor between agents.
+  const openRequests =
+    options.toolsAvailable && !options.routine && !run.background && !isAgentOnlyDm(channel)
+      ? openRequestsOf(db, run.orgId, agent.id, run.channelId).then(openRequestsBlock, () => null)
+      : null;
   // A routine's background run (ADR 0053 §4): its room's history (earlier briefs) is no conversation;
   // it reads its brief, and what people said where it reports comes in the routine block.
   const background = run.background;

@@ -3102,7 +3102,7 @@ async function executeRunInner(
         !betweenAgents &&
         granted.some((g) => g.name === WITHDRAW_REQUEST_TOOL)
           ? openRequestNudge(
-              (await openRequestsOf(db, run.orgId, run.agentId).catch(() => [])).filter((r) =>
+              (await openRequestsOf(db, run.orgId, run.agentId, run.channelId).catch(() => [])).filter((r) =>
                 detachedIds.includes(r.id),
               ),
             )

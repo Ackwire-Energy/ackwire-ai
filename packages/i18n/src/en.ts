@@ -2064,6 +2064,7 @@ export const en: Translations = {
     waitingFor: "Only {{person}} can answer.",
     outcomeBy: "Delivered by {{person}}",
     outcomeByYou: "Delivered by you",
+    outcomeWithdrawn: "No longer needed",
     alreadyAnswered: "This request was already answered or expired.",
     failed: "Couldn't deliver it. Is the agent's computer on?",
     empty: "Type the value.",
@@ -2091,6 +2092,7 @@ export const en: Translations = {
     alreadyAnswered: "This question was already answered or closed.",
     closed: "Closed without an answer.",
     failed: "Couldn't send the answer. Try again.",
+    withdrawn: "{{name}} no longer needs an answer.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
   ask: {

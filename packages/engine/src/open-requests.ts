@@ -1,4 +1,4 @@
-import { and, type Executor, eq, gt, schema, sql } from "@agenteschat/db";
+import { and, type Executor, eq, gt, rowsOf, schema, sql } from "@agenteschat/db";
 import { UUID } from "./authority";
 import { cutText } from "./format";
 
@@ -17,14 +17,15 @@ export interface OpenRequest {
 }
 
 /**
- * The agent's open requests, oldest first. Asked help counts only while nobody took control (then it is the
- * person's turn, not the agent's to take back).
+ * The agent's open requests in one conversation: asked help counts only while nobody took control (then it is the
+ * person's turn, not the agent's to take back). Scoped to the run's channel, like its other blocks: another
+ * conversation's requests are neither listed nor withdrawable from here (people there may not see this one).
  */
-export async function openRequestsOf(db: Executor, orgId: string, agentId: string): Promise<OpenRequest[]> {
+function openRequestQueries(db: Executor, orgId: string, agentId: string, channelId: string) {
   const now = new Date();
   const place = { channelName: channels.name, channelKind: channels.kind };
-  const [handoffs, secrets, questions] = await Promise.all([
-    db
+  return {
+    handoffs: db
       .select({ row: browserHandoffs, ...place })
       .from(browserHandoffs)
       .innerJoin(messages, and(eq(messages.orgId, browserHandoffs.orgId), eq(messages.id, browserHandoffs.id)))
@@ -33,12 +34,13 @@ export async function openRequestsOf(db: Executor, orgId: string, agentId: strin
         and(
           eq(browserHandoffs.orgId, orgId),
           eq(browserHandoffs.agentId, agentId),
+          eq(messages.channelId, channelId),
           eq(browserHandoffs.kind, "ask"),
           sql`(${browserHandoffs.status} = 'pending' or (${browserHandoffs.status} = 'active' and ${browserHandoffs.controllerUserId} is null))`,
           gt(browserHandoffs.expiresAt, now),
         ),
       ),
-    db
+    secrets: db
       .select({ row: secretRequests, ...place })
       .from(secretRequests)
       .innerJoin(channels, eq(channels.id, secretRequests.channelId))
@@ -46,11 +48,12 @@ export async function openRequestsOf(db: Executor, orgId: string, agentId: strin
         and(
           eq(secretRequests.orgId, orgId),
           eq(secretRequests.agentId, agentId),
+          eq(secretRequests.channelId, channelId),
           eq(secretRequests.status, "pending"),
           gt(secretRequests.expiresAt, now),
         ),
       ),
-    db
+    questions: db
       .select({ row: agentQuestions, ...place })
       .from(agentQuestions)
       .innerJoin(channels, eq(channels.id, agentQuestions.channelId))
@@ -58,11 +61,32 @@ export async function openRequestsOf(db: Executor, orgId: string, agentId: strin
         and(
           eq(agentQuestions.orgId, orgId),
           eq(agentQuestions.agentId, agentId),
+          eq(agentQuestions.channelId, channelId),
           eq(agentQuestions.status, "open"),
           gt(agentQuestions.expiresAt, now),
         ),
       ),
-  ]);
+  };
+}
+
+/** Whether the agent has any open request in this conversation: one query, asked on every tool listing. */
+export async function hasOpenRequest(db: Executor, orgId: string, agentId: string, channelId: string) {
+  const q = openRequestQueries(db, orgId, agentId, channelId);
+  const [row] = rowsOf<{ open: boolean }>(
+    await db.execute(sql`select (exists(${q.handoffs}) or exists(${q.secrets}) or exists(${q.questions})) as open`),
+  );
+  return row?.open === true;
+}
+
+/** The agent's open requests in this conversation (`openRequestQueries`), oldest first. */
+export async function openRequestsOf(
+  db: Executor,
+  orgId: string,
+  agentId: string,
+  channelId: string,
+): Promise<OpenRequest[]> {
+  const q = openRequestQueries(db, orgId, agentId, channelId);
+  const [handoffs, secrets, questions] = await Promise.all([q.handoffs, q.secrets, q.questions]);
   return [
     ...handoffs.map(({ row, ...p }) => ({
       id: row.id,

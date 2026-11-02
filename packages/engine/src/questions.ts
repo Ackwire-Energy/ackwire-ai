@@ -32,6 +32,8 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+  /** The agent took it back (`withdraw_request`): it no longer needs an answer. Kept on the card by later syncs. */
+  withdrawn?: true;
 }
 
 export function questionView(q: AgentQuestionRow): AgentQuestion {
@@ -125,12 +127,14 @@ export function questionResult(q: AgentQuestionRow | undefined): { content: stri
   };
 }
 
-/** Writes the current state of the question into its chat message (`meta.question`). */
-export async function syncQuestionMessage(db: Executor, q: AgentQuestionRow) {
+/** Writes the current state of the question into its chat message (`meta.question`), keeping `withdrawn`. */
+export async function syncQuestionMessage(db: Executor, q: AgentQuestionRow, view: AgentQuestion = questionView(q)) {
   if (!q.messageId) return;
   await db
     .update(messages)
-    .set({ meta: sql`jsonb_set(${messages.meta}, '{question}', ${JSON.stringify(questionView(q))}::jsonb)` })
+    .set({
+      meta: sql`jsonb_set(${messages.meta}, '{question}', coalesce(${messages.meta}->'question', '{}'::jsonb) || ${JSON.stringify(view)}::jsonb)`,
+    })
     .where(and(eq(messages.id, q.messageId), eq(messages.orgId, q.orgId)));
 }
 
@@ -146,8 +150,9 @@ export async function publishQuestion(
   pubsub: PubSub | undefined,
   q: AgentQuestionRow,
   type: "question.asked" | "question.answered",
+  view: AgentQuestion = questionView(q),
 ) {
-  await publishChannelEvent(pubsub, { type, channelId: q.channelId, threadId: q.threadId, question: questionView(q) });
+  await publishChannelEvent(pubsub, { type, channelId: q.channelId, threadId: q.threadId, question: view });
 }
 
 /**
@@ -223,12 +228,12 @@ export async function withdrawQuestion(deps: { db: Database; pubsub?: PubSub }, 
       )
       .returning();
     if (!row) return null;
-    await syncQuestionMessage(tx, row);
+    await syncQuestionMessage(tx, row, { ...questionView(row), withdrawn: true });
     await enqueue(tx, resumeJob(row));
     return row;
   });
   if (withdrawn) {
-    await publishQuestion(deps.pubsub, withdrawn, "question.answered");
+    await publishQuestion(deps.pubsub, withdrawn, "question.answered", { ...questionView(withdrawn), withdrawn: true });
     await resolveQuestionNotifications(deps, withdrawn.orgId, withdrawn.id).catch(() => {});
   }
   return withdrawn;

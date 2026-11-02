@@ -2245,6 +2245,8 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+  /** The agent took it back: it no longer needs an answer. */
+  withdrawn?: true;
 }
 
 /**
@@ -2279,6 +2281,8 @@ export interface SecretRequest {
   expiresAt: string;
   deliveredAt: string | null;
   removed: boolean;
+  /** The agent took it back: it no longer needs it. */
+  withdrawn?: true;
 }
 
 /** A secret on an agent's computer, by name (the agent page). */

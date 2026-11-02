@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, countQueries, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
+  addChannelMember,
   BROWSER_SCOPE,
   createAgent,
   createBrowserHandoffToolSource,
+  createChannel,
   createWithdrawRequestToolSource,
   drainOutbox,
   grantScopes,
@@ -52,13 +54,14 @@ const readyHub: MachineCaller = {
 
 /**
  * "sign in" asks a person in the browser. Woken by "use the API instead", it withdraws the request at once
- * (`eager`) or only when told it is still open; after withdrawing it writes nothing more.
+ * (`eager`), only when told it is still open, or (`keep`) never; after withdrawing it writes nothing more.
  */
-function agentReply(eager: boolean) {
+function agentReply(eager: boolean, keep = false) {
   return (req: ModelRequest) => {
     const last = JSON.stringify(req.messages.at(-1)?.content);
     if (last.includes("Withdrawn:")) return { chunks: eager ? ["Ok, vou pela API."] : [] };
     if (last.includes("still open, and people still see them waiting")) {
+      if (keep) return { chunks: [] };
       return { chunks: [], toolUses: [{ name: "withdraw_request", input: { id: ID.exec(last)?.[1] ?? "" } }] };
     }
     if (last.includes("use the API instead")) {
@@ -76,10 +79,10 @@ function agentReply(eager: boolean) {
   };
 }
 
-async function start(eager = true) {
+async function start(eager = true, keep = false) {
   ready.clear();
   f = await setup({
-    reply: agentReply(eager),
+    reply: agentReply(eager, keep),
     machines: true,
     toolSources: [createBrowserHandoffToolSource({ machines: { hub: readyHub } }), createWithdrawRequestToolSource()],
   });
@@ -193,7 +196,10 @@ describe("withdraw_request", () => {
     });
     // Not offered to an agent with nothing open, and refused by id all the same.
     expect(await source.tools(ctx(other.id))).toEqual([]);
-    const [tool] = await source.tools(ctx(f.agent.id));
+    // One cheap check per listing, whatever the agent has open.
+    const listed = await countQueries(() => source.tools(ctx(f.agent.id)));
+    expect(listed.queries).toBe(1);
+    const [tool] = listed.result;
     const out = await tool?.execute({ id: h?.id ?? "" }, ctx(other.id));
     expect(out?.content).toContain("No open request of yours");
     expect(
@@ -246,11 +252,74 @@ describe("withdraw_request", () => {
     await drainOutbox(f.db, f.handlers);
     expect((await f.db.select().from(schema.agentQuestions))[0]?.status).toBe("canceled");
     const card = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find((m) => m.id === q?.messageId);
-    expect(card?.meta.question).toMatchObject({ status: "answered", answer: null });
+    expect(card?.meta.question).toMatchObject({ status: "answered", answer: null, withdrawn: true });
     expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
     expect(JSON.stringify(f.provider.calls.at(-1)?.request.messages.at(-1)?.content)).toContain(
       "You withdrew this question",
     );
     expect(await source.tools(ctx)).toEqual([]);
+  });
+
+  test("another conversation's run neither reads nor withdraws the request; a routine's run isn't offered the tool", async () => {
+    await start(true);
+    const ask = await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    const elsewhere = (await createChannel(f.db, f.owner.id, f.org.id, { name: "random" })).id;
+    await addChannelMember(f.db, f.owner.id, f.org.id, elsewhere, { agentId: f.agent.id });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, elsewhere, { body: "@dev hello" });
+    await drainOutbox(f.db, f.handlers);
+    const hello = f.provider.calls.find((c) => JSON.stringify(c.request.messages).includes("@dev hello"));
+    expect(hello).toBeDefined();
+    expect(systemText(hello?.request.system ?? "")).not.toContain("# Your open requests");
+    expect(hello?.request.tools?.some((t) => t.name === "withdraw_request")).toBe(false);
+
+    const source = createWithdrawRequestToolSource();
+    const ctx = (channelId: string, background?: boolean): ToolContext => ({
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId,
+      threadRootId: ask.id,
+      triggerMessageId: ask.id,
+      background,
+    });
+    expect(await source.tools(ctx(elsewhere))).toEqual([]);
+    expect(await source.tools(ctx(f.general.id, true))).toEqual([]);
+    const [tool] = await source.tools(ctx(f.general.id));
+    expect((await tool?.execute({ id: h?.id ?? "" }, ctx(elsewhere)))?.content).toContain("No open request of yours");
+    expect((await handoffs())[0]?.status).toBe("pending");
+  });
+
+  test("withdrawn by a later run after the asking run stopped waiting and ended: no notice, no new run", async () => {
+    await start(false, true);
+    const { id } = await askThenOtherWay();
+    expect((await handoffs())[0]?.status).toBe("pending");
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.every((r) => r.status === "done")).toBe(true);
+    const calls = f.provider.calls.length;
+
+    const source = createWithdrawRequestToolSource();
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: id,
+      triggerMessageId: id,
+    };
+    const [tool] = await source.tools(ctx);
+    expect((await tool?.execute({ id }, ctx))?.content).toContain("Withdrawn");
+    await drainOutbox(f.db, f.handlers);
+
+    expect((await handoffs())[0]?.status).toBe("withdrawn");
+    const notices = (await f.db.select().from(schema.messages)).filter(
+      (m) => (m.meta as { notice?: { refs?: { waitId?: string } } }).notice?.refs?.waitId === id,
+    );
+    expect(notices).toEqual([]);
+    expect(await f.db.select().from(schema.agentRuns)).toHaveLength(runs.length);
+    expect(f.provider.calls.length).toBe(calls);
   });
 });

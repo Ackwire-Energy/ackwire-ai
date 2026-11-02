@@ -876,6 +876,7 @@ async function resumeWaitingRun(
   row: BrowserHandoffRow,
   result: BrowserHandoffResult,
   answeredBy?: string,
+  waitingOnly?: boolean,
 ) {
   if (!row.runId) return;
   await resumeRunWithResult(deps.db, {
@@ -885,6 +886,7 @@ async function resumeWaitingRun(
       content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row, answeredBy), row.screen),
     },
     pubsub: deps.pubsub,
+    waitingOnly,
   });
 }
 
@@ -1023,7 +1025,7 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
 /**
  * The agent withdraws its own asked help (`withdraw_request`) while nobody took control: the card says it no
  * longer needs it, the people asked stop waiting. A run still waiting on it resumes; the run withdrawing it
- * (`byRunId`) is told nothing more. Null: not open anymore, or a person is in control.
+ * (`byRunId`), or one that stopped waiting on it and ended, is told nothing more (no late notice, no new run). Null: not open anymore, or a person is in control.
  */
 export async function withdrawHandoff(deps: HandoffDeps, handoffId: string, byRunId: string, reason: string | null) {
   const [row] = await deps.db.transaction(async (tx) => {
@@ -1042,7 +1044,7 @@ export async function withdrawHandoff(deps: HandoffDeps, handoffId: string, byRu
     return rows;
   });
   if (!row) return null;
-  if (row.runId !== byRunId) await resumeWaitingRun(deps, row, endedResult(row)).catch(() => {});
+  if (row.runId !== byRunId) await resumeWaitingRun(deps, row, endedResult(row), undefined, true).catch(() => {});
   await afterChange(deps, row).catch(() => {});
   return row;
 }

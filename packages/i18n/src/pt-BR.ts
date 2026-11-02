@@ -2083,6 +2083,7 @@ export const ptBR = {
     waitingFor: "Só {{person}} pode responder.",
     outcomeBy: "Entregue por {{person}}",
     outcomeByYou: "Entregue por você",
+    outcomeWithdrawn: "Não precisa mais",
     alreadyAnswered: "Esse pedido já foi respondido ou expirou.",
     failed: "Não deu para entregar. O computador do agente está ligado?",
     empty: "Digite o valor.",
@@ -2109,6 +2110,7 @@ export const ptBR = {
     group: "Pergunta de {{agent}}",
     alreadyAnswered: "Esta pergunta já foi respondida ou encerrada.",
     closed: "Encerrada sem resposta.",
+    withdrawn: "{{The}} {{name}} não precisa mais da resposta.",
     failed: "Não foi possível enviar a resposta. Tente de novo.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */

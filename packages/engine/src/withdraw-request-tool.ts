@@ -1,6 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { withdrawHandoff } from "./browser/handoff";
-import { openRequestsOf, WITHDRAW_REQUEST_TOOL, WITHDRAW_RULE } from "./open-requests";
+import { hasOpenRequest, openRequestsOf, WITHDRAW_REQUEST_TOOL, WITHDRAW_RULE } from "./open-requests";
 import { withdrawQuestion } from "./questions";
 import { withdrawSecretRequest } from "./secrets";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -8,7 +8,7 @@ import type { ToolDefinition, ToolSource } from "./tools/types";
 /**
  * `withdraw_request`: the agent takes back one of its own open requests (asked help on its screens, a secret, a
  * question) once it no longer needs it. Its card says so and the people asked stop waiting. Offered only while
- * the agent has one open; only its own (another agent's id is not found).
+ * the agent has one open in this conversation; only its own there (another agent's, or another conversation's, id is not found).
  */
 export function createWithdrawRequestToolSource(deps: { pubsub?: PubSub } = {}): ToolSource {
   const tool: ToolDefinition = {
@@ -27,8 +27,12 @@ export function createWithdrawRequestToolSource(deps: { pubsub?: PubSub } = {}):
     describe: () => ({ title: "Withdraw a request" }),
     async execute(input, ctx) {
       const id = String(input.id ?? "").trim();
-      const open = (await openRequestsOf(ctx.db, ctx.orgId, ctx.agentId)).find((r) => r.id === id);
-      if (!open) return { content: "No open request of yours has that id: it was answered, ended or isn't yours." };
+      const open = (await openRequestsOf(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId)).find((r) => r.id === id);
+      if (!open)
+        return {
+          content:
+            "No open request of yours has that id: it was answered, ended, isn't yours or is in another conversation.",
+        };
       const reason = typeof input.reason === "string" && input.reason.trim() ? input.reason.trim().slice(0, 300) : null;
       const d = { db: ctx.db, pubsub: deps.pubsub };
       const done =
@@ -44,7 +48,9 @@ export function createWithdrawRequestToolSource(deps: { pubsub?: PubSub } = {}):
   return {
     name: "withdraw-request",
     async tools(ctx) {
-      return (await openRequestsOf(ctx.db, ctx.orgId, ctx.agentId)).length > 0 ? [tool] : [];
+      // A routine's background run keeps to its task, as in its context.
+      if (ctx.background) return [];
+      return (await hasOpenRequest(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId)) ? [tool] : [];
     },
   };
 }
