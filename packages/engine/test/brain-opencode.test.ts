@@ -130,7 +130,9 @@ test("which brain a run thinks with, and why OpenCode can't now", () => {
     "opencode_missing",
   );
   const off = { folders: [], tools: { claude: true, codex: true, opencode: false, commands: true } };
-  expect(computerBrainUnavailable("opencode", "m1", status({ access: off }))?.code).toBe("tool_off");
+  expect(computerBrainUnavailable("opencode", "m1", status({ access: off }))?.message).toBe(
+    "OpenCode is turned off on MacBook (its owner can turn it on in the agentes app).",
+  );
 });
 
 test("Quem pensa lists OpenCode with the models its CLI listed, free ones first, else OpenCode's free tier", () => {

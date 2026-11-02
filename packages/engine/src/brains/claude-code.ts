@@ -18,6 +18,7 @@ import { type MachineCaller, MachineRequestError, type MachineStatus } from "../
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
 import {
+  BRAIN_NAMES,
   BRAIN_PLAN_NAMES,
   type Brain,
   type BrainAccount,
@@ -242,7 +243,7 @@ export function toolOff(
   tool: "claude" | "codex" | "cursor" | "opencode",
 ): { code: string; message: string } | null {
   const tools = status.access?.tools;
-  const name = tool === "claude" ? "Claude Code" : tool === "codex" ? "Codex" : "Cursor";
+  const name = tool === "claude" ? "Claude Code" : BRAIN_NAMES[tool];
   if (tools) {
     // A runner before Cursor's switch (protocol 36) reports none: Cursor follows Codex's there, as on the runner.
     return (tool === "cursor" || tool === "opencode" ? (tools[tool] ?? tools.codex) : tools[tool]) === true
