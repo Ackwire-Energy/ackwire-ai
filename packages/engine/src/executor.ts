@@ -3041,7 +3041,6 @@ async function executeRunInner(
             : null,
           evidence: judging.evidence,
         });
-        if (decision.outcome === "done") learnLater(decision);
         transcript.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
         const { nudge, ...recorded } = { ...decision, count: transcript.continuation.count };
         later(() =>
@@ -3050,6 +3049,8 @@ async function executeRunInner(
             ...(decision.outcome === "continue" ? { nudged: decision.rule === "untried" ? "untried" : "promise" } : {}),
           }),
         );
+        // After the verdict's own step, so the run's steps keep their order.
+        if (decision.outcome === "done") learnLater(decision);
         const kept = [transcript.routineRecord, record].filter(Boolean).join("\n\n");
         if (decision.outcome === "continue" && nudge) {
           transcript.routineRecord = kept;
@@ -3181,7 +3182,6 @@ async function executeRunInner(
         evidence: judging.evidence,
       });
       turnEnd = decision;
-      if (decision.outcome === "done") learnLater(decision);
       if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
       t.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
       const nudgedAs = {
@@ -3199,6 +3199,7 @@ async function executeRunInner(
           ...(decision.outcome === "continue" ? { nudged: nudgedAs ?? (plan.missionId ? "mission_ask" : "ask") } : {}),
         }),
       );
+      if (decision.outcome === "done") learnLater(decision);
       if (decision.outcome === "ask_card") return askWithCard(text || judged);
       let keep: string | null = null;
       if (decision.outcome === "continue" && decision.nudge) {
