@@ -2840,6 +2840,7 @@
     "runsEmpty": "“{{q}}” ile eşleşen çalıştırma yok.",
     "runsNone": "Henüz çalıştırma yok.",
     "runNoText": "Metin yok",
+    "runPrivate": "Dahil olmadığın bir konuşmada",
     "runTokens": "{{input}} giriş · {{cached}} önbellek · {{output}} çıkış",
     "runTokensTip": "{{input}} yeni giriş tokenı, önbellekten okunan {{cached}} (daha ucuz), {{output}} çıkış",
     "budgetHelp": "Sınıra ulaşınca {{name}} durur ve bunu kanalda söyler. {{ownerNote}}",

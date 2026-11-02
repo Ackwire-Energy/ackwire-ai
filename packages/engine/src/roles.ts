@@ -315,7 +315,7 @@ export async function deleteRole(
     });
     return left;
   });
-  await announceChannelLeavers(options.pubsub, orgId, leavers);
+  await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, leavers);
   await announceRoles(options.pubsub, orgId);
 }
 
@@ -473,7 +473,7 @@ export async function setMemberRoles(
     return left;
   });
   if (changed) {
-    await announceChannelLeavers(options.pubsub, orgId, changed);
+    await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, changed);
     await announceMembers(options.pubsub, orgId);
   }
   return next;

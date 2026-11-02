@@ -2773,6 +2773,7 @@
     "runsEmpty": "没有与“{{q}}”匹配的运行记录。",
     "runsNone": "还没有运行记录。",
     "runNoText": "无文本",
+    "runPrivate": "在你未参与的对话中",
     "runTokens": "输入 {{input}} · 缓存 {{cached}} · 输出 {{output}}",
     "runTokensTip": "{{input}} 个新输入 token，{{cached}} 个从缓存读取（更便宜），{{output}} 个输出",
     "budgetHelp": "达到上限时，{{name}} 会停止并在频道中说明。{{ownerNote}}",

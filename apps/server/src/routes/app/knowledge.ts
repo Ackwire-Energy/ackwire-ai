@@ -1,5 +1,5 @@
 import { MESSAGE_HAS, type MessageHas } from "@agenteschat/adapters";
-import { and, desc, eq, schema } from "@agenteschat/db";
+import { and, desc, eq, inArray, schema } from "@agenteschat/db";
 import {
   addContextItemByPerson,
   addReaction,
@@ -15,6 +15,7 @@ import {
   listContextItems,
   listMessageReactions,
   memoryJudging,
+  readableChannelIds,
   removeReaction,
   requirePermission,
   searchForUser,
@@ -429,6 +430,29 @@ export function knowledgeRoutes(deps: AppDeps) {
         .where(and(eq(o.orgId, orgId), agentId ? eq(o.agentId, agentId) : undefined))
         .orderBy(desc(o.createdAt))
         .limit(200);
+      // What a run did in a conversation is quoted only to who reads it, as on the run history.
+      const runIds = [...new Set(rows.flatMap((r) => (!r.channelId && r.runId ? [r.runId] : [])))];
+      const runChannel = new Map(
+        (runIds.length
+          ? await db
+              .select({ id: schema.agentRuns.id, channelId: schema.agentRuns.channelId })
+              .from(schema.agentRuns)
+              .where(and(eq(schema.agentRuns.orgId, orgId), inArray(schema.agentRuns.id, runIds)))
+          : []
+        ).map((r) => [r.id, r.channelId]),
+      );
+      const channelOf = (r: (typeof rows)[number]) => r.channelId ?? (r.runId ? runChannel.get(r.runId) : undefined);
+      const readable = await readableChannelIds(
+        db,
+        orgId,
+        c.get("user").id,
+        rows.flatMap((r) => channelOf(r) ?? []),
+      );
+      // A run pruned since leaves its conversation unknown: kept quiet too.
+      const hidden = (r: (typeof rows)[number]) => {
+        const channelId = channelOf(r);
+        return channelId ? !readable.has(channelId) : r.runId !== null;
+      };
       return c.json(
         {
           outcomes: rows.map((r) => ({
@@ -437,8 +461,8 @@ export function knowledgeRoutes(deps: AppDeps) {
             runId: r.runId,
             kind: r.kind,
             polarity: r.polarity,
-            subject: r.subject,
-            summary: r.summary,
+            subject: hidden(r) ? "" : r.subject,
+            summary: hidden(r) ? "" : r.summary,
             source: r.source,
             createdAt: r.createdAt.toISOString(),
           })),

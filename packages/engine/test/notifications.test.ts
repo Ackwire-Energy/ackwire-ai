@@ -36,7 +36,7 @@ import {
   wakeSnoozedNotifications,
 } from "../src";
 import { deliverNotice } from "../src/delivery";
-import { addMember, type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, makeAdmin, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -222,7 +222,8 @@ test("one-off notifications are idempotent; done, undo, read-all and the cursor"
     groupKey: "mention:test-0",
     source: {},
   });
-  // An approval waits: it comes first.
+  // An approval waits: it comes first (for who may decide it).
+  await makeAdmin(f.db, f.org.id, bia.id);
   await notify(deps(), {
     orgId: f.org.id,
     userIds: [bia.id, f.agent.id],

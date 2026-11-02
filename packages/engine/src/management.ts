@@ -11,6 +11,7 @@ import {
   channelRoleIds,
   dropRoleLeavers,
   placesAgentsIn,
+  readableChannelIds,
 } from "./channels";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
@@ -527,7 +528,7 @@ export async function updateChannel(
     caches.channels.delete(`${orgId}:${channelId}`);
     // What agents may search depends on visibility (agentSearchChannels).
     if (input.visibility !== undefined) caches.scopes.deletePrefix(`${orgId}:`);
-    await announceChannelLeavers(options.pubsub, orgId, leavers);
+    await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, leavers);
     return row;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`#${name} already exists`);
@@ -575,8 +576,15 @@ export interface RunSummary {
   trigger: string;
   status: string;
   error: string | null;
-  /** First part of the message that started the run. */
+  /** First part of the message that started the run; empty when `private`. */
   what: string;
+  /**
+   * The viewer doesn't read the run's conversation: its message and steps stay out, only its numbers (tokens, cost,
+   * duration, status) show. Owners, usage viewers and admins included.
+   */
+  private: boolean;
+  /** Started by one of the agent's routines (its trigger carries `meta.routine`), shown even when `private`. */
+  routine: boolean;
   turns: number;
   /** Every input token, cache included. */
   inputTokens: number;
@@ -631,7 +639,7 @@ export async function listRuns(
     .groupBy(usageRecords.runId);
   const byRun = new Map(usage.map((u) => [u.runId, u]));
   const triggers = await db
-    .select({ id: messages.id, body: messages.body })
+    .select({ id: messages.id, body: messages.body, meta: messages.meta })
     .from(messages)
     .where(
       and(
@@ -643,8 +651,16 @@ export async function listRuns(
       ),
     );
   const bodies = new Map(triggers.map((t) => [t.id, t.body]));
+  const routineTriggers = new Set(triggers.filter((t) => t.meta?.routine != null).map((t) => t.id));
+  const readable = await readableChannelIds(
+    db,
+    orgId,
+    actorId,
+    rows.map((r) => r.channelId),
+  );
   return rows.map((r) => {
     const u = byRun.get(r.id);
+    const hidden = !readable.has(r.channelId);
     return {
       id: r.id,
       agentId: r.agentId,
@@ -653,7 +669,9 @@ export async function listRuns(
       trigger: r.trigger,
       status: r.status,
       error: r.error,
-      what: (bodies.get(r.triggerMessageId) ?? "").slice(0, 200),
+      what: hidden ? "" : (bodies.get(r.triggerMessageId) ?? "").slice(0, 200),
+      private: hidden,
+      routine: routineTriggers.has(r.triggerMessageId),
       turns: r.turns,
       inputTokens: Number(u?.input ?? 0),
       cachedTokens: Number(u?.cached ?? 0),
@@ -676,6 +694,7 @@ export async function getRun(db: Database, actorId: string, orgId: string, runId
   if (!run) throw new NotFoundError("Run not found");
   await requireUsageAccess(db, actorId, orgId, run.agentId);
   const [summary] = await listRuns(db, actorId, orgId, { agentId: run.agentId, runId });
+  if (!summary || summary.private) return { run: summary, steps: [] };
   const steps = await db
     .select({
       seq: agentRunSteps.seq,

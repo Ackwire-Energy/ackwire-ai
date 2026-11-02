@@ -2760,6 +2760,7 @@
     "runsEmpty": "「{{q}}」に一致する実行はありません。",
     "runsNone": "実行はまだありません。",
     "runNoText": "テキストなし",
+    "runPrivate": "参加していない会話",
     "runTokens": "入力 {{input}} · キャッシュ {{cached}} · 出力 {{output}}",
     "runTokensTip": "新しい入力トークン{{input}}、キャッシュからの読み込み{{cached}}（割安）、出力{{output}}",
     "budgetHelp": "上限に達すると、{{name}}は停止してチャンネルでお知らせします。{{ownerNote}}",

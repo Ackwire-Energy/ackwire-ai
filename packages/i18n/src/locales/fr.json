@@ -2957,6 +2957,7 @@
     "runsEmpty": "Aucune exécution ne correspond à « {{q}} ».",
     "runsNone": "Aucune exécution pour l'instant.",
     "runNoText": "Aucun texte",
+    "runPrivate": "Dans une conversation dont vous ne faites pas partie",
     "runTokens": "{{input}} en entrée · {{cached}} en cache · {{output}} en sortie",
     "runTokensTip": "{{input}} jetons d'entrée nouveaux, {{cached}} lus depuis le cache (moins chers), {{output}} en sortie",
     "budgetHelp": "À la limite, {{name}} s'arrête et le signale dans le canal. {{ownerNote}}",

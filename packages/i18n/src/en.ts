@@ -2768,6 +2768,7 @@ export const en = {
     runsEmpty: "No runs matching “{{q}}”.",
     runsNone: "No runs yet.",
     runNoText: "No text",
+    runPrivate: "In a conversation you're not in",
     runTokens: "{{input}} in · {{cached}} cached · {{output}} out",
     runTokensTip: "{{input}} new input tokens, {{cached}} read from the cache (cheaper), {{output}} output",
     budgetHelp: "At the limit, {{name}} stops and says so in the channel. {{ownerNote}}",

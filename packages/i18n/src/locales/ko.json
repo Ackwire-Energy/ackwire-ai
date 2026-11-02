@@ -2758,6 +2758,7 @@
     "runsEmpty": "“{{q}}”와 일치하는 실행이 없어요.",
     "runsNone": "아직 실행이 없어요.",
     "runNoText": "텍스트 없음",
+    "runPrivate": "참여하지 않은 대화",
     "runTokens": "입력 {{input}} · 캐시 {{cached}} · 출력 {{output}}",
     "runTokensTip": "새 입력 토큰 {{input}}개, 캐시에서 읽은 토큰 {{cached}}개(더 저렴해요), 출력 {{output}}개",
     "budgetHelp": "한도에 도달하면 {{name}}은(는) 멈추고 채널에 알려요. {{ownerNote}}",
