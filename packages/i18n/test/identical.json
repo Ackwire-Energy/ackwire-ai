@@ -755,6 +755,7 @@
       "connectors.category.support",
       "connectors.names.cloudflare_bindings",
       "connectors.names.intercom_eu",
+      "connectors.toolChanges.description",
       "connectors.tools",
       "contextMenu.lookSystem",
       "database.host",

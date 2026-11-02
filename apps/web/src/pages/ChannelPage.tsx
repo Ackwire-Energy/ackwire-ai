@@ -96,6 +96,7 @@ import {
   usageLine,
 } from "@agenteschat/client/lib/chat";
 import { choiceReplyLine } from "@agenteschat/client/lib/choices";
+import { draftKeyOf } from "@agenteschat/client/lib/composer-drafts";
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
@@ -314,6 +315,7 @@ import { UsageWaitCancel } from "@/components/UsagePauseCard";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
+import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
@@ -625,7 +627,12 @@ function ChannelView({
   const sendTyping = useTypingSender(channel.id, thread?.id);
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
-  const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
+  // What I typed and didn't send stays in this browser: switching conversations or reloading keeps it.
+  const [draft, setDraft] = useComposerDraft(
+    me.user.id,
+    draftKeyOf(channel.id, thread?.id),
+    draftKey ? peekDraft(draftKey) : undefined,
+  );
   // Stopping is immediate, nothing asked (what it did stays, "Continuar" picks it up): the composer's
   // button when the box is empty, or Esc anywhere on the page (composer empty, nothing open).
   const { canStop: mayStop, stop: stopRun } = useStopRun();
