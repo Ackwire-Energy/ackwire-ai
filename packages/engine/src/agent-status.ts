@@ -4,6 +4,7 @@ import { publishOrgEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { requirePermission } from "./organizations";
+import { routineSeer } from "./routines";
 import { outageParkedSql } from "./runs";
 import { toolGroupKey } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
@@ -87,10 +88,14 @@ const ACTIVITY_LOOKBACK_MS = 7 * 24 * 3600_000;
 const ACTIVE = ["queued", "running"] as const;
 const WAITING = ["waiting_approval", "waiting_input"] as const;
 
-/** Every agent's presence and written status, for a member of the organization. */
+/**
+ * Every agent's presence and written status, for a member of the organization. An agent hidden from them (the
+ * agents list's rule, `routineSeer`) keeps its presence but not its line, which can name a routine, task or channel.
+ */
 export async function agentStatuses(db: Database, actorId: string, orgId: string, now = new Date()) {
   await requirePermission(db, actorId, orgId, "read");
-  return loadAgentStatuses(db, orgId, now);
+  const [list, sees] = await Promise.all([loadAgentStatuses(db, orgId, now), routineSeer(db, orgId, actorId)]);
+  return list.map((s) => (sees({ agentId: s.agentId, createdByUserId: null }) ? s : { ...s, status: null }));
 }
 
 /**

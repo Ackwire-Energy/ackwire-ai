@@ -913,7 +913,9 @@ export async function getRoutineView(
   hooks?: RoutineHookConfig,
 ) {
   await requirePermission(db, actorId, orgId, "read");
-  const [view] = await views(db, [await loadRoutine(db, orgId, id)], actorId, hooks);
+  const row = await loadRoutine(db, orgId, id);
+  if (!(await routineSeer(db, orgId, actorId))(row)) throw new NotFoundError("Routine not found");
+  const [view] = await views(db, [row], actorId, hooks);
   return view as RoutineView;
 }
 
@@ -1218,7 +1220,36 @@ export async function listRoutines(db: Database, actorId: string, orgId: string,
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
-  return views(db, rows, actorId, hooks);
+  const sees = await routineSeer(db, orgId, actorId);
+  return views(db, rows.filter(sees), actorId, hooks);
+}
+
+/**
+ * Whether `viewerId` sees a routine at all (its name, schedule, runs): who manages it (its creator, admins, the
+ * agent's owner), who manages agents, or who the agent answers. The agents list's own rule (`listsAgent` in the
+ * apps), so an agent hidden from someone doesn't show through its routines on Início, Rotinas or the calendar.
+ */
+export async function routineSeer(
+  db: Database,
+  orgId: string,
+  viewerId: string,
+): Promise<(r: Pick<RoutineRow, "agentId" | "createdByUserId">) => boolean> {
+  const [membership, agentRows] = await Promise.all([
+    getMembership(db, viewerId, orgId),
+    db
+      .select({
+        id: agents.id,
+        ownerUserId: agents.ownerUserId,
+        audienceMode: agents.audienceMode,
+        audienceUserIds: agents.audienceUserIds,
+      })
+      .from(agents)
+      .where(eq(agents.orgId, orgId)),
+  ]);
+  if (can(membership, "manage_routines") || can(membership, "manage_agents")) return () => true;
+  const talks = can(membership, "talk_to_agents");
+  const listed = new Set(agentRows.filter((a) => canTalkTo(a, viewerId, talks)).map((a) => a.id));
+  return (r) => r.createdByUserId === viewerId || listed.has(r.agentId);
 }
 
 /**
@@ -1583,6 +1614,7 @@ export async function listRoutineRuns(
 ): Promise<RoutineRunView[]> {
   await requirePermission(db, actorId, orgId, "read");
   const routine = await loadRoutine(db, orgId, id, { deleted: true });
+  if (!(await routineSeer(db, orgId, actorId))(routine)) throw new NotFoundError("Routine not found");
   const [runs, rights] = await Promise.all([
     db
       .select()
