@@ -514,7 +514,7 @@ describe("Configurações do workspace", () => {
     expect(line()?.textContent).toBe("Os agentes só respondem quando mencionados.");
   });
 
-  test("members see only their own settings: no Geral, roles, GIFs or usage, and never the workspace's keys", async () => {
+  test("members see only their own settings: no Geral, roles or GIFs, never the workspace's keys or money", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
@@ -533,6 +533,8 @@ describe("Configurações do workspace", () => {
       "Membros e convites",
       "Conectores",
       "Computadores",
+      // Their own plans' meters, in percentages (ADR 0063).
+      "Orçamento e uso",
       "Contas de IA",
     ]);
     // Settings opens on their account: what the agents know of the workspace is not theirs to read.
@@ -547,10 +549,17 @@ describe("Configurações do workspace", () => {
     expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
     cleanup();
-    // A section they can't open (the workspace's usage, its storage) falls back to their account.
-    for (const gone of ["settings/usage", "settings/storage", "settings/general", "settings/roles"]) {
+    // Orçamento e uso: the plans in percentages, never money or the workspace's report.
+    await go(state, "settings/usage");
+    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    expect(within(plans).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("62");
+    expect(screen().queryByRole("region", { name: "Gastos da API por tipo" })).toBeNull();
+    expect(screen().queryByRole("region", { name: "Orçamento padrão dos agentes" })).toBeNull();
+    expect(document.body.textContent).not.toContain("US$");
+    cleanup();
+    // A section they can't open (its storage, Geral, roles) falls back to their account.
+    for (const gone of ["settings/storage", "settings/general", "settings/roles"]) {
       await go(state, gone);
-      expect(screen().queryByRole("region", { name: "Contas dos planos" })).toBeNull();
       expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
       expect(screen().queryByRole("heading", { level: 2, name: "Geral" })).toBeNull();
       cleanup();

@@ -99,8 +99,9 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     const ids = (permissions: string[]) => visibleSections(as("member", permissions)).map((s) => s.id);
     const all = ["read", "invite_people", "view_audit", "view_usage", "manage_agents", "configure", "create_agents"];
     expect(visibleSections(as("owner", all)).length).toBe(SETTINGS_SECTIONS.length);
-    // No Geral (what the agents know of the workspace), GIFs or Uso: those are the workspace's, for admins.
-    expect(ids(["read", "post"])).toEqual(["apps", "members", "connectors", "computers", "keys"]);
+    // No Geral (what the agents know of the workspace) or GIFs: those are the workspace's, for admins. Uso stays:
+    // their own plans' meters, in percentages (ADR 0063).
+    expect(ids(["read", "post"])).toEqual(["apps", "members", "connectors", "computers", "usage", "keys"]);
     expect(ids(["read", "manage_agents"])).toEqual([
       "apps",
       "members",
@@ -108,13 +109,13 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       "connectors",
       "skills",
       "computers",
+      "usage",
       "keys",
     ]);
     expect(ids(["read", "configure"])).toEqual(expect.arrayContaining(["general", "media", "storage"]));
-    expect(ids(["read", "view_usage"])).toContain("usage");
     expect(ids(["read", "view_audit"])).toContain("audit");
     expect(ids(["read", "create_agents"])).toContain("import");
-    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["apps", "connectors"]);
+    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["apps", "connectors", "usage"]);
   });
 
   test("each section opens a screen the app has", () => {

@@ -79,8 +79,9 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
   // Every member sees the computers and connects one (ADR 0025).
   { id: "computers", group: "agents", icon: "laptop", href: "/settings/computers", allowed: (o) => can(o, "read") },
-  // The workspace's spend and every agent's use: who may see usage.
-  { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: (o) => can(o, "view_usage") },
+  // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
+  // money only for who has `view_usage`.
+  { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", group: "costs", icon: "brain", href: "/ai-accounts", allowed: (o) => can(o, "read") },
   { id: "storage", group: "costs", icon: "drive", href: "/settings/storage", allowed: (o) => can(o, "configure") },

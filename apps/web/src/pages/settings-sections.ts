@@ -53,8 +53,9 @@ export const SETTINGS_SECTIONS: {
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
   // Every member sees the computers and can pair one (ADR 0025).
   { id: "computers", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
-  // The workspace's spend and every agent's use: who may see usage.
-  { id: "usage", icon: "wallet", group: "costs", allowed: (o) => can(o, "view_usage") },
+  // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
+  // money and the workspace's report only for who has `view_usage`.
+  { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", icon: "key", group: "costs", allowed: (o) => can(o, "read") },
   { id: "storage", icon: "drive", group: "costs", allowed: (o) => can(o, "configure") },
