@@ -7,7 +7,7 @@ import { setup as baseSetup, type Fixture } from "./fixtures";
 let f: Fixture;
 afterEach(() => f?.close());
 
-const MODELS_URL = "https://api.typesafe.example/v1/models";
+const MODELS_URL = "https://api.northwind.example/v1/models";
 
 /** A stand-in for the agent's computer: a request to an address, which works only at the right one. */
 const fetchSource: ToolSource = {
@@ -42,21 +42,21 @@ describe("agents reuse past work", () => {
         const system = systemText(req.system);
         if (isReflect(system)) return { chunks: [JSON.stringify({ summary: "", items: [], entities: [] })] };
         const all = JSON.stringify(req.messages);
-        if (all.includes("list the TypeSafe models again")) {
+        if (all.includes("list the Northwind models again")) {
           secondSystems.push(system);
           return all.includes("your earlier step")
             ? { chunks: ["ts-small, ts-large"] }
-            : { chunks: [], toolUses: [{ name: "search_context", input: { query: "typesafe models" } }] };
+            : { chunks: [], toolUses: [{ name: "search_context", input: { query: "northwind models" } }] };
         }
         step++;
         const calls: Record<number, { name: string; input: Record<string, unknown> }> = {
-          1: { name: "fetch_url", input: { url: "https://typesafe.example/api/models", secret: "TYPESAFE_API_KEY" } },
-          2: { name: "fetch_url", input: { url: MODELS_URL, secret: "TYPESAFE_API_KEY" } },
+          1: { name: "fetch_url", input: { url: "https://northwind.example/api/models", secret: "NORTHWIND_API_KEY" } },
+          2: { name: "fetch_url", input: { url: MODELS_URL, secret: "NORTHWIND_API_KEY" } },
           3: {
             name: "save_how_to",
             input: {
-              title: "List the TypeSafe models",
-              how: `GET ${MODELS_URL} with the TYPESAFE_API_KEY secret as a bearer token; script scripts/typesafe-models.sh`,
+              title: "List the Northwind models",
+              how: `GET ${MODELS_URL} with the NORTHWIND_API_KEY secret as a bearer token; script scripts/northwind-models.sh`,
             },
           },
         };
@@ -67,7 +67,7 @@ describe("agents reuse past work", () => {
     const post = (body: string, channelId = f.general.id) =>
       postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, channelId, { body });
 
-    await post("@dev pull the models from the TypeSafe API");
+    await post("@dev pull the models from the Northwind API");
     await drainOutbox(f.db, f.handlers);
     const results = (await f.db.select().from(schema.agentRunSteps))
       .filter((s) => s.kind === "tool_result")
@@ -87,7 +87,7 @@ describe("agents reuse past work", () => {
       "agent",
       [],
       "agent",
-      "List the TypeSafe models",
+      "List the Northwind models",
     ]);
 
     // The person gave the key through request_secret in that run; a removed one and another agent's don't count.
@@ -101,7 +101,7 @@ describe("agents reuse past work", () => {
       toolUseId: `tu_${name}`,
       requestedForUserId: f.owner.id,
       name,
-      purpose: "TypeSafe API",
+      purpose: "Northwind API",
       targetKind: "env" as const,
       publicKey: "fake-public-key",
       expiresAt: new Date(Date.now() + 60_000),
@@ -112,7 +112,7 @@ describe("agents reuse past work", () => {
     await f.db
       .insert(schema.secretRequests)
       .values([
-        secret("TYPESAFE_API_KEY"),
+        secret("NORTHWIND_API_KEY"),
         secret("OLD_TOKEN", { removedAt: new Date() }),
         secret("NPM_TOKEN", { targetKind: "file", targetPath: ".npmrc" }),
       ]);
@@ -120,14 +120,14 @@ describe("agents reuse past work", () => {
     // Elsewhere, later: another channel the agent is in.
     const ops = await createChannel(f.db, f.owner.id, f.org.id, { name: "ops", visibility: "public" });
     await addChannelMember(f.db, f.owner.id, f.org.id, ops.id, { agentId: f.agent.id });
-    await post("@dev list the TypeSafe models again", ops.id);
+    await post("@dev list the Northwind models again", ops.id);
     await drainOutbox(f.db, f.handlers);
 
     const first = secondSystems[0] ?? "";
     // Its memory carries the how-to; its computer's secrets are named, never their values.
-    expect(first).toContain(`List the TypeSafe models: GET ${MODELS_URL}`);
+    expect(first).toContain(`List the Northwind models: GET ${MODELS_URL}`);
     expect(first).toContain("# Secrets on your computer");
-    expect(first).toContain("- TYPESAFE_API_KEY: an environment variable in your commands");
+    expect(first).toContain("- NORTHWIND_API_KEY: an environment variable in your commands");
     expect(first).toContain("- NPM_TOKEN: the file .npmrc");
     expect(first).not.toContain("OLD_TOKEN");
     // The prompt says to look for past work first and to save what took figuring out.
