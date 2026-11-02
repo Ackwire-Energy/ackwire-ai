@@ -30,6 +30,7 @@ import {
   saveCustomTools,
   setAgentAccess,
   setAgentScopes,
+  sqlArgOf,
   type ToolContext,
   updateAgent,
 } from "../src";
@@ -661,7 +662,7 @@ function sqlMcp() {
     const server = new McpServer({ name: "db", version: "1" });
     server.registerTool(
       "execute_sql",
-      { description: "Runs SQL on a project", inputSchema: { project_id: z.string(), query: z.string() } },
+      { description: "Runs SQL on a Postgres project", inputSchema: { project_id: z.string(), query: z.string() } },
       async (args) => {
         calls.push(args);
         return { content: [{ type: "text" as const, text: "[]" }] };
@@ -698,6 +699,30 @@ const READ = "select status, count(*) from orders group by 1";
 const sql = (query: string, project_id = "proj-a") => ({ project_id, query, why: WHY });
 
 describe("Aprovar sempre leituras", () => {
+  test("offered only on Postgres: a known preset's tool, or a custom one that says Postgres and no other engine", () => {
+    const tool = (name: string, description: string, ...args: string[]) => ({
+      name,
+      description,
+      inputSchema: { properties: Object.fromEntries(args.map((a) => [a, { type: "string" }])) },
+    });
+    const cases: [string, ReturnType<typeof tool>, string | null, string | null][] = [
+      ["supabase", tool("execute_sql", "Runs SQL", "project_id", "query"), "supabase", "query"],
+      ["supabase-readonly", tool("execute_sql", "Runs SQL", "project_id", "query"), "supabase-readonly", "query"],
+      ["neon", tool("run_sql", "Runs SQL", "projectId", "sql"), "neon", "sql"],
+      ["preset, other tool", tool("list_tables", "Lists tables", "query"), "supabase", null],
+      ["preset not Postgres", tool("run_sql", "Runs SQL", "sql"), "github", null],
+      ["custom Postgres", tool("query", "Run a read-only query on PostgreSQL", "sql"), null, "sql"],
+      ["custom, no engine named", tool("run_sql", "Runs SQL", "sql"), null, null],
+      ["custom MySQL", tool("mysql_query", "Runs SQL on MySQL", "sql"), null, null],
+      ["custom MySQL by name only", tool("mysql_query", "Runs SQL", "sql"), null, null],
+      ["custom, Postgres and MySQL", tool("run_sql", "Postgres or MySQL", "sql"), null, null],
+      ["custom GraphQL", tool("graphql_query", "Postgres GraphQL", "query"), null, null],
+    ];
+    expect(cases.map(([what, t, preset]) => [what, sqlArgOf(t, preset)])).toEqual(
+      cases.map(([what, , , arg]) => [what, arg]),
+    );
+  });
+
   test("offered only on SQL proven read-only; it then runs that project's reads and still asks for anything else", async () => {
     f = await setup();
     const { mcp, gateway, serverId, name } = await sqlWorld(f);

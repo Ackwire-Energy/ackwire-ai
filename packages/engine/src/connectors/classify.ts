@@ -225,17 +225,40 @@ export function openEnded(slug: string): boolean {
   return words.at(-1) === "query" || words.some((w) => OPEN_ENDED.has(w));
 }
 
-/** Servers' tools known to run the SQL in one argument, by the server's own tool name. */
+/**
+ * Servers known to run Postgres, by their preset (`presets.ts`), each with its tool that runs the SQL in one
+ * argument. `provenReadOnly` reads SQL as Postgres does: another engine reads it otherwise (MySQL runs what Postgres
+ * takes for a `/*!…` comment, and a backslash in a string ends it there), so only Postgres is ever offered.
+ */
+const POSTGRES_SQL_TOOLS: Record<string, Record<string, string>> = {
+  supabase: { execute_sql: "query" },
+  "supabase-readonly": { execute_sql: "query" },
+  neon: { run_sql: "sql" },
+};
+/** A custom server's tools that run SQL by their usual names (the reference Postgres server's `query`). */
 const SQL_TOOLS: Record<string, string> = { execute_sql: "query", run_sql: "sql", query: "sql" };
+const POSTGRES = /postgres/i;
+const OTHER_ENGINES =
+  /mysql|maria|sql ?server|mssql|t-sql|sqlite|oracle|bigquery|snowflake|clickhouse|duckdb|redshift|databricks|trino|presto|athena|cockroach|tidb|spanner/i;
 
 /**
- * The argument holding the SQL a server's tool runs (Supabase's `execute_sql`: `query`), or null when it runs none:
- * a known tool whose schema has that argument, else a tool whose name says SQL (or ends in query, GraphQL aside)
- * with one string argument named `sql` or `query`.
+ * The argument holding the SQL a server's tool runs on Postgres (Supabase's `execute_sql`: `query`), or null: a
+ * preset's tool from `POSTGRES_SQL_TOOLS`; on a custom server, a tool whose own description says Postgres and names
+ * no other engine, known by name (`SQL_TOOLS`) or whose name says SQL (or ends in query, GraphQL aside), with one
+ * string argument named `sql` or `query`.
  */
-export function sqlArgOf(tool: { name: string; inputSchema?: { properties?: unknown } }): string | null {
+export function sqlArgOf(
+  tool: { name: string; description?: string; inputSchema?: { properties?: unknown } },
+  preset?: string | null,
+): string | null {
   const props = (tool.inputSchema?.properties ?? {}) as Record<string, { type?: unknown } | undefined>;
-  const isText = (arg: string) => props[arg]?.type === "string";
+  const isText = (arg: string | undefined): arg is string => arg !== undefined && props[arg]?.type === "string";
+  if (preset) {
+    const arg = POSTGRES_SQL_TOOLS[preset]?.[tool.name];
+    return isText(arg) ? arg : null;
+  }
+  const said = tool.description ?? "";
+  if (!POSTGRES.test(said) || OTHER_ENGINES.test(said)) return null;
   const known = SQL_TOOLS[tool.name];
   if (known) return isText(known) ? known : null;
   const words = nameWords(tool.name);

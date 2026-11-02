@@ -196,7 +196,7 @@ export function createConnectorToolSource(
       const access = row.access as ToolAccess;
       if (!tool) return [];
       const executor = tool.name === COMPOSIO_EXECUTOR;
-      const sqlArg = composio ? null : sqlArgOf(tool);
+      const sqlArg = composio ? null : sqlArgOf(tool, preset);
       const action = composio ? composioAction(composio.way, tool.name) : null;
       // Our rules for a Composio action as they are now (its entry's `ask`, its tags at the pinned version), not only
       // as the row stored them at the last sync: an action they make ask asks on every connection at once.
