@@ -47,14 +47,14 @@ import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { rgba } from "@/sky/math";
 import { TRACKPAD_SHADER } from "@/sky/shaders";
-import { Button, Icon, IconButton, Text, useReducedMotion, useToast } from "@/ui";
+import { Button, haptics, Icon, IconButton, Text, useReducedMotion, useToast } from "@/ui";
 import { useInfoHint } from "@/ui/InfoHint";
 import { type LiveKey, stepText } from "../browser/logic";
 import { TypeBar } from "../browser/parts";
 import { useFinishHandoff } from "../browser/useFinishHandoff";
 import { useColors, useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { tapHaptic } from "../shared/parts";
+import { successHaptic, tapHaptic } from "../shared/parts";
 import { useActiveWork } from "../shared/queries";
 import { Cover } from "./Cover";
 import { PixelCursor } from "./PixelCursor";
@@ -68,6 +68,7 @@ import {
   sessionCookieScript,
 } from "./screen-page";
 import {
+  atDesktopEdge,
   boundCamera,
   clamp,
   controlScale,
@@ -95,6 +96,8 @@ const DOT_GAP = 9;
 const HOLD_MS = 320;
 /** Points a finger goes before the trackpad follows it: enough that a tap's small roll doesn't move the cursor. */
 const SWIPE_START = 3;
+/** The closest two ticks of the wheel come under the fingers: faster, the phone only buzzes. */
+const NOTCH_HAPTIC_MS = 45;
 const CAMERA = { duration: 260 };
 
 /** Everything the camera and the cursor share across the gestures, on the UI thread. */
@@ -255,6 +258,7 @@ export function AgentScreen({
       // Whoever may take over the agent's browser but not its screen takes the browser, as on the web.
       else await actions.takeover(agentId, run?.runId);
       await view.desktopQ.refetch();
+      successHaptic();
     } catch (err) {
       const busy = (err as { status?: number }).status === 409;
       toast({ title: busy ? t("browser.card.busy") : t("mobile.app.failed"), icon: "x" });
@@ -341,15 +345,28 @@ export function AgentScreen({
   }));
 
   const moved = (px: number, py: number) => line.move(px, py);
+  const pointed = (px: number, py: number) => {
+    haptics.selection();
+    line.move(px, py);
+  };
   const clicked = () => {
     tapHaptic();
     line.click(cursorX.value, cursorY.value);
   };
   const held = (down: boolean) => {
-    if (down) tapHaptic();
+    if (down) haptics.medium();
+    else haptics.light();
     line.press(cursorX.value, cursorY.value, down ? BUTTON.left : BUTTON.none);
   };
-  const wheeled = (down: boolean) => line.click(cursorX.value, cursorY.value, down ? BUTTON.wheelDown : BUTTON.wheelUp);
+  const lastNotch = useRef(0);
+  const wheeled = (down: boolean) => {
+    const at = Date.now();
+    if (at - lastNotch.current >= NOTCH_HAPTIC_MS) {
+      lastNotch.current = at;
+      haptics.selection();
+    }
+    line.click(cursorX.value, cursorY.value, down ? BUTTON.wheelDown : BUTTON.wheelUp);
+  };
 
   const pinchFrom = useSharedValue(1);
   const pinch = usePinchGesture({
@@ -397,7 +414,7 @@ export function AgentScreen({
       const to = toDesktop({ x: e.x, y: e.y }, { x: x.value, y: y.value }, s.value, desk.value);
       cursorX.value = to.x;
       cursorY.value = to.y;
-      scheduleOnRN(moved, to.x, to.y);
+      scheduleOnRN(pointed, to.x, to.y);
     },
   });
   const viewGestures = useSimultaneousGestures(pinch, panView, tapView);
@@ -518,6 +535,7 @@ export function AgentScreen({
               onClick={clicked}
               onHold={held}
               onWheel={wheeled}
+              onEdge={haptics.firm}
               onKeyboard={() => setTyping(true)}
             />
             {ask ? (
@@ -545,6 +563,7 @@ function Trackpad({
   onClick,
   onHold,
   onWheel,
+  onEdge,
   onKeyboard,
 }: {
   camera: Camera;
@@ -557,6 +576,8 @@ function Trackpad({
   onClick: () => void;
   onHold: (down: boolean) => void;
   onWheel: (down: boolean) => void;
+  /** The cursor just reached the desktop's edge. */
+  onEdge: () => void;
   onKeyboard: () => void;
 }) {
   const { t } = useTranslation();
@@ -564,6 +585,7 @@ function Trackpad({
   const reduced = useReducedMotion();
   const { s, x, y, cursorX, cursorY, box, desk } = camera;
   const wheel = useSharedValue(0);
+  const edge = useSharedValue(false);
   const [holding, setHolding] = useState(false);
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
   const padSize = useSharedValue<Size>({ width: 0, height: 0 });
@@ -643,6 +665,9 @@ function Trackpad({
       const d = desk.value;
       cursorX.value = clamp(cursorX.value + e.changeX * gain, 0, d.width);
       cursorY.value = clamp(cursorY.value + e.changeY * gain, 0, d.height);
+      const edged = atDesktopEdge({ x: cursorX.value, y: cursorY.value }, d);
+      if (edged && !edge.value) scheduleOnRN(onEdge);
+      edge.value = edged;
       const to = followCursor(
         { x: x.value, y: y.value },
         s.value,

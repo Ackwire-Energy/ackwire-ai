@@ -95,6 +95,12 @@ export const cursorGain = (speed: number, s: number) => {
   return (AIM_GAIN + (TRAVEL_GAIN - AIM_GAIN) * fast) / s;
 };
 
+/** Whether the cursor stands on the desktop's edge: it can go no further that way. */
+export const atDesktopEdge = (cursor: Point, desk: Size) => {
+  "worklet";
+  return cursor.x <= 0 || cursor.y <= 0 || cursor.x >= desk.width || cursor.y >= desk.height;
+};
+
 /** The camera moved just enough to keep the cursor inside the view's margin. */
 export const followCursor = (camera: Point, s: number, cursor: Point, box: Size, desk: Size): Point => {
   "worklet";
