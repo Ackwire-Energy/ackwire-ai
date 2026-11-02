@@ -23,6 +23,14 @@ const access = async (dialog: HTMLElement, option: RegExp) => {
   await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
   await click(screen().getByRole("option", { name: option }));
 };
+/** "Papéis que veem o canal", its own dialog: tick these and "Pronto". */
+const rolesDialog = () => screen().getByRole("dialog", { name: "Papéis que veem o canal" });
+const pickRoles = async (...names: RegExp[]) => {
+  const d = rolesDialog();
+  for (const name of names) await click(within(d).getByRole("checkbox", { name }));
+  await click(within(d).getByRole("button", { name: "Pronto" }));
+  await settle(3);
+};
 const calls = (state: ReturnType<typeof seedState>, method: string) =>
   state.calls.filter((c) => c.method === method).map((c) => c.args.at(-1));
 
@@ -42,13 +50,19 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     await act(async () => fireEvent.change(within(dialog).getByLabelText("Nome"), { target: { value: "vendas" } }));
     await access(dialog, /Departamentos ou papéis/);
     await settle(3);
-
+    // No role yet: their dialog opens by itself. Closed without one, the channel isn't created.
+    await click(within(rolesDialog()).getByRole("button", { name: "Cancelar" }));
+    await settle(2);
     await click(within(dialog).getByRole("button", { name: "Criar #vendas" }));
     await settle(3);
     expect(calls(state, "chat.createChannel")).toEqual([]);
     expect(dialog.textContent).toContain("Escolha pelo menos um papel.");
 
-    await click(within(dialog).getByRole("checkbox", { name: /Admin/ }));
+    await click(within(dialog).getByRole("button", { name: "Escolher papéis" }));
+    await settle(2);
+    await pickRoles(/Admin/);
+    // The role picked, under the field, removable.
+    expect(within(dialog).getByRole("button", { name: "Remover Admin" })).toBeTruthy();
     await click(within(dialog).getByRole("button", { name: "Criar #vendas" }));
     await settle(6);
     expect(calls(state, "chat.createChannel")).toEqual([
@@ -64,17 +78,17 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     await access(dialog, /Departamentos ou papéis/);
     await settle(3);
     expect(calls(state, "chat.update")).toEqual([]);
-    await click(within(dialog).getByRole("checkbox", { name: /Admin/ }));
-    await settle(3);
+    await pickRoles(/Admin/);
     expect(calls(state, "chat.update")).toEqual([{ visibility: "private", audienceRoleIds: [ADMIN_ROLE_ID] }]);
 
-    // Unticking the last role saves nothing, and says why.
-    await click(within(dialog).getByRole("checkbox", { name: /Admin/ }));
+    // Removing the last role saves nothing, and says why.
+    await click(within(dialog).getByRole("button", { name: "Remover Admin" }));
     await settle(3);
     expect(calls(state, "chat.update")).toHaveLength(1);
     expect(dialog.textContent).toContain("Escolha pelo menos um papel.");
-    await click(within(dialog).getByRole("checkbox", { name: /Admin/ }));
-    await settle(3);
+    await click(within(dialog).getByRole("button", { name: "Escolher papéis" }));
+    await settle(2);
+    await pickRoles(/Admin/);
     expect(calls(state, "chat.update")).toHaveLength(2);
 
     // Going public opens every message to the workspace: asked first.
