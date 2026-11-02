@@ -229,6 +229,10 @@ export function formatSearch(chips: readonly SearchChip[], text: string): string
   return [...parts, text.trim()].filter(Boolean).join(" ");
 }
 
+/** The sort shown when the person picked none: by relevance with words, newest first without. */
+export const searchSortFor = (sort: SearchSort | null, text: string): SearchSort =>
+  sort ?? (text.trim() ? "relevance" : "newest");
+
 /** What the search API is asked for these chips (ADR 0123). */
 export function searchFilterInput(chips: readonly SearchChip[], sort?: SearchSort): SearchFilterInput {
   const out: SearchFilterInput = {};

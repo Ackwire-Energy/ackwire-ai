@@ -8,6 +8,7 @@ import {
   type SearchDirectory,
   type SearchWords,
   searchFilterInput,
+  searchSortFor,
   suggestActors,
   typingOperator,
 } from "../src/lib/search-filters";
@@ -103,6 +104,12 @@ describe("search filters", () => {
     expect(typingOperator("http:")).toBeNull();
     expect(suggestActors("mor", dir.actors).map((a) => a.id)).toEqual(["u1"]);
     expect(suggestActors("@d", dir.actors).map((a) => a.id)).toEqual(["a1"]);
+  });
+
+  test("unpicked, the sort is by relevance with words and newest first without", () => {
+    expect(searchSortFor(null, "invoice")).toBe("relevance");
+    expect(searchSortFor(null, "  ")).toBe("newest");
+    expect(searchSortFor("oldest", "invoice")).toBe("oldest");
   });
 
   test("recent searches and channel groups", () => {

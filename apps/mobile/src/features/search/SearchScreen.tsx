@@ -8,6 +8,7 @@ import {
   type SearchDirectory,
   type SearchSort,
   searchChipKey,
+  searchSortFor,
   searchWords,
   typingOperator,
 } from "@agenteschat/client/lib/search-filters";
@@ -43,7 +44,8 @@ export function SearchScreen() {
   const list = useConversations();
   const [q, setQ] = useState("");
   const [chips, setChips] = useState<SearchChip[]>([]);
-  const [sort, setSort] = useState<SearchSort>("newest");
+  // Null until picked: by relevance with words, newest first without (as on the web).
+  const [sort, setSort] = useState<SearchSort | null>(null);
   const field = useRef<TextInputInstance>(null);
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -164,8 +166,9 @@ export function SearchScreen() {
           chips={chips}
           text={text}
           directory={directory}
-          sort={sort}
+          sort={searchSortFor(sort, text)}
           onSort={setSort}
+          onClear={() => setChips([])}
           onOpen={remember}
         />
       ) : words ? (

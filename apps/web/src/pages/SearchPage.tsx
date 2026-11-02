@@ -12,6 +12,7 @@ import {
   type SearchDirectory,
   type SearchPlace,
   searchFilterInput,
+  searchSortFor,
   searchWords,
 } from "@agenteschat/client/lib/search-filters";
 import { Button, EmptyState, List, Select, TabPanel, Tabs } from "@agenteschat/ui";
@@ -97,7 +98,6 @@ export function SearchPage({ scope }: { scope?: string }) {
   const [input, setInput] = useState("");
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  // Null: by relevance with words, newest first without.
   const [sort, setSort] = useState<SearchSort | null>(null);
   // Search as you type, a beat after the last key; an operator still being typed isn't searched as words.
   useEffect(() => {
@@ -105,7 +105,7 @@ export function SearchPage({ scope }: { scope?: string }) {
     return () => clearTimeout(timer);
   }, [input, directory, words]);
   const filtered = chips.length > 0;
-  const effectiveSort = sort ?? (q.trim() ? "relevance" : "newest");
+  const effectiveSort = searchSortFor(sort, q);
   const search = useSearch(
     org.id,
     q,

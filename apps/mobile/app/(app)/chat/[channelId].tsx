@@ -16,10 +16,11 @@ export function ErrorBoundary(props: ErrorBoundaryProps) {
  * request for help in its browser, whose card opens in place, in control.
  */
 export default function ChatRoute() {
-  const { channelId, thread, handoff } = useLocalSearchParams<{
+  const { channelId, thread, handoff, m } = useLocalSearchParams<{
     channelId: string;
     thread?: string;
     handoff?: string;
+    m?: string;
   }>();
   const threadId = isSafeId(thread) ? thread : null;
   // Where "Onde você parou" opens the next time the app starts (ADR 0108).
@@ -31,6 +32,7 @@ export default function ChatRoute() {
         channelId={channelId}
         threadId={threadId}
         handoffId={isSafeId(handoff) ? handoff : null}
+        focusMessageId={isSafeId(m) ? m : null}
       />
     </FocusLive>
   );

@@ -30,8 +30,14 @@ export type AppHref =
   | "/connect-ai?ready=1"
   | "/usage";
 
-export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
-  threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
+/** `messageId`: open at that message (a search hit). */
+export const chatHref = (channelId: string, threadId?: string | null, messageId?: string | null): AppHref => {
+  const params = [
+    threadId && threadId !== channelId ? `thread=${threadId}` : null,
+    messageId ? `m=${messageId}` : null,
+  ].filter(Boolean);
+  return params.length ? `/chat/${channelId}?${params.join("&")}` : `/chat/${channelId}`;
+};
 
 /** Two agents' conversation for a question asked in a conversation, read only. */
 export const consultationHref = (consultationId: string, channelId: string): AppHref =>

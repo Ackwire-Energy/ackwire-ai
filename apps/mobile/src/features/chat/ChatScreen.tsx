@@ -241,23 +241,34 @@ export function ChatScreen({
   channelId,
   threadId,
   handoffId,
+  focusMessageId,
 }: {
   channelId: string;
   threadId?: string | null;
   handoffId?: string | null;
+  /** Scrolled to once it is on screen (a search hit). */
+  focusMessageId?: string | null;
 }) {
   return (
     <SheetHostProvider>
       <FocusLive>
         <OpenHandoffProvider handoffId={handoffId ?? null}>
-          <Chat channelId={channelId} threadId={threadId ?? null} />
+          <Chat channelId={channelId} threadId={threadId ?? null} focusMessageId={focusMessageId ?? null} />
         </OpenHandoffProvider>
       </FocusLive>
     </SheetHostProvider>
   );
 }
 
-function Chat({ channelId, threadId }: { channelId: string; threadId: string | null }) {
+function Chat({
+  channelId,
+  threadId,
+  focusMessageId,
+}: {
+  channelId: string;
+  threadId: string | null;
+  focusMessageId: string | null;
+}) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -653,19 +664,29 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // "Ver" on the requests' line: the list goes to the request and stays there. It stops following the end, as
   // when reading a long message from its top, so a reply streaming in doesn't pull it back down; reaching the end,
   // sending or the pill follow again. The card ends its message: a message taller than the screen shows its end.
-  const seeAsk = useCallback(() => {
-    const id = awayAsk?.ask.messageId;
-    const key = id ? rows.find((r) => r.kind === "message" && r.message.id === id)?.key : undefined;
-    if (!key) return;
-    letGo();
-    setReadHold(true);
-    // After the render that turns following off, so the end doesn't pull it back down.
-    requestAnimationFrame(() => {
-      const index = listRef.current?.getState().indexByKey(key);
-      if (index === undefined) return;
-      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5, viewPositionFallback: "end" });
-    });
-  }, [awayAsk, rows, letGo]);
+  const holdAt = useCallback(
+    (messageId: string | undefined) => {
+      const key = messageId ? rows.find((r) => r.kind === "message" && r.message.id === messageId)?.key : undefined;
+      if (!key) return false;
+      letGo();
+      setReadHold(true);
+      // After the render that turns following off, so the end doesn't pull it back down.
+      requestAnimationFrame(() => {
+        const index = listRef.current?.getState().indexByKey(key);
+        if (index === undefined) return;
+        void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5, viewPositionFallback: "end" });
+      });
+      return true;
+    },
+    [rows, letGo],
+  );
+  const seeAsk = useCallback(() => void holdAt(awayAsk?.ask.messageId), [awayAsk, holdAt]);
+  // A search hit: the list goes to it once its message is among the loaded ones, and stays there.
+  // ponytail: only the loaded pages; an older message opens at the end until history paging can seek to it.
+  const focusPending = useRef(focusMessageId);
+  useEffect(() => {
+    if (focusPending.current && holdAt(focusPending.current)) focusPending.current = null;
+  }, [holdAt]);
 
   // Rows that arrive at the bottom while the screen is open rise in; older pages and the first load don't.
   const prevKeysRef = useRef<string[]>([]);

@@ -17,8 +17,9 @@ import {
 } from "@agenteschat/client/lib/search-filters";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Filters, Icon, Text } from "@/ui";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Button, Filters, Icon, Text } from "@/ui";
+import { Note } from "../ai/parts";
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";
@@ -183,6 +184,7 @@ export function FilteredResults({
   directory,
   sort,
   onSort,
+  onClear,
   onOpen,
 }: {
   chips: SearchChip[];
@@ -190,9 +192,12 @@ export function FilteredResults({
   directory: SearchDirectory;
   sort: SearchSort;
   onSort: (sort: SearchSort) => void;
+  /** Removes every chip. */
+  onClear: () => void;
   onOpen: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const c = useColors();
   const when = useWhen();
   const hits = useSearch(useOrgId(), text, ["message"], searchFilterInput(chips, sort));
   const list = hits.data ?? [];
@@ -205,12 +210,25 @@ export function FilteredResults({
         onChange={(s) => onSort(s as SearchSort)}
       />
       <View style={styles.res}>
-        {list.length > 0 ? (
-          <Text tone="faint" accessibilityRole="text" style={styles.count}>
+        <View style={styles.bar}>
+          <Text tone="faint" accessibilityRole="text">
             {list.length >= 100
               ? t("searchPage.countMore", { count: 100 })
-              : t("searchPage.count", { count: list.length })}
+              : list.length > 0
+                ? t("searchPage.count", { count: list.length })
+                : ""}
           </Text>
+          <Pressable onPress={onClear} accessibilityRole="button" hitSlop={8} style={styles.clear}>
+            <Text tone="faint">{t("searchPage.filtersApplied", { count: chips.length })}</Text>
+            <Icon name="x" size={14} color={c.muted} />
+          </Pressable>
+        </View>
+        {hits.isLoading ? <ActivityIndicator color={c.muted} style={styles.empty} /> : null}
+        {hits.isError && !hits.data ? (
+          <View style={styles.group}>
+            <Note icon="x">{t("common.loadFailed")}</Note>
+            <Button size="sm" variant="secondary" label={t("common.retry")} onPress={() => void hits.refetch()} />
+          </View>
         ) : null}
         {groupByChannel(list).map(([channelId, inChannel]) => {
           const p = place(channelId);
@@ -227,7 +245,7 @@ export function FilteredResults({
                   hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
                   onPress: () => {
                     onOpen();
-                    router.push(chatHref(channelId, h.threadId));
+                    router.push(chatHref(channelId, h.threadId, h.messageId));
                   },
                 }))}
               />
@@ -259,6 +277,14 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 4,
   },
-  count: { paddingHorizontal: 4, paddingTop: 8 },
+  bar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingTop: 8,
+  },
+  clear: { flexDirection: "row", alignItems: "center", gap: 4 },
   empty: { textAlign: "center", paddingVertical: 40 },
 });
