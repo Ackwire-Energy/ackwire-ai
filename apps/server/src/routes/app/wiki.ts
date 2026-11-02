@@ -4,8 +4,8 @@ import {
   createWikiPage,
   deleteWikiPage,
   diffWikiVersions,
-  getWikiPage,
   getWikiFolderAudience,
+  getWikiPage,
   getWikiVersion,
   importWikiPages,
   listWikiPages,
@@ -659,7 +659,10 @@ export function wikiRoutes(deps: AppDeps) {
       const { folder, audience, agentIds, editors, agentEditorIds } = c.req.valid("json");
       const edit = { editors: editors ?? null, agentEditorIds: agentEditorIds ?? null };
       const { orgId } = c.req.valid("param");
-      return c.json(await setWikiFolderAudience(wiki(), c.get("user").id, orgId, folder, audience, agentIds, edit), 200);
+      return c.json(
+        await setWikiFolderAudience(wiki(), c.get("user").id, orgId, folder, audience, agentIds, edit),
+        200,
+      );
     },
   );
 

@@ -6771,8 +6771,7 @@ export const ptBR = {
     restrictedHint: "Só os donos e quem foi escolhido veem esta página.",
     audience: "Quem vê",
     audienceTitle: "Quem vê {{title}}",
-    audienceText:
-      "Os donos sempre leem. Quem fica de fora não encontra a página em listas, buscas ou links.",
+    audienceText: "Os donos sempre leem. Quem fica de fora não encontra a página em listas, buscas ou links.",
     audienceEveryone: "Todos podem editar",
     audienceEveryoneText: "Qualquer membro lê e edita.",
     audienceLimited: "Só quem eu escolher",
@@ -6803,7 +6802,8 @@ export const ptBR = {
     audienceBaseChosen: "Escolhidos",
     audienceBaseView: "Todos veem",
     audienceBaseEdit: "Todos editam",
-    audienceEditNote: "Editar também depende da permissão de editar a wiki: o papel da pessoa, ou o acesso do agente à wiki.",
+    audienceEditNote:
+      "Editar também depende da permissão de editar a wiki: o papel da pessoa, ou o acesso do agente à wiki.",
     readOnly: "Só leitura",
     readOnlyHint: "Você pode ler esta página, mas não editar.",
     audienceRoles: "Papéis",

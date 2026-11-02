@@ -176,25 +176,15 @@ describe("wiki folders with an audience", () => {
 
   test("a page and a subfolder can only be narrower than the folder", async () => {
     const { deps, admin, ana, bia, other, page } = await workspace();
-    await setWikiFolderAudience(
-      deps,
-      f.owner.id,
-      f.org.id,
-      "Financeiro",
-      { roleIds: [admin], userIds: [] },
-      [f.agent.id],
-    );
+    await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro", { roleIds: [admin], userIds: [] }, [
+      f.agent.id,
+    ]);
     const open = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null).catch((e) => e);
     expect(open).toBeInstanceOf(ValidationError);
     expect(code(open)).toBe("wiki.audience_wider_than_folder");
-    const wider = await setWikiPageAudience(
-      deps,
-      f.owner.id,
-      f.org.id,
-      page.id,
-      { roleIds: [], userIds: [bia.id] },
-      [f.agent.id],
-    ).catch((e) => e);
+    const wider = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, { roleIds: [], userIds: [bia.id] }, [
+      f.agent.id,
+    ]).catch((e) => e);
     expect(code(wider)).toBe("wiki.audience_wider_than_folder");
     const moreAgents = await setWikiPageAudience(
       deps,
@@ -245,10 +235,17 @@ describe("wiki folders with an audience", () => {
 
   test("the setter stays in it, a limited folder is only for its audience, and leavers are removed", async () => {
     const { deps, admin, ana, bia } = await workspace();
-    const out = await setWikiFolderAudience(deps, ana.id, f.org.id, "Financeiro", {
-      roleIds: [],
-      userIds: [],
-    }, null).catch((e) => e);
+    const out = await setWikiFolderAudience(
+      deps,
+      ana.id,
+      f.org.id,
+      "Financeiro",
+      {
+        roleIds: [],
+        userIds: [],
+      },
+      null,
+    ).catch((e) => e);
     expect(code(out)).toBe("wiki.audience_excludes_you");
     const both = { roleIds: [admin], userIds: [bia.id] };
     await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro", both, null);
@@ -299,10 +296,18 @@ describe("who edits a wiki page", () => {
 
   test("seeing still comes first: an editor outside the audience gets no access", async () => {
     const { deps, admin, bia, page } = await workspace();
-    const view = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, { roleIds: [admin], userIds: [] }, null, {
-      editors: { roleIds: [], userIds: [bia.id] },
-      agentEditorIds: null,
-    });
+    const view = await setWikiPageAudience(
+      deps,
+      f.owner.id,
+      f.org.id,
+      page.id,
+      { roleIds: [admin], userIds: [] },
+      null,
+      {
+        editors: { roleIds: [], userIds: [bia.id] },
+        agentEditorIds: null,
+      },
+    );
     expect(code(await write(person(bia.id), page.id, view.version).catch((e) => e))).toBe("wiki.no_access");
   });
 

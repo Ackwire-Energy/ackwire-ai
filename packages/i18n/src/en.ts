@@ -6715,8 +6715,7 @@ export const en: Translations = {
     restrictedHint: "Only owners and the people chosen see this page.",
     audience: "Who sees it",
     audienceTitle: "Who sees {{title}}",
-    audienceText:
-      "Owners always read it. Anyone left out won't find the page in lists, search or links.",
+    audienceText: "Owners always read it. Anyone left out won't find the page in lists, search or links.",
     audienceEveryone: "Everyone can edit",
     audienceEveryoneText: "Any member reads and edits it.",
     audienceLimited: "Only who I choose",
@@ -8499,7 +8498,8 @@ export const en: Translations = {
       noAccess: "You don't have access to this page.",
       audienceForbidden: "Only people who edit the wiki and manage roles choose who sees a page.",
       audienceExcludesYou: "Include yourself (one of your roles, or your name) to keep seeing the page.",
-      audienceWiderThanFolder: "This folder is limited: here you can only narrow it further. To open it, change the folder.",
+      audienceWiderThanFolder:
+        "This folder is limited: here you can only narrow it further. To open it, change the folder.",
       editLimited: "Only the people chosen edit this page.",
       editorsExcludeYou: "Include yourself among the people who edit, to keep this page.",
       titleTaken: "There's already a page called “{{title}}”.",
