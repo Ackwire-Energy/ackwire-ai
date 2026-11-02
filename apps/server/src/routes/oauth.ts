@@ -6,6 +6,7 @@ import {
   createAppsMcpHandler,
   exchangeCode,
   type FetchAppDocument,
+  mcpRequestHeaders,
   type OauthDeps,
   refreshTokens,
   registerApp,
@@ -26,7 +27,7 @@ import type { AppDeps } from "./app/context";
  * `Authorization` on a cross-host redirect.
  */
 
-/** The largest MCP request body (JSON-RPC batches included). */
+/** The largest MCP request body. */
 export const MCP_MAX_BODY = 128 * 1024;
 const REGISTER_MAX_BODY = 16 * 1024;
 
@@ -117,75 +118,88 @@ export function registerAppsRoot(app: OpenAPIHono, deps: AppDeps, options: AppsR
   const challenge = `Bearer resource_metadata="${urls.resourceMetadata}", scope="${APP_SCOPES.join(" ")}"`;
   const serve = mcpHandler(deps, options.version);
 
-  app.use("/mcp", publicCors);
-  app.on(["GET", "DELETE", "PUT", "PATCH"], "/mcp", (c) =>
-    c.json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Method not allowed." } }, 405, {
-      allow: "POST",
-    }),
-  );
-  app.post(
-    "/mcp",
-    bodyLimit({
-      maxSize: MCP_MAX_BODY,
-      onError: (c) =>
-        c.json({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Request body too large" } }, 413),
-    }),
-    async (c) => {
-      const text = await c.req.text();
-      let id: unknown = null;
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) id = parsed.id ?? null;
-      } catch {}
-      const row = await authenticateAppBearer(deps.db, c.req.header("authorization"));
-      const unauthorized = () =>
-        c.json(
-          {
-            jsonrpc: "2.0",
-            id,
-            error: {
-              code: -32010,
-              message: "Authorization required",
-              data: { www_authenticate: challenge },
-              _meta: { "mcp/www_authenticate": challenge },
-            },
-          },
-          401,
-          { "www-authenticate": challenge },
-        );
-      if (!row) return unauthorized();
-      for (const [suffix, rule] of [
-        ["m", LIMITS.mcpMinute],
-        ["d", LIMITS.mcpDay],
-      ] as const) {
-        const r = await deps.adapters.rateLimiter.consume(`mcp:${suffix}:${row.grant.id}`, rule);
-        if (!r.allowed) {
-          const retry = Math.max(1, Math.ceil((r.resetAt.getTime() - Date.now()) / 1000));
+  // With and without the trailing slash people paste: the resource matching accepts both.
+  for (const path of ["/mcp", "/mcp/"]) {
+    app.use(path, publicCors);
+    app.on(["GET", "DELETE", "PUT", "PATCH"], path, (c) =>
+      c.json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Method not allowed." } }, 405, {
+        allow: "POST",
+      }),
+    );
+    app.post(
+      path,
+      bodyLimit({
+        maxSize: MCP_MAX_BODY,
+        onError: (c) =>
+          c.json({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Request body too large" } }, 413),
+      }),
+      async (c) => {
+        const text = await c.req.text();
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(text);
+        } catch {}
+        // MCP dropped JSON-RPC batches in 2025-06-18, and one request has to be one call for the rate limits.
+        if (Array.isArray(parsed))
           return c.json(
-            { jsonrpc: "2.0", id, error: { code: -32013, message: "Too many requests", data: { retry_after: retry } } },
-            429,
-            { "retry-after": String(retry) },
+            { jsonrpc: "2.0", id: null, error: { code: -32600, message: "JSON-RPC batches are not supported" } },
+            400,
           );
+        const id = parsed && typeof parsed === "object" ? ((parsed as { id?: unknown }).id ?? null) : null;
+        const row = await authenticateAppBearer(deps.db, c.req.header("authorization"));
+        const unauthorized = () =>
+          c.json(
+            {
+              jsonrpc: "2.0",
+              id,
+              error: {
+                code: -32010,
+                message: "Authorization required",
+                data: { www_authenticate: challenge },
+                _meta: { "mcp/www_authenticate": challenge },
+              },
+            },
+            401,
+            { "www-authenticate": challenge },
+          );
+        if (!row) return unauthorized();
+        for (const [suffix, rule] of [
+          ["m", LIMITS.mcpMinute],
+          ["d", LIMITS.mcpDay],
+        ] as const) {
+          const r = await deps.adapters.rateLimiter.consume(`mcp:${suffix}:${row.grant.id}`, rule);
+          if (!r.allowed) {
+            const retry = Math.max(1, Math.ceil((r.resetAt.getTime() - Date.now()) / 1000));
+            return c.json(
+              {
+                jsonrpc: "2.0",
+                id,
+                error: { code: -32013, message: "Too many requests", data: { retry_after: retry } },
+              },
+              429,
+              { "retry-after": String(retry) },
+            );
+          }
         }
-      }
-      const principal = await appPrincipal(deps.db, row);
-      if (!principal) return unauthorized();
-      const request = new Request(c.req.url, {
-        method: "POST",
-        headers: c.req.raw.headers,
-        body: text,
-        signal: c.req.raw.signal,
-      });
-      const res = await serve(request, principal);
-      await touchGrant(deps.db, principal.grantId);
-      // Buffered: ChatGPT refuses a chunked JSON answer, so it goes with a Content-Length.
-      const body = await res.arrayBuffer();
-      const headers = new Headers(res.headers);
-      headers.delete("transfer-encoding");
-      headers.set("content-length", String(body.byteLength));
-      return new Response(body, { status: res.status, headers });
-    },
-  );
+        const principal = await appPrincipal(deps.db, row);
+        if (!principal) return unauthorized();
+        const request = new Request(c.req.url, {
+          method: "POST",
+          headers: mcpRequestHeaders(c.req.raw.headers, parsed),
+          body: text,
+          signal: c.req.raw.signal,
+        });
+        const res = await serve(request, principal);
+        await touchGrant(deps.db, principal.grantId);
+        // Buffered: ChatGPT refuses a chunked JSON answer, so it goes with a Content-Length.
+        const body = await res.arrayBuffer();
+        const headers = new Headers(res.headers);
+        headers.delete("transfer-encoding");
+        headers.set("content-length", String(body.byteLength));
+        return new Response(body, { status: res.status, headers });
+      },
+    );
+  }
 }
 
 /** The MCP handler's dependencies, from the app's. */

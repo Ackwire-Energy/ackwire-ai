@@ -165,7 +165,7 @@ configs:
   caddyfile:
     content: |
       ${DOMAIN:-localhost} {
-      	request_body /mcp {
+      	request_body /mcp* {
       		max_size 128KB
       	}
       	reverse_proxy agentes:3000

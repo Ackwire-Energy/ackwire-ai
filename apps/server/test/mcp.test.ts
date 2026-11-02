@@ -182,6 +182,67 @@ describe("protocol", () => {
     expect(list.apps.map((a) => a.access)).toEqual(["write"]);
   });
 
+  test("initialize with a modern version header negotiates from the body, as Claude's directory checker sends it", async () => {
+    const { b, orgId } = await setup();
+    const app = await connectApp(t, b, orgId);
+    const res = await mcp(
+      t,
+      app.access,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "checker", version: "1" } },
+      },
+      { "mcp-protocol-version": "2026-07-28" },
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      result: { protocolVersion: string; serverInfo: { icons: { src: string; mimeType: string }[] } };
+    };
+    expect(json.result.protocolVersion).toBe("2025-06-18");
+    expect(json.result.serverInfo.icons[0]).toMatchObject({ src: `${ORIGIN}/icon-512.png`, mimeType: "image/png" });
+  });
+
+  test("an Accept of JSON alone is served (every answer is JSON), and /mcp/ is the same endpoint", async () => {
+    const { b, orgId } = await setup();
+    const app = await connectApp(t, b, orgId);
+    const json = await mcp(
+      t,
+      app.access,
+      { jsonrpc: "2.0", id: 1, method: "tools/list" },
+      { accept: "application/json" },
+    );
+    expect(json.status).toBe(200);
+    const slash = (bearer: string | null) =>
+      t.app.request("/mcp/", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
+      });
+    const anonymous = await slash(null);
+    expect([anonymous.status, anonymous.headers.get("www-authenticate")]).toEqual([401, CHALLENGE]);
+    expect((await slash(app.access)).status).toBe(200);
+  });
+
+  test("a JSON-RPC batch is refused before it runs anything; a huge argument list is refused by count", async () => {
+    const { b, orgId } = await setup();
+    const app = await connectApp(t, b, orgId);
+    const call = { jsonrpc: "2.0", method: "tools/call", params: { name: "list_agents", arguments: {} } };
+    const batch = await mcp(t, app.access, [
+      { ...call, id: 1 },
+      { ...call, id: 2 },
+    ]);
+    expect(batch.status).toBe(400);
+    expect(((await batch.json()) as { error: { code: number } }).error.code).toBe(-32600);
+    const wide = await callTool(t, app.access, "list_agents", { query: Array.from({ length: 10_001 }, () => 1) });
+    expect(wide.isError).toBe(true);
+    expect(wide.content[0]?.text).toContain("maximum of 10000 elements");
+  });
+
   test("GET is 405, an unknown method 200 with -32601, a body over 128 KiB 413", async () => {
     const { b, orgId } = await setup();
     const app = await connectApp(t, b, orgId);

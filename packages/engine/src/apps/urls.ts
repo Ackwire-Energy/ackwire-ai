@@ -46,7 +46,9 @@ export function appsUrls(publicUrl: string) {
     revoke: `${issuer}/api/oauth/revoke`,
     consentPage: `${issuer}/autorizar`,
     docs: `${issuer}/help/apps-de-ia`,
-    icon: `${issuer}/favicon.svg`,
+    /** PNG first: clients that draw icons must support PNG, SVG only should (and directories ask for 512 px). */
+    icon: `${issuer}/icon-512.png`,
+    iconSvg: `${issuer}/favicon.svg`,
   };
 }
 

@@ -371,7 +371,7 @@ server {
     client_max_body_size 110m;
 
     # AI apps' MCP endpoint (Apps de IA, below): small JSON requests only.
-    location = /mcp {
+    location ~ ^/mcp/?$ {
         client_max_body_size 128k;
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -639,7 +639,7 @@ nothing to configure: Settings → Apps de IA shows the address and the steps fo
   needs a public https address (a domain, or Tailscale Funnel: What needs a public URL). Claude Code, Cursor and
   VS Code call from the computer they run on.
 - **Proxies**: the compose file's Caddy needs nothing more (answers are JSON, never streamed) and caps `/mcp`
-  bodies at 128 KB. With nginx, add the `location = /mcp` block shown above. Behind Cloudflare, never challenge
+  bodies at 128 KB. With nginx, add the `location ~ ^/mcp/?$` block shown above. Behind Cloudflare, never challenge
   `/mcp`, `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server`,
   `/.well-known/openid-configuration` and `/api/oauth/*` (a WAF skip rule: no Bot Fight Mode, no managed
   challenge, no rate limits there). On the free plan, which can't skip Bot Fight Mode per path, allow Claude's

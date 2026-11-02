@@ -1369,7 +1369,7 @@ describe("the compose file the setup drives", () => {
       [
         // biome-ignore lint/suspicious/noTemplateCurlyInString: Compose's interpolation, not a template literal
         "${DOMAIN:-localhost} {",
-        "\trequest_body /mcp {",
+        "\trequest_body /mcp* {",
         "\t\tmax_size 128KB",
         "\t}",
         "\treverse_proxy agentes:3000",

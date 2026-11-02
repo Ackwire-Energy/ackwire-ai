@@ -7,6 +7,7 @@ import {
   createMcpHandler,
   isLegacyRequest,
   McpServer,
+  PROTOCOL_VERSION_META_KEY,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/server";
 import { z } from "zod";
@@ -546,9 +547,13 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
       title: "agentes.chat",
       version,
       websiteUrl: urls.issuer,
-      icons: [{ src: urls.icon, mimeType: "image/svg+xml", sizes: ["any"] }],
+      icons: [
+        { src: urls.icon, mimeType: "image/png", sizes: ["512x512"] },
+        { src: urls.iconSvg, mimeType: "image/svg+xml", sizes: ["any"] },
+      ],
     },
-    { instructions: appsInstructions(p) },
+    // Every element of a tool's arguments is walked before its schema refuses them: a wide array costs CPU.
+    { instructions: appsInstructions(p), maxToolInputElements: 10_000 },
   );
   const tool = <S extends z.ZodObject>(
     name: (typeof APP_TOOL_NAMES)[number],
@@ -913,6 +918,24 @@ async function namesOf(db: Database, orgId: string, list: MessageView[]) {
       names.set(u.id, u.name);
   for (const [id, a] of await agentNamesOf(db, orgId, agentIds)) names.set(id, a.name);
   return names;
+}
+
+/**
+ * The headers an MCP request is served with. An `initialize` without a 2026 envelope is the 2025 handshake, which
+ * negotiates its version from the body: a modern `MCP-Protocol-Version` header next to it (Claude's directory
+ * checker sends one) would get it refused as a header/body mismatch. Replies are always JSON, so an Accept without
+ * both types (curl, a simple script) gets both, as the 2025 transport insists.
+ */
+export function mcpRequestHeaders(headers: Headers, body: unknown): Headers {
+  const out = new Headers(headers);
+  const message = body && typeof body === "object" ? (body as { method?: unknown; params?: { _meta?: unknown } }) : {};
+  const meta = message.params?._meta;
+  if (message.method === "initialize" && !(meta && typeof meta === "object" && PROTOCOL_VERSION_META_KEY in meta))
+    for (const name of ["mcp-protocol-version", "mcp-method", "mcp-name"]) out.delete(name);
+  const accept = out.get("accept") ?? "";
+  if (!accept.includes("application/json") || !accept.includes("text/event-stream"))
+    out.set("accept", "application/json, text/event-stream");
+  return out;
 }
 
 /**
