@@ -6,7 +6,7 @@ import { APP_LIMITS, DCR_CLIENT_PREFIX, randomBase62 } from "./urls";
 const { oauthAppClients } = schema;
 
 /**
- * The apps that connect (ADR 0113 §1.6): registered here (DCR) or named by the https address of their metadata
+ * The apps that connect (ADR 0119 §1.6): registered here (DCR) or named by the https address of their metadata
  * document (CIMD). Only a name and return addresses are kept; logos, home pages and pinned scopes an app sends are
  * dropped, so nothing an app claims about itself reaches a consent screen except its name, shown as unverified.
  */

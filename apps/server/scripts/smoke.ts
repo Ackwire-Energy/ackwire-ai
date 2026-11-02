@@ -16,7 +16,7 @@
  * wasn't running) watched until one framebuffer update, and its terminal's
  * `id -un`, which must not be root, or its refusal where sessions are screened
  * (`smoke-desktop.ts`). Without a model key, only that runs. With `--apps`, the
- * AI apps' endpoint at PUBLIC_URL (ADR 0113): its resource document and the exact
+ * AI apps' endpoint at PUBLIC_URL (ADR 0119): its resource document and the exact
  * 401 challenge of `/mcp`, as an app sees them through every proxy in front.
  */
 import { parseArgs } from "node:util";
@@ -200,7 +200,7 @@ async function modelSmoke(db: Database) {
   );
 }
 
-/** AI apps (ADR 0113): what an MCP client reads first, through the proxies in front of PUBLIC_URL. */
+/** AI apps (ADR 0119): what an MCP client reads first, through the proxies in front of PUBLIC_URL. */
 async function appsSmoke() {
   const urls = appsUrls(config.PUBLIC_URL);
   const doc = (await (await fetch(urls.resourceMetadata)).json()) as { resource?: string };

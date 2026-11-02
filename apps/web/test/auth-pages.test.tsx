@@ -350,7 +350,7 @@ describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
     expect(lead()).toBe("Para criar um agente.");
     cleanup();
 
-    // An AI app's sign-in (ADR 0113): back to its consent page.
+    // An AI app's sign-in (ADR 0119): back to its consent page.
     await renderApp(at("/autorizar?req=0192"), { api, auth: createFakeAuth().auth });
     expect(lead()).toBe("Para conectar um app ao agentes.chat.");
   });

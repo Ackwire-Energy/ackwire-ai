@@ -117,7 +117,7 @@ export const WORKER_INTERVALS_MS = {
   deletions: 3600_000,
   /** Yesterday's stall-and-noise report, queued for an hour after the UTC day ended (once per day: its dedupe key). */
   opsReport: 3600_000,
-  /** AI apps' expired requests, tokens and unused registrations (ADR 0113). */
+  /** AI apps' expired requests, tokens and unused registrations (ADR 0119). */
   apps: 3600_000,
 };
 

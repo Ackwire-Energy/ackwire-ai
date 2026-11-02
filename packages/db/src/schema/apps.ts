@@ -4,7 +4,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * AI apps (ADR 0113): Claude, ChatGPT, Cursor and other MCP clients that call this server's `/mcp` as a person,
+ * AI apps (ADR 0119): Claude, ChatGPT, Cursor and other MCP clients that call this server's `/mcp` as a person,
  * in one workspace. The server is its own OAuth 2.1 authorization server for them. Not the outgoing connectors'
  * `oauth_clients` / `oauth_states` (ADR 0016): those are apps this server signs in to.
  */

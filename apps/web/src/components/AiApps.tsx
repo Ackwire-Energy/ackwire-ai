@@ -75,7 +75,7 @@ export function AppMark({
 type Confirm = { kind: "app"; item: ConnectedApp } | { kind: "token"; item: PersonalToken };
 
 /**
- * Configurações → Apps de IA (ADR 0113): this server's address, "Conectar um app" with each app's steps, the apps
+ * Configurações → Apps de IA (ADR 0119): this server's address, "Conectar um app" with each app's steps, the apps
  * connected here and the personal tokens. Who manages members also sees everyone's, and disconnects any.
  */
 export function AiAppsSection() {

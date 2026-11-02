@@ -598,13 +598,16 @@ const notRequested = {
   isError: true,
 };
 
-/** Who wrote the message this run answers, when a person did. */
+/**
+ * Who wrote the message this run answers, when a person did in their own words: one sent through an AI app carries
+ * `meta.readOutside` and counts as outside content (ADR 0119).
+ */
 async function triggerAuthor(ctx: ToolContext) {
   const [m] = await ctx.db
-    .select({ type: messages.authorType, userId: messages.authorUserId })
+    .select({ type: messages.authorType, userId: messages.authorUserId, meta: messages.meta })
     .from(messages)
     .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
-  return m?.type === "person" ? m.userId : null;
+  return m?.type === "person" && m.meta.readOutside !== true ? m.userId : null;
 }
 
 /**

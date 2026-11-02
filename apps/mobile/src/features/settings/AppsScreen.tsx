@@ -12,7 +12,7 @@ import { useColors } from "../shared/hooks";
 import { CommandBlock, chooseAction, confirmAction, Gap, SettingsPage } from "./parts";
 
 /**
- * Configurações › Apps de IA (ADR 0113), as the web's: this server's address, the apps connected here and the personal
+ * Configurações › Apps de IA (ADR 0119), as the web's: this server's address, the apps connected here and the personal
  * tokens, each disconnected or revoked from its row's actions. Connecting an app and creating a token open the web,
  * where the steps and the shown-once token fit.
  */

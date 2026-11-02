@@ -98,7 +98,7 @@ const RequestParams = z.object({
 });
 
 /**
- * AI apps (ADR 0113): the consent page's two calls, and Settings → AI apps (connected apps, personal tokens). A
+ * AI apps (ADR 0119): the consent page's two calls, and Settings → AI apps (connected apps, personal tokens). A
  * consent answers once; the workspace and the access come from this form, checked again here.
  */
 export function appRoutes(deps: AppDeps) {

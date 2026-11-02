@@ -109,7 +109,7 @@ export async function createTestServer(
      * Absent: `gifs` serves them, and a saved key is kept unchecked (tests never reach the network).
      */
     giphyFetch?: typeof fetch;
-    /** AI apps (ADR 0113): a fake fetch of apps' metadata documents (CIMD); absent = none answers. */
+    /** AI apps (ADR 0119): a fake fetch of apps' metadata documents (CIMD); absent = none answers. */
     appsFetchDocument?: FetchAppDocument;
   } = {},
 ) {

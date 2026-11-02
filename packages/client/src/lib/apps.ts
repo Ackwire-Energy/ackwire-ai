@@ -4,7 +4,7 @@ import type { AppAccess, AppConsent, AppDisplayKind, AppsList, ConnectedApp, Per
 import { formatShortDate, relativeTime } from "./format";
 
 /*
- * AI apps (ADR 0113) in words and marks, for the web and the phone alike: which mark stands for an app, how long a
+ * AI apps (ADR 0119) in words and marks, for the web and the phone alike: which mark stands for an app, how long a
  * name is shown, and which of the consent page's states an error or an `?erro=` is.
  */
 

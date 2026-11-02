@@ -227,7 +227,7 @@ export function RoutineTag({
   );
 }
 
-/** A person's message sent through a connected AI app (ADR 0113): "via Claude", with the app's mark when known. */
+/** A person's message sent through a connected AI app (ADR 0119): "via Claude", with the app's mark when known. */
 export function AppViaTag({ via, person }: { via: AppVia; person: string }) {
   const { t } = useTranslation();
   const mark = via.brand ? APP_BRANDS[via.brand] : undefined;

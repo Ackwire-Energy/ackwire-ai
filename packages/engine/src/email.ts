@@ -188,7 +188,7 @@ export type EmailTemplate =
     }
   /** An owner restored a workspace that was being deleted, one email per member. */
   | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
-  /** An AI app or a personal token got access to the person's account in a workspace (ADR 0113), to that person. */
+  /** An AI app or a personal token got access to the person's account in a workspace (ADR 0119), to that person. */
   | { kind: "app_connected"; locale: EmailLocale; appName: string; orgName: string; url: string }
   /**
    * The account `email` was deleted. `orgNames`: the workspaces only they were in, which closed with it and go for

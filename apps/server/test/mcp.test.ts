@@ -316,6 +316,8 @@ describe("tools", () => {
       brand: null,
       host: null,
     });
+    // Written by the person's AI, which may carry text it read elsewhere: outside content for learning.
+    expect(message?.meta.readOutside).toBe(true);
     expect(s.message_url).toBe(`${ORIGIN}/org/${orgId}/c/${message?.channelId}?m=${message?.id}`);
     expect((await t.db.select().from(schema.appSends)).map((r) => r.agentId)).toEqual([agentId]);
     const audit = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "apps.message_sent"));

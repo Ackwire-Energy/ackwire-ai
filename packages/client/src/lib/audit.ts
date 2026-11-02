@@ -72,7 +72,7 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
     const what = (["joined", "left", "role_changed"] as const).find((s) => s === rest);
     if (what) return t(`audit.change.member.${what}`);
   }
-  // AI apps (ADR 0113): the app's or the token's name, as it was shown when it happened.
+  // AI apps (ADR 0119): the app's or the token's name, as it was shown when it happened.
   if (area === "apps") {
     const what = (
       ["connected", "scopes_changed", "disconnected", "token_created", "token_revoked", "message_sent"] as const

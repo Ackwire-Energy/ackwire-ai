@@ -32,7 +32,7 @@ const isPageError = (e: ConsentError): e is PageError => e !== "workspace_paused
 type Outcome = { kind: "allowed"; app: string; to: string } | { kind: "denied"; to: string } | null;
 
 /**
- * `/autorizar?req=` (ADR 0113): an AI app asks to act as this person. The page says who asks (from the address it
+ * `/autorizar?req=` (ADR 0119): an AI app asks to act as this person. The page says who asks (from the address it
  * returns to, never what it says of itself unless verified), where the browser goes back, the workspace and the
  * access, what it can and can never do, and Permitir or Cancelar. Either way the browser goes back to the app once:
  * an app's own scheme (`cursor://`) leaves this page open on its last state. `?erro=` is the server's refusal before

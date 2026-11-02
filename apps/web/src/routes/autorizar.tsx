@@ -4,7 +4,7 @@ import { requireUser } from "@/app/guards";
 import { AuthorizePage } from "@/pages/AuthorizePage";
 
 /**
- * `/autorizar?req=` (ADR 0113): where an AI app's sign-in lands. Signed out, the person signs in first and comes back
+ * `/autorizar?req=` (ADR 0119): where an AI app's sign-in lands. Signed out, the person signs in first and comes back
  * with the request. `?erro=` is the server's refusal before there was a request: it shows without signing in.
  */
 export const Route = createFileRoute("/autorizar")({

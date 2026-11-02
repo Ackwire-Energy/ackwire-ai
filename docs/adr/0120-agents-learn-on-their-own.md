@@ -60,7 +60,7 @@ The model proposes items (`fact | preference | decision | lesson | how_to | term
 
 ### 5. Trust
 
-- **Run trust** (`learnTrust`): high only with a person behind the run (`personBehindCall`) and no outside content read so far: `web_search`, `web_fetch`, browser tools, and any result in an outside envelope (`external_data`, `page_content`, `email_content`, `database_rows`), which covers MCP and connector answers and mail.
+- **Run trust** (`learnTrust`): high only with a person behind the run (`personBehindCall`) and no outside content read so far: `web_search`, `web_fetch`, browser tools, and any result in an outside envelope (`external_data`, `page_content`, `email_content`, `database_rows`), which covers MCP and connector answers and mail. A person's message sent through a connected AI app (ADR 0119) carries `meta.readOutside` and counts as outside content too: the person stays behind the run, but what is learned from it is low trust and the agent's own.
 - **Low trust never verifies** (`insert_context_item`, merges): such an item is labeled data, never shared, never promoted, never a skill. Only a person's edit (a new version) or a linked positive outcome raises it.
 - Confidence set by code: a person's words 0.95, the agent's own finding 0.75 to 0.8, inferred from a person's message 0.7, outside content 0.5.
 

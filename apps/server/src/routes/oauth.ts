@@ -22,7 +22,7 @@ import { requestLimitIp } from "../http/client-ip";
 import type { AppDeps } from "./app/context";
 
 /**
- * agentes.chat as a remote MCP server for AI apps (ADR 0113): the discovery documents, this server's own OAuth 2.1
+ * agentes.chat as a remote MCP server for AI apps (ADR 0119): the discovery documents, this server's own OAuth 2.1
  * authorization server (`/api/oauth/*`) and the MCP endpoint (`/mcp`). One origin for all of them: Claude drops
  * `Authorization` on a cross-host redirect.
  */

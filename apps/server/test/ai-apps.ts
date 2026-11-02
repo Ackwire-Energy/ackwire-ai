@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { type Browser, ORIGIN, type TestServer } from "./harness";
 
-/** AI apps (ADR 0113) in tests: an app registering, the person allowing it, the code traded for tokens. */
+/** AI apps (ADR 0119) in tests: an app registering, the person allowing it, the code traded for tokens. */
 
 export const LOOPBACK = "http://127.0.0.1:33418/callback";
 

@@ -1472,7 +1472,7 @@ export interface ApiClient {
     search(orgId: string, query: GifQuery): Promise<GifPage>;
   };
   /**
-   * AI apps (ADR 0113): the consent page an app's sign-in opens (`/autorizar?req=`), and Settings → AI apps. A
+   * AI apps (ADR 0119): the consent page an app's sign-in opens (`/autorizar?req=`), and Settings → AI apps. A
    * consent answers once (409 `request_used`); 410 `request_expired` past its 30 minutes.
    */
   apps: {

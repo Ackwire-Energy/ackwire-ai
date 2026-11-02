@@ -193,7 +193,7 @@ describe("apps in words", () => {
   });
 });
 
-describe("Configurações › Apps de IA (ADR 0113)", () => {
+describe("Configurações › Apps de IA (ADR 0119)", () => {
   test("its own section under Você, the server's address with Copiar, the empty state and the tokens shown at once", async () => {
     copied.length = 0;
     await go();
@@ -218,7 +218,7 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     const cards = dialog()
       .getAllByRole("button")
       .filter((b) => b.classList.contains("apps-client"));
-    // ChatGPT and Codex wait for their QA gates (ADR 0113).
+    // ChatGPT and Codex wait for their QA gates (ADR 0119).
     expect(cards.map((c) => c.querySelector(".apps-client__name")?.textContent)).toEqual([
       "Claude",
       "Claude Code",

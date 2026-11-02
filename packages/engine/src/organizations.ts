@@ -1055,7 +1055,7 @@ export async function removeMember(
       .returning({ id: schema.agents.id });
     for (const a of unlisted) caches.agents.delete(`${orgId}:${a.id}`);
     if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
-    // Their AI apps and personal tokens here stop now (ADR 0113).
+    // Their AI apps and personal tokens here stop now (ADR 0119).
     await revokeMemberApps(tx, orgId, targetUserId);
     // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an
     // agent on a computer of theirs then goes back to the API too (`releaseAgents`).

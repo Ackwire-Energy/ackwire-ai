@@ -10,7 +10,7 @@ import { ACCESS_TOKEN_PREFIX, APP_LIMITS, type AppScope, PERSONAL_TOKEN_PREFIX, 
 
 const { appGrants, appTokens, appSends, oauthAppRequests, oauthAppClients, users, organizations } = schema;
 
-/** Who an MCP request acts as, once its bearer token checked out (ADR 0113 §1.9). */
+/** Who an MCP request acts as, once its bearer token checked out (ADR 0119 §1.9). */
 export interface AppPrincipal {
   grantId: string;
   orgId: string;
@@ -285,7 +285,7 @@ export async function createPersonalToken(
 }
 
 /**
- * Hourly cleanup (ADR 0113 §2): requests a day after they ran out, tokens 30 days after they expired or were
+ * Hourly cleanup (ADR 0119 §2): requests a day after they ran out, tokens 30 days after they expired or were
  * revoked, registrations with no connection unused for 90 days, sends after 90 days, and grants unused for 90 days
  * (revoked, then their rows go with the tokens).
  */

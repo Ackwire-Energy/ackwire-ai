@@ -1604,7 +1604,7 @@ export function taskNotice(m: Pick<Message, "body" | "meta">, current = false): 
 }
 
 /**
- * A person's message sent from an AI app (ADR 0113, `meta.via`): the agent learns the person reads the reply there,
+ * A person's message sent from an AI app (ADR 0119, `meta.via`): the agent learns the person reads the reply there,
  * maybe not in agentes.chat. "" for anything else.
  */
 function viaLine(m: Message, who: string): string {

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 /**
- * AI apps (ADR 0113): the addresses, scopes and token shapes of this server as an MCP server and its own
+ * AI apps (ADR 0119): the addresses, scopes and token shapes of this server as an MCP server and its own
  * OAuth 2.1 authorization server. One helper for every address, so the metadata, the 401 challenge and the
  * address shown in Settings never drift apart.
  */

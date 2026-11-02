@@ -30,7 +30,7 @@ import {
 const { oauthAppRequests, oauthAppClients, appGrants, appTokens, users } = schema;
 
 /**
- * This server's own OAuth 2.1 authorization server for AI apps (ADR 0113 §1): authorization code with PKCE (S256
+ * This server's own OAuth 2.1 authorization server for AI apps (ADR 0119 §1): authorization code with PKCE (S256
  * only), public clients, opaque tokens stored only as sha256, refresh rotation with reuse detection. Ported from
  * Dinzo's authorization server and checked against the edge cases MillionSend and Real Oficial met in production.
  */

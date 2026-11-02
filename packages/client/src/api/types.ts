@@ -5727,7 +5727,7 @@ export interface AgentPlanUsage {
   current: PlanAccountUsage | null;
 }
 
-// ── AI apps (ADR 0113): this server as a remote MCP server ──
+// ── AI apps (ADR 0119): this server as a remote MCP server ──
 
 /** What a connected app or a personal token may do: `write` reads and sends tasks, `read` only reads. */
 export type AppAccess = "read" | "write";

@@ -58,7 +58,7 @@ export interface SettingsEntry {
 
 /** The web's settings, in its order and groups (`settings.group.*`, `settings.section.*`), with the phone's screens. */
 export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
-  // AI apps (ADR 0113): each person's own connections in this workspace; connecting one happens on the web.
+  // AI apps (ADR 0119): each person's own connections in this workspace; connecting one happens on the web.
   { id: "apps", group: "you", icon: "share", href: "/settings/apps", allowed: () => true },
   { id: "general", group: "org", icon: "home", href: "/settings/general", allowed: () => true },
   // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).

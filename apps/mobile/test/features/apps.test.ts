@@ -22,7 +22,7 @@ const app = (over: Partial<ConnectedApp> = {}): ConnectedApp => ({
   ...over,
 });
 
-describe("Apps de IA on the phone (ADR 0113)", () => {
+describe("Apps de IA on the phone (ADR 0119)", () => {
   test("everyone opens it, first, under Você", () => {
     const first = visibleSections(undefined)[0];
     expect([first?.id, first?.group, first?.href]).toEqual(["apps", "you", "/settings/apps"]);

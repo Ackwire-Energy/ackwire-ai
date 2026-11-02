@@ -41,7 +41,7 @@ const title = () => within(page()).getByRole("heading", { level: 1 });
 const calls = (state: FakeState, method: string) => state.calls.filter((c) => c.method === method).map((c) => c.args);
 const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
 
-describe("/autorizar: an AI app asks to act as this person (ADR 0113)", () => {
+describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
   test("signed out: sign in first, then come back to the same request", async () => {
     const { router } = await renderApp(`/autorizar?req=${REQ}`, { api: createFakeApi(seedState({ me: null })) });
     expect(router.state.location.pathname).toBe("/login");

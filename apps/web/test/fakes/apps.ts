@@ -1,5 +1,5 @@
 /**
- * Test fake — AI apps (ADR 0113), same shapes as the server's `/api/app/authorize/{req}` and `…/apps`, `…/tokens`
+ * Test fake — AI apps (ADR 0119), same shapes as the server's `/api/app/authorize/{req}` and `…/apps`, `…/tokens`
  * routes. Tests add consents, connect apps (as an app's sign-in would) and make the next call fail.
  */
 import type { ApiClient, AppConsent, ConnectedApp, PersonalToken } from "@agenteschat/client";

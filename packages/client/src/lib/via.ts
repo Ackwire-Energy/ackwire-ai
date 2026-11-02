@@ -1,4 +1,4 @@
-/** `message.meta.via` (ADR 0113, server-made): the person sent it through a connected AI app. */
+/** `message.meta.via` (ADR 0119, server-made): the person sent it through a connected AI app. */
 export interface AppVia {
   name: string;
   brand: string | null;

@@ -7,7 +7,7 @@ const { appGrants, appTokens } = schema;
 export type RevokedBy = { type: "person"; id: string } | { type: "system"; reason: string };
 
 /**
- * Revokes the AI app grants matching `where`, every token they have, and audits each one (ADR 0113 §1.5). The one
+ * Revokes the AI app grants matching `where`, every token they have, and audits each one (ADR 0119 §1.5). The one
  * way a grant ends, so a grant connected again later never brings an old token back.
  */
 export async function revokeAppGrants(tx: Executor, where: SQL | undefined, by: RevokedBy) {

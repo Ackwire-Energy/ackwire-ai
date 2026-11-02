@@ -82,7 +82,7 @@ export interface AppOptions {
   moduleContext?: ModuleContext;
   /** Database, auth and adapters. Without them only system routes are mounted (some tests). */
   services?: AppDeps;
-  /** AI apps (ADR 0113): how an app's metadata document is fetched; swapped in tests. */
+  /** AI apps (ADR 0119): how an app's metadata document is fetched; swapped in tests. */
   appsFetchDocument?: AppsRouteOptions["fetchDocument"];
   /** Directory with the built web app (Vite SPA). Skipped when absent. */
   webDir?: string;
@@ -107,8 +107,8 @@ export interface AppOptions {
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
  * - `/api/hooks/*`        public: a webhook routine's own address (POST, ADR 0106)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
- * - `/api/oauth/*`        public: the OAuth 2.1 authorization server for AI apps (ADR 0113)
- * - `/mcp`                AI apps' MCP endpoint, bearer tokens only (ADR 0113); `/.well-known/oauth-*` its discovery
+ * - `/api/oauth/*`        public: the OAuth 2.1 authorization server for AI apps (ADR 0119)
+ * - `/mcp`                AI apps' MCP endpoint, bearer tokens only (ADR 0119); `/.well-known/oauth-*` its discovery
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)

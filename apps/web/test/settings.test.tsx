@@ -528,7 +528,7 @@ describe("Configurações do workspace", () => {
     ).toEqual([
       "Sua conta",
       "Notificações",
-      // Each person connects their own AI apps (ADR 0113).
+      // Each person connects their own AI apps (ADR 0119).
       "Apps de IA",
       "Geral",
       "Membros e convites",

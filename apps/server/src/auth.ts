@@ -188,7 +188,7 @@ export function createAuth(deps: {
             // every session: the address counts as confirmed, so a provider can join the account (ADR 0006).
             onPasswordReset: async ({ user }: { user: { id: string } }) => {
               await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));
-              // A new password cuts off every AI app and personal token the old one let in (ADR 0113).
+              // A new password cuts off every AI app and personal token the old one let in (ADR 0119).
               await revokeUserApps(db, user.id);
             },
           }

@@ -175,7 +175,7 @@ export const MessageRow = memo(function MessageRow({
   const reminder = isReminderMessage(meta);
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = isAgent && isTalkerReply(meta);
-  // A person's message sent through a connected AI app (ADR 0113): "via Claude".
+  // A person's message sent through a connected AI app (ADR 0119): "via Claude".
   const via = m.author.type === "person" ? appVia(meta) : null;
   const viaMark = via?.brand ? APP_BRANDS[via.brand] : undefined;
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a

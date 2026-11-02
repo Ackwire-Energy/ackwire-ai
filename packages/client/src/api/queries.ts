@@ -4370,7 +4370,7 @@ export function useSetAgentDatabase(orgId: string) {
   });
 }
 
-/** `/autorizar?req=`: the app asking and the workspaces it could get (ADR 0113). Asked once: it answers once. */
+/** `/autorizar?req=`: the app asking and the workspaces it could get (ADR 0119). Asked once: it answers once. */
 export const useAppConsent = (requestId: string) => {
   const api = useApi();
   return useQuery({

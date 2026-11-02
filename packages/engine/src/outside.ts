@@ -140,7 +140,8 @@ const PERSON_WORDS_LIMIT = 200;
 
 /**
  * What people wrote in a conversation (its thread and the channel's top level), newest first, joined: an address,
- * handle or credential found here was written by a person, not read from outside.
+ * handle or credential found here was written by a person, not read from outside. A person's message marked
+ * `meta.readOutside` (sent through an AI app, ADR 0119) is left out.
  */
 export async function personWords(
   db: Executor,
@@ -157,6 +158,7 @@ export async function personWords(
         eq(messages.channelId, channelId),
         eq(messages.authorType, "person"),
         isNull(messages.deletedAt),
+        sql`coalesce(${messages.meta}->>'readOutside', '') <> 'true'`,
         threadId
           ? or(isNull(messages.threadId), eq(messages.id, threadId), eq(messages.threadId, threadId))
           : isNull(messages.threadId),

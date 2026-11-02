@@ -1,6 +1,6 @@
 /*
- * Every fact about connecting an AI app to this server (ADR 0113), in one place: the "Conectar um app" dialog and the
- * help page's tabs both read it. Commands, deep links and menu paths are each vendor's as of ADR 0113's QA gates
+ * Every fact about connecting an AI app to this server (ADR 0119), in one place: the "Conectar um app" dialog and the
+ * help page's tabs both read it. Commands, deep links and menu paths are each vendor's as of ADR 0119's QA gates
  * (G1–G6). A card ships with its gate: ChatGPT waits for G3, Codex for G5, and the help page lists them then too.
  */
 

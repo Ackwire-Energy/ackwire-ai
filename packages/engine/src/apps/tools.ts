@@ -30,7 +30,7 @@ import { appsUrls } from "./urls";
 const { agentRuns, appSends, approvals, messages, users, agents, channels } = schema;
 
 /**
- * The tools an AI app gets on `/mcp` (ADR 0113 §3). They act as the person, through the same engine calls the web
+ * The tools an AI app gets on `/mcp` (ADR 0119 §3). They act as the person, through the same engine calls the web
  * app makes, so every permission is the person's own. None decides an approval, changes a setting or manages
  * people: approvals stay a human action inside agentes.chat.
  */
@@ -650,7 +650,12 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
           body,
           threadId: args.thread_id ?? null,
           clientId: `app:${sha256(`${p.grantId}:${key}`).slice(0, 40)}`,
-          meta: { via: { kind: "app", grantId: p.grantId, name: p.app.name, brand: p.app.brand, host: p.app.host } },
+          // The person's own request, with their permissions, but written by their AI, which may carry text it read
+          // elsewhere: outside content for learning and for what the run relays (ADR 0117, ADR 0120).
+          meta: {
+            via: { kind: "app", grantId: p.grantId, name: p.app.name, brand: p.app.brand, host: p.app.host },
+            readOutside: true,
+          },
         },
       );
       const [already] = await deps.db
