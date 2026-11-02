@@ -2459,8 +2459,11 @@ async function executeRunInner(
    */
   const usageReading = async (stored?: PlanUsage | null) => {
     if (plan.kind === "model") {
-      const used = await budgetUsedPercent(db, agent).catch(() => 0);
-      return { source: "budget" as const, used, resetsAt: new Date(nextMonthStart(Date.now())).toISOString() };
+      const { spent, held } = await budgetUsedPercent(db, agent).catch(() => ({ spent: 0, held: 0 }));
+      // Over the line only with other calls' reservations in flight: they're released in seconds, so it looks again
+      // soon instead of waiting for the month.
+      if (spent < PLAN_PAUSE && held >= PLAN_PAUSE) return { source: "budget" as const, used: held, soon: true };
+      return { source: "budget" as const, used: spent, resetsAt: new Date(nextMonthStart(Date.now())).toISOString() };
     }
     const machineId = plan.session?.machineId ?? agent.machineId;
     const usage =
@@ -2567,7 +2570,8 @@ async function executeRunInner(
         return waitForUsage({
           code: "usage_pause",
           message: `Long work paused at ${pause.used}% of the ${pause.source}.`,
-          ...(pause.resetsAt ? { resetsAt: pause.resetsAt } : {}),
+          ...("resetsAt" in pause && pause.resetsAt ? { resetsAt: pause.resetsAt } : {}),
+          ...("soon" in pause ? { soon: true } : {}),
           pause: { source: pause.source, used: pause.used, ...("window" in pause ? { window: pause.window } : {}) },
         });
       }

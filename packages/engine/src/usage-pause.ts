@@ -142,12 +142,15 @@ export function isLongWork(w: {
 export const overrideHolds = (o: { until: string | null } | undefined, now = Date.now()) =>
   o !== undefined && (o.until === null || Date.parse(o.until) > now);
 
-/** How much of its monthly budget (spent and reserved) the agent used this UTC month, in percent. */
+/**
+ * How much of its monthly budget the agent used this UTC month, in percent: `spent`, and `held` with what its runs
+ * reserved for calls in flight (worst-case, released when each call ends).
+ */
 export async function budgetUsedPercent(
   db: Database,
   agent: { id: string; orgId: string; monthlyBudgetNanoUsd: number | null },
   now = new Date(),
-): Promise<number> {
+): Promise<{ spent: number; held: number }> {
   const { agentBudgetPeriods } = schema;
   const period = monthStartUtc(now).toISOString().slice(0, 10);
   const [[row], budget] = await Promise.all([
@@ -157,8 +160,9 @@ export async function budgetUsedPercent(
       .where(and(eq(agentBudgetPeriods.agentId, agent.id), eq(agentBudgetPeriods.periodStart, period))),
     effectiveAgentBudget(db, agent),
   ]);
-  const used = (row?.spent ?? 0) + (row?.reserved ?? 0);
-  return budget <= 0 ? 0 : Math.floor((used / budget) * 100);
+  const percent = (n: number) => (budget <= 0 ? 0 : Math.floor((n / budget) * 100));
+  const spent = row?.spent ?? 0;
+  return { spent: percent(spent), held: percent(spent + (row?.reserved ?? 0)) };
 }
 
 /** A plan's window in a sentence the engine writes ("of its 5 hours"); the apps word it themselves. */

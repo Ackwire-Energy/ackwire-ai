@@ -413,3 +413,27 @@ test("a paused mission: a person's question in its thread gets an answer, its no
   expect(told.steered).toBe(main?.id ?? "");
   expect(await runs(f)).toHaveLength(2);
 });
+
+test("over the budget's line only by other calls' reservations: it looks again soon, not next month", async () => {
+  f = await setup({ contextTools: true, budgetNanoUsd: BUDGET, reply: stepper(12) });
+  await spend(f, 84);
+  const period = monthStartUtc(new Date()).toISOString().slice(0, 10);
+  const hold = (reservedNanoUsd: number) =>
+    f.db
+      .update(schema.agentBudgetPeriods)
+      .set({ reservedNanoUsd })
+      .where(and(eq(schema.agentBudgetPeriods.agentId, f.agent.id), eq(schema.agentBudgetPeriods.periodStart, period)));
+  await hold(BUDGET * 0.13);
+  await post(f, "@dev analisa os pedidos");
+  await drainOutbox(f.db, f.handlers);
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  const until = Date.parse((run?.transcript as { waitingForBrain?: { until?: string } }).waitingForBrain?.until ?? "");
+  expect(until).toBeLessThan(Date.now() + 3600_000);
+  expect(await cards(f)).toHaveLength(0);
+
+  // The reservation was released: it goes on.
+  await hold(0);
+  await drainOutbox(f.db, f.handlers, { now: later(3600_000) });
+  expect((await runs(f))[0]?.status).toBe("done");
+});
