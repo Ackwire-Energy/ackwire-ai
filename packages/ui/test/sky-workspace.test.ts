@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { parseColor } from "../src/sky/math";
 import {
   CLOUDS,
   cloudAt,
@@ -40,8 +41,13 @@ describe("tones", () => {
     expect(isDarkSurface("#f6f9fd")).toBe(false);
     expect(workspaceInk("day", "#f6f9fd").bright).toBe("#ffffff");
     expect(workspaceInk("day", "#0d1015").bright).not.toBe("#ffffff");
-    // Over the header's faint field on a light surface: the sky's own deeper tones, so they show.
-    expect(workspaceInk("dusk", "#f6f9fd", true).bright).toBe(workspaceTones("dusk", "#f6f9fd")[3] ?? "");
+    // Over the header's faint field on a light surface: the sky's own deeper tones, thinned toward the surface.
+    const surface = parseColor("#f6f9fd");
+    const away = (color: string) => parseColor(color).reduce((sum, c, i) => sum + Math.abs(c - (surface[i] ?? 0)), 0);
+    const ink = workspaceInk("dusk", "#f6f9fd", true);
+    expect(away(ink.bright)).toBeGreaterThan(0);
+    expect(away(ink.bright)).toBeLessThan(away(workspaceTones("dusk", "#f6f9fd")[3] ?? ""));
+    expect(away(ink.dim)).toBeLessThan(away(ink.bright));
   });
 });
 
@@ -77,9 +83,22 @@ describe("clouds and stars", () => {
     const first = CLOUDS[0];
     if (!first) throw new Error("no clouds");
     const [a] = first.rows[2] ?? [0];
-    const inside = (x: number) => x >= w * HEADER_AREA.x0 && x < w * HEADER_AREA.x1;
-    if (inside(cx + a)) expect(cloudAt(cx + a, cy + 2, w, h, t, HEADER_AREA)).toBe(1);
-    expect(cloudAt(cx + 2, cy, w, h, t, HEADER_AREA)).toBe(inside(cx + 2) ? 2 : 0);
+    const fade = HEADER_AREA.fade ?? 0;
+    const solid = (x: number) => x >= w * (HEADER_AREA.x0 + fade) && x < w * (HEADER_AREA.x1 - fade);
+    if (solid(cx + a)) expect(cloudAt(cx + a, cy + 2, w, h, t, HEADER_AREA)).toBe(1);
+    if (solid(cx + 2)) expect(cloudAt(cx + 2, cy, w, h, t, HEADER_AREA)).toBe(2);
+  });
+  test("a cloud dissolves at the area's edges, never a straight cut", () => {
+    const cells = (x: number) => {
+      let n = 0;
+      for (let t = 0; t < 120; t += 0.5) for (let y = 0; y < h; y++) if (cloudAt(x, y, w, h, t, HEADER_AREA)) n++;
+      return n;
+    };
+    const last = Math.ceil(w * HEADER_AREA.x1) - 1;
+    const middle = Math.floor(w * ((HEADER_AREA.x0 + HEADER_AREA.x1) / 2));
+    expect(cells(last)).toBeLessThan(cells(middle) * 0.5);
+    // The phone's area ends at the screen's edge: no fade there.
+    expect(PHONE_AREA.fade).toBeUndefined();
   });
   test("clouds drift left and come back from the right", () => {
     const [x0] = cloudOrigin(1, w, h, 10, HEADER_AREA);
