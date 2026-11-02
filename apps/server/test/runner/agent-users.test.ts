@@ -260,7 +260,7 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: "31627",
   };
-  const launcher = systemLauncher(user, true);
+  const launcher = systemLauncher(user, true, false);
   const p = launcher.prefix;
   expect(p.slice(0, 8)).toEqual([
     "/usr/bin/systemd-run",
@@ -321,6 +321,10 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     "mkdir -m 1777 /tmp/.ICE-unix 2>/dev/null || :",
     'exec "$@"',
   ]);
+  // systemd 253 and later: a process the kernel stops for memory takes only itself, not the rest of the scope.
+  const keeps = systemLauncher(user, true, true).prefix;
+  expect(keeps.slice(3, 6)).toEqual(["--collect", "--property=OOMPolicy=continue", "--slice=agents-21003.slice"]);
+  expect(keeps.slice(6)).toEqual(p.slice(5));
   // No systemd as PID 1 (a container): runuser alone.
   expect(systemLauncher(user, false)).toEqual({
     prefix: ["/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"],

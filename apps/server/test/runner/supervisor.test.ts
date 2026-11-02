@@ -779,14 +779,16 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
   };
   const asked: string[][] = [];
   let systemd: "moves" | "refuses" | "never" = "moves";
+  let oomPolicy = true;
   let clock = Date.UTC(2026, 9, 27, 12);
   const t = setup({
     proc,
     now: () => clock,
+    scopeOomPolicy: () => oomPolicy,
     busctl: async (args) => {
       asked.push(args);
       if (systemd === "refuses") return { code: 1, output: "Unit agentes-browser-21000-4242.scope already exists." };
-      const [pid, slice, unit] = [args[13], args[16], args[7]];
+      const [pid, slice, unit] = [args[args.indexOf("PIDs") + 3], args[args.indexOf("Slice") + 2], args[7]];
       if (systemd === "moves") {
         setTimeout(
           () =>
@@ -815,6 +817,7 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
 
   pidAt(4242, [21000, 21000, 21000, 21000], "/agents.slice/agents-21000.slice/run-r1.scope");
   expect(await answer({ enterId: "e1", pid: 4242, kind: "browser" })).toEqual({ type: "scope.entered", enterId: "e1" });
+  // A tab the kernel stops for memory takes only itself, not the agent's whole Chrome (systemd 253 and later).
   expect(asked).toEqual([
     [
       "call",
@@ -826,7 +829,10 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
       "ssa(sv)a(sa(sv))",
       "agentes-browser-21000-4242.scope",
       "fail",
-      "3",
+      "4",
+      "OOMPolicy",
+      "s",
+      "continue",
       "PIDs",
       "au",
       "1",
@@ -872,6 +878,11 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
     error: "systemd didn't move it",
   });
   expect(t.logs.some((l) => l.includes("couldn't move a process into agents-21000-cli.slice"))).toBe(true);
+  // An older systemd refuses OOMPolicy on a scope: never asked there.
+  oomPolicy = false;
+  expect((await answer({ enterId: "e3b", pid: 4250, kind: "cli" }))?.error).toBe("systemd didn't move it");
+  expect(asked.at(-1)?.slice(9, 11)).toEqual(["3", "PIDs"]);
+  oomPolicy = true;
   systemd = "never";
   expect(await answer({ enterId: "e4", pid: 4250, kind: "cli" })).toEqual({
     type: "scope.entered",
@@ -880,7 +891,7 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
   });
 
   // 30 a minute: the 31st waits for the next minute. These already show in their slice.
-  const used = 8; // every ask above that named a process of a kind counted, refused or not
+  const used = 9; // every ask above that named a process of a kind counted, refused or not
   for (let i = used; i < 30; i++) {
     pidAt(5000 + i, [21000, 21000, 21000, 21000], "/agents.slice/agents-21000.slice/agents-21000-cli.slice/x.scope");
     expect(await answer({ enterId: `r${i}`, pid: 5000 + i, kind: "cli" })).toEqual({
@@ -2373,9 +2384,10 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   const ana = USERS[0] as AgentUser;
   const runner = ["/opt/agentes-runner/bin/bun", "/opt/agentes-runner/agentes-runner.mjs"];
   const home = "/var/lib/agentes-runner-agents/ag-a1b2c3d4";
-  const cmd = workerCommand(ana, runner, home, true);
+  // A systemd older than 253 (no OOMPolicy on scopes): the same on any computer the test runs on.
+  const cmd = workerCommand(ana, runner, home, true, false);
   expect(cmd.argv).toEqual([
-    ...systemLauncher(ana, true).prefix,
+    ...systemLauncher(ana, true, false).prefix,
     ...runner,
     "worker",
     "--agent",

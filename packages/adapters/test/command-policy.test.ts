@@ -111,6 +111,15 @@ describe("read-only calls (allowed at once, no card)", () => {
     }
   });
 
+  test("what the computer has and who uses it (agentes-runner computer), and no other runner command", () => {
+    expect(bash("agentes-runner computer")).toBe(true);
+    expect(bash("agentes-runner computer | head -3")).toBe(true);
+    expect(bash("/usr/local/bin/agentes-runner computer")).toBe(true);
+    for (const command of ["agentes-runner update", "agentes-runner computer --x", "agentes-runner service install"]) {
+      expect([command, bash(command)]).toEqual([command, false]);
+    }
+  });
+
   test("GET and HEAD fetches; saving only into the mission folder", () => {
     for (const command of [
       "curl -sI https://commons.wikimedia.org/w/api.php",
