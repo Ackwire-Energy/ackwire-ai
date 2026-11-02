@@ -27,6 +27,7 @@ import {
   useMarkChannelRead,
   useMessages,
   useMissionControl,
+  usePins,
   usePostMessage,
   useRoster,
   useSettings,
@@ -56,6 +57,7 @@ import {
 } from "@agenteschat/client/lib/media";
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
+import { pinsIn } from "@agenteschat/client/lib/pins";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { isIdHandle } from "@agenteschat/ui/names";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
@@ -144,7 +146,7 @@ import { stickerRowsOnScreen } from "./media";
 import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
-import { PinsSheet } from "./PinsSheet";
+import { PinnedBar, PinsSheet } from "./PinsSheet";
 import {
   appendedKeys,
   type HeldRun,
@@ -227,6 +229,10 @@ const HOLD_MS = 900;
 const FREEZE_AFTER_MS = 450;
 /** The list shows by itself after this even if it never said it was placed (ms). */
 const SHOW_LIST_MS = 700;
+/** Going to a pinned message: at most this many older pages loaded looking for it. */
+const SEEK_MAX_PAGES = 10;
+/** How long the message gone to stays lit. */
+const FLASH_MS = 1600;
 /** No questions to other agents here (yet): the same list each time, so the memos over it keep. */
 const NO_CONSULTATIONS: RunConsultation[] = [];
 
@@ -241,23 +247,34 @@ export function ChatScreen({
   channelId,
   threadId,
   handoffId,
+  focusId,
 }: {
   channelId: string;
   threadId?: string | null;
   handoffId?: string | null;
+  /** Open at this message: paged in, scrolled to and lit for a moment (a pin). */
+  focusId?: string | null;
 }) {
   return (
     <SheetHostProvider>
       <FocusLive>
         <OpenHandoffProvider handoffId={handoffId ?? null}>
-          <Chat channelId={channelId} threadId={threadId ?? null} />
+          <Chat channelId={channelId} threadId={threadId ?? null} focusId={focusId ?? null} />
         </OpenHandoffProvider>
       </FocusLive>
     </SheetHostProvider>
   );
 }
 
-function Chat({ channelId, threadId }: { channelId: string; threadId: string | null }) {
+function Chat({
+  channelId,
+  threadId,
+  focusId,
+}: {
+  channelId: string;
+  threadId: string | null;
+  focusId: string | null;
+}) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -942,20 +959,47 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   // ── Pins ──
   const rowsRef = useRef<Row[]>([]);
-  const goToPin = (pin: MessagePin) => {
-    sheet.close();
-    // The pin is where the list goes now, not where it was under the sheet.
-    letGo();
-    const shown = rowsRef.current;
-    const target = pinTarget(pin, new Set(shown.flatMap((r) => (r.kind === "message" ? [r.message.id] : []))));
-    if (target.kind === "scroll") {
-      const index = shown.findIndex((r) => r.kind === "message" && r.message.id === target.messageId);
-      if (index >= 0) void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+  // Going to a message (a pin, `?m=`): found among the rows, or older pages loaded until it is (at most
+  // `SEEK_MAX_PAGES`); then scrolled to and lit for a moment.
+  const [seek, setSeek] = useState<string | null>(focusId);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const seekPages = useRef(0);
+  const seekReady = isThread ? threadMessages.isSuccess : top.isSuccess;
+  useEffect(() => {
+    if (!seek || !seekReady) return;
+    const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
+    if (index >= 0) {
+      setSeek(null);
+      letGo();
+      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+      setFlashId(seek);
       return;
     }
-    if (target.threadId !== threadId) router.push(chatHref(channelId, target.threadId));
+    if (isThread || olderDone || seekPages.current >= SEEK_MAX_PAGES) {
+      setSeek(null);
+      return;
+    }
+    if (!loadingOlder) {
+      seekPages.current += 1;
+      loadOlder();
+    }
+  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo]);
+  useEffect(() => {
+    if (!flashId) return;
+    const timer = setTimeout(() => setFlashId(null), FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flashId]);
+  const goToPin = (pin: MessagePin) => {
+    sheet.close();
+    const target = pinTarget(pin, threadId);
+    if (target.kind === "open") {
+      router.push(chatHref(channelId, target.threadId, target.messageId));
+      return;
+    }
+    seekPages.current = 0;
+    setSeek(target.messageId);
   };
-  const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
+  const openPins = () => sheet.open(<PinsSheet channelId={channelId} threadId={threadId} onPick={goToPin} />);
   // "Ver resultado" on a work's line: its report, when this conversation shows it.
   const jumpToMessage = useCallback((messageId: string) => {
     const index = rowsRef.current.findIndex((r) => r.kind === "message" && r.message.id === messageId);
@@ -1287,6 +1331,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   );
   rowsRef.current = rows;
   const pinned = mission && isOpenMission(mission) ? mission : null;
+  // The pinned bar shows while something is pinned here (`PinnedBar`).
+  const pinsData = usePins(orgId, channelId, member).data;
+  const hasPins = useMemo(() => pinsIn(pinsData ?? [], threadId).length > 0, [pinsData, threadId]);
 
   // ── Agents' receipts and "no AI" ──
   // One receipt on screen (`receiptMessageId`): a mark beside my bubble, or at the end of the name line of someone
@@ -1388,6 +1435,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                   ? ENTER
                   : undefined
               }
+              style={item.message.id === flashId ? { backgroundColor: c.sunken } : undefined}
             >
               <MessageRow
                 message={item.message}
@@ -1435,6 +1483,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       onResend,
       consultFolds,
       seeConsult,
+      flashId,
+      c.sunken,
     ],
   );
 
@@ -1472,7 +1522,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
   // The conversation starts below the clear bar by our own padding, on both platforms (the pinned card, when there
   // is one, already holds that room). iOS's automatic inset made keyboard moves land short at the end.
-  const hasPin = pinned !== null;
+  const hasPin = pinned !== null || hasPins;
   const listPad = useMemo(
     () => (hasPin ? styles.listPad : [styles.listPad, { paddingTop: headerHeight + 8 }]),
     [hasPin, headerHeight],
@@ -1587,10 +1637,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         {/* A clear bar on every conversation (DM, channel, thread): the band behind it is ours, below, so the
             system's scroll edge never makes one look different from another. */}
         <PushedHeader title={pill ?? title} plate solid={false} right={right} />
-        {pinned ? (
-          // The bar is see-through (the conversation runs under it): the pinned card starts below it.
-          <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: headerHeight }]}>
-            <MissionCardView mission={pinned} pinned />
+        {hasPin ? (
+          // The bar is see-through (the conversation runs under it): the pinned bar and card start below it.
+          <View style={{ backgroundColor: c.bg, paddingTop: headerHeight }}>
+            {hasPins ? <PinnedBar channelId={channelId} threadId={threadId} onOpen={openPins} /> : null}
+            {pinned ? (
+              <View style={[styles.pin, hasPins && styles.pinBelowBar]}>
+                <MissionCardView mission={pinned} pinned />
+              </View>
+            ) : null}
           </View>
         ) : null}
         {/* No `textInputNativeID`: with it the composer could stay down while the keyboard was up (iOS 26; Bluesky
@@ -1937,6 +1992,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   emptyText: { textAlign: "center" },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
+  pinBelowBar: { paddingTop: 10 },
   day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },

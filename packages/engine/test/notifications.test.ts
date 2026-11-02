@@ -256,6 +256,44 @@ test("one-off notifications are idempotent; done, undo, read-all and the cursor"
   await expect(markNotificationRead(deps(), f.owner.id, f.org.id, target, true)).rejects.toBeInstanceOf(NotFoundError);
 });
 
+test("Concluídas lists what the person marked done for 30 days, the latest first; Mover de volta brings it back", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const base = Date.parse("2026-03-01T12:00:00Z");
+  const at = (ms: number) => ({ ...deps(), now: () => new Date(base + ms) });
+  for (const [i, text] of ["old", "a", "b", "auto"].entries())
+    await notify(at(i * 1000), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "mention",
+      groupKey: `mention:${text}`,
+      source: {},
+      latest: { text },
+    });
+  const ids = Object.fromEntries((await inbox(bia.id)).items.map((n) => [n.latest.text, n.id]));
+  const day = 24 * 3600_000;
+  await markNotificationDone(at(0), bia.id, f.org.id, ids.old ?? "", true);
+  await markNotificationDone(at(29 * day), bia.id, f.org.id, ids.a ?? "", true);
+  await markNotificationDone(at(30 * day), bia.id, f.org.id, ids.b ?? "", true);
+  // Resolved on its own (question answered, approval decided): not something the person marked done.
+  await resolveNotifications(at(30 * day), f.org.id, { groupKey: "mention:auto" });
+
+  const done = (cursor?: string | null) =>
+    listNotifications(at(31 * day), bia.id, f.org.id, { filter: "done", limit: 1, cursor });
+  const first = await done();
+  expect(first.items.map((n) => n.latest.text)).toEqual(["b"]);
+  const second = await done(first.nextCursor);
+  expect(second.items.map((n) => n.latest.text)).toEqual(["a"]);
+  // `old` was marked done 31 days before: out of the window.
+  expect(second.nextCursor).toBeNull();
+  // "Marcar tudo como lido" never reaches into what is done.
+  expect((await markAllNotificationsRead(at(31 * day), bia.id, f.org.id, "done")).ids).toEqual([]);
+
+  await markNotificationDone(at(31 * day), bia.id, f.org.id, ids.b ?? "", false);
+  expect((await done()).items.map((n) => n.latest.text)).toEqual(["a"]);
+  expect((await inbox(bia.id)).items.map((n) => n.latest.text)).toEqual(["b"]);
+});
+
 test("a merged request-to-join notice keeps the first two names, each once, and counts every ask", async () => {
   f = await setup();
   for (const name of ["Ana Souza", "Ana Souza", "Bruno Lima", "Carla Dias"])

@@ -5305,9 +5305,10 @@ export interface AuditQuery {
   kind?: "tool" | "change";
 }
 
-export type NotificationFilter = "all" | "mentions" | "waiting" | "unread" | "reactions";
+/** `done`: "Concluídas", what I marked done in the last 30 days, the latest first (not counted). */
+export type NotificationFilter = "all" | "mentions" | "waiting" | "unread" | "reactions" | "done";
 
-export type NotificationCounts = Record<NotificationFilter, number>;
+export type NotificationCounts = Record<Exclude<NotificationFilter, "done">, number>;
 
 /** `GET …/notifications`: visible ones (not done, not snoozed), waiting first, then newest. */
 export interface NotificationPage {

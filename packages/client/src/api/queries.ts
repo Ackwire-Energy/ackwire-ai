@@ -3998,7 +3998,8 @@ export function cacheNotification(qc: QC, orgId: string, item: AppNotification) 
 export function dropNotification(qc: QC, orgId: string, id: string) {
   const before = knownNotification(qc, orgId, id);
   for (const [key, data] of listCaches(qc, orgId)) {
-    if (data) qc.setQueryData<NotificationPages>(key, removeFromPages(data, id, before));
+    // "Concluídas" keeps what I marked done (the event says only that it left the inbox).
+    if (data && key[4] !== "done") qc.setQueryData<NotificationPages>(key, removeFromPages(data, id, before));
   }
   moveCount(qc, orgId, before, undefined);
 }
@@ -4008,8 +4009,11 @@ export function applyNotificationEvent(qc: QC, orgId: string, event: Notificatio
   if (event.type === "notification.upserted" && event.notification.kind === "join_request")
     void qc.invalidateQueries({ queryKey: keys.joinRequests(orgId) });
   if (event.type === "notification.upserted") cacheNotification(qc, orgId, event.notification);
-  else if (event.type === "notification.removed") dropNotification(qc, orgId, event.id);
-  else {
+  else if (event.type === "notification.removed") {
+    dropNotification(qc, orgId, event.id);
+    // Marked done on another device: "Concluídas" gains it (one auto-resolved changes nothing there).
+    void qc.invalidateQueries({ queryKey: keys.notificationList(orgId, "done") });
+  } else {
     const count = { unread: event.unread, waiting: event.waiting };
     qc.setQueryData<NotificationCount>(keys.notificationCount(orgId), count);
     for (const [key, data] of listCaches(qc, orgId))

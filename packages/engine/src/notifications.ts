@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   gt,
+  gte,
   inArray,
   isNull,
   like,
@@ -137,7 +138,8 @@ export const NOTIFICATION_KINDS = [
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
-export const NOTIFICATION_FILTERS = ["all", "mentions", "waiting", "unread", "reactions"] as const;
+/** `done`: "Concluídas", what the person marked done in the last `DONE_KEPT_MS`, the latest first (not counted). */
+export const NOTIFICATION_FILTERS = ["all", "mentions", "waiting", "unread", "reactions", "done"] as const;
 export type NotificationFilter = (typeof NOTIFICATION_FILTERS)[number];
 
 export interface NotificationActor {
@@ -268,6 +270,8 @@ export const SNIPPET_LENGTH = 280;
 export const MAX_PAGE = 100;
 /** How far ahead a notification can be snoozed. */
 export const MAX_SNOOZE_MS = 365 * 24 * 3600_000;
+/** How far back "Concluídas" lists. */
+export const DONE_KEPT_MS = 30 * 24 * 3600_000;
 
 const nowOf = (deps: { now?: () => Date }) => deps.now?.() ?? new Date();
 
@@ -622,14 +626,30 @@ function filterSql(filter: NotificationFilter): SQL | undefined {
       return isNull(notifications.readAt);
     case "reactions":
       return eq(notifications.kind, "reaction");
+    case "done":
+      return undefined;
     default:
       return undefined;
   }
 }
 
-/** Opaque keyset cursor over `(waiting desc, updated_at desc, id desc)`. */
-function encodeCursor(r: Row) {
-  return Buffer.from(JSON.stringify([r.waiting ? 1 : 0, r.updatedAt.toISOString(), r.id])).toString("base64url");
+/** Marked done by the person, recently enough to list. */
+function doneByMe(orgId: string, userId: string, now: Date): SQL {
+  return and(
+    eq(notifications.orgId, orgId),
+    eq(notifications.userId, userId),
+    eq(notifications.doneByUser, true),
+    gte(notifications.doneAt, new Date(now.getTime() - DONE_KEPT_MS)),
+  ) as SQL;
+}
+
+/**
+ * Opaque keyset cursor over `(waiting desc, updated_at desc, id desc)`; for "Concluídas", `(done_at desc, id desc)`
+ * with a 0 in front.
+ */
+function encodeCursor(r: Row, done: boolean) {
+  const at = done ? (r.doneAt ?? r.updatedAt) : r.updatedAt;
+  return Buffer.from(JSON.stringify([!done && r.waiting ? 1 : 0, at.toISOString(), r.id])).toString("base64url");
 }
 
 function decodeCursor(cursor: string): [number, Date, string] {
@@ -678,21 +698,36 @@ export async function listNotifications(
   if (!NOTIFICATION_FILTERS.includes(filter)) throw new ValidationError("Unknown filter");
   const limit = Math.max(1, Math.min(options.limit ?? 50, MAX_PAGE));
   const after = options.cursor ? decodeCursor(options.cursor) : null;
+  const done = filter === "done";
   const [rows, counts] = await Promise.all([
-    db
-      .select()
-      .from(notifications)
-      .where(
-        and(
-          visible(orgId, userId, now),
-          filterSql(filter),
-          after
-            ? sql`(${notifications.waiting}::int, ${notifications.updatedAt}, ${notifications.id}) < (${after[0]}::int, ${after[1].toISOString()}::timestamptz, ${after[2]}::uuid)`
-            : undefined,
-        ),
-      )
-      .orderBy(desc(notifications.waiting), desc(notifications.updatedAt), desc(notifications.id))
-      .limit(limit + 1),
+    done
+      ? db
+          .select()
+          .from(notifications)
+          .where(
+            and(
+              doneByMe(orgId, userId, now),
+              after
+                ? sql`(${notifications.doneAt}, ${notifications.id}) < (${after[1].toISOString()}::timestamptz, ${after[2]}::uuid)`
+                : undefined,
+            ),
+          )
+          .orderBy(desc(notifications.doneAt), desc(notifications.id))
+          .limit(limit + 1)
+      : db
+          .select()
+          .from(notifications)
+          .where(
+            and(
+              visible(orgId, userId, now),
+              filterSql(filter),
+              after
+                ? sql`(${notifications.waiting}::int, ${notifications.updatedAt}, ${notifications.id}) < (${after[0]}::int, ${after[1].toISOString()}::timestamptz, ${after[2]}::uuid)`
+                : undefined,
+            ),
+          )
+          .orderBy(desc(notifications.waiting), desc(notifications.updatedAt), desc(notifications.id))
+          .limit(limit + 1),
     countsOf(db, orgId, userId, now),
   ]);
   const page = rows.slice(0, limit);
@@ -700,7 +735,7 @@ export async function listNotifications(
   return {
     items: page.map(notificationView),
     counts,
-    nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
+    nextCursor: rows.length > limit && last ? encodeCursor(last, done) : null,
   };
 }
 
@@ -765,7 +800,7 @@ export async function markNotificationRead(
   return view;
 }
 
-/** "Concluir" (out of the inbox) or its undo. */
+/** "Concluir" (out of the inbox, into "Concluídas") or its undo ("Mover de volta"). */
 export async function markNotificationDone(
   deps: NotificationDeps,
   userId: string,
@@ -774,7 +809,11 @@ export async function markNotificationDone(
   done: boolean,
 ): Promise<NotificationView> {
   const row = await mine(deps, userId, orgId, id);
-  const updated = await change(deps, row, { doneAt: done ? (row.doneAt ?? nowOf(deps)) : null });
+  const updated = await change(
+    deps,
+    row,
+    done ? { doneAt: row.doneAt ?? nowOf(deps), doneByUser: true } : { doneAt: null, doneByUser: false },
+  );
   const view = notificationView(updated);
   await publishUserEvent(
     deps.pubsub,
@@ -831,6 +870,8 @@ export async function markAllNotificationsRead(
 ): Promise<{ ids: string[] }> {
   await requirePermission(deps.db, userId, orgId, "read");
   if (!NOTIFICATION_FILTERS.includes(filter)) throw new ValidationError("Unknown filter");
+  // What is done is out of the inbox: nothing there to mark.
+  if (filter === "done") return { ids: [] };
   const now = nowOf(deps);
   const rows = await deps.db
     .update(notifications)

@@ -72,6 +72,19 @@ describe("live changes on a loaded list", () => {
     expect(unreadList.pages[0]?.items).toEqual([]);
   });
 
+  test("Concluídas: done joins it, the latest done first; Mover de volta takes it out; the counts stay the inbox's", () => {
+    const old = notification({ id: "old", kind: "mention", doneAt: at(60) });
+    const data = page([old], { all: 3, mentions: 3 });
+    const done = upsertInPages(data, "done", { ...a, doneAt: at(0) }, a, NOW.getTime());
+    expect(done.pages[0]?.items.map((n) => n.id)).toEqual(["a", "old"]);
+    expect(done.pages[0]?.counts).toMatchObject({ all: 2, mentions: 2 });
+    const back = upsertInPages(done, "done", { ...old, doneAt: null }, undefined, NOW.getTime());
+    expect(back.pages[0]?.items.map((n) => n.id)).toEqual(["a"]);
+    expect(
+      groupByDay([old, { ...a, doneAt: at(0) }], NOW, (n) => n.doneAt ?? "").map(([, l]) => l.map((n) => n.id)),
+    ).toEqual([["a", "old"]]);
+  });
+
   test("removed (auto-resolved) goes away with its counts", () => {
     const data = page([b, a], { all: 2, mentions: 2, unread: 1 });
     const next = removeFromPages(data, "a", undefined, NOW.getTime());
