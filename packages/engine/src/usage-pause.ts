@@ -101,8 +101,16 @@ export async function usageWaitPlace(
  * reset reading, an unknown reset's re-checks). Without this a routine's slot could wait well past the reset while a
  * person's reply on the same plan had already gone through. A long-work pause (95%) keeps its timer: a quick reply
  * going through says nothing about its line. One job per wait; the old timed one finds the wait gone and does nothing.
+ * Only waits on the same `model` (a model's own weekly limit isn't lifted by another model's turn); a wait stored
+ * without one is woken.
  */
-export async function wakePlanWaits(db: Executor, orgId: string, key: string, now = Date.now()): Promise<string[]> {
+export async function wakePlanWaits(
+  db: Executor,
+  orgId: string,
+  key: string,
+  model: string | null,
+  now = Date.now(),
+): Promise<string[]> {
   const { agentRuns } = schema;
   const rows = await db
     .select({
@@ -119,6 +127,7 @@ export async function wakePlanWaits(db: Executor, orgId: string, key: string, no
         eq(agentRuns.status, "waiting_input"),
         sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'plan_limit'`,
         sql`${agentRuns.transcript}->'waitingForBrain'->>'waitKey' = ${key}`,
+        sql`(not (${agentRuns.transcript}->'waitingForBrain' ? 'model') or ${agentRuns.transcript}->'waitingForBrain'->>'model' is not distinct from ${model})`,
       ),
     )
     .orderBy(agentRuns.createdAt)

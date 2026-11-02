@@ -478,6 +478,8 @@ export interface Transcript {
     resetsAt?: string;
     /** A usage wait's plan in words ("Claude", "ChatGPT"): Rotinas says what it waits for. */
     plan?: string;
+    /** A plan wait's model (null: the brain's default): a turn through on another model doesn't wake it. */
+    model?: string | null;
     /** A plan pause's: where its plan was read. */
     reading?: PlanReadingRef;
   };
@@ -2617,7 +2619,7 @@ async function executeRunInner(
       waitKey: key,
       until: runAt.toISOString(),
       ...(resetsAt ? { resetsAt } : {}),
-      ...(budget ? {} : { plan: name }),
+      ...(budget ? {} : { plan: name, model: plan.model ?? null }),
       ...(u.pause ? { source: u.pause.source } : {}),
       // Continuar agora reads this plan's window again (`pauseContinuesPastPlan`).
       ...(u.pause?.source === "plan"
@@ -3096,7 +3098,7 @@ async function executeRunInner(
               kind: turnPlan.kind,
               accountId: account?.id,
             });
-            later(() => wakePlanWaits(db, run.orgId, key));
+            later(() => wakePlanWaits(db, run.orgId, key, turnPlan.model ?? null));
           }
           turnLimited = false;
           // Later turns of this run continue the same session.

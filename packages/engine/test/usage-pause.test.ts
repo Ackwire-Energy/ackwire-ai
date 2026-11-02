@@ -22,6 +22,8 @@ import {
   runRoutineNow,
   storedPlanLimit,
   updateAgent,
+  usageWaitKey,
+  wakePlanWaits,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -716,4 +718,22 @@ test("Don't run it goes away once the run is back at work, and comes back if it 
   await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + RESUME_GAP_MS) });
   expect((await runs(f))[0]?.status).toBe("done");
   expect(await ended()).toBe(true);
+});
+
+test("a turn through on another model doesn't wake a wait parked on its own model's limit", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const machineId = await computerAgent(f, { brainFallback: false });
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your weekly limit", worked: false },
+  ]);
+  await routineSlot(f);
+  await drainOutbox(f.db, handlersWith(f, brain));
+  const [slot] = await runs(f);
+  expect(slot?.status).toBe("waiting_input");
+  const parkedOn = (slot?.transcript as { waitingForBrain?: { model?: string | null } } | undefined)?.waitingForBrain
+    ?.model;
+  const key = usageWaitKey({ code: "plan_limit", machineId, kind: "claude_code" });
+  expect(await wakePlanWaits(f.db, f.org.id, key, "another-model")).toEqual([]);
+  expect(await wakePlanWaits(f.db, f.org.id, key, parkedOn ?? null)).toEqual([slot?.id ?? ""]);
 });
