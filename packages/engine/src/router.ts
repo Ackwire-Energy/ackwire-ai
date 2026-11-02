@@ -1119,25 +1119,26 @@ export async function routeMessage(
       );
     return (row?.n ?? 0) >= DEFAULT_PICKS_PER_HOUR;
   };
-  // Whom a person's thanks is for: the agent whose message they replied to, else the agent whose message is the
-  // last one in this conversation, when only agents spoke since the person's own previous message here. Never one
-  // whose last words asked them something: an "ok" there is an answer, not thanks.
+  // Whom a person's thanks is for: the agent that answered their own previous message in this conversation (the one
+  // they mentioned there, else the first to answer it), when only agents spoke since. Never one whose last words
+  // asked them something: an "ok" there is an answer, not thanks. A quote or a thread reply to an agent never gets
+  // here: the reply rule already gives that agent a run, which may pass.
   const thankedAgent = () => {
     const here = [
       ...recent.filter((m) => m.threadId === message.threadId),
       ...(root && message.createdAt.getTime() - root.createdAt.getTime() <= windowMs ? [root] : []),
     ];
     const theirs = here.findIndex((m) => m.authorUserId === message.authorUserId);
-    const lastId = here[0]?.authorAgentId;
-    const agentId =
-      repliedAgentId ??
-      (theirs > 0 && lastId && candidateIds.has(lastId) && here.slice(0, theirs).every((m) => m.authorAgentId)
-        ? lastId
-        : null);
+    if (theirs < 1) return null;
+    const since = here.slice(0, theirs);
+    const mentioned = here[theirs]?.mentionedAgentIds.filter((id) => candidateIds.has(id)) ?? [];
+    const agentId = mentioned.length === 1 ? mentioned[0] : here[theirs - 1]?.authorAgentId;
+    if (!agentId || !candidateIds.has(agentId) || !since.every((m) => m.authorAgentId)) return null;
+    if (!since.some((m) => m.authorAgentId === agentId)) return null;
     const said = [...history, ...(root ? [root] : [])].find(
       (m) => m.authorAgentId === agentId && (m === root || m.threadId === message.threadId),
     );
-    return agentId && !said?.body.trim().split("\n").at(-1)?.includes("?") ? agentId : null;
+    return said?.body.trim().split("\n").at(-1)?.includes("?") ? null : agentId;
   };
   // Which default tier picked (R5): the agent the person talks with, the coordinator, the best placed agent.
   let fallback: "talk" | "coordinator" | "best" | null = null;
@@ -1390,6 +1391,8 @@ export async function routeMessage(
       db,
       { orgId: message.orgId, agentId: thanked, messageId: message.id, reaction },
       deps.pubsub,
+      // The person sees the reaction live on their own message; an inbox line about their own thanks is noise.
+      { notify: false },
     ).then(
       () => ({ agentId: thanked, reaction }),
       () => undefined,

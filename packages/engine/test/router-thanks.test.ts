@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   createAgent,
   createJobHandlers,
@@ -25,13 +25,14 @@ const quiet: RouterStrategy = {
     return { agents: input.candidates.map((c) => ({ agentId: c.agentId, score: 0.05 })), needsAgent: 0.05 };
   },
 };
-const said = (userId: string, body: string, createdAt: Date) =>
+const said = (userId: string, body: string, createdAt: Date, threadId: string | null = null) =>
   insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
     author: { type: "person", userId },
     body,
     createdAt,
+    threadId,
   });
 const answered = (agentId: string, body: string, createdAt: Date) =>
   insertMessage(f.db, {
@@ -41,6 +42,24 @@ const answered = (agentId: string, body: string, createdAt: Date) =>
     body,
     createdAt,
   });
+const addOps = async () => {
+  const ops = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "ops", handle: "ops" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
+  return ops;
+};
+const addBia = async () => {
+  const bia = await addMember(f.db, f.org.id, "member", "Bia");
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+  return bia;
+};
+const route = (messageId: string) =>
+  routeMessage({ db: f.db, strategy: quiet, policy }, { orgId: f.org.id, messageId });
 const post = (userId: string, body: string) =>
   postPersonMessage({ db: f.db, pubsub: f.pubsub }, userId, f.org.id, f.general.id, { body });
 const reactionsOn = async (messageId: string) =>
@@ -97,6 +116,8 @@ describe("an agent reacts to the thanks of the person it just answered", () => {
       expect.objectContaining({ reaction: "🙏", agentIds: [f.agent.id] }),
     ]);
     expect(events).toContainEqual(expect.objectContaining({ type: "message.reactions", messageId: thanks.id }));
+    // Shown live on the person's own message; no inbox line about their own thanks.
+    expect((await f.db.select().from(schema.notifications)).filter((n) => n.kind === "reaction")).toEqual([]);
 
     const question = await post(f.owner.id, "and the deploy, is it done?");
     await drainOutbox(f.db, handlers);
@@ -145,5 +166,44 @@ describe("an agent reacts to the thanks of the person it just answered", () => {
     const second = await routeMessage({ db: f.db, strategy: quiet, policy }, { orgId: f.org.id, messageId: ok.id });
     expect(second.reacted).toBeUndefined();
     expect(await reactionsOn(ok.id)).toEqual([]);
+  });
+
+  test("another agent posting between the answer and the thanks: the agent that answered reacts", async () => {
+    f = await setup();
+    const ops = await addOps();
+    await said(f.owner.id, "why is the build failing?", minutesAgo(5));
+    await answered(f.agent.id, "A missing env var in CI. Fixed it.", minutesAgo(4));
+    await answered(ops.id, "Nightly report: 3 deploys, 0 incidents.", minutesAgo(1));
+    const thanks = await post(f.owner.id, "vlw pai");
+    const result = await route(thanks.id);
+    expect(result.reacted).toEqual({ agentId: f.agent.id, reaction: "🙏" });
+    expect((await reactionsOn(thanks.id)).map((r) => r.agentId)).toEqual([f.agent.id]);
+  });
+
+  test("thanks between two people in an agent's thread: that agent doesn't react", async () => {
+    f = await setup();
+    const ops = await addOps();
+    const bia = await addBia();
+    const report = await answered(ops.id, "Nightly report: disk at 91%.", minutesAgo(20));
+    await said(bia.id, "I cleaned the old logs, should be fine now", minutesAgo(15), report.id);
+    const thanks = await said(f.owner.id, "valeu", minutesAgo(1), report.id);
+    const result = await route(thanks.id);
+    // A reply under an agent's message is that agent's by the reply rule: a run that may pass, never a reaction.
+    expect(result.selected).toEqual([ops.id]);
+    expect(result.reacted).toBeUndefined();
+    expect(await reactionsOn(thanks.id)).toEqual([]);
+  });
+
+  test("an agent that may not answer this person here doesn't react", async () => {
+    f = await setup();
+    await f.db
+      .update(schema.channelMembers)
+      .set({ autoReply: false })
+      .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.agentId, f.agent.id)));
+    await said(f.owner.id, "why is the build failing?", minutesAgo(5));
+    await answered(f.agent.id, "A missing env var in CI. Fixed it.", minutesAgo(4));
+    const thanks = await post(f.owner.id, "vlw pai");
+    expect((await route(thanks.id)).reacted).toBeUndefined();
+    expect(await reactionsOn(thanks.id)).toEqual([]);
   });
 });
