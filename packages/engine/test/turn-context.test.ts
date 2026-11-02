@@ -203,7 +203,11 @@ describe("the prompt's rules", () => {
     expect(turnAt).toBeGreaterThan(1);
     expect(ctx.system.slice(turnAt).every((b) => b.turn)).toBe(true);
     const perTurn = ctx.system.slice(turnAt).map((b) => b.text.split("\n")[0]);
-    expect(perTurn).toEqual(["# Now", "# Where you are"]);
+    expect(perTurn).toEqual([
+      "# Now",
+      "The person's app language: pt-BR, Portuguese (Brazil). Still reply in the language they write in.",
+      "# Where you are",
+    ]);
   });
 });
 

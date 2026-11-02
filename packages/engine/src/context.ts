@@ -15,6 +15,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import type { AiStatusDeps } from "./ai-status";
@@ -466,7 +467,7 @@ export async function buildRunContext(
   const history = samePerson ? samePerson.history : fullHistory;
 
   const listsTeam = options.team && channel.kind !== "forum";
-  const [names, members, zone, talks] = await Promise.all([
+  const [names, members, zone, talks, appLanguage] = await Promise.all([
     authorNames(db, history),
     caches.channelMembers.getOrLoad(`${run.orgId}:${run.channelId}`, () =>
       db
@@ -502,6 +503,7 @@ export async function buildRunContext(
     zoneOf(db, run.orgId, trigger.authorUserId),
     // Who "# Your team" lists (below) depends on it: read with the rest, not one more round trip before the model call.
     listsTeam ? speakerFor(db, run.orgId, trigger.authorUserId) : NO_PERSON,
+    background ? null : appLanguageOf(db, trigger.authorUserId),
   ]);
   // One statement, two parts: what agents already did in this thread (or DM),
   // and this agent's own work in other conversations the requester is in.
@@ -795,6 +797,7 @@ export async function buildRunContext(
       now: nowFor,
     },
     ...(routine ? [{ turn: true, text: routine.timeLine }] : []),
+    ...(appLanguage ? [{ turn: true, text: appLanguage }] : []),
     // Brought in without being named, or by another agent (reply-policy.ts): staying quiet is an answer.
     ...(options.mayPass
       ? [{ turn: true, text: byAnotherAgent(run, trigger) ? WHY_AN_AGENT_CALLED : WHY_YOU_WERE_CALLED }]
@@ -1274,6 +1277,17 @@ async function loadZone(db: Database, orgId: string, userId: string | null) {
     )
     .where(eq(organizations.id, orgId));
   return row?.mine ?? row?.org ?? "UTC";
+}
+
+/**
+ * The language the person's app shows, for what the agent writes for the app rather than the chat (a file's title, a
+ * form's labels). Replies still follow the language the person writes in.
+ */
+async function appLanguageOf(db: Database, userId: string | null) {
+  if (!userId) return null;
+  const [row] = await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId));
+  if (!isAppLocale(row?.locale)) return null;
+  return `The person's app language: ${row.locale}, ${localeInfo(row.locale).english}. Still reply in the language they write in.`;
 }
 
 /** A zone the formatter knows, else "UTC". */
