@@ -53,7 +53,10 @@ export function reportLearnFailure(
   }
 }
 
-/** What a learning report says about who thinks: the brain, its provider and model, and the account it uses. */
+/**
+ * The agent a learning report is about: its brain, provider, model and account, under `agent_*` so they never pass
+ * for the call that failed (the judge's or the summary model's, tagged `provider`/`model` or `judge_*`).
+ */
 export const learnTags = (agent: {
   orgId: string;
   id: string;
@@ -65,18 +68,18 @@ export const learnTags = (agent: {
     ? {
         org_id: agent.orgId,
         agent_id: agent.id,
-        brain: "model",
-        provider: modelInfo(agent.model)?.provider ?? "unknown",
-        model: agent.model,
-        account: "api_key",
+        agent_brain: "model",
+        agent_provider: modelInfo(agent.model)?.provider ?? "unknown",
+        agent_model: agent.model,
+        agent_account: "api_key",
       }
     : {
         org_id: agent.orgId,
         agent_id: agent.id,
-        brain: agent.brain,
-        provider: agent.brain,
-        model: agent.brainModel ?? "default",
-        account: "plan_sign_in",
+        agent_brain: agent.brain,
+        agent_provider: agent.brain,
+        agent_model: agent.brainModel ?? "default",
+        agent_account: "plan_sign_in",
       };
 
 // ── Trust ────────────────────────────────────────────────────────────────────

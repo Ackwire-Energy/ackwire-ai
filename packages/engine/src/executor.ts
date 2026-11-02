@@ -138,7 +138,7 @@ import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
-import type { Judge } from "./judge";
+import { type Judge, judgeCallOf } from "./judge";
 import { answerNoTurn, listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
@@ -956,6 +956,7 @@ async function executeRunInner(
       reportLearnFailure(deps.context, "judge_learn_question", error, {
         ...learnTags(agent),
         judge: judge.name,
+        ...judgeCallOf(error),
         run_id: run.id,
       });
   };

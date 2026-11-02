@@ -26,6 +26,7 @@ import {
 } from "../src";
 import { learnTags, readsOutside, reportLearnFailure } from "../src/context/learn";
 import { continuationVerdict, runCalls } from "../src/continuation";
+import { createLlmJudge, judgeCallOf, withJudgeCall, withJudgeFallback } from "../src/judge";
 import { addMember, setup as baseSetup, type Fixture } from "./fixtures";
 
 let f: Fixture;
@@ -871,12 +872,16 @@ describe("learning guards", () => {
     expect(learnTags(planAgent)).toEqual({
       org_id: orgId,
       agent_id: "agent-1",
-      brain: "claude_code",
-      provider: "claude_code",
-      model: "sonnet",
-      account: "plan_sign_in",
+      agent_brain: "claude_code",
+      agent_provider: "claude_code",
+      agent_model: "sonnet",
+      agent_account: "plan_sign_in",
     });
-    expect(learnTags(keyAgent)).toMatchObject({ brain: "model", provider: "unknown", account: "api_key" });
+    expect(learnTags(keyAgent)).toMatchObject({
+      agent_brain: "model",
+      agent_provider: "unknown",
+      agent_account: "api_key",
+    });
     const t0 = 1_000_000;
     const report = (cause: "judge_learn_question" | "learn_call", at: number) =>
       reportLearnFailure({ errors }, cause, new Error("400"), { ...learnTags(planAgent), judge: "llm" }, at);
@@ -894,10 +899,10 @@ describe("learning guards", () => {
     reportLearnFailure({}, "learn_queue", new Error("x"), { org_id: orgId });
   });
 
-  test("a run whose judge refuses the learn question reports it, tagged with the agent's brain and the judge", async () => {
+  test("a run whose judge refuses the learn question reports it, tagged with the judge call and the agent apart", async () => {
     f = await setup({
       judge: (_kind, id) => {
-        if (id === "learn") throw new Error("400 invalid_request_error");
+        if (id === "learn") throw withJudgeCall(new Error("400 invalid_request_error"), "small-x", "openai");
         return undefined;
       },
     });
@@ -908,8 +913,41 @@ describe("learning guards", () => {
     });
     await drainOutbox(f.db, f.handlers);
     expect(
-      errors.reports.map((r) => [r.tags.cause, r.tags.org_id, r.tags.agent_id, r.tags.brain, r.tags.judge]),
-    ).toEqual([["judge_learn_question", f.org.id, f.agent.id, "model", "fake"]]);
+      errors.reports.map((r) => [
+        r.tags.cause,
+        r.tags.org_id,
+        r.tags.agent_id,
+        r.tags.agent_brain,
+        r.tags.judge,
+        r.tags.judge_model,
+        r.tags.judge_provider,
+        r.tags.model,
+      ]),
+    ).toEqual([["judge_learn_question", f.org.id, f.agent.id, "model", "fake", "small-x", "openai", undefined]]);
+  });
+
+  test("a judge call that fails carries its own model and provider; the fallback's error is the one reported", async () => {
+    f = await setup();
+    const refusing = (provider: string) =>
+      createLlmJudge({
+        gateway: { complete: () => Promise.reject(new ProviderError("400 bad request", false, 400)) },
+        resolveModel: async () => provider,
+      });
+    const request = {
+      orgId: "org-1",
+      kind: "continuation",
+      state: {},
+      questions: { learn: { type: "noul" as const, instructions: "x", criteria: { true: "a", false: "b" } } },
+    };
+    const caught = await refusing("claude-haiku-5-5")
+      .ask(request)
+      .catch((e: unknown) => e);
+    expect(judgeCallOf(caught)).toEqual({ judge_model: "claude-haiku-5-5", judge_provider: "anthropic" });
+    const viaFallback = await withJudgeFallback(refusing("primary-model"), refusing("claude-haiku-5-5"))
+      .ask(request)
+      .catch((e: unknown) => e);
+    expect(judgeCallOf(viaFallback).judge_model).toBe("claude-haiku-5-5");
+    expect(judgeCallOf(new Error("judge: no small model on this workspace's keys"))).toEqual({});
   });
 
   test("a learning call the provider refuses is reported and skipped; a rate limit is left to the outbox", async () => {
