@@ -283,6 +283,10 @@ export type InvokeResult =
  *    computer) is held once when the team already did it to the same target,
  *    and recorded for the team once it went out (ADR 0064, `team-actions.ts`).
  */
+/** A tool's answer carries text from outside the org (ADR 0117): an external or reading tool that said something. */
+const readsOutsideText = (tool: ToolDefinition, output: ToolOutput) =>
+  Boolean(tool.external || tool.readsOutside) && output.content.trim() !== "";
+
 export function createToolGateway(deps: {
   sources: ToolSource[];
   now?: () => Date;
@@ -578,6 +582,7 @@ export function createToolGateway(deps: {
       return check.ok ? null : check.message;
     };
     let output: ToolOutput;
+    let outside = false;
     const refused = await refusal();
     if (refused || !tool) output = { content: refused ?? "Not allowed", isError: true };
     else {
@@ -602,6 +607,7 @@ export function createToolGateway(deps: {
         return ranBefore(row ?? approval);
       }
       output = await run(tool, approval.params, { ...ctx, toolUseId, approved: true }, 1);
+      outside = readsOutsideText(tool, output);
       // Team actions (ADR 0064): what a person approved and went out is the team's too.
       if (isOutsideTool(tool) && !output.isError) {
         await recordTeamAction(ctx.db, {
@@ -626,7 +632,7 @@ export function createToolGateway(deps: {
       approvalId: approval.id,
       isError: output.isError === true,
       content: shown(output.content),
-      ...(output.data ? { data: output.data } : {}),
+      ...(output.data || outside ? { data: { ...output.data, ...(outside ? { outside: true } : {}) } } : {}),
     });
     // The audit: the approved action ran (or couldn't any more). Who approved it is the approval's row.
     if (tool) {
@@ -745,10 +751,13 @@ export function createToolGateway(deps: {
           ...extra,
         });
       };
-      /** `outcome`: what the audit says; none for a call that never really was one (a malformed input). */
-      const finish = async (output: ToolOutput, outcome?: AuditOutcome) => {
-        // A result read from outside marks the run (`runReadOutside`, ADR 0117).
-        const outside = !output.isError && (tool?.external || tool?.readsOutside) ? { outside: true } : null;
+      /**
+       * `outcome`: what the audit says; none for a call that never really was one (a malformed input). `ran`: the
+       * tool itself answered (not a gateway refusal).
+       */
+      const finish = async (output: ToolOutput, outcome?: AuditOutcome, ran = false) => {
+        // A result read from outside marks the run (`runReadOutside`, ADR 0117), an error too: its text came from there.
+        const outside = ran && tool && readsOutsideText(tool, output) ? { outside: true } : null;
         const data = output.data || outside ? { ...output.data, ...outside } : null;
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
@@ -993,7 +1002,7 @@ export function createToolGateway(deps: {
         await audit("pending", { secretRequestId: output.waitForSecret.requestId });
         return { type: "secret", requestId: output.waitForSecret.requestId };
       }
-      return finish(output, prompt ? promptOutcome(prompt, output) : output.isError ? "failed" : "done");
+      return finish(output, prompt ? promptOutcome(prompt, output) : output.isError ? "failed" : "done", true);
     },
 
     /**
