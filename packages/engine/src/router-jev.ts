@@ -8,7 +8,9 @@ import {
   type RouterStrategy,
   type RoutingInput,
   type RoutingResult,
+  SOCIAL_REACTIONS,
   SPOKEN_TO,
+  socialChoice,
   withAddressee,
 } from "./router";
 
@@ -43,18 +45,6 @@ export const JEV_NANO_USD_PER_INPUT_TOKEN = 42;
 export const jevCostNanoUsd = (inputTokens: number) => Math.round(inputTokens * JEV_NANO_USD_PER_INPUT_TOKEN);
 
 const NONE = "none";
-
-/** The reactions Jev's `social` question chooses from (the small model writes any emoji), and `none`. */
-const SOCIAL_CHOICES: Record<string, string> = {
-  "🌙": "Says good night, or that they are off to sleep.",
-  "☀️": "Says good morning.",
-  "👋": "Says hi, good afternoon, or bye.",
-  "🎉": "Congratulates or celebrates.",
-  "🙏": "Thanks.",
-  "❤️": "Shows affection.",
-  "👍": "An ok, an acknowledgement, or cheers.",
-  [NONE]: "Needs a real answer, or isn't social.",
-};
 
 /**
  * How to read the state and who a message is for: the small model's rules too (`ROUTER_SYSTEM`). Built per
@@ -108,9 +98,9 @@ export function createJevRouterStrategy(options: {
       const questions: Record<string, unknown> = {
         needs_agent: {
           type: "noul",
-          instructions: `Should any AI agent reply to \`latest_message\`? ${whoFor()} People in a team chat mostly talk among themselves: an agent should reply only when the message speaks to an agent (by @, by name or by its role), asks the agents or anyone something an agent can help with ("does anyone know…", "alguém sabe…"), speaks to the agents as a group, or continues a conversation with an agent. When unsure, no.`,
+          instructions: `Should any AI agent reply to \`latest_message\`? ${whoFor()} People in a team chat mostly talk among themselves: an agent should reply only when the message speaks to an agent (by @, by name or by its role), asks the agents or anyone something an agent can help with ("does anyone know…", "alguém sabe…"), speaks to the agents as a group, or continues a conversation with an agent. Also yes when the person insists or complains that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first): they want an agent's reply. Otherwise, when unsure, no.`,
           criteria: {
-            true: "The message is for an agent or needs an agent's answer.",
+            true: "The message is for an agent or needs an agent's answer, or the person insists that nobody answered.",
             false: "People talking to each other, or unclear; no agent should interrupt.",
           },
         },
@@ -180,7 +170,7 @@ export function createJevRouterStrategy(options: {
         questions.social = {
           type: "choice",
           instructions: `Is \`latest_message\` purely social, needing no real answer, and which emoji fits it as a reaction? ${whoFor()} \`${NONE}\` when it asks or says anything that needs an answer, or the person wants an actual reply: they insist, or complain that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first).`,
-          criteria: SOCIAL_CHOICES,
+          criteria: { ...SOCIAL_REACTIONS, [NONE]: "Needs a real answer, or isn't social." },
         };
       }
 
@@ -219,6 +209,7 @@ export function createJevRouterStrategy(options: {
         new Map(input.candidates.map((c) => [c.agentId, clamp(to[c.handle])])),
       );
       const social = answers.social?.choice;
+      const reaction = social ? socialChoice(social) : null;
       const choice = answers.best_agent?.choice;
       const bestPlaced = input.candidates.find((c) => c.handle === choice);
       const spokenTo = input.candidates.find((c) => c.agentId === scored.addressee);
@@ -241,8 +232,8 @@ export function createJevRouterStrategy(options: {
         ...(social
           ? {
               social: {
-                react: social in SOCIAL_CHOICES && social !== NONE && clamp(answers.social?.confidence) >= 0.5,
-                emoji: social === NONE ? "" : social,
+                react: reaction !== null && clamp(answers.social?.confidence) >= 0.5,
+                emoji: reaction ?? "",
               },
             }
           : {}),

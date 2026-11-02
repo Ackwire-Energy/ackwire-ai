@@ -298,6 +298,21 @@ export function selectAgents(
     .map(([agentId]) => agentId);
 }
 
+/** The only reactions a step may choose for a social message (`RoutingResult.social`), with when each fits. */
+export const SOCIAL_REACTIONS: Record<string, string> = {
+  "🌙": "Says good night, or that they are off to sleep.",
+  "☀️": "Says good morning.",
+  "👋": "Says hi, good afternoon, or bye.",
+  "🎉": "Congratulates or celebrates.",
+  "🙏": "Thanks.",
+  "❤️": "Shows affection.",
+  "👍": "An ok, an acknowledgement, or cheers.",
+};
+const bareEmoji = (e: string) => e.trim().replace(/\uFE0F/g, "");
+/** One of `SOCIAL_REACTIONS`, however the variation selector was written ("❤" is "❤️"), else null. */
+export const socialChoice = (emoji: string) =>
+  Object.keys(SOCIAL_REACTIONS).find((e) => bareEmoji(e) === bareEmoji(emoji)) ?? null;
+
 /** Who a message speaks to, in every step's words (Jev's questions and `ROUTER_SYSTEM`). */
 export const SPOKEN_TO =
   'A message speaks to the agent it asks to answer or to act (by @, by name or by its role), not to an agent it only names as someone to ask, involve or hand over to, or only talks about: "Mila, ask Omar for the sales numbers" speaks to Mila, and Mila asks Omar. A follow-up that names another agent only as someone to ask, involve or hand over to still speaks to the agent the person was just talking to: right after Omar spoke, "ask Mila if the PR is up" speaks to Omar.';
@@ -337,7 +352,7 @@ export function routerPrompt(input: RoutingInput) {
       already_answered: { type: "number" },
       social: {
         type: "object",
-        properties: { react: { type: "boolean" }, emoji: { type: "string" } },
+        properties: { react: { type: "boolean" }, emoji: { enum: ["", ...Object.keys(SOCIAL_REACTIONS)] } },
         required: ["react", "emoji"],
         additionalProperties: false,
       },
@@ -406,6 +421,19 @@ export function scoresOf(
     new Map(to ? [[to, 1]] : []),
   );
   return parsed.social ? { ...scored, social: parsed.social } : scored;
+}
+
+/**
+ * A small model's `social`: a reaction only from `SOCIAL_REACTIONS`. Any other emoji (one the person's message pushed
+ * it toward, or text around it) is no choice: `socialReaction` decides.
+ */
+function socialOf(social: { react?: unknown; emoji?: unknown } | null | undefined): {
+  social?: { react: boolean; emoji: string };
+} {
+  if (typeof social?.react !== "boolean") return {};
+  if (!social.react) return { social: { react: false, emoji: "" } };
+  const emoji = typeof social.emoji === "string" ? socialChoice(social.emoji) : null;
+  return emoji ? { social: { react: true, emoji } } : {};
 }
 
 /** A small model's answer within this, or the next step decides. */
@@ -505,9 +533,7 @@ export function parseRouterJson(raw: unknown): {
     for_everyone: typeof o.for_everyone === "number" ? o.for_everyone : 0,
     already_answered: typeof o.already_answered === "number" ? o.already_answered : 0,
     scores,
-    ...(typeof o.social?.react === "boolean"
-      ? { social: { react: o.social.react, emoji: typeof o.social.emoji === "string" ? o.social.emoji : "" } }
-      : {}),
+    ...socialOf(o.social),
     reason: typeof o.reason === "string" ? o.reason : "",
   };
 }
@@ -1160,8 +1186,9 @@ export async function routeMessage(
   };
   // A social message nobody answers (a greeting, goodnight, thanks, an ok) gets one agent's reaction, the emoji the
   // step chose (`social`), else `socialReaction`'s. Who reacts: the agent it speaks to, else the one that just answered
-  // this person here, else, for a greeting or a congratulation to the room, the best placed agent; thanks, an ok or
-  // affection are always for someone, so nobody then. Never between people, never on an agent's message.
+  // this person here, else, for a greeting or a congratulation to the room, the agent they talk with, else the best
+  // placed agent; thanks, an ok or affection are always for someone, so nobody then. Never between people, never on an
+  // agent's message.
   const reactToSocial = async (decided: RoutingResult | null): Promise<RouteResult["reacted"]> => {
     if (byAgent || toPerson || peopleTalking) return undefined;
     const emoji = decided?.social ? (decided.social.react ? decided.social.emoji : "") : socialReaction(saidText);
@@ -1174,10 +1201,11 @@ export async function routeMessage(
       (named.length === 1 ? named[0]?.id : null) ??
       thankedAgent() ??
       (toRoom
-        ? bestPlaced(
+        ? ((talkingWith && candidateIds.has(talkingWith) ? talkingWith : null) ??
+          bestPlaced(
             (id) => Math.max(0, ...(decided?.agents ?? []).filter((a) => a.agentId === id).map((a) => a.score)),
             decided?.best,
-          )
+          ))
         : null);
     if (!agentId) return undefined;
     // Cosmetic: a reaction that fails never fails the routing.

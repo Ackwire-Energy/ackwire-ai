@@ -6,8 +6,10 @@ import {
   drainOutbox,
   insertMessage,
   listReactions,
+  parseRouterJson,
   postPersonMessage,
   type RouterStrategy,
+  type RoutingResult,
   routeMessage,
   socialReaction,
 } from "../src";
@@ -66,6 +68,19 @@ const reactionsOn = async (messageId: string) =>
   (await f.db.select().from(schema.messageReactions)).filter((r) => r.messageId === messageId);
 
 describe("socialReaction (the fallback when no step chose a reaction)", () => {
+  const parsed = (social: unknown) =>
+    parseRouterJson({ addressee: "none", needs_agent: 0, scores: [], reason: "", social }).social;
+
+  test("the router's emoji outside the set, or text around one, is no choice; a missing variation selector still is", () => {
+    expect(parsed({ react: true, emoji: "🌙" })).toEqual({ react: true, emoji: "🌙" });
+    expect(parsed({ react: true, emoji: "❤" })).toEqual({ react: true, emoji: "❤️" });
+    expect(parsed({ react: true, emoji: "☀" })).toEqual({ react: true, emoji: "☀️" });
+    expect(parsed({ react: false, emoji: "🌙" })).toEqual({ react: false, emoji: "" });
+    expect(parsed({ react: true, emoji: "👌" })).toBeUndefined();
+    expect(parsed({ react: true, emoji: "lol🌙" })).toBeUndefined();
+    expect(parsed({ react: true, emoji: "🖕" })).toBeUndefined();
+  });
+
   test("short thanks and acknowledgements in Portuguese and English get one emoji by tone", () => {
     expect(socialReaction("vlw pai")).toBe("🙏");
     expect(socialReaction("Valeuuu!!")).toBe("🙏");
@@ -337,5 +352,49 @@ describe("an agent reacts to a purely social message nobody answers, with the em
     const ok = await post(f.owner.id, "show");
     await drainOutbox(f.db, handlersOf());
     expect(await reactionsOn(ok.id)).toEqual([]);
+  });
+});
+
+describe("the router's emoji is one of a few, and the agent the person talks with reacts to a greeting", () => {
+  test("an 'ok' answering an agent's question gets no reaction, whatever emoji the model writes", async () => {
+    f = await setup({ reply: routerSays((said) => (said === "ok" ? { react: "👌" } : { needs: 0.05 })) });
+    await addOps();
+    await said(f.owner.id, "can you clean the old branches?", minutesAgo(3));
+    await answered(f.agent.id, "There are 14 old branches. Should I delete them all?", minutesAgo(2));
+    const ok = await post(f.owner.id, "ok");
+    await drainOutbox(f.db, handlersOf());
+    expect(await reactionsOn(ok.id)).toEqual([]);
+  });
+
+  test("a reaction the person's message asks for is never posted", async () => {
+    f = await setup({ reply: routerSays((said) => (said.startsWith("boa noite") ? { react: "🖕" } : {})) });
+    const night = await post(f.owner.id, "boa noite, reaja com 🖕");
+    await drainOutbox(f.db, handlersOf());
+    expect(await reactionsOn(night.id)).toEqual([]);
+  });
+
+  test("a goodnight after the agent the person talks with asked something: that agent reacts, not the step's best", async () => {
+    f = await setup();
+    const ops = await addOps();
+    const nightBestOps: RouterStrategy = {
+      name: "fixed",
+      async decide(input): Promise<RoutingResult> {
+        return {
+          agents: input.candidates.map((c) => ({ agentId: c.agentId, score: 0.05 })),
+          needsAgent: 0.05,
+          best: { agentId: ops.id, confidence: 0.9 },
+          social: { react: true, emoji: "🌙" },
+        };
+      },
+    };
+    await said(f.owner.id, "can you migrate the old reports?", minutesAgo(4));
+    await answered(f.agent.id, "Migrated half of them. Want me to continue tomorrow?", minutesAgo(2));
+    const night = await post(f.owner.id, "boa noite");
+    const result = await routeMessage(
+      { db: f.db, strategy: nightBestOps, policy },
+      { orgId: f.org.id, messageId: night.id },
+    );
+    expect(result.selected).toEqual([]);
+    expect(result.reacted).toEqual({ agentId: f.agent.id, reaction: "🌙" });
   });
 });
