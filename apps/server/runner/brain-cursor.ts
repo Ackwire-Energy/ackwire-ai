@@ -1,11 +1,12 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { isAccountId } from "@agenteschat/adapters/machine-protocol";
+import { redactSecrets } from "@agenteschat/adapters/secret-box";
 import { ACCOUNT_MISSING_MESSAGE, accountEnv, cursorKeyOf } from "./accounts";
 import {
   CODEX_TOOL_OUTPUT_MAX,
@@ -40,11 +41,15 @@ import { agentSecrets } from "./secrets";
  *   Cursor's sandbox (`--sandbox enabled`). Cursor asks nobody mid-turn in print
  *   mode, so whatever its sandbox refuses stays refused, as with `codex exec`.
  * - Our MCP bridge: Cursor reads `.cursor/mcp.json` from the workspace and its
- *   parents, so the agent's own folder holds our server's entry (written once,
- *   the same for every turn); the run id and the token reach it through the env
- *   by `${env:…}` interpolation, never a file or argv. `--approve-mcps` lets it
- *   load without a prompt. Our bridge's calls are not repeated as `tool_call`:
- *   the engine ran them.
+ *   parents, so the agent's own folder holds our server's entry, rewritten every
+ *   turn with ours alone (a turn could have added a server there); the run id
+ *   and the token reach it through the env by `${env:…}` interpolation, never a
+ *   file or argv. `--approve-mcps` approves every server Cursor finds, and an
+ *   MCP server runs outside Cursor's sandbox, so it is passed only when the
+ *   turn's folder is the agent's own folder or under it with no other
+ *   `.cursor/mcp.json` on the way: a turn in a granted folder elsewhere runs
+ *   without our bridge or anyone's. Our bridge's calls are not repeated as
+ *   `tool_call`: the engine ran them.
  * - Events: `assistant` lines with `timestamp_ms` and no `model_call_id` are the
  *   text deltas (the other `assistant` lines repeat them); `tool_call`
  *   `completed` is an executed `tool_call` (transcript only); `result` ends the
@@ -99,32 +104,24 @@ export function cursorMcpEntry(input: { command?: string[]; url?: string }): Rec
   };
 }
 
-/** Writes our entry into `<folder>/.cursor/mcp.json`, keeping every other server there (written whole, then renamed). */
+/** Writes `<folder>/.cursor/mcp.json` with our server alone (written whole, then renamed). */
 export function writeCursorMcp(folder: string, entry: Record<string, unknown>) {
   const dir = path.join(folder, ".cursor");
   const file = path.join(dir, "mcp.json");
-  let config: { mcpServers?: Record<string, unknown> } = {};
-  try {
-    const v = JSON.parse(readFileSync(file, "utf8")) as unknown;
-    if (v && typeof v === "object" && !Array.isArray(v)) config = v as typeof config;
-  } catch {
-    // none yet, or not JSON: ours replaces it
-  }
-  const servers =
-    config.mcpServers && typeof config.mcpServers === "object" && !Array.isArray(config.mcpServers)
-      ? config.mcpServers
-      : {};
-  if (JSON.stringify(servers[CODEX_MCP_SERVER]) === JSON.stringify(entry)) return;
   mkdirSync(dir, { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(
-    tmp,
-    `${JSON.stringify({ ...config, mcpServers: { ...servers, [CODEX_MCP_SERVER]: entry } }, null, 2)}\n`,
-    {
-      mode: 0o600,
-    },
-  );
+  writeFileSync(tmp, `${JSON.stringify({ mcpServers: { [CODEX_MCP_SERVER]: entry } }, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, file);
+}
+
+/** Whether `--approve-mcps` may go: `cwd` is `folder` or under it, with no `.cursor/mcp.json` but ours on the way. */
+export function cursorMayApproveMcps(folder: string, cwd: string): boolean {
+  const rel = path.relative(folder, cwd);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return false;
+  for (let dir = cwd; dir !== folder; dir = path.dirname(dir)) {
+    if (existsSync(path.join(dir, ".cursor", "mcp.json"))) return false;
+  }
+  return true;
 }
 
 /** The prompt argument: a new chat's leads with the engine's context, cut in its middle past `CURSOR_PROMPT_MAX`. */
@@ -148,6 +145,7 @@ export function cursorTurnArgs(input: {
   chat?: string;
   model?: string;
   profile?: CommandProfile;
+  approveMcps?: boolean;
 }): string[] {
   return [
     "-p",
@@ -157,7 +155,7 @@ export function cursorTurnArgs(input: {
     "--workspace",
     input.cwd,
     "--trust",
-    "--approve-mcps",
+    ...(input.approveMcps ? ["--approve-mcps"] : []),
     ...(input.profile === "plan" ? ["--mode", "ask"] : ["--force", "--sandbox", "enabled"]),
     ...(input.model ? ["--model", input.model] : []),
     ...(input.chat ? ["--resume", input.chat] : []),
@@ -168,8 +166,7 @@ export function cursorTurnArgs(input: {
 const USAGE_LIMIT =
   /usage limit|rate limit|quota|out of (?:credits|usage|requests)|spend(?:ing)? limit|upgrade your plan/i;
 /** Cursor can't authenticate (signed out, a revoked key). */
-export const CURSOR_AUTH =
-  /not (?:logged in|authenticated)|agent login|unauthori[sz]ed|\b401\b|invalid api key|authentication/i;
+export const CURSOR_AUTH = /not (?:logged in|authenticated)|agent login|invalid api key|authentication required/i;
 
 /** How a turn that went wrong ends: `limit` then `plan_limit`, `not_logged_in`, or `cursor_failed`. */
 export function cursorProblem(problem: string, worked = false): CodexBrainEvent[] {
@@ -378,6 +375,7 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
     ...(chat ? { chat } : {}),
     ...(input.model ? { model: input.model } : {}),
     profile: input.profile ?? "work",
+    approveMcps: cursorMayApproveMcps(input.folder, input.cwd),
   });
   const base: NodeJS.ProcessEnv = {
     ...process.env,
@@ -388,10 +386,15 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
     ...(opts.runnerHome ? { [CODEX_MCP_ENV[2]]: opts.runnerHome } : {}),
   };
   const env = input.account ? accountEnv("cursor", input.account.home, base) : base;
-  if (input.account?.key) env.CURSOR_API_KEY = input.account.key;
+  const key = input.account?.key;
+  if (key) env.CURSOR_API_KEY = key;
+  // The agent's shell could print the key (its env, its file in the lent folder).
+  const redact = key
+    ? (text: string) => redactSecrets(opts.redact ? opts.redact(text) : text, [{ name: "CURSOR_API_KEY", value: key }])
+    : opts.redact;
   const mapper = new CursorEventMapper({
     ...(input.model ? { model: input.model } : {}),
-    ...(opts.redact ? { redact: opts.redact } : {}),
+    ...(redact ? { redact } : {}),
   });
 
   let child: ChildProcess;

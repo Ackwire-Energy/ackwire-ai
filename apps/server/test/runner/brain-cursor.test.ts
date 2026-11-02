@@ -11,6 +11,7 @@ import {
   CURSOR_PROMPT_MAX,
   CursorEventMapper,
   cursorChatsFile,
+  cursorMayApproveMcps,
   cursorMcpEntry,
   cursorPrompt,
   cursorTurnArgs,
@@ -43,7 +44,7 @@ const CHAT = "c0ffee00-0000-4000-8000-000000000001";
 const envRef = (name: string) => `\${env:${name}}`;
 
 test("command line: print mode with stream-json deltas in the turn's folder; plan reads only, work forces inside the sandbox", () => {
-  const work = cursorTurnArgs({ cwd: "/w/app", prompt: "oi", model: "grok-5-code", chat: CHAT });
+  const work = cursorTurnArgs({ cwd: "/w/app", prompt: "oi", model: "grok-5-code", chat: CHAT, approveMcps: true });
   expect(work.slice(0, 6)).toEqual([
     "-p",
     "--output-format",
@@ -62,6 +63,20 @@ test("command line: print mode with stream-json deltas in the turn's folder; pla
   expect(plan.join(" ")).toContain("--mode ask");
   expect(plan).not.toContain("--force");
   expect(plan).not.toContain("--resume");
+  expect(plan).not.toContain("--approve-mcps");
+});
+
+test("--approve-mcps only in the agent's own folder or under it, with no other .cursor/mcp.json on the way", () => {
+  const folder = tempDir("cursor-approve-");
+  dirs.push(folder);
+  const repo = path.join(folder, "repo", "src");
+  mkdirSync(repo, { recursive: true });
+  expect(cursorMayApproveMcps(folder, folder)).toBe(true);
+  expect(cursorMayApproveMcps(folder, repo)).toBe(true);
+  expect(cursorMayApproveMcps(folder, path.dirname(folder))).toBe(false);
+  mkdirSync(path.join(folder, "repo", ".cursor"));
+  writeFileSync(path.join(folder, "repo", ".cursor", "mcp.json"), "{}");
+  expect(cursorMayApproveMcps(folder, repo)).toBe(false);
 });
 
 test("the prompt: a new chat leads with the context, a resumed one doesn't; a context past the argument limit loses its middle", () => {
@@ -157,19 +172,21 @@ test("a turn that went wrong: a usage limit, a sign-in that ended, anything else
     code: "not_logged_in",
   });
   expect(end("boom")[0]).toMatchObject({ code: "cursor_failed", retryable: true });
+  // An MCP server's or the network's 401 isn't the account signing out.
+  expect(end("mcp: 401 Unauthorized")[0]).toMatchObject({ code: "cursor_failed" });
   expect(new CursorEventMapper().finish({ exitCode: 0, sessionId: SESSION })[0]).toMatchObject({
     code: "cursor_failed",
   });
 });
 
-test("our bridge in the agent's .cursor/mcp.json: the run and the token only as env references, other servers kept", () => {
+test("our bridge in the agent's .cursor/mcp.json: the run and the token only as env references, any other server dropped", () => {
   const folder = tempDir("cursor-mcp-");
   dirs.push(folder);
   mkdirSync(path.join(folder, ".cursor"));
   writeFileSync(path.join(folder, ".cursor", "mcp.json"), JSON.stringify({ mcpServers: { mine: { command: "x" } } }));
   writeCursorMcp(folder, cursorMcpEntry({ command: ["/usr/bin/bun", "/r/runner.js"] }));
   const config = JSON.parse(readFileSync(path.join(folder, ".cursor", "mcp.json"), "utf8"));
-  expect(config.mcpServers.mine).toEqual({ command: "x" });
+  expect(Object.keys(config.mcpServers)).toEqual([CODEX_MCP_SERVER]);
   expect(config.mcpServers[CODEX_MCP_SERVER]).toEqual({
     type: "stdio",
     command: "/usr/bin/bun",
@@ -359,6 +376,16 @@ test.skipIf(!posix)(
     const keyed = withAccounts({ accountDir: () => keyDir });
     expect(await run({ account: ACCOUNT, runId: RUN.replace(/1$/, "4") }, keyed)).toMatchObject({ type: "done" });
     expect(logOf(log).at(-1)).toMatchObject({ apiKey: "key_fake_0000000000000000" });
+    // The agent's shell printing its env never shows the key to the channel.
+    const seen: unknown[] = [];
+    const watching = { ...scope, emit: (f: unknown) => seen.push(f) };
+    const printed = (await handleRequest(
+      keyed as never,
+      turn({ account: ACCOUNT, runId: RUN.replace(/1$/, "7"), prompt: "ENV" }),
+      watching as never,
+    )) as { final: CodexBrainEvent };
+    expect(JSON.stringify([seen, printed])).not.toContain("key_fake_0000000000000000");
+    expect(JSON.stringify(seen)).toContain("CURSOR_API_KEY");
 
     expect(
       await run({ account: ACCOUNT, runId: RUN.replace(/1$/, "5") }, withAccounts({ accountDir: () => null })),

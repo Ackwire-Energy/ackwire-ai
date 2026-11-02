@@ -79,6 +79,17 @@ if (args[0] === "-p") {
   }
   const chat = flag("--resume") ?? "c0ffee00-0000-4000-8000-000000000001";
   const line = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
+  if (prompt.includes("ENV")) {
+    // The agent's shell printing its env: the key shows in the tool's output and the answer.
+    const out = `CURSOR_API_KEY=${env.CURSOR_API_KEY ?? ""}`;
+    const success = { stdout: `${out}\n`, exitCode: 0 };
+    const call = { shellToolCall: { args: { command: "env" }, result: { success } } };
+    line({ type: "tool_call", subtype: "completed", call_id: "call_env", tool_call: call, session_id: chat });
+    const msg = { role: "assistant", content: [{ type: "text", text: out }] };
+    line({ type: "assistant", message: msg, session_id: chat, timestamp_ms: 1 });
+    line({ type: "result", subtype: "success", is_error: false, result: out, session_id: chat });
+    process.exit(0);
+  }
   const text = (t, extra = {}) => ({
     type: "assistant",
     message: { role: "assistant", content: [{ type: "text", text: t }] },
