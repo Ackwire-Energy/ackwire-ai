@@ -98,7 +98,7 @@ export function AudienceChoice({
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const g = agentGrammar(t, agentName);
+  const g = agentGrammar(agentName);
   const owner = ownerUserId ? dir.memberById.get(ownerUserId) : undefined;
   const roles = useRoles(org.id);
   const [query, setQuery] = useState("");

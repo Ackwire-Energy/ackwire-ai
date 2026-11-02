@@ -1875,9 +1875,9 @@ describe("Quem pensa: Automático", () => {
       "option",
     );
     expect(picks.map((o) => [o.textContent, o.getAttribute("aria-disabled")])).toEqual([
-      ["Z.ai: GLM LatestPrecisa de uma chave da OpenRouter", "true"],
-      ["DeepSeek: DeepSeek Flash LatestPrecisa de uma chave da OpenRouter", "true"],
-      ["Claude Sonnet LatestPrecisa de uma chave da OpenRouter", "true"],
+      ["Z.ai: GLM LatestPrecisa de uma chave de API OpenRouter", "true"],
+      ["DeepSeek: DeepSeek Flash LatestPrecisa de uma chave de API OpenRouter", "true"],
+      ["Claude Sonnet LatestPrecisa de uma chave de API OpenRouter", "true"],
     ]);
     expect(within(list).queryByRole("group", { name: "OpenRouter" })).toBeNull();
   });

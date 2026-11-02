@@ -273,7 +273,7 @@ function ConnectAiDialog({
       onOpenChange={(o) => !o && onClose()}
       title={
         one && (theirs || target === one.id)
-          ? t("connectAi.titleFor", agentGrammar(t, one.name))
+          ? t("connectAi.titleFor", agentGrammar(one.name))
           : t("connectAi.title.any")
       }
       closeLabel={t("common.close")}

@@ -224,7 +224,7 @@ function NewAgentForm({
   const taken = useMemo(() => takenHandles(dir.agents, [...dir.memberById.values()]), [dir.agents, dir.memberById]);
   const draft = { role, name, handle, taken };
   const shownName = name.trim() || t("newAgent.previewName");
-  const g = agentGrammar(t, name.trim() || t("newAgent.defaultName"));
+  const g = agentGrammar(name.trim() || t("newAgent.defaultName"));
   const handleIssue = handle || tried ? handleProblem(handle, taken) : null;
   const handleText =
     handleIssue === "taken"
@@ -704,7 +704,7 @@ function NewAgentForm({
           ) : null}
           <Text variant="footnote" tone="faint">
             {proposed && listedApps.length + myMail.length > 0
-              ? `${t("mobile.settings.access.how")} ${t("newAgent.approvalsNote")}`
+              ? t("common.joinSentences", { a: t("mobile.settings.access.how"), b: t("newAgent.approvalsNote") })
               : t("newAgent.approvalsNote")}
           </Text>
         </View>

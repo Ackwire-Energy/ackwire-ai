@@ -44,6 +44,7 @@ import {
   consultNoticeFolds,
   consultsForLine,
 } from "@agenteschat/client/lib/consult-group";
+import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import {
@@ -257,7 +258,7 @@ export function ChatScreen({
 }
 
 function Chat({ channelId, threadId }: { channelId: string; threadId: string | null }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
   const api = useApi();
@@ -1028,9 +1029,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       (e) => e.type === "agent" && e.id === dmAgentId,
     );
     if (!entry) return null;
-    const verb = activityVerb(t, entry.activity);
-    return verb.charAt(0).toUpperCase() + verb.slice(1);
-  }, [dmAgentId, isThread, runs, lineConsults, dir.agentById, t]);
+    return capitalize(activityVerb(t, entry.activity), i18n.language);
+  }, [dmAgentId, isThread, runs, lineConsults, dir.agentById, t, i18n.language]);
   // A DM's pill says how the other side is (ADR 0084): an agent's presence and what it does, a person's line.
   const dmLine = useDmStatusLine(
     dm && !isThread ? { type: dm.with.type, id: dm.with.id } : null,

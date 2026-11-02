@@ -197,7 +197,7 @@ export function AgentEditScreen({ id }: { id: string }) {
             <GroupedRow
               icon="flag"
               label={t("coordinator.chip")}
-              sub={t("coordinator.help", agentGrammar(t, agent.name))}
+              sub={t("coordinator.help", agentGrammar(agent.name))}
               subLines={4}
               toggle={draft.coordinator}
               disabled={!fields.has("coordinator")}
@@ -217,9 +217,9 @@ export function AgentEditScreen({ id }: { id: string }) {
             <GroupedList>
               <GroupedRow
                 icon="agent"
-                label={t("audience.consultable", agentGrammar(t, agent.name))}
+                label={t("audience.consultable", agentGrammar(agent.name))}
                 labelLines={2}
-                sub={t("audience.consultableHint", agentGrammar(t, agent.name))}
+                sub={t("audience.consultableHint", agentGrammar(agent.name))}
                 subLines={4}
                 toggle={draft.audience.consultable !== false}
                 disabled={
@@ -264,7 +264,7 @@ export function AgentEditScreen({ id }: { id: string }) {
             <GroupedList>
               <GroupedRow
                 icon="x"
-                label={t("agentPage.delete.action", agentGrammar(t, agent.name))}
+                label={t("agentPage.delete.action", agentGrammar(agent.name))}
                 sub={t("agentPage.delete.help")}
                 subLines={2}
                 danger

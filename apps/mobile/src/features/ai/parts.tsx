@@ -140,7 +140,7 @@ export function PlanRepliesOf({ on, owner, agentName }: { on: boolean; owner: st
           labelLines={2}
         />
       </GroupedList>
-      <GroupedFooter>{t("aiAccounts.share.onOther", { ...agentGrammar(t, agentName), owner })}</GroupedFooter>
+      <GroupedFooter>{t("aiAccounts.share.onOther", { ...agentGrammar(agentName), owner })}</GroupedFooter>
     </View>
   );
 }

@@ -9,7 +9,8 @@ import {
 } from "@agenteschat/client/lib/apps";
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { visibleText } from "@agenteschat/client/lib/text";
-import { Alert, Button, Card, EmptyState, Field, Icon, OptionList, Segmented, Select } from "@agenteschat/ui";
+import { isAppLocale } from "@agenteschat/i18n/locale";
+import { Alert, Button, Card, EmptyState, Field, Icon, OptionList, Select } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -19,7 +20,7 @@ import { useAuth } from "@/auth/context";
 import { AppMark } from "@/components/AiApps";
 import { CenteredLayout } from "@/components/AuthLayout";
 import { LoadingLine } from "@/components/Loading";
-import { type LocaleCode, locales, TYPED_VALUES, usePageT } from "@/i18n";
+import { DEFAULT_LOCALE, type LocaleCode, locales, TYPED_VALUES, usePageT } from "@/i18n";
 import "@/components/ai-apps.css";
 
 /** How long "Pronto" shows before the browser goes back to the app. */
@@ -40,7 +41,7 @@ type Outcome = { kind: "allowed"; app: string; to: string } | { kind: "denied"; 
  */
 export function AuthorizePage({ requestId, error }: { requestId: string; error: PageError | null }) {
   const { i18n } = useTranslation();
-  const [lang, setLang] = useState<LocaleCode>(i18n.language === "en" ? "en" : "pt-BR");
+  const [lang, setLang] = useState<LocaleCode>(isAppLocale(i18n.language) ? i18n.language : DEFAULT_LOCALE);
   const t = usePageT(lang);
   return (
     <CenteredLayout narrow>
@@ -51,9 +52,9 @@ export function AuthorizePage({ requestId, error }: { requestId: string; error: 
           <Consent t={t} requestId={requestId} />
         )}
         <div className="consent__lang">
-          <Segmented
+          <Select
             size="sm"
-            label={t("shell.language")}
+            aria-label={t("shell.language")}
             value={lang}
             onValueChange={(v) => setLang(v as LocaleCode)}
             options={locales.map((l) => ({ value: l.code, label: l.label }))}

@@ -115,7 +115,7 @@ export function summaryKeys(role: OrgRole, everyone: OrgRole | undefined): RoleP
 const wordList = (t: TFunction, locale: string, items: string[]) =>
   typeof Intl.ListFormat === "function"
     ? new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items)
-    : joinNames(items, t("notifications.and"));
+    : joinNames(items, t);
 
 /** The sentence that sums a role up: its own keys past what `everyone` gives, the first three, "and N more". */
 export function roleSummary(t: TFunction, locale: string, role: OrgRole, everyone: OrgRole | undefined) {

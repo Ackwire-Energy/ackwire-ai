@@ -1,4 +1,4 @@
-import i18next, { type TFunction } from "i18next";
+import type { TFunction } from "i18next";
 import { ApiError, NetworkError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
 import { billingHoldOf } from "./billing";
@@ -375,14 +375,11 @@ const deviceOffline = () => (globalThis as { navigator?: { onLine?: boolean } })
 const noAnswerText = (t: TFunction) => t(deviceOffline() ? "common.offline" : "common.unreachable");
 
 /**
- * The words of a refusal the app doesn't translate: the server's own only for English readers and a 4xx, which the
- * server writes for people (a 5xx's are for the log). The language: `locale`, else `useTranslation`'s `t` (its
- * `lng`), else the app's i18next instance.
+ * The words of a refusal the app doesn't translate: the server's own (English, written for people) for a 4xx, in
+ * every language, since English is every language's fallback; a 5xx's are for the log.
  */
-function untranslatedText(t: TFunction, error: ApiError, locale?: string): string {
-  const language = locale ?? (t as { lng?: unknown }).lng ?? i18next.language;
-  const english = typeof language === "string" && language.startsWith("en");
-  return english && error.status < 500 && error.message ? error.message : t("common.unknownError");
+function untranslatedText(t: TFunction, error: ApiError): string {
+  return error.status < 500 && error.message ? error.message : t("common.unknownError");
 }
 
 /**
@@ -488,5 +485,5 @@ export function errorText(t: TFunction, error: unknown, locale?: string): string
     if (error.status === 403) return t("common.notAllowed");
   }
   if (noAnswer(error)) return noAnswerText(t);
-  return error instanceof ApiError ? untranslatedText(t, error, locale) : t("common.unknownError");
+  return error instanceof ApiError ? untranslatedText(t, error) : t("common.unknownError");
 }

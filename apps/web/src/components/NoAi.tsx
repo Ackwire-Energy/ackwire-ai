@@ -44,7 +44,7 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
       <div className="noai-banner" role="status">
         <span className="noai-banner__text ac-iconline">
           <Icon name="plug" size={16} />
-          <b>{t("noAi.agent", agentGrammar(t, name))}</b>
+          <b>{t("noAi.agent", agentGrammar(name))}</b>
         </span>
         <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId })}>
           {t("noAi.action")}
@@ -106,8 +106,8 @@ export function NoAiCard({ message }: { message: Message }) {
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
         : card.own
-          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(t, name))
-          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
+          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(name))
+          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name));
   const action =
     !connect || answering ? null : ready || answer === "pending" ? (
       mayAnswer && (

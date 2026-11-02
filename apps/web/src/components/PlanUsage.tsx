@@ -142,7 +142,7 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
           <span className="plan-block__month">
             {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
             {money && typeof account.equivalentUsd === "number" && (
-              <> · {t("usageViews.equivalent", { amount: formatUsd(t, i18n.language, account.equivalentUsd) })}</>
+              <> · {t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}</>
             )}
           </span>
         </div>
@@ -198,8 +198,8 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
                   <small>
                     {noteWhole(
                       t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
-                        spent: formatUsd(t, i18n.language, a.costUsd),
-                        budget: formatUsd(t, i18n.language, a.budgetUsd),
+                        spent: formatUsd(i18n.language, a.costUsd),
+                        budget: formatUsd(i18n.language, a.budgetUsd),
                       }),
                     )}
                   </small>

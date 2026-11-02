@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AgentStatusLine, WorkView } from "../api/types";
-import { formatTime } from "./format";
+import { formatTime, lowerFirst } from "./format";
 
 /**
  * Long work (ADR 0121), the same on every app: the line under the agent's "Vou cuidar disso" (WorkLine on web, its
@@ -154,7 +154,7 @@ export function autoUpdateText(t: TFunction, params: Record<string, unknown>): s
   const kind = typeof params.kind === "string" ? params.kind : null;
   if (!kind) return head;
   const now = say(`presence.agent.${kind}`, { subject: typeof params.subject === "string" ? params.subject : "" });
-  return `${head} ${say("work.autoUpdateNow", { now: now.charAt(0).toLocaleLowerCase() + now.slice(1) })}`;
+  return `${head} ${say("work.autoUpdateNow", { now: lowerFirst(now) })}`;
 }
 
 /** A card's blocked badge (background work stopped on something, ADR 0121 §4): in its stage, not a column. */
@@ -180,7 +180,7 @@ function errorWords(t: TFunction, code: unknown, params?: unknown) {
     ...values,
     defaultValue: "",
   }).replace(/\.$/, "");
-  return why.charAt(0).toLocaleLowerCase() + why.slice(1);
+  return lowerFirst(why);
 }
 
 /**

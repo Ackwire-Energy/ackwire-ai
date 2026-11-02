@@ -26,14 +26,16 @@ const WORDS: Record<string, string> = {
   "media.word.gif": "GIF",
   "media.word.sticker": "Figurinha",
   "media.gifTitled": "GIF: {{title}}",
-  "media.stickerOf": "Figurinha {{of}} {{name}}: {{mood}}",
+  "media.stickerOf": "Figurinha do {{name}}: {{mood}}",
+  "media.stickerOf_female": "Figurinha da {{name}}: {{mood}}",
   "media.moods.celebrate": "comemorando",
   "media.moods.love": "amei",
-  "grammar.ofF": "da",
-  "grammar.ofM": "do",
 };
 const t = ((key: string, o: Record<string, string> = {}) =>
-  (WORDS[key] ?? key).replace(/\{\{(\w+)\}\}/g, (_, k: string) => o[k] ?? "")) as unknown as TFunction;
+  (WORDS[o.context ? `${key}_${o.context}` : key] ?? WORDS[key] ?? key).replace(
+    /\{\{(\w+)\}\}/g,
+    (_, k: string) => o[k] ?? "",
+  )) as unknown as TFunction;
 
 const GIF = { kind: "gif", provider: "giphy", id: "abc", title: "party cat", width: 480, height: 270 };
 const STICKER = { kind: "sticker", agentId: "ag-1", mood: "love" };

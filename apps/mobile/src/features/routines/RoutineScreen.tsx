@@ -183,7 +183,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
         usage.tokens !== null
           ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
           : null,
-        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(i18n.language, usage.costUsd) }) : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -313,7 +313,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
             </Block>
           </Section>
 
-          <Section title={t("routines.panel.what", agentGrammar(t, agentName))}>
+          <Section title={t("routines.panel.what", agentGrammar(agentName))}>
             <Block>
               {r.canSeeDetails && r.prompt !== null ? (
                 <Text variant="body" selectable>
@@ -448,7 +448,10 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               <Block>
                 <Text variant="footnote" tone="muted">
                   {nexts[0] && !done
-                    ? `${t("routines.noRuns")} ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`
+                    ? t("common.joinSentences", {
+                        a: t("routines.noRuns"),
+                        b: t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) }),
+                      })
                     : t("routines.noRuns")}
                 </Text>
               </Block>

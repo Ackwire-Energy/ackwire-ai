@@ -103,7 +103,7 @@ export function CorrectionDialog({
   const toast = useToast();
   const correct = useCorrectMessage(org.id);
   const [text, setText] = useState("");
-  const g = agentGrammar(t, agentName);
+  const g = agentGrammar(agentName);
   return (
     <Dialog
       open={open}

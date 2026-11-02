@@ -7,14 +7,18 @@ import type {
   OrgRole,
   Person,
 } from "@agenteschat/client";
-import { daysBetween, formatShortDate, namesText, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
+import {
+  daysBetween,
+  formatShortDate,
+  lowerFirst,
+  namesText,
+  relativeTime,
+  timeLeft,
+} from "@agenteschat/client/lib/format";
 import { askedLabel } from "@agenteschat/client/lib/join-requests";
 import { grants, rolesOf } from "@agenteschat/client/lib/roles";
 import { addressesIn } from "@agenteschat/client/lib/text";
 import type { TFunction } from "i18next";
-
-/** A sentence's start, to follow another fact on a line ("Admin · expira em 6 dias"). */
-const lowerFirst = (text: string, locale: string) => text.charAt(0).toLocaleLowerCase(locale) + text.slice(1);
 
 /** "agora", "há 2 h", "ontem", "em 22 out": when something happened, to follow a verb. */
 export function whenWords(t: TFunction, locale: string, iso: string, now = new Date()) {

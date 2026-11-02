@@ -100,7 +100,7 @@ import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
@@ -1261,7 +1261,7 @@ function ChannelView({
   const commandAgent = dmAgent ?? suggestedAgent;
   const navigateTo = useNavigate();
   const commandPrefix = dmAgent || !commandAgent ? "" : `@${commandAgent.handle} `;
-  const cg = agentGrammar(t, commandAgent?.name ?? "");
+  const cg = agentGrammar(commandAgent?.name ?? "");
   const commands: ComposerCommand[] = commandAgent
     ? [
         {
@@ -1521,7 +1521,7 @@ function ChannelView({
   // While an agent works here: the send button turns into stop (box empty), and typing offers
   // "Juntar ao que ele faz" (↵) or "Parar e mandar" (⌘↵).
   const stopName = stopTarget ? (dir.agentById.get(stopTarget.agentId)?.name ?? t("channel.unknownAgent")) : "";
-  const stopGrammar = agentGrammar(t, stopName);
+  const stopGrammar = agentGrammar(stopName);
   const working = stopTarget
     ? {
         stopLabel: t("run.stopAgent", stopGrammar),
@@ -1531,7 +1531,6 @@ function ChannelView({
     : null;
   // The choice is for anyone who writes while an agent works (the stop button only for who may stop it).
   const busyGrammar = agentGrammar(
-    t,
     busyTarget ? (dir.agentById.get(busyTarget.agentId)?.name ?? t("channel.unknownAgent")) : "",
   );
   const choice = busyTarget
@@ -1719,7 +1718,7 @@ function ChannelView({
   const Tag = chrome?.panel ? "section" : "main";
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
-    t("newAgent.and"),
+    t,
   );
   const subtitle = [
     channel.topic,
@@ -2596,8 +2595,6 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
   );
 }
 
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
-
 /**
  * The block's header: the time it started, as any message. What it is doing and for how long is the
  * bar's above the composer (saying it twice was noise).
@@ -2616,7 +2613,7 @@ function LiveRunStatus({
   run: LiveRun /** The waiting row's step line says what it does. */;
   quietOnly?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -2666,7 +2663,7 @@ function LiveRunStatus({
       ) : (
         doing && (
           <p className="ac-msg__activity" aria-live="polite">
-            {capitalize(activityVerb(t, doing))}…
+            {capitalize(activityVerb(t, doing), i18n.language)}…
           </p>
         )
       )}
@@ -3318,7 +3315,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
   // Nobody called it: it joined the conversation on its own (`meta.joined`).
   const joined = m.author.type === "agent" && meta.joined === true;
-  const joinedTip = joined ? t("chat.joined.tip", agentGrammar(t, name)) : null;
+  const joinedTip = joined ? t("chat.joined.tip", agentGrammar(name)) : null;
   // The root of an issue's work thread (the person asked the agent to implement it): the issue card, no text.
   const issueWork = issueWorkOf(meta);
   // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
@@ -4106,10 +4103,10 @@ function ChannelDetails({
                   {!r.autoReply
                     ? t("channelMembers.mentionLine", { handle: r.handle })
                     : !picksForMe(routing)
-                      ? t(replyAloneKey(routing), agentGrammar(t, r.name))
+                      ? t(replyAloneKey(routing), agentGrammar(r.name))
                       : dir.agentById.get(r.id)?.coordinator
                         ? t("channelMembers.coordinatorLine")
-                        : t("channelMembers.aloneLine", agentGrammar(t, r.name))}
+                        : t("channelMembers.aloneLine", agentGrammar(r.name))}
                 </span>
               </span>
               {r.setsReply && (
@@ -4128,7 +4125,7 @@ function ChannelDetails({
                   }
                 >
                   <MenuRadioGroup
-                    label={t("channelMembers.replyHeading", agentGrammar(t, r.name))}
+                    label={t("channelMembers.replyHeading", agentGrammar(r.name))}
                     value={r.autoReply ? "alone" : "mention"}
                     onValueChange={(v) => autoReply.mutate({ agentId: r.id, on: v === "alone" })}
                     options={[
@@ -4136,8 +4133,8 @@ function ChannelDetails({
                         value: "alone",
                         label: (
                           <>
-                            {t("channelMembers.replyAlone", agentGrammar(t, r.name))}
-                            <span className="ac-menu__desc">{t(replyAloneKey(routing), agentGrammar(t, r.name))}</span>
+                            {t("channelMembers.replyAlone", agentGrammar(r.name))}
+                            <span className="ac-menu__desc">{t(replyAloneKey(routing), agentGrammar(r.name))}</span>
                           </>
                         ),
                       },
@@ -4238,7 +4235,7 @@ function ChannelDetails({
         title={t("channelMembers.removeTitle", { name: removing?.name ?? "", channel: channel.name })}
         description={t(
           removing?.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody",
-          agentGrammar(t, removing?.name ?? ""),
+          agentGrammar(removing?.name ?? ""),
         )}
         closeLabel={t("common.close")}
         width={440}

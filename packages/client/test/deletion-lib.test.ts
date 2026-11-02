@@ -5,7 +5,11 @@ import { accountDeletionLines, deletionProof, proofToSend, soleOwnerWaysOut } fr
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
 const t = ((key: string, o?: Record<string, unknown>) =>
-  o && Object.keys(o).length > 0 ? `${key} ${JSON.stringify(o)}` : key) as unknown as TFunction;
+  key === "format.list"
+    ? new Intl.ListFormat("en").format(o?.names as string[])
+    : o && Object.keys(o).length > 0
+      ? `${key} ${JSON.stringify(o)}`
+      : key) as unknown as TFunction;
 
 const plan = (patch: Partial<AccountDeletionPlan>): AccountDeletionPlan => ({
   closes: [],

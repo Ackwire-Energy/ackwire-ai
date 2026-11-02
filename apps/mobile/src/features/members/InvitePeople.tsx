@@ -273,7 +273,11 @@ function OnlyYouNote() {
   const status = useAiStatus(orgId).data;
   const thinks = (id: string) => (aiStateOf(status, id) ?? "no_ai") !== "no_ai";
   if (!meId || !onlyOwnerReplies(agents, thinks, meId)) return null;
-  return <GroupedFooter>{`${t("members.agentsOnlyYou")} ${t("members.agentsOnlyYouHint")}`}</GroupedFooter>;
+  return (
+    <GroupedFooter>
+      {t("common.joinSentences", { a: t("members.agentsOnlyYou"), b: t("members.agentsOnlyYouHint") })}
+    </GroupedFooter>
+  );
 }
 
 /** Canais, pushed over Convidar pessoas: what they also join, #general always (ADR 0090 §5). */

@@ -501,7 +501,7 @@ function Proposal({ proposal }: { proposal: CalendarRange["proposals"][number] }
   const action = useCalendarAction(org.id);
   const agent = { type: "agent" as const, id: proposal.agentId };
   const when = `${dayLabel(i18n.language, new Date(proposal.start))}, ${formatTime(i18n.language, proposal.start)}–${formatTime(i18n.language, proposal.end)}`;
-  const people = joinNames(proposal.participants.map(actors.name), t("newAgent.and"));
+  const people = joinNames(proposal.participants.map(actors.name), t);
   return (
     <ApprovalCard
       status="waiting"

@@ -145,7 +145,7 @@ var R=window.__block||{};
 function mem(){var d={};return{getItem:function(k){return k in d?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){d={}}}}
 ["localStorage","sessionStorage"].forEach(function(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catch(_){}}});
 try{void document.cookie}catch(e){try{Object.defineProperty(document,"cookie",{get:function(){return""},set:function(){},configurable:true})}catch(_){}}
-var L=R.labels||{send:"Send",more:"More",thousand:"k"},LOC=R.locale||"pt-BR";
+var L=R.labels||{send:"Send",more:"More",thousand:"k"},LOC=R.locale||"en";
 var post=function(m){m.agentes=1;try{var n=window.ReactNativeWebView;if(n)n.postMessage(JSON.stringify(m));else parent.postMessage(m,"*")}catch(_){}};
 var state=Object.assign({},R.state||{}),calc=[],subs=[],derived={},queued=false;
 var view=function(){return Object.assign({},state,derived)};

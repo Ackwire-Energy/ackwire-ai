@@ -95,7 +95,7 @@ export function DesktopView({
   const sayFailed = useSayFailed();
   const createSocket = useContext(SocketFactoryContext);
   const actions = useBrowserHandoffMutations(org.id);
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const color = colorOf(dir.agentById.get(agentId));
   const [view, setView] = useState<DesktopViewState>("connecting");
   const [round, setRound] = useState(0);

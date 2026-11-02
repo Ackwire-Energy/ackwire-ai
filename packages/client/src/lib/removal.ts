@@ -16,7 +16,7 @@ export function removalLines(
   const names = (list: { name: string }[]) =>
     joinNames(
       list.map((x) => x.name),
-      t("newAgent.and"),
+      t,
     );
   const heir = p.heir ? (p.heir.userId === who.meId ? t("members.remove.you") : p.heir.name) : "";
   const own = mine ? "Mine" : "";

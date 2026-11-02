@@ -221,7 +221,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
   /* ---------- What changed, said in words ---------- */
 
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const ownerFirst = agent.ownerUserId ? (dir.memberById.get(agent.ownerUserId)?.name.split(/\s+/)[0] ?? null) : null;
   const lookText = (l: Look) =>
     [
@@ -239,7 +239,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     const ids = [...new Set([...(owner === NO_OWNER ? [] : [owner]), ...a.userIds])];
     const roles = (a.roleIds ?? []).flatMap((id) => dir.roleName(id) ?? []);
     const names = [...roles, ...ids.map(first)];
-    return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
+    return names.length ? joinNames(names, t) : t("audience.summary.nobody");
   };
   const budgetText = (amount: number | null) =>
     amount === null
@@ -542,7 +542,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     }
     setEdits((e) => dropFields(e, done));
     setSaving(false);
-    if (!failed) toast.show(t("agent.savedToast", agentGrammar(t, draft.name.trim() || agent.name)));
+    if (!failed) toast.show(t("agent.savedToast", agentGrammar(draft.name.trim() || agent.name)));
   };
 
   // ⌘/Ctrl+S saves.
@@ -765,7 +765,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         title={t("agentPage.archive.title", g)}
         description={
           agent.coordinator
-            ? `${t("agentPage.archive.text", g)} ${t("coordinator.archive", g)}`
+            ? t("common.joinSentences", { a: t("agentPage.archive.text", g), b: t("coordinator.archive", g) })
             : t("agentPage.archive.text", g)
         }
         closeLabel={t("common.close")}

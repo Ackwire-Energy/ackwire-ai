@@ -13,6 +13,7 @@ import { readValueSync, writeValue } from "@/lib/storage";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
+import { LanguageLine } from "@/ui/auth/LanguageLine";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { ServerLine } from "@/ui/auth/ServerLine";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
@@ -365,6 +366,7 @@ export function AuthFlow({
           <View style={{ gap: 14, alignItems: "center" }}>
             {terms}
             <ServerLine />
+            <LanguageLine />
           </View>
         ) : (
           terms

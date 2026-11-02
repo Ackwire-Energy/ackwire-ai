@@ -23,6 +23,21 @@ body {
   font-feature-settings: "ss01", "tnum";
   -webkit-font-smoothing: antialiased;
 }
+
+/* Japanese and Chinese break lines by their own strict rules, Korean between words; none of the three slants a
+   word for emphasis. */
+:lang(ja),
+:lang(zh-Hans) {
+  line-break: strict;
+}
+:lang(ko) {
+  word-break: keep-all;
+}
+:lang(ja) em,
+:lang(ko) em,
+:lang(zh-Hans) em {
+  font-style: normal;
+}
 code,
 kbd,
 pre,

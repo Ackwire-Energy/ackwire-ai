@@ -1,6 +1,8 @@
+import { useMe } from "@agenteschat/client";
 import { isPaidReturn } from "@agenteschat/client/lib/billing";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { requireUser } from "@/app/guards";
+import { useServerLocale } from "@/i18n";
 import { OnboardingPage, resumeOnboarding } from "@/pages/OnboardingPage";
 
 export const Route = createFileRoute("/onboarding")({
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/onboarding")({
         })
       : null,
   component: function Onboarding() {
+    useServerLocale(useMe().data?.user);
     return <OnboardingPage resumed={Route.useLoaderData()} paid={Route.useSearch().paid === true} />;
   },
 });

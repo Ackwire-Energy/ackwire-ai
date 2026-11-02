@@ -78,16 +78,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
   },
-  // Native permission texts (the OS shows them before the app's i18n runs).
+  // Native permission texts (the OS shows them before the app's i18n runs). Only ready languages
+  // (@agenteschat/i18n/locale), here and in `supportedLocales`: the stores list these as the app's languages.
   locales: {
-    "pt-BR": "./assets/locales/pt-BR.json",
     en: "./assets/locales/en.json",
+    "pt-BR": "./assets/locales/pt-BR.json",
   },
   plugins: [
     ["expo-router", { redirects: LEGACY_REDIRECTS }],
     ["expo-screen-orientation", { initialOrientation: "PORTRAIT_UP" }],
     "expo-secure-store",
-    "expo-localization",
+    // Every ready language, so Android 13+ and iOS offer it as the app's own language.
+    ["expo-localization", { supportedLocales: ["en", "pt-BR"] }],
     "expo-web-browser",
     "expo-apple-authentication",
     [

@@ -1180,7 +1180,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
         return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
       },
-      me: async () => state.me && withPermissions(state.me),
+      // A person who picked Portuguese, as the screens' tests read it (`useServerLocale` keeps the app in it).
+      me: async () =>
+        state.me && withPermissions({ ...state.me, user: { locale: "pt-BR", localeAuto: false, ...state.me.user } }),
       updateMe: async (input) => {
         log("account.updateMe", input);
       },

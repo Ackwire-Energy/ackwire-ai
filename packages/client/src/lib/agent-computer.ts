@@ -216,7 +216,7 @@ export function liveSubLine(
   w: Pick<EntryWords, "person"> & { name: string; nowMs?: number },
 ): string {
   const nowMs = w.nowMs ?? Date.now();
-  const g = agentGrammar(t, w.name);
+  const g = agentGrammar(w.name);
   const h = f.handoff;
   if (h?.status === "active" && h.controllerUserId) {
     if (h.controllerUserId !== f.userId) return t("desktop.sub.hidden", { person: w.person(h.controllerUserId) });

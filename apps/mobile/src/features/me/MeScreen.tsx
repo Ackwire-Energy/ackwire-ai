@@ -7,6 +7,7 @@ import {
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -74,7 +75,6 @@ export function MeScreen() {
   const sounds = useSoundChoice();
   const styleLabel = useSoundLabel();
   const startLabel = useStartLabel();
-  const en = i18n.language.startsWith("en");
   const withMe = openIssuesWithMe(issues.data, meId);
   const version = Constants.expoConfig?.version ?? "";
 
@@ -151,7 +151,7 @@ export function MeScreen() {
     {
       icon: "globe",
       label: t("mobile.me.language"),
-      value: en ? t("mobile.me.langEn") : t("mobile.me.langPt"),
+      value: isAppLocale(i18n.language) ? localeInfo(i18n.language).native : i18n.language,
       href: "/me/language",
     },
   ];

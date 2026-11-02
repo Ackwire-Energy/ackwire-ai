@@ -113,7 +113,7 @@ function SettingsBody({
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
-  const g = agentGrammar(t, agentName);
+  const g = agentGrammar(agentName);
   const look = lookOf(dir.agentById.get(m.agentId));
   const settings = useMissionSettings(org.id, m.id);
   const setApproval = useSetCommandApproval(org.id, m.id);

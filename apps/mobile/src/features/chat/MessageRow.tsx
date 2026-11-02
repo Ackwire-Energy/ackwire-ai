@@ -728,12 +728,12 @@ function Tag({
 function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultation; channelId: string }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("mobile.chat.someone"));
+  const from = agentGrammar(dir.agentById.get(c.agentId)?.name ?? t("mobile.chat.someone"));
   return (
     <>
       <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
         {withAgentFaces(
-          t("chat.consultPanel.helping", { name: from.name, article: from.article }),
+          t("chat.consultPanel.helping", { name: from.name, context: from.context }),
           [{ name: from.name, agentId: c.agentId }],
           12,
         )}

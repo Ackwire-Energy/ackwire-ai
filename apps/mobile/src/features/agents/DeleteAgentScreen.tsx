@@ -39,7 +39,7 @@ export function DeleteAgentScreen({ id }: { id: string }) {
       </SettingsPage>
     );
   }
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const ready = matchesName(typed, agent.name) && !purge.isPending;
   const confirm = () => {
     if (!ready) return;

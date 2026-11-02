@@ -61,7 +61,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const agent = dir.agentById.get(agentId);
   const name = agent?.name ?? "";
   const ownerFirst = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const brain = useAgentBrain(orgId, agentId);
   const models = useModels();
   const apiKey = useAiStatus(orgId).data?.apiKey !== false;

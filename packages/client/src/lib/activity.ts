@@ -2,7 +2,6 @@ import type { TFunction } from "i18next";
 import type { LiveConsult, LiveConsultStatus } from "../realtime/consults";
 import type { LiveRun } from "../realtime/streams";
 import { joinNames } from "./format";
-import { agentGrammar } from "./grammar";
 import { MAIL_BRANDS } from "./mail";
 
 /**
@@ -519,14 +518,13 @@ export function markedPieces(text: string): MarkedPiece[] {
 
 /** "Theo", "Theo e Iris", "Theo e mais 2". */
 export function listNames(t: TFunction, names: string[], mark: MarkName = plain) {
-  if (names.length <= 2) return joinNames(names.map(mark), t("newAgent.and"));
+  if (names.length <= 2) return joinNames(names.map(mark), t);
   return t("chat.namesMore", { first: mark(names[0] ?? ""), count: names.length - 1 });
 }
 
 /** One consultation's phrase: "Dev está perguntando ao Infra", "Infra respondeu. Dev está escrevendo". */
 function consultPhrase(t: TFunction, from: string, c: EntryConsult, mark: MarkName) {
-  const g = agentGrammar(t, c.toName);
-  if (c.status === "asking") return t("chat.consult.asking", { from: mark(from), to: mark(c.toName), prep: g.to });
+  if (c.status === "asking") return t("chat.consult.asking", { from: mark(from), to: mark(c.toName) });
   if (c.status === "answered") return t("chat.consult.answered", { from: mark(from), to: mark(c.toName) });
   return t("chat.consult.writing", { from: mark(from) });
 }

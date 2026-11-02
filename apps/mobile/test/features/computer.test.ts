@@ -117,7 +117,7 @@ describe("the agent's computer on the phone: its words by edition", () => {
       expect(at(keys, "browser.profile")).toBeUndefined();
     }
     expect(at(resources["pt-BR"].translation, "agentComputer.button")).toBe("Computador");
-    expect(at(resources["pt-BR"].translation, "agentComputer.title")).toBe("Computador {{of}} {{name}}");
+    expect(at(resources["pt-BR"].translation, "agentComputer.title")).toBe("Computador do {{name}}");
   });
 });
 
@@ -223,11 +223,11 @@ describe("the agent's computer full screen on the phone: what its stage shows", 
     // Someone else in control: the header says who, and the page only why nothing shows.
     const joao = request({ status: "active", controllerUserId: "u-joao", kind: "takeover", expiresAt: null });
     expect(liveSubLine(pt, facts({ handoff: joao }), words)).toBe("João no controle");
-    expect(pt("browser.inCard.hiddenHelp", agentGrammar(pt, "Ada"))).toBe(
+    expect(pt("browser.inCard.hiddenHelp", agentGrammar("Ada"))).toBe(
       "Por privacidade, a tela fica oculta até voltar para a Ada.",
     );
     const card = await Bun.file(new URL("../../src/features/browser/BrowserCard.tsx", import.meta.url).pathname).text();
-    expect(card).toContain('? t("browser.inCard.hiddenHelp", agentGrammar(t, name))');
+    expect(card).toContain('? t("browser.inCard.hiddenHelp", agentGrammar(name))');
   });
 });
 

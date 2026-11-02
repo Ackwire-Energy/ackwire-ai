@@ -210,7 +210,7 @@ export function NewTopicDialog({
                   <em>
                     {t("forum.form.templateMeta", {
                       rounds: t("forum.rounds", { count: x.rounds }),
-                      format: t(`forum.format.${x.format}`).toLowerCase(),
+                      format: t(`forum.formatLower.${x.format}`),
                     })}
                   </em>
                 </span>

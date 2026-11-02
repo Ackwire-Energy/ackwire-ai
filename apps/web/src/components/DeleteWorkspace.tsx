@@ -93,7 +93,7 @@ export function DeleteWorkspaceDialog({
               <span className="ac-hintline">
                 {t("deleteOrg.goes.connectors")}
                 <InfoHint name={t("common.about", { label: t("deleteOrg.goes.connectors") })}>
-                  {`${t("deleteOrg.bucket")} ${t("deleteOrg.github")}`}
+                  {t("common.joinSentences", { a: t("deleteOrg.bucket"), b: t("deleteOrg.github") })}
                 </InfoHint>
               </span>
             </DeletionLine>

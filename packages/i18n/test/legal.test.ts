@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
-import { legalDocuments, legalInline } from "../src/legal";
+import { type LegalKind, legalDocument, legalDocuments, legalInline } from "../src/legal";
 
 describe("legal pages", () => {
   for (const [kind, byLocale] of Object.entries(legalDocuments)) {
@@ -71,4 +71,21 @@ describe("legalInline", () => {
       ],
     );
   });
+});
+
+describe("legal pages in every language", () => {
+  for (const [kind, byLocale] of Object.entries(legalDocuments)) {
+    test(`${kind}: each translation has English's sections and date, and says English prevails`, () => {
+      const english = byLocale.en;
+      for (const [code, doc] of Object.entries(byLocale)) {
+        if (!doc) continue;
+        expect({ code, ids: doc.sections.map((s) => s.id) }).toEqual({ code, ids: english.sections.map((s) => s.id) });
+        expect({ code, updated: doc.updated }).toEqual({ code, updated: english.updated });
+        // pt-BR predates the notice (open question for the owner); every newer translation carries it.
+        if (code !== "en" && code !== "pt-BR")
+          expect({ code, courtesy: !!doc.courtesy?.trim() }).toEqual({ code, courtesy: true });
+      }
+      expect(legalDocument(kind as LegalKind, "ja")).toBe(byLocale.ja ?? english);
+    });
+  }
 });

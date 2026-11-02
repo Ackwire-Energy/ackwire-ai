@@ -1,5 +1,5 @@
 import type { BrainMachine, Credential, Member, Model } from "@agenteschat/client";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
+
 import { namesComputers } from "@agenteschat/client/lib/machines";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
@@ -39,9 +39,14 @@ export const NO_OWNER = "__none__";
 /** Value of the "Chave padrão do workspace" option (the API takes `credentialId: null`). */
 export const DEFAULT_KEY = "__default__";
 
-/** "US$ 10", "US$ 12,50": whole amounts without cents. */
-export const usd = (t: TFunction, locale: string, n: number) =>
-  t("format.usd", { value: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n) });
+/** "$10", "US$ 12,50": whole amounts without cents, as the language writes dollars. */
+export const usd = (_t: TFunction, locale: string, n: number) =>
+  new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(n);
 
 /** 1–3 bars by price among the catalog's models (cheapest third = 1). */
 export function priceTier(model: Model, models: Model[]) {
@@ -78,7 +83,7 @@ export function modelOptions(t: TFunction, locale: string, choices: [string, Mod
       leading: <ProviderLogo id={provider} size="sm" />,
       description: available
         ? modelDescription(t, locale, m)
-        : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
+        : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
     })),
   );
 }
@@ -497,7 +502,9 @@ function ModelCard({
       {/* Other models describe themselves by price: only for those who see money. */}
       {(money || !available || claudeFamily(model)) && (
         <span className="newag__model-desc">
-          {available ? modelDescription(t, locale, model) : t("newAgent.modelNeedsKey", providerGrammar(t, provider))}
+          {available
+            ? modelDescription(t, locale, model)
+            : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) })}
         </span>
       )}
       {available ? (
@@ -517,7 +524,7 @@ function ModelCard({
       ) : (
         <span className="newag__cost">
           <ProviderLogo id={provider} size="xs" />
-          {t("newAgent.noKeyFor", providerGrammar(t, provider))}
+          {t("newAgent.noKeyFor", { provider: providerLabel(provider) })}
         </span>
       )}
     </>

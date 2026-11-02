@@ -154,7 +154,7 @@ function PlanBody({ s, topic }: { s: ForumPlanCards; topic: ForumTopicDetail }) 
         <div className="forum-forreq">
           <SeatAvatar seat={{ type: "person", id: requester }} size="sm" />
           <span>
-            <b>{t("forum.synthesis.forRequester", { name, article: who.g(name).article })}</b> {s.summaryForRequester}
+            <b>{t("forum.synthesis.forRequester", { name, context: who.g(name).context })}</b> {s.summaryForRequester}
           </span>
         </div>
       )}
@@ -306,7 +306,7 @@ function SuggestedIssues({ topic }: { topic: ForumTopicDetail }) {
           <span className="forum-appr__t">
             <b>
               <Icon name="shield" size={16} />
-              {t("forum.synthesis.approveTitle", { name: ownerName, The: who.g(ownerName).The })}
+              {t("forum.synthesis.approveTitle", { name: ownerName, context: who.g(ownerName).context })}
             </b>
             <small>{t(plan && parent ? "forum.synthesis.approveTextPlan" : "forum.synthesis.approveText")}</small>
           </span>
@@ -373,7 +373,7 @@ export function SynthesisCard({ topic }: { topic: ForumTopicDetail }) {
                 : plan
                   ? "forum.synthesis.closedPlan"
                   : "forum.synthesis.closed",
-              { name: writerName, The: g.The },
+              { name: writerName, context: g.context },
             )}
           </b>
           <small>

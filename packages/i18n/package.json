@@ -10,12 +10,23 @@
     "./pt-BR": "./src/pt-BR.ts",
     "./en": "./src/en.ts",
     "./locale": "./src/locale.ts",
+    "./load": "./src/load.ts",
+    "./format": "./src/format.ts",
+    "./plurals": "./src/plurals.ts",
+    "./locales/*": "./src/locales/*",
     "./legal": "./src/legal/index.ts",
-    "./help": "./src/help/index.ts"
+    "./help": "./src/help/index.ts",
+    "./testing": "./test/check-locale.ts",
+    "./glossary": "./glossary.json",
+    "./tree": "./src/tree.ts",
+    "./widen": "./src/widen.ts"
   },
   "sideEffects": false,
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
-  "license": "AGPL-3.0-only"
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "i18next": "^26.4.2"
+  }
 }

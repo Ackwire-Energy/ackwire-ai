@@ -47,7 +47,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(proposal.after);
   const [stale, setStale] = useState(false);
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const onError = (error: unknown) => {
     if (error instanceof ApiError && error.status === 409) setStale(true);
     else toast.show(errorText(t, error), "error");

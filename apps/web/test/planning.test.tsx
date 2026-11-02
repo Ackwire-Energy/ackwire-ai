@@ -148,7 +148,7 @@ describe("Issues (board and list)", () => {
     await settle(3);
     await pick(within(dialog).getByRole("combobox", { name: "Prioridade" }), "Alta");
     await type(within(dialog).getByLabelText("Prazo (opcional)"), "31/02");
-    expect(dialog.textContent).toContain("Use dd/mm ou dd/mm/aaaa.");
+    expect(dialog.textContent).toContain("Use 24/10 ou 24/10/2026.");
     await type(within(dialog).getByLabelText("Prazo (opcional)"), "");
     await click(create);
     await settle(5);

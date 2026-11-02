@@ -59,7 +59,7 @@ export function PlanRepliesOf({ on, owner, agentName }: { on: boolean; owner: st
     <div className="plan-replies">
       <b>{on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { owner })}</b>
       <span className="plan-replies__terms">
-        {t("aiAccounts.share.onOther", { ...agentGrammar(t, agentName), owner })}
+        {t("aiAccounts.share.onOther", { ...agentGrammar(agentName), owner })}
       </span>
     </div>
   );

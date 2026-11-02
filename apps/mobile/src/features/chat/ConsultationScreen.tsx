@@ -51,8 +51,8 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
   const list = query.data?.messages ?? [];
   const asker = q ? dir.agentById.get(q.agentId) : undefined;
   const consulted = q ? dir.agentById.get(q.consultedAgentId) : undefined;
-  const from = agentGrammar(t, asker?.name ?? t("mobile.chat.someone"));
-  const to = agentGrammar(t, consulted?.name ?? t("mobile.chat.someone"));
+  const from = agentGrammar(asker?.name ?? t("mobile.chat.someone"));
+  const to = agentGrammar(consulted?.name ?? t("mobile.chat.someone"));
   const state = q ? consultLineState(q, Date.now()) : null;
   // The consulted agent's own words came: its last one is the answer. Left out (its run also answers a question
   // from another conversation), the answer shows on its own.
@@ -81,7 +81,6 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
             <Text variant="caption" tone="faint" style={styles.grow}>
               {t(consultOriginKey(q, Boolean(channelName)), {
                 from: from.name,
-                toArticle: to.to,
                 to: to.name,
                 channel: channelName,
                 time: when.time(q.createdAt),
@@ -101,7 +100,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
         {q?.status === "answered" && q.answer && !said ? (
           <View style={[styles.answer, styles.pad]}>
             <Text variant="caption" tone="faint" style={styles.bold}>
-              {t("chat.consultation.answerOf", { name: to.name, of: to.of })}
+              {t("chat.consultation.answerOf", { name: to.name, context: to.context })}
             </Text>
             <MessageText body={q.answer} />
           </View>
@@ -130,7 +129,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
             <Text variant="footnote" tone="ink2" style={styles.bold}>
               {t("chat.consultPanel.readOnly")}
             </Text>{" "}
-            {t("chat.consultPanel.steer", { name: from.name, article: from.article })}
+            {t("chat.consultPanel.steer", { name: from.name, context: from.context })}
           </Text>
         </View>
         {asker ? (
@@ -139,7 +138,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
             size="sm"
             icon="chat"
             wide
-            label={t("chat.consultPanel.talk", { name: from.name, article: from.article })}
+            label={t("chat.consultPanel.talk", { name: from.name, context: from.context })}
             onPress={talk}
           />
         ) : null}

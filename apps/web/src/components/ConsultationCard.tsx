@@ -30,12 +30,12 @@ export function ConsultationCard({
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
   const bodyId = useId();
-  const to = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
-  const from = agentGrammar(t, dir.agentById.get(askerId)?.name ?? t("channel.unknownAgent"));
+  const to = agentGrammar(dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
+  const from = agentGrammar(dir.agentById.get(askerId)?.name ?? t("channel.unknownAgent"));
   const ok = c.status === "answered" && c.answer !== null;
   const minutes = CONSULTATION_MINUTES;
   const state = ok ? "answered" : c.status === "expired" ? "expired" : "failed";
-  const title = t(consultLineKey(state, { kind: c.kind, waiting: null }), { name: to.name, The: to.The });
+  const title = t(consultLineKey(state, { kind: c.kind, waiting: null }), { name: to.name, context: to.context });
   const preview = ok
     ? previewOf(c.answer ?? "")
     : c.status === "expired"
@@ -71,7 +71,7 @@ export function ConsultationCard({
           </div>
           {ok ? (
             <>
-              <small>{t("chat.consultation.answerOf", { name: to.name, of: to.of })}</small>
+              <small>{t("chat.consultation.answerOf", { name: to.name, context: to.context })}</small>
               <div className="ac-consult__text">
                 <MessageBody body={c.answer ?? ""} resolveMention={dir.mentionName} />
               </div>
@@ -81,12 +81,10 @@ export function ConsultationCard({
               <small>{t("chat.consultation.answer")}</small>
               <p className="ac-consult__text ac-consult__text--q">
                 {c.status === "expired"
-                  ? t("chat.consultation.noAnswer", { minutes, from: from.name, theFrom: from.The })
+                  ? t("chat.consultation.noAnswer", { minutes, from: from.name })
                   : t("chat.consultation.couldNot", {
                       from: from.name,
-                      theFrom: from.The,
                       to: to.name,
-                      theTo: to.The,
                     })}
               </p>
             </>
@@ -95,9 +93,7 @@ export function ConsultationCard({
             <Icon name="eyeOff" size={14} />
             {t("chat.consultation.private", {
               from: from.name,
-              articleFrom: from.article,
               to: to.name,
-              articleTo: to.article,
             })}
           </p>
         </div>

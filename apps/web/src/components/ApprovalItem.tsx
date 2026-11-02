@@ -84,7 +84,7 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
   const openPanel = useOpenAgentPanel();
   const decide = useDecideApproval(org.id);
   if (!approveAlwaysOffered(approval)) return null;
-  const g = agentGrammar(t, agent?.name ?? t("channel.unknownAgent"));
+  const g = agentGrammar(agent?.name ?? t("channel.unknownAgent"));
   const kind = approval.approveAlways;
   // In a conversation: the agent's Acesso in the panel beside it; elsewhere, its page.
   const open = () =>
@@ -106,7 +106,7 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
             t("approval.always.done", { name: g.name }),
             "info",
             { label: t("approval.always.open"), run: open },
-            t("approval.always.undoHere", { of: g.of, name: g.name }),
+            t("approval.always.undoHere", { context: g.context, name: g.name }),
           );
         },
       },

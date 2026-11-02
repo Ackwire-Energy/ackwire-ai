@@ -63,7 +63,7 @@ import {
 } from "@agenteschat/client/lib/brain-advanced";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
-import { firstName, lowerFirst } from "@agenteschat/client/lib/format";
+import { firstName } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
   commandInReason,
@@ -294,9 +294,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const effort =
     kind !== "model" && view
       ? t("agentPage.work.cell.effort", {
-          level: t(
-            `agentPage.work.brain.efforts.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`,
-          ).toLowerCase(),
+          level: t(`agentPage.work.brain.effortsLower.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`),
         })
       : null;
   const target = work.target;
@@ -965,7 +963,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
                   t("aiAccounts.done.savedAgent", {
                     agent: agent.name,
-                    label: lowerFirst(t("connectAi.own.shared"), i18n.language),
+                    label: t("connectAi.own.sharedLower"),
                   })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves

@@ -419,7 +419,10 @@ function GeneralSection() {
           title={contextTitle}
           hint={{
             name: t("common.about", { label: contextTitle }),
-            text: `${t("settings.contextSubtitle")} ${t("settings.contextHelp", { name: orgName })}`,
+            text: t("common.joinSentences", {
+              a: t("settings.contextSubtitle"),
+              b: t("settings.contextHelp", { name: orgName }),
+            }),
           }}
         />
         <Textarea
@@ -978,7 +981,7 @@ function UsageSection() {
             <>
               <span className="small muted">
                 {t("settings.usageTotal", {
-                  amount: formatUsd(t, i18n.language, report.data.totalUsd),
+                  amount: formatUsd(i18n.language, report.data.totalUsd),
                   since: formatShortDate(i18n.language, report.data.since),
                 })}
               </span>
@@ -989,7 +992,7 @@ function UsageSection() {
                     <span className="connector-row__granted tabular">
                       {t("settings.usageCalls", { count: k.calls })}
                     </span>
-                    <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
+                    <span className="tabular">{formatUsd(i18n.language, k.costUsd)}</span>
                   </div>
                 ))}
               </div>

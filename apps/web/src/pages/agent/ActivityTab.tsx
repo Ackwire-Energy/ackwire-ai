@@ -1,6 +1,7 @@
 import type { Run } from "@agenteschat/client";
 import { useAgentDetail, useChannels, useRoutines, useRuns, useUsage } from "@agenteschat/client";
 import {
+  capitalize,
   dayLabel,
   formatInt,
   formatMonth,
@@ -9,7 +10,6 @@ import {
   formatTokensShort,
   formatUsd,
 } from "@agenteschat/client/lib/format";
-import { runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { covers } from "@agenteschat/client/lib/repos";
 import {
   type AgentColor,
@@ -47,7 +47,7 @@ function failure(t: TFunction, run: Run) {
   const code = run.errorCode?.replace(/^run\./, "");
   if (code && code !== "failed") {
     const text = (t as unknown as TT)(`agentPage.activity.errors.${code}`, {
-      ...runErrorGrammar(t, run.errorParams),
+      ...run.errorParams,
       defaultValue: "",
     });
     if (text) return text;
@@ -96,7 +96,7 @@ function MonthStrip({
     <section className="agp-month" aria-label={t("agentPage.activity.monthLabel", { month })}>
       <div className="agp-month__chart">
         <p className="agp-month__cap">
-          <b>{capitalize(month)}</b>
+          <b>{capitalize(month, i18n.language)}</b>
           <span>{t("agentPage.activity.perDay")}</span>
         </p>
         <div
@@ -143,7 +143,7 @@ function MonthStrip({
             <dd>
               {"spent" in money ? (
                 <>
-                  {formatUsd(t, locale, money.spent)}{" "}
+                  {formatUsd(locale, money.spent)}{" "}
                   <small>{t("agentPage.stats.of", { amount: usd(t, locale, money.limit) })}</small>
                 </>
               ) : (
@@ -163,8 +163,6 @@ function MonthStrip({
     </section>
   );
 }
-
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Atividade: this month's runs by day, with search and filters (all, failures, waiting, routines). */
 export function ActivityTab() {

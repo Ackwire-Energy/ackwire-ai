@@ -69,7 +69,7 @@ export function appCreatedLine(t: TFunction, n: Pick<AppNotification, "latest">)
   const what = CREATED_KINDS.filter((k) => (created[k] ?? 0) > 0).map((k) =>
     t(`apps.created.${k}`, { count: created[k] }),
   );
-  return t("apps.created.notice", { app: n.latest.title ?? "", what: joinNames(what, t("notifications.and")) });
+  return t("apps.created.notice", { app: n.latest.title ?? "", what: joinNames(what, t) });
 }
 
 /**

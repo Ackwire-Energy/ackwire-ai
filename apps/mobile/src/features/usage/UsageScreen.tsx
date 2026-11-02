@@ -107,7 +107,7 @@ export function UsageScreen() {
           <UsageCard icon="chart" title={t("settings.usageTitle")}>
             <Text variant="small" tone="muted">
               {t("settings.usageTotal", {
-                amount: formatUsd(t, i18n.language, report.data.totalUsd),
+                amount: formatUsd(i18n.language, report.data.totalUsd),
                 since: formatShortDate(i18n.language, report.data.since),
               })}
             </Text>
@@ -124,7 +124,7 @@ export function UsageScreen() {
                     {t("settings.usageCalls", { count: k.calls })}
                   </Text>
                   <Text variant="subhead" tone="ink2" style={[styles.tabular, styles.amount]}>
-                    {formatUsd(t, i18n.language, k.costUsd)}
+                    {formatUsd(i18n.language, k.costUsd)}
                   </Text>
                 </View>
               ))}
@@ -180,7 +180,7 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
           <Text variant="small" tone="muted">
             {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
             {money && typeof account.equivalentUsd === "number"
-              ? ` · ${t("usageViews.equivalent", { amount: formatUsd(t, i18n.language, account.equivalentUsd) })}`
+              ? ` · ${t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}`
               : ""}
           </Text>
         </View>
@@ -218,8 +218,8 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
                 {a.costUsd !== undefined && a.budgetUsd !== undefined ? (
                   <Text variant="small" tone="muted" style={styles.tabular}>
                     {t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
-                      spent: formatUsd(t, i18n.language, a.costUsd),
-                      budget: formatUsd(t, i18n.language, a.budgetUsd),
+                      spent: formatUsd(i18n.language, a.costUsd),
+                      budget: formatUsd(i18n.language, a.budgetUsd),
                     })}
                   </Text>
                 ) : null}

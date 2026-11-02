@@ -102,11 +102,11 @@ function Month({ data, tones }: { data: AgentPlanUsage; tones: Map<string, CSSPr
               tokens: formatTokensShort(t, i18n.language, data.tokens),
               parts: joinNames(
                 used.map((s) => usageSourcePart(t, i18n.language, s)),
-                t("usageViews.and"),
+                t,
               ),
             })}
             {typeof data.equivalentUsd === "number" && data.equivalentUsd > 0 && (
-              <> {t("usageViews.agent.equivalent", { amount: formatUsd(t, i18n.language, data.equivalentUsd) })}</>
+              <> {t("usageViews.agent.equivalent", { amount: formatUsd(i18n.language, data.equivalentUsd) })}</>
             )}
           </p>
           <div>
@@ -147,9 +147,7 @@ function Now({ data }: { data: AgentPlanUsage }) {
       <CardHead id="agent-usage-now" icon="clock" title={t("usageViews.agent.now")} />
       <AccountHead
         account={current}
-        extra={
-          others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t("usageViews.and")) }) : null
-        }
+        extra={others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t) }) : null}
       />
       {current.usage ? (
         <PlanMeter
@@ -192,12 +190,12 @@ function BySource({ data }: { data: AgentPlanUsage }) {
           const money =
             s.type === "api"
               ? s.costUsd !== undefined
-                ? t("usageViews.paid", { amount: formatUsd(t, i18n.language, s.costUsd) })
+                ? t("usageViews.paid", { amount: formatUsd(i18n.language, s.costUsd) })
                 : s.budgetPercent !== undefined
                   ? t("usageViews.budgetShare", { percent: formatPercent(i18n.language, s.budgetPercent) })
                   : null
               : typeof s.equivalentUsd === "number"
-                ? t("usageViews.equivalent", { amount: formatUsd(t, i18n.language, s.equivalentUsd) })
+                ? t("usageViews.equivalent", { amount: formatUsd(i18n.language, s.equivalentUsd) })
                 : t("usageViews.agent.ofMonth", { percent: formatPercent(i18n.language, s.share) });
           return (
             <div key={s.key} className="plan-source">

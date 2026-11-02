@@ -58,10 +58,10 @@ describe("Auditoria in words (web and phone)", () => {
   });
 
   test("who did what, then about what, who asked and where", () => {
-    expect(auditSentence(t, row())).toEqual({ name: "Ada", text: "audit.call.used(Gmail)" });
+    expect(auditSentence(t, row(), "en")).toEqual({ name: "Ada", text: "audit.call.used(Gmail)" });
     expect(auditSubLine(t, row())).toBe("Gmail: Send · audit.behind.person(Bia) · #geral");
     const expired = row({ actor: { type: "system", id: null, name: null }, action: "approval.expired", details: {} });
-    expect(auditSentence(t, expired)).toEqual({ name: null, text: "audit.change.approval.expired" });
+    expect(auditSentence(t, expired, "en")).toEqual({ name: null, text: "audit.change.approval.expired" });
   });
 
   test("a waiting call says what became of its approval or of the secret it asked for", () => {

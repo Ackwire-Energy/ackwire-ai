@@ -164,7 +164,7 @@ export function useFileLine() {
   return (info: FileInfo, extra: string[] = []) =>
     [
       t(`mobile.files.type.${info.type}`),
-      ...(info.size !== null ? [formatBytes(i18n.language || "pt-BR", info.size)] : []),
+      ...(info.size !== null ? [formatBytes(i18n.language || "en", info.size)] : []),
       ...extra.filter(Boolean),
     ].join(" · ");
 }

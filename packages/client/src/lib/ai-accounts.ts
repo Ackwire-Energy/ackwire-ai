@@ -149,7 +149,7 @@ export function accountAbout(
   agentName: string,
 ): string | undefined {
   if (!a.mine) return t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" });
-  if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) });
+  if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t) });
   // A coding plan's key never signs out: it reads signed out once its endpoint refused it.
   if (a.status === "signed_out") {
     return t(isPlanId(a.provider) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut");
@@ -157,7 +157,7 @@ export function accountAbout(
   const others = a.usedBy.filter((n) => n !== agentName);
   // One made for all of its owner's agents there thinks for this one too: nothing moves.
   if (others.length && a.shared === true) {
-    return t("agentPage.work.brain.accountAlso", { agents: joinNames(others, t("newAgent.and")) });
+    return t("agentPage.work.brain.accountAlso", { agents: joinNames(others, t) });
   }
   if (others.length) return t("agentPage.work.brain.accountMove", { agents: others.join(", ") });
   return a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : (a.email ?? undefined);

@@ -31,7 +31,7 @@ export function DeleteAgentDialog({
   const toast = useToast();
   const [typed, setTyped] = useState("");
   const purge = useMutation({ mutationFn: (id: string) => api.agents.purge(org.id, id) });
-  const g = agentGrammar(t, agent?.name ?? "");
+  const g = agentGrammar(agent?.name ?? "");
   const ready = Boolean(agent) && matchesName(typed, agent?.name ?? "");
   const close = () => {
     setTyped("");

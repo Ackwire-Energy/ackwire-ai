@@ -76,5 +76,5 @@ export function deciderOf(
         : t("receipts.by.planOf", { brand, person: names.person(by.ownerId) });
     return { mark: { logo: planMark(by.brand) }, text };
   }
-  return { mark: { rule: by.rule }, text: t(`receipts.by.${by.rule}`, agentGrammar(t, names.agent(first))) };
+  return { mark: { rule: by.rule }, text: t(`receipts.by.${by.rule}`, agentGrammar(names.agent(first))) };
 }

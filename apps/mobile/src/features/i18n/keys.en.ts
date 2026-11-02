@@ -1,7 +1,7 @@
-import type { FeatureTranslations } from "./keys.pt-BR";
+import type { Widen } from "@agenteschat/i18n/widen";
 
-/** The screens' strings in English: the same shape as `keys.pt-BR.ts` (the type checks it). */
-export const featureKeysEn: FeatureTranslations = {
+/** The screens' strings in English, the source: every other language follows this shape. */
+export const featureKeysEn = {
   app: {
     failed: "That didn't work. Try again.",
     send: "Send",
@@ -886,8 +886,6 @@ export const featureKeysEn: FeatureTranslations = {
     activityHint:
       "The tools they used and how long it took, in this workspace, here and on your computer. While they work, you still see what they're doing.",
     activityFailed: "Couldn't save that. Try again.",
-    langPt: "Português",
-    langEn: "English",
     sounds: "Sounds",
     soundsOn: "Sounds in the app",
     soundsOff: "Off",
@@ -1223,7 +1221,8 @@ export const featureKeysEn: FeatureTranslations = {
     ownerYou: "Owner: you",
     nowWaiting: "Needs your ok: {{title}}",
     did: {
-      title: "What {{she}} did for you",
+      title: "What he did for you",
+      title_female: "What she did for you",
       month_one: "{{count}} this month",
       month_other: "{{count}} this month",
       seeAll: "See all",
@@ -1257,7 +1256,8 @@ export const featureKeysEn: FeatureTranslations = {
       },
     },
     knows: {
-      title: "What {{she}} knows about you",
+      title: "What he knows about you",
+      title_female: "What she knows about you",
       footF: "Tap to correct or forget.",
       footM: "Tap to correct or forget.",
       footOwner: "Only {{name}} or an admin can correct these.",
@@ -1283,7 +1283,8 @@ export const featureKeysEn: FeatureTranslations = {
     },
     thinks: "Thinks with",
     uses: {
-      title: "What {{she}} can use",
+      title: "What he can use",
+      title_female: "What she can use",
       level: { read: "Read", write: "Read and write", some: "Partly" },
       area: {
         context: "Memory",
@@ -1340,7 +1341,6 @@ export const featureKeysEn: FeatureTranslations = {
       cloudTag: "Always on",
       managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
-      and: " and ",
       none: "No other computer can take these agents right now. Connect one on the website.",
       gone: "{{computer}} is back. Nobody needs to switch.",
       reason: {
@@ -1662,7 +1662,8 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who {{she}} answers",
+    audience: "Who he answers",
+    audience_female: "Who she answers",
     another: "Another AI",
   },
   crash: {
@@ -1701,3 +1702,6 @@ export const featureKeysEn: FeatureTranslations = {
     bySelfUntil: "Written by {{name}} · {{when}}",
   },
 };
+
+/** Every language of these strings has this shape (English is the source). */
+export type FeatureTranslations = Widen<typeof featureKeysEn>;

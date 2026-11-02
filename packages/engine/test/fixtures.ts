@@ -68,9 +68,10 @@ import { listenLiveSteering } from "../src/live-steer";
 
 export const SECRET = "test-secret-".padEnd(48, "x");
 
+/** A person who reads Portuguese, as the tests' people do (a person with no language reads English). */
 export async function addUser(db: Database, name: string) {
   const id = `user_${name}_${crypto.randomUUID().slice(0, 8)}`;
-  await db.insert(schema.users).values({ id, name, email: `${name}-${id.slice(-8)}@example.com` });
+  await db.insert(schema.users).values({ id, name, email: `${name}-${id.slice(-8)}@example.com`, locale: "pt-BR" });
   return { id, name, email: `${name}-${id.slice(-8)}@example.com` };
 }
 

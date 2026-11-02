@@ -187,7 +187,7 @@ function useTargetLabel() {
     // From the chat: "na DM com o Jorge", "no #general (thread)".
     if (target.type === "conversation") {
       const dm = dms.data?.find((d) => d.channelId === target.channelId);
-      if (dm) return t("routines.inDm", agentGrammar(t, dm.with.name));
+      if (dm) return t("routines.inDm", agentGrammar(dm.with.name));
       const c = channels.data?.find((x) => x.id === target.channelId);
       if (!c) return t("routines.inConversation");
       return t(target.threadId ? "routines.inThread" : "routines.inChannel", { channel: c.name });
@@ -1133,7 +1133,7 @@ function RoutineDetails({
         usage.tokens !== null
           ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
           : null,
-        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(i18n.language, usage.costUsd) }) : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -1224,7 +1224,7 @@ function RoutineDetails({
           <p className="routine-details__sentence">{runsOn}</p>
         </DetailsSection>
       )}
-      <DetailsSection title={t("routines.panel.what", agentGrammar(t, name))}>
+      <DetailsSection title={t("routines.panel.what", agentGrammar(name))}>
         {r.canSeeDetails && r.prompt !== null ? (
           <p className="routine-details__prompt">{r.prompt}</p>
         ) : (

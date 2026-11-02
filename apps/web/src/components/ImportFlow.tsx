@@ -1075,7 +1075,7 @@ function Row({
   const pickable = choosable(item) && !reason;
   const checked = pickable && flow.pick.has(id);
   const status = statusOf(item, reason);
-  const names = (list: string[]) => joinNames(list, t("newAgent.and"));
+  const names = (list: string[]) => joinNames(list, t);
 
   let title = item.label;
   let lead: ReactNode = <Icon name={KIND_ICON[item.kind]} size={16} />;

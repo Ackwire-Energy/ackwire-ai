@@ -21,7 +21,7 @@ export function dayRunsLabel(t: TFunction, runs: RunEntry[], day: string) {
   return t("calendar.dayRunsAria", {
     count: runs.reduce((n, r) => n + r.count, 0),
     day,
-    names: joinNames([...new Set(runs.map((r) => r.item.title))], t("newAgent.and")),
+    names: joinNames([...new Set(runs.map((r) => r.item.title))], t),
   });
 }
 
@@ -78,7 +78,7 @@ export function RunMarks({
           time: time(first),
           names: joinNames(
             runs.map((r) => r.item.title),
-            t("newAgent.and"),
+            t,
           ),
         }));
   return (

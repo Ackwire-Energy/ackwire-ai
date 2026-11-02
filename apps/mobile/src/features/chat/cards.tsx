@@ -82,7 +82,7 @@ export function ConsultationCard({
       : cs.status === "expired"
         ? t(`mobile.chat.consult.expired${gn}`, { name })
         : cs.kind === "note"
-          ? t("chat.consultation.failedNote", { name, The: agentGrammar(t, name).The })
+          ? t("chat.consultation.failedNote", { name, context: agentGrammar(name).context })
           : t(`mobile.chat.consult.failed${gn}`, { name });
   return (
     <View style={[styles.box, styles.cs, surface]}>
@@ -635,7 +635,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         done
         words={
           q.withdrawn
-            ? t("question.withdrawn", agentGrammar(t, dir.anyAgent(q.agentId)?.name ?? t("channel.unknownAgent")))
+            ? t("question.withdrawn", agentGrammar(dir.anyAgent(q.agentId)?.name ?? t("channel.unknownAgent")))
             : q.answer === null
               ? t("mobile.chat.question.closed")
               : who

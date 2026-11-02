@@ -71,7 +71,7 @@ async function mentionRun(options: { askAgent?: boolean } = {}) {
   return { beforeModel, total: p.total.queries };
 }
 
-test("claim → model request stays within 17 statements; a whole mention run within 38", async () => {
+test("claim → model request stays within 18 statements; a whole mention run within 39", async () => {
   const run = await mentionRun();
   // 11 since every agent has a budget (ADR 0026): the call always reserves (one statement on the fast path).
   // 12 since the run stores the brain it runs with (ADR 0053 §10).
@@ -81,7 +81,8 @@ test("claim → model request stays within 17 statements; a whole mention run wi
   // 16 since it names the secrets on its computer (one statement, ADR 0017). Who is behind a person's message is
   // that person, so its how-tos and their preferences (ADR 0120) cost no read of their own.
   // 17 since it lists the agent's background work in this conversation (ADR 0121; one statement, read beside them).
-  expect(run.beforeModel).toBeLessThanOrEqual(17);
+  // 18 since it says the person's app language (ADR 0122; one statement, read with the rest, no round trip of its own).
+  expect(run.beforeModel).toBeLessThanOrEqual(18);
   // 22 since the reply carries how many tool calls the run made, so the apps leave "Ver o que ele fez" out at 0.
   // 23 with the open tasks, 24 with the work handed off, 25 with what other runs here hold.
   // 30 since every turn's end is decided and recorded (ADR 0097): the judgment through the gateway, its step, and
@@ -93,10 +94,11 @@ test("claim → model request stays within 17 statements; a whole mention run wi
   // 38 since a finished turn counts the how-tos it reused and decides whether it taught something (ADR 0120): its
   // calls and its how-tos (2), in the background after the reply; and the read before the model call above.
   // 38 with the background work read before the model call above.
-  expect(run.total).toBeLessThanOrEqual(38);
+  // 39 with the app language read before the model call above.
+  expect(run.total).toBeLessThanOrEqual(39);
 });
 
-test("with tools, as every production run has them (find_agent among them): within 21 before the model call, 43 in all", async () => {
+test("with tools, as every production run has them (find_agent among them): within 22 before the model call, 44 in all", async () => {
   const run = await mentionRun({ askAgent: true });
   // 4 more, all for the tool list and the prompt: who is behind the run (2, the Tool Gateway's policy), the connectors
   // it lacks (1) and whether the person may talk to agents ("# Your team", 1, beside the context's other reads).
@@ -104,12 +106,14 @@ test("with tools, as every production run has them (find_agent among them): with
   // 20 with the secrets on its computer (ADR 0017), since who is behind the message is read once however many of the
   // run's parallel reads ask (`messageRoot`).
   // 21 with the background work in this conversation (ADR 0121).
-  expect(run.beforeModel).toBeLessThanOrEqual(21);
+  // 22 with the person's app language (ADR 0122).
+  expect(run.beforeModel).toBeLessThanOrEqual(22);
   // 36: the browser profile release above, and the turn-end judge naming the teammates the person may reach (ADR 0109):
   // whether they may talk to agents, read again because a resumed run has no context of its own to carry it from.
   // Who is behind the run comes from the run in memory, and the calls it tried are read only when it made some.
   // 40 with the open requests (1) and the reply's read-outside check above (3).
   // 42 with the secrets above and the finished turn's learning reads (ADR 0120).
   // 43 with the background work read before the model call above.
-  expect(run.total).toBeLessThanOrEqual(43);
+  // 44 with the app language read before the model call above.
+  expect(run.total).toBeLessThanOrEqual(44);
 });

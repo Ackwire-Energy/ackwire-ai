@@ -325,7 +325,7 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
                 {silent.length > 0 && said > 0 && (
                   <p className="forum-quiet ac-iconline">
                     <Icon name="dash" size={14} />
-                    {t("forum.posts.didntSpeak", { count: silent.length, names: joinNames(silent, t("newAgent.and")) })}
+                    {t("forum.posts.didntSpeak", { count: silent.length, names: joinNames(silent, t) })}
                   </p>
                 )}
                 {liveHere && <LiveTurn topic={topic} active={active} />}
@@ -756,7 +756,7 @@ function LiveTurn({ topic, active }: { topic: ForumTopicDetail; active: string[]
             <Icon name="pause" size={16} />
             {now.synthesis || !name
               ? t("forum.stalled.titleSynthesis")
-              : t("forum.stalled.title", { name, of: who.g(name).of })}
+              : t("forum.stalled.title", { name, context: who.g(name).context })}
           </b>
           <small>
             {failed
@@ -983,7 +983,7 @@ function TopicComposer({
         <p className="forum-chint ac-iconline">
           <Icon name="repeat" size={14} />
           {ask
-            ? t("forum.composer.reroundHint", { name: ownerName, the: who.g(ownerName).article })
+            ? t("forum.composer.reroundHint", { name: ownerName, context: who.g(ownerName).context })
             : t("forum.composer.doneHint")}
         </p>
       </div>
@@ -995,7 +995,7 @@ function TopicComposer({
     return (
       <div className={owner ? "forum-closed ac-iconline" : "forum-closed"}>
         {owner && <SeatAvatar seat={{ type: "agent", id: owner }} size="xs" mode="run" />}
-        <span>{t("forum.closed.synthesizing", { name: ownerName, The: who.g(ownerName).The })}</span>
+        <span>{t("forum.closed.synthesizing", { name: ownerName, context: who.g(ownerName).context })}</span>
       </div>
     );
   const send = (text: string) => {
@@ -1080,7 +1080,7 @@ function ConcludeDialog({
             <span className="forum-steps3__k">1</span>
             <span>
               {cur
-                ? t("forum.conclude.finishes", { name: curName, The: who.g(curName).The, hers: who.g(curName).hers })
+                ? t("forum.conclude.finishes", { name: curName, context: who.g(curName).context })
                 : t("forum.conclude.nobody")}
               <small>{cur ? t("forum.conclude.finishesSub") : t("forum.conclude.nobodySub")}</small>
             </span>
@@ -1092,7 +1092,7 @@ function ConcludeDialog({
               <span className="forum-steps3__k">2</span>
             )}
             <span>
-              {t("forum.conclude.writes", { name: ownerName, The: who.g(ownerName).The })}
+              {t("forum.conclude.writes", { name: ownerName, context: who.g(ownerName).context })}
               <small>{t(plan ? "forum.conclude.writesSubPlan" : "forum.conclude.writesSub")}</small>
             </span>
           </li>
@@ -1301,8 +1301,7 @@ function Standing({
           <b>{t("forum.side.agree", { count: conv.agree.length, total: conv.total })}</b>
           <small>
             {t(ended ? "forum.side.withDecision" : "forum.side.withProposal")}
-            {askers.length > 0 &&
-              ` · ${t("forum.side.askers", { count: askers.length, names: joinNames(askers, t("newAgent.and")) })}`}
+            {askers.length > 0 && ` · ${t("forum.side.askers", { count: askers.length, names: joinNames(askers, t) })}`}
           </small>
         </div>
       </div>

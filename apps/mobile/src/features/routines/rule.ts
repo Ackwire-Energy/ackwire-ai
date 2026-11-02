@@ -58,12 +58,11 @@ export function ruleSentence(
   /** Leave the zone out (the list says it only when it isn't mine). */
   withZone = true,
 ): string {
-  const and = t("newAgent.and");
   const n = Math.max(1, rule.interval || 1);
   const days = (list: Weekday[]) =>
     joinNames(
       list.map((d) => t(`recurrence.wd.${d}.abbr`)),
-      and,
+      t,
     );
   let head: string;
   switch (rule.freq) {
@@ -107,7 +106,7 @@ export function ruleSentence(
   const times = [...rule.times].sort();
   const parts = [head];
   if (rule.freq === "hourly") parts.push(t("recurrence.s.from", { time: times[0] ?? "00:00" }));
-  else if (times.length) parts.push(t("recurrence.s.at", { times: joinNames(times, and) }));
+  else if (times.length) parts.push(t("recurrence.s.at", { times: joinNames(times, t) }));
   let out = withZone ? `${parts.join(", ")} (${timezoneName(rule.timezone, locale)})` : parts.join(", ");
   if (rule.until) out += `, ${t("recurrence.s.until", { date: shortDate(locale, rule.until, now) })}`;
   else if (rule.count) out += `, ${t("recurrence.s.count", { count: rule.count })}`;

@@ -256,9 +256,9 @@ test("each step's question and its one line: the phone's own where it can't do w
     "Ada is already in #general.",
   ]);
   // In the team's order, as the web's welcome; then the invitations emailed, if any.
-  expect(stepText(en, "done", acme)[1]).toBe("Theo, Ada and Lia are already in #general.");
+  expect(stepText(en, "done", acme)[1]).toBe("Theo, Ada, and Lia are already in #general.");
   expect(stepText(en, "done", { ...acme, invited: 2 })[1]).toBe(
-    "Theo, Ada and Lia are already in #general. We emailed 2 invitations.",
+    "Theo, Ada, and Lia are already in #general. We emailed 2 invitations.",
   );
   const pt = await translator("pt-BR");
   expect(stepText(pt, "done", acme)).toEqual(["Boas-vindas à Acme", "Theo, Ada e Lia já estão no #general."]);

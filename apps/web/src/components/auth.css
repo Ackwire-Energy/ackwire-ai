@@ -23,6 +23,11 @@
   top: 24px;
   left: 28px;
 }
+.auth__lang {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+}
 .auth__col {
   width: 100%;
   max-width: 460px;

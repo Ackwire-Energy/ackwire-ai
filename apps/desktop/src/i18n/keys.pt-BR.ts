@@ -1,5 +1,7 @@
+import type { LocaleStrings } from "@agenteschat/i18n/plurals";
+
 /**
- * The desktop app's own strings (pt-BR, the primary locale), under `desktop.*`. `./index.ts` merges
+ * The desktop app's own strings (pt-BR; English, `keys.en.ts`, is the source), under `desktop.*`. `./index.ts` merges
  * them into the shared resources (`@agenteschat/i18n`); `keys.en.ts` has exactly the same shape.
  * Never "runner", "MCP" or "protocolo". `{{device}}` is this computer's name (`device.*`), filled in by
  * `./index.ts` for every string. A path to a setting ("Preferências › Servidores") has no-break spaces around
@@ -611,7 +613,4 @@ export const desktopPtBR = {
     help: "Ajuda",
     downloaded: "Download concluído",
   },
-};
-
-type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
-export type DesktopTranslations = Shape<typeof desktopPtBR>;
+} satisfies LocaleStrings;

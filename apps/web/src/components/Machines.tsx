@@ -398,7 +398,7 @@ function MachineRow({
             title={t("machines.usedBy", {
               names: joinNames(
                 m.agents.map((a) => a.name),
-                t("newAgent.and"),
+                t,
               ),
             })}
           >
@@ -810,7 +810,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
                 {f.agents.length > 0 ? (
                   <span className="machine-folder__agents">
                     <span className="ac-visually-hidden">
-                      {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t("newAgent.and"))}
+                      {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t)}
                     </span>
                     <AvatarStack aria-hidden="true">
                       {f.agents.map((id) => (
@@ -961,7 +961,7 @@ function OpenComputerButton({ agentId, name }: { agentId: string; name: string }
       variant="ghost"
       icon="computer"
       className="machine-page__screen"
-      aria-label={`${t("agentComputer.open")}: ${t("agentComputer.title", agentGrammar(t, name))}`}
+      aria-label={`${t("agentComputer.open")}: ${t("agentComputer.title", agentGrammar(name))}`}
       onClick={() => openComputer(agentId)}
     >
       {t("agentComputer.open")}
@@ -1090,10 +1090,10 @@ export function MachinePage({ machineId }: { machineId: string }) {
                           <span className="small muted">
                             {folders.length > 0
                               ? t("machines.page.agentFolders", {
-                                  ...agentGrammar(t, a.name),
-                                  folders: joinNames(folders, t("newAgent.and")),
+                                  ...agentGrammar(a.name),
+                                  folders: joinNames(folders, t),
                                 })
-                              : t("machines.page.agentOwnFolder", agentGrammar(t, a.name))}
+                              : t("machines.page.agentOwnFolder", agentGrammar(a.name))}
                           </span>
                         )}
                       </span>

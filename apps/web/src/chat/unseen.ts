@@ -42,7 +42,7 @@ export function pillParts(t: TFunction, count: number, names: string[], writing:
     names.length === 0
       ? ""
       : names.length <= 2
-        ? joinNames(names, t("newAgent.and"))
+        ? joinNames(names, t)
         : t("channel.newPill.more", { names: names.slice(0, 2).join(", "), count: names.length - 2 });
   return [
     count > 0 ? t("channel.newPill.count", { count }) : "",

@@ -1,7 +1,7 @@
-import type { MobileTranslations } from "./keys.pt-BR";
+import type { Widen } from "@agenteschat/i18n/widen";
 
-/** The app's own strings in English (same shape as keys.pt-BR.ts). */
-export const mobileEn: MobileTranslations = {
+/** The app's own strings in English, the source: every other language follows this shape. */
+export const mobileEn = {
   common: {
     back: "Back",
     cancel: "Cancel",
@@ -126,3 +126,6 @@ export const mobileEn: MobileTranslations = {
     placeholder: "Search",
   },
 };
+
+/** Every language of these strings has this shape (English is the source). */
+export type MobileTranslations = Widen<typeof mobileEn>;

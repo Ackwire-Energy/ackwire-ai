@@ -114,12 +114,12 @@ export function audienceNames(agent: Agent, nameOf: NameOf, roleName: NameOf = (
 export function audienceNotice(t: TFunction, agent: Agent, nameOf: NameOf, roleName?: NameOf): string {
   const mode = modeOf(agent);
   if (mode === "everyone") return "";
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   // From the directory list (mode only, no user ids): don't guess names.
   if (mode === "people" && !agent.audience) return t("audience.notice.some", g);
   const names = audienceNames(agent, nameOf, roleName);
   if (names.length === 0) return t("audience.notice.nobody", g);
-  return t("audience.notice.only", { ...g, names: joinNames(names, t("newAgent.and")) });
+  return t("audience.notice.only", { ...g, names: joinNames(names, t) });
 }
 
 /** The profile summary: "Todos do workspace", "Suporte, Tecnologia e mais 2 pessoas", "Só Walter". */
@@ -131,7 +131,7 @@ export function audienceSummary(t: TFunction, agent: Agent, nameOf: NameOf, role
   const { roles, people } = answered(agent, nameOf, roleName);
   const names = [...roles, ...people];
   if (names.length === 0) return t("audience.summary.someone");
-  if (names.length <= 3) return t("audience.summary.people", { names: joinNames(names, t("newAgent.and")) });
+  if (names.length <= 3) return t("audience.summary.people", { names: joinNames(names, t) });
   const shown = names.slice(0, 2).join(", ");
   const count = names.length - 2;
   // Only people left over: "e mais 2 pessoas".

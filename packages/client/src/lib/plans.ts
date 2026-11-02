@@ -115,7 +115,7 @@ export function planReplies(
     line:
       agent === null
         ? t(on ? "aiAccounts.share.line.onAll" : "aiAccounts.share.line.offAll", { plan: which })
-        : t(on ? "aiAccounts.share.line.on" : "aiAccounts.share.line.off", { ...agentGrammar(t, agent), plan: which }),
+        : t(on ? "aiAccounts.share.line.on" : "aiAccounts.share.line.off", { ...agentGrammar(agent), plan: which }),
     about: t("common.about", { label: t("aiAccounts.share.terms.about") }),
     text: coding
       ? t("aiAccounts.share.terms.other", { maker: coding.maker })

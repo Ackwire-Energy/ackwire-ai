@@ -38,8 +38,8 @@ import {
   useMachines,
   wheelEvent,
 } from "@agenteschat/client";
-import { formatTime } from "@agenteschat/client/lib/format";
-import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
 import {
@@ -263,8 +263,6 @@ export function useHeldTakeover(agentId: string, runId: string, enabled = true):
   return !liveHere && open.data && isHeldTakeover(open.data, runId) ? open.data : null;
 }
 
-const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
-
 /**
  * What covers the page (or the agent's desktop) instead of it: a state said plainly, with a spinner only
  * while something is on its way; `action`: what the person can do about it.
@@ -369,7 +367,7 @@ export function BrowserCard({
   // The workspace's own computer is never off and nobody connects one: its words say so.
   const cloud = useComputerEdition(org.id) === "cloud";
   const agent = dir.agentById.get(agentId);
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const color = colorOf(agent);
   // In the conversation (not the dialog, not a computer's page that folds it away) the page is always in
   // view, framed in the agent's color.
@@ -1471,18 +1469,22 @@ export function BrowserCard({
 
 /** Names with their faces, joined as people say them ("Ada, Bia e Atlas"). */
 function FacesList({ agentIds }: { agentIds: string[] }) {
-  const { t } = useTranslation();
+  const { i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const names = agentIds.map((id) => ({ id, name: dir.agentById.get(id)?.name ?? "" })).filter((a) => a.name);
+  let next = 0;
   return (
     <>
-      {names.map((a, i) => (
-        <Fragment key={a.id}>
-          {i > 0 && (i === names.length - 1 ? ` ${t("newAgent.and")} ` : ", ")}
-          <AgentWho agentId={a.id} name={a.name} />
-        </Fragment>
-      ))}
+      {new Intl.ListFormat(i18n.language).formatToParts(names.map((a) => a.name)).map((p, k) => {
+        const a = p.type === "element" ? names[next++] : undefined;
+        return a ? (
+          <AgentWho key={a.id} agentId={a.id} name={a.name} />
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: separators have no identity of their own
+          <Fragment key={k}>{p.value}</Fragment>
+        );
+      })}
     </>
   );
 }
@@ -1509,8 +1511,7 @@ function ProfileWaitCover({ wait, waiter }: { wait: BrowserProfileWait; waiter: 
     holder.type === "agent"
       ? (dir.agentById.get(holder.agentId)?.name ?? "")
       : (dir.memberById.get(holder.userId)?.name ?? t("channel.unknownPerson"));
-  const she = agentGrammar(t, holderName).she;
-  const w = agentGrammar(t, waiter.name);
+  const w = agentGrammar(waiter.name);
   return (
     <div className="brw-dim">
       <span className="brw-dim__box" role="status">
@@ -1528,8 +1529,9 @@ function ProfileWaitCover({ wait, waiter }: { wait: BrowserProfileWait; waiter: 
           </span>
           <small>
             <Trans
-              i18nKey={isFeminineName(waiter.name) ? "browser.profiles.waitingNextF" : "browser.profiles.waitingNextM"}
-              values={{ The: w.The, she }}
+              i18nKey="browser.profiles.waitingNext"
+              context={w.context}
+              values={{ holder: holderName }}
               components={{ who: <AgentWho agentId={waiter.agentId} name={waiter.name} /> }}
             />
           </small>
