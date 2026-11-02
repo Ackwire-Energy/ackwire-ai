@@ -24,6 +24,7 @@ import {
   MULTIPART_SLACK_BYTES,
   OrgParams,
   requireSession,
+  routineConnectorDeps,
   security,
 } from "./context";
 
@@ -310,7 +311,7 @@ export function agentImportRoutes(deps: AppDeps) {
       const blobs = deps.extras?.artifacts?.blobs;
       if (!blobs) throw new Error("storage is not configured on this server");
       const plan = await applyImport(
-        { db: deps.db, blobs, pubsub: deps.adapters.pubsub },
+        { db: deps.db, blobs, pubsub: deps.adapters.pubsub, connectors: routineConnectorDeps(deps) },
         c.get("user").id,
         c.req.valid("param").orgId,
         c.req.valid("json"),

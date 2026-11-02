@@ -351,6 +351,7 @@ export function buildEngine(o: EngineOptions) {
         context,
         mail: adapters.mail,
         hooks: hookConfig(config),
+        connectors: connectorDeps,
       }),
       createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
