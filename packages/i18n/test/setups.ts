@@ -122,6 +122,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.computer.hostConnecting",
     "onboarding.computer.hostReady",
     "onboarding.computer.otherComputer",
+    // A self-hosted server on a private host, which AI apps on the internet can't reach.
+    "onboarding.import.aiApp.private",
     "onboarding.platformKeyDesc",
     "openOnPhone.stepTailscale",
     "outage.dialog.none",
