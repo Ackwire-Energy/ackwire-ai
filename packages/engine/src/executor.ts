@@ -1,4 +1,4 @@
-import { PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
+import { CODEX_FOLDER_PROTOCOL, PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   count,
@@ -100,7 +100,7 @@ import {
   restatesReaction,
   stableFirst,
   teammatesNowAgain,
-  thisTurnText,
+  thisTurnParts,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
@@ -136,7 +136,7 @@ import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
-import type { CodeSetup } from "./git/machine";
+import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
@@ -2948,7 +2948,17 @@ async function executeRunInner(
       // Meanwhile a computer brain's checkouts get synced for its first turn (used only if that turn is the same).
       if (plan.kind !== "model" && plan.session && deps.prepareCode && computerTurns === 0 && !nextPrompt) {
         const early = brainTurnOf(run, thinker, transcript, tools, triggerText, plan);
-        earlyCode = { plan, code: deps.prepareCode(early, signal).catch(() => null) };
+        const prepare = deps.prepareCode;
+        const machineId = plan.session.machineId;
+        // Not for Codex on a runner that never uses its checkouts (`CodexBrain`): a sync nobody reads.
+        const code = (async () => {
+          if (plan.kind === "codex") {
+            const protocol = (await deps.machines?.status(machineId).catch(() => null))?.protocol;
+            if (protocol !== undefined && protocol < CODEX_FOLDER_PROTOCOL) return null;
+          }
+          return prepare(early, signal);
+        })().catch(() => null);
+        earlyCode = { plan, code };
       }
       await waitForBurst(db, triggerMessage, deps.quietMs, signal);
     }
@@ -3090,9 +3100,15 @@ async function executeRunInner(
           // Memory and wiki once per run: its first turn, or a session started afresh.
           brainTurnOf(run, thinker, transcript, turnTools, prompt, turnPlan, {
             found: computerTurns === 0 || !turnPlan.session?.resume,
-            // Synced during the quiet window for this very turn: nothing came in since that could name another repository.
-            ...(earlyCode?.plan === turnPlan && computerTurns === 0 && prompt === triggerText
-              ? { code: earlyCode.code }
+            // Synced during the quiet window for this very turn; where it starts is picked again from its words now
+            // (what came in meanwhile may name another repository).
+            ...(earlyCode?.plan === turnPlan && computerTurns === 0
+              ? {
+                  code: startAgain(earlyCode.code, {
+                    trigger: prompt,
+                    messages: transcript.messages.map((m) => ({ content: flattenContent(m.content) })),
+                  }),
+                }
               : {}),
           }),
           io,
@@ -3937,6 +3953,13 @@ function brainTurnOf(
   options: { found?: boolean; code?: Promise<CodeSetup | null> } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
+  const turnParts = () => {
+    if (plan.kind === "model") return undefined;
+    // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
+    const lost: ContextBlock[] =
+      t.sessionLost && !plan.session?.resume ? [{ turn: true, found: true, text: sessionLostNote(t.sessionLost) }] : [];
+    return thisTurnParts([...t.system, ...lost], new Date(), options);
+  };
   return {
     runId: run.id,
     orgId: run.orgId,
@@ -3962,13 +3985,11 @@ function brainTurnOf(
         .join("\n\n");
     },
     get thisTurn() {
-      if (plan.kind === "model") return undefined;
-      // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
-      const lost: ContextBlock[] =
-        t.sessionLost && !plan.session?.resume
-          ? [{ turn: true, found: true, text: sessionLostNote(t.sessionLost) }]
-          : [];
-      return thisTurnText([...t.system, ...lost], new Date(), options) || undefined;
+      const parts = turnParts();
+      return [parts?.head, parts?.found].filter(Boolean).join("\n\n") || undefined;
+    },
+    get thisTurnFound() {
+      return turnParts()?.found || undefined;
     },
     get messages() {
       return t.messages.map((m) => ({ role: m.role, content: flattenContent(m.content) }));
@@ -3983,6 +4004,10 @@ function brainTurnOf(
     ...(options.code ? { code: options.code } : {}),
   };
 }
+
+/** An early checkouts sync for a turn whose words may have changed since: where it starts picked again from them. */
+const startAgain = (code: Promise<CodeSetup | null>, turn: Parameters<typeof codeStart>[1]) =>
+  code.then((c) => (c?.pick ? { ...c, ...codeStart(c.pick, turn) } : c));
 
 /** A message as plain text for brains that take text: tool calls and results inline, provider blocks dropped. */
 const flattenContent = (content: string | ContentBlock[]): string =>

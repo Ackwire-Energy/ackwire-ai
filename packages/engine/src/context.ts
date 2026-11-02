@@ -255,10 +255,20 @@ export function thisTurnText(
   now = new Date(),
   options: { found?: boolean } = {},
 ): string {
+  const { head, found } = thisTurnParts(system, now, options);
+  return [head, found].filter(Boolean).join("\n\n");
+}
+
+/** `thisTurnText` in two: the clipped part (time, place, why) and what was found for the trigger after it. */
+export function thisTurnParts(
+  system: readonly ContextBlock[],
+  now = new Date(),
+  options: { found?: boolean } = {},
+): { head: string; found: string } {
   const blocks = system.filter(isComputerTurnBlock);
   const fixed = blocks.filter((b) => !b.found);
   const found = options.found === false ? [] : blocks.filter((b) => b.found);
-  if (fixed.length === 0 && found.length === 0) return "";
+  if (fixed.length === 0 && found.length === 0) return { head: "", found: "" };
   // One level under "# This turn": "## Now", "## Where you are".
   const level = (text: string) => text.replace(/^# /, "## ");
   // The time first: it is what a resumed session most needs fresh.
@@ -276,7 +286,7 @@ export function thisTurnText(
     head.length > THIS_TURN_MAX_CHARS
       ? `${cutText(head, THIS_TURN_MAX_CHARS).trimEnd()}\n[… cut; look it up with your tools if you need more]`
       : head;
-  return [clipped, ...found.map((b) => level(b.text))].join("\n\n");
+  return { head: clipped, found: found.map((b) => level(b.text)).join("\n\n") };
 }
 
 /**

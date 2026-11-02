@@ -1,11 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { CODEX_FOLDER_PROTOCOL, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { asc, eq, schema } from "@agenteschat/db";
 import { createAnthropicProvider, type ModelRequest } from "@agenteschat/providers";
 import {
   addRunStep,
   type Brain,
   type BrainTurn,
+  type CodeSetup,
   computerPrompt,
   createJobHandlers,
   drainOutbox,
@@ -161,8 +162,115 @@ test("computer brain: one system text per session, recent work and where it star
   expect(two?.system).not.toContain("# Recent actions");
   expect(two?.prompt).toContain("## Recent actions in this thread\nWhat the agents already did here");
   expect(two?.prompt).toContain("@dev list_issues → 3 open issues (ok)");
+  // Found for the trigger: the end of "# This turn", where "You start in …" goes before.
+  expect((two?.turn as { thisTurnFound?: string } | undefined)?.thisTurnFound ?? "").toStartWith(
+    "## Recent actions in this thread",
+  );
   // The person's message once, with its author ("[Owner]: @dev oi" used to come again after "Now answer this").
   expect(one?.prompt.match(/@dev oi/g)).toHaveLength(1);
   expect(two?.prompt.match(/e agora\?/g)).toHaveLength(1);
   expect(two?.prompt).toMatch(/Now answer this:\n\n\[[^\]]+\]: @dev e agora\?$|\n\n\[[^\]]+\]: @dev e agora\?$/);
+});
+
+/** The agent on a paired computer with `brain`, the computer reporting `protocol`. */
+async function onComputer(brain: "claude_code" | "codex", protocol: number) {
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+    name: "MacBook",
+    hostname: "mac",
+    os: "darwin",
+    arch: "arm64",
+    version: "0.8.0",
+    protocol,
+    workspace: "/Users/w/agentes",
+    exec: true,
+  });
+  await f.db.update(schema.agents).set({ machineId: paired.machineId, brain }).where(eq(schema.agents.id, f.agent.id));
+  return (id: string): MachineStatus => ({
+    id,
+    orgId: f.org.id,
+    name: "MacBook",
+    online: true,
+    execAllowed: true,
+    os: "darwin",
+    protocol,
+    executors: {
+      claude: { version: "2.1.300", loggedIn: true },
+      codex: { version: "codex-cli 0.163.0" },
+      detectedAt: new Date().toISOString(),
+    },
+  });
+}
+
+test("the quiet window's checkouts sync is the turn's own, its start picked again from what came in meanwhile", async () => {
+  f = await setup({ quietMs: 300 });
+  const status = await onComputer("claude_code", MACHINE_PROTOCOL_VERSION);
+  const codes: (CodeSetup | null | undefined)[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      codes.push(await turn.code);
+      yield { type: "done", text: "ok" };
+    },
+  };
+  let syncs = 0;
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => status(id) },
+    prepareCode: async () => {
+      // The person adds a line while the checkouts sync, naming the other repository.
+      if (++syncs === 1)
+        await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+          body: "é no billing-api",
+        });
+      return {
+        cwd: "repos/acme/web-app",
+        prompt: "# Your code",
+        start: "You start in repos/acme/web-app.",
+        pick: {
+          present: [
+            { repo: "acme/web-app", dir: "repos/acme/web-app" },
+            { repo: "acme/billing-api", dir: "repos/acme/billing-api" },
+          ],
+          primary: "acme/web-app",
+        },
+      };
+    },
+  });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev o deploy quebrou",
+  });
+  await drainOutbox(f.db, handlers);
+  expect(syncs).toBe(1);
+  expect(codes).toHaveLength(1);
+  expect(codes[0]?.cwd).toBe("repos/acme/billing-api");
+  expect(codes[0]?.start).toBe("You start in repos/acme/billing-api.");
+  expect(codes[0]?.prompt).toBe("# Your code");
+});
+
+test("no early checkouts sync for Codex on a runner that never uses its checkouts", async () => {
+  f = await setup({ quietMs: 50 });
+  const status = await onComputer("codex", CODEX_FOLDER_PROTOCOL - 1);
+  let ran = 0;
+  const brain: Brain = {
+    kind: "codex",
+    async *run() {
+      ran++;
+      yield { type: "done", text: "ok" };
+    },
+  };
+  let syncs = 0;
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { codex: () => brain },
+    machines: { status: async (id) => status(id) },
+    prepareCode: async () => {
+      syncs++;
+      return null;
+    },
+  });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+  await drainOutbox(f.db, handlers);
+  expect(ran).toBe(1);
+  expect(syncs).toBe(0);
 });

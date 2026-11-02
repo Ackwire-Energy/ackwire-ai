@@ -3,9 +3,10 @@ import type { BrainTurn } from "./types";
 /**
  * A turn as a computer brain gets it: `thisTurn` is the "# This turn" block (ADR 0053 §10), what is true
  * for this turn only (the time, why it was called, where it is, memory and wiki found for the trigger,
- * a routine's time line). Its system prompt holds only what doesn't change during its session.
+ * a routine's time line); `thisTurnFound` is its end, what was found for the trigger (memory, wiki, recent actions).
+ * Its system prompt holds only what doesn't change during its session.
  */
-export type ComputerTurn = BrainTurn & { thisTurn?: string };
+export type ComputerTurn = BrainTurn & { thisTurn?: string; thisTurnFound?: string };
 
 /**
  * What a computer brain (Claude Code, Codex) reads this turn. Every turn starts
@@ -14,10 +15,14 @@ export type ComputerTurn = BrainTurn & { thisTurn?: string };
  * conversation so far (the system text goes separately) and the trigger; a
  * resumed session already has everything up to its own last reply, so it gets
  * only what people said after it. `start`: where the turn starts ("You start in …", `prepareAgentCode`), read
- * with "# This turn" so the system text doesn't change with it.
+ * with "# This turn" so the system text doesn't change with it: with the turn's facts, before what was found
+ * (memory items are hints, and the line would read as one of them).
  */
 export function computerPrompt(turn: ComputerTurn, start = ""): string {
-  const now = [turn.thisTurn?.trim(), start.trim()].filter(Boolean).join("\n\n");
+  const all = turn.thisTurn?.trim() ?? "";
+  const found = turn.thisTurnFound?.trim() ?? "";
+  const head = found && all.endsWith(found) ? all.slice(0, -found.length).trim() : all;
+  const now = [head, start.trim(), head === all ? "" : found].filter(Boolean).join("\n\n");
   const body = conversationPrompt(turn);
   return now ? `${now}\n\n${body}` : body;
 }
@@ -37,9 +42,10 @@ function conversationPrompt(turn: BrainTurn): string {
 }
 
 /**
- * The conversation without the trigger at its end, which "Now answer this" gives once: the last user message is the
- * trigger itself, or ends with it as its author's part (`[Ana]: …`, marked `(current message)` after others), which
- * is then what "Now answer this" shows, its author kept.
+ * The conversation without the trigger, which "Now answer this" gives once: the last user message is the trigger
+ * itself, or holds it in its author's part (`[Ana]: …`, marked `(current message)` after others; a quote line,
+ * attached files, a "sent through" line or notes may surround the text). That part and what follows it in the
+ * message is then what "Now answer this" shows, its author kept.
  */
 function withoutTrigger(
   messages: BrainTurn["messages"],
@@ -50,15 +56,18 @@ function withoutTrigger(
   if (last?.role !== "user" || !trigger) return same;
   const content = last.content.trimEnd();
   if (content.trim() === trigger) return { before: messages.slice(0, -1), trigger };
-  const tail = `]: ${trigger}`;
-  if (!content.endsWith(tail)) return same;
-  // The trigger's part starts after the parts before it (joined by a blank line), with its author.
-  const sep = content.lastIndexOf("\n\n", content.length - tail.length);
-  const part = (sep === -1 ? content : content.slice(sep + 2)).replace(/^\(current message\) /, "");
-  if (!/^\[[^\]\n]*\]: /.test(part)) return same;
-  const rest = sep === -1 ? "" : content.slice(0, sep).trimEnd();
+  const at = content.lastIndexOf(trigger);
+  if (at === -1) return same;
+  // The trigger's part starts at its author's label, after the parts before it (joined by a blank line).
+  const head = content.slice(0, at);
+  let from = -1;
+  for (const m of head.matchAll(/(^|\n\n)(?:\(current message\) )?\[[^\]\n]*\]: /g)) {
+    from = m.index + (m[1]?.length ?? 0);
+  }
+  if (from === -1) return same;
+  const rest = content.slice(0, from).trimEnd();
   return {
     before: rest ? [...messages.slice(0, -1), { ...last, content: rest }] : messages.slice(0, -1),
-    trigger: part,
+    trigger: content.slice(from).replace(/^\(current message\) /, ""),
   };
 }

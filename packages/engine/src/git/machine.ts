@@ -231,6 +231,36 @@ export interface CodeSetup {
   prompt: string;
   /** "You start in …" for the turn's prompt; absent or "" when it starts in no checkout. */
   start?: string;
+  /** What the start was picked from, to pick it again for other words (`codeStart`) without syncing again. */
+  pick?: { present: CodeStartRepo[]; primary?: string };
+}
+
+type CodeStartRepo = { repo: string; dir: string; path?: string };
+
+/**
+ * Where a turn starts among the synced checkouts: the repository the conversation names (its trigger first, then
+ * its last messages, newest first), else the agent's first repository, else the first checkout.
+ */
+export function codeStart(
+  pick: NonNullable<CodeSetup["pick"]>,
+  turn: Pick<CodeTurn, "trigger" | "messages">,
+): Pick<CodeSetup, "cwd" | "start"> {
+  const texts = [
+    turn.trigger,
+    ...turn.messages
+      .slice(-8)
+      .map((m) => m.content)
+      .reverse(),
+  ];
+  const named = namedRepo(
+    pick.present.map((r) => r.repo),
+    texts,
+  );
+  const start =
+    pick.present.find((r) => r.repo === named) ??
+    pick.present.find((r) => r.repo.toLowerCase() === pick.primary?.toLowerCase()) ??
+    pick.present[0];
+  return { cwd: start?.dir ?? "", start: start ? `You start in ${start.path ?? start.dir}.` : "" };
 }
 
 /** What a chat turn needs from `prepareAgentCode`. */
@@ -320,22 +350,11 @@ export async function prepareAgentCode(
     const coming = new Set(downloading.map((r) => r.toLowerCase()));
     const notCloned = explicit.filter((r) => !lower.has(r.toLowerCase()) && !coming.has(r.toLowerCase()));
     if (present.length === 0 && notCloned.length === 0 && downloading.length === 0) return null;
-    const texts = [
-      turn.trigger,
-      ...turn.messages
-        .slice(-8)
-        .map((m) => m.content)
-        .reverse(),
-    ];
-    const named = namedRepo(
-      present.map((r) => r.repo),
-      texts,
-    );
     const primary = explicit.find((r) => lower.has(r.toLowerCase()));
-    const start =
-      present.find((r) => r.repo === named) ??
-      present.find((r) => r.repo.toLowerCase() === primary?.toLowerCase()) ??
-      present[0];
+    const pick = {
+      present: present.map((r) => ({ repo: r.repo, dir: r.dir, ...(r.path ? { path: r.path } : {}) })),
+      ...(primary ? { primary } : {}),
+    };
     const checkouts: CodeCheckout[] = present.map((r) => ({
       repo: r.repo,
       path: r.path ?? r.dir,
@@ -343,7 +362,7 @@ export async function prepareAgentCode(
       ...(r.status === "failed" ? { stale: r.message || "the update failed" } : {}),
     }));
     const prompt = codePrompt({ handle: agent.handle, checkouts, notCloned, downloading });
-    return { cwd: start?.dir ?? "", prompt, start: start ? `You start in ${start.path ?? start.dir}.` : "" };
+    return { ...codeStart(pick, turn), prompt, pick };
   } catch {
     // Offline, slow, refused: the turn goes on in the agent's folder, as before.
     return null;
