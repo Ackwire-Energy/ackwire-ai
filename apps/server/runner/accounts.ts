@@ -258,6 +258,8 @@ const MAX_CODEX_AUTH_CHARS = 64_000;
 export const CODEX_REFRESH_AFTER_MS = 8 * 24 * 3600_000;
 /** How long a turn on a sign-in due for its refresh holds the others back, waiting for the refreshed copy. */
 export const CODEX_REFRESH_WAIT_MS = 60_000;
+/** How far ahead of root's clock a worker's `last_refresh` may be. */
+const CODEX_CLOCK_SKEW_MS = 5 * 60_000;
 
 export interface CodexAuth {
   /** The whole file, as JSON. */
@@ -266,6 +268,7 @@ export interface CodexAuth {
   refreshedAt: number;
   /** The ChatGPT account it signs in to (`tokens.account_id`). */
   accountId: string;
+  refreshToken: string;
 }
 
 /** A Codex `auth.json` (its text) that signs in to ChatGPT: tokens with a refresh token. Null for anything else. */
@@ -286,6 +289,7 @@ export function codexAuthOf(text: unknown): CodexAuth | null {
     text: JSON.stringify(o),
     refreshedAt: Number.isFinite(at) ? at : 0,
     accountId: typeof tokens.account_id === "string" ? tokens.account_id : "",
+    refreshToken: tokens.refresh_token,
   };
 }
 
@@ -1812,7 +1816,9 @@ export class AccountManager {
 
   /**
    * A refreshed copy of a ChatGPT sign-in for all agents, from the worker of an agent whose turn thinks with it:
-   * kept when it is newer than root's and signs in to the same ChatGPT account. True when kept.
+   * kept when it signs in to the same ChatGPT account and looks like a refresh (a newer `last_refresh`, not in the
+   * future, with a rotated refresh token). The agent's shell writes that file too, so a copy dated years ahead would
+   * otherwise stick and refuse every genuine refresh after it. True when kept.
    */
   keepCodexAuth(id: string, text: unknown): boolean {
     if (!isAccountId(id) || !this.isShared("codex", id)) return false;
@@ -1820,6 +1826,8 @@ export class AccountManager {
     const dir = this.dirOf("codex", id);
     const now = readCodexAuth(dir);
     if (!next || !now || next.accountId !== now.accountId || next.refreshedAt <= now.refreshedAt) return false;
+    if (next.refreshedAt > (this.opts.now ?? Date.now)() + CODEX_CLOCK_SKEW_MS) return false;
+    if (next.refreshToken === now.refreshToken) return false;
     writeJson(path.join(dir, CODEX_AUTH_FILE), JSON.parse(next.text));
     const held = this.refreshing.get(id);
     this.refreshing.delete(id);

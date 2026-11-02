@@ -976,6 +976,9 @@ test.if(posix)(
     expect(m.keepCodexAuth(id, codexAuth("old", clock - 10 * DAY))).toBe(false);
     expect(m.keepCodexAuth(id, codexAuth("other", clock, "acct-someone-else"))).toBe(false);
     expect(m.keepCodexAuth(id, "not json")).toBe(false);
+    // Written by hand in the agent's Codex home: dated ahead, or the same refresh token, is no refresh.
+    expect(m.keepCodexAuth(id, codexAuth("fake-refresh-x", Date.parse("2099-01-01T00:00:00Z")))).toBe(false);
+    expect(m.keepCodexAuth(id, codexAuth("fake-refresh-1", clock))).toBe(false);
     expect(m.keepCodexAuth(id, codexAuth("fake-refresh-2", clock))).toBe(true);
     await waiting;
     expect(second).toEqual({ kind: "codex_auth", auth: codexAuth("fake-refresh-2", clock) });
