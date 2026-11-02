@@ -35,6 +35,7 @@ export interface ThemeColors {
   warnSoft: string;
   onWarn: string;
   danger: string;
+  info: string;
   plate: string;
   plateSoft: string;
   scrim: string;
