@@ -140,6 +140,7 @@ import type {
   OrgSettings,
   Person,
   PhoneSignIn,
+  Poll,
   Proposal,
   ReactionCount,
   Reminder,
@@ -988,6 +989,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ).artifacts,
       get: (orgId, id, version) =>
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}`, { query: { version } }),
+      keep: (orgId, id) => request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}/keep`, { method: "POST" }),
+      reply: (orgId, id, text, clientId) =>
+        request<{ id: string }>(`${org(orgId)}/artifacts/${enc(id)}/reply`, {
+          json: { text, clientId },
+        }),
+      poll: (orgId, id) => request<Poll>(`${org(orgId)}/polls/${enc(id)}`),
+      vote: (orgId, id, options) =>
+        request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),
       versions: async (orgId, id) =>
         (await request<{ versions: ArtifactVersion[] }>(`${org(orgId)}/artifacts/${enc(id)}/versions`)).versions,
       download: (orgId, id, version) =>

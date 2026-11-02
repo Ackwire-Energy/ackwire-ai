@@ -19,6 +19,7 @@ import { useDirectory, useOrgId } from "../shared/hooks";
 import { savedAt, useFileActions, useSavedWhen } from "./actions";
 import { decodeFileList, fileInfo } from "./logic";
 import { useRemoteFile } from "./source";
+import { tellViewerPlace } from "./viewer-place";
 import { ZoomableImage } from "./ZoomableImage";
 
 /**
@@ -26,11 +27,20 @@ import { ZoomableImage } from "./ZoomableImage";
  * it on top, pinch and double tap to zoom, swipe between the pictures (dots), drag down to close, and
  * Compartilhar, Salvar em Fotos, Ver no Drive at the bottom. A tap hides and shows the bars.
  */
-export function ImageViewer({ files: rawFiles, at }: { files: string | string[] | undefined; at: string | undefined }) {
+export function ImageViewer({
+  files: rawFiles,
+  at,
+  from,
+}: {
+  files: string | string[] | undefined;
+  at: string | undefined;
+  /** The stack it opened from, told where the person stops. */
+  from?: string | undefined;
+}) {
   return (
     // Toasts show inside the modal (the app's host sits under it).
     <ToastHost>
-      <Viewer rawFiles={rawFiles} at={at} />
+      <Viewer rawFiles={rawFiles} at={at} from={from} />
     </ToastHost>
   );
 }
@@ -39,7 +49,15 @@ const WHITE = "#fff";
 const DIM = "rgba(255,255,255,0.6)";
 const PLATE = "rgba(255,255,255,0.14)";
 
-function Viewer({ rawFiles, at }: { rawFiles: string | string[] | undefined; at: string | undefined }) {
+function Viewer({
+  rawFiles,
+  at,
+  from,
+}: {
+  rawFiles: string | string[] | undefined;
+  at: string | undefined;
+  from: string | undefined;
+}) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -56,6 +74,9 @@ function Viewer({ rawFiles, at }: { rawFiles: string | string[] | undefined; at:
   const detail = useArtifact(orgId, current?.id ?? null, current?.version).data;
   const actions = useFileActions(detail);
   const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
+  useEffect(() => {
+    if (from) tellViewerPlace(from, index);
+  }, [from, index]);
 
   const onPage = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -242,6 +263,7 @@ function Round({
       accessibilityLabel={label}
       hitSlop={4}
       style={[styles.round, { backgroundColor: PLATE }]}
+      contentStyle={styles.center}
     >
       <Icon name={icon} size={20} color={WHITE} />
     </PressScale>
@@ -270,6 +292,7 @@ function Action({
       accessibilityLabel={label}
       accessibilityState={{ busy, disabled }}
       style={styles.action}
+      contentStyle={styles.actionIn}
     >
       <View style={[styles.circle, { backgroundColor: PLATE }]}>
         {busy ? <ActivityIndicator color={WHITE} /> : <Icon name={icon} size={21} color={WHITE} />}
@@ -297,11 +320,13 @@ const styles = StyleSheet.create({
   },
   title: { flex: 1, minWidth: 0, alignItems: "center" },
   bold: { fontWeight: "600" },
-  round: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  round: { width: 44, height: 44, borderRadius: 22 },
+  center: { alignItems: "center", justifyContent: "center" },
   bottom: { position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 6 },
   dots: { flexDirection: "row", justifyContent: "center", gap: 6, paddingVertical: 6 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   actions: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 20, paddingTop: 10 },
-  action: { alignItems: "center", gap: 5, minWidth: 88 },
+  action: { minWidth: 88 },
+  actionIn: { alignItems: "center", gap: 5 },
   circle: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
 });

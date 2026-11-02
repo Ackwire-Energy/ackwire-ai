@@ -8,6 +8,8 @@ import { join, relative } from "node:path";
  * options (`onAgentReaction`, `createSocket`, `fetch`, `headers`).
  */
 const SRC = join(import.meta.dir, "..", "src");
+/** Text, not code the client runs: the script of a block's own sandboxed page (ADR 0113). */
+const PAGE_TEXT = new Set(["lib/block-kit.ts"]);
 const files = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -41,6 +43,7 @@ describe("@agenteschat/client stays platform-neutral", () => {
   test("no DOM, browser storage, react-dom or @agenteschat/ui in src", () => {
     const offenders: string[] = [];
     for (const f of files(SRC)) {
+      if (PAGE_TEXT.has(relative(SRC, f))) continue;
       const source = code(readFileSync(f, "utf8"));
       for (const [re, what] of FORBIDDEN) {
         const m = re.exec(source);

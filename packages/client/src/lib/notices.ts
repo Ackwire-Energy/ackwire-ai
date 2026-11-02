@@ -12,6 +12,7 @@ export type NoticeKind =
   | "wait_result"
   | "talker_reply"
   | "proposal_result"
+  | "poll_result"
   | "follow_up"
   | "wake_skipped";
 
@@ -38,6 +39,7 @@ export const AGENT_ONLY_NOTICES: ReadonlySet<string> = new Set<NoticeKind>([
   "agent_note",
   "wait_result",
   "proposal_result",
+  "poll_result",
 ]);
 
 /** A message that is a notice only its agent reads: left out of the conversation. */

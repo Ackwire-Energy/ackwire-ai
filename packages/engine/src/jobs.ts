@@ -15,6 +15,7 @@ import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
+import { closePoll, POLL_CLOSE_JOB } from "./blocks";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
@@ -629,6 +630,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A stretch's limit held a wake-up: its pause card, with Continuar (ADR 0089).
     [STRETCH_JOB]: async (job) => {
       await postStretchCard({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload as unknown as StretchHold);
+    },
+    // A vote's time came: it closes and the agent hears the result (ADR 0113).
+    [POLL_CLOSE_JOB]: async (job) => {
+      if (!deps.artifacts) throw new Error("Files are unavailable");
+      await closePoll(deps.artifacts, orgOf(job), String(job.payload.artifactId));
     },
     // A follow-up's time came: the agent is woken in its conversation (follow-through.ts).
     [FOLLOW_UP_JOB]: async (job) => {

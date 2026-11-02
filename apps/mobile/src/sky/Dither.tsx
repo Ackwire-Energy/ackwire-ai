@@ -1,7 +1,7 @@
 import { Canvas, Fill, Shader, Skia, type SkRuntimeEffect, useClock } from "@shopify/react-native-skia";
 import { useState } from "react";
 import { type LayoutChangeEvent, type StyleProp, View, type ViewStyle } from "react-native";
-import { useDerivedValue } from "react-native-reanimated";
+import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import { useLivePaused } from "@/agent/live";
 import { useReducedMotion } from "@/ui/theme";
 import { paletteUniform } from "./math";
@@ -38,6 +38,10 @@ export interface DitherProps {
   fade?: number;
   /** The first tone is see-through (a drawing over glass). */
   clear?: boolean;
+  /** The drawing's width, from the UI thread, when it changes faster than a layout should (the canvas stays). */
+  liveWidth?: SharedValue<number>;
+  /** The `pill` drawing's `work` uniform, from the UI thread: 0 at rest, 1 working. */
+  liveWork?: SharedValue<number>;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -46,7 +50,18 @@ export interface DitherProps {
  * thread nothing; with reduced motion it is drawn once at t = 0. If the shader can't compile, the first
  * tone fills the box.
  */
-export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, clear = false, style }: DitherProps) {
+export function Dither({
+  kind,
+  tones,
+  pixel,
+  extra,
+  animated = true,
+  fade = 2,
+  clear = false,
+  liveWidth,
+  liveWork,
+  style,
+}: DitherProps) {
   const reduced = useReducedMotion();
   // Off screen (LivePause): drawn still, so Skia stops redrawing.
   const paused = useLivePaused();
@@ -60,7 +75,12 @@ export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, c
   const moving = animated && !reduced && !paused;
   const clock = useClock();
   const base = { size: [size.width, size.height], px: pixel, last, fade, clear: clear ? 1 : 0, pal, ...(extra ?? {}) };
-  const uniforms = useDerivedValue(() => ({ ...base, t: moving ? clock.value / 1000 : 0 }));
+  const uniforms = useDerivedValue(() => ({
+    ...base,
+    ...(liveWidth ? { size: [Math.max(1, liveWidth.value), size.height] } : {}),
+    ...(liveWork ? { work: liveWork.value } : {}),
+    t: moving ? clock.value / 1000 : 0,
+  }));
 
   if (!effect)
     return (

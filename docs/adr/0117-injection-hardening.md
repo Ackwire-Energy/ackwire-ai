@@ -76,7 +76,7 @@ Four ways out stayed open after ADR 0109:
      `permission_prompt` (`runPermissionPrompt` and a mission's `handlePermissionPrompt`) does the same before
      `readOnlyCall`.
    - `web_search` queries aren't checked: they go to a fixed provider the attacker can't read.
-2. **MCP tools keep the text an admin approved** (`connector_tool_pins`, migration 0166; `connectors/pins.ts`).
+2. **MCP tools keep the text an admin approved** (`connector_tool_pins`, migration 0167; `connectors/pins.ts`).
    Each tool's description and input schema are pinned by sha256 of their canonical JSON: a custom server's from
    the same listing its admin classifies (`syncCustomTools`), a catalog connector's (and a custom tool missed
    there) the first time an agent lists it (inside the 60 s listing cache). Connections that exist at deploy are
@@ -88,11 +88,11 @@ Four ways out stayed open after ADR 0109:
    classification, and resolves the notice once nothing of the connection waits. A change back to the pinned
    version clears the pending one, and resolves the notice once nothing of the connection waits. Composio's tools (pinned by toolkit version) and the tools we serve ourselves
    are never pinned. A custom server's admin classification gate is unchanged.
-3. **A chat card's preview loads nothing from the network** (`HtmlFrame.tsx`, `PREVIEW_CSP`). The thumbnail's page
-   starts, right after its doctype and before anything of the page or our shim, with a CSP meta: `default-src
-   'none'`, scripts inline and from cdnjs, jsDelivr and unpkg, styles inline and Google Fonts, fonts from data and
-   Google Fonts, images from data and blob, `connect-src 'none'`, `form-action 'none'`. The opened page is
-   unchanged.
+3. **A chat card's preview loads nothing from the network** (`HtmlFrame.tsx`). Every page an agent writes, the
+   thumbnail and the opened page alike, starts behind `isolatedPage`'s policy (ADR 0019, `PAGE_CSP` in
+   `packages/client/src/lib/isolated-page.ts`): `default-src 'none'`, scripts, styles and images only inline or from
+   data and blob, no outside host at all. A live block (ADR 0113) needs no network either: what it proposes reaches
+   the app through `postMessage`, and the app sends it.
 4. **A work turn loads none of the checkout's Claude Code settings** (`apps/server/runner/brain.ts`,
    `brainProfileLaunch`, `repoInstructions`). Work turns without the owner's own MCP servers start with
    `--setting-sources ""`, like plan turns. Checked against the real CLI (2.1.316, its API pointed at a local fake,

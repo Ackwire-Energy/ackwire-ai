@@ -79,6 +79,7 @@ export const ChartCard = memo(function ChartCard({
           accessibilityRole="switch"
           accessibilityState={{ checked: table }}
           style={[styles.pill, table ? { backgroundColor: c.plate } : null]}
+          contentStyle={styles.center}
         >
           <Text variant="label" tone={table ? "ink" : "muted"}>
             {t("mobile.chart.table")}
@@ -94,6 +95,7 @@ export const ChartCard = memo(function ChartCard({
           accessibilityLabel={t("mobile.code.fullScreen")}
           hitSlop={6}
           style={styles.tool}
+          contentStyle={styles.center}
         >
           <Icon name="expand" size={17} color={c.muted} />
         </PressScale>
@@ -547,8 +549,9 @@ const styles = StyleSheet.create({
   pending: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 14 },
   top: { flexDirection: "row", alignItems: "flex-start", gap: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 10 },
   titles: { flex: 1, gap: 1, paddingTop: 4 },
-  pill: { height: 30, paddingHorizontal: 10, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  tool: { height: 30, width: 32, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  pill: { height: 30, paddingHorizontal: 10, borderRadius: 15 },
+  tool: { height: 30, width: 32, borderRadius: 15 },
+  center: { alignItems: "center", justifyContent: "center" },
   body: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12 },
   bars: { gap: 9 },
   barRow: { flexDirection: "row", alignItems: "center", gap: 10 },

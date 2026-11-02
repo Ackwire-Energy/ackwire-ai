@@ -51,6 +51,7 @@ Output: PASS/FAIL per case with each check (printed as each case ends), totals p
 | `issues`, `seedIssues` | the built-in issue tools, and issues already there |
 | `workspace` | `add_agent_to_channel` and `update_thread` (internal changes with undo) |
 | `chat` | the real `post_message` and `send_dm` (speaking elsewhere or for someone; a routine's run never gets them) |
+| `blocks` | the real `show_block` and `start_poll` (ADR 0113), next to `create_artifact` and the Drive's other tools |
 | `missions` | a `propose_mission` with the real description and findings schema (no computer: the proposal is only recorded) |
 | `memory` | the agent's memory items (found with `search_context`) |
 | `fixtures` | per tool name, canned results: the first entry whose `when` words all appear in the call's input (no `when` = default) |

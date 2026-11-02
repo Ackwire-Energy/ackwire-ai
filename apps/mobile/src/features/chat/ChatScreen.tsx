@@ -1193,14 +1193,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           dmAgentId ? (
             <AgentFace
               agentId={dmAgentId}
-              size={26}
+              size={32}
               framed={false}
               mode={dmDoing ? "run" : "idle"}
               presence
               ring={c.glassSolid}
             />
           ) : (
-            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} presence ring={c.glassSolid} />
+            <Face who={{ type: dm.with.type, id: dm.with.id }} size={32} live={false} presence ring={c.glassSolid} />
           )
         }
         title={dm.with.name}
