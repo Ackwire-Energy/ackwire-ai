@@ -12,6 +12,7 @@ import { notifyRunFailed } from "./notification-producers";
 import { ANSWER_NUDGE } from "./reply-policy";
 import { deliverNoticeToRun } from "./run-resume";
 import type { AgentRun } from "./runs";
+import { neutralizeUntrusted, untrustedBlock } from "./untrusted";
 
 /**
  * The continuation controller (ADR 0097): every turn of every run kind that reaches its final answer ends in exactly
@@ -47,8 +48,50 @@ export type ContinuationVerdict = "done" | "continue" | "ask" | "untried" | "sec
  */
 export function untriedNudge(means: string[], tried: string[]) {
   const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
-  const done = tried.length > 0 ? tried.slice(-8).join("; ") : "nothing yet";
-  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried: ${done}. Use the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. If none works, say what you tried and the one thing a person must give.`;
+  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried:\n${triedBlock(tried)}\nUse the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. ${SAFETY_FINAL} If none works, say what you tried and the one thing a person must give.`;
+}
+
+/**
+ * A refusal for safety ends that path for that data (ADR 0117): the nudges and HOW_YOU_WORK say so, so "take another
+ * way" never reads as "send it some other way".
+ */
+export const SAFETY_FINAL =
+  "A refusal for safety (a credential, private data in an address, secrets, sending data out) is final: never send that data another way. Say what was refused.";
+
+/** What a tried line starts with when its call was refused for safety (`triedCalls`). */
+export const SAFETY_TAG = "[refused for safety]";
+
+/**
+ * Refusal codes (a tool result's `data.code`) that stop data from going out: the gateway's credential check,
+ * `remember`'s unasked destination and the outbound checks on web addresses. A command held for a person's approval
+ * (`command.approval_needed`) is not one: the person may let it run.
+ */
+const SAFETY_CODES = new Set([
+  "tool.credential",
+  "memory.unasked_destination",
+  "outbound.private_text",
+  "outbound.credential",
+  "outbound.long",
+]);
+
+const isSafetyCode = (code: unknown) => typeof code === "string" && SAFETY_CODES.has(code);
+
+/**
+ * A computer brain's own call the command policy refused because it reads secrets or sends data out
+ * (`mission-commands.ts`). Inline code, a remote host or a shell are refused with another way to do it, so they
+ * aren't final.
+ */
+const HARNESS_SAFETY =
+  /→ failed: (?:This command was refused because (?:it touches secrets|it sends data)|Agents never read secrets)/;
+
+/** The tried lines as a run reads them: inside the envelope, since their outcomes quote tool results. */
+const triedBlock = (tried: string[]) =>
+  tried.length > 0 ? untrustedBlock("what you tried", tried.slice(-8).join("\n")) : "nothing yet";
+
+/** Every failed tried line was refused for safety (and at least one failed). */
+export function onlySafetyRefusals(tried: string[]): boolean {
+  const failed = tried.filter((l) => l.includes("→ failed: "));
+  return failed.length > 0 && failed.every((l) => l.startsWith(SAFETY_TAG));
 }
 
 /**
@@ -57,8 +100,7 @@ export function untriedNudge(means: string[], tried: string[]) {
  */
 export function findableNudge(means: string[], tried: string[]) {
   const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
-  const done = tried.length > 0 ? tried.slice(-8).join("; ") : "nothing yet";
-  return `Not asked yet: ask a person only for what only they can give, and this you can find. Your means: ${have}. Already tried: ${done}. Find it first: search the web for the docs and read them, try it (on your computer, or with web_fetch), search the workspace for a name the person uses. When something stays unclear, state your assumption and go on. Ask only for what only a person can give (a key through request_secret, a decision, an approval). If you still need to ask, call ask_user again: that one is asked.`;
+  return `Not asked yet: ask a person only for what only they can give, and this you can find. Your means: ${have}. Already tried:\n${triedBlock(tried)}\n${SAFETY_FINAL} Find it first: search the web for the docs and read them, try it (on your computer, or with web_fetch), search the workspace for a name the person uses. When something stays unclear, state your assumption and go on. Ask only for what only a person can give (a key through request_secret, a decision, an approval). If you still need to ask, call ask_user again: that one is asked.`;
 }
 
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */
@@ -111,7 +153,7 @@ export async function continuationVerdict(
       request: cutText(input.request, 2000),
       reply: cutTextEnd(input.reply, 3000),
       means: input.means,
-      tried: input.tried.slice(-20),
+      tried: input.tried.slice(-20).map(neutralizeUntrusted),
       runKind: input.runKind,
       ...(input.unreached ? { unreached: input.unreached } : {}),
     },
@@ -123,7 +165,7 @@ export async function continuationVerdict(
         criteria: {
           done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
           untried:
-            "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt.",
+            "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
           continue:
             "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
           ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
@@ -135,12 +177,19 @@ export async function continuationVerdict(
   });
   const a = answers.verdict;
   const p = (k: ContinuationVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
-  if (p("secret") >= 0.45 && (["untried", "continue", "ask"] as const).every((k) => p("secret") >= p(k)))
-    return "secret";
-  if (p("untried") >= 0.45 && p("untried") >= p("continue") && p("untried") >= p("ask")) return "untried";
-  if (p("continue") >= 0.45 && p("continue") >= p("ask")) return "continue";
-  if (p("ask") >= 0.45) return "ask";
-  return "done";
+  const verdict: ContinuationVerdict =
+    p("secret") >= 0.45 && (["untried", "continue", "ask"] as const).every((k) => p("secret") >= p(k))
+      ? "secret"
+      : p("untried") >= 0.45 && p("untried") >= p("continue") && p("untried") >= p("ask")
+        ? "untried"
+        : p("continue") >= 0.45 && p("continue") >= p("ask")
+          ? "continue"
+          : p("ask") >= 0.45
+            ? "ask"
+            : "done";
+  // What failed was only refused for safety: no way is left to try for that data. Work it said it will still do
+  // (`continue`) goes on.
+  return verdict === "untried" && onlySafetyRefusals(input.tried) ? "done" : verdict;
 }
 
 /** One tool call as the judge reads it: `name(argument) → outcome`, short. */
@@ -176,7 +225,10 @@ export async function triedCalls(db: Database, run: { id: string; orgId: string 
       ),
     )
     .orderBy(schema.agentRunSteps.seq);
-  const calls = new Map<string, { name: string; input: unknown; result?: { content: string; isError?: boolean } }>();
+  const calls = new Map<
+    string,
+    { name: string; input: unknown; result?: { content: string; isError?: boolean }; safety?: boolean }
+  >();
   for (const { kind, data } of steps) {
     const id = typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`;
     const name = typeof data.name === "string" ? data.name : "";
@@ -184,10 +236,15 @@ export async function triedCalls(db: Database, run: { id: string; orgId: string 
     else {
       const call = calls.get(id) ?? { name, input: undefined };
       call.result = { content: String(data.content ?? ""), isError: data.isError === true };
+      call.safety = data.isError === true && isSafetyCode((data.data as { code?: unknown } | undefined)?.code);
       calls.set(id, call);
     }
   }
-  return [...[...calls.values()].map((c) => callLine(c.name, c.input, c.result)), ...harness].slice(-20);
+  const tag = (line: string, safety: boolean | undefined) => (safety ? `${SAFETY_TAG} ${line}` : line);
+  return [
+    ...[...calls.values()].map((c) => tag(callLine(c.name, c.input, c.result), c.safety)),
+    ...harness.map((l) => tag(l, !l.startsWith(SAFETY_TAG) && HARNESS_SAFETY.test(l))),
+  ].slice(-20);
 }
 
 export type TurnKind = "conversation" | "agents_dm" | "routine";

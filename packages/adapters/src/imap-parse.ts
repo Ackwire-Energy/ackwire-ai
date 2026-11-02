@@ -5,6 +5,7 @@
  */
 import type { MessageStructureObject, SearchObject } from "imapflow";
 import { type AddressObject, type EmailAddress, simpleParser } from "mailparser";
+import { htmlToText } from "./html-text";
 import {
   type MailAddress,
   type MailAttachment,
@@ -299,76 +300,17 @@ export async function decodePartText(raw: Uint8Array, node: MessageStructureObje
   const encoding = (node.encoding ?? "7bit").replace(/[^a-z0-9-]/gi, "");
   const head = `Content-Type: ${type}${params}\r\nContent-Transfer-Encoding: ${encoding}\r\n\r\n`;
   const parsed = await simpleParser(Buffer.concat([Buffer.from(head, "latin1"), Buffer.from(raw)]));
-  if (type === "text/html") return htmlToText(typeof parsed.html === "string" ? parsed.html : (parsed.text ?? ""));
+  if (type === "text/html") return htmlText(typeof parsed.html === "string" ? parsed.html : (parsed.text ?? ""));
   return parsed.text ?? "";
 }
 
 // ---------------------------------------------------------------------------
-// HTML → text
+// HTML → text (one converter for all mail and web pages: html-text.ts)
 
-const ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  copy: "©",
-  reg: "®",
-  hellip: "…",
-  mdash: "—",
-  ndash: "–",
-  lsquo: "‘",
-  rsquo: "’",
-  ldquo: "“",
-  rdquo: "”",
-  laquo: "«",
-  raquo: "»",
-  euro: "€",
-  bull: "•",
-};
+export { decodeEntities, htmlToText } from "./html-text";
 
-export function decodeEntities(text: string): string {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code: string) => {
-    if (code[0] === "#") {
-      const n = code[1] === "x" || code[1] === "X" ? Number.parseInt(code.slice(2), 16) : Number(code.slice(1));
-      return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : whole;
-    }
-    return ENTITIES[code.toLowerCase()] ?? whole;
-  });
-}
-
-/** Small dependency-free HTML → text: blocks become lines, links "text (url)", quotes kept. */
-export function htmlToText(html: string): string {
-  let s = html.slice(0, MAX_TEXT_CHARS * 4);
-  s = s.replace(/<!--[\s\S]*?-->/g, "");
-  s = s.replace(/<(script|style|head|title|noscript|template)\b[\s\S]*?<\/\1\s*>/gi, "");
-  s = s.replace(/<a\b[^>]*?\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a\s*>/gi, (...m) => {
-    const href = decodeEntities(String(m[2] ?? m[3] ?? m[4] ?? "")).trim();
-    const label = collapse(decodeEntities(String(m[5]).replace(/<[^>]+>/g, "")));
-    const url = href.replace(/^mailto:/i, "");
-    if (!/^(https?:|mailto:)/i.test(href)) return label;
-    if (!label) return url;
-    return label === url || label === href ? label : `${label} (${url})`;
-  });
-  s = s.replace(/<img\b[^>]*?\balt\s*=\s*("([^"]*)"|'([^']*)')[^>]*>/gi, (...m) => {
-    const alt = String(m[2] ?? m[3] ?? "").trim();
-    return alt ? `[${alt}]` : "";
-  });
-  s = s.replace(/<br\s*\/?>/gi, "\n");
-  s = s.replace(/<li\b[^>]*>/gi, "\n- ");
-  s = s.replace(/<(td|th)\b[^>]*>/gi, " ");
-  s = s.replace(/<\/?(p|div|tr|table|ul|ol|h[1-6]|blockquote|pre|section|article|header|footer|hr)\b[^>]*>/gi, "\n");
-  s = s.replace(/<[^>]+>/g, "");
-  s = decodeEntities(s);
-  s = s
-    .split("\n")
-    .map((line) => line.replace(/[ \t\f\v ]+/g, " ").trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  return s.slice(0, MAX_TEXT_CHARS);
-}
+/** HTML → text within the message size cap. */
+const htmlText = (html: string) => htmlToText(html.slice(0, MAX_TEXT_CHARS * 4)).slice(0, MAX_TEXT_CHARS);
 
 // ---------------------------------------------------------------------------
 // Summaries and full messages
@@ -452,11 +394,9 @@ export async function parseMessage(
   uidValidity: number,
 ): Promise<MailMessage> {
   const parsed = await simpleParser(Buffer.from(source), { skipImageLinks: true, skipTextToHtml: true });
-  // HTML-only mail: our converter (links as "text (url)", same as the snippets); else mailparser's text.
-  const htmlOnly =
-    typeof parsed.html === "string" && findTextPart(meta.bodyStructure)?.type.toLowerCase() === "text/html";
-  const plain =
-    !htmlOnly && parsed.text?.trim() ? parsed.text : typeof parsed.html === "string" ? htmlToText(parsed.html) : "";
+  // The HTML part when there is one: it's what people see, and a text/plain part can say something else
+  // (hidden instructions). Only mail without HTML falls back to mailparser's text.
+  const plain = typeof parsed.html === "string" ? htmlText(parsed.html) : (parsed.text ?? "");
   const text = capText(plain.replace(/\r\n/g, "\n").trim());
   const references = parsed.references
     ? (Array.isArray(parsed.references) ? parsed.references : parsed.references.split(/\s+/)).filter(Boolean)

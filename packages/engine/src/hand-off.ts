@@ -5,6 +5,7 @@ import { deliverNotice, publishDelivery } from "./delivery";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { insertMessage, type Message, unreachedAgents } from "./messages";
+import { runReadOutsideById } from "./outside";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import { type AgentRun, addRunStep } from "./runs";
@@ -12,6 +13,7 @@ import { REQUEST_SECRET_TOOL } from "./secrets";
 import { maskCredentials } from "./tool-detail";
 import { reachesTeammates, turnMeans } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
+import { neutralizeUntrusted } from "./untrusted";
 
 export const HAND_OFF_TOOL = "hand_off";
 /** A report, not a transcript: long enough for findings, why and what next. */
@@ -83,6 +85,7 @@ export async function deliverRoutineReport(
     )
     .returning({ id: routineRuns.id });
   if (!open) return null;
+  const relays = await runReadOutsideById(tx, run.orgId, run.id);
   if (!input.wake) {
     // Agents it names outside that conversation: the routine hands it to them (`settleReach`).
     const unreached = await unreachedAgents(tx, {
@@ -102,6 +105,7 @@ export async function deliverRoutineReport(
       meta: {
         routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId },
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+        ...(relays ? { readOutside: true } : {}),
       },
     });
     await tx.update(routineRuns).set({ messageId: message.id }).where(eq(routineRuns.id, brief.routineRunId));
@@ -115,6 +119,7 @@ export async function deliverRoutineReport(
     // Nobody is behind it (authority.ts): the run it wakes answers at hop 1, in a stretch of its own.
     hop: 0,
     stretchId: null,
+    readOutside: relays,
     notice: {
       kind: "routine_handoff",
       text,
@@ -279,7 +284,7 @@ export async function askVerdict(
       question: cutText(input.question, 1000),
       request: cutText(input.request, 2000),
       means: input.means,
-      tried: input.tried.slice(-20),
+      tried: input.tried.slice(-20).map(neutralizeUntrusted),
     },
     questions: {
       verdict: {
