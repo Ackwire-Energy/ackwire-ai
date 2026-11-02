@@ -271,6 +271,11 @@ export async function setAgentAudience(
   if (audience.mode === "people" && userIds.length === 0 && roleIds.length === 0 && !agent.ownerUserId) {
     throw new ValidationError("Pick at least one person or role");
   }
+  // Under "owner" the lists are who a plan kept out (ADR 0059 §5), back once it is let out: staying "owner" keeps them.
+  if (audience.mode === "owner" && agent.audienceMode === "owner") {
+    userIds = agent.audienceUserIds;
+    roleIds = agent.audienceRoleIds;
+  }
   const consultable = audience.consultable ?? agent.consultable;
   planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds, roleIds, consultable });
   const [updated] = await db

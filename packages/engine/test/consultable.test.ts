@@ -190,6 +190,19 @@ describe("other agents can consult it", () => {
     ).toBe(true);
   });
 
+  test("turning the switch under 'only its owner' keeps who its plan kept out, for when the plan is let out", async () => {
+    f = await setup({ askAgent: true });
+    const lia = await addMember(f.db, f.org.id, "member", "lia");
+    const { nino } = await world({ brain: "claude_code", audienceUserIds: [lia.id] });
+    const updated = await setAgentAudience(f.db, f.owner.id, f.org.id, nino.id, {
+      mode: "owner",
+      userIds: [],
+      roleIds: [],
+      consultable: false,
+    });
+    expect(updated).toMatchObject({ audienceMode: "owner", audienceUserIds: [lia.id], consultable: false });
+  });
+
   test("its approvals go to the people who decide for it, never to the person it was consulted for", async () => {
     f = await setup({ askAgent: true });
     const { lia, nino } = await world();
