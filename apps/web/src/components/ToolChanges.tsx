@@ -43,8 +43,8 @@ export function ToolChanges({ orgId }: { orgId: string }) {
             </Button>
           </div>
           <div className="tool-change__sides">
-            <Version label={t("connectors.toolChanges.before")} version={c.before} />
-            <Version label={t("connectors.toolChanges.after")} version={c.after} />
+            <Version label={t("connectors.toolChanges.before")} version={c.before} other={c.after} />
+            <Version label={t("connectors.toolChanges.after")} version={c.after} other={c.before} />
           </div>
         </article>
       ))}
@@ -52,18 +52,48 @@ export function ToolChanges({ orgId }: { orgId: string }) {
   );
 }
 
-function Version({ label, version }: { label: string; version: ToolChange["before"] }) {
+/** One side: its description and each input field as the model reads it, a field that differs on the other side marked. */
+function Version({
+  label,
+  version,
+  other,
+}: {
+  label: string;
+  version: ToolChange["before"];
+  other: ToolChange["before"];
+}) {
   const { t } = useTranslation();
   const fields = inputFields(version.inputSchema);
+  const otherJson = new Map(inputFields(other.inputSchema).map((f) => [f.name, f.json]));
   return (
     <div className="tool-change__side">
       <div className="small muted">{label}</div>
       <p className="tool-change__text">{version.description}</p>
-      <div className="small muted">
-        {fields.length > 0
-          ? t("connectors.toolChanges.input", { fields: fields.join(", ") })
-          : t("connectors.toolChanges.noInput")}
-      </div>
+      {fields.length > 0 ? (
+        <>
+          <div className="small muted">{t("connectors.toolChanges.input")}</div>
+          <ul className="tool-change__fields">
+            {fields.map((f) => {
+              const changed = otherJson.get(f.name) !== f.json;
+              return (
+                <li
+                  key={f.name}
+                  className={changed ? "tool-change__field tool-change__field--changed" : "tool-change__field"}
+                >
+                  <code>{f.name}</code>
+                  {f.type ? <span className="muted"> · {f.type}</span> : null}
+                  {changed ? (
+                    <span className="tool-change__tag">{t("connectors.toolChanges.fieldChanged")}</span>
+                  ) : null}
+                  {f.description ? <div className="tool-change__text">{f.description}</div> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : (
+        <div className="small muted">{t("connectors.toolChanges.noInput")}</div>
+      )}
     </div>
   );
 }

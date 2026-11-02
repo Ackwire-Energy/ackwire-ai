@@ -11757,3 +11757,22 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+.tool-change__fields {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tool-change__field {
+  padding: 4px var(--space-2);
+  border-radius: 8px;
+}
+.tool-change__field--changed {
+  background: var(--warn-soft);
+}
+.tool-change__tag {
+  margin-left: var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
