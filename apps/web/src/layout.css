@@ -916,6 +916,13 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   justify-content: flex-end;
   margin-top: 6px;
 }
+/*
+ * A wide picture's tile is as wide as the picture's own size allows, while its thumbnail stops at 420px: the
+ * thumbnail (or a file's row) keeps to the tile's right edge, under the bubble, instead of its left.
+ */
+.ac-msg--own .artifact-tile > :is(.file-thumb, .file-row) {
+  margin-left: auto;
+}
 /* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
 .ac-msg--own .ac-msg__text .md__table {
   background: var(--bg);

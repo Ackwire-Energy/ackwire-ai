@@ -469,7 +469,12 @@ export const MessageRow = memo(function MessageRow({
           </View>
         ) : null}
         {consulted.map((cs) => (
-          <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
+          <ConsultationCard
+            key={cs.consultationId}
+            askerId={m.author.id ?? ""}
+            consultation={cs}
+            channelId={readOnly ? undefined : m.channelId}
+          />
         ))}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {brainWait ? (

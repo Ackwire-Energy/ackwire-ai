@@ -8460,6 +8460,10 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
 .ac-consult__head:hover {
   background: rgba(127, 127, 127, 0.05);
 }
+/* Opens beside the chat (the two agents' conversation in the panel) while it shows there: like the block's line. */
+.ac-consult__head[aria-pressed="true"] {
+  background: var(--plate);
+}
 html:not([data-pointer]) .ac-consult__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);

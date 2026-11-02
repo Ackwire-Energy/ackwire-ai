@@ -41,7 +41,7 @@ import {
   useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
-import { chatHref } from "../links/logic";
+import { chatHref, consultationHref } from "../links/logic";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
@@ -59,13 +59,20 @@ import { markName, threadFaces } from "./logic";
 
 // ── Consultation ─────────────────────────────────────────────────────────────
 
-/** "Infra respondeu": what the agent asked another agent before answering, in a private conversation. */
+/**
+ * "Infra respondeu": what the agent asked another agent before answering, in a private conversation. With the
+ * conversation it was asked from (`channelId`), a tap opens the two agents' conversation on its own screen, as the
+ * reply's block lines do: a long question or answer reads there, never stretching the chat. Without it (already
+ * on that screen) it opens in place.
+ */
 export function ConsultationCard({
   askerId,
   consultation: cs,
+  channelId,
 }: {
   askerId: string;
   consultation: MessageConsultation;
+  channelId?: string;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -87,9 +94,16 @@ export function ConsultationCard({
   return (
     <View style={[styles.box, styles.cs, surface]}>
       <Pressable
-        onPress={() => setOpen((v) => !v)}
+        onPress={
+          channelId
+            ? () => {
+                tapHaptic();
+                router.push(consultationHref(cs.consultationId, channelId));
+              }
+            : () => setOpen((v) => !v)
+        }
         accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
+        accessibilityState={channelId ? undefined : { expanded: open }}
         style={styles.head}
       >
         <AgentFace agentId={cs.agentId} size={18} live={false} />
@@ -99,11 +113,15 @@ export function ConsultationCard({
         <Text variant="small" tone="faint" numberOfLines={1} style={[styles.grow, open && styles.hidden]}>
           {cs.answer ? previewOf(cs.answer) : ""}
         </Text>
-        <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={16} color={c.faint} />
-        </View>
+        {channelId ? (
+          <Icon name="right" size={16} color={c.faint} />
+        ) : (
+          <View style={open ? styles.flip : undefined}>
+            <Icon name="chev" size={16} color={c.faint} />
+          </View>
+        )}
       </Pressable>
-      {open ? (
+      {open && !channelId ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
             {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}

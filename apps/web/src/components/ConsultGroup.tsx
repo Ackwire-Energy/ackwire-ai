@@ -58,6 +58,8 @@ const EMPTY: ConsultGroups = {
 };
 const ConsultGroupsContext = createContext<ConsultGroups>(EMPTY);
 export const ConsultGroupsProvider = ConsultGroupsContext.Provider;
+/** The question open in the panel beside the conversation, if any (a card or a line that opens it shows pressed). */
+export const useOpenConsultation = () => useContext(ConsultGroupsContext).open;
 
 const RELOAD_ON = new Set(["agent.consulting", "agent.consulted", "agent.consultation"]);
 
