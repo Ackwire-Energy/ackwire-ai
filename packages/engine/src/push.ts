@@ -63,11 +63,8 @@ export type PushDeviceInput =
 /** An Expo push token as the iPhone app gets it from `getExpoPushTokenAsync`. */
 export const EXPO_PUSH_TOKEN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,200}\]$/;
 
-/**
- * An FCM registration token as the Android app gets it from `getDevicePushTokenAsync` (ADR 0123): opaque,
- * about 150 to 200 characters of base64url and colons. Capped well under what a unique index takes.
- */
-export const FCM_PUSH_TOKEN = /^[A-Za-z0-9_:-]{32,2048}$/;
+/** An FCM registration token as the Android app gets it (ADR 0123): the shape the push relay also checks. */
+export { FCM_PUSH_TOKEN } from "@agenteschat/adapters";
 
 type NotificationRow = typeof notifications.$inferSelect;
 
@@ -330,7 +327,7 @@ async function isLooking(presence: PushDeps["presence"], orgId: string, userId: 
 
 /**
  * Sends the push of one notification to every device of its person, unless
- * it was read, done or snoozed meanwhile: phones through `push` (one request),
+ * it was read, done or snoozed meanwhile: phones through `push` (one call),
  * browsers whose session is still on through `webPush` (one per subscription).
  * Devices their push service reports as gone are deleted, and so are browsers
  * whose session ended. Accepted phone tickets are checked
@@ -431,9 +428,11 @@ export async function deliverPush(
       const results = await deps.push.send(messages);
       sent += results.filter((r) => r.ok).length;
       gone.push(...results.filter((r) => r.unregistered).map((r) => r.token));
-      // Android answers per phone (FCM): one that may take it later (429, 5xx) lets the outbox try again.
+      // Android answers per phone (FCM): one that may take it later (429, 5xx) lets the outbox try again. A
+      // platform this server sends nothing to (`skipped`) is no failure: it would keep the others from a retry.
       for (const r of results) {
-        if (!r.ok && !r.unregistered) failures.push({ retryable: r.retryable === true, error: r.error ?? "not sent" });
+        if (r.ok || r.unregistered || r.skipped) continue;
+        failures.push({ retryable: r.retryable === true, error: r.error ?? "not sent" });
       }
       const tickets = results.flatMap((r) => (r.ok && r.ticketId ? [{ id: r.ticketId, token: r.token }] : []));
       if (tickets.length > 0 && deps.push.receipts) {

@@ -200,6 +200,10 @@ async function boot(
   let resolved: Adapters | null = null;
   // The push relay's credentials are sealed the same way (ADR 0123).
   const keyWrappers = () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])];
+  // Android pushes straight to Firebase and the push relay this server may run share one sender, so one access
+  // token (ADR 0123).
+  const account = config.FIREBASE_SERVICE_ACCOUNT;
+  const fcm = account ? createFcmPushSender({ serviceAccount: account }) : null;
   // The GIPHY key its owner may add in Settings (ADR 0091, amended 2026-10-31), made below once modules had their
   // say on the key wrappers; the GIF provider asks it on every call.
   let gifKey: GifKey | null = null;
@@ -219,16 +223,11 @@ async function boot(
     // Phone app push (ADR 0035, ADR 0123): only devices that registered get anything. Android straight to
     // Firebase or through the push relay (`PUSH_SENDER`); iPhones through Expo.
     push: createPhonePushSender({
-      android: androidPushSender(config, database.db, keyWrappers, release),
+      android: androidPushSender(config, fcm, database.db, keyWrappers, release),
       ios: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
     }),
     // Browser push (ADR 0071): the installation's own VAPID pair, made on first use.
-    webPush: webPushSender(
-      config,
-      database.db,
-      () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])],
-      log,
-    ),
+    webPush: webPushSender(config, database.db, keyWrappers, log),
     // Each Composio call counts for its workspace before it is made (ADR 0107 §7).
     mail: mailAdapters(
       config,
@@ -430,6 +429,7 @@ async function boot(
         speech: engine.speech,
         voice: engine.voice,
         gitProxy: engine.gitProxy,
+        pushRelaySender: fcm,
       },
     },
     log,
@@ -626,22 +626,20 @@ function androidPushMode(config: Config): "direct" | "relay" | "off" {
 }
 
 /**
- * Android pushes (ADR 0123): straight to Firebase with this server's service account, or through the push
- * relay, which registers this installation on its first push and keeps its credentials sealed with
+ * Android pushes (ADR 0123): straight to Firebase with this server's service account (`fcm`), or through the
+ * push relay, which registers this installation on its first push and keeps its credentials sealed with
  * `wrappers()`; null when off or `direct` has no account.
  */
 function androidPushSender(
   config: Config,
+  fcm: PushSender | null,
   db: Database,
   wrappers: () => KeyWrapper[],
   version: string,
 ): PushSender | null {
   const mode = androidPushMode(config);
   if (mode === "off") return null;
-  if (mode === "direct") {
-    const account = config.FIREBASE_SERVICE_ACCOUNT;
-    return account ? createFcmPushSender({ serviceAccount: account }) : null;
-  }
+  if (mode === "direct") return fcm;
   return createRelayPushSender({
     url: config.PUSH_RELAY_URL,
     credentials: relayCredentials(db, wrappers, config.PUSH_RELAY_URL),

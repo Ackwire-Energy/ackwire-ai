@@ -27,6 +27,11 @@ export interface PushResult {
   unregistered: boolean;
   /** Not taken now, but may be later (rate limited, the service unavailable): the outbox may try again. */
   retryable?: boolean;
+  /**
+   * Not sent because this server sends nothing to the phone's platform (`PUSH_SENDER=off`, or `direct` with no
+   * Firebase account): not a failure, and the device stays for when it does.
+   */
+  skipped?: boolean;
   /** Accepted: the ticket to ask about later (`receipts`), when the service gives one. */
   ticketId?: string;
   error?: string;
@@ -65,12 +70,20 @@ export class PushError extends Error {
   }
 }
 
+/** Whether a sender's failure may work later: a `PushError` says so; anything else (the network, a store) may. */
+const mayRetry = (error: unknown) => (error as { retryable?: unknown } | null)?.retryable !== false;
+
 /**
  * The phone sender the server uses: each message goes to its platform's sender, in one `send` per
- * platform, and the results come back in the messages' order. A platform with no sender (no
- * `FIREBASE_SERVICE_ACCOUNT` for Android) answers its messages with a final failure: neither sent nor
- * unregistered, so the device stays for when the server gets credentials. Receipts are the iOS sender's
- * (only Expo gives tickets). A `PushError` from either sender is thrown as is.
+ * platform (both at once), and the results come back in the messages' order. A platform with no sender
+ * answers its messages as `skipped`: neither sent, failed nor unregistered, so the device stays for when the
+ * server sends there. Receipts are the iOS sender's
+ * (only Expo gives tickets).
+ *
+ * One sender failing as a whole (a `PushError`) never keeps the other platform's phones from their push. When
+ * no phone took it, that error is thrown (a retryable one first) as a single sender's would be, so the outbox
+ * decides; when some did, the failed platform's phones answer it as their own failure instead, since a retry
+ * would push the others twice.
  */
 export function createPhonePushSender(senders: {
   android?: PushSender | null;
@@ -82,31 +95,51 @@ export function createPhonePushSender(senders: {
     id: "phones",
     async send(messages) {
       const out = new Array<PushResult>(messages.length);
-      for (const platform of ["android", "ios"] as const) {
-        const at = messages.flatMap((m, i) => (m.platform === platform ? [i] : []));
-        if (at.length === 0) continue;
-        const sender = of(platform);
-        if (!sender) {
-          for (const i of at) {
-            out[i] = {
-              token: messages[i]?.to ?? "",
-              ok: false,
-              unregistered: false,
-              retryable: false,
-              error: `this server sends no ${platform} push`,
-            };
+      const thrown: { at: number[]; error: unknown }[] = [];
+      await Promise.all(
+        (["android", "ios"] as const).map(async (platform) => {
+          const at = messages.flatMap((m, i) => (m.platform === platform ? [i] : []));
+          if (at.length === 0) return;
+          const sender = of(platform);
+          if (!sender) {
+            for (const i of at) {
+              out[i] = {
+                token: messages[i]?.to ?? "",
+                ok: false,
+                unregistered: false,
+                skipped: true,
+                error: `this server sends no ${platform} push`,
+              };
+            }
+            return;
           }
-          continue;
-        }
-        const results = await sender.send(at.map((i) => messages[i] as PushMessage));
-        at.forEach((i, n) => {
-          out[i] = results[n] ?? {
+          try {
+            const results = await sender.send(at.map((i) => messages[i] as PushMessage));
+            at.forEach((i, n) => {
+              out[i] = results[n] ?? {
+                token: messages[i]?.to ?? "",
+                ok: false,
+                unregistered: false,
+                error: "no result",
+              };
+            });
+          } catch (error) {
+            thrown.push({ at, error });
+          }
+        }),
+      );
+      const first = thrown.find((t) => mayRetry(t.error)) ?? thrown[0];
+      if (first && !out.some((r) => r?.ok)) throw first.error;
+      for (const { at, error } of thrown) {
+        for (const i of at) {
+          out[i] = {
             token: messages[i]?.to ?? "",
             ok: false,
             unregistered: false,
-            error: "no result",
+            retryable: mayRetry(error),
+            error: error instanceof Error ? error.message : String(error),
           };
-        });
+        }
       }
       return out;
     },

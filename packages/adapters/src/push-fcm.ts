@@ -27,6 +27,12 @@ export const FCM_URL = "https://fcm.googleapis.com";
 export const FCM_TTL_SECONDS = 86_400;
 /** The Android notification channel the app creates for its notifications (`ensureAndroidChannel`). */
 export const FCM_ANDROID_CHANNEL = "default";
+/**
+ * An FCM registration token as the Android app gets it from `getDevicePushTokenAsync` (ADR 0123): opaque,
+ * about 150 to 200 characters of base64url and colons. Capped well under what a unique index takes. The
+ * push relay refuses anything else, and its client never sends it one.
+ */
+export const FCM_PUSH_TOKEN = /^[A-Za-z0-9_:-]{32,2048}$/;
 /** Requests in flight at once (one request per message). */
 export const FCM_CONCURRENCY = 10;
 /** An access token is refreshed this long before it expires. */
@@ -73,8 +79,9 @@ export function fcmResultOf(token: string, status: number, payload: FcmErrorBody
   const message = payload.error?.message ?? "";
   const error = `FCM answered ${status}${code ? ` ${code}` : ""}${message ? `: ${message.slice(0, 200)}` : ""}`;
   // Uninstalled, or a token of another Firebase project (a build of another app): never reachable with ours.
-  if (status === 404 || code === "UNREGISTERED" || code === "SENDER_ID_MISMATCH")
-    return { token, ok: false, unregistered: true, error };
+  // FCM says which (`UNREGISTERED` comes with its 404); a bare 404 is about the request (a project id that
+  // isn't one), and taking it for the token would delete every Android phone.
+  if (code === "UNREGISTERED" || code === "SENDER_ID_MISMATCH") return { token, ok: false, unregistered: true, error };
   const aboutToken =
     details.some((d) => d.fieldViolations?.some((v) => v.field === "message.token")) ||
     /registration token/i.test(message);
@@ -147,7 +154,7 @@ const failed = (token: string, retryable: boolean, error: string): PushResult =>
 });
 
 /**
- * Android's `PushSender`. Answers every message (never throws): sent, unregistered (404, `UNREGISTERED`,
+ * Android's `PushSender`. Answers every message (never throws): sent, unregistered (`UNREGISTERED`,
  * `SENDER_ID_MISMATCH`, a malformed token), retryable (429, 5xx, the network, Google's token endpoint
  * unavailable) or a final failure (a key Google refuses, other 4xx). The access token is shared by every
  * send until five minutes before it expires; a 401 gets one new token and one more try.
@@ -228,8 +235,9 @@ export function createFcmPushSender(options: {
       body: JSON.stringify(fcmMessage(message)),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    const payload = res.ok ? {} : ((await res.json().catch(() => ({}))) as FcmErrorBody);
-    return { status: res.status, payload };
+    // Read either way: an unread body keeps its connection from being reused (FCM answers the message's name).
+    const payload = (await res.json().catch(() => ({}))) as FcmErrorBody;
+    return { status: res.status, payload: res.ok ? {} : payload };
   }
 
   async function sendOne(message: PushMessage): Promise<PushResult> {

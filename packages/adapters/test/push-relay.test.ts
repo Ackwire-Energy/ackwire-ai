@@ -115,6 +115,18 @@ describe("relay push sender", () => {
     expect(relay.calls.map((c) => c.path)).toEqual(["/instances", "/send", "/send"]);
   });
 
+  test("a token that can't be an FCM token answers as gone and never reaches the relay", async () => {
+    const relay = fakeRelay();
+    const sender = createRelayPushSender({ url: RELAY_URL, credentials: memoryCredentials(), fetch: relay.fetch });
+    const older = { ...msg(2), to: "ExponentPushToken[older-android-build]" };
+    expect(await sender.send([older, msg(1)])).toEqual([
+      { token: older.to, ok: false, unregistered: true, error: "not an FCM registration token" },
+      { token: msg(1).to, ok: true, unregistered: false },
+    ]);
+    const sent = relay.calls.filter((c) => c.path === "/send").flatMap((c) => c.body.messages as PushMessage[]);
+    expect(sent.map((m) => m.to)).toEqual([msg(1).to]);
+  });
+
   test("the message goes as the server would send it to Firebase", async () => {
     const relay = fakeRelay();
     const sender = createRelayPushSender({ url: RELAY_URL, credentials: memoryCredentials(), fetch: relay.fetch });

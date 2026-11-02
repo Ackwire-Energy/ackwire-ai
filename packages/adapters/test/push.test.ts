@@ -7,6 +7,7 @@ import {
   EXPO_RECEIPTS_URL,
   PushError,
   type PushMessage,
+  type PushSender,
 } from "../src";
 
 const msg = (n: number): PushMessage => ({
@@ -171,13 +172,29 @@ describe("phone push sender", () => {
     expect(await phones.receipts?.([ticket])).toEqual([{ ticketId: ticket, ok: true, unregistered: false }]);
   });
 
-  test("a platform without a sender: a final failure that keeps the device; the other still sends", async () => {
+  test("a platform without a sender: skipped, the device kept; the other still sends", async () => {
     const expo = createFakePushSender();
     const phones = createPhonePushSender({ android: null, ios: expo });
     const results = await phones.send([android(1), msg(2)]);
-    expect(results[0]).toMatchObject({ token: "fcm-token-1", ok: false, unregistered: false, retryable: false });
+    expect(results[0]).toMatchObject({ token: "fcm-token-1", ok: false, unregistered: false, skipped: true });
     expect(results[1]).toMatchObject({ ok: true });
     expect(createPhonePushSender({ android: createFakePushSender() }).receipts).toBeUndefined();
+  });
+
+  test("one platform failing as a whole never stops the other; only nothing sent throws", async () => {
+    const down: PushSender = {
+      id: "down",
+      send: async () => {
+        throw new PushError("push relay refused the request (403)", false, 403);
+      },
+    };
+    const expo = createFakePushSender();
+    const phones = createPhonePushSender({ android: down, ios: expo });
+    const results = await phones.send([android(1), msg(2)]);
+    expect(results[0]).toMatchObject({ token: "fcm-token-1", ok: false, unregistered: false, retryable: false });
+    expect(results[1]).toMatchObject({ token: "ExponentPushToken[t2]", ok: true });
+    expect(expo.sent.map((m) => m.to)).toEqual(["ExponentPushToken[t2]"]);
+    await expect(phones.send([android(1)])).rejects.toMatchObject({ retryable: false, status: 403 });
   });
 
   test("the fake's failing tokens come back retryable", async () => {

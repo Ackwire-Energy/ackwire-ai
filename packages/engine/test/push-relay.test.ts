@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   createFakePushSender,
   createMemoryRateLimiter,
+  type KeyWrapper,
   PushError,
   type PushMessage,
   type PushSender,
@@ -123,6 +124,8 @@ describe("relay sending", () => {
       msg(1, { title: 42 as never }),
       msg(1, { body: undefined as never }),
       msg(1, { data: { blob: "x".repeat(PUSH_RELAY_LIMITS.dataBytes) } }),
+      // Each within its own limit, too much together for FCM (Japanese text is 3 bytes a character).
+      msg(1, { body: "あ".repeat(PUSH_RELAY_LIMITS.body), data: { blob: "x".repeat(1500) } }),
       msg(1, { priority: "urgent" as never }),
       { ...msg(1), data: [1, 2] },
       "text",
@@ -228,5 +231,30 @@ describe("relay credentials", () => {
     expect(await relayCredentials(db, wrappers, URL_B).get()).toBeNull();
     const rotated = () => [createLocalKeyWrapper("another-secret-".padEnd(48, "y"))];
     expect(await relayCredentials(db, rotated, URL_A).get()).toBeNull();
+  });
+
+  test("a key service that doesn't answer is an error to retry, not a reason to register again", async () => {
+    await relayCredentials(db, wrappers, URL_A).save({ instanceId: "inst-1", secret: "s" });
+    const local = createLocalKeyWrapper(SECRET);
+    const down = (): KeyWrapper[] => [
+      {
+        id: local.id,
+        wrap: local.wrap,
+        unwrap: async () => {
+          throw new Error("timed out");
+        },
+      },
+    ];
+    await expect(relayCredentials(db, down, URL_A).get()).rejects.toThrow("timed out");
+  });
+
+  test("saving and clearing leave the date of the Web Push pair alone", async () => {
+    const made = new Date(Date.now() - 60_000);
+    await db.insert(instancePush).values({ id: 1, vapidPublicKey: "pub", vapidPrivateKey: "priv", updatedAt: made });
+    const creds = relayCredentials(db, wrappers, URL_A);
+    await creds.save({ instanceId: "inst-1", secret: "s" });
+    await creds.clear();
+    const [row] = await db.select().from(instancePush).where(eq(instancePush.id, 1));
+    expect(row?.updatedAt.getTime()).toBe(made.getTime());
   });
 });

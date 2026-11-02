@@ -452,7 +452,7 @@ describe("Android push (FCM)", () => {
     expect(push.sent[1]).toMatchObject({ data: { orgId: f.org.id, kind: "mention", notificationId: id } });
   });
 
-  test("a server without Firebase credentials: the Android phone stays registered and the job ends", async () => {
+  test("a server that sends no Android push: the phone stays registered, and it is no failure", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     await registerPushDevice(f.db, bia.id, { token: FCM_BIA, platform: "android", locale: "pt-BR" });
@@ -466,8 +466,13 @@ describe("Android push (FCM)", () => {
       latest: { text: "oi" },
     });
     const push = createPhonePushSender({ android: null, ios: createFakePushSender() });
-    expect(await deliverPush({ db: f.db, push }, n?.id ?? "")).toEqual({ sent: 0, removed: 0, failed: 1 });
+    expect(await deliverPush({ db: f.db, push }, n?.id ?? "")).toEqual({ sent: 0, removed: 0, failed: 0 });
     expect(await listPushDevices(f.db, bia.id)).toHaveLength(1);
+
+    // So a browser's failure that may work later is still tried again.
+    const webPush = createFakeWebPushSender({ failing: [BROWSER] });
+    await registerPushDevice(f.db, bia.id, webSubscription(BROWSER, await signIn(bia.id)));
+    await expect(deliverPush({ db: f.db, push, webPush }, n?.id ?? "")).rejects.toMatchObject({ retryable: true });
   });
 });
 

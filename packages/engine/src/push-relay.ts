@@ -19,8 +19,10 @@ export const PUSH_RELAY_LIMITS = {
   /** Characters; the server's own pushes keep well under (80 and 180). */
   title: 200,
   body: 1000,
-  /** `data` as JSON, in bytes (FCM takes 4 KB for the whole message). */
+  /** `data` as JSON, in bytes. */
   dataBytes: 2048,
+  /** Title, text and data together, in bytes: FCM takes 4 KB for the whole message, its own fields included. */
+  totalBytes: 3584,
   /** Messages per installation per hour. */
   perInstance: { limit: 3000, windowMs: 3600_000 },
   /** Messages to one phone per hour, from every installation together. */
@@ -105,8 +107,12 @@ function relayMessage(input: unknown, index: number): PushMessage {
   }
   const data = m.data ?? {};
   if (typeof data !== "object" || Array.isArray(data) || data === null) throw bad("data must be an object");
-  if (Buffer.byteLength(JSON.stringify(data)) > PUSH_RELAY_LIMITS.dataBytes) {
+  const dataBytes = Buffer.byteLength(JSON.stringify(data));
+  if (dataBytes > PUSH_RELAY_LIMITS.dataBytes) {
     throw bad(`data must be at most ${PUSH_RELAY_LIMITS.dataBytes} bytes as JSON`);
+  }
+  if (Buffer.byteLength(title) + Buffer.byteLength(body) + dataBytes > PUSH_RELAY_LIMITS.totalBytes) {
+    throw bad(`title, body and data must be at most ${PUSH_RELAY_LIMITS.totalBytes} bytes together`);
   }
   if (m.priority !== undefined && m.priority !== "default" && m.priority !== "high") {
     throw bad("priority must be default or high");

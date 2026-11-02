@@ -1,4 +1,5 @@
 import { PushError, type PushMessage, type PushResult, type PushSender } from "./push";
+import { FCM_PUSH_TOKEN } from "./push-fcm";
 
 /**
  * Android pushes through the push relay (ADR 0123). The Android app is one app in the stores, built with
@@ -112,9 +113,17 @@ export function createRelayPushSender(options: {
   return {
     id: "relay",
     async send(messages: PushMessage[]) {
-      const results: PushResult[] = [];
-      for (let i = 0; i < messages.length; i += PUSH_RELAY_BATCH) {
-        const batch = messages.slice(i, i + PUSH_RELAY_BATCH);
+      const results = new Array<PushResult>(messages.length);
+      // The relay refuses a whole request over one token that can't be an FCM token (an Expo token an older
+      // Android build registered): such a token never reaches a phone through it, so it answers as gone here.
+      const sendable: number[] = [];
+      messages.forEach((m, i) => {
+        if (FCM_PUSH_TOKEN.test(m.to)) sendable.push(i);
+        else results[i] = { token: m.to, ok: false, unregistered: true, error: "not an FCM registration token" };
+      });
+      for (let i = 0; i < sendable.length; i += PUSH_RELAY_BATCH) {
+        const at = sendable.slice(i, i + PUSH_RELAY_BATCH);
+        const batch = at.map((n) => messages[n] as PushMessage);
         const payload = (await call("/send", { messages: batch.map(relayMessageOf) })) as { results?: unknown };
         const got = Array.isArray(payload.results) ? (payload.results as Partial<PushResult>[]) : null;
         if (!got || got.length !== batch.length) {
@@ -122,15 +131,16 @@ export function createRelayPushSender(options: {
         }
         batch.forEach((m, n) => {
           const r = got[n] ?? {};
-          if (r.ok === true) results.push({ token: m.to, ok: true, unregistered: false });
-          else
-            results.push({
-              token: m.to,
-              ok: false,
-              unregistered: r.unregistered === true,
-              ...(r.unregistered === true ? {} : { retryable: r.retryable === true }),
-              error: typeof r.error === "string" ? r.error : "error",
-            });
+          results[at[n] as number] =
+            r.ok === true
+              ? { token: m.to, ok: true, unregistered: false }
+              : {
+                  token: m.to,
+                  ok: false,
+                  unregistered: r.unregistered === true,
+                  ...(r.unregistered === true ? {} : { retryable: r.retryable === true }),
+                  error: typeof r.error === "string" ? r.error : "error",
+                };
         });
       }
       return results;

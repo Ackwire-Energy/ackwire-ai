@@ -88,6 +88,9 @@ interface Registration {
 /** Registrations run one at a time: asking the system for the token may also fire the token listener. */
 let queue: Promise<unknown> = Promise.resolve();
 
+/** How long a registration waits for the server: one that doesn't answer must not hold the ones queued after it. */
+const REGISTER_WAIT_MS = 15_000;
+
 /**
  * Registers this phone for pushes. With `ask`, shows the system prompt when not decided yet; without
  * it, only registers when permission is already granted. Returns whether a token was registered.
@@ -113,6 +116,8 @@ async function register({ ask, locale, token: given }: Registration): Promise<bo
   if (!Device.isDevice) return false;
   // The listener's token is the one just registered (asking the system for it fired the listener): done.
   if (given && (await readValue(STORED.pushToken)) === given) return true;
+  // Turned off while this one waited in the queue: registering now would turn it back on.
+  if (!ask && (await pushTurnedOff())) return false;
   let permission = await pushPermission();
   if (permission === "undetermined" && ask) {
     await writeValue(STORED.pushAsked, "1");
@@ -122,11 +127,15 @@ async function register({ ask, locale, token: given }: Registration): Promise<bo
   if (permission !== "granted") return false;
   const token = given ?? (await phoneToken());
   if (!token) return false;
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), REGISTER_WAIT_MS);
   const res = await authedFetch(`${serverUrl()}/api/app/push/devices`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify(deviceBody(token, Platform.OS, locale)),
+    signal: abort.signal,
   }).catch(() => null);
+  clearTimeout(timer);
   if (!res?.ok) return false;
   // A token this phone registered before (the system rolled it, or an Expo token from an older Android build) is
   // forgotten on the server, so pushes don't go to a token nothing answers.

@@ -83,6 +83,9 @@ describe("fcmResultOf", () => {
     expect(fcmResultOf("t", 200, {})).toEqual({ token: "t", ok: true, unregistered: false });
     expect(fcmResultOf("t", 404, error(404, "UNREGISTERED"))).toMatchObject({ ok: false, unregistered: true });
     expect(fcmResultOf("t", 403, error(403, "SENDER_ID_MISMATCH"))).toMatchObject({ unregistered: true });
+    // A 404 that doesn't say UNREGISTERED is about the request (the project), never the phone.
+    const notFound = { error: { code: 404, status: "NOT_FOUND", message: "Requested entity was not found." } };
+    expect(fcmResultOf("t", 404, notFound)).toMatchObject({ unregistered: false, retryable: false });
     const badToken = {
       error: {
         code: 400,

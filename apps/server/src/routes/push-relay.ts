@@ -53,11 +53,12 @@ export function pushRelayRoutes(deps: PushRelayDeps) {
 
   app.post("/instances", async (c) => {
     const ip = requestLimitIp(c.req.raw.headers, trustedProxies);
-    const [perIp, total] = await Promise.all([
-      rateLimiter.consume(`push-relay:register:${ip}`, REGISTER_PER_IP),
-      rateLimiter.consume("push-relay:register", REGISTER_TOTAL),
-    ]);
-    if (!perIp.allowed || !total.allowed) return limited(c, perIp.allowed ? total.resetAt : perIp.resetAt);
+    // The address first: the total counts only what an address may ask, or one address could use it all up
+    // (a limiter counts refused calls too) and keep every new installation out.
+    const perIp = await rateLimiter.consume(`push-relay:register:${ip}`, REGISTER_PER_IP);
+    if (!perIp.allowed) return limited(c, perIp.resetAt);
+    const total = await rateLimiter.consume("push-relay:register", REGISTER_TOTAL);
+    if (!total.allowed) return limited(c, total.resetAt);
     const body = await readJson(c);
     const version = body && typeof body.version === "string" ? body.version.slice(0, 40) : undefined;
     const created = await registerRelayInstance(db);

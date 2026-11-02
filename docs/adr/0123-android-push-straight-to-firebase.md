@@ -53,11 +53,14 @@ project can push to it. A self-hosted server doesn't have one, and must not need
    it a new one while it runs (`addPushTokenListener`). A token the phone registered before is deleted on the server
    once the new one is in. The route takes an FCM token for `android` and an Expo token for `ios`, each refusing the
    other's.
-5. **One `PushSender` for phones** (`createPhonePushSender`) sends each message to its platform's sender and keeps
-   the results in order. FCM and the relay answer per message: a gone token (404, `UNREGISTERED`,
-   `SENDER_ID_MISMATCH`, a malformed token) is deleted; 429, 5xx and the network are retryable; the rest is final.
-   `deliverPush` counts those per-phone failures, and the outbox tries the job again only when nothing was sent and
-   every failure can be retried, so a phone is never pushed twice.
+5. **One `PushSender` for phones** (`createPhonePushSender`) sends each message to its platform's sender (both at
+   once) and keeps the results in order; one platform's sender failing as a whole never keeps the other's phones
+   from their push, and is thrown only when no phone took it. FCM and the relay answer per message: a gone token
+   (`UNREGISTERED`, which comes with a 404, `SENDER_ID_MISMATCH`, a malformed token) is deleted, never a bare 404,
+   which is about the request; 429, 5xx and the network are retryable; the rest is final. A token that can't be
+   an FCM token never goes to the relay (it would refuse the whole request) and answers as gone. `deliverPush`
+   counts those per-phone failures, and the outbox tries the job again only when nothing was sent and every
+   failure can be retried, so a phone is never pushed twice.
 6. **iPhones are unchanged for now**: Expo push tokens through the Expo Push API, with receipts.
 
 ## Consequences
