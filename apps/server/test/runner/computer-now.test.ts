@@ -32,7 +32,9 @@ function computer() {
     });
   };
   const cpuStat = (busy: number, idle: number) => `cpu  ${busy} 0 0 ${idle} 0 0 0 0 0 0\ncpu0 1 2 3 4\n`;
-  put(proc, { stat: cpuStat(1000, 9000), meminfo: `MemTotal: 8000000 kB\nMemAvailable: ${3 * 1024 * 1024} kB\n` });
+  const meminfo = (availGb: number, swapGb: number) =>
+    `MemTotal: 8000000 kB\nMemAvailable: ${availGb * 1024 * 1024} kB\nSwapTotal: ${swapGb * 1024 * 1024} kB\n`;
+  put(proc, { stat: cpuStat(1000, 9000), meminfo: meminfo(3, 4) });
   put(etc, {
     passwd: [
       "root:x:0:0:root:/root:/bin/bash",
@@ -44,7 +46,7 @@ function computer() {
     // One runner (a workspace's computer): Dora hasn't joined the shared group yet, and is one of its agents all the same.
     group: ["root:x:0:", "agentes-shared:x:997:ag-aaaaaaaa,ag-bbbbbbbb,ag-cccccccc"].join("\n"),
   });
-  return { root, cgroup, proc, etc, agent, put, cpuStat };
+  return { root, cgroup, proc, etc, agent, put, cpuStat, meminfo };
 }
 
 test("cpuTimes: busy and all of /proc/stat's CPU line, guest time left out (it is in user time already)", () => {
@@ -75,8 +77,9 @@ test("what the agents share, what is free for new work, and who uses the most, b
     groups: [20000, 997],
     cpus: 4,
     totalBytes: 7.76 * GIB,
-    sampleMs: 1000,
-    // One second later: the computer was busy for 3 of its 4 CPUs, Bia used 2.5 of them, Ada 0.2.
+    sampleMs: 500,
+    // One second later by /proc/stat's clock (a late wake, so not the half second asked for): the computer was busy
+    // for 3 of its 4 CPUs, Bia used 2.5 of them, Ada 0.2.
     sleep: async () => {
       writeFileSync(path.join(c.proc, "stat"), c.cpuStat(1000 + 300, 9000 + 100));
       c.agent(20001, { bytes: 3.5 * GIB, cache: 0.3 * GIB, swap: 0.6 * GIB, usec: 3_500_000 });
@@ -108,10 +111,11 @@ test("what the agents share, what is free for new work, and who uses the most, b
   // Before the caller joined its organization's group: only itself by name.
   const alone = await computerNow({ ...still, groups: [20000] });
   expect(alone).toContain("\n- Ada (you): 0.4 GB, 0.0 CPUs\n- Other agents: 4.1 GB (and 0.6 GB in swap), 0.0 CPUs");
-  // As a person (root): every agent by name, and the computer's free memory when it is less than the agents' room.
-  writeFileSync(path.join(c.proc, "meminfo"), `MemAvailable: ${0.5 * 1024 * 1024} kB\n`);
+  // As a person (root): every agent by name, and the computer's free memory when it is less than the agents' room;
+  // the swap they may use is no more than the computer has.
+  writeFileSync(path.join(c.proc, "meminfo"), c.meminfo(0.5, 1));
   const asRoot = await computerNow({ ...still, uid: 0, groups: [0] });
-  expect(asRoot).toContain("\nFree for new work: about 0.5 GB of memory.\n");
+  expect(asRoot).toContain(" together (swap: 0.8 GB of 1.0 GB).\nFree for new work: about 0.5 GB of memory.\n");
   expect(asRoot).toContain("\n- Dora: 0.6 GB, 0.0 CPUs");
   expect(asRoot).not.toContain("(you)");
 });
@@ -122,14 +126,22 @@ test("no limit on the agents, nobody busy, and a computer whose agents don't hav
   const io = { cgroup: c.cgroup, proc: c.proc, etc: c.etc, uid: 20000, groups: [997], cpus: 2, totalBytes: 4 * GIB };
   const idle = await computerNow({ ...io, sleep: async () => {} });
   expect(idle.split("\n").slice(1)).toEqual([
-    "Now: 0.0 of 2 CPUs busy. The agents use 1.0 GB of memory.",
+    "Now: 0.0 of 2 CPUs busy. The agents use 1.0 GB of memory (swap: 0.0 GB of 4.0 GB).",
     "Free for new work: about 3.0 GB of memory.",
     "No agent is using it now.",
   ]);
-  // Single-user mode, or not Linux: the computer's own figures only.
+  // A computer with no swap: none to tell of, whatever the slice may hold.
+  writeFileSync(path.join(c.proc, "meminfo"), c.meminfo(3, 0));
+  expect(await computerNow({ ...io, sleep: async () => {} })).toContain(" The agents use 1.0 GB of memory.\n");
+  // Single-user mode: the computer's own figures only.
   const alone = await computerNow({ ...io, cgroup: path.join(c.root, "none"), sleep: async () => {} });
   expect(alone.split("\n")).toEqual([
     "This computer: 2 CPUs and 4.0 GB of memory.",
     "Now: 0.0 of 2 CPUs busy, 3.0 GB of memory free.",
   ]);
+  // Not Linux (no /proc): its size alone.
+  const elsewhere = { ...io, cgroup: path.join(c.root, "none"), proc: path.join(c.root, "none") };
+  expect(await computerNow({ ...elsewhere, sleep: async () => {} })).toBe(
+    "This computer: 2 CPUs and 4.0 GB of memory.",
+  );
 });

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { cgroupCounters, memAvailable } from "@agenteschat/adapters/host-stats";
+import { cgroupCounters, meminfoBytes } from "@agenteschat/adapters/host-stats";
 import { AGENTS_CGROUP } from "./service";
 import { isOrgSharedGroup } from "./shared-folder";
 
@@ -35,6 +35,9 @@ const LISTED = 10;
 /** Less than this, of memory and of a CPU, is an agent doing nothing. */
 const IDLE_BYTES = 0.05 * GIB;
 const IDLE_CPUS = 0.05;
+
+/** /proc/stat counts CPU time in ticks of USER_HZ, 100 a second on Linux. */
+const USER_HZ = 100;
 
 const readText = (file: string) => {
   try {
@@ -127,20 +130,20 @@ export async function computerNow(io: ComputerIo = {}): Promise<string> {
   const before = new Map((slices ?? []).map((u) => [u, usage(u)]));
   await (io.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(sampleMs);
   const machineAfter = cpuTimes(readText(path.join(proc, "stat")) ?? "");
-  const free = memAvailable(readText(path.join(proc, "meminfo")) ?? "") ?? os.freemem();
+  const after = new Map((slices ?? []).map((u) => [u, usage(u)]));
+  const meminfo = readText(path.join(proc, "meminfo")) ?? "";
 
   const lines = [
     `This computer: ${cpus} CPUs and ${gb(totalBytes)} of memory${slices ? ", shared by all its agents" : ""}.`,
   ];
-  const elapsed = machineBefore && machineAfter ? machineAfter.total - machineBefore.total : null;
-  const busy =
-    machineBefore && machineAfter && elapsed !== null
-      ? elapsed > 0
-        ? ((machineAfter.busy - machineBefore.busy) / elapsed) * cpus
-        : 0
-      : null;
-  const cpuNow =
-    busy === null ? `a load of ${cpu(os.loadavg()[0] ?? 0)} on ${cpus} CPUs` : `${cpu(busy)} of ${cpus} CPUs busy`;
+  // No /proc: not Linux, where the agents don't have users of their own anyway.
+  if (!machineBefore || !machineAfter) return lines.join("\n");
+  const free = meminfoBytes(meminfo, "MemAvailable") ?? os.freemem();
+  // The window the samples cover, from /proc/stat's own clock (all CPUs' ticks): a late wake doesn't inflate CPU use.
+  const ticks = machineAfter.total - machineBefore.total;
+  const seconds = ticks > 0 ? ticks / cpus / USER_HZ : sampleMs / 1000;
+  const busy = ticks > 0 ? ((machineAfter.busy - machineBefore.busy) / ticks) * cpus : 0;
+  const cpuNow = `${cpu(busy)} of ${cpus} CPUs busy`;
   const used = slices ? cgroupMemory(cgroup) : null;
   if (!slices || used === null) {
     lines.push(`Now: ${cpuNow}, ${gb(free)} of memory free.`);
@@ -150,8 +153,10 @@ export async function computerNow(io: ComputerIo = {}): Promise<string> {
   const limit = readNumber(path.join(cgroup, "memory.max"));
   const swap = readNumber(path.join(cgroup, "memory.swap.current")) ?? 0;
   const swapLimit = readNumber(path.join(cgroup, "memory.swap.max"));
+  const swapTotal = meminfoBytes(meminfo, "SwapTotal") ?? 0;
   const share = limit === null ? `${gb(used)} of memory` : `${gb(used)} of the ${gb(limit)} they may use together`;
-  const swapped = swapLimit === null ? "" : ` (swap: ${gb(swap)} of ${gb(swapLimit)})`;
+  const swapRoom = swapLimit === null ? swapTotal : Math.min(swapLimit, swapTotal);
+  const swapped = swapTotal > 0 ? ` (swap: ${gb(swap)} of ${gb(swapRoom)})` : "";
   lines.push(`Now: ${cpuNow}. The agents use ${share}${swapped}.`);
   const room = Math.max(0, Math.min(free, limit === null ? free : limit - used));
   lines.push(`Free for new work: about ${gb(room)} of memory.`);
@@ -160,11 +165,11 @@ export async function computerNow(io: ComputerIo = {}): Promise<string> {
   // Root (a person on the computer) sees everyone.
   const named =
     uid === 0 ? null : sideBySide(readText(path.join(etc, "group")) ?? "", io.groups ?? process.getgroups?.() ?? []);
-  const micros = sampleMs * 1000;
+  const micros = seconds * 1e6;
   const agents: AgentUse[] = slices.map((u) => {
     const dir = path.join(cgroup, `agents-${u}.slice`);
     const was = before.get(u);
-    const is = usage(u);
+    const is = after.get(u) ?? null;
     const user = users.get(u);
     const known = user && (named === null || named.has(user.user) || u === uid);
     return {
