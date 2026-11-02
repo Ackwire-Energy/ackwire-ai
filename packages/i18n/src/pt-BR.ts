@@ -1955,6 +1955,9 @@ export const ptBR = {
     rolesNone: "O workspace ainda não tem papéis.",
     rolesNeeded: "Escolha pelo menos um papel.",
     rolesLeave: "Quem perde o papel sai do canal.",
+    rolesChoose: "Escolher papéis",
+    rolesChange: "Mudar papéis",
+    rolesDone: "Pronto",
     publicTitle: "Tornar #{{channel}} público?",
     publicBody: "Todo mundo no workspace vai poder entrar e ler todas as mensagens, inclusive as antigas.",
     publicConfirm: "Tornar público",
@@ -10394,6 +10397,12 @@ export const ptBR = {
       see: "Ver",
     },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
+    /** A long message from one agent to another, folded to its first paragraph: the whole opens in its thread. */
+    talk: {
+      readAll: "Ler tudo",
+      more_one: "mais {{count}} linha",
+      more_other: "mais {{count}} linhas",
+    },
     consultPanel: {
       label: "Conversa entre {{from}} e {{to}}",
       /** The phone's bar (the web draws the arrows as an icon between the names). */

@@ -1906,6 +1906,9 @@
     "rolesNone": "워크스페이스에 아직 역할이 없어요.",
     "rolesNeeded": "역할을 하나 이상 선택하세요.",
     "rolesLeave": "역할을 잃은 사람은 채널에서 나가요.",
+    "rolesChoose": "역할 선택",
+    "rolesChange": "역할 변경",
+    "rolesDone": "완료",
     "publicTitle": "#{{channel}}을(를) 공개할까요?",
     "publicBody": "워크스페이스의 모든 사람이 참여하고 이전 메시지를 포함한 모든 메시지를 읽을 수 있게 됩니다.",
     "publicConfirm": "공개하기",
@@ -10388,6 +10391,10 @@
       "answeredFar": "{{to}}이(가) {{from}}의 질문에 답했어요",
       "answeredRequestFar": "{{to}}이(가) {{from}}의 요청에 답했어요",
       "see": "보기"
+    },
+    "talk": {
+      "readAll": "전체 읽기",
+      "more_other": "{{count}}줄 더"
     },
     "consultPanel": {
       "label": "{{from}}과(와) {{to}}의 대화",

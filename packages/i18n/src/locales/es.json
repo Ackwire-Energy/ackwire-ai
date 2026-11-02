@@ -2040,6 +2040,9 @@
     "rolesNone": "El workspace aún no tiene roles.",
     "rolesNeeded": "Elige al menos un rol.",
     "rolesLeave": "Quien pierde el rol sale del canal.",
+    "rolesChoose": "Elegir roles",
+    "rolesChange": "Cambiar roles",
+    "rolesDone": "Listo",
     "publicTitle": "¿Hacer público #{{channel}}?",
     "publicBody": "Todos en el workspace podrán unirse y leer todos sus mensajes, incluidos los anteriores.",
     "publicConfirm": "Hacer público",
@@ -11158,6 +11161,12 @@
       "answeredFar": "{{to}} respondió la pregunta de {{from}}",
       "answeredRequestFar": "{{to}} respondió el pedido de {{from}}",
       "see": "Ver"
+    },
+    "talk": {
+      "readAll": "Leer todo",
+      "more_one": "{{count}} línea más",
+      "more_many": "{{count}} líneas más",
+      "more_other": "{{count}} líneas más"
     },
     "consultPanel": {
       "label": "Conversación entre {{from}} y {{to}}",
