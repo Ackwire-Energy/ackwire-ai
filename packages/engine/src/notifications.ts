@@ -809,11 +809,15 @@ export async function markNotificationDone(
   done: boolean,
 ): Promise<NotificationView> {
   const row = await mine(deps, userId, orgId, id);
-  const updated = await change(
+  let updated = await change(
     deps,
     row,
     done ? { doneAt: row.doneAt ?? nowOf(deps), doneByUser: true } : { doneAt: null, doneByUser: false },
   );
+  // A newer unread row of the same group holds the open-group slot (notifications_open_group):
+  // the restored one comes back read, which the index allows.
+  if (!done && updated.doneAt)
+    updated = await change(deps, row, { doneAt: null, doneByUser: false, readAt: row.readAt ?? nowOf(deps) });
   const view = notificationView(updated);
   await publishUserEvent(
     deps.pubsub,

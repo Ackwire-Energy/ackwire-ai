@@ -294,6 +294,23 @@ test("Concluídas lists what the person marked done for 30 days, the latest firs
   expect((await inbox(bia.id)).items.map((n) => n.latest.text)).toEqual(["b"]);
 });
 
+test("Mover de volta while a newer unread row of the same thread is open brings it back read", async () => {
+  f = await setup();
+  const { bia, caio } = await people();
+  const root = await post(f.owner.id, "Deploy notes");
+  await post(bia.id, "First reply", root.id);
+  const [first] = (await inbox(f.owner.id)).items;
+  await markNotificationDone(deps(), f.owner.id, f.org.id, first?.id ?? "", true);
+  await post(caio.id, "Second reply", root.id);
+  expect((await inbox(f.owner.id)).items).toHaveLength(1);
+
+  const restored = await markNotificationDone(deps(), f.owner.id, f.org.id, first?.id ?? "", false);
+  expect(restored.doneAt).toBeNull();
+  expect(restored.readAt).not.toBeNull();
+  expect((await inbox(f.owner.id)).items).toHaveLength(2);
+  expect((await listNotifications(deps(), f.owner.id, f.org.id, { filter: "done" })).items).toEqual([]);
+});
+
 test("a merged request-to-join notice keeps the first two names, each once, and counts every ask", async () => {
   f = await setup();
   for (const name of ["Ana Souza", "Ana Souza", "Bruno Lima", "Carla Dias"])
