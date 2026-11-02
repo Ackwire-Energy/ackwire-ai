@@ -2,10 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { type RealtimeEvent, userTopic } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import {
+  createChannel,
+  createRole,
   drainOutbox,
   ForbiddenError,
   getRun,
   insertMessage,
+  joinChannel,
   listAgentMemoryRows,
   listNotifications,
   listOrgMemoryRows,
@@ -200,6 +203,29 @@ describe("notifications follow access", () => {
     });
     await removeChannelMember(f.db, admin.id, f.org.id, channelId, { userId: admin.id });
     expect(await inbox(admin.id)).toEqual(["approval:deploy", "mention:hello"]);
+  });
+
+  test("losing the role a channel is limited to takes its snippets too", async () => {
+    f = await setup();
+    const sales = await createRole(f.db, f.owner.id, f.org.id, { name: "Vendas" });
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, ana.id, [sales.id]);
+    const ch = await createChannel(f.db, f.owner.id, f.org.id, {
+      name: "deals",
+      visibility: "private",
+      audienceRoleIds: [sales.id],
+    });
+    await joinChannel(f.db, ana.id, f.org.id, ch.id);
+    await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [ana.id],
+      kind: "mention",
+      groupKey: "mention:deal",
+      source: { channelId: ch.id },
+      latest: { text: "the merger closes friday" },
+    });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, ana.id, [], { pubsub: f.pubsub });
+    expect(await inbox(ana.id)).toEqual([]);
   });
 
   test("leaving the workspace empties the inbox there: invited back, nothing returns", async () => {
