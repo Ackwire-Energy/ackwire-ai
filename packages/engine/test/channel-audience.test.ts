@@ -144,3 +144,51 @@ test("changing it later: a dropped role's people go; turned invite only or publi
   const open = await updateChannel(f.db, f.owner.id, f.org.id, ch.id, { visibility: "public" });
   expect([open.visibility, open.audienceRoleIds]).toEqual(["public", []]);
 });
+
+/** `f.db`, whose first transaction waits for `meanwhile`: what another request commits between a read and a write. */
+const racing = (meanwhile: () => Promise<unknown>) => {
+  const state = { raced: false };
+  const db = new Proxy(f.db, {
+    get(target, key) {
+      if (key === "transaction" && !state.raced)
+        return async (...args: Parameters<typeof target.transaction>) => {
+          state.raced = true;
+          await meanwhile();
+          return target.transaction(...args);
+        };
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return { db, state };
+};
+
+test("joining while the role is taken away: the join checks the role again under the lock and refuses", async () => {
+  const sales = await role("Vendas");
+  const ana = await addMember(f.db, f.org.id, "member", "ana");
+  await setMemberRoles(f.db, f.owner.id, f.org.id, ana.id, [sales.id]);
+  const ch = await createChannel(f.db, f.owner.id, f.org.id, {
+    name: "vendas",
+    visibility: "private",
+    audienceRoleIds: [sales.id],
+  });
+  const race = racing(() => setMemberRoles(f.db, f.owner.id, f.org.id, ana.id, []));
+  await expect(joinChannel(race.db, ana.id, f.org.id, ch.id)).rejects.toBeInstanceOf(ForbiddenError);
+  expect(race.state.raced).toBe(true);
+  expect(await isChannelMember(f.db, f.org.id, ch.id, ana.id)).toBe(false);
+});
+
+test("a topic edit while a role is deleted doesn't write the deleted role back on the channel", async () => {
+  const sales = await role("Vendas");
+  const support = await role("Suporte");
+  const ch = await createChannel(f.db, f.owner.id, f.org.id, {
+    name: "time",
+    visibility: "private",
+    audienceRoleIds: [sales.id, support.id],
+  });
+  // The role is deleted between updateChannel's first read and its write.
+  const race = racing(() => deleteRole(f.db, f.owner.id, f.org.id, support.id));
+  await updateChannel(race.db, f.owner.id, f.org.id, ch.id, { topic: "novo" });
+  expect(race.state.raced).toBe(true);
+  expect((await channelCard(f.db, f.owner.id, f.org.id, ch.id)).audienceRoleIds).toEqual([sales.id]);
+});

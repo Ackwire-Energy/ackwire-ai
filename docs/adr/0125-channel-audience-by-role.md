@@ -47,4 +47,11 @@ was a private channel kept by hand.
 
 - No new permission, no change to messages, search, routing or the WebSocket.
 - A member who wasn't in a role keeps a channel they joined by name; an admin removes them by hand if needed.
+- Admins see a role channel only as anyone does: when they hold one of its roles or are in it, as with private
+  channels. There is no listing of every channel for `manage_channels`.
+- Joining a role channel, taking a role away (from a person or by deleting it) and changing a channel's roles take the
+  workspace's `org-members` lock, so a join at the same moment as a removal never leaves someone without the role in.
+  A rename or topic change leaves the roles as they are.
+- Going public from the channel's details asks first: it opens every past message to the workspace. A role change
+  without any role ticked is not saved and says so. Role changes refresh everyone's channel list (`org.members`).
 - Open: creating private and role channels on the phone (it only creates public channels today).

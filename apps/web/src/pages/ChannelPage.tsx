@@ -3913,13 +3913,19 @@ function ChannelDetails({
   useEffect(() => {
     if (open) setAccess(accessOf(channel));
   }, [open, accessKey]);
-  const changeAccess = (next: ChannelAccess) => {
+  const saveAccess = (next: ChannelAccess) => {
     setAccess(next);
     if (!accessValid(next)) return;
     update.mutate(accessInput(next), {
       onSuccess: () => setSaved(true),
       onError: (e) => toast.show(errorText(t, e), "error"),
     });
+  };
+  // Going public opens the whole history to the workspace: asked first, like a removal.
+  const [goingPublic, setGoingPublic] = useState(false);
+  const changeAccess = (next: ChannelAccess) => {
+    if (next.mode === "public" && channel.visibility !== "public") setGoingPublic(true);
+    else saveAccess(next);
   };
   // Who is about to be removed: asked first, in a dialog of its own.
   const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
@@ -4035,7 +4041,7 @@ function ChannelDetails({
   return (
     <>
       <Dialog
-        open={open && !adding && !removing}
+        open={open && !adding && !removing && !goingPublic}
         onOpenChange={(o) => {
           if (!o) {
             saveTopic();
@@ -4105,7 +4111,7 @@ function ChannelDetails({
               <CategorySelect value={channel.categoryId ?? null} onChange={moveTo} canCreate={editable} />
             </Field>
             {channel.name !== "general" && (
-              <ChannelAccessChoice value={access} onChange={changeAccess} idPrefix="channel-edit" />
+              <ChannelAccessChoice value={access} onChange={changeAccess} idPrefix="channel-edit" showError />
             )}
           </DialogBody>
         )}
@@ -4269,6 +4275,27 @@ function ChannelDetails({
           <Button onClick={() => setRemoving(null)}>{t("common.cancel")}</Button>
           <Button variant="danger" loading={remove.isPending} onClick={() => removing && remove.mutate(removing)}>
             {t("channelMembers.removeConfirm")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+      <Dialog
+        open={open && goingPublic}
+        onOpenChange={(o) => !o && setGoingPublic(false)}
+        title={t("newChannel.publicTitle", { channel: channel.name })}
+        description={t("newChannel.publicBody")}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setGoingPublic(false)}>{t("common.cancel")}</Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setGoingPublic(false);
+              saveAccess({ mode: "public", roleIds: [] });
+            }}
+          >
+            {t("newChannel.publicConfirm")}
           </Button>
         </DialogFooter>
       </Dialog>

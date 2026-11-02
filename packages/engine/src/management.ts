@@ -23,7 +23,7 @@ import {
   mediaSettingsCacheKey,
   mediaSettingsFrom,
 } from "./media";
-import { can, requireActiveMembership, requirePermission } from "./organizations";
+import { can, lockOrgMembers, requireActiveMembership, requirePermission } from "./organizations";
 import {
   agentBudgetsThisMonth,
   budgetPercent,
@@ -491,25 +491,36 @@ export async function updateChannel(
   if (channel.name === "general" && name !== undefined && name !== "general")
     throw new ValidationError("#general can't be renamed");
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
+  const accessChanges = input.visibility !== undefined || input.audienceRoleIds !== undefined;
   const visibility = input.visibility ?? channel.visibility;
-  const audienceRoleIds =
-    visibility === "public"
-      ? []
-      : input.audienceRoleIds !== undefined
-        ? await channelRoleIds(db, orgId, visibility, input.audienceRoleIds)
-        : channel.audienceRoleIds;
-  // Turned invite only, whoever is in stays; still limited to roles, only the dropped roles' people go.
-  const dropped =
-    audienceRoleIds.length > 0 ? channel.audienceRoleIds.filter((id) => !audienceRoleIds.includes(id)) : [];
+  const asked =
+    visibility === "public" || input.audienceRoleIds === undefined
+      ? undefined
+      : await channelRoleIds(db, orgId, visibility, input.audienceRoleIds);
   try {
     const { row, leavers } = await db.transaction(async (tx) => {
+      let access = {};
+      let dropped: string[] = [];
+      if (accessChanges) {
+        // Under the lock deleteRole and joinChannel take, on the roles as they are now: a role deleted meanwhile is
+        // neither written back nor missed by the leavers.
+        await lockOrgMembers(tx, orgId);
+        const [now] = await tx
+          .select({ audienceRoleIds: channels.audienceRoleIds })
+          .from(channels)
+          .where(eq(channels.id, channelId));
+        const before = now?.audienceRoleIds ?? [];
+        const audienceRoleIds = visibility === "public" ? [] : (asked ?? before);
+        // Turned invite only, whoever is in stays; still limited to roles, only the dropped roles' people go.
+        dropped = audienceRoleIds.length > 0 ? before.filter((id) => !audienceRoleIds.includes(id)) : [];
+        access = { visibility, audienceRoleIds };
+      }
       const [row] = await tx
         .update(channels)
         .set({
           ...(name !== undefined ? { name } : {}),
           ...(input.topic !== undefined ? { topic: input.topic } : {}),
-          ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
-          audienceRoleIds,
+          ...access,
         })
         .where(eq(channels.id, channelId))
         .returning();

@@ -11,6 +11,7 @@ import { notificationSnippet } from "./notifications";
 import {
   can,
   getMembership,
+  lockOrgMembers,
   MEMBER_ROLE_IDS,
   type Membership,
   requireActiveMembership,
@@ -395,7 +396,7 @@ export async function channelCard(
   };
 }
 
-export async function isChannelMember(db: Database, orgId: string, channelId: string, userId: string) {
+export async function isChannelMember(db: Executor, orgId: string, channelId: string, userId: string) {
   const [row] = await db
     .select({ id: channelMembers.id })
     .from(channelMembers)
@@ -469,7 +470,24 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm" || (channel.visibility !== "public" && channel.byRole !== true))
     throw new ForbiddenError("This channel is private");
-  await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
+  if (channel.visibility === "public") {
+    await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
+    return;
+  }
+  // Checked again in the insert, under the lock that taking a role away holds (setMemberRoles, deleteRole,
+  // updateChannel): a removal at the same moment either sees this membership and drops it, or wins and this refuses.
+  const joined = await db.transaction(async (tx) => {
+    await lockOrgMembers(tx, orgId);
+    const rows = rowsOf(
+      await tx.execute(sql`insert into ${channelMembers} (org_id, channel_id, user_id)
+        select c.org_id, c.id, ${userId} from ${channels} c
+        where c.id = ${channelId}::uuid and c.org_id = ${orgId}::uuid and ${channelAudienceSql("c", sql`${userId}`)}
+        on conflict do nothing returning 1`),
+    );
+    if (rows.length > 0) return true;
+    return isChannelMember(tx, orgId, channelId, userId);
+  });
+  if (!joined) throw new ForbiddenError("This channel is private");
 }
 
 /**

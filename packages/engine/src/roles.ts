@@ -7,6 +7,7 @@ import {
   announceMembers,
   can,
   getMembership,
+  lockOrgMembers,
   type Membership,
   outranks,
   requireActiveMembership,
@@ -290,6 +291,8 @@ export async function deleteRole(
   if (role.kind === "everyone") throw new ForbiddenError("Every workspace keeps its base role", "role.base");
   if (!mayEdit(actor, role)) throw new ForbiddenError("Only someone above this role changes it", "role.above_you");
   const leavers = await db.transaction(async (tx) => {
+    // The lock joinChannel takes for a role channel: a join at the same moment sees the role gone, or is dropped here.
+    await lockOrgMembers(tx, orgId);
     const holders = (
       await tx
         .select({ userId: organizationMemberRoles.userId })
@@ -435,7 +438,7 @@ export async function setMemberRoles(
   const next = [...new Set(roleIds)];
   // Read and checked under the lock: two people changing the same person's roles at once never undo each other.
   const changed = await db.transaction(async (tx): Promise<false | ChannelLeaver[]> => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+    await lockOrgMembers(tx, orgId);
     const before = await memberRoleIds(tx, orgId, targetUserId);
     const added = next.filter((id) => !before.includes(id));
     const removed = before.filter((id) => !next.includes(id));

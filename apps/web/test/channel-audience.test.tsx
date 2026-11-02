@@ -61,7 +61,32 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     await settle(3);
     expect(calls(state, "chat.update")).toEqual([{ visibility: "private", audienceRoleIds: [ADMIN_ROLE_ID] }]);
 
+    // Unticking the last role saves nothing, and says why.
+    await click(within(dialog).getByRole("checkbox", { name: /Admin/ }));
+    await settle(3);
+    expect(calls(state, "chat.update")).toHaveLength(1);
+    expect(dialog.textContent).toContain("Escolha pelo menos um papel.");
+    await click(within(dialog).getByRole("checkbox", { name: /Admin/ }));
+    await settle(3);
+    expect(calls(state, "chat.update")).toHaveLength(2);
+
+    // Going public opens every message to the workspace: asked first.
     await click(within(dialog).getByRole("radio", { name: /Público/ }));
+    await settle(3);
+    expect(calls(state, "chat.update")).toHaveLength(2);
+    const ask = screen().getByRole("dialog", { name: "Tornar #eng público?" });
+    await click(within(ask).getByRole("button", { name: "Cancelar" }));
+    await settle(3);
+    expect(calls(state, "chat.update")).toHaveLength(2);
+
+    const again = screen().getByRole("dialog", { name: /^#eng/ });
+    await click(within(again).getByRole("radio", { name: /Público/ }));
+    await settle(3);
+    await click(
+      within(screen().getByRole("dialog", { name: "Tornar #eng público?" })).getByRole("button", {
+        name: "Tornar público",
+      }),
+    );
     await settle(3);
     expect(calls(state, "chat.update").at(-1)).toEqual({ visibility: "public" });
   });

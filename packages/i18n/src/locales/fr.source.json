@@ -4748,6 +4748,15 @@
   "newChannel.rolesLeave": {
     "value": "Whoever loses the role leaves the channel."
   },
+  "newChannel.publicTitle": {
+    "value": "Make #{{channel}} public?"
+  },
+  "newChannel.publicBody": {
+    "value": "Everyone in the workspace will be able to join it and read all its messages, past ones included."
+  },
+  "newChannel.publicConfirm": {
+    "value": "Make public"
+  },
   "newChannel.members": {
     "value": "Initial members"
   },
