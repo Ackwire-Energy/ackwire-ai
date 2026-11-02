@@ -5119,6 +5119,20 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own:is(:hover, :focus-within, [data-menu-open="true"]) > .ac-msg__body > .ac-msg__aside--floating {
   opacity: 0;
 }
+/* The keys on the check (a DM's "Vista por" face) keep it on screen with its ring; the bar gives way instead. */
+html:not([data-pointer])
+  .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible)
+  > .ac-msg__body
+  > .ac-msg__aside--floating {
+  opacity: 1;
+}
+html:not([data-pointer])
+  .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible)
+  > .ac-msg__body
+  > .ac-msg__actions {
+  opacity: 0;
+  pointer-events: none;
+}
 .ac-msg--own > .ac-msg__body > .ac-msg__actions,
 .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   top: 20px;

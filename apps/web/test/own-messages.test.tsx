@@ -158,7 +158,10 @@ describe("own message styles", () => {
     );
     const out = new Map<string, string>();
     for (const [, list = "", body = ""] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g))
-      for (const selector of list.split(",")) out.set(selector.trim(), `${out.get(selector.trim()) ?? ""}${body}`);
+      for (const raw of list.split(",")) {
+        const selector = raw.trim().replace(/\s+/g, " ");
+        out.set(selector, `${out.get(selector) ?? ""}${body}`);
+      }
     return out;
   };
 
@@ -172,6 +175,11 @@ describe("own message styles", () => {
     expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating")).toContain("right: calc(100% + 8px)");
     // The check gives way to the bar (`:is(:hover, :focus-within, [data-menu-open]) …`, split at its commas).
     expect(r.get('[data-menu-open="true"]) > .ac-msg__body > .ac-msg__aside--floating')).toContain("opacity: 0");
+    // Except under the keys' focus on the check itself (a DM's face is a button): it stays, the bar gives way.
+    const keys =
+      "html:not([data-pointer]) .ac-msg--own:has(> .ac-msg__body > .ac-msg__aside--floating :focus-visible) > .ac-msg__body >";
+    expect(r.get(`${keys} .ac-msg__aside--floating`)).toContain("opacity: 1");
+    expect(r.get(`${keys} .ac-msg__actions`)).toContain("opacity: 0");
   });
 
   test("a narrow window keeps room for the bar left of the bubble; a touch screen's bar sits over its top edge", async () => {
