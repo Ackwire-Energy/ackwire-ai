@@ -26,6 +26,7 @@ import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { formatDuration } from "../machine-tasks";
 import { computerDrivers, drivesComputer, getMachine, requireComputerDriver, servesDesktops } from "../machines";
+import { answersAgentsOnly } from "../consultations";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
 import {
@@ -385,7 +386,10 @@ export async function requireBrowserAccess(
           .limit(5)
       ).map((r) => r.id);
   for (const runId of runs) {
-    if ((await humanBehindRun({ db }, orgId, runId)) === userId) return access;
+    // A run consulted for someone outside the agent's audience has nobody behind it for its screen.
+    if ((await humanBehindRun({ db }, orgId, runId)) === userId && !(await answersAgentsOnly(db, orgId, runId))) {
+      return access;
+    }
   }
   if (screen === "desktop" && agent.machineId) {
     const machine = await getMachine(db, orgId, agent.machineId);
@@ -743,7 +747,13 @@ export function createBrowserHandoffToolSource(
       ? drivers.length === 1
         ? (drivers[0] ?? null)
         : null
-      : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      : await browserHandoffRecipient(
+          { db: ctx.db },
+          ctx.orgId,
+          // Consulted for someone outside its audience: its owner helps, never that person.
+          (await answersAgentsOnly(ctx.db, ctx.orgId, ctx.runId)) ? null : ctx.runId,
+          ctx.agentId,
+        );
     const busy = {
       content: `A person is using your ${s.what}, or was just asked to; wait for that before asking.`,
       isError: true,

@@ -818,6 +818,26 @@ describe("take over", () => {
     await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
   });
 
+  test("a run consulted for someone outside the agent's audience: that person never sees its screen nor is asked for help", async () => {
+    await start();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    await f.db
+      .update(schema.agents)
+      .set({ audienceMode: "owner", ownerUserId: f.owner.id })
+      .where(eq(schema.agents.id, f.agent.id));
+    // Another agent asked it for her (ADR 0085 addendum): her run, though she may not talk to it.
+    const { runId } = await runFor(ana.id);
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, runId));
+    await expect(requireBrowserAccess(f.db, ana.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    const ctx = { db: f.db, orgId: f.org.id, agentId: f.agent.id, runId, threadRootId: "" } as never;
+    const [tool] = await askSource().tools(ctx);
+    await tool?.execute({ instructions: "Sign in to Stripe" }, ctx);
+    const [h] = await handoffs();
+    expect(h?.requestedForUserId).toBe(f.owner.id);
+    await expect(requireBrowserControl(f.db, ana.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
   test("the person a request was asked of takes control only while it is open", async () => {
     await start();
     const ana = await addMember(f.db, f.org.id, "member", "ana");
