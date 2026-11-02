@@ -238,6 +238,7 @@ function outcomeText(result: BrowserHandoffResult, kind: "ask" | "takeover", scr
   if (result.result === "failed") {
     return `The person couldn't do it. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
+  if (result.result === "withdrawn") return "You withdrew this request: nobody will do it.";
   if (result.result === "cancelled") {
     return `A person canceled the request. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
@@ -892,6 +893,7 @@ function endedResult(row: BrowserHandoffRow): BrowserHandoffResult {
   const note = row.note ? { note: row.note } : {};
   if (row.status === "done") return { result: "done", ...note };
   if (row.status === "cancelled") return { result: "cancelled" };
+  if (row.status === "withdrawn") return { result: "withdrawn" };
   if (row.status === "failed") return { result: "failed", ...note };
   return { result: "expired" };
 }
@@ -1016,6 +1018,33 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
   if (!row) throw new ConflictError("This is already over");
   await settle(deps, row);
   return handoffView(row);
+}
+
+/**
+ * The agent withdraws its own asked help (`withdraw_request`) while nobody took control: the card says it no
+ * longer needs it, the people asked stop waiting. A run still waiting on it resumes; the run withdrawing it
+ * (`byRunId`) is told nothing more. Null: not open anymore, or a person is in control.
+ */
+export async function withdrawHandoff(deps: HandoffDeps, handoffId: string, byRunId: string, reason: string | null) {
+  const [row] = await deps.db.transaction(async (tx) => {
+    const rows = await tx
+      .update(browserHandoffs)
+      .set({ status: "withdrawn", note: reason, resolvedAt: new Date() })
+      .where(
+        and(
+          eq(browserHandoffs.id, handoffId),
+          eq(browserHandoffs.kind, "ask"),
+          sql`(${browserHandoffs.status} = 'pending' or (${browserHandoffs.status} = 'active' and ${browserHandoffs.controllerUserId} is null))`,
+        ),
+      )
+      .returning();
+    if (rows[0]) await syncCard(tx, rows[0]);
+    return rows;
+  });
+  if (!row) return null;
+  if (row.runId !== byRunId) await resumeWaitingRun(deps, row, endedResult(row)).catch(() => {});
+  await afterChange(deps, row).catch(() => {});
+  return row;
 }
 
 /**

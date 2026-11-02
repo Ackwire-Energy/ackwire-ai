@@ -31,6 +31,7 @@ import { type MessageMedia, mediaOf } from "./media";
 import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
+import { openRequestsBlock, openRequestsOf } from "./open-requests";
 import { reachNote, reachOf } from "./reach";
 import { byAnotherAgent, WHY_AN_AGENT_CALLED, WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
@@ -365,6 +366,10 @@ export async function buildRunContext(
   // Asked in the main timeline: the run answers there, not in a thread.
   const flat = rootIsTrigger;
   const heldElsewhere = run.background ? null : heldHere(db, run).catch(() => null);
+  // What it asked people for and still stands, so it can take back what it no longer needs (`withdraw_request`).
+  const openRequests = options.toolsAvailable
+    ? openRequestsOf(db, run.orgId, agent.id).then(openRequestsBlock, () => null)
+    : null;
   // A routine's background run (ADR 0053 §4): its room's history (earlier briefs) is no conversation;
   // it reads its brief, and what people said where it reports comes in the routine block.
   const background = run.background;
@@ -807,6 +812,7 @@ export async function buildRunContext(
     // system prompt it started with.
     ...(openTasks ? await openTasks.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(heldElsewhere ? await heldElsewhere.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
+    ...(openRequests ? await openRequests.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(handOffs
       ? await handOffs.then((rows) => {
           const text = rows && handOffsBlock(rows, zone);

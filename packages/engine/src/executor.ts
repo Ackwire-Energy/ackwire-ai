@@ -131,6 +131,7 @@ import { getMessage, insertMessage, type Message, messageView, unreachedAgents, 
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
 import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-producers";
+import { openRequestNudge, openRequestsOf, WITHDRAW_REQUEST_TOOL } from "./open-requests";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
@@ -3093,9 +3094,23 @@ async function executeRunInner(
           )
         : "";
       const judging = evidenceFor(t);
+      // Help it asked for in this run and stopped waiting on (a person wrote meanwhile): only then a lookup.
+      const detachedIds = ((t as { detachedWaits?: { waitId: string }[] }).detachedWaits ?? []).map((d) => d.waitId);
+      const openRequest =
+        detachedIds.length > 0 &&
+        !state.requestNudged &&
+        !betweenAgents &&
+        granted.some((g) => g.name === WITHDRAW_REQUEST_TOOL)
+          ? openRequestNudge(
+              (await openRequestsOf(db, run.orgId, run.agentId).catch(() => [])).filter((r) =>
+                detachedIds.includes(r.id),
+              ),
+            )
+          : "";
       const decision = await decideTurnEnd({
         state,
         kind: betweenAgents ? "agents_dm" : "conversation",
+        openRequest,
         executed: transcript.executedCalls ?? 0,
         bound: t.stuck?.endAt !== undefined ? "stuck" : t.wrapUpNoted ? "step_limit" : null,
         quiet: silent && !judged,
@@ -3133,6 +3148,7 @@ async function executeRunInner(
         unreached: "unreached",
         untried: "untried",
         secret: "secret",
+        open_request: "open_request",
       }[decision.rule];
       const { nudge: _, ...recorded } = { ...decision, count: t.continuation.count };
       later(() =>

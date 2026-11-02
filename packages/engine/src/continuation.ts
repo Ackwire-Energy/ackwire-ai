@@ -33,6 +33,8 @@ export interface ContinuationState {
   askNudged?: boolean;
   /** The last turn was told to ask: this one is judged past the cap, and turns into the question if it didn't. */
   askPending?: boolean;
+  /** It was told once to say whether it still needs its open requests (`openRequestNudge`). */
+  requestNudged?: boolean;
   /** It was told once to ask for a secret securely: the next secret verdict ends the run as it is. */
   secretNudged?: boolean;
 }
@@ -211,6 +213,11 @@ export interface TurnEnd {
   /** What is judged ("" skips the judgment: nothing to read, or an agents' DM run that owes no answer). */
   judged: string;
   mission: boolean;
+  /**
+   * Requests for a person it made in this run and stopped waiting on, still open (`openRequestNudge`, "" none): it
+   * says once whether it still needs them before ending.
+   */
+  openRequest?: string;
   /** Something durable brings it back (`wakesLater`), read only when the judgment would run. */
   wakesLater(): Promise<boolean>;
   /** The judgment; null when the workspace has no judge. */
@@ -240,6 +247,8 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   if (t.quiet) return { outcome: "done", rule: "quiet" };
   if (t.decided && canNudge) return { outcome: "continue", rule: "decision", nudge: decisionNudge(t.decided) };
   if (t.unanswered && canNudge) return { outcome: "continue", rule: "answer", nudge: ANSWER_NUDGE };
+  if (t.openRequest && !t.state.requestNudged)
+    return { outcome: "continue", rule: "open_request", nudge: t.openRequest };
   if (!t.judged || !t.verdict) return { outcome: "done", rule: t.verdict ? "nothing_to_judge" : "no_judge" };
   if (!canNudge && !t.state.askPending && (t.state.askNudged || t.kind !== "conversation"))
     return { outcome: "done", rule: "cap" };
@@ -298,6 +307,7 @@ export function advance(state: ContinuationState, d: TurnEndDecision, executed: 
   if (d.outcome !== "continue") return rest;
   if (d.rule === "ask") return { ...rest, askNudged: true, askPending: true };
   if (d.rule === "secret") return { ...rest, secretNudged: true };
+  if (d.rule === "open_request") return { ...rest, requestNudged: true };
   return { ...rest, count: state.count + 1, executedAtNudge: executed };
 }
 

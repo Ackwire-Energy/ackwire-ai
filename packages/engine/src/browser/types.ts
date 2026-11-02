@@ -98,7 +98,7 @@ export const DESKTOP_TOOL_INFO = {
 
 /** How a handoff ended, as the agent reads it when it resumes (ADR 0040 §6). */
 export interface BrowserHandoffResult {
-  result: "done" | "failed" | "expired" | "cancelled";
+  result: "done" | "failed" | "expired" | "cancelled" | "withdrawn";
   /** The person's note, in their own words ("it asked for Ana's phone code", "signed in with the shop's account"). */
   note?: string;
 }

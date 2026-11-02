@@ -39,7 +39,7 @@ export type ToolKind =
   | { kind: "hand_off" }
   /** `pass`: ends the run without a message. */
   | { kind: "pass" }
-  /** `set_status`: the agent's own line next to its name (ADR 0084), nothing else. */
+  /** `set_status` (the agent's own line next to its name, ADR 0084) and `withdraw_request` (its own open requests): nothing else. */
   | { kind: "self" }
   /** Speaks in the run's own conversation (a reaction, a question, a card people act on). */
   | { kind: "here" }
@@ -181,7 +181,7 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "pass") return { kind: "pass" };
-  if (tool.name === "set_status") return { kind: "self" };
+  if (tool.name === "set_status" || tool.name === "withdraw_request") return { kind: "self" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
   if (MISSION.has(tool.name)) return { kind: "mission" };
   if (ELSEWHERE.has(tool.name)) return { kind: "elsewhere" };

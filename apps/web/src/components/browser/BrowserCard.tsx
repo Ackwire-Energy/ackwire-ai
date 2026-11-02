@@ -158,6 +158,7 @@ const RANK: Record<BrowserHandoff["status"], number> = {
   failed: 2,
   expired: 2,
   cancelled: 2,
+  withdrawn: 2,
 };
 
 /** Two views of the same request (the socket's, the cache's): the one further along wins; another request, the first. */
