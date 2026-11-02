@@ -2108,6 +2108,8 @@ export interface SearchHit {
   /** Message hits: the message (open it there) and its thread (null = the main timeline). */
   messageId?: string | null;
   threadId?: string | null;
+  /** Message hits: a voice message (its snippet is empty, ADR 0100), a GIF or a sticker. `hitText` says which. */
+  mediaKind?: MediaKind;
 }
 
 /** What a message has (ADR 0123): a link, a file, an image (an image file, a GIF, a sticker), a card. */

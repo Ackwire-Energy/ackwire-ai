@@ -205,6 +205,13 @@ export function textOrMedia(t: TFunction, body: string, meta: Meta): string {
   return kind ? mediaWord(t, kind) : body;
 }
 
+/**
+ * A search hit's line: its words, else the word for what it was. A voice message's hit has none (people hear it, ADR
+ * 0100), and a search by filters alone also lists GIFs and stickers sent with no words.
+ */
+export const hitText = (t: TFunction, hit: { snippet: string; mediaKind?: MediaKind }) =>
+  hit.snippet || (hit.mediaKind ? mediaWord(t, hit.mediaKind) : "");
+
 /** A quote's line: its excerpt, or the word for what it quotes when that was a GIF or a sticker. */
 export function quoteText(t: TFunction, reply: Pick<ReplyRef, "excerpt" | "media">): string {
   const kind = mediaKindOf(reply.media);
