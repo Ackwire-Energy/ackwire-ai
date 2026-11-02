@@ -6672,7 +6672,9 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   height: auto;
   max-height: 320px;
 }
-.file-thumb[data-loading] {
+/* Also when alone on the message (its `height: auto` would otherwise collapse the tile until the image decodes). */
+.file-thumb[data-loading],
+.artifact-tile:only-child .file-thumb[data-loading] {
   width: 240px;
   height: 180px;
 }

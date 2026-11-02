@@ -18,3 +18,10 @@ test("the activity bar's room opens and closes in a glide (from 0, not from auto
   expect(glide).toContain("margin 180ms");
   expect(last(topLevel(css), ".channel__composer > .ac-typing", "transition")).toBeUndefined();
 });
+
+test("an image alone on a message keeps its loading size too (the lone tile's height: auto doesn't win)", () => {
+  // `.artifact-tile:only-child .file-thumb` (0,3,0) beats `.file-thumb[data-loading]` (0,2,0): the lone tile needs its own rule.
+  const lone = ".artifact-tile:only-child .file-thumb[data-loading]";
+  expect(last(topLevel(css), lone, "height")).toBe("180px");
+  expect(last(topLevel(css), lone, "width")).toBe("240px");
+});
