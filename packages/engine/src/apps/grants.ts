@@ -286,7 +286,7 @@ export async function createPersonalToken(
 
 /**
  * Hourly cleanup (ADR 0113 §2): requests a day after they ran out, tokens 30 days after they expired or were
- * revoked, registrations nobody connected with in 7 days, sends after 90 days, and grants unused for 90 days
+ * revoked, registrations with no connection unused for 90 days, sends after 90 days, and grants unused for 90 days
  * (revoked, then their rows go with the tokens).
  */
 export async function purgeApps(db: Database, now = new Date()) {
@@ -306,14 +306,14 @@ export async function purgeApps(db: Database, now = new Date()) {
         sql`not exists (select 1 from ${appTokens} t where t.grant_id = ${appGrants.id})`,
       ),
     );
-  await db
-    .delete(oauthAppClients)
-    .where(
-      and(
-        eq(oauthAppClients.kind, "dcr"),
-        lt(sql`coalesce(${oauthAppClients.lastUsedAt}, ${oauthAppClients.createdAt})`, ago(7)),
-        sql`not exists (select 1 from ${appGrants} g where g.client_id = ${oauthAppClients.id})`,
-      ),
-    );
+  await db.delete(oauthAppClients).where(
+    and(
+      eq(oauthAppClients.kind, "dcr"),
+      // Apps keep their client_id for good and only register again after an invalid_client from the token
+      // endpoint, which an abandoned sign-in never reaches: a short life locks them out on their next try.
+      lt(sql`coalesce(${oauthAppClients.lastUsedAt}, ${oauthAppClients.createdAt})`, ago(90)),
+      sql`not exists (select 1 from ${appGrants} g where g.client_id = ${oauthAppClients.id})`,
+    ),
+  );
   await db.delete(appSends).where(lt(appSends.createdAt, ago(90)));
 }

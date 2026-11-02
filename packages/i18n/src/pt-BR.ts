@@ -9119,7 +9119,8 @@ export const ptBR = {
       language: "Idioma",
       error: {
         app_desconhecido: "Não reconhecemos este app",
-        app_desconhecidoText: "Volte ao app e conecte de novo.",
+        app_desconhecidoText:
+          "O app guardou um registro que não vale mais. Apague a conexão salva nele e conecte de novo. No Claude Code, digite /mcp, escolha agentes e Clear authentication. No Cursor, saia do servidor agentes em Configurações\u00a0›\u00a0MCP.",
         endereco_de_retorno: "Endereço de retorno não registrado",
         endereco_de_retornoText:
           "Este app pediu para voltar a um endereço que ele não registrou. Por segurança, paramos aqui.",

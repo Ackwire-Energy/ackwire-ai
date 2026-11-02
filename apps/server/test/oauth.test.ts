@@ -767,21 +767,28 @@ describe("what ends a connection", () => {
   });
 });
 
-test("the hourly cleanup: old requests, unused registrations, grants unused for 90 days", async () => {
+test("the hourly cleanup: old requests, registrations unused for 90 days, grants unused for 90 days", async () => {
   const { b, orgId } = await owner();
   await connectApp(t, b, orgId);
   const unused = await registerClient(t, { client_name: "Nobody", redirect_uris: [LOOPBACK] });
   const unusedId = ((await unused.json()) as { client_id: string }).client_id;
   const day = 86_400_000;
   await t.db.update(schema.oauthAppRequests).set({ expiresAt: new Date(Date.now() - 2 * day) });
+  const abandoned = await registerClient(t, { client_name: "Came back later", redirect_uris: [LOOPBACK] });
+  const abandonedId = ((await abandoned.json()) as { client_id: string }).client_id;
+  await t.db
+    .update(schema.oauthAppClients)
+    .set({ createdAt: new Date(Date.now() - 91 * day) })
+    .where(eq(schema.oauthAppClients.id, unusedId));
   await t.db
     .update(schema.oauthAppClients)
     .set({ createdAt: new Date(Date.now() - 8 * day) })
-    .where(eq(schema.oauthAppClients.id, unusedId));
+    .where(eq(schema.oauthAppClients.id, abandonedId));
   await t.db.update(schema.appGrants).set({ lastUsedAt: new Date(Date.now() - 91 * day) });
   await purgeApps(t.db);
   expect(await t.db.select().from(schema.oauthAppRequests)).toEqual([]);
   expect((await t.db.select().from(schema.oauthAppClients)).map((c) => c.id)).not.toContain(unusedId);
-  expect((await t.db.select().from(schema.oauthAppClients)).length).toBe(1);
+  expect((await t.db.select().from(schema.oauthAppClients)).map((c) => c.id)).toContain(abandonedId);
+  expect((await t.db.select().from(schema.oauthAppClients)).length).toBe(2);
   expect((await t.db.select().from(schema.appGrants)).map((g) => g.revokedAt === null)).toEqual([false]);
 });

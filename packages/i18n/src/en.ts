@@ -9052,7 +9052,8 @@ export const en: Translations = {
       language: "Language",
       error: {
         app_desconhecido: "We don't recognize this app",
-        app_desconhecidoText: "Go back to the app and connect again.",
+        app_desconhecidoText:
+          "The app kept a registration that's no longer valid. Clear its saved connection and connect again. In Claude Code, type /mcp, pick agentes and Clear authentication. In Cursor, log out of the agentes server in Settings\u00a0›\u00a0MCP.",
         endereco_de_retorno: "Return address not registered",
         endereco_de_retornoText:
           "This app asked to return to an address it didn't register. For safety, we stopped here.",

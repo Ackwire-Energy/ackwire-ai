@@ -335,7 +335,7 @@ export function appIdentity(
   return { ...identity, returnsTo, reservedNameWarning, cursor };
 }
 
-/** Marks an app as used (a token was issued to it): a registration nobody uses goes after 7 days. */
+/** Marks an app as used (a token was issued to it): a registration with no connection goes 90 days after its last use. */
 export async function touchApp(db: Database, clientId: string) {
   await db
     .update(oauthAppClients)

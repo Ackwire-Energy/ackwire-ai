@@ -26,7 +26,7 @@ export const oauthAppClients = pgTable(
     /** A metadata document's last good fetch (`cimd`). */
     fetchedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    /** Bumped when a token is issued: an unused registration is purged after 7 days. */
+    /** Bumped when a token is issued: a registration with no connection is purged 90 days after its last use. */
     lastUsedAt: timestamp({ withTimezone: true }),
   },
   (t) => [check("oauth_app_clients_kind", sql`${t.kind} in ('dcr', 'cimd')`), index().on(t.kind, t.lastUsedAt)],
