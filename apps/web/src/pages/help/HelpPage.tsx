@@ -5,7 +5,7 @@ import { Logo, Select } from "@agenteschat/ui";
 import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
-import { DEFAULT_LOCALE, type LocaleCode, locales, setLocale, usePageT } from "@/i18n";
+import { DEFAULT_LOCALE, type LocaleCode, locales, usePageT } from "@/i18n";
 import { useDocumentTitle } from "@/lib/desktop";
 import "../legal.css";
 import "./help.css";
@@ -24,10 +24,9 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
   useDocumentTitle(doc ? `${doc.title} · agentes.chat` : undefined);
   if (!doc) return <Navigate to="/" replace />;
 
-  const switchTo = (code: LocaleCode) => {
-    setLocale(code, i18n);
+  // The page's language only (its link's `?lang=`): the app's own is picked in Settings.
+  const switchTo = (code: LocaleCode) =>
     void navigate({ to: "/help/$slug", params: { slug }, search: { lang: code }, replace: true });
-  };
   // The page's own language: English where `locale` has no translation of it yet.
   const shown = isHelpSlug(slug) && HELP[locale][slug] ? locale : DEFAULT_LOCALE;
   return (

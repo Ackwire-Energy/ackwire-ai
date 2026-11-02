@@ -320,7 +320,9 @@ export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
     const code = next === "auto" ? deviceLocale() : next;
     rememberLocale(next, !signedIn);
     setLocale(code);
-    if (signedIn) void api.account.updateMe({ locale: code, auto: next === "auto" }).catch(() => {});
+    // Not heard: kept as pending, so the next start sends it.
+    if (signedIn)
+      void api.account.updateMe({ locale: code, auto: next === "auto" }).catch(() => rememberLocale(next, true));
   };
   return (
     <Page title={t("mobile.me.language")}>

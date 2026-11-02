@@ -65,18 +65,19 @@ describe("help pages", () => {
     expect(document.querySelector(".help")?.getAttribute("lang")).toBe("en");
   });
 
-  test("the language switch changes the page and the address's lang", async () => {
+  test("the language switch changes the page and the address's lang, never the app's language", async () => {
     const { router, services } = await renderApp("/help/approvals?lang=en", { api: signedOut() });
+    const app = services.i18n.language;
     expectPage(helpDocument("approvals", "en"));
     await pick(screen().getByRole("combobox", { name: "Language" }), "Português (Brasil)");
     expect(router.state.location.pathname).toBe("/help/approvals");
     expect(router.state.location.search).toEqual({ lang: "pt-BR" });
     expectPage(helpDocument("approvals", "pt-BR"));
-    expect(services.i18n.language).toBe("pt-BR");
     await pick(screen().getByRole("combobox", { name: "Idioma" }), "English");
     expect(router.state.location.search).toEqual({ lang: "en" });
     expectPage(helpDocument("approvals", "en"));
-    expect(services.i18n.language).toBe("en");
+    expect(services.i18n.language).toBe(app);
+    expect(localStorage.getItem("agentes.locale")).toBeNull();
   });
 
   test("code reads as code: a path in a line, and a command in a block of its own", async () => {

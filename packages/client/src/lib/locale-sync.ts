@@ -9,9 +9,12 @@ export interface LocaleState {
 }
 
 /**
- * Once signed in, the language every device of the person shows (ADR 0121). A pick on this device the server hasn't
- * heard wins and is sent; else a language the person picked anywhere (`localeAuto` false) wins; else each device
- * follows its own (`detected`), and the server keeps the last one detected for emails and pushes.
+ * Once signed in, the language every device of the person shows (ADR 0121):
+ * 1. A pick on this device the server hasn't heard (`pending`) wins and is sent, "auto" included.
+ * 2. A language kept on this device while the server has none picked (`localeAuto` not false) is the person's pick
+ *    too: one made before the server kept picks, or one whose send failed. It wins and is sent.
+ * 3. Else a language the person picked anywhere (`localeAuto` false) wins.
+ * 4. Else each device follows its own (`detected`), and the server keeps the last one detected for emails and pushes.
  */
 export function localeSync(input: {
   state: LocaleState;
@@ -19,10 +22,10 @@ export function localeSync(input: {
   server: { locale?: string | null; localeAuto?: boolean };
 }): { use: AppLocale; store: AppLocale | "auto"; patch?: { locale: AppLocale; auto: boolean } } {
   const { state, detected, server } = input;
-  if (state.pending && state.stored && state.stored !== "auto")
-    return { use: state.stored, store: state.stored, patch: { locale: state.stored, auto: false } };
-  if (!state.pending && server.localeAuto === false && isAppLocale(server.locale))
-    return { use: server.locale, store: server.locale };
+  const own = state.stored && state.stored !== "auto" ? state.stored : null;
+  const picked = server.localeAuto === false && isAppLocale(server.locale) ? server.locale : null;
+  if (own && (state.pending || !picked)) return { use: own, store: own, patch: { locale: own, auto: false } };
+  if (picked && !state.pending) return { use: picked, store: picked };
   return {
     use: detected,
     store: "auto",

@@ -29,7 +29,7 @@ import { useOrg } from "@/components/org-context";
 import { MyFace, ProfilePhotoDialog } from "@/components/ProfilePhoto";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
-import { localePatch } from "@/i18n";
+import { localePatch, rememberLocale } from "@/i18n";
 import { type MenuLook, menuLook, onMenuLookChange, setMenuLook } from "@/lib/context-menu";
 import { inDesktopApp } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
@@ -167,7 +167,9 @@ export function AccountSection() {
               <LanguageSelect
                 signedIn
                 align="end"
-                onPick={(choice) => void api.account.updateMe(localePatch(choice)).catch(() => {})}
+                onPick={(choice) =>
+                  void api.account.updateMe(localePatch(choice)).catch(() => rememberLocale(choice, true))
+                }
               />
             }
           />
