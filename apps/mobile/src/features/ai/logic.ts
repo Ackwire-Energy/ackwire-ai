@@ -1,6 +1,7 @@
 import type {
   AgentBrain,
   AgentBrainInput,
+  AiAccounts,
   BrainKind,
   Credential,
   MachineAccount,
@@ -16,9 +17,10 @@ import {
   existingAi,
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
-import { type Advanced, advancedParts, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
+import { type Advanced, advancedParts } from "@agenteschat/client/lib/brain-advanced";
+import { type BrainPick, brainModelLine, brainPickInput, needsOwnSignIn } from "@agenteschat/client/lib/brain-picker";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiChoiceOf, type PlanGate, planOfAccount } from "@agenteschat/client/lib/no-ai";
+import { aiChoiceOf, type PlanChoice, type PlanGate, planOfAccount, planOfKind } from "@agenteschat/client/lib/no-ai";
 import {
   brainModelChoice,
   brainModelChoices,
@@ -110,20 +112,21 @@ export function modelRows(
 ): ModelRow[] {
   const option = view.options.find((o) => o.kind === view.brain);
   const chosen = brainModelChoice(view.brain, plan, view.effectiveModel ?? option?.defaultModel ?? "");
+  const models = brainModelChoices(plan, option?.models ?? []);
+  const cursorSays = view.brain === "cursor" && models.some((m) => m.inPlan);
   const rows: Omit<ModelRow, "checked">[] = [
     { value: AUTO, label: t("brain.auto.label"), sub: t("brain.auto.hint") },
-    ...brainModelChoices(plan, option?.models ?? []).map(({ value, label, tag, needs, maker }) => ({
-      value,
-      label,
-      // Claude's own models say what each is for.
-      ...(tag
-        ? { sub: t(`brain.modelTag.${tag}`) }
-        : !plan && view.brain === "claude_code" && isClaudeAlias(value)
-          ? { sub: t(`agentPage.work.brain.modelLine.${value}`) }
-          : {}),
-      ...(needs ? { note: t(`brain.modelNeeds.${needs}`), needs } : {}),
-      ...(maker ? { maker } : {}),
-    })),
+    ...models.map((m) => {
+      // What each is for (Claude's own), sold as, or costs: the agent's page's line.
+      const sub = brainModelLine(t, view.brain, plan, m, cursorSays);
+      return {
+        value: m.value,
+        label: m.label,
+        ...(sub ? { sub } : {}),
+        ...(m.needs ? { note: t(`brain.modelNeeds.${m.needs}`), needs: m.needs } : {}),
+        ...(m.maker ? { maker: m.maker } : {}),
+      };
+    }),
   ];
   return rows.map((r) => ({ ...r, checked: r.value === chosen }));
 }
@@ -252,10 +255,25 @@ export function setupWords(
  * its context window right after; or Automático there and the last setup's plan saved on it right after; with no
  * setup, Automático on the API. The setup's Autonomia goes at creation either way.
  */
-export function newAgentAi(thinks: NewAgentStart | null) {
+export function newAgentAi(thinks: NewAgentStart | null): {
+  model: string;
+  credentialId: string | null;
+  contextTokens: number | null;
+  plan: { machineId: string; input: AgentBrainInput } | null;
+  autonomy: NewAgentStart["autonomy"] | undefined;
+  /** A plan to connect once the agent exists (`pickedAi`). */
+  connect: PlanChoice | null;
+} {
   const autonomy = thinks?.autonomy;
   if (thinks?.brain === "model") {
-    return { model: thinks.model, credentialId: thinks.key, contextTokens: thinks.contextTokens, plan: null, autonomy };
+    return {
+      model: thinks.model,
+      credentialId: thinks.key,
+      contextTokens: thinks.contextTokens,
+      plan: null,
+      autonomy,
+      connect: null,
+    };
   }
   return {
     model: AUTO,
@@ -263,5 +281,26 @@ export function newAgentAi(thinks: NewAgentStart | null) {
     contextTokens: null,
     plan: thinks ? { machineId: thinks.machineId, input: thinks.input } : null,
     autonomy,
+    connect: null,
+  };
+}
+
+/**
+ * What a pick in the phone's "Quem pensa" sends, as the web's step: an API model at creation; or Automático there and
+ * the plan saved right after; or, for a plan with nothing to think with yet, Connect on it once the agent exists (also
+ * a computer's own sign-in that can't think for the person's agent yet: `computers`, `useAiAccounts`).
+ */
+export function pickedAi(
+  pick: BrainPick,
+  computers: AiAccounts["computers"] | undefined,
+): ReturnType<typeof newAgentAi> {
+  const none = { credentialId: null, contextTokens: null, plan: null, autonomy: undefined, connect: null };
+  if (pick.kind === "model") return { ...none, model: pick.model };
+  if (pick.kind === "connect") return { ...none, model: AUTO, connect: pick.choice };
+  return {
+    ...none,
+    model: AUTO,
+    plan: { machineId: pick.machineId, input: brainPickInput(pick) },
+    connect: needsOwnSignIn(computers, pick) ? planOfKind(pick.kind) : null,
   };
 }

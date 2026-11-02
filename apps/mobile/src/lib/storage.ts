@@ -58,6 +58,8 @@ export const STORED = {
   outagesDismissed: "outages-dismissed",
   /** The last conversation opened in each workspace (JSON by workspace id): "Onde você parou" (ADR 0108). */
   lastPlace: "last-place",
+  /** Recent searches, newest first, per workspace (JSON by workspace id; ADR 0123). */
+  searchRecent: "search-recent",
   /** The person has touched the trackpad: its lesson is over ("1"). */
   trackpadTaught: "trackpad-taught",
 } as const;

@@ -47,6 +47,16 @@
     "pollAnswered_other": "Odpowiedzi: {{count}} z {{total}}",
     "voteFailed": "Twój głos nie został zapisany."
   },
+  "choices": {
+    "step": "{{step}} z {{total}}",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "close": "Zamknij",
+    "closed": "{{title}} · zamknięte",
+    "reopen": "Pokaż ponownie",
+    "answeredBy": "Wybór: {{name}}",
+    "failed": "Twój wybór nie został wysłany. Spróbuj ponownie."
+  },
   "chart": {
     "pending": "Tworzenie wykresu…",
     "table": "Tabela",
@@ -534,7 +544,12 @@
     "full": "Ten czat ma już 100 przypiętych. Najpierw odepnij jedną.",
     "mark": "Przypięte",
     "none": "Nic jeszcze nie przypięto",
-    "empty": "Nic tu jeszcze nie przypięto. Przytrzymaj wiadomość i stuknij Przypnij."
+    "empty": "Nic tu jeszcze nie przypięto. Przytrzymaj wiadomość i stuknij Przypnij.",
+    "bar_one": "Przypięte wiadomości ({{count}})",
+    "bar_few": "Przypięte wiadomości ({{count}})",
+    "bar_many": "Przypięte wiadomości ({{count}})",
+    "bar_other": "Przypięte wiadomości ({{count}})",
+    "unpinOf": "Odepnij wiadomość od: {{name}}"
   },
   "thread": {
     "threadIn": "Wątek na #{{channel}}",
@@ -778,7 +793,8 @@
     "title": "Aktywność",
     "filter": {
       "all": "Wszystko",
-      "waiting": "Czeka na ciebie"
+      "waiting": "Czeka na ciebie",
+      "done": "Zakończone"
     },
     "day": {
       "today": "Dzisiaj",
@@ -924,6 +940,8 @@
     "markUnread": "Oznacz jako nieprzeczytane",
     "unread": "Nieprzeczytane",
     "done": "Gotowe",
+    "restore": "Przywróć",
+    "noneDone": "Nic nie oznaczono jako zakończone w ciągu ostatnich 30 dni.",
     "more": "Zobacz więcej",
     "empty": "Nic na ciebie nie czeka. Odetchnij."
   },

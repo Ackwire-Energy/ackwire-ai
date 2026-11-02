@@ -10,6 +10,7 @@ import Animated, {
 import { needsHeaderBlur } from "@/lib/nav";
 import { coverTransform, progress } from "@/lib/parallax";
 import { Glass } from "./Glass";
+import { withAlpha } from "./palette";
 import { Text } from "./Text";
 import { useReducedMotion, useTheme } from "./theme";
 
@@ -133,7 +134,7 @@ export function CoverBarBackdrop({
     return (
       <Animated.View pointerEvents="none" style={[styles.backdrop, { height: height + EDGE_FADE }, fade]}>
         <LinearGradient
-          colors={[base, fadeStop(base, 0.86), fadeStop(base, 0)]}
+          colors={[base, withAlpha(base, 0.86), withAlpha(base, 0)]}
           locations={[0, 0.62, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -150,12 +151,6 @@ export function CoverBarBackdrop({
 
 /** How far below the bar the content's fade reaches (Android), as the conversation's under its glass header. */
 const EDGE_FADE = 28;
-
-/** A `#rrggbb` color at `alpha`: a stop of the fade. */
-const fadeStop = (hex: string, alpha: number) =>
-  `${hex.slice(0, 7)}${Math.round(alpha * 255)
-    .toString(16)
-    .padStart(2, "0")}`;
 
 const styles = StyleSheet.create({
   title: { fontWeight: "600" },

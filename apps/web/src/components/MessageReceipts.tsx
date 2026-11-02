@@ -1,8 +1,17 @@
 import type { DecidedBy, Message, SteerState } from "@agenteschat/client";
-import { type ReceiptPhase, type ReceiptView, receiptView, useModelLabel, useSteerState } from "@agenteschat/client";
+import {
+  type MessageReceipt,
+  type ReceiptPhase,
+  type ReceiptView,
+  receiptTicks,
+  receiptView,
+  useModelLabel,
+  useReactions,
+  useSteerState,
+} from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { deciderOf } from "@agenteschat/client/lib/routing";
-import { Icon, type IconName, InfoHint, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
+import { Icon, type IconName, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
 import { type ReactNode, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -13,25 +22,13 @@ import { useLive } from "@/realtime/context";
 import { CallAgentMenu, useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
 
-/**
- * Which icon the receipt shows: one check (seen), two (answered), clock (the author's plan picking, answering,
- * waiting), alert (failed).
- */
-export function receiptIcon(view: ReceiptView): IconName {
-  if (view.picking) return "waiting";
+const TICK_ICON = { clock: "waiting", check: "check", checks: "checks" } as const satisfies Record<string, IconName>;
+
+/** Which icon the receipt shows: alert for a failure, else its ticks (`receiptTicks`). */
+export function receiptIcon(view: ReceiptView, receipt: MessageReceipt | undefined): IconName {
   const kind = view.status?.kind;
   if (kind === "failed" || kind === "no_ai") return "alert";
-  if (
-    kind === "claimed" ||
-    kind === "waiting" ||
-    kind === "asking" ||
-    kind === "outage" ||
-    kind === "queued" ||
-    kind === "away"
-  )
-    return "waiting";
-  if (kind === "handled") return "checks";
-  return "check";
+  return TICK_ICON[receiptTicks(receipt)];
 }
 
 /** A rule's line leads with what it follows: the reply, the one person with the agent, the talk, the coordinator. */
@@ -71,24 +68,16 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * A person's message's receipt (and an agent's that mentions agents: whom it handed work to, and "Só mencionado"
  * with "Chamar um agente" for one it only mentioned, ADR 0089): a small muted mark at the end of its first line, or of
  * the time's line under my own turn (`part="check"`), never a line of its own, so it never changes the message's
- * height or the room before the next one. Clicking or focusing it opens a popover with each agent and its status, and who picked them. While the author's own plan picks, the mark is the
- * clock, and "Chamar um agente" is in its popover. A message sent into a task at work wears what became of it there
- * instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words only for what
- * you can act on ("Nenhum agente vai responder", a failure, no AI connected) or what nobody can (the AI provider is
- * down, it retries by itself): then the whole receipt is a line under
- * the message (`part="line"`), so the text still follows the name. "Nenhum agente vai responder" is said that way only
- * under the conversation's newest message (`latest`): in a talk among people, or where agents answer only when
- * called, it repeated under every message. Older ones keep the check, whose popover says it.
+ * height or the room before the next one. Clicking or focusing it opens a popover with each agent and its status, and
+ * who picked them. The mark is the clock, one tick or two (`receiptTicks`). While the author's own plan picks, and
+ * when no agent will answer (an agent's reaction counts as acting), "Chamar um agente" is in its popover: never a line
+ * in the timeline, which read as wrong beside an agent's reaction. A message sent into a task at work wears what
+ * became of it there instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change.
+ * Words only for what you can act on (a failure, no AI connected) or what nobody can (the AI provider is down, it
+ * retries by itself): then the whole receipt is a line under the message (`part="line"`), so the text still follows
+ * the name.
  */
-export function MessageReceipts({
-  message,
-  part,
-  latest = true,
-}: {
-  message: Message;
-  part: "check" | "line";
-  latest?: boolean;
-}) {
+export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -97,6 +86,8 @@ export function MessageReceipts({
   const modelLabel = useModelLabel();
   const steerId = useId();
   const receipt = useLive((s) => s.receipts[message.id]);
+  // The pills' list (live through `message.reactions`), else the message's: an agent's reaction is its answer.
+  const reactions = useReactions(org.id, message.id, false).data ?? message.reactions;
   const steer = useSteerState(org.id, message.channelId, part === "check" ? message.id : "");
   const steerName = steer ? dir.agentById.get(steer.agentId)?.name : undefined;
   const steered =
@@ -109,18 +100,16 @@ export function MessageReceipts({
         <CallAgentMenu />
       </ReceiptAction>
     ) : null;
-  // Nobody answers an older message: its check says so in the popover, not a line under each message.
-  const quietNobody = status?.kind === "nobody" && !latest;
+  const nobody = status?.kind === "nobody";
   // "Tentar de novo" sends the words again as mine: never an agent's.
   const worded =
-    (status?.kind === "nobody" && !quietNobody) ||
     status?.kind === "outage" ||
     status?.kind === "queued" ||
     status?.kind === "away" ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
-  // The mark stays where a line says the rest (a failure, nobody): what became of it in the task is its own news.
+  // The mark stays where a line says the rest (a failure, no AI): what became of it in the task is its own news.
   if (part === "line" ? !worded : worded && !steered) return null;
   const marked = view.seen.length > 0 || view.picking === true || steered !== null;
   if (!marked && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
@@ -146,9 +135,11 @@ export function MessageReceipts({
     .filter(Boolean)
     .join(". ");
   const phases = new Map<string, ReceiptPhase>(receipt?.agents ?? []);
+  const reacted = new Set(reactions?.flatMap((r) => r.agentIds ?? []));
   const phaseText = (id: string) => {
     const phase = phases.get(id) ?? "seen";
     if (phase === "no_ai") return t("noAi.chip");
+    if (phase === "seen" && reacted.has(id)) return t("receipts.status.reacted");
     return view.referenced.includes(id) && phase === "seen"
       ? t("receipts.status.referenced")
       : t(`receipts.status.${phase}`);
@@ -176,7 +167,7 @@ export function MessageReceipts({
             // Keyed by the state: each new mark swaps in.
             <SteerMark key={steered.steer.state} steer={steered.steer} name={steered.name} size={16} />
           ) : (
-            <Icon name={receiptIcon(view)} />
+            <Icon name={receiptIcon(view, receipt)} />
           )}
         </button>
       }
@@ -220,7 +211,7 @@ export function MessageReceipts({
           <span>{by.text}</span>
         </div>
       )}
-      {quietNobody && (
+      {nobody && (
         <div className="who-by">
           <span className="ac-receipt__words">
             <span>{statusText}</span>
@@ -230,6 +221,7 @@ export function MessageReceipts({
       )}
       {mentionNeeded && (
         <div className="who-by">
+          <span className="ac-receipt__words">{t("receipts.mentionNeededHint")}</span>
           <HelpLink slug="who-answers">{t("routing.how")}</HelpLink>
         </div>
       )}
@@ -264,21 +256,6 @@ export function MessageReceipts({
               {t("receipts.retry")}
             </button>
           </ReceiptAction>
-        </span>
-      )}
-      {status?.kind === "nobody" && (
-        <span className="ac-receipt__words">
-          {mentionNeeded ? (
-            <span className="ac-hintline">
-              <span>{t("receipts.mentionNeeded")}</span>
-              <InfoHint name={t("common.about", { label: t("routing.title") })}>
-                {t("receipts.mentionNeededHint")}
-              </InfoHint>
-            </span>
-          ) : (
-            <span>{t("receipts.nobody")}</span>
-          )}
-          {callAgent}
         </span>
       )}
       {status?.kind === "platform_cap" && (

@@ -244,3 +244,29 @@ export function decisionOutcome(
   if (name) return t(approved ? "approval.outcomeApprovedBy" : "approval.outcomeRefusedBy", { name });
   return t(approved ? "approvals.status.approved" : "approvals.status.refused");
 }
+
+/** Who an approval waits for, by name: the people `request_approval` asked (ADR 0126), else the agent's owner. */
+export const approvalWaitsFor = (approval: Pick<Approval, "approvers">, ownerName: string | undefined) =>
+  approval.approvers?.label || ownerName;
+
+/**
+ * Who a shared card's requests wait for: one `request_approval` and an ordinary approval of the same agent can share
+ * a card while different people decide them, so every distinct name of the waiting requests (all of them once none
+ * waits).
+ */
+export function approvalGroupWaitsFor(items: Pick<Approval, "approvers" | "status">[], ownerName: string | undefined) {
+  const waiting = items.filter((a) => a.status === "pending");
+  const names = new Set((waiting.length > 0 ? waiting : items).map((a) => approvalWaitsFor(a, ownerName)));
+  return [...names].filter(Boolean).join(", ") || undefined;
+}
+
+/**
+ * The line saying the person whose request it is decides it too, as an approver by role (ADR 0126): while it waits
+ * and once they decided it. Null for any other approval.
+ */
+export function requesterDecidesLine(t: TFunction, a: Pick<Approval, "approvers" | "status" | "decidedByUserId">) {
+  const asked = a.approvers;
+  if (!asked?.requesterDecides || !asked.requestedByUserId) return null;
+  if (a.status !== "pending" && a.decidedByUserId !== asked.requestedByUserId) return null;
+  return t("approval.requesterDecides");
+}

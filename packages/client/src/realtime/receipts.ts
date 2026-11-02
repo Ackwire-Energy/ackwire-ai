@@ -440,3 +440,20 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
     ...decided,
   };
 }
+
+/**
+ * The mark on a message's receipt, as the person reads it: the clock while nobody picked it up yet (no agent took it,
+ * or the ones picked still wait in line), one tick once an agent got it and is on it, two once everyone it was for
+ * acted: answered, or decided not to (routed to nobody, an agent's reaction, an only mention).
+ */
+export type ReceiptTicks = "clock" | "check" | "checks";
+
+const ACTED: ReadonlySet<ReceiptPhase> = new Set(["handled", "failed", "no_ai"]);
+
+export function receiptTicks(receipt: MessageReceipt | undefined): ReceiptTicks {
+  if (!receipt || (receipt.picking && !receipt.routed)) return "clock";
+  const expected = receipt.agents.filter(([id, p]) => p !== "seen" && !receipt.referenced?.includes(id));
+  if (expected.length === 0) return receipt.routed ? "checks" : "clock";
+  if (expected.every(([, p]) => ACTED.has(p))) return "checks";
+  return expected.some(([, p]) => p !== "picked") ? "check" : "clock";
+}

@@ -41,6 +41,16 @@
     "pollAnswered_other": "{{count}}/{{total}} 人已回答",
     "voteFailed": "你的投票没有提交成功。"
   },
+  "choices": {
+    "step": "{{step}} / {{total}}",
+    "back": "上一步",
+    "next": "下一步",
+    "close": "关闭",
+    "closed": "{{title}} · 已关闭",
+    "reopen": "再次显示",
+    "answeredBy": "{{name}} 已选择",
+    "failed": "你的选择没有发送成功。请重试。"
+  },
   "chart": {
     "pending": "正在生成图表…",
     "table": "表格",
@@ -489,7 +499,9 @@
     "full": "此聊天已有 100 条置顶。请先取消置顶一条。",
     "mark": "已置顶",
     "none": "还没有置顶内容",
-    "empty": "这里还没有置顶内容。长按一条消息，然后点按“置顶”。"
+    "empty": "这里还没有置顶内容。长按一条消息，然后点按“置顶”。",
+    "bar_other": "置顶消息（{{count}}）",
+    "unpinOf": "取消置顶 {{name}} 的消息"
   },
   "thread": {
     "threadIn": "#{{channel}} 中的话题",
@@ -709,7 +721,8 @@
     "title": "动态",
     "filter": {
       "all": "全部",
-      "waiting": "等你处理"
+      "waiting": "等你处理",
+      "done": "已完成"
     },
     "day": {
       "today": "今天",
@@ -756,6 +769,8 @@
     "markUnread": "标为未读",
     "unread": "未读",
     "done": "完成",
+    "restore": "移回",
+    "noneDone": "过去 30 天内没有标记为完成的内容。",
     "more": "查看更多",
     "empty": "没有等你处理的事。放松一下吧。"
   },

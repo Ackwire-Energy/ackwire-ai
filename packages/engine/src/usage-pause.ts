@@ -96,6 +96,60 @@ export async function usageWaitPlace(
 }
 
 /**
+ * A turn on a plan just went through, so the plan has room again: the runs parked on its limit (`plan_limit`, the same
+ * `key`) go on now, in `usageWaitPlace`'s order, 60 s apart, instead of each sleeping until its own timer (a later
+ * reset reading, an unknown reset's re-checks). Without this a routine's slot could wait well past the reset while a
+ * person's reply on the same plan had already gone through. A long-work pause (95%) keeps its timer: a quick reply
+ * going through says nothing about its line. One job per wait; the old timed one finds the wait gone and does nothing.
+ * Only waits on the same `model` (a model's own weekly limit isn't lifted by another model's turn); a wait stored
+ * without one is woken.
+ */
+export async function wakePlanWaits(
+  db: Executor,
+  orgId: string,
+  key: string,
+  model: string | null,
+  now = Date.now(),
+): Promise<string[]> {
+  const { agentRuns } = schema;
+  const rows = await db
+    .select({
+      id: agentRuns.id,
+      background: agentRuns.background,
+      workId: agentRuns.workId,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      until: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'until'`,
+    })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'plan_limit'`,
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'waitKey' = ${key}`,
+        sql`(not (${agentRuns.transcript}->'waitingForBrain' ? 'model') or ${agentRuns.transcript}->'waitingForBrain'->>'model' is not distinct from ${model})`,
+      ),
+    )
+    .orderBy(agentRuns.createdAt)
+    .limit(100);
+  const rank = (r: { background: boolean; workId: string | null }) => (r.background ? 2 : r.workId ? 1 : 0);
+  const due = rows
+    .filter((r) => r.waitId && !(Date.parse(r.until ?? "") <= now + RESUME_GAP_MS))
+    .sort((a, b) => rank(a) - rank(b));
+  for (const [i, r] of due.entries()) {
+    await enqueue(db, {
+      orgId,
+      kind: "agent_run.execute",
+      payload: { runId: r.id, wait: r.waitId },
+      dedupeKey: `agent_run.execute:${r.id}:plan_back:${r.waitId}`,
+      runAt: new Date(now + i * RESUME_GAP_MS),
+      maxAttempts: 4,
+    });
+  }
+  return due.map((r) => r.id);
+}
+
+/**
  * The agent's budget went up (its own, or the workspace's default): the runs that wait for it go on now.
  * One that still doesn't fit parks again quietly. `agentId` null: every agent of the workspace.
  */
@@ -288,8 +342,11 @@ export async function routineRunByHand(db: Executor, runId: string) {
 /** `meta.actionCard` of a long-work pause's card (ADR 0118). Only the executor and Continuar agora write it. */
 export interface UsagePauseCard {
   kind: "usage_paused";
-  /** `ended`: the run ended paused (canceled, superseded, failed): nothing left to continue. */
-  state: "paused" | "continued" | "resumed" | "ended";
+  /**
+   * `ended`: the run ended paused (superseded, failed): nothing left to continue. `canceled`: someone said not to run
+   * it ("Don't run it", or any stop while it waited).
+   */
+  state: "paused" | "continued" | "resumed" | "ended" | "canceled";
   runId: string;
   waitId: string;
   agentId: string;
@@ -335,6 +392,69 @@ async function setUsageCardState(
     )
     .returning();
   if (row && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(row));
+}
+
+/**
+ * A run's "I'll answer when it resets" note while it is back at work (`ended`: true) or parked on it again (false):
+ * "Don't run it" shows only while it waits, never stopping a live answer or a run already over.
+ */
+export async function usageWaitNoteEnded(
+  deps: { db: Database; pubsub?: PubSub },
+  run: { id: string; orgId: string; channelId: string; createdAt: Date },
+  ended: boolean,
+) {
+  const { messages } = schema;
+  const rows = await deps.db
+    .update(messages)
+    .set({
+      meta: ended
+        ? sql`jsonb_set(${messages.meta}, '{usageWait,ended}', 'true'::jsonb)`
+        : sql`${messages.meta} #- '{usageWait,ended}'`,
+    })
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        sql`${messages.createdAt} >= ${run.createdAt.toISOString()}::timestamptz`,
+        sql`${messages.meta}->'usageWait'->>'runId' = ${run.id}`,
+        sql`${messages.meta}->'usageWait'->'canceled' is null`,
+        ended
+          ? sql`${messages.meta}->'usageWait'->'ended' is null`
+          : sql`${messages.meta}->'usageWait'->'ended' is not null`,
+      ),
+    )
+    .returning();
+  if (deps.pubsub) for (const row of rows) await publishMessageCreated(deps.pubsub, messageView(row));
+}
+
+/**
+ * A run waiting on its plan or budget was stopped ("Don't run it", or any stop while it waited): what said it would run
+ * later says it won't, quietly: its note (`meta.usageWait.canceled`) and its long-work card (`canceled`).
+ */
+export async function usageWaitCanceled(
+  deps: { db: Database; pubsub?: PubSub },
+  run: { id: string; orgId: string; channelId: string; createdAt: Date },
+) {
+  const { messages } = schema;
+  const card = sql`coalesce(${messages.meta}->'actionCard'->>'kind', '') = 'usage_paused'`;
+  const rows = await deps.db
+    .update(messages)
+    .set({
+      meta: sql`case when ${card}
+        then jsonb_set(${messages.meta}, '{actionCard,state}', '"canceled"'::jsonb)
+        else jsonb_set(${messages.meta}, '{usageWait,canceled}', 'true'::jsonb) end`,
+    })
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        sql`${messages.createdAt} >= ${run.createdAt.toISOString()}::timestamptz`,
+        sql`((${card} and ${messages.meta}->'actionCard'->>'runId' = ${run.id} and ${messages.meta}->'actionCard'->>'state' = 'paused')
+          or (not ${card} and ${messages.meta}->'usageWait'->>'runId' = ${run.id} and ${messages.meta}->'usageWait'->'canceled' is null))`,
+      ),
+    )
+    .returning();
+  if (deps.pubsub) for (const row of rows) await publishMessageCreated(deps.pubsub, messageView(row));
 }
 
 /**

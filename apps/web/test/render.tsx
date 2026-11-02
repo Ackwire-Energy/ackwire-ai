@@ -16,6 +16,7 @@ import { createQueryClient } from "@/app/query-client";
 import type { RouterContext } from "@/app/router-context";
 import type { AuthClient } from "@/auth/client";
 import { OrgProvider } from "@/components/org-context";
+import { forgetComposerDrafts } from "@/hooks/useComposerDraft";
 import { createI18n } from "@/i18n";
 import { createToastStore } from "@/lib/toast";
 import { RealtimeProvider } from "@/realtime/context";
@@ -128,8 +129,17 @@ export async function renderPage(
  */
 export async function renderApp(
   path: string,
-  options: { api: ApiClient; auth?: AuthClient; createSocket?: SocketFactory; strict?: boolean },
+  options: {
+    api: ApiClient;
+    auth?: AuthClient;
+    createSocket?: SocketFactory;
+    strict?: boolean;
+    /** A reload of the same browser: keep what this browser wrote down (unsent composer text). */
+    reload?: boolean;
+  },
 ) {
+  // Unsent composer text lives in localStorage: an app starts like a fresh browser unless the test reloads one.
+  if (!options.reload) forgetComposerDrafts();
   const sockets = fakeSockets();
   const services = makeServices(options.api, options.auth, options.createSocket ?? sockets.factory);
   const router = createRouter({

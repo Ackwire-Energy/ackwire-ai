@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNotNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNotNull, schema } from "@agenteschat/db";
 import { caches } from "../cache";
 import { NotFoundError } from "../errors";
 import { notifyToolChanged, resolveToolChanged } from "../notification-producers";
@@ -162,7 +162,7 @@ export async function listToolChanges(db: Database, actorId: string, orgId: stri
  * resolved once nothing else of the connection waits.
  */
 export async function acceptToolChange(
-  deps: { db: Database; pubsub?: PubSub; resync?: (connectionId: string) => Promise<unknown> },
+  deps: AcceptDeps,
   actorId: string,
   orgId: string,
   connectionId: string,
@@ -172,10 +172,41 @@ export async function acceptToolChange(
   const where = and(eq(pins.orgId, orgId), eq(pins.connectionId, connectionId), eq(pins.toolName, toolName));
   const [pin] = await deps.db.select().from(pins).where(where);
   if (!pin?.pendingFingerprint) throw new NotFoundError("No change waits for this tool");
-  await deps.db
+  await promotePending(deps.db, pin);
+  await afterAccepted(deps, orgId, connectionId);
+}
+
+/**
+ * "Aceitar todas": every change waiting on one connection accepted at once, the connection listed again once.
+ * Returns how many tools were accepted.
+ */
+export async function acceptConnectionToolChanges(
+  deps: AcceptDeps,
+  actorId: string,
+  orgId: string,
+  connectionId: string,
+): Promise<number> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const waiting = await deps.db
+    .select()
+    .from(pins)
+    .where(and(eq(pins.orgId, orgId), eq(pins.connectionId, connectionId), isNotNull(pins.pendingFingerprint)));
+  if (waiting.length === 0) throw new NotFoundError("No change waits on this connection");
+  await deps.db.transaction(async (tx) => {
+    for (const pin of waiting) await promotePending(tx, pin);
+  });
+  await afterAccepted(deps, orgId, connectionId);
+  return waiting.length;
+}
+
+type AcceptDeps = { db: Database; pubsub?: PubSub; resync?: (connectionId: string) => Promise<unknown> };
+
+/** The pending text becomes the pin. */
+const promotePending = (db: Executor, pin: typeof pins.$inferSelect) =>
+  db
     .update(pins)
     .set({
-      fingerprint: pin.pendingFingerprint,
+      fingerprint: pin.pendingFingerprint ?? pin.fingerprint,
       description: pin.pendingDescription ?? "",
       inputSchema: pin.pendingSchema ?? {},
       pinnedAt: new Date(),
@@ -185,6 +216,9 @@ export async function acceptToolChange(
       changedAt: null,
     })
     .where(eq(pins.id, pin.id));
+
+/** Agents get the accepted text now: the connection is listed again, and its notice resolved once nothing waits. */
+async function afterAccepted(deps: AcceptDeps, orgId: string, connectionId: string) {
   await deps.db
     .update(schema.connectorConnections)
     .set({ updatedAt: new Date() })

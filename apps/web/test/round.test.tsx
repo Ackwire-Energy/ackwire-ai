@@ -167,6 +167,7 @@ describe("Criar canal", () => {
       name: "vendas-sul",
       topic: "Leads e propostas",
       visibility: "private",
+      audienceRoleIds: [],
     });
     const created = state.channels.find((c) => c.name === "vendas-sul");
     expect(state.calls.find((c) => c.method === "chat.addMember")?.args).toEqual([
@@ -347,24 +348,26 @@ describe("models by provider and the default key", () => {
     ).toBe(true);
   });
 
-  test("Criar agente: model cards by provider, OpenAI disabled without a key; key defaults to the workspace's", async () => {
+  test("Criar agente: Quem pensa by provider, OpenAI disabled without a key; key defaults to the workspace's", async () => {
     await go("agents/new");
     await startAs("QA");
     await proceed(4);
-    const models = screen().getByRole("group", { name: "Modelo" });
-    const cards = within(models).getAllByRole("button");
+    await act(async () => fireEvent.click(screen().getByRole("combobox", { name: "Quem pensa" })));
+    const list = screen().getByRole("listbox", { name: "Modelos" });
+    const options = within(list).getAllByRole("option");
     // "Automático" first and chosen, then the models by provider.
-    expect(cards[0]?.querySelector(".newag__model-head b")?.textContent).toBe("Automático");
-    expect(cards[0]?.getAttribute("aria-pressed")).toBe("true");
-    expect(cards.slice(1).map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
-      "Claude",
-      "Claude",
-      "Claude",
-      "OpenAI",
-    ]);
-    const gpt = within(models).getByRole("button", { name: /GPT-5/ });
+    expect(options[0]?.querySelector(".ac-menu__label span")?.textContent).toBe("Automático");
+    expect(options[0]?.getAttribute("aria-selected")).toBe("true");
+    const groups = within(list)
+      .getAllByRole("group")
+      .map((g) => g.getAttribute("aria-label"));
+    expect(groups.slice(0, 2)).toEqual(["Claude", "OpenAI"]);
+    const gpt = within(list).getAllByRole("option", { name: /GPT-5/ })[0] as HTMLElement;
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
     expect(gpt.textContent).toContain("Precisa de uma chave de API OpenAI");
+    await act(async () =>
+      fireEvent.keyDown(screen().getByRole("combobox", { name: "Buscar modelos" }), { key: "Escape" }),
+    );
     const key = screen().getByRole("combobox", { name: "Chave" });
     expect(key.textContent).toContain("Chave padrão do workspace");
   });

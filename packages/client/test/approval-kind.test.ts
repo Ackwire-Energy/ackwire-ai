@@ -10,10 +10,13 @@ import { approvalOriginShort } from "../src/lib/approval-origin";
 import {
   actionName,
   aheadEndLine,
+  approvalGroupWaitsFor,
   approvalRuleWords,
   approvalSummary,
   approvalValues,
+  approvalWaitsFor,
   approveAlwaysWords,
+  requesterDecidesLine,
 } from "../src/lib/approval-words";
 import { knownErrorText } from "../src/lib/errors";
 
@@ -191,5 +194,55 @@ describe("an action prepared ahead", () => {
     expect(qc.getQueryState(keys.routines("o1"))?.isInvalidated).toBe(false);
     cacheApproval(qc, "o1", { ...ran, routineId: "r1", runAt: "2026-11-03T13:00:00.000Z" });
     expect(qc.getQueryState(keys.routines("o1"))?.isInvalidated).toBe(true);
+  });
+});
+
+describe("approvals an agent asked of named people (ADR 0126)", () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+  const asked = { label: "Diretoria", requestedByUserId: "bia", requesterDecides: true };
+
+  test("waits for the people asked, else the agent's owner", () => {
+    expect(approvalWaitsFor({ approvers: asked }, "Ana")).toBe("Diretoria");
+    expect(approvalWaitsFor({ approvers: null }, "Ana")).toBe("Ana");
+  });
+
+  test("a shared card names everyone its waiting requests wait for", () => {
+    const pending = "pending" as const;
+    expect(
+      approvalGroupWaitsFor(
+        [
+          { approvers: asked, status: pending },
+          { approvers: null, status: pending },
+        ],
+        "Ana",
+      ),
+    ).toBe("Diretoria, Ana");
+    expect(
+      approvalGroupWaitsFor(
+        [
+          { approvers: asked, status: pending },
+          { approvers: asked, status: pending },
+        ],
+        "Ana",
+      ),
+    ).toBe("Diretoria");
+    expect(
+      approvalGroupWaitsFor(
+        [
+          { approvers: asked, status: "approved" },
+          { approvers: null, status: pending },
+        ],
+        "Ana",
+      ),
+    ).toBe("Ana");
+  });
+
+  test("says the requester decides only while it waits or once they decided it", () => {
+    const line = (over: Partial<Pick<Approval, "status" | "decidedByUserId" | "approvers">>) =>
+      requesterDecidesLine(t, { status: "pending", decidedByUserId: null, approvers: asked, ...over });
+    expect(line({})).toBe("approval.requesterDecides");
+    expect(line({ status: "approved", decidedByUserId: "bia" })).toBe("approval.requesterDecides");
+    expect(line({ status: "approved", decidedByUserId: "carla" })).toBeNull();
+    expect(line({ approvers: { ...asked, requesterDecides: false } })).toBeNull();
   });
 });

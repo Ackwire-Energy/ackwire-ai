@@ -1,6 +1,6 @@
 import { useApproval, useChannels, useDecideApproval } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
-import { aheadEndLine } from "@agenteschat/client/lib/approval-words";
+import { aheadEndLine, approvalWaitsFor, requesterDecidesLine } from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -103,7 +103,8 @@ export function ApprovalSheet({
   } else {
     const pending = a.status === "pending" && new Date(a.expiresAt).getTime() > now;
     const high = approvalRisk(a) === "high";
-    const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name : undefined;
+    const owner = approvalWaitsFor(a, a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name : undefined);
+    const requester = requesterDecidesLine(t, a);
     body = (
       <>
         <View style={styles.who}>
@@ -160,6 +161,11 @@ export function ApprovalSheet({
               </>
             )}
             <ApprovalSaid approval={a} name={name} />
+            {requester ? (
+              <Text variant="small" tone="muted">
+                {requester}
+              </Text>
+            ) : null}
             <ApprovalTraits approval={a} />
             {pending ? (
               <>

@@ -51,7 +51,10 @@ export const Organization = z
     role: Role,
     permissions: Permissions,
     rank: Rank,
-    context: z.string().optional(),
+    context: z
+      .string()
+      .optional()
+      .openapi({ description: "What the agents know of it: only for who may `configure`." }),
     logo: z
       .string()
       .nullable()
@@ -248,6 +251,10 @@ export const Agent = z
     audience: AgentAudience,
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean().openapi({ description: "Whether the current person can talk to it (mentions, DMs)." }),
+    seesDetails: z.boolean().openapi({
+      description:
+        "Whether the current person sees how it works: its owner, who manages agents, and whoever it answers. Without it `instructions` is empty and its tools, memory, usage and activity answer 403 `agent.details_hidden`.",
+    }),
     appearance: AgentAppearance.nullable().openapi({ description: "Its look; null = the default." }),
     mediaReplies: z.boolean().openapi({
       description:
@@ -296,6 +303,9 @@ export const Channel = z
     name: z.string(),
     topic: z.string(),
     visibility: z.enum(["public", "private"]),
+    audienceRoleIds: z.array(z.uuid()).optional().openapi({
+      description: "Private and limited to these roles (departments, ADR 0125); empty: public or invite only.",
+    }),
     isMember: z.boolean(),
     createdByUserId: z
       .string()
