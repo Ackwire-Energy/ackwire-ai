@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { createFakeErrorReporter } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import { systemText } from "@agenteschat/providers";
+import { ProviderError, systemText } from "@agenteschat/providers";
 import {
   addRunStep,
   afterTurnDone,
@@ -23,7 +24,7 @@ import {
   type ToolContext,
   type ToolSource,
 } from "../src";
-import { readsOutside } from "../src/context/learn";
+import { learnTags, readsOutside, reportLearnFailure } from "../src/context/learn";
 import { continuationVerdict, runCalls } from "../src/continuation";
 import { addMember, setup as baseSetup, type Fixture } from "./fixtures";
 
@@ -70,7 +71,7 @@ const isLearn = (system: string) => system.includes("You keep the memory of an A
 const isPromotion = (system: string) => system.includes("saved how-to notes into one reusable skill");
 
 /** What the learning job's model answers (set per test). */
-let learnOutput: { items: unknown[]; skill_fixes: unknown[] } = { items: [], skill_fixes: [] };
+let learnOutput: { items: unknown[]; skill_fixes: unknown[] } | Error = { items: [], skill_fixes: [] };
 const skillOutput = { name: "northwind-api", description: "Calls the Northwind API.", body: "1. GET the models." };
 
 async function setup(options: Parameters<typeof baseSetup>[0] = {}) {
@@ -82,7 +83,10 @@ async function setup(options: Parameters<typeof baseSetup>[0] = {}) {
     ...options,
     reply: (req, call) => {
       const system = systemText(req.system);
-      if (isLearn(system)) return { chunks: [JSON.stringify(learnOutput)] };
+      if (isLearn(system)) {
+        if (learnOutput instanceof Error) throw learnOutput;
+        return { chunks: [JSON.stringify(learnOutput)] };
+      }
       if (isPromotion(system)) return { chunks: [JSON.stringify(skillOutput)] };
       return typeof options.reply === "function" ? options.reply(req, call) : { chunks: ["ok"] };
     },
@@ -839,6 +843,7 @@ describe("learning guards", () => {
       },
     } as unknown as Parameters<typeof continuationVerdict>[0];
     let signal: string | undefined;
+    const failed: unknown[] = [];
     const verdict = await continuationVerdict(judge, {
       orgId: crypto.randomUUID(),
       agentId: crypto.randomUUID(),
@@ -851,7 +856,75 @@ describe("learning guards", () => {
       onLearn: (s) => {
         signal = s;
       },
+      onLearnFailed: (e) => failed.push(e),
     });
     expect([verdict, signal, asked]).toEqual(["continue", "none", [["verdict", "learn"], ["verdict"]]]);
+    expect(failed.map((e) => (e as Error).message)).toEqual(["400 invalid_request_error"]);
+  });
+
+  test("learning failures are reported with who thinks, never what was said, once per workspace and cause an hour", async () => {
+    f = await setup();
+    const errors = createFakeErrorReporter();
+    const orgId = f.org.id;
+    const planAgent = { orgId, id: "agent-1", brain: "claude_code", model: "claude-x", brainModel: "sonnet" };
+    const keyAgent = { orgId, id: "agent-2", brain: "model", model: "made-up-model", brainModel: null };
+    expect(learnTags(planAgent)).toEqual({
+      org_id: orgId,
+      agent_id: "agent-1",
+      brain: "claude_code",
+      provider: "claude_code",
+      model: "sonnet",
+      account: "plan_sign_in",
+    });
+    expect(learnTags(keyAgent)).toMatchObject({ brain: "model", provider: "unknown", account: "api_key" });
+    const t0 = 1_000_000;
+    const report = (cause: "judge_learn_question" | "learn_call", at: number) =>
+      reportLearnFailure({ errors }, cause, new Error("400"), { ...learnTags(planAgent), judge: "llm" }, at);
+    report("judge_learn_question", t0);
+    report("judge_learn_question", t0 + 59 * 60_000);
+    report("learn_call", t0 + 60_000);
+    report("judge_learn_question", t0 + 61 * 60_000);
+    expect(errors.reports.map((r) => r.tags.cause)).toEqual([
+      "judge_learn_question",
+      "learn_call",
+      "judge_learn_question",
+    ]);
+    expect(errors.reports[0]?.tags).toEqual({ ...learnTags(planAgent), judge: "llm", cause: "judge_learn_question" });
+    // Without a reporter nothing happens.
+    reportLearnFailure({}, "learn_queue", new Error("x"), { org_id: orgId });
+  });
+
+  test("a run whose judge refuses the learn question reports it, tagged with the agent's brain and the judge", async () => {
+    f = await setup({
+      judge: (_kind, id) => {
+        if (id === "learn") throw new Error("400 invalid_request_error");
+        return undefined;
+      },
+    });
+    const errors = createFakeErrorReporter();
+    f.context.errors = errors;
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev what's our deploy command?",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(
+      errors.reports.map((r) => [r.tags.cause, r.tags.org_id, r.tags.agent_id, r.tags.brain, r.tags.judge]),
+    ).toEqual([["judge_learn_question", f.org.id, f.agent.id, "model", "fake"]]);
+  });
+
+  test("a learning call the provider refuses is reported and skipped; a rate limit is left to the outbox", async () => {
+    f = await setup();
+    const errors = createFakeErrorReporter();
+    const { run } = await personRun("@dev check the models");
+    learnOutput = new ProviderError("401 invalid x-api-key", false, 401);
+    expect((await learnRun({ ...f.context, errors }, { orgId: f.org.id, runId: run.id })).skipped).toBe("model_failed");
+    expect(errors.reports.map((r) => [r.tags.cause, r.tags.org_id, r.tags.run_id, r.tags.account])).toEqual([
+      ["learn_call", f.org.id, run.id, "api_key"],
+    ]);
+    expect(JSON.stringify(errors.reports[0]?.tags)).not.toContain("check the models");
+    const { run: again } = await personRun("@dev once more");
+    learnOutput = new ProviderError("429 rate limited", true, 429);
+    await expect(learnRun({ ...f.context, errors }, { orgId: f.org.id, runId: again.id })).rejects.toThrow("429");
+    expect(errors.reports.length).toBe(1);
   });
 });

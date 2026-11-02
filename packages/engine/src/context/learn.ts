@@ -1,4 +1,6 @@
+import type { ErrorTags } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
+import { modelInfo } from "@agenteschat/providers";
 import { recordAgentActions } from "../agent-actions";
 import { callLine, type LearnSignal, type RunCall, runCalls } from "../continuation";
 import { cutText, cutTextEnd } from "../format";
@@ -18,6 +20,64 @@ export const LEARN_DEFAULTS = { maxPerAgentDay: 20, minToolCalls: 6, skillAfter:
 export const learnConfig = (deps: Pick<ContextDeps, "learn">) => ({ ...LEARN_DEFAULTS, ...deps.learn });
 
 export const LEARN_JOB = "context.learn";
+
+// ── Error reports ────────────────────────────────────────────────────────────
+
+/** Why learning failed, as its error report is tagged. */
+export type LearnFailure = "judge_learn_question" | "learn_queue" | "learn_call";
+
+const REPORT_EVERY_MS = 60 * 60_000;
+const lastReported = new Map<string, number>();
+
+/**
+ * Reports a learning failure (ADR 0120) to error reports (ADR 0104), at most once per workspace and cause an hour so
+ * a broken provider doesn't flood them. Tags only: never what the conversation said.
+ */
+export function reportLearnFailure(
+  deps: Pick<ContextDeps, "errors">,
+  cause: LearnFailure,
+  error: unknown,
+  tags: ErrorTags & { org_id: string },
+  now = Date.now(),
+) {
+  if (!deps.errors) return;
+  const key = `${tags.org_id}:${cause}`;
+  if (now - (lastReported.get(key) ?? Number.NEGATIVE_INFINITY) < REPORT_EVERY_MS) return;
+  // ponytail: per-process memory, so each replica reports once; a shared table if replicas multiply.
+  if (lastReported.size > 10_000) lastReported.clear();
+  lastReported.set(key, now);
+  try {
+    deps.errors.capture(error, { ...tags, cause });
+  } catch {
+    // A report that can't be made never fails learning.
+  }
+}
+
+/** What a learning report says about who thinks: the brain, its provider and model, and the account it uses. */
+export const learnTags = (agent: {
+  orgId: string;
+  id: string;
+  brain: string;
+  model: string;
+  brainModel: string | null;
+}): ErrorTags & { org_id: string } =>
+  agent.brain === "model"
+    ? {
+        org_id: agent.orgId,
+        agent_id: agent.id,
+        brain: "model",
+        provider: modelInfo(agent.model)?.provider ?? "unknown",
+        model: agent.model,
+        account: "api_key",
+      }
+    : {
+        org_id: agent.orgId,
+        agent_id: agent.id,
+        brain: agent.brain,
+        provider: agent.brain,
+        model: agent.brainModel ?? "default",
+        account: "plan_sign_in",
+      };
 
 // ── Trust ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +123,7 @@ type EndedRun = { id: string; orgId: string; agentId: string; channelId: string;
  * with no how-to for it yet). Never throws.
  */
 export async function afterTurnDone(
-  deps: Pick<ContextDeps, "learn"> & { db: Database },
+  deps: Pick<ContextDeps, "learn" | "errors"> & { db: Database },
   run: EndedRun,
   input: { judged: boolean; signal?: LearnSignal },
 ) {
@@ -92,7 +152,8 @@ export async function afterTurnDone(
       dedupeKey: `${LEARN_JOB}:${run.id}`,
     });
     return true;
-  } catch {
+  } catch (error) {
+    reportLearnFailure(deps, "learn_queue", error, { org_id: run.orgId, agent_id: run.agentId, run_id: run.id });
     return false;
   }
 }
@@ -216,7 +277,7 @@ function parseLearnOutput(text: string): { items: LearnedItem[]; skillFixes: { s
 
 export interface LearnResult {
   /** `running`: the run took more messages after the turn that queued this; the job retries (`jobs.ts`). */
-  skipped?: "missing" | "cap_reached" | "busy" | "running" | "budget" | "no_model";
+  skipped?: "missing" | "cap_reached" | "busy" | "running" | "budget" | "no_model" | "model_failed";
   saved: { id: string; action: string; trust: string; scopeType: string }[];
   rejected: { content: string; reason: "no_sources" | "secret" | "refused" }[];
   skills: { slug: string; action: string }[];
@@ -336,18 +397,34 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
   } catch {
     return { ...out, skipped: "no_model" };
   }
-  const result = await deps.gateway.complete({
-    orgId: run.orgId,
-    agentId: agent.id,
-    runId: run.id,
-    kind: "summary",
-    model,
-    system: LEARN_SYSTEM,
-    messages: [{ role: "user", content: `<turn>\n${cutTextEnd(text, LEARN_INPUT_CHARS)}\n</turn>` }],
-    maxTokens: 3000,
-    effort: "low",
-    outputSchema: LEARN_SCHEMA,
-  });
+  let result: Awaited<ReturnType<typeof deps.gateway.complete>>;
+  try {
+    result = await deps.gateway.complete({
+      orgId: run.orgId,
+      agentId: agent.id,
+      runId: run.id,
+      kind: "summary",
+      model,
+      system: LEARN_SYSTEM,
+      messages: [{ role: "user", content: `<turn>\n${cutTextEnd(text, LEARN_INPUT_CHARS)}\n</turn>` }],
+      maxTokens: 3000,
+      effort: "low",
+      outputSchema: LEARN_SCHEMA,
+    });
+  } catch (error) {
+    // A rate limit or an overload: the outbox tries again later.
+    if ((error as { retryable?: unknown } | null)?.retryable === true) throw error;
+    const provider = modelInfo(model)?.provider ?? "unknown";
+    reportLearnFailure(deps, "learn_call", error, {
+      org_id: run.orgId,
+      agent_id: agent.id,
+      run_id: run.id,
+      provider,
+      model,
+      account: "api_key",
+    });
+    return { ...out, skipped: "model_failed" };
+  }
   const parsed = parseLearnOutput(result.text);
   const now = new Date().toISOString();
   const judging = {

@@ -103,7 +103,7 @@ import {
   thisTurnText,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
-import { afterTurnDone } from "./context/learn";
+import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { fitContextWindow } from "./context-budget";
@@ -138,6 +138,7 @@ import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
+import type { Judge } from "./judge";
 import { answerNoTurn, listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
@@ -944,6 +945,14 @@ async function executeRunInner(
     const judged = d.verdict === "done";
     const signal = learned;
     later(() => afterTurnDone(context, run, { judged, signal }));
+  };
+  const reportJudgeLearn = (judge: Judge, error: unknown) => {
+    if (deps.context && agent)
+      reportLearnFailure(deps.context, "judge_learn_question", error, {
+        ...learnTags(agent),
+        judge: judge.name,
+        run_id: run.id,
+      });
   };
   /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
   const takeSteering = () => takeInbox(db, run.id);
@@ -3236,6 +3245,7 @@ async function executeRunInner(
                   onLearn: (signal) => {
                     learned = signal;
                   },
+                  onLearnFailed: (error) => reportJudgeLearn(judge, error),
                 })
             : null,
           evidence: judging.evidence,
@@ -3390,6 +3400,7 @@ async function executeRunInner(
                 onLearn: (signal) => {
                   learned = signal;
                 },
+                onLearnFailed: (error) => reportJudgeLearn(judge, error),
               })
           : null,
         evidence: judging.evidence,
