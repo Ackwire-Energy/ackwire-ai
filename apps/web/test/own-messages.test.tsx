@@ -169,13 +169,29 @@ describe("own message styles", () => {
 
   test("the bar stands left of the bubble, never over my words; the check ends the time's line, always on screen", async () => {
     const r = await rules();
-    const bar = r.get(
+    const css = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
+    // With a mouse: flat icons 2px left of the bubble, their middle on its first line (7px padding + half a
+    // 15.5px / 1.7 line - half a 30px button), inside the row, so never in the gap above.
+    const mouse =
+      css
+        .split("@media (hover: hover) and (pointer: fine) {\n  .ac-msg--own > .ac-msg__body > .ac-msg__actions,")[1]
+        ?.split("\n}")[0] ?? "";
+    expect(mouse).toContain("right: calc(100% + 2px);");
+    for (const sel of [
+      ".ac-msg--own > .ac-msg__body > .ac-msg__actions",
       ".ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions",
-    );
-    // The bar's middle on the bubble's top edge, as on everyone's rows.
-    expect(bar).toContain("right: calc(100% + 8px)");
-    expect(bar).toContain("top: 0");
-    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__actions")).toContain("top: 0");
+    ]) {
+      const bar = r.get(sel) ?? "";
+      expect(bar).toContain("right: calc(100% + 2px)");
+      expect(bar).toContain("top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 15px)");
+      expect(bar).toMatch(/background: transparent;\s*box-shadow: none;\s*transform: none;/);
+      expect(bar).not.toContain("top: 0");
+    }
+    // Three 28px icons fit the row's 96px left padding beside a full-width bubble.
+    expect(mouse).toMatch(/\.ac-msg__actions \.ac-btn--sm \{\s*min-width: 28px;\s*width: 28px;\s*height: 30px;/);
+    // The bubble's padding and line, which the bar's top is computed from.
+    expect(r.get(".ac-msg--own .ac-msg__text")).toContain("padding: 7px 14px");
+    expect(r.get(".ac-msg__text")).toMatch(/font-size: 15\.5px;\s*line-height: 1\.7/);
     // The check in the time's line, on the bubble's right edge: no line of its own, and no room while it's empty.
     expect(r.get(".ac-msg__own-foot")).toContain("justify-content: flex-end");
     expect(r.get(".ac-msg__own-foot > .ac-msg__aside")).toContain("height: 16px");
@@ -190,6 +206,17 @@ describe("own message styles", () => {
     );
     expect(own.length).toBeGreaterThan(0);
     for (const [, , body = ""] of own) expect(body).not.toMatch(/opacity|visibility|display:\s*none/);
+  });
+
+  test("my bar's buttons are in screen order, Reagir nearest the bubble; others' keep Reagir first", async () => {
+    await open([said("j1", "u-joao", "Bom dia!", 10), said("w1", "u-walter", "Vi o alerta também", 9)]);
+    const names = (id: string) =>
+      within(row(id))
+        .getAllByRole("button")
+        .filter((b) => b.closest(".ac-msg__actions"))
+        .map((b) => b.getAttribute("aria-label"));
+    expect(names("w1")).toEqual(["Mais ações da mensagem", "Responder", "Reagir"]);
+    expect(names("j1")).toEqual(["Reagir", "Responder", "Mais ações da mensagem"]);
   });
 
   test("a turn's bubble ends on the cut corner, on the side it stands", async () => {

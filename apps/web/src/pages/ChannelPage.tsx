@@ -3767,7 +3767,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
           {personBar && !(mediaAfter && readOnly) && (
-            <PersonMessageActions message={m} authorName={name} more={menu.more} />
+            <PersonMessageActions message={m} authorName={name} more={menu.more} own={own} />
           )}
           {menu.dialog}
         </Parts>
