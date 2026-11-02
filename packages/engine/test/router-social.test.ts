@@ -9,7 +9,7 @@ import {
   postPersonMessage,
   type RouterStrategy,
   routeMessage,
-  thanksReaction,
+  socialReaction,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -65,26 +65,36 @@ const post = (userId: string, body: string) =>
 const reactionsOn = async (messageId: string) =>
   (await f.db.select().from(schema.messageReactions)).filter((r) => r.messageId === messageId);
 
-describe("thanksReaction", () => {
+describe("socialReaction (the fallback when no step chose a reaction)", () => {
   test("short thanks and acknowledgements in Portuguese and English get one emoji by tone", () => {
-    expect(thanksReaction("vlw pai")).toBe("🙏");
-    expect(thanksReaction("Valeuuu!!")).toBe("🙏");
-    expect(thanksReaction("muito obrigado mesmo")).toBe("🙏");
-    expect(thanksReaction("thank you so much")).toBe("🙏");
-    expect(thanksReaction("ty")).toBe("🙏");
-    expect(thanksReaction("show")).toBe("+1");
-    expect(thanksReaction("perfeito, top")).toBe("+1");
-    expect(thanksReaction("👍")).toBe("+1");
-    expect(thanksReaction("te amo pai ❤️")).toBe("❤️");
-    expect(thanksReaction("valeu <3")).toBe("❤️");
+    expect(socialReaction("vlw pai")).toBe("🙏");
+    expect(socialReaction("Valeuuu!!")).toBe("🙏");
+    expect(socialReaction("muito obrigado mesmo")).toBe("🙏");
+    expect(socialReaction("thank you so much")).toBe("🙏");
+    expect(socialReaction("ty")).toBe("🙏");
+    expect(socialReaction("show")).toBe("+1");
+    expect(socialReaction("perfeito, top")).toBe("+1");
+    expect(socialReaction("👍")).toBe("+1");
+    expect(socialReaction("te amo pai ❤️")).toBe("❤️");
+    expect(socialReaction("valeu <3")).toBe("❤️");
+  });
+
+  test("greetings, goodnights, goodbyes and congratulations get theirs", () => {
+    expect(socialReaction("boa noite")).toBe("🌙");
+    expect(socialReaction("boa noite pessoal to indo dormir ok")).toBe("🌙");
+    expect(socialReaction("bom dia galera")).toBe("☀️");
+    expect(socialReaction("oi")).toBe("👋");
+    expect(socialReaction("tchau, até amanhã")).toBe("👋");
+    expect(socialReaction("parabéns!!")).toBe("🎉");
+    expect(socialReaction("alô???")).toBeNull();
+    expect(socialReaction("boa noite, o deploy subiu")).toBeNull();
   });
 
   test("anything else is no thanks", () => {
-    expect(thanksReaction("valeu, e o deploy?")).toBeNull();
-    expect(thanksReaction("obrigado, agora sobe a versão nova")).toBeNull();
-    expect(thanksReaction("boa noite")).toBeNull();
-    expect(thanksReaction("pode")).toBeNull();
-    expect(thanksReaction("")).toBeNull();
+    expect(socialReaction("valeu, e o deploy?")).toBeNull();
+    expect(socialReaction("obrigado, agora sobe a versão nova")).toBeNull();
+    expect(socialReaction("pode")).toBeNull();
+    expect(socialReaction("")).toBeNull();
   });
 });
 
@@ -205,5 +215,127 @@ describe("an agent reacts to the thanks of the person it just answered", () => {
     const thanks = await post(f.owner.id, "vlw pai");
     expect((await route(thanks.id)).reacted).toBeUndefined();
     expect(await reactionsOn(thanks.id)).toEqual([]);
+  });
+});
+
+/**
+ * A fake provider whose router answer comes from what the person said (`<message>`): needs, social and scores. An
+ * agent's run answers briefly.
+ */
+const routerSays =
+  (decide: (said: string) => { needs?: number; react?: string; scores?: Record<string, number> }) =>
+  (req: { outputSchema?: unknown; messages: unknown }) => {
+    if (!req.outputSchema) return { chunks: ["Boa noite! Tô por aqui."] };
+    const said = /<message>\\n\[[^\]]*\]: (.*?)\\n<\/message>/.exec(JSON.stringify(req.messages))?.[1] ?? "";
+    const d = decide(said);
+    const scores = Object.entries(d.scores ?? {}).map(([handle, score]) => ({ handle, score }));
+    return {
+      chunks: [
+        JSON.stringify({
+          addressee: "none",
+          needs_agent: d.needs ?? 0.05,
+          for_everyone: 0,
+          already_answered: 0,
+          social: { react: Boolean(d.react), emoji: d.react ?? "" },
+          scores,
+          reason: "test",
+        }),
+      ],
+    };
+  };
+const goodnight = routerSays((said) => (/^(boa noite|bom dia)/i.test(said) ? { react: "🌙" } : { needs: 0.05 }));
+const runsOn = async (messageId: string) =>
+  (await f.db.select().from(schema.agentRuns)).filter((r) => r.triggerMessageId === messageId);
+const handlersOf = () => createJobHandlers({ ...f.jobDeps, router: { enabled: true, model: "claude-haiku-5-5" } });
+
+describe("an agent reacts to a purely social message nobody answers, with the emoji the router chose", () => {
+  test("boa noite: the agent that answered the person reacts 🌙, not the one that posted last; no run", async () => {
+    f = await setup({ reply: goodnight });
+    const ops = await addOps();
+    await said(f.owner.id, "why is the build failing?", minutesAgo(6));
+    await answered(f.agent.id, "A missing env var in CI. Fixed it.", minutesAgo(5));
+    await answered(ops.id, "Nightly report: 3 deploys, 0 incidents.", minutesAgo(2));
+    const night = await post(f.owner.id, "boa noite");
+    await drainOutbox(f.db, handlersOf());
+    expect(await listReactions(f.db, f.org.id, night.id)).toEqual([
+      expect.objectContaining({ reaction: "🌙", agentIds: [f.agent.id] }),
+    ]);
+    expect(await runsOn(night.id)).toEqual([]);
+    expect((await f.db.select().from(schema.notifications)).filter((n) => n.kind === "reaction")).toEqual([]);
+  });
+
+  test("a goodnight to everyone gets exactly one agent's reaction", async () => {
+    f = await setup({ reply: goodnight });
+    await addOps();
+    const night = await post(f.owner.id, "boa noite pessoal");
+    await drainOutbox(f.db, handlersOf());
+    const reactions = await reactionsOn(night.id);
+    expect(reactions).toHaveLength(1);
+    expect(reactions[0]?.reaction).toBe("🌙");
+    expect(await runsOn(night.id)).toEqual([]);
+  });
+
+  test("insisting after a greeting got no answer: an agent answers briefly instead of only reacting", async () => {
+    f = await setup({
+      reply: routerSays((said) =>
+        said.startsWith("boa noite") ? { react: "🌙" } : { needs: 0.8, scores: { dev: 0.4, ops: 0.2 } },
+      ),
+    });
+    await addOps();
+    await said(f.owner.id, "boa noite pessoal", minutesAgo(3));
+    const insist = await post(f.owner.id, "alô???");
+    await drainOutbox(f.db, handlersOf());
+    expect(await reactionsOn(insist.id)).toEqual([]);
+    expect((await runsOn(insist.id)).map((r) => r.agentId)).toEqual([f.agent.id]);
+    const replies = (await f.db.select().from(schema.messages)).filter((m) => m.authorAgentId === f.agent.id);
+    expect(replies.map((m) => m.body)).toEqual(["Boa noite! Tô por aqui."]);
+  });
+
+  test("a person's goodnight to another person gets nothing, even when the router calls it social", async () => {
+    f = await setup({ reply: goodnight });
+    const bia = await addBia();
+    await said(f.owner.id, "why is the build failing?", minutesAgo(9));
+    await answered(f.agent.id, "A missing env var in CI. Fixed it.", minutesAgo(8));
+    await said(bia.id, "vou indo nessa", minutesAgo(1));
+    const toBia = await post(f.owner.id, "boa noite bia");
+    const afterBia = await post(f.owner.id, "boa noite");
+    await drainOutbox(f.db, handlersOf());
+    expect(await reactionsOn(toBia.id)).toEqual([]);
+    expect(await reactionsOn(afterBia.id)).toEqual([]);
+    expect([...(await runsOn(toBia.id)), ...(await runsOn(afterBia.id))]).toEqual([]);
+  });
+
+  test("an agent this person may not talk to never reacts: one they may talk to does", async () => {
+    f = await setup({ reply: goodnight });
+    const ops = await addOps();
+    const bia = await addBia();
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: f.owner.id, audienceMode: "owner" })
+      .where(eq(schema.agents.id, f.agent.id));
+    await said(bia.id, "can someone check the logs?", minutesAgo(5));
+    await answered(f.agent.id, "The logs are clean.", minutesAgo(4));
+    const night = await post(bia.id, "boa noite pessoal");
+    await drainOutbox(f.db, handlersOf());
+    expect((await reactionsOn(night.id)).map((r) => [r.agentId, r.reaction])).toEqual([[ops.id, "🌙"]]);
+  });
+
+  test("with no step's choice, the fallback still reacts to a goodnight to the room", async () => {
+    f = await setup();
+    await addOps();
+    const night = await post(f.owner.id, "boa noite pessoal");
+    const result = await route(night.id);
+    expect(result.selected).toEqual([]);
+    expect(result.reacted?.reaction).toBe("🌙");
+    expect(await reactionsOn(night.id)).toHaveLength(1);
+  });
+
+  test("the router saying it isn't social wins over the fallback's words", async () => {
+    f = await setup({ reply: routerSays(() => ({ needs: 0.05 })) });
+    await said(f.owner.id, "why is the build failing?", minutesAgo(6));
+    await answered(f.agent.id, "A missing env var in CI. Fixed it.", minutesAgo(5));
+    const ok = await post(f.owner.id, "show");
+    await drainOutbox(f.db, handlersOf());
+    expect(await reactionsOn(ok.id)).toEqual([]);
   });
 });

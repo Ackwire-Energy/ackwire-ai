@@ -887,6 +887,7 @@ describe("Jev strategy end to end", () => {
       "best_agent",
       "for_everyone",
       "needs_agent",
+      "social",
     ]);
     expect(JSON.stringify(req?.body.state)).toContain("is the deploy green?");
     expect(f.provider.calls).toHaveLength(1); // only the agent's reply: no LLM router call

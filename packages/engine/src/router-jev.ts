@@ -44,6 +44,18 @@ export const jevCostNanoUsd = (inputTokens: number) => Math.round(inputTokens * 
 
 const NONE = "none";
 
+/** The reactions Jev's `social` question chooses from (the small model writes any emoji), and `none`. */
+const SOCIAL_CHOICES: Record<string, string> = {
+  "🌙": "Says good night, or that they are off to sleep.",
+  "☀️": "Says good morning.",
+  "👋": "Says hi, good afternoon, or bye.",
+  "🎉": "Congratulates or celebrates.",
+  "🙏": "Thanks.",
+  "❤️": "Shows affection.",
+  "👍": "An ok, an acknowledgement, or cheers.",
+  [NONE]: "Needs a real answer, or isn't social.",
+};
+
 /**
  * How to read the state and who a message is for: the small model's rules too (`ROUTER_SYSTEM`). Built per
  * call: loading `router.ts` first loads this module before `SPOKEN_TO` exists (router.ts → messages.ts →
@@ -164,6 +176,13 @@ export function createJevRouterStrategy(options: {
           criteria: spoken,
         };
       }
+      if (input.authorUserId !== null) {
+        questions.social = {
+          type: "choice",
+          instructions: `Is \`latest_message\` purely social, needing no real answer, and which emoji fits it as a reaction? ${whoFor()} \`${NONE}\` when it asks or says anything that needs an answer, or the person wants an actual reply: they insist, or complain that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first).`,
+          criteria: SOCIAL_CHOICES,
+        };
+      }
 
       const body = await callJev<{
         model?: string;
@@ -199,6 +218,7 @@ export function createJevRouterStrategy(options: {
         },
         new Map(input.candidates.map((c) => [c.agentId, clamp(to[c.handle])])),
       );
+      const social = answers.social?.choice;
       const choice = answers.best_agent?.choice;
       const bestPlaced = input.candidates.find((c) => c.handle === choice);
       const spokenTo = input.candidates.find((c) => c.agentId === scored.addressee);
@@ -218,6 +238,14 @@ export function createJevRouterStrategy(options: {
           ? { best: { agentId: bestPlaced.agentId, confidence: clamp(answers.best_agent?.confidence) } }
           : {}),
         ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
+        ...(social
+          ? {
+              social: {
+                react: social in SOCIAL_CHOICES && social !== NONE && clamp(answers.social?.confidence) >= 0.5,
+                emoji: social === NONE ? "" : social,
+              },
+            }
+          : {}),
         ...(reason ? { reason } : {}),
         strategy: "jev",
         decidedBy: { step: "jev" },
