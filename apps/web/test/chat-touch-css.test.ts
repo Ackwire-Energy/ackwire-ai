@@ -17,7 +17,8 @@ test("what ships gives the emoji popover one scroll, the menu's two lines one le
   expect(last(shipped, ".ac-emoji__scroll", "overflow-y")).toBe("auto");
 
   // The line under the reactions stops 8px in from each side, where a separator does.
-  expect(last(shipped, ".ac-menu__separator", "margin")).toBe("6px 8px");
+  expect(last(shipped, ".ac-menu__separator", "margin")).toBe("4px var(--menu-item-px)");
+  expect(last(shipped, ":root", "--menu-item-px")).toBe("8px");
   expect(last(shipped, ".ac-menu__reactions", "border-bottom")).toBeUndefined();
   expect(last(shipped, ".ac-menu__reactions", "background")).toContain("calc(100% - 16px) 1px no-repeat");
 

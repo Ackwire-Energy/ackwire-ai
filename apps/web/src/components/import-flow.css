@@ -479,3 +479,10 @@ html:not([data-pointer]) .imp-link:focus-visible {
     margin-left: 24px;
   }
 }
+
+/* ── "Do seu app de IA": the most reliable way, on top of the sources ───── */
+.imp-aiapp {
+  justify-content: flex-start;
+  gap: 12px;
+  text-align: left;
+}

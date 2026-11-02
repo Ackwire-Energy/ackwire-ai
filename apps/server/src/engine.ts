@@ -1,4 +1,10 @@
-import { type Adapters, type BrainTurnRequest, type S3Fetch, STREAM_CLOSE } from "@agenteschat/adapters";
+import {
+  type Adapters,
+  type BrainTurnRequest,
+  type ErrorReporter,
+  type S3Fetch,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
@@ -141,6 +147,8 @@ export interface EngineOptions {
     info(message: string, data?: Record<string, unknown>): void;
     warn(message: string, data?: Record<string, unknown>): void;
   };
+  /** Error reports (ADR 0104) for failures nothing logs: learning's (`reportLearnFailure`). */
+  errors?: ErrorReporter;
 }
 
 /**
@@ -176,6 +184,7 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
     judge: o.judge,
     schedules: o.schedules,
+    errors: o.errors,
     reflect: {
       everyMessages: config.REFLECT_EVERY_MESSAGES,
       idleMinutes: config.REFLECT_IDLE_MINUTES,

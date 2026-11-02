@@ -1,3 +1,4 @@
+import { clockHour } from "@agenteschat/client/lib/format";
 import type { TFunction } from "i18next";
 
 /** "agora", "2 min", "3 h" since a time. */
@@ -14,7 +15,7 @@ export function clock(iso: string, locale: string, now: Date = new Date()): stri
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const sameDay = d.toDateString() === now.toDateString();
-  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString(locale, { hour: clockHour(locale), minute: "2-digit" });
   if (sameDay) return time;
   return `${d.toLocaleDateString(locale, { weekday: "short" })} ${time}`;
 }

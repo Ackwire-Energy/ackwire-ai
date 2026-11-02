@@ -99,7 +99,7 @@ export async function changesPermissions(judge: Judge | undefined, orgId: string
 
 // ── Evidence ─────────────────────────────────────────────────────────────────
 
-export const EVIDENCE_WEIGHT: Record<Evidence["type"], number> = { outcome: 4, human: 3, agent: 2, self: 1 };
+export const EVIDENCE_WEIGHT: Record<Evidence["type"], number> = { outcome: 4, human: 3, agent: 2, app: 2, self: 1 };
 
 /**
  * Verified = backed by an observed outcome or a person. Claims by agents
@@ -573,10 +573,21 @@ export async function editContextItem(
       }),
     );
   }
-  if (input.pinned !== undefined || input.archived !== undefined) {
+  // Saving an app-sent item's text unchanged is a person confirming it (ADR 0119 item 5).
+  const confirms =
+    input.content !== undefined &&
+    current === item &&
+    item.trust !== "low" &&
+    item.evidence.some((e) => e.type === "app") &&
+    !isVerified(item.evidence);
+  if (confirms || input.pinned !== undefined || input.archived !== undefined) {
+    const evidence = confirms
+      ? mergeEvidence(item.evidence, [{ type: "human", ref: actorId, at: new Date().toISOString() }])
+      : undefined;
     const [row] = await db
       .update(contextItems)
       .set({
+        ...(evidence ? { evidence, verified: true, confidence: Math.max(item.confidence, 0.9) } : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.archived !== undefined
           ? { status: input.archived ? ("archived" as const) : ("active" as const) }
@@ -601,14 +612,26 @@ export async function deleteContextItem(db: Database, actorId: string, orgId: st
   });
 }
 
-/** A person adds a fact or note by hand (org context items need `configure`; agent notes need ownership). */
+/**
+ * A person adds a fact or note by hand (org context items need `configure`; agent notes need ownership). `viaApp`:
+ * the text came through a connected AI app (ADR 0119), so it is outside content: only an agent's own memory, kept
+ * high trust for that agent but unverified, which keeps it out of every promotion until a person confirms it.
+ */
 export async function addContextItemByPerson(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { kind: ContextKind; content: string; title?: string; agentId?: string | null; pinned?: boolean },
+  input: {
+    kind: ContextKind;
+    content: string;
+    title?: string;
+    agentId?: string | null;
+    pinned?: boolean;
+    viaApp?: boolean;
+  },
   judge?: Judge,
 ) {
+  if (input.viaApp && !input.agentId) throw new ValidationError("An app writes only an agent's own memory");
   const fake = { orgId, agentId: input.agentId ?? null } as ContextItem;
   await requireEdit(db, actorId, fake);
   await checkPermissionText(judge, orgId, `${input.title ?? ""}\n${input.content}`);
@@ -624,8 +647,8 @@ export async function addContextItemByPerson(
       content: input.content,
       pinned: input.pinned,
       trust: "high",
-      evidence: [{ type: "human", ref: actorId, at: new Date().toISOString() }],
-      confidence: 0.95,
+      evidence: [{ type: input.viaApp ? "app" : "human", ref: actorId, at: new Date().toISOString() }],
+      confidence: input.viaApp ? 0.8 : 0.95,
       createdByKind: "person",
       createdById: actorId,
     }),

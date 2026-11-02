@@ -660,6 +660,21 @@ export const ptBR = {
       title: "Já usa agentes em outro app?",
       lead: "Eles chegam com instruções, skills, rotinas e memória.",
       sourcesLabel: "De onde vêm os agentes",
+      aiApp: {
+        title: "Do seu app de IA (mais confiável)",
+        lead: "O seu app de IA cria aqui cada agente, instrução, skill e rotina que você tem nele.",
+        connect: "Conecte o app a este endereço:",
+        howTo: "Como conectar, app por app",
+        allow: "Na tela de permissão, escolha Criar e editar agentes, rotinas e skills.",
+        paste: "Depois cole este pedido no app:",
+        prompt:
+          "Conecte {{url}} e, para cada agente, instrução, skill e rotina que você tem, crie o equivalente no agentes.chat. Antes, liste o que já existe lá para não duplicar.",
+        promptLabel: "Pedido para o seu app de IA",
+        copy: "Copiar o pedido",
+        copied: "Agora é só colar no seu app de IA.",
+        private:
+          "Do seu app de IA: indisponível neste servidor, porque apps como o Claude e o ChatGPT só conectam a um endereço https público.",
+      },
       otherName: "Outro app",
       agenteschatName: "agentes.chat",
       where: {
@@ -3343,6 +3358,7 @@ export const ptBR = {
     editHelp: "A versão anterior fica no histórico. {{source}}",
     origin: {
       person: "Escrito por {{name}}",
+      app: "Enviado por {{name}} por um app de IA",
       agent: "Anotado pelo agente",
       lesson: "Aprendido",
       recorded: "Registrado",
@@ -3413,6 +3429,7 @@ export const ptBR = {
       human: "Uma pessoa",
       agent: "Outro agente",
       self: "O próprio agente",
+      app: "Enviado por um app de IA",
     },
   },
   newAgent: {
@@ -4642,7 +4659,9 @@ export const ptBR = {
       continuedToast: "Execução continuando.",
       forbidden: "Só quem criou a rotina, o dono do agente ou um admin pode continuar agora",
       extra_off:
-        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora",
+        "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora, ou ele retoma depois que o limite renovar",
+      extra_used_up:
+        "A janela deste plano acabou e o uso extra pago dele acabou ou não está disponível. Ele retoma depois que o limite renovar",
     },
     pausedRunningToast: "Rotina pausada. A execução em andamento também parou.",
     deleteBodyRunning:
@@ -8847,7 +8866,9 @@ export const ptBR = {
       agentNotInChannel: "Adicione o agente à conversa antes.",
       webhookPaused: "Ligue a rotina para testar.",
       continueExtraOff:
-        "O trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora.",
+        "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora, ou ele retoma depois que o limite renovar.",
+      continueExtraUsedUp:
+        "A janela deste plano acabou e o uso extra pago dele acabou ou não está disponível. Ele retoma depois que o limite renovar.",
     },
     run: {
       notContinuable: "Esta resposta não pode mais ser continuada.",
@@ -9190,8 +9211,22 @@ export const ptBR = {
     connected: "Conectados",
     onThisComputer: "neste computador",
     access: {
+      manage: "Cria agentes, rotinas e skills",
       write: "Lê e manda tarefas",
       read: "Só leitura",
+    },
+    created: {
+      notice: "{{app}} criou {{what}} pelo app",
+      agent_one: "{{count}} agente",
+      agent_other: "{{count}} agentes",
+      routine_one: "{{count}} rotina",
+      routine_other: "{{count}} rotinas",
+      skill_one: "{{count}} skill",
+      skill_other: "{{count}} skills",
+      memory_one: "{{count}} memória",
+      memory_other: "{{count}} memórias",
+      channel_one: "{{count}} canal",
+      channel_other: "{{count}} canais",
     },
     connectedAt: "Conectado {{when}}",
     usedAt: "Usado {{when}}",
@@ -9331,12 +9366,15 @@ export const ptBR = {
       access: "Acesso",
       write: "Ler e mandar tarefas aos agentes",
       writeHelp: "Manda mensagens em seu nome e lê as respostas.",
+      manage: "Criar e editar agentes, rotinas e skills",
+      manageHelp: "Também cria agentes, rotinas, skills e memórias em seu nome, com as suas permissões.",
       read: "Só ler",
       readHelp: "Vê agentes, canais e respostas, sem mandar nada.",
       can: "Pode",
       canSee: "Ver os agentes e os canais que você vê.",
       canSend: "Mandar mensagens como você, marcadas com via {{app}}.",
       canRead: "Ler as respostas e o que os agentes estão fazendo.",
+      canManage: "Criar e editar agentes, rotinas e skills como você. Você recebe um aviso do que ele criar.",
       never: "Nunca",
       neverApprove: "Aprovar ações dos agentes. Aprovações ficam com pessoas no agentes.chat.",
       neverSettings: "Mudar configurações, membros ou permissões.",

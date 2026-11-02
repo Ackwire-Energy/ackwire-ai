@@ -65,6 +65,12 @@ describe("replyPolicyFor", () => {
     expect(WHY_YOU_WERE_CALLED).toContain("without re-checking an answer already given");
   });
 
+  test("a run the router woke on a greeting or an 'alô???' answers in one short line", () => {
+    expect(WHY_YOU_WERE_CALLED).toContain(
+      'A greeting, or someone asking whether anyone is there because nobody answered ("alô???"), gets one short friendly line back, nothing more.',
+    );
+  });
+
   test("a run a note, a late result, its own fast reply or a news-only report woke may pass; an answer may not", () => {
     const notice = (kind: string) => ({ authorType: "agent" as const, meta: { notice: { kind, text: "x" } } });
     for (const kind of ["agent_note", "wait_result", "talker_reply"])

@@ -7,6 +7,7 @@ import {
   useRoutines,
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
@@ -361,13 +362,15 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })
-    : t(`mobile.activity.kind.${kind}`, {
-        names: NAMES,
-        count: who.total,
-        // `plan_reset_unknown`: the plan's name.
-        plan: n.latest.title ?? "",
-        defaultValue: NAMES,
-      });
+    : n.kind === "app_created"
+      ? appCreatedLine(t, n)
+      : t(`mobile.activity.kind.${kind}`, {
+          names: NAMES,
+          count: who.total,
+          // `plan_reset_unknown`: the plan's name.
+          plan: n.latest.title ?? "",
+          defaultValue: NAMES,
+        });
   const parts = template.split(NAMES);
   const title = parts.join(names);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.

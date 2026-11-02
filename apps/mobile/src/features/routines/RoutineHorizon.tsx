@@ -1,5 +1,5 @@
 import { type Routine, useCalendar } from "@agenteschat/client";
-import { whenAt } from "@agenteschat/client/lib/format";
+import { clockHour, whenAt } from "@agenteschat/client/lib/format";
 import { runPixels } from "@agenteschat/client/lib/routine-view";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
@@ -64,7 +64,7 @@ export function RoutineHorizon({ routines, now }: { routines: readonly Routine[]
   const futureOf = (r: Routine) => futureRuns(r, slots.data?.routines ?? [], at, to);
   const later = lanes.filter((r) => futureOf(r).length === 0).length;
   const time = (iso: string | Date) =>
-    new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+    new Intl.DateTimeFormat(i18n.language, { hour: clockHour(i18n.language), minute: "2-digit" }).format(new Date(iso));
   const weekday = (d: Date) =>
     new Intl.DateTimeFormat(i18n.language, { weekday: "short" }).format(d).replace(/\./g, "");
   const sub = [

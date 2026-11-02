@@ -1241,3 +1241,21 @@ export const remindBrowserHandoffNotifications = (deps: NotificationDeps, orgId:
 export async function resolveBrowserHandoffNotifications(deps: NotificationDeps, orgId: string, handoffId: string) {
   await resolveNotifications(deps, orgId, { groupKey: `browser_handoff:${handoffId}` });
 }
+
+/**
+ * Something an AI app created as the person (ADR 0119): it tells them in their own inbox, one row per connection that
+ * sums what it made while unread ("Claude criou 3 agentes e 2 rotinas pelo app"), opening the newest agent or routine.
+ */
+export async function notifyAppCreated(
+  deps: NotificationDeps,
+  input: { orgId: string; userId: string; grantId: string; app: string; kind: string; id: string },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [input.userId],
+    kind: "app_created",
+    groupKey: `app_created:${input.grantId}`,
+    source: input.kind === "agent" ? { agentId: input.id } : input.kind === "routine" ? { routineId: input.id } : {},
+    latest: { title: input.app, created: { [input.kind]: 1 } },
+  });
+}

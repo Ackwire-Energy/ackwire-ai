@@ -22,6 +22,14 @@ describe("locales", () => {
   });
 });
 
+describe("proposal evidence", () => {
+  test("every evidence type has a label (mirror of ContextEvidence in packages/db/src/schema/context.ts)", () => {
+    for (const tree of [ptBR, en]) {
+      expect(Object.keys(tree.proposals.evidence).sort()).toEqual(["agent", "app", "human", "outcome", "self"]);
+    }
+  });
+});
+
 describe("menu paths", () => {
   test("a path to a setting stays on one line: no-break spaces around its ›", () => {
     for (const tree of [ptBR, en]) {

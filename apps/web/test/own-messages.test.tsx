@@ -75,22 +75,24 @@ describe("my own messages sit on the right", () => {
     expect(row("w3").querySelector(".ac-msg__own-time")?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  test("a run's rows before its last keep their time for hover and keyboard, in the left column", async () => {
+  test("the receipt follows the time under the turn's last bubble, and no time hangs in the far-left column", async () => {
     await open([
       said("w1", "u-walter", "Vi o alerta também", 9),
       said("w2", "u-walter", "Estou no celular", 9),
-      said("w3", "u-walter", "Já volto", 8),
+      said("w3", "u-walter", "@ada consegue olhar?", 8, {
+        mentionedAgentIds: [ADA_ID],
+        receipts: { seenBy: [ADA_ID], pickedBy: [], handled: [] },
+      }),
     ]);
-    expect(
-      ["w1", "w2", "w3"].map((id) => row(id).querySelector(".ac-msg__gutter-time time")?.textContent ?? null),
-    ).toEqual([
-      row("w1").querySelector("time")?.textContent ?? "",
-      row("w2").querySelector("time")?.textContent ?? "",
-      null,
-    ]);
-    expect(row("w1").querySelector(".ac-msg__gutter-time")?.textContent).toMatch(/\d{2}:\d{2}/);
-    // Never read twice: the hidden head reads it.
-    expect(row("w1").querySelector(".ac-msg__gutter")?.getAttribute("aria-hidden")).toBe("true");
+    // Time, then the check, one line under the turn's last bubble ("8:39 PM ✓"); nothing left of the bubble.
+    const foot = row("w3").querySelector(".ac-msg__own-foot") as HTMLElement;
+    expect([...foot.children].map((part) => part.className)).toEqual(["ac-msg__own-time", "ac-msg__aside"]);
+    expect(foot.querySelector(".ac-msg__aside .ac-receipt__check")?.tagName).toBe("BUTTON");
+    expect(row("w3").querySelector(".ac-msg__aside--floating")).toBeNull();
+    // The rows before a run's last: no hover time in the far-left column, where everyone else's grouped rows have it.
+    for (const id of ["w1", "w2", "w3"])
+      expect(row(id).querySelector(".ac-msg__gutter, .ac-msg__gutter-time")).toBeNull();
+    for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__own-foot")).toBeNull();
   });
 
   test("something under a bubble ends the run's look: the next bubble doesn't square off against it", async () => {
@@ -205,18 +207,16 @@ describe("own message styles", () => {
     expect(r.get(".ac-msg--own")).toContain("padding-left: 96px");
     const css = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
     // Any bubble may take a narrow row, so wrapped words, code, a table and a file share one left edge; a phone
-    // keeps 64px of it, and with a mouse the time of a run's row goes under the bar standing there.
+    // keeps 64px of it.
     expect(css).toContain("@media (max-width: 600px) {\n  .ac-msg--own > .ac-msg__body {\n    --own-max: 100%;");
     expect(css).toContain("@media (max-width: 600px) and (hover: none) {\n  .ac-msg--own {\n    padding-left: 64px;");
-    expect(css).toContain(
-      "@media (max-width: 600px) and (hover: hover) and (pointer: fine) {\n  .ac-msg--own > .ac-msg__gutter {\n    margin-top: 40px;",
-    );
+    expect(css).not.toContain(".ac-msg--own > .ac-msg__gutter");
     const narrow = css.split("@media (hover: none), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
     expect(narrow).toContain(".ac-msg--own > .ac-msg__body > .ac-msg__actions");
     expect(narrow).toContain("top: -4px;\n    right: 8px;");
     // Keyboard focus in my row opens its time's details (the head that has them is hidden).
     expect(css).toMatch(
-      /\.ac-msg--own:has\(:focus-visible\) :is\(\.ac-msg__gutter-time, \.ac-msg__own-time\) > \.ac-msg__tip \{\s*visibility: visible;/,
+      /\.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
     );
   });
 

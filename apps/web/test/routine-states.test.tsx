@@ -227,7 +227,9 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
 
     const off = await details("Triagem de issues");
     expect((within(off).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(off.textContent).toContain("O trabalho longo deste agente não usa o uso extra pago");
+    expect(off.textContent).toContain(
+      "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago",
+    );
   });
 
   test("Continuar agora on a run its timed job already holds: no 'Execução continuando.'", async () => {

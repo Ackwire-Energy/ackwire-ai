@@ -9,6 +9,7 @@ import type {
   MemberStatus,
 } from "../api/types";
 import { workStatusText } from "./long-work";
+import { clockHour } from "./format";
 
 /**
  * Presence and written status (ADR 0084), platform-neutral: what you pick, the suggestions, when a status
@@ -70,7 +71,9 @@ export function clearsText(t: TFunction, language: string, until: string | null,
   if (!until) return t("presence.untilChanged");
   const at = new Date(until);
   if (at.toDateString() === now.toDateString()) {
-    return t("presence.clearsAt", { time: at.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) });
+    return t("presence.clearsAt", {
+      time: at.toLocaleTimeString(language, { hour: clockHour(language), minute: "2-digit" }),
+    });
   }
   const days = (at.getTime() - now.getTime()) / 86_400_000;
   const when =

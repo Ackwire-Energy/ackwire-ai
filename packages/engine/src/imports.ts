@@ -222,7 +222,7 @@ const UNNAMED = /^new agent$/i;
  * named "New agent" (or by its id), or whose name has no letter we keep, takes it from its role, else from the
  * first sentence of its instructions, else it is `newagent`.
  */
-function handleFromName(name: string, role: string, instructions: string) {
+export function handleFromName(name: string, role: string, instructions: string) {
   const own = UNNAMED.test(name) || isIdHandle(name) ? "" : name;
   const texts = [own, role, instructions.split(/[.!?\n]/)[0] ?? "", "New agent"];
   return (texts.map(handleLetters).find(Boolean) ?? "").padEnd(2, "0");

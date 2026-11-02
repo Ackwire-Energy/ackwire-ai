@@ -817,6 +817,8 @@ export const featureKeysEn: FeatureTranslations = {
       connector_tool_changed_other: "A connected server changed tools you approved",
       computer_disk_full_one: "A computer's disk is almost full",
       computer_disk_full_other: "A computer's disk is almost full",
+      app_created_one: "An AI app created things for you",
+      app_created_other: "An AI app created things for you",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",

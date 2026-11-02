@@ -166,6 +166,9 @@ export function notificationHref(
   if (n.kind === "agent_unreached" || n.kind === "browser_profile_request")
     return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
+  // What an AI app created as the person: the newest agent, else the newest routine.
+  if (n.kind === "app_created")
+    return isSafeId(s.agentId) ? `/agent/${s.agentId}` : s.routineId ? routineHref(s.routineId) : null;
   if (n.kind === "join_request") return "/join-requests";
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
