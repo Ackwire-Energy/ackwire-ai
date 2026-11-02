@@ -633,13 +633,19 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reauth, setReauth] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const qc = useQueryClient();
   const signInAgain = useSignInAgain(qc.getQueryData<Me | null>(keys.me)?.user.email ?? "");
   if (secret) {
     return (
       <Dialog
         open
-        onOpenChange={(o) => !o && onClose()}
+        // ×, Esc or a press outside before copying would lose the token for good: they ask first.
+        onOpenChange={(o) => {
+          if (o) return;
+          if (copied) onClose();
+          else setLeaving(true);
+        }}
         title={t("apps.tokens.createdTitle")}
         closeLabel={t("common.close")}
         width={520}
@@ -653,8 +659,14 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
             onCopied={() => setCopied(true)}
           />
           <SettingNote icon="info">{t("apps.tokens.use")}</SettingNote>
+          {leaving && !copied && <Alert>{t("apps.tokens.leaveText")}</Alert>}
         </DialogBody>
         <DialogFooter>
+          {leaving && !copied && (
+            <Button variant="danger" onClick={onClose}>
+              {t("apps.tokens.leave")}
+            </Button>
+          )}
           <Button variant="primary" disabled={!copied} onClick={onClose}>
             {t("apps.tokens.done")}
           </Button>

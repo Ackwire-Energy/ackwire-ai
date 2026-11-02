@@ -318,6 +318,16 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     expect(screen().getByRole("dialog").textContent).toContain("Copie agora. Ele não aparece de novo.");
     const done = dialog().getByRole("button", { name: "Já copiei" });
     expect(done.hasAttribute("disabled")).toBe(true);
+    // Before copying, Esc and a press outside keep the token on screen and ask first.
+    await key(screen().getByRole("dialog"), "Escape");
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+      fireEvent.pointerUp(document.body);
+    });
+    await settle(4);
+    expect(screen().getByRole("dialog").textContent).toContain("agp_FAKEFAKE");
+    expect(screen().getByRole("dialog").textContent).toContain("Fechar sem copiar? O token não aparece de novo");
+    expect(dialog().getByRole("button", { name: "Fechar sem copiar" })).toBeTruthy();
     await click(dialog().getByRole("button", { name: "Copiar token" }));
     expect(copied).toEqual(["agp_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAK"]);
     expect(dialog().getByRole("button", { name: "Já copiei" }).hasAttribute("disabled")).toBe(false);

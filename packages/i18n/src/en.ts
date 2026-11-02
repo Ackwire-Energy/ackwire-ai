@@ -8940,6 +8940,8 @@ export const en: Translations = {
       copy: "Copy token",
       copied: "Token copied",
       done: "I've copied it",
+      leave: "Close without copying",
+      leaveText: "Close without copying? The token won't show again, and you'll have to create another one to use it.",
       use: "Use it in the Authorization: Bearer header, with the server address.",
       limit: "You have 10 tokens in this workspace. Revoke one to create another.",
       reauth: "A token with no expiry needs a recent sign-in. Sign in again and create it, or pick an expiry.",

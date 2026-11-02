@@ -9007,6 +9007,8 @@ export const ptBR = {
       copy: "Copiar token",
       copied: "Token copiado",
       done: "Já copiei",
+      leave: "Fechar sem copiar",
+      leaveText: "Fechar sem copiar? O token não aparece de novo, e para usar um você vai precisar criar outro.",
       use: "Use no cabeçalho Authorization: Bearer, com o endereço do servidor.",
       limit: "Você chegou a 10 tokens neste workspace. Revogue um para criar outro.",
       reauth: "Um token sem validade pede uma entrada recente. Entre de novo e crie o token, ou escolha uma validade.",
