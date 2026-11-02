@@ -166,8 +166,12 @@ describe("other agents can consult it", () => {
     expect(await ask(await devRunFor(lia.id, "@dev a fatura 812 foi paga?"))).toMatchObject({
       output: { isError: true, content: expect.stringContaining("@nino only works with some people") },
     });
+    // "Só algumas pessoas" with nobody but its owner picked (what a move onto a plan keeps): still only its owner.
+    for (const audienceUserIds of [[], [f.owner.id]]) {
+      expect(canTalkTo({ ...nino, audienceMode: "people", audienceUserIds }, lia.id, via)).toBe(false);
+    }
     // Its owner turned the plan's switch on (some people, Lia not among them): consulted for her.
-    const shared = { ...nino, audienceMode: "people" as const, audienceUserIds: [f.owner.id] };
+    const shared = { ...nino, audienceMode: "people" as const, audienceUserIds: [crypto.randomUUID()] };
     expect(canTalkTo(shared, lia.id, via)).toBe(true);
     expect(canTalkTo({ ...shared, consultable: false }, lia.id, via)).toBe(false);
     // Never directly.

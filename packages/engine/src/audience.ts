@@ -99,10 +99,12 @@ export const viaAgent = (s: Speaker): Speaker => ({ ...s, viaAgent: true });
 
 /**
  * Whether other agents may consult it for people outside its audience: its switch, unless it thinks with a plan
- * that answers only its owner (ADR 0059 §5): answering for someone else is answering others.
+ * that answers nobody but its owner, `owner` or `people` with nobody else picked (ADR 0059 §5): answering for
+ * someone else is answering others.
  */
-export const takesConsultations = (a: Pick<AudienceFields, "consultable" | "brain" | "audienceMode">) =>
-  a.consultable && !(isComputerBrain(a.brain) && a.audienceMode === "owner");
+export const takesConsultations = (a: AudienceFields) =>
+  a.consultable &&
+  !(isComputerBrain(a.brain) && !answersOthers({ ...audienceOf(a), consultable: false }, a.ownerUserId));
 
 /** The `Speaker` for a person in a workspace (`NO_PERSON` for none). */
 export async function speakerFor(db: Database, orgId: string, userId: string | null): Promise<Speaker> {
