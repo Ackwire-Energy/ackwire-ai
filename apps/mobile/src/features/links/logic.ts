@@ -11,6 +11,8 @@ import { isSafeId } from "../shared/logic";
 export type AppHref =
   | `/chat/${string}`
   | `/chat/${string}?thread=${string}`
+  | `/chat/${string}?m=${string}`
+  | `/chat/${string}?thread=${string}&m=${string}`
   | `/approval/${string}`
   | `/mission/${string}`
   | `/chat/${string}?handoff=${string}`
@@ -30,8 +32,14 @@ export type AppHref =
   | "/connect-ai?ready=1"
   | "/usage";
 
-export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
-  threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
+/** `messageId`: open at that message (`m=`: paged in, scrolled to and lit for a moment). */
+export const chatHref = (channelId: string, threadId?: string | null, messageId?: string | null): AppHref => {
+  const params = [
+    threadId && threadId !== channelId ? `thread=${threadId}` : null,
+    messageId ? `m=${messageId}` : null,
+  ].filter(Boolean);
+  return params.length ? `/chat/${channelId}?${params.join("&")}` : `/chat/${channelId}`;
+};
 
 /** Two agents' conversation for a question asked in a conversation, read only. */
 export const consultationHref = (consultationId: string, channelId: string): AppHref =>

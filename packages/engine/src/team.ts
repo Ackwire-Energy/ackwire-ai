@@ -3,7 +3,7 @@ import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-
 import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiStates } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
-import { canTalkTo, type Speaker, speakerFor, speakerOf, viaAgent } from "./audience";
+import { canTalkTo, type Speaker, seesAgentDetails, speakerFor, speakerOf, viaAgent } from "./audience";
 import { mayCall } from "./autonomy-settings";
 import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
@@ -428,7 +428,8 @@ export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
  * a conversation between agents is private.
  */
 export async function getTeam(db: Database, actorId: string, orgId: string) {
-  const talks = speakerOf(await requirePermission(db, actorId, orgId, "read"));
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const talks = speakerOf(membership);
   const list = await db
     .select({
       id: agents.id,
@@ -485,17 +486,21 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
   const busyIds = new Set(busy.map((r) => r.agentId));
   const active = new Set(ids);
   return {
-    agents: list.map((a) => ({
-      id: a.id,
-      name: a.name,
-      handle: a.handle,
-      role: a.role,
-      appearance: (a.appearance ?? null) as AgentAppearance | null,
-      ownerUserId: a.ownerUserId,
-      capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),
-      busy: busyIds.has(a.id),
-      canTalk: canTalkTo(a, actorId, talks),
-    })),
+    agents: list.map((a) => {
+      const seesDetails = seesAgentDetails(a, actorId, membership);
+      return {
+        id: a.id,
+        name: a.name,
+        handle: a.handle,
+        role: a.role,
+        appearance: (a.appearance ?? null) as AgentAppearance | null,
+        ownerUserId: a.ownerUserId,
+        capabilities: seesDetails ? capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)) : [],
+        busy: busyIds.has(a.id),
+        canTalk: canTalkTo(a, actorId, talks),
+        seesDetails,
+      };
+    }),
     people: owners.map((o) => ({ id: o.id, name: o.name, image: o.image ?? null })),
     // Only between agents still here (an archived one has no place in the sky).
     consultations: consultations.filter((c) => active.has(c.askerAgentId) && active.has(c.targetAgentId)),

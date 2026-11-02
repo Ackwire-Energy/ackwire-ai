@@ -13,6 +13,7 @@ import {
   type Message,
   nowLine,
   openAgentDm,
+  PLAIN_WORDS_LINE,
   postPersonMessage,
   setCoordinator,
   toTurns,
@@ -161,6 +162,23 @@ test("every brain reads that it carries one conversation on: no name up front, n
   expect(CONTINUE_THE_CONVERSATION).toContain("Don't open with the person's name");
   expect(CONTINUE_THE_CONVERSATION).toContain("don't repeat what you or others already said here");
   expect(CONTINUE_THE_CONVERSATION).toContain("say only what changed");
+});
+
+test("every brain is told to say what it does in plain words, not the names of its tools", async () => {
+  const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev entra no site do banco",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, ask.id));
+  if (!run) throw new Error("no run");
+  const text = systemText(
+    (await buildRunContext(f.db, run, f.agent, { maxMessages: 10, toolsAvailable: true })).system,
+  );
+  expect(text).toContain(PLAIN_WORDS_LINE);
+  expect(forComputerBrain(text)).toContain(PLAIN_WORDS_LINE);
+  expect(PLAIN_WORDS_LINE).toContain("Never name your tools or functions");
+  expect(PLAIN_WORDS_LINE).toContain("clearly technical");
+  // The language line no longer tells it to keep tool names as they are.
+  expect(text).not.toContain("Tool names, ids and code stay as they are");
 });
 
 test("a new top-level message reads the replies shown under earlier messages, not only the top level", async () => {

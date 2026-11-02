@@ -47,8 +47,8 @@ export function WorkspaceScreen() {
     <CoverPage face={<OrgAvatar logo={org?.logo} size={68} />} title={org?.name ?? ""} headline={headline}>
       {SETTINGS_GROUPS.map((group) => {
         const rows = areas.filter((s) => s.group === group);
-        // The workspace itself heads its own group, above its people.
-        const own = group === "org";
+        // The workspace itself heads its own group, above its people: for who configures it.
+        const own = group === "org" && can(org, "configure");
         if (rows.length === 0 && !own) return null;
         return (
           <Fragment key={group}>
@@ -56,7 +56,7 @@ export function WorkspaceScreen() {
             {own ? (
               <PageRow
                 icon="pen"
-                label={can(org, "configure") ? t("mobile.settings.edit") : t("settings.section.general")}
+                label={t("mobile.settings.edit")}
                 below={<Line text={t("settings.sectionText.general")} />}
                 onPress={() => router.push("/settings/general")}
               />

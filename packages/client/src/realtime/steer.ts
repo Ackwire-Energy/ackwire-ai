@@ -336,11 +336,13 @@ export function steerStateIn(state: SteerStoreState, messageId: string): SteerSt
 }
 
 /**
- * The run that continues this stopped reply (`meta.canceled.continuedRunId`), or this reply of a run that ended at
- * its step limit (`meta.stepLimit.continuedRunId`), if any.
+ * The run that continues this stopped reply (`meta.canceled.continuedRunId`), this reply of a run that ended at
+ * its step limit (`meta.stepLimit.continuedRunId`), or this end of a long work (`meta.workEnd.continuedRunId`), if any.
  */
 export function continuedRunIdOf(message: Pick<Message, "meta">): string | null {
-  const ended = (message.meta?.canceled ?? message.meta?.stepLimit) as { continuedRunId?: unknown } | undefined;
+  const ended = (message.meta?.canceled ?? message.meta?.stepLimit ?? message.meta?.workEnd) as
+    | { continuedRunId?: unknown }
+    | undefined;
   return typeof ended?.continuedRunId === "string" ? ended.continuedRunId : null;
 }
 

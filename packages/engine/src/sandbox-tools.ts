@@ -15,6 +15,7 @@ import {
   ARTIFACT_LIMITS,
   type ArtifactActor,
   type ArtifactDeps,
+  choicesText,
   cleanFileName,
   createArtifact,
   diffToPatch,
@@ -391,6 +392,8 @@ const fileOfArtifact = (a: Awaited<ReturnType<typeof getArtifact>>) => {
       return { ext: "html", text: c.html };
     case "poll":
       return { ext: "md", text: [c.question, ...c.options.map((o) => `- ${o}`)].join("\n") };
+    case "choices":
+      return { ext: "md", text: choicesText(c.questions) };
     case "file":
       // Bytes, not text: `import_file` copies them as they are.
       return null;

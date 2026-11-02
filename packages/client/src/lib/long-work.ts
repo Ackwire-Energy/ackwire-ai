@@ -58,7 +58,7 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
   const since = Date.parse(w.startedAt);
   const mine = Boolean(c.meId && w.requestedByUserId === c.meId);
   const task = w.issue ? { ...w.issue, label: say("work.task", { number: w.issue.number }) } : null;
-  const over = w.status === "done" || w.status === "failed" || w.status === "canceled";
+  const over = workIsOver(w);
   const stop = !over && c.canStop && w.runId ? { runId: w.runId } : null;
   // The last update is news only while it works: once over, the report says where it ended.
   const base = { task, stop, threadId: w.threadId, update: over ? null : (w.lastUpdate?.text ?? null) };
@@ -118,6 +118,35 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
       next > 60_000 ? say("work.line.next", { minutes: Math.round(next / 60_000) }) : say("work.line.nextSoon"),
     );
   return { ...base, tone: "working", text: parts.join(" · "), result: null };
+}
+
+/** A work that ended (done, failed or stopped): its anchor is dimmed and keeps no promise. */
+export const workIsOver = (w: Pick<WorkView, "status">) =>
+  w.status === "done" || w.status === "failed" || w.status === "canceled";
+
+/**
+ * The anchor's words once the work is over: the promise of the next update goes, since the line under it now says how
+ * it ended ("Terminou em 38 min"). The server's own anchor has a version without it; an agent's keeps all but a last
+ * sentence that promises a time ("O próximo update deve sair em ~10 min.").
+ */
+export function workAnchorBody(t: TFunction, body: string, meta: Record<string, unknown> | undefined, w: WorkView) {
+  if (!workIsOver(w)) return body;
+  if (meta?.bodyCode === "work_auto_moved") return loose(t)("chat.body.work_auto_movedOver", { defaultValue: body });
+  const kept = body.replace(/(^|[.!?…]\s+)[^.!?…\n]*~\s?\d+\s?min[^.!?…\n]*[.!?…]?\s*$/i, "$1").trim();
+  return kept || body;
+}
+
+/** The AI provider's errors (`run.provider_error`, `run.provider_unavailable`): mirrors `PROVIDER_ERRORS` in the engine. */
+const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_unavailable"]);
+
+/**
+ * A work's end posted home after its AI provider failed (`meta.workEnd`): Continuar goes on from there, once (ADR 0121).
+ * Null for any other message or once it was continued.
+ */
+export function workContinuable(meta: Record<string, unknown> | undefined): { continuedRunId: string | null } | null {
+  const end = meta?.workEnd as { status?: unknown; errorCode?: unknown; continuedRunId?: unknown } | undefined;
+  if (end?.status !== "failed" || typeof end.errorCode !== "string" || !PROVIDER_ERRORS.has(end.errorCode)) return null;
+  return { continuedRunId: typeof end.continuedRunId === "string" ? end.continuedRunId : null };
 }
 
 /** How far along its plan is: "2 de 5". Null without a plan. */

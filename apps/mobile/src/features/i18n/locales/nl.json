@@ -43,6 +43,16 @@
     "pollAnswered_other": "{{count}} van {{total}} hebben geantwoord",
     "voteFailed": "Je stem is niet doorgekomen."
   },
+  "choices": {
+    "step": "{{step}} van {{total}}",
+    "back": "Terug",
+    "next": "Volgende",
+    "close": "Sluiten",
+    "closed": "{{title}} · gesloten",
+    "reopen": "Opnieuw tonen",
+    "answeredBy": "{{name}} koos",
+    "failed": "Je keuze is niet verstuurd. Probeer het opnieuw."
+  },
   "chart": {
     "pending": "De grafiek wordt gemaakt…",
     "table": "Tabel",
@@ -504,7 +514,10 @@
     "full": "Dit gesprek heeft al 100 vastgezette berichten. Maak er eerst een los.",
     "mark": "Vastgezet",
     "none": "Nog niets vastgezet",
-    "empty": "Hier is nog niets vastgezet. Houd een bericht ingedrukt en tik op Vastzetten."
+    "empty": "Hier is nog niets vastgezet. Houd een bericht ingedrukt en tik op Vastzetten.",
+    "bar_one": "Vastgezette berichten ({{count}})",
+    "bar_other": "Vastgezette berichten ({{count}})",
+    "unpinOf": "Bericht van {{name}} losmaken"
   },
   "thread": {
     "threadIn": "Thread in #{{channel}}",
@@ -732,7 +745,8 @@
     "title": "Activiteit",
     "filter": {
       "all": "Alles",
-      "waiting": "Wacht op jou"
+      "waiting": "Wacht op jou",
+      "done": "Afgerond"
     },
     "day": {
       "today": "Vandaag",
@@ -812,6 +826,8 @@
     "markUnread": "Markeren als ongelezen",
     "unread": "Ongelezen",
     "done": "Klaar",
+    "restore": "Terugzetten",
+    "noneDone": "Niets als afgerond gemarkeerd in de afgelopen 30 dagen.",
     "more": "Meer bekijken",
     "empty": "Er wacht niets op je. Even ademhalen."
   },

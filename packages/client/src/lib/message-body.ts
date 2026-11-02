@@ -74,7 +74,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   if (USAGE_NOTES.has(code)) {
     const resetsAt = (m.usageWait as { resetsAt?: unknown } | undefined)?.resetsAt;
     const when = typeof resetsAt === "string" ? usageWhen(t, locale, resetsAt) : "";
-    return t(`chat.body.${code}`, { ...params, when, defaultValue: body });
+    const text = t(`chat.body.${code}`, { ...params, when, defaultValue: body });
+    // Someone said not to run it: the promise above no longer holds.
+    if ((m.usageWait as { canceled?: unknown } | undefined)?.canceled !== true) return text;
+    return `${text}\n\n_${t("chat.body.usage_wait_canceled", { defaultValue: "Canceled. It won't run when the limit is back." })}_`;
   }
   // Long work paused near a limit (ADR 0118): its window in the reader's words.
   if (code === "usage_paused" || code === "usage_paused_budget") {
