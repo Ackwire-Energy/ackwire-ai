@@ -38,11 +38,13 @@ import { type MessageMemory, memoriesFor } from "./message-memories";
 import { agentOnlyNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
-import { inChannelRun } from "./run-scope";
+import { inChannelRun, workKeepsThread } from "./run-scope";
 import { NO_AI, outageParkedSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
+import { WEB_USAGE_PROVIDER } from "./web-tools";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
+import { type WorkView, workViews } from "./works";
 
 export { stopChecksSettled } from "./steering";
 
@@ -85,6 +87,8 @@ export interface MessageView {
    * receipts with Undo (ADR 0037 round 2); live via `message.actions`.
    */
   actions?: AgentActionView[];
+  /** On a long work's anchor (`meta.longWork`, ADR 0121): its line, live via `agent.work`. */
+  longWork?: WorkView;
   createdAt: string;
 }
 
@@ -653,6 +657,26 @@ export async function insertMessageWithRuns(
       ), answering as (
         -- Who can talk to the agent: the others get no run, only a notice for the sender.
         select agent_id, trig from addressed where allowed and agent_id not in (select agent_id from muted)
+      ), floor_runs as (
+        -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
+        -- answering this same person there, asked within the last minutes. Deterministic, no router. Only
+        -- while one agent is at it: with two answering them (a question to each), the next message may be
+        -- for one of them or both, so the router decides.
+        select r.id, r.agent_id from ${agentRuns} r
+        join ${agents} ra on ra.id = r.agent_id
+        where ${startRuns && !threadId}::boolean and ${deliver}::boolean and not exists (select 1 from mentioned)
+          and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
+          and r.status in ('queued', 'running') and not r.background and ${inChannelRun(sql`r`)}
+          and ${workKeepsThread(sql`r`)}
+          and r.agent_id not in (select agent_id from answered)
+          and r.agent_id not in (select agent_id from muted)
+          and r.agent_id <> all(${referenced}::uuid[])
+          and r.created_at > now() - ${FLOOR_WINDOW_MS / 1000}::int * interval '1 second'
+          and ra.archived_at is null
+          and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
+          and exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid
+            and tm.id = r.trigger_message_id and tm.author_user_id = ${userId})
+          and ${audienceSql("ra", sql`${userId}::text`)}
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
         -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
@@ -668,6 +692,8 @@ export async function insertMessageWithRuns(
         where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_input')
           and not r.background
+          -- Background work (ADR 0121) answers only in its own thread: in the conversation it left, the agent is free.
+          and ${workKeepsThread(sql`r`)}
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
@@ -685,16 +711,7 @@ export async function insertMessageWithRuns(
                 }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
-            -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
-            -- answering this same person there, asked within the last minutes. Deterministic, no router.
-            or (${startRuns && !threadId}::boolean and not exists (select 1 from mentioned)
-              and r.status in ('queued', 'running') and ${inChannelRun(sql`r`)}
-              and r.created_at > now() - ${FLOOR_WINDOW_MS / 1000}::int * interval '1 second'
-              and ra.archived_at is null
-              and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
-              and exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid
-                and tm.id = r.trigger_message_id and tm.author_user_id = ${userId})
-              and ${audienceSql("ra", sql`${userId}::text`)})
+            or (r.id in (select id from floor_runs) and (select count(distinct agent_id) from floor_runs) = 1)
           )
         order by r.agent_id, r.created_at desc
       ), held as (
@@ -1459,7 +1476,14 @@ async function usageFor(db: Database, orgId: string, list: Message[]) {
       output: sql<number>`coalesce(sum(${u.outputTokens}), 0)::int`,
     })
     .from(u)
-    .where(and(eq(u.orgId, orgId), inArray(u.runId, runIds), eq(u.kind, "agent")))
+    .where(
+      and(
+        eq(u.orgId, orgId),
+        inArray(u.runId, runIds),
+        eq(u.kind, "agent"),
+        sql`${u.provider} <> ${WEB_USAGE_PROVIDER}`,
+      ),
+    )
     .groupBy(u.runId);
   for (const r of rows) {
     if (!r.runId) continue;
@@ -1492,12 +1516,22 @@ async function pinnedOf(db: Database, orgId: string, list: Message[]): Promise<S
   return new Set(rows.map((r) => r.messageId));
 }
 
+const longWorkOf = (m: Message, works: Map<string, WorkView>) => {
+  const id = (m.meta.longWork as { id?: unknown } | undefined)?.id;
+  const view = typeof id === "string" ? works.get(id) : undefined;
+  return view ? { longWork: view } : {};
+};
+
 /** Message views with what lists carry: receipts, usage, reactions, memory marks, pins, wiki links. */
 export const withMessageDetails = (db: Database, orgId: string, list: Message[]) => withReceipts(db, orgId, list);
 
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
   const agentMessageIds = list.flatMap((m) => (m.authorType === "agent" ? [m.id] : []));
-  const [receipts, usage, reactions, memories, pinned, actions] = await Promise.all([
+  const workIds = list.flatMap((m) => {
+    const id = (m.meta.longWork as { id?: unknown } | undefined)?.id;
+    return typeof id === "string" ? [id] : [];
+  });
+  const [receipts, usage, reactions, memories, pinned, actions, works] = await Promise.all([
     // A person's message, and an agent's that mentions agents (whom it handed work to, ADR 0089).
     receiptsFor(
       db,
@@ -1513,6 +1547,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
     memoriesFor(db, orgId, list),
     pinnedOf(db, orgId, list),
     actionsFor(db, orgId, agentMessageIds),
+    workIds.length ? workViews(db, orgId, workIds) : Promise.resolve(new Map<string, WorkView>()),
   ]);
   const views = list.map((m) => {
     const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
@@ -1525,6 +1560,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...(memories.has(m.id) ? { memories: memories.get(m.id) } : {}),
       ...(pinned.has(m.id) ? { pinned: true } : {}),
       ...(actions.has(m.id) ? { actions: actions.get(m.id) } : {}),
+      ...longWorkOf(m, works),
     };
   });
   return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));

@@ -1,4 +1,4 @@
-import type { PubSub, SearchIndexResolver } from "@agenteschat/adapters";
+import type { ErrorReporter, PubSub, SearchIndexResolver } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { cutText, cutTextEnd } from "../format";
 import type { ModelGateway } from "../gateway";
@@ -6,6 +6,7 @@ import { createLlmJudge, type Judge } from "../judge";
 import type { Message } from "../messages";
 import { cheapModelForOrg } from "../router";
 import { createLlmScheduleReader, type ScheduleReader } from "../schedule-reader";
+import { neutralizeUntrusted } from "../untrusted";
 import { type ContextItem, insertContextItem, type MemoryJudging, supersede } from "./items";
 
 const { messages, users, agents, contextItems, organizationSettings } = schema;
@@ -20,10 +21,14 @@ export interface ContextDeps {
   cheapModels?: Record<string, string>;
   pubsub?: PubSub;
   reflect?: { maxPerThread?: number; everyMessages?: number; idleMinutes?: number };
+  /** Learning from runs (ADR 0120): `LEARN_MAX_PER_AGENT_DAY`, `LEARN_MIN_TOOL_CALLS`, `LEARN_SKILL_AFTER`. */
+  learn?: { maxPerAgentDay?: number; minToolCalls?: number; skillAfter?: number };
   /** Semantic yes/no and choice judgments (judge.ts); default: the org's cheap model. Tests pass a fake. */
   judge?: Judge;
   /** Reads schedules and moments people write (schedule-reader.ts); default: the org's cheap model. Tests pass a fake. */
   schedules?: ScheduleReader;
+  /** Where learning's failures are reported (ADR 0104, `reportLearnFailure`); absent: not reported. */
+  errors?: ErrorReporter;
 }
 
 /** How memory writes are judged: by meaning, in every organization (ADR 0028). */
@@ -58,9 +63,12 @@ export async function resolveSummaryModel(
   return cheapModelForOrg(deps.db, orgId, { anthropic: deps.summaryModel, ...deps.cheapModels });
 }
 
-/** Content from outside the org (webhooks, system notices) is untrusted. */
-export const isTrustedMessage = (m: Pick<Message, "authorType">) =>
-  m.authorType === "person" || m.authorType === "agent";
+/**
+ * Content from outside the org (webhooks, system notices) is untrusted, and so is an agent's message
+ * relaying what it read outside (`meta.readOutside`, ADR 0117): memory built from it stays low trust.
+ */
+export const isTrustedMessage = (m: Pick<Message, "authorType"> & { meta?: Message["meta"] | null }) =>
+  (m.authorType === "person" || m.authorType === "agent") && m.meta?.readOutside !== true;
 
 export interface ThreadView {
   root: Message;
@@ -165,7 +173,10 @@ export async function ensureThreadSummary(
   let content = options.text;
   if (!content) {
     const body = thread.messages
-      .map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${cutText(m.body, 2000)}`)
+      .map(
+        (m) =>
+          `${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${neutralizeUntrusted(cutText(m.body, 2000))}`,
+      )
       .join("\n");
     const result = await deps.gateway.complete({
       orgId,
@@ -247,7 +258,9 @@ export async function ensurePeriodSummary(
       {
         role: "user",
         content: `<thread>\n${cutTextEnd(
-          rows.map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}${cutText(m.body, 500)}`).join("\n"),
+          rows
+            .map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}${neutralizeUntrusted(cutText(m.body, 500))}`)
+            .join("\n"),
           60_000,
         )}\n</thread>`,
       },

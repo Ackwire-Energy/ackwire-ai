@@ -333,7 +333,7 @@ export function SettingsTab({
               <div className="agp-spent__top">
                 {admin && spent !== undefined && limit !== undefined ? (
                   <>
-                    <b>{formatUsd(t, locale, spent)}</b>
+                    <b>{formatUsd(locale, spent)}</b>
                     <span className="small muted">
                       {saved.budget === null
                         ? t("agentPage.settings.spentOfDefault", { month, amount: usd(t, locale, limit) })
@@ -423,6 +423,7 @@ export function SettingsTab({
                   ownerUserId={ownerId}
                   agentName={agent.name}
                   idPrefix="agp-audience"
+                  onPlan={onPlan}
                 />
                 {blocked && (
                   <SettingNote icon="lock" live>
@@ -440,7 +441,9 @@ export function SettingsTab({
             ) : (
               <>
                 <span className="agp-chips">
-                  <Chip icon="message">{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</Chip>
+                  <Chip icon="message">
+                    {audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}
+                  </Chip>
                 </span>
                 <span className="small muted">{t("audience.notListed")}</span>
               </>

@@ -15,10 +15,13 @@ import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
+import { closePoll, POLL_CLOSE_JOB } from "./blocks";
+import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
+import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { reportDroppedMentions } from "./continuation";
@@ -77,6 +80,7 @@ import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
+import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
 import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
@@ -207,6 +211,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
     quietMs: router.quietMs,
+    pubsub: deps.pubsub,
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
     ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
   };
@@ -235,7 +240,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   async function delegatedAgents(
     message: NonNullable<Awaited<ReturnType<typeof getMessage>>>,
     outside: string[] = [],
-    /** `wakeAll`: a routine set to act was told to name only agents that must act, so each one it names wakes. */
+    /** `wakeAll`: a routine was told to name only agents that must act, so each one it names wakes. */
     options: { record?: boolean; wakeAll?: boolean } = {},
   ) {
     const ids = [...message.mentionedAgentIds, ...outside];
@@ -475,23 +480,17 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
         // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
         if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
-        // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01): set to act, its
-        // mentions wake the agents it names for its creator, like any agent's (the router stays out); set to only
-        // read, it wakes nobody, since text it read must not become actions. Never silently: the agents it named
-        // and its run's tell_agent refusals show under it.
+        // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01): its mentions wake
+        // the agents it names for its creator, like any agent's (the router stays out). With no creator left it
+        // has nobody's reach and wakes nobody. Never silently: the agents it named and its run's tell_agent
+        // refusals show under it.
         const routineRun = await routinePostRun(deps.db, message);
         const routineAuthority = routineRun ? await runAuthorityById(deps.db, message.orgId, routineRun) : null;
         const actingRoutine = routineAuthority ? routineCreatorOf(routineAuthority) : null;
         if (message.meta.routine && !message.meta.reminder && !message.agentRunId && !actingRoutine) {
           const [refused, outside] = await Promise.all([refusedReach(message), outsideAgents(message)]);
           const named = message.mentionedAgentIds.filter((id) => id !== message.authorAgentId);
-          // Set to act but with no creator left: nobody's reach to wake them with, which is not "only looks".
-          const act = !!routineAuthority && "brief" in routineAuthority && routineAuthority.brief?.access === "act";
-          await settleReach(deps, message, {
-            outside,
-            blocked: act ? [...new Set([...refused, ...named])] : refused,
-            routinePost: act ? [] : named,
-          });
+          await settleReach(deps, message, { outside, blocked: [...new Set([...refused, ...named])] });
           return;
         }
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
@@ -522,13 +521,19 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
             : { runs: [] };
           const dropped = "dropped" in res ? (res.dropped ?? []) : [];
           // Never silent: who its mention didn't reach hears it as a note, or the people here read why not.
-          await settleReach(deps, message, {
+          const reach = await settleReach(deps, message, {
             outside: handed.allowed.filter((id) => outside.includes(id)),
             blocked: [
               ...new Set([...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused]),
             ],
           });
-          await reportDroppedMentions({ db: deps.db, pubsub: deps.pubsub }, message, dropped);
+          // A member consulted by note instead (it takes consultations) was reached: no "wasn't woken" notice.
+          const consulted = new Set(reach.filter((e) => e.consultationId).map((e) => e.agentId));
+          await reportDroppedMentions(
+            { db: deps.db, pubsub: deps.pubsub },
+            message,
+            dropped.filter((d) => !consulted.has(d.agentId)),
+          );
           await publishRouted(deps.pubsub, message, {
             strategy: "mention",
             seenBy: message.mentionedAgentIds,
@@ -628,9 +633,23 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     [STRETCH_JOB]: async (job) => {
       await postStretchCard({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload as unknown as StretchHold);
     },
+    // A vote's time came: it closes and the agent hears the result (ADR 0113).
+    [POLL_CLOSE_JOB]: async (job) => {
+      if (!deps.artifacts) throw new Error("Files are unavailable");
+      await closePoll(deps.artifacts, orgOf(job), String(job.payload.artifactId));
+    },
     // A follow-up's time came: the agent is woken in its conversation (follow-through.ts).
     [FOLLOW_UP_JOB]: async (job) => {
       await wakeFollowUp(deps, orgOf(job), String(job.payload.messageId));
+    },
+    // A long work's promised update is due (ADR 0121 §3): a nudge, then the server's own line.
+    [WORK_CHECK_IN_JOB]: async (job) => {
+      await checkInWork(deps, orgOf(job), {
+        workId: String(job.payload.workId),
+        seq: Number(job.payload.seq),
+        phase: job.payload.phase === "fallback" ? "fallback" : job.payload.phase === "card" ? "card" : "nudge",
+        ...(typeof job.payload.due === "number" ? { due: job.payload.due } : {}),
+      });
     },
     "secret.activate": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");
@@ -658,6 +677,12 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "context.reflect": async (job) => {
       if (!deps.context) return;
       await reflectThread(deps.context, { orgId: orgOf(job), threadRootId: String(job.payload.threadRootId) });
+    },
+    [LEARN_JOB]: async (job) => {
+      if (!deps.context) return;
+      const res = await learnRun(deps.context, { orgId: orgOf(job), runId: String(job.payload.runId) });
+      // Its run went on after the turn that queued it: the outbox's backoff brings it back once the run ends.
+      if (res.skipped === "running") throw Object.assign(new Error("its run is still going"), { retryable: true });
     },
     // A reply a while ago: the thread's title and "resolved?" suggestion, unless a newer reply came.
     "threads.assess": async (job) => {
@@ -795,6 +820,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
+    },
+    // A request for help in an agent's browser nobody answered within the hour: the people asked hear it again, once.
+    [HANDOFF_REMIND_JOB]: async (job) => {
+      await remindBrowserHandoff({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.handoffId));
     },
     // A notification for a person's phones and browsers (ADR 0035, 0071): skipped if read, done or snoozed meanwhile.
     "push.send": async (job) => {

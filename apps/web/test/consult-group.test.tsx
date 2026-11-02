@@ -140,7 +140,7 @@ const push = (socket: { push: (f: unknown) => void }, event: Record<string, unkn
   act(async () =>
     socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, threadId: null, ...event } }),
   );
-/** Ada's question going out, live: "Ada está perguntando ao Atlas…" on the working line. */
+/** Ada's question going out, live: "Ada está perguntando para Atlas…" on the working line. */
 const asking = { type: "agent.consulting", runId: RUN, agentId: ADA_ID, consultedAgentId: ATLAS_ID };
 
 describe("the questions inside the reply that asked (ConsultGroup)", () => {
@@ -177,7 +177,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     await act(async () => fireEvent.click(line));
     await settle(3);
     const side = panel() as HTMLElement;
-    expect(side.textContent).toContain("Ada fez um pedido ao Atlas em #eng");
+    expect(side.textContent).toContain("Ada fez um pedido para Atlas em #eng");
     expect(side.textContent).toContain("O Atlas passou uma parte adiante e espera o retorno");
   });
 
@@ -214,7 +214,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     // Not in place: in the panel over the channel, the question as it went and the answer.
     expect(block.textContent).not.toContain(QUESTION);
     const side = panel() as HTMLElement;
-    expect(side.getAttribute("aria-label")).toBe("Conversa entre a Ada e o Atlas");
+    expect(side.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
     expect(side.textContent).toContain(QUESTION);
     expect(side.textContent).toContain("subiu 6 pb");
     expect(line.getAttribute("aria-pressed")).toBe("true");
@@ -311,17 +311,19 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(card.textContent).toContain("ajudando a Ada");
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver conversa" })));
     await settle(3);
-    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre a Ada e o Atlas");
+    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
   });
 
   test("the answer far below its question: one line where it arrived, 'Ver' opens the conversation", async () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     await open(talkAfter(withTalk(withAsk([c], true), c), 3));
     expect(document.querySelectorAll(".ac-consult").length).toBe(0);
-    const line = screen()
-      .getByText(/Atlas respondeu à pergunta da Ada/)
-      .closest(".cn-line") as HTMLElement;
-    expect(line).not.toBeNull();
+    const line = [...document.querySelectorAll(".cn-line")].find((l) =>
+      l.textContent?.includes("Atlas respondeu à pergunta da Ada"),
+    ) as HTMLElement;
+    expect(line).toBeTruthy();
+    // Each agent with its face before its name.
+    expect([...line.querySelectorAll(".ac-who b")].map((b) => b.textContent)).toEqual(["Atlas", "Ada"]);
     await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Ver" })));
     await settle(3);
     // The two agents' conversation over the channel: the question and the whole answer.
@@ -385,14 +387,14 @@ describe("the working line while the block shows the questions", () => {
     // Ada at work again (another turn): her own line, not the question.
     await push(socket, { type: "agent.thinking", runId: "r-next", agentId: ADA_ID });
     await settle(2);
-    expect(bar()).toBe("Ada está trabalhando…");
+    expect(bar()).toBe("Ada");
   });
 
   test("the reply that asked is farther up: the line still says it (the only sign at the bottom)", async () => {
     const { socket } = await open(talkAfter(withAsk([consultation({})]), 3));
     await push(socket, asking);
     await settle(2);
-    expect(bar()).toBe("Ada está perguntando ao Atlas…");
+    expect(bar()).toBe("Ada está perguntando para Atlas…");
     expect(typingBar().querySelector(".ac-typing__clock")).not.toBeNull();
   });
 });

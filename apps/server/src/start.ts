@@ -16,7 +16,6 @@ import {
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
-  createMillionSendMail,
   createMillionSendSender,
   createPostgresBlobStore,
   createPostgresDatabaseDriver,
@@ -27,6 +26,7 @@ import {
   createTurnstileCheck,
   createWebPushSender,
   type EmailSender,
+  type ErrorReporter,
   envPlatformCredentials,
   type GifProvider,
   type KeyWrapper,
@@ -60,6 +60,7 @@ import {
   meterComposio,
   resolveHostDns,
   retireHostTokens,
+  retireMillionSendMailboxes,
   setRestrictionNotices,
   vapidKeys,
   vapidSubject,
@@ -139,7 +140,7 @@ export async function startServer(options: StartOptions) {
   });
   const log = createLogger(config.LOG_LEVEL, errors);
   try {
-    return await boot(options, config, log, release);
+    return await boot(options, config, log, release, errors);
   } catch (error) {
     log.error("startup failed", { error, unhandled: true });
     await log.flush(EXIT_FLUSH_MS);
@@ -153,6 +154,7 @@ async function boot(
   config: Config,
   log: Logger,
   release: string,
+  errors: ErrorReporter,
 ) {
   log.info("starting agentes.chat", { version: release, edition, config: redactConfig(config) });
   log.info(
@@ -231,7 +233,6 @@ async function boot(
   log.info("mail for agents", {
     composio: Boolean(defaults.mail?.composio),
     imap: Boolean(defaults.mail?.imap),
-    millionsend: Boolean(defaults.mail?.millionsend),
   });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
   const base = { config, db: database.db, edition, version: release };
@@ -303,9 +304,17 @@ async function boot(
     onRunProfile: (p) => log.debug("run profile", p),
     emailArt,
     log,
+    errors,
   });
   // The saved Jev key, before anything calls Jev (vision reads it synchronously).
   await engine.jevKey.ready();
+  // Off the boot path: it calls MillionSend once per mailbox left from the withdrawn path (ADR 0102).
+  void retireMillionSendMailboxes({ db: database.db, keyWrappers: engine.mail.keyWrappers })
+    .then((r) => {
+      if (r.checked > 0)
+        log.info("MillionSend mailboxes disconnected", { checked: r.checked, webhooksLeft: r.webhooksLeft });
+    })
+    .catch((error: unknown) => log.warn("MillionSend mailboxes cleanup failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -594,8 +603,7 @@ function gifProvider(config: Config, key: () => string | null): GifProvider | nu
 }
 
 /**
- * People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off, and
- * MillionSend inboxes (ADR 0102) at `MILLIONSEND_INBOXES_API_URL` unless turned off, each with its own key. The same
+ * People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. The same
  * Composio client serves the connectors that go through it (ADR 0107).
  */
 function mailAdapters(
@@ -631,9 +639,5 @@ function mailAdapters(
           presets: MAIL_PRESETS,
         }
       : null,
-    millionsend:
-      config.MILLIONSEND_INBOXES_API_URL === "off"
-        ? null
-        : createMillionSendMail({ baseURL: config.MILLIONSEND_INBOXES_API_URL }),
   };
 }

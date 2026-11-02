@@ -15,7 +15,6 @@ import {
   missingPermissions,
   NEW_AGENT_DEFAULTS,
   NOT_IN_ALL,
-  REFUSALS,
   type RoutineAccess,
   type RunAuthority,
   setAgentScopes,
@@ -142,14 +141,11 @@ describe("pure parts", () => {
   const person: RunAuthority = { kind: "person", personId: "user_ana" };
   const desktopTool = { name: "desktop_do", scope: DESKTOP_SCOPE, connectionId: null };
 
-  test("the desktop is its own area: routines that act and runs nobody is behind may use it; read-only routines may not", () => {
+  test("the desktop is its own area: every routine and runs nobody is behind may use it (ADR 0109)", () => {
     expect(toolKind(desktopTool)).toEqual({ kind: "internal", area: "desktop" });
     expect(toolPolicy(person, desktopTool).action).toBe("allow");
     expect(toolPolicy(routine("act"), desktopTool).action).toBe("allow");
-    expect(toolPolicy(routine("read"), desktopTool)).toEqual({
-      action: "refuse",
-      reason: REFUSALS.routineDesktopReadOnly,
-    });
+    expect(toolPolicy(routine("read"), desktopTool).action).toBe("allow");
     expect(toolPolicy(unattended, desktopTool).action).toBe("allow");
     // Asking a person speaks in the run's own conversation, like the browser's.
     const ask = { name: "desktop_ask_person", scope: DESKTOP_SCOPE, connectionId: null };

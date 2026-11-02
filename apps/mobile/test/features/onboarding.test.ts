@@ -149,7 +149,8 @@ test("the import step names the three most used apps, in the web's order, each b
   const web = (name: string) => Bun.file(new URL(`../../../web/public/brands/${name}`, import.meta.url).pathname);
   // Each mark is the web's SVG (a dark one where the maker has one), rendered for the phone at 96 px (the PNG
   // header's width and height). Create agent's import step shows the rest. No other import logo is left in the folder (Gemini's mark there is the AI
-  // pickers').
+  // pickers', VS Code's the AI apps').
+  const notImports = new Set(["gemini.png", "vscode.png"]);
   const rendered: [phone: string, web: string][] = [
     ["chatgpt-dots.png", "chatgpt-dots.svg"],
     ["grok-bot-dark.png", "grok-bot-dark.svg"],
@@ -162,7 +163,7 @@ test("the import step names the three most used apps, in the web's order, each b
     ["paperclip-dark.png", "paperclip-dark.svg"],
     ["paperclip.png", "paperclip.svg"],
   ];
-  const pngs = readdirSync(brands).filter((f) => f.endsWith(".png") && f !== "gemini.png");
+  const pngs = readdirSync(brands).filter((f) => f.endsWith(".png") && !notImports.has(f));
   expect(pngs.sort()).toEqual(rendered.map(([png]) => png));
   for (const [png, svg] of rendered) {
     expect(await web(svg).exists()).toBe(true);
@@ -255,9 +256,9 @@ test("each step's question and its one line: the phone's own where it can't do w
     "Ada is already in #general.",
   ]);
   // In the team's order, as the web's welcome; then the invitations emailed, if any.
-  expect(stepText(en, "done", acme)[1]).toBe("Theo, Ada and Lia are already in #general.");
+  expect(stepText(en, "done", acme)[1]).toBe("Theo, Ada, and Lia are already in #general.");
   expect(stepText(en, "done", { ...acme, invited: 2 })[1]).toBe(
-    "Theo, Ada and Lia are already in #general. We emailed 2 invitations.",
+    "Theo, Ada, and Lia are already in #general. We emailed 2 invitations.",
   );
   const pt = await translator("pt-BR");
   expect(stepText(pt, "done", acme)).toEqual(["Boas-vindas à Acme", "Theo, Ada e Lia já estão no #general."]);

@@ -60,8 +60,8 @@ export function NoAiCard({ message: m }: { message: Message }) {
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
         : card.own
-          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(t, name))
-          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
+          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(name))
+          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name));
   const answerNow = async () => {
     setAnswer("pending");
     try {

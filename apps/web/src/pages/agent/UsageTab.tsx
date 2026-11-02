@@ -1,5 +1,5 @@
 import type { AgentPlanUsage } from "@agenteschat/client";
-import { useAgentPlanUsage, useApi } from "@agenteschat/client";
+import { useAgentPlanUsage, useApi, useModels } from "@agenteschat/client";
 import {
   formatMonth,
   formatPercent,
@@ -8,6 +8,7 @@ import {
   formatUsd,
   joinNames,
 } from "@agenteschat/client/lib/format";
+import { apiProviderOf } from "@agenteschat/client/lib/providers";
 import { Card, CardFooter, Icon, Meter, PlanMeter, ProviderLogo, UsageDays, UsageSwatch } from "@agenteschat/ui";
 import { type CSSProperties, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -101,11 +102,11 @@ function Month({ data, tones }: { data: AgentPlanUsage; tones: Map<string, CSSPr
               tokens: formatTokensShort(t, i18n.language, data.tokens),
               parts: joinNames(
                 used.map((s) => usageSourcePart(t, i18n.language, s)),
-                t("usageViews.and"),
+                t,
               ),
             })}
             {typeof data.equivalentUsd === "number" && data.equivalentUsd > 0 && (
-              <> {t("usageViews.agent.equivalent", { amount: formatUsd(t, i18n.language, data.equivalentUsd) })}</>
+              <> {t("usageViews.agent.equivalent", { amount: formatUsd(i18n.language, data.equivalentUsd) })}</>
             )}
           </p>
           <div>
@@ -146,9 +147,7 @@ function Now({ data }: { data: AgentPlanUsage }) {
       <CardHead id="agent-usage-now" icon="clock" title={t("usageViews.agent.now")} />
       <AccountHead
         account={current}
-        extra={
-          others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t("usageViews.and")) }) : null
-        }
+        extra={others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t) }) : null}
       />
       {current.usage ? (
         <PlanMeter
@@ -176,6 +175,7 @@ function BySource({ data }: { data: AgentPlanUsage }) {
   const { t, i18n } = useTranslation();
   const { agent, g } = useAgentEdit();
   const onApi = !agent.brain || agent.brain.kind === "model";
+  const keyProvider = apiProviderOf(agent.model, useModels().data?.models ?? []);
   return (
     <Card as="section" className="agp-card" aria-labelledby="agent-usage-sources">
       <CardHead id="agent-usage-sources" icon="wallet" title={t("usageViews.agent.byAccount")} />
@@ -190,12 +190,12 @@ function BySource({ data }: { data: AgentPlanUsage }) {
           const money =
             s.type === "api"
               ? s.costUsd !== undefined
-                ? t("usageViews.paid", { amount: formatUsd(t, i18n.language, s.costUsd) })
+                ? t("usageViews.paid", { amount: formatUsd(i18n.language, s.costUsd) })
                 : s.budgetPercent !== undefined
                   ? t("usageViews.budgetShare", { percent: formatPercent(i18n.language, s.budgetPercent) })
                   : null
               : typeof s.equivalentUsd === "number"
-                ? t("usageViews.equivalent", { amount: formatUsd(t, i18n.language, s.equivalentUsd) })
+                ? t("usageViews.equivalent", { amount: formatUsd(i18n.language, s.equivalentUsd) })
                 : t("usageViews.agent.ofMonth", { percent: formatPercent(i18n.language, s.share) });
           return (
             <div key={s.key} className="plan-source">
@@ -203,7 +203,9 @@ function BySource({ data }: { data: AgentPlanUsage }) {
                 <AccountHead account={s.account} extra={when} />
               ) : (
                 <div className="plan-acct ac-faceline">
-                  {s.type === "api" ? (
+                  {s.type === "api" && keyProvider ? (
+                    <ProviderLogo id={keyProvider} size="sm" />
+                  ) : s.type === "api" ? (
                     <span className="plan-source__key" aria-hidden="true">
                       <Icon name="key" size={16} />
                     </span>

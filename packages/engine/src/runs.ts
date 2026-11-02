@@ -162,8 +162,19 @@ export async function transitionRun(
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))
     .returning();
-  if (row && isTerminal(to)) await recordRunFinished(db, row);
+  if (row && isTerminal(to)) {
+    await recordRunFinished(db, row);
+    await releaseProfileTurns(db, row.id);
+  }
   return row ?? null;
+}
+
+/** A run's browser profile turns end with it (done, failed or canceled; ADR 0110 §4). */
+export async function releaseProfileTurns(db: Executor, runId: string) {
+  await db
+    .update(schema.browserProfiles)
+    .set({ heldByRunId: null, heldByAgentId: null, heldUntil: null, heldSince: null })
+    .where(eq(schema.browserProfiles.heldByRunId, runId));
 }
 
 export type StepKind = (typeof schema.agentRunStepKindEnum.enumValues)[number];

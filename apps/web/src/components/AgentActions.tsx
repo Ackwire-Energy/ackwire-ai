@@ -61,6 +61,8 @@ export const RECEIPT_ICONS: Record<AgentAction["kind"], IconName> = {
   "wiki.page_edited": "page",
   "thread.renamed": "thread",
   "thread.closed": "thread",
+  "skill.created": "book",
+  "skill.updated": "book",
 };
 
 /** A kind a newer server sends that this build doesn't know yet gets the plain check. */

@@ -74,7 +74,7 @@ describe("work summary", () => {
     expect(w.connectors).toEqual(["himetrica", "Drive"]);
     expect(workHeader(t, { steps: w.steps.length, connectors: w.connectors, durationMs: w.durationMs })).toEqual({
       steps: "2 passos",
-      connectors: "himetrica, Drive",
+      connectors: "himetrica e Drive",
       duration: "12 s",
     });
   });
@@ -90,9 +90,14 @@ describe("work summary", () => {
         steps,
       };
     };
+    const reply = state.messages.find((m) => m.id === "m-2");
+    if (reply)
+      reply.meta = {
+        work: { steps: 2, calls: [{ name: "himetrica_get_summary" }, { name: "create_artifact" }], durationMs: 12_000 },
+      };
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
-    const head = screen().getAllByRole("button", { name: /Ver o que ela fez/ })[0] as HTMLElement;
+    const head = screen().getAllByRole("button", { name: /Usou 2 ferramentas/ })[0] as HTMLElement;
     expect(asked).toEqual([]);
     await click(head);
     await settle(4);
@@ -105,6 +110,34 @@ describe("work summary", () => {
     expect(within(work).getByText("Consultou o Himetrica")).toBeTruthy();
     // The one that failed says so, and doesn't read as done.
     expect(within(work).getByText("Deu erro escrevendo no Drive")).toBeTruthy();
+  });
+
+  test("a reply without meta.work (saved before it) keeps a block that loads its steps, gone if it called none", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    let runSteps = steps;
+    api.agents.run = async (_orgId, runId) => ({
+      run: { id: runId, createdAt: at(0), finishedAt: at(12) } as Run,
+      steps: runSteps,
+    });
+    const reply = state.messages.find((m) => m.id === "m-2");
+    if (reply) reply.meta = {};
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const head = screen().getAllByRole("button", { name: /O que ela fez/ })[0] as HTMLElement;
+    await click(head);
+    await settle(4);
+    expect(head.textContent).toContain("Usou 2 ferramentas");
+    cleanup();
+
+    runSteps = [steps[0], steps[steps.length - 1]].filter((s) => s !== undefined);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const none = screen().getAllByRole("button", { name: /O que ela fez/ })[0] as HTMLElement;
+    await click(none);
+    await settle(4);
+    expect(none.isConnected).toBe(false);
+    expect(document.body.textContent).not.toContain("sem usar ferramentas");
   });
 
   test("a reaction already shows on the message: no block for a reply that only reacted, other tools count alone", async () => {

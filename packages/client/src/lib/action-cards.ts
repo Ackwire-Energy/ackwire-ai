@@ -3,6 +3,7 @@ import type { Agent, AgentDraft, AgentProposalCard, AiStatus, ProposedRoutine, S
 import type { Level } from "./access-levels";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
+import { type UsagePauseCard, usagePauseCardOf } from "./usage-pause";
 
 /**
  * An agent's action card (ADR 0061, `meta.actionCard`): its button opens the app's own dialog, filled in.
@@ -68,7 +69,7 @@ export function stretchCardOf(meta: Record<string, unknown> | null | undefined):
 export function stretchCardText(t: TFunction, card: StretchCard, names: string[], cost?: string | null) {
   // Plurals by `count` and the `_cost` context are past what the typed keys can check here.
   const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
-  const agents = joinNames(names, t("newAgent.and"));
+  const agents = joinNames(names, t);
   const count = names.length;
   if (card.reason === "runs") return say("chat.body.stretch_paused_runs", { agents, count, steps: card.limit });
   return say("chat.body.stretch_paused_spend", {
@@ -87,7 +88,7 @@ export const mayContinueStretch = (
   admin: boolean,
 ) => admin || (meId !== null && (card.forUserId === meId || card.agentIds.some((id) => ownerOf(id) === meId)));
 
-export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard;
+export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard | UsagePauseCard;
 
 /** An agent's proposal of a new agent (ADR 0081), or null. Unlike the Connect card, it keeps its state. */
 export function agentProposalOf(meta: Record<string, unknown> | null | undefined): AgentProposalCard | null {
@@ -108,10 +109,6 @@ export const suggestedAiText = (t: TFunction, ai: SuggestedAi) =>
   ai.kind === "account"
     ? t("actionCard.agentProposal.aiAccount", { account: ai.label })
     : t(ai.kind === "model" ? "actionCard.agentProposal.aiModel" : "actionCard.agentProposal.aiNone");
-
-/** "Pode agir", "Só olhar e contar": what a proposed routine may do on its own. */
-export const routineAccessText = (t: TFunction, routine: ProposedRoutine) =>
-  t(routine.access === "act" ? "routines.access.act" : "routines.access.read");
 
 /** A created proposal's routine nobody made yet (its agent wasn't where it reports): it can still be made. */
 export const routineLeft = (card: AgentProposalCard) =>
@@ -198,7 +195,7 @@ function routineLine(
 }
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
-  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta);
+  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta) ?? usagePauseCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;

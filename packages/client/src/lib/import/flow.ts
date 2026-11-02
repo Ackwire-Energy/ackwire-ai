@@ -1,7 +1,15 @@
 import type { TFunction } from "i18next";
 import type { ApiClient } from "../../api/client";
 import { ApiError } from "../../api/http";
-import type { BundleNote, ImportItemKind, ImportItemResult, ImportSkipReason, MigrationBundle } from "../../api/types";
+import type {
+  BundleNote,
+  BundleTodo,
+  ImportItemKind,
+  ImportItemResult,
+  ImportSkipReason,
+  MigrationBundle,
+} from "../../api/types";
+import { joinNames } from "../format";
 import {
   type AgentFile,
   type AgentFileSkip,
@@ -29,6 +37,16 @@ export const kindsLine = (t: TFunction, count: (kind: ImportItemKind) => number)
   IMPORT_KINDS.filter((kind) => count(kind) > 0)
     .map((kind) => t(`onboarding.import.report.kinds.${kind}`, { count: count(kind) }))
     .join(" · ");
+
+/**
+ * What the import needs set up by hand, as one plain line: "Ada e Theo usam o HubSpot." The agents it matters to
+ * are the subject; with none, the import itself.
+ */
+export function todoLine(t: TFunction, todo: BundleTodo, nameOf: (key: string) => string): string {
+  const names = todo.agents.map(nameOf);
+  const who = names.length > 0 ? joinNames(names, t) : t("onboarding.import.need.someone");
+  return t(`onboarding.import.need.${todo.kind}`, { who, label: todo.label, count: Math.max(names.length, 1) });
+}
 
 /** Apps that answer `EXPORT_PROMPT`: the brand, and the `source.app` the prompt suggests it writes. */
 export const EXPORT_PROMPT_APPS = [
@@ -188,7 +206,7 @@ export function sliceBundle(bundle: MigrationBundle, pick: ReadonlySet<string>):
 export async function applyInChunks(
   api: ApiClient,
   orgId: string,
-  input: { bundle: MigrationBundle; pick: string[]; enableSkills: string[] },
+  input: { bundle: MigrationBundle; pick: string[] },
   done: Map<string, ImportItemResult>,
   onProgress?: (applied: number) => void,
 ): Promise<ImportItemResult[]> {
@@ -198,7 +216,6 @@ export async function applyInChunks(
       bundle: sliceBundle(input.bundle, new Set(pick)),
       dryRun: false,
       pick,
-      enableSkills: input.enableSkills,
     });
     for (const item of items) {
       const before = done.get(itemId(item));

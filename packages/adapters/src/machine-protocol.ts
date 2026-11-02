@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 33;
+export const MACHINE_PROTOCOL_VERSION = 37;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -299,6 +299,13 @@ export interface MachineLoad {
    * runner: the server needs to know nothing new, so no protocol number.
    */
   oomKills?: number;
+  /**
+   * Free space on the workspace's disk (GB) and the share of it in use (0 to 1), and the shared folder's size (GB,
+   * measured hourly), ADR 0115. Absent from an older runner: no protocol number, as `oomKills`.
+   */
+  diskFreeGb?: number;
+  diskUse?: number;
+  sharedGb?: number;
 }
 
 /** How often a computer's load is sampled (protocol 22). */
@@ -344,6 +351,23 @@ export const DESKTOP_TEXT_MAX = 16_000;
  * no `setup`.
  */
 export const BROWSER_WARM_PROTOCOL = 27;
+
+/**
+ * Protocol 35 (ADR 0116): `git.sync` repos may carry `github`, a short-lived single-repository GitHub App token
+ * (contents: read). The checkout then fetches straight from github.com with it and pushes through our proxy
+ * (`remote.origin.pushurl`). A clone outlives its request: past `timeoutSeconds` the answer is `cloning` and the
+ * download goes on (at most two at once per computer, the rest wait); a later `git.sync` of the same folder waits
+ * for it again. The server sends `github` only to these runners and gives older ones the full clone deadline.
+ */
+export const GIT_DIRECT_PROTOCOL = 35;
+
+/**
+ * Protocol 34: browser profiles (ADR 0110). Every `browser.*` op may carry `profile: { id }`: it runs in that
+ * profile's session (one Chrome per profile, in `<runner home>/browser-profiles/<id>`, always headless) instead of
+ * the agent's; `agent` still says who acts. `browser.profile.delete` stops its Chrome and removes its folder. Frames
+ * of a profile's stream carry `agentId: "profile:<id>"`. A system-mode runner refuses profiles (phase 2).
+ */
+export const BROWSER_PROFILE_PROTOCOL = 34;
 
 /**
  * From this protocol on: `brain.turn` carries `contextTokens`, the most context the agent's model reads
@@ -405,10 +429,26 @@ export const CODEX_FOLDER_PROTOCOL = 32;
  */
 export const DESKTOP_SWITCH_PROTOCOL = 30;
 
+/**
+ * From this protocol on (ADR 0114): the Cursor brain. `brain.turn` takes `kind: "cursor"` (Cursor's CLI, `agent -p`,
+ * one process per turn), `account` takes `kind: "cursor"` (a browser sign-in, or a Cursor API key sealed to the
+ * machine: `begin` with `provider: "cursor"`), `hello.executors.cursor` reports the CLI with the models its sign-in
+ * lists, and `access.tools.cursor` turns it on or off. The server never sends any of these to an older runner.
+ */
+export const CURSOR_PROTOCOL = 36;
+/** `account` `begin`'s `provider` for a Cursor account made with an API key (`CURSOR_API_KEY`) instead of a sign-in. */
+export const CURSOR_KEY_PROVIDER = "cursor";
+/**
+ * From this protocol on (ADR 0057): in system mode the agents share the computer, none with memory or CPUs of its
+ * own, and `agentes-runner computer` shows who uses it. Agents are told so only from here; an older runner still caps
+ * each agent and has no such command.
+ */
+export const SHARED_COMPUTER_PROTOCOL = 37;
+
 /** Which CLI an account signs in. */
-export type AccountKind = "claude_code" | "codex";
-export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
-export const isAccountKind = (v: unknown): v is AccountKind => v === "claude_code" || v === "codex";
+export type AccountKind = "claude_code" | "codex" | "cursor";
+export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex", "cursor"];
+export const isAccountKind = (v: unknown): v is AccountKind => v === "claude_code" || v === "codex" || v === "cursor";
 /** Account and sign-in ids: UUIDs (the server makes them; the desktop app's runner too). */
 export const isAccountId = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
@@ -473,7 +513,11 @@ export interface PlanUsage {
 export type OwnPlanUsage = Partial<Record<AccountKind, PlanUsage>>;
 
 /** `list.fresh` ids for the computer's own sign-ins (the rest are account ids). */
-export const OWN_USAGE_ID: Record<AccountKind, string> = { claude_code: "own:claude_code", codex: "own:codex" };
+export const OWN_USAGE_ID: Record<AccountKind, string> = {
+  claude_code: "own:claude_code",
+  codex: "own:codex",
+  cursor: "own:cursor",
+};
 
 export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
 
@@ -847,8 +891,11 @@ export interface GitSyncRequest {
   proxy: { base: string; token: string };
   /** The commit author set in each checkout ("Theo (agentes)", "theo@agents.agentes.chat"). */
   author: { name: string; email: string };
-  /** `clone: false`: update it only when it is already there. `dir` is relative to the agent's folder. */
-  repos: { repo: string; dir: string; clone: boolean }[];
+  /**
+   * `clone: false`: update it only when it is already there. `dir` is relative to the agent's folder. `github`
+   * (protocol 35): a GitHub App installation token for this repository only (contents: read, 1 hour).
+   */
+  repos: { repo: string; dir: string; clone: boolean; github?: string }[];
   /** Also update every checkout already under `repos/` (one `owner/name` level). */
   existing?: boolean;
   /** For the whole request; each fetch stops at the deadline (a slow or offline network never blocks). */
@@ -863,8 +910,11 @@ export interface GitSyncRepo {
   dir: string;
   /** Absolute path on the machine. */
   path?: string;
-  /** `missing`: not cloned (and not asked to); `failed`: see `message` (offline, refused by the proxy…). */
-  status: "cloned" | "updated" | "missing" | "failed";
+  /**
+   * `missing`: not cloned (and not asked to); `failed`: see `message` (offline, refused by the proxy…);
+   * `cloning` (protocol 35): still downloading in the background, or waiting for another download (`message`).
+   */
+  status: "cloned" | "updated" | "missing" | "failed" | "cloning";
   /** The branch checked out now, and the remote's default branch. */
   branch?: string;
   defaultBranch?: string;
@@ -1013,7 +1063,20 @@ export interface RunnerExecutorInfo {
   /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `ultra`…). */
   authMethod?: string;
   plan?: string;
+  /** Protocol 36, `cursor` only: the models its sign-in lists (`agent models`), and which its plan includes when the CLI says. */
+  models?: CursorModelInfo[];
 }
+
+/** A model Cursor's CLI lists (`agent models`). */
+export interface CursorModelInfo {
+  id: string;
+  label?: string;
+  /** The CLI said the plan includes it (absent: it didn't say; other models are billed at API prices). */
+  inPlan?: boolean;
+}
+
+/** Most models kept from `agent models`, and their longest id and label. */
+export const CURSOR_MODEL_LIMITS = { models: 60, id: 80, label: 80 } as const;
 
 /**
  * One event of a brain turn on the wire (`brain.event`), the same shape as
@@ -1086,7 +1149,8 @@ export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
  */
 export interface BrainTurnRequest {
   runId: string;
-  kind: "claude_code" | "codex";
+  /** `cursor`: protocol 36 (`CURSOR_PROTOCOL`). */
+  kind: "claude_code" | "codex" | "cursor";
   /** The executor's session (a UUID, stable per thread); `resume`: the server knows it ran before (a hint). */
   session: { id: string; resume: boolean };
   /** Relative to the agent's folder ("" = the folder). */
@@ -1271,6 +1335,8 @@ export interface RunnerPause {
 export interface RunnerTools {
   claude: boolean;
   codex: boolean;
+  /** Protocol 36: Cursor's CLI (ADR 0114). Absent = off (older runners). */
+  cursor?: boolean;
   /** Shell commands (`exec`, `shell` tasks). The same as `exec` in `hello` once protocol 10 is in use. */
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
@@ -1285,9 +1351,20 @@ export interface RunnerTools {
 export interface RunnerFolderGrant {
   /** Absolute, normalized path on the machine. */
   path: string;
-  /** Agent ids that may use it; empty = allowed on the machine but no agent uses it yet. */
+  /** Agent ids that may use it; empty = allowed on the machine but no agent uses it yet; `ALL_AGENTS`: every agent. */
   agents: string[];
 }
+
+/** The agents of the folder grant every agent on the computer has: its shared folder (ADR 0115). */
+export const ALL_AGENTS = "*";
+
+/** Whether a folder grant is for `agentId` (by its id, or for every agent). */
+export const grantedTo = (grant: Pick<RunnerFolderGrant, "agents">, agentId: string) =>
+  grant.agents.includes(agentId) || grant.agents.includes(ALL_AGENTS);
+
+/** The computer's shared folder (ADR 0115): the folder granted to every agent; null from an older runner. */
+export const sharedFolderOf = (access: Pick<RunnerAccess, "folders"> | null | undefined) =>
+  access?.folders.find((f) => f.agents.includes(ALL_AGENTS))?.path ?? null;
 
 /** What the machine allows (protocol 10). */
 export interface RunnerAccess {
@@ -1319,7 +1396,7 @@ export interface RunnerInfo {
   /** `false` when started with `--no-exec`: files and uploads only. */
   exec: boolean;
   /** Protocol 7: the coding CLIs found on the machine's PATH (best effort, cached by the runner). */
-  executors?: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo };
+  executors?: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo; cursor?: RunnerExecutorInfo };
   /** Protocol 9: whether the owner paused this computer. */
   paused?: RunnerPause;
   /** Protocol 10: folders and tools allowed on the machine. */
@@ -1465,6 +1542,8 @@ export type MachineRequest = (
   | { op: "browser.capture"; allowedDomains?: string[] }
   /** Protocol 27: start the agent's Chrome before its first command (`desktop`: as on `browser.act`). */
   | { op: "browser.warm"; desktop?: boolean }
+  /** Protocol 34: stops a browser profile's Chrome and removes its folder (the profile was deleted). */
+  | { op: "browser.profile.delete" }
   /** Protocol 18: starts the agent's desktop; when it runs already, only marks it used (idempotent). */
   | { op: "desktop.session.start" }
   /** Protocol 18: ends the agent's desktop, and its browser on it. */
@@ -1482,7 +1561,11 @@ export type MachineRequest = (
   | { op: "desktop.apps" }
   /** Protocol 25: the text on the agent's screen, read on the computer. */
   | { op: "desktop.text" }
-) & { agent?: AgentScope };
+) & {
+  agent?: AgentScope;
+  /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
+  profile?: { id: string };
+};
 
 /** One command of a `browser.batch` (protocol 17). */
 export interface BrowserBatchCommand {
@@ -1522,6 +1605,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.batch",
   "browser.capture",
   "browser.warm",
+  "browser.profile.delete",
   "desktop.session.start",
   "desktop.session.stop",
   "desktop.session.status",
@@ -1599,6 +1683,7 @@ export interface MachineReplies {
   "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[]; setup?: BrowserSetup };
   /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
   "browser.warm": { started: boolean; setup?: BrowserSetup };
+  "browser.profile.delete": { deleted: boolean };
   /**
    * The page as a JPEG (base64), its size in pixels, the page's size in CSS
    * pixels, and its numbered elements with their boxes (CSS pixels).
@@ -1896,11 +1981,25 @@ const denialList = (v: unknown): TaskDenial[] => {
   return out;
 };
 
-/** `hello.executors`: only `claude` and `codex`, each with a short version line (and Claude Code's login). */
+/** `cursor`'s `models` (protocol 36), cut to `CURSOR_MODEL_LIMITS`; ids are short words only. */
+export function parseCursorModels(v: unknown): CursorModelInfo[] {
+  if (!Array.isArray(v)) return [];
+  const out: CursorModelInfo[] = [];
+  for (const m of v) {
+    if (!isObject(m) || !isString(m.id) || !/^[\w.:/-]{1,80}$/.test(m.id)) continue;
+    if (out.some((x) => x.id === m.id)) continue;
+    const label = isString(m.label) ? m.label.replace(/\s+/g, " ").trim().slice(0, CURSOR_MODEL_LIMITS.label) : "";
+    out.push({ id: m.id, ...(label ? { label } : {}), ...(m.inPlan === true ? { inPlan: true } : {}) });
+    if (out.length >= CURSOR_MODEL_LIMITS.models) break;
+  }
+  return out;
+}
+
+/** `hello.executors`: only `claude`, `codex` and `cursor`, each with a short version line (and Claude Code's login). */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   const word = (x: unknown) => (isString(x) && /^[\w.-]{1,40}$/.test(x) ? x : undefined);
-  for (const name of ["claude", "codex"] as const) {
+  for (const name of ["claude", "codex", "cursor"] as const) {
     const e = v[name];
     if (!isObject(e) || !isString(e.version)) continue;
     const authMethod = word(e.authMethod);
@@ -1911,6 +2010,8 @@ export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerIn
       ...(authMethod ? { authMethod } : {}),
       ...(plan ? { plan } : {}),
     };
+    const models = name === "cursor" ? parseCursorModels(e.models) : [];
+    if (models.length) out[name] = { ...out[name], models } as RunnerExecutorInfo;
   }
   return out;
 }
@@ -2754,6 +2855,8 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
     tools: {
       claude: t.claude === true,
       codex: t.codex === true,
+      // Kept off too: absent means a runner before Cursor's switch, where Cursor follows Codex.
+      ...(typeof t.cursor === "boolean" ? { cursor: t.cursor } : {}),
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
       ...(t.desktop === true ? { desktop: true } : {}),
@@ -2821,6 +2924,9 @@ export function parseMachineLoad(v: unknown): MachineLoad | null {
     memoryPeak: v.memoryPeak,
     hours: v.hours,
     ...(inRange(v.oomKills, [0, 1e9]) ? { oomKills: v.oomKills } : {}),
+    ...(between(v.diskFreeGb, 0, 1e6) ? { diskFreeGb: v.diskFreeGb } : {}),
+    ...(between(v.diskUse, 0, 1) ? { diskUse: v.diskUse } : {}),
+    ...(between(v.sharedGb, 0, 1e6) ? { sharedGb: v.sharedGb } : {}),
   };
 }
 

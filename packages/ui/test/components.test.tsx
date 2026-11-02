@@ -15,6 +15,7 @@ import {
   CardHeader,
   Chip,
   Composer,
+  FilterChip,
   Icon,
   type IconName,
   iconNames,
@@ -22,7 +23,9 @@ import {
   ListRow,
   Logo,
   Menu,
+  MenuCheckboxItem,
   MenuItem,
+  MenuRadioGroup,
   MenuReactions,
   Message,
   MessageText,
@@ -552,6 +555,63 @@ describe("Menu", () => {
     expect(body().queryByRole("menu")).toBeNull();
   });
 
+  test("checkable items keep their check at the row's end, after the label and the hint", async () => {
+    render(
+      <Menu trigger={<Button>Filtros</Button>} label="Filtros">
+        <MenuCheckboxItem checked={false} onCheckedChange={() => {}} hint={3}>
+          Mostrar canceladas
+        </MenuCheckboxItem>
+        <MenuRadioGroup
+          label="Ordem"
+          value="new"
+          onValueChange={() => {}}
+          options={[
+            { value: "new", label: "Mais novas", leading: <span>•</span> },
+            { value: "old", label: "Mais antigas" },
+          ]}
+        />
+      </Menu>,
+    );
+    const trigger = body().getByRole("button", { name: "Filtros" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const menu = body().getByRole("menu");
+    const box = within(menu).getByRole("menuitemcheckbox");
+    expect(box.getAttribute("aria-checked")).toBe("false");
+    expect([...box.children].map((c) => c.getAttribute("class"))).toEqual([
+      "ac-menu__label",
+      "ac-menu__hint",
+      "ac-menu__check",
+    ]);
+    const radios = within(menu).getAllByRole("menuitemradio");
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+    expect(radios.map((r) => [...r.children].map((c) => c.getAttribute("class")))).toEqual([
+      ["ac-menu__leading", "ac-menu__label", "ac-menu__check"],
+      ["ac-menu__label", "ac-menu__check"],
+    ]);
+  });
+
+  test("a checkable item with an icon starts with it, like the plain items around it", async () => {
+    render(
+      <Menu trigger={<Button>Mais</Button>} label="Mais">
+        <MenuItem icon="layers">Nova coluna</MenuItem>
+        <MenuCheckboxItem icon="eye" checked onCheckedChange={() => {}}>
+          Mostrar canceladas
+        </MenuCheckboxItem>
+      </Menu>,
+    );
+    const trigger = body().getByRole("button", { name: "Mais" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const box = within(body().getByRole("menu")).getByRole("menuitemcheckbox");
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    expect([...box.children].map((c) => c.getAttribute("class")?.split(" ")[0])).toEqual([
+      "ac-icon",
+      "ac-menu__label",
+      "ac-menu__check",
+    ]);
+  });
+
   test("quick reactions end with a cell that opens every emoji", async () => {
     let picked = "";
     let more = 0;
@@ -714,7 +774,51 @@ describe("Message aside and foot", () => {
     }
   });
 
-  test("the action bar sits on the first line, left of the check, clear of the lines around it", async () => {
+  test("my own row: the time and then the receipt under the turn's last bubble, no time in the far-left column", () => {
+    const { container } = render(
+      <>
+        <Message author="Eu" time="8:39 PM" own run="start" aside={<span>✓</span>}>
+          <MessageText>primeira</MessageText>
+        </Message>
+        <Message author="Eu" time="8:40 PM" own run="end" grouped aside={<span>✓✓</span>}>
+          <MessageText>segunda</MessageText>
+        </Message>
+      </>,
+    );
+    const [start, end] = Array.from(container.querySelectorAll("article"));
+    // A line under the bubble: time first, then the receipt (a button stays one).
+    expect(end?.querySelector(".ac-msg__text + .ac-msg__own-foot")?.textContent).toBe("8:40 PM✓✓");
+    expect(end?.querySelector(".ac-msg__own-time")?.getAttribute("aria-hidden")).toBe("true");
+    expect(end?.querySelector(".ac-msg__own-foot > .ac-msg__aside")?.getAttribute("aria-hidden")).toBeNull();
+    // A run's earlier row: no time, in the left column or under it.
+    expect(start?.querySelector(".ac-msg__own-foot, .ac-msg__own-time")).toBeNull();
+    for (const row of [start, end])
+      expect(row?.querySelector(".ac-msg__gutter, .ac-msg__avatar, .ac-msg__aside--floating")).toBeNull();
+  });
+
+  test("every menu's rows share one dense height and side padding, as dense as the message's bar", async () => {
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const decls = (selector: string) =>
+      [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((m) => (m[1] ?? "").split(",").some((s) => s.trim() === selector))
+        .map((m) => m[2] ?? "")
+        .join(";");
+    const value = (selector: string, prop: string) =>
+      [...decls(selector).matchAll(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`, "g"))].at(-1)?.[1]?.trim();
+    expect(css).toContain(":root {\n  --menu-item-h: 28px;\n  --menu-item-px: 8px;\n}");
+    expect(value(".ac-menu__item", "padding")).toBe("calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px)");
+    expect(value(".ac-menu__item", "min-height")).toBe("var(--menu-item-h)");
+    expect(value(".ac-menu__item", "line-height")).toBe("20px");
+    expect(value(".ac-menu__reaction", "height")).toBe("var(--menu-item-h)");
+    expect(value(".ac-menu", "padding")).toBe("4px");
+    // No menu's rows taller than the bar's buttons by more than the token: nothing sets its own item height.
+    expect(css).not.toMatch(/\.ac-menu__item\s*\{[^}]*min-height:\s*\d+px/);
+  });
+
+  test("the action bar is small and sits on the row's top edge, left of the check", async () => {
     const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
@@ -733,27 +837,18 @@ describe("Message aside and foot", () => {
     expect(value(".ac-msg:hover .ac-msg__actions", "transform")).toBe("translateY(-50%)");
     expect(value(".ac-msg:focus-within .ac-msg__actions", "transform")).toBe("translateY(-50%)");
     expect(bodies(bar)).not.toMatch(/(^|;)\s*(bottom|translate):/);
-    // The name's 20px line starts at the row's top padding, and the bar sits on its capitals' middle. A grouped row's
-    // first line is its text's, under the row's and the text's top margins.
-    expect(value(".ac-msg", "padding")).toBe("6px var(--msg-inline)");
-    expect(value(bar, "top")).toBe("calc(16px - var(--cap-mid))");
-    const line =
-      Number.parseFloat(value(".ac-msg__text", "font-size") ?? "") * Number(value(".ac-msg__text", "line-height"));
-    expect(line).toBeCloseTo(26.35, 3);
-    expect(value(".ac-msg--grouped", "padding-top")).toBe("2px");
-    expect(value(".ac-msg__text", "margin")).toBe("2px 0 0");
-    expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe(
-      "calc(4px + 13.175px - var(--cap-mid))",
-    );
-    // A grouped row with a line under one line of text: between the row above's last line (its 6px bottom padding
-    // up) and that line (2px under the text), the room holds the bar (its 32px buttons, 3px around them) whole, and
-    // the bar takes its middle.
-    const footed =
-      ".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions";
-    const above = -6;
-    const under = 2 + 2 + line + 2;
-    expect(Number.parseFloat(value(footed, "top") ?? "")).toBeCloseTo((above + under) / 2, 3);
-    expect(under - above).toBeGreaterThanOrEqual(32 + 2 * 3);
+    // Its middle on the row's top edge, grouped or not: half of it in the gap above, never over the first line.
+    expect(value(bar, "top")).toBe("0");
+    expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe("0");
+    expect(
+      bodies(".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions"),
+    ).toBe("");
+    // 26px buttons with 16px icons, 2px around them, no gap: a 30px bar.
+    for (const decl of [/gap:\s*0\s*(;|$)/, /padding:\s*2px\s*(;|$)/, /border-radius:\s*10px\s*(;|$)/])
+      expect(bodies(bar)).toMatch(decl);
+    expect(value(".ac-msg__actions .ac-btn--sm", "width")).toBe("26px");
+    expect(value(".ac-msg__actions .ac-btn--sm", "height")).toBe("26px");
+    expect(value(".ac-msg__actions .ac-btn--sm .ac-icon", "width")).toBe("16px");
     // On touch too, where small buttons grow to 40px: the bar's keep their 32px plates, and each target reaches 4px
     // past its plate to the ruler's 40px, the plates 8px apart so no two targets overlap.
     const touch = [...css.matchAll(/@media \(pointer: coarse\) \{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)]
@@ -961,8 +1056,8 @@ describe("Message on touch", () => {
     expect(rule(".ac-msg:hover")).toBe("background: var(--plate-soft);");
     expect(rule('.ac-msg[data-menu-open="true"]')).toBe("background: var(--plate);");
     expect(css.indexOf('.ac-msg[data-menu-open="true"]')).toBeGreaterThan(css.indexOf(".ac-msg:hover {"));
-    expect(rule(".ac-menu__item", block("pointer: coarse"))).toBe("min-height: 40px;");
-    expect(rule(".ac-menu__reaction", block("pointer: coarse"))).toBe("width: 40px; height: 40px;");
+    expect(rule(":root", block("pointer: coarse"))).toContain("--menu-item-h: 40px;");
+    expect(rule(".ac-menu__reaction", block("pointer: coarse"))).toBe("width: 40px;");
   });
 });
 
@@ -1015,5 +1110,33 @@ describe("text and faces that are never cut", () => {
     expect(initials?.querySelector("img")).toBeNull();
     expect(initials?.textContent).toBe("MA");
     expect(agent?.getAttribute("data-kind")).toBe("agent");
+  });
+});
+
+describe("FilterChip", () => {
+  test("each option starts with its face and name; the check sits at its end, kept empty when off", async () => {
+    render(
+      <FilterChip
+        label="Papel"
+        icon="person"
+        clearLabel="Limpar Papel"
+        multiple
+        value={["admin"]}
+        onChange={() => {}}
+        options={[
+          { value: "admin", label: "Admin", leading: <span className="face">A</span> },
+          { value: "member", label: "Membro" },
+        ]}
+      />,
+    );
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Papel: Admin" })));
+    const options = within(body().getByRole("listbox", { name: "Papel" })).getAllByRole("option");
+    expect(options.map((o) => o.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    expect(options.map((o) => [...o.children].map((c) => c.getAttribute("class")))).toEqual([
+      ["face", "ac-filter__label", "ac-tz__check"],
+      ["ac-filter__label", "ac-tz__check"],
+    ]);
+    expect(options[0]?.querySelector(".ac-tz__check svg")).not.toBeNull();
+    expect(options[1]?.querySelector(".ac-tz__check svg")).toBeNull();
   });
 });

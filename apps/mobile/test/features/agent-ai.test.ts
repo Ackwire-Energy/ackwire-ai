@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
-import { planOf, planReplies } from "@agenteschat/client/lib/plans";
+import { CURSOR_KEY_PLAN, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
 import { markOf } from "@agenteschat/ui/brand/marks";
 import type { TFunction } from "i18next";
 import {
@@ -142,7 +142,7 @@ describe("the agent's AI", () => {
     });
     expect(says(pt, false, { coding: glm }).line).toBe("A Ada só atende você, pelo seu plano GLM Coding.");
     // The phone's header over it.
-    expect([en("mobile.ai.audience", { she: "she" }), pt("mobile.ai.audience", { she: "ela" })]).toEqual([
+    expect([en("mobile.ai.audience", { context: "female" }), pt("mobile.ai.audience", { context: "female" })]).toEqual([
       "Who she answers",
       "Quem ela atende",
     ]);
@@ -206,7 +206,7 @@ describe("the agent's AI", () => {
     expect(t("connectAi.otherAccount.claude_code", { email: "walt@gmail.com", account: "walt@acme.com" })).toBe(
       "O Claude entrou como walt@gmail.com, não como walt@acme.com. Saia na página do Claude e tente de novo.",
     );
-    expect(t("connectAi.own.one", { for: "para a", name: "Ada" })).toBe("Uma conta só para a Ada");
+    expect(t("connectAi.own.one", { context: "female", name: "Ada" })).toBe("Uma conta só para a Ada");
     expect(t("connectAi.own.shared")).toBe("A conta que os seus agentes dividem");
   });
 
@@ -343,14 +343,14 @@ describe("the agent's AI", () => {
   test("a card whose plan's sign-in ended: the agent says so, and Entrar de novo opens on its own plan", async () => {
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
     const [card, sheet] = await Promise.all([read("NoAiCard.tsx"), read("ConnectAi.tsx")]);
-    expect(card).toContain('t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name))');
+    expect(card).toContain('t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name))');
     // The plan the client tests pin (`signInAgainPlan`): ChatGPT for a Codex agent, never Claude's page.
     expect(card).toContain("const again = signInAgainPlan(card, agent);");
     expect(card).toContain('t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")');
     expect(card).toContain("...(plan ? { plan } : {}),");
     expect(sheet).toContain("PLAN_CHOICES.find((c) => c === params.plan) ?? choiceOfIntent(");
     const t = await translator("pt-BR");
-    expect(t("noAi.signedOut", { name: "Ada", hers: "dela" })).toBe(
+    expect(t("noAi.signedOut", { name: "Ada", context: "female" })).toBe(
       "Ada não vai responder porque a IA dela saiu da\u00a0conta.",
     );
   });
@@ -370,10 +370,10 @@ describe("the agent's AI", () => {
     // A plan's page waits for the computer's row for ChatGPT too, not only Claude (`ownSignInFor`).
     expect(connect).toContain("brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,");
     // Its card: what isn't signed in and where to connect, and Conectar on that CLI's plan.
-    expect(card).toMatch(/t\(`noAi\.notSignedIn\.\$\{card\.own\}`, agentGrammar\(t, name\)\)/);
+    expect(card).toMatch(/t\(`noAi\.notSignedIn\.\$\{card\.own\}`, agentGrammar\(name\)\)/);
     expect(card).toContain("const plan = card.own ? planOfKind(card.own) : again;");
     const pt = await translator("pt-BR");
-    expect(pt("noAi.notSignedIn.codex", { of: "da", name: "Ada" })).toBe(
+    expect(pt("noAi.notSignedIn.codex", { context: "female", name: "Ada" })).toBe(
       "O Codex está sem login neste computador. Conecte uma conta do ChatGPT na página da Ada.",
     );
     const en = await translator("en");
@@ -788,4 +788,16 @@ describe("the agent's AI", () => {
     expect(newAgentAi(null).autonomy).toBeUndefined();
     expect(screen).toContain("...(thinks.autonomy ? { autonomy: thinks.autonomy } : {})");
   });
+});
+
+test("a Cursor sign-in on the phone: its own steps, or its API key when chosen, never Claude's code", async () => {
+  // The flow is a component the tests can't render: what it wires in, as text.
+  const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
+  expect(flow).toContain('} else if (kind === "cursor") {');
+  expect(flow).toContain("agentPage.work.brain.add.cursorFinish");
+  expect(flow).toContain("signInKey(planId, kind, cursorKey)");
+  expect(signInKey(undefined, "cursor", false)).toEqual({ plan: undefined, provider: undefined });
+  expect(signInKey(undefined, "cursor", true)).toEqual({ plan: CURSOR_KEY_PLAN, provider: "cursor" });
+  expect(signInKey(undefined, "claude_code", true).plan).toBeUndefined();
+  expect(signInKey("zai", "claude_code", false)).toEqual({ plan: planOf("zai") as never, provider: "zai" });
 });

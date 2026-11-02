@@ -38,6 +38,8 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheMessageWork,
+  cachePinned,
   cacheReceipts,
   cacheTask,
   catchUpChannel,
@@ -478,15 +480,6 @@ export function RealtimeProvider({
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);
       }
-      // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count, the
-      // roles' counts, and `me` (a role change changes what you may do, ADR 0085).
-      if (event.type === "org.members") {
-        void qc.invalidateQueries({ queryKey: keys.people(orgId) });
-        void qc.invalidateQueries({ queryKey: keys.members(orgId) });
-        void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
-        void qc.invalidateQueries({ queryKey: keys.roles(orgId) });
-        void qc.invalidateQueries({ queryKey: keys.me });
-      }
       // Someone arranged the sidebar's channel categories (ADR 0080): channels and categories refetch.
       if (event.type === "channels.layout") {
         void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
@@ -547,12 +540,25 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
     });
+    // Taken out of the workspace: `me` without it shows "Você não faz mais parte" (routes/org.$orgId.tsx) at once.
+    const offError = conn.onError((code) => {
+      if (code === "membership_revoked") void qc.invalidateQueries({ queryKey: keys.me });
+    });
     conn.start();
     setConnection(conn);
+    // Back from a sleep or a network change, the socket may be dead while it still says open: check it now.
+    const wake = () => {
+      if (document.visibilityState === "visible") conn.checkAlive();
+    };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
     return () => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
       offReconnect();
       offOpen();
       offUser();
+      offError();
       conn.stop();
       setConnection(null);
     };
@@ -747,6 +753,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if ((event.type as string) === "artifact.deleted")
           void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
+      if (event.type === "poll.updated") qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
       if (event.type === "thread.updated") applyThreadEvent(qc, orgId, event);
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
       if (event.type === "browser.handoff.updated")
@@ -769,7 +776,17 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       // An agent saved something from a person's message: the memory mark appears (or goes) live.
       if (event.type === "message.memories")
         cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
+      // Someone pinned or unpinned a message: its "Fixar" / "Desafixar" and the pins list follow.
+      if (event.type === "message.pinned" || event.type === "message.unpinned") {
+        cachePinned(qc, orgId, channelId, event.messageId, event.type === "message.pinned");
+        void qc.invalidateQueries({ queryKey: keys.pins(orgId, channelId) });
+      }
       // Act with undo: an agent message's receipts changed (made, undone, redone): replace the list.
+      // A long work moved, updated or ended (ADR 0121): its anchor's line redraws; its card on the board too.
+      if (event.type === "agent.work") {
+        cacheMessageWork(qc, orgId, event.channelId, event.work);
+        if (event.work.issue) void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      }
       if (event.type === "message.actions") {
         cacheMessageActions(qc, orgId, event.channelId, event.messageId, event.actions);
         // A channel an agent created (or its undo archived): the sidebar lists it now, not at the next refetch.

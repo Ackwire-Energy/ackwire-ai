@@ -32,9 +32,10 @@ const NAMES_PRIVATE_PATHS = new Set(["scripts/check-boundaries.ts", "scripts/che
 
 /**
  * A planning decision id in running text: "(D46)", "D60: …", "D9–D13", "D18/D20", "D104". A slash only joins
- * two ids, so base64 like "ab/D45/x" passes. Cloudflare's D1 is a product name.
+ * two ids, so base64 like "ab/D45/x" passes. Cloudflare's D1 is a product name, after R2 in any language ("R2 und D1", "R2, D1").
  */
-const DECISION_ID = /(?<=^|[\s([,;–]|D\d{1,3}[a-c]?\/)D\d{1,3}[a-c]?(?=$|[\s)\],;:.'’–-]|\/D\d)(?<!R2 (?:and|e) D1)/;
+const DECISION_ID =
+  /(?<=^|[\s([,;–]|D\d{1,3}[a-c]?\/)D\d{1,3}[a-c]?(?=$|[\s)\],;:.'’–-]|\/D\d)(?<!R2,? \S{1,4} D1|R2, D1)/;
 
 const NOTES: [RegExp, string][] = [
   [DECISION_ID, "cites a planning decision id: cite the ADR or state the reason itself"],

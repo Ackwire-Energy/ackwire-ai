@@ -144,7 +144,7 @@ test("the sign-up's own language: the confirmation email and the account follow 
     subject: "Confirm your email for agentes.chat",
   });
   expect(await localeOf("bia@example.com")).toBe("en");
-  const ana = await signUpIn("ana@example.com", "de-DE,pt-PT;q=0.9,en;q=0.8");
+  const ana = await signUpIn("ana@example.com", "sv-SE,pt-PT;q=0.9,en;q=0.8");
   expect(t.email.sent.at(-1)).toMatchObject({
     to: ["ana@example.com"],
     subject: "Confirme seu e-mail no agentes.chat",

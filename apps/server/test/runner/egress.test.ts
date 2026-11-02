@@ -92,6 +92,7 @@ test("system probe ignores user curl settings and inherited proxy or loader vari
   expect(captured?.args).toContain("/usr/bin/curl");
   expect(Object.keys(captured?.options.env ?? {}).sort()).toEqual([
     "AGENTES_NETWORK_OBSERVATION",
+    "AGENTES_SHARED_BIN",
     "ANDROID_ADB_SERVER_PORT",
     "HOME",
     "LANG",

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, PresenceBadge, Text, useTheme } from "@/ui";
 import { useMyPerson } from "./hooks";
-import { availabilityOf, lowerFirst, personLine } from "./logic";
+import { availabilityOf, personLine } from "./logic";
 import { openStatus } from "./StatusScreen";
 
 /**
@@ -18,11 +18,11 @@ export function MyStatusRow() {
   const status = me?.status ?? null;
   const title = presence === "online" && !status ? t("presence.setStatus") : t(`presence.${presence}`);
   const sub = status
-    ? personLine(t, i18n.language || "pt-BR", status)
+    ? personLine(t, i18n.language || "en", status)
     : presence === "hidden"
       ? t("presence.hiddenPreview")
       : presence === "online"
-        ? `${t("presence.online")} · ${lowerFirst(t("presence.placeholder"))}`
+        ? `${t("presence.online")} · ${t("presence.placeholderLower")}`
         : t("presence.placeholder");
   return (
     <Pressable

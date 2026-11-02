@@ -109,7 +109,7 @@ export function AgentsScreen() {
               key={a.id}
               onPress={() => openAgentDelete(a.id)}
               accessibilityRole="button"
-              accessibilityLabel={t("agentPage.delete.action", agentGrammar(t, a.name))}
+              accessibilityLabel={t("agentPage.delete.action", agentGrammar(a.name))}
               divider={i > 0}
               leading={<AgentFace agentId={a.id} size={50} mode="rest" live={false} />}
               title={a.name}

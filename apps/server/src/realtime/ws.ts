@@ -20,8 +20,10 @@ import {
   isConnected,
   NotFoundError,
   type OrgEvent,
+  profileIdOfKey,
   requireBrowserAccess,
   requireChannelAccess,
+  requireProfileWatcher,
   touchLastSeen,
 } from "@agenteschat/engine";
 import type { Auth, SessionUser } from "../auth";
@@ -73,6 +75,8 @@ export interface RealtimeDeps {
   browserLive?: BrowserLive;
   /** Agents' desktops and terminals (ADR 0058): people's stream sockets and the runners' data sockets. */
   streams?: StreamSockets;
+  /** How often an open socket checks its session and channels again (`SESSION_RECHECK_MS`; tests go faster). */
+  sessionRecheckMs?: number;
 }
 
 /** A browser tab of the web app. */
@@ -254,6 +258,49 @@ export function createRealtime(deps: RealtimeDeps) {
     }
   }
 
+  /** Each socket's last input frame on its way into the live view (`browserInput`). */
+  const inputLanes = new WeakMap<BrowserSocket, Promise<unknown>>();
+
+  /**
+   * A person's input frame. Frames of one socket enter the live view strictly in the order they came, one after
+   * another: the checks on the way await (the session, the rate limiter), and a later frame whose await ended first
+   * would otherwise overtake, reordering typed text or putting a click before the moves that lead to it. Only
+   * entering is in line: the answer is awaited outside it, so frames keep coming while a batch is on its way.
+   */
+  function browserInput(ws: BrowserSocket, frame: Extract<BrowserClientFrame, { type: "browser.input" }>) {
+    const live = deps.browserLive;
+    if (!live) return;
+    const { agentId } = frame;
+    const { orgId, user } = ws.data;
+    const entered = (inputLanes.get(ws) ?? Promise.resolve()).then(async () => {
+      if (!(await liveSession(ws))) return null;
+      const t = await deps.rateLimiter.consume(`ws-browser:${ws.data.connectionId}`, {
+        limit: BROWSER_INPUT_PER_SECOND,
+        windowMs: 1000,
+      });
+      if (!t.allowed) return void send(ws, { type: "error", code: "rate_limited", agentId });
+      if (!ws.data.browsers.has(agentId)) return void send(ws, { type: "error", code: "not_in_control", agentId });
+      // Wrapped: a bare promise returned here would hold the line until the computer answers.
+      return { sent: live.input(user.id, orgId, agentId, frame.events) };
+    });
+    const settled = entered.catch(() => {
+      if (ws.readyState === 1) send(ws, { type: "browser.unavailable", agentId, reason: "unavailable" });
+      return null;
+    });
+    inputLanes.set(ws, settled);
+    return settled.then(async (step) => {
+      if (!step) return;
+      try {
+        const sent = await step.sent;
+        if (sent.refused) send(ws, { type: "error", code: "not_in_control", agentId });
+      } catch (error) {
+        if (ws.readyState === 1) {
+          send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: String(error) });
+        }
+      }
+    });
+  }
+
   /** Placeholders of browser views still starting (`browser.watch` in flight). */
   const startingBrowsers = new WeakSet<() => void>();
 
@@ -266,21 +313,6 @@ export function createRealtime(deps: RealtimeDeps) {
     if (frame.type === "browser.unwatch") {
       ws.data.browsers.get(agentId)?.();
       ws.data.browsers.delete(agentId);
-      return;
-    }
-    if (frame.type === "browser.input") {
-      const t = await deps.rateLimiter.consume(`ws-browser:${ws.data.connectionId}`, {
-        limit: BROWSER_INPUT_PER_SECOND,
-        windowMs: 1000,
-      });
-      if (!t.allowed) return send(ws, { type: "error", code: "rate_limited", agentId });
-      if (!ws.data.browsers.has(agentId)) return send(ws, { type: "error", code: "not_in_control", agentId });
-      try {
-        const sent = await live.input(user.id, orgId, agentId, frame.events);
-        if (sent.refused) send(ws, { type: "error", code: "not_in_control", agentId });
-      } catch (error) {
-        send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: String(error) });
-      }
       return;
     }
     const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
@@ -303,7 +335,9 @@ export function createRealtime(deps: RealtimeDeps) {
     ws.data.browsers.set(agentId, starting);
     let stop: () => void;
     try {
-      await requireBrowserAccess(deps.db, user.id, orgId, agentId);
+      const profileId = profileIdOfKey(agentId);
+      if (profileId) await requireProfileWatcher(deps.db, user.id, orgId, profileId);
+      else await requireBrowserAccess(deps.db, user.id, orgId, agentId);
       stop = await live.watch(
         {
           userId: user.id,
@@ -410,15 +444,12 @@ export function createRealtime(deps: RealtimeDeps) {
                 );
                 timeout.unref?.();
               });
+              // Only these are judged: a channel subscribed while the query runs passed its own check, and isn't in
+              // `allowed` only because nobody asked about it.
+              const checked = [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()];
               let allowed: Set<string> | null;
               try {
-                allowed = await Promise.race([
-                  currentSubscriptions(deps.db, user.id, orgId, [
-                    ...ws.data.subscriptions.keys(),
-                    ...ws.data.pending.keys(),
-                  ]),
-                  deadline,
-                ]);
+                allowed = await Promise.race([currentSubscriptions(deps.db, user.id, orgId, checked), deadline]);
               } finally {
                 if (timeout) clearTimeout(timeout);
               }
@@ -427,9 +458,7 @@ export function createRealtime(deps: RealtimeDeps) {
                 ws.close(4403, "membership revoked");
                 return;
               }
-              for (const channelId of ws.data.subscriptions.keys())
-                if (!allowed.has(channelId)) drop(channelId, "revoked");
-              for (const [channelId, pending] of ws.data.pending) if (!allowed.has(channelId)) pending.revoked = true;
+              for (const channelId of checked) if (!allowed.has(channelId)) drop(channelId, "revoked");
             } catch {
               // A failed durable check must not leave a private subscription open.
               if (ws.readyState === 1) ws.close(1011, "membership unavailable");
@@ -437,7 +466,7 @@ export function createRealtime(deps: RealtimeDeps) {
               rechecking = false;
             }
           })();
-        }, SESSION_RECHECK_MS);
+        }, deps.sessionRecheckMs ?? SESSION_RECHECK_MS);
         ws.data.system.push(
           deps.pubsub.subscribe(orgTopic(orgId), (raw) => {
             const event = raw as unknown as OrgEvent;
@@ -452,7 +481,7 @@ export function createRealtime(deps: RealtimeDeps) {
             for (const channelId of [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()])
               drop(channelId, "revoked");
             if (ws.readyState === 1) {
-              send(ws, { type: "error", code: "membership_revoked" });
+              send(ws, { type: "error", code: event.quiet ? "membership_ended" : "membership_revoked" });
               // Closed outside the publisher's call stack (in-memory pub/sub delivers synchronously).
               ws.close(4403, "membership revoked");
             }
@@ -471,8 +500,9 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
         if (isStream(socket)) return deps.streams?.message(socket, raw);
         const ws = socket as BrowserSocket;
-        if (!(await liveSession(ws))) return;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
+        if (browserFrame?.type === "browser.input") return browserInput(ws, browserFrame);
+        if (!(await liveSession(ws))) return;
         if (browserFrame) {
           return browserMessage(ws, browserFrame).catch(() => {
             if (ws.readyState === 1) {

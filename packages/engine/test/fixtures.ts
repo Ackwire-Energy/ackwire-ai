@@ -24,6 +24,7 @@ import {
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
+  createBlockToolSource,
   createCalendarToolSource,
   createChatToolSource,
   createContextToolSource,
@@ -51,6 +52,7 @@ import {
   createSkillToolSource,
   createToolGateway,
   createWikiToolSource,
+  createWorkToolSource,
   type FakeScheduleAnswer,
   type FakeScheduleAnswers,
   localDateTimeOf,
@@ -58,6 +60,7 @@ import {
   type SandboxDeps,
   type ServerCatalog,
   type StorageDeps,
+  type ToolGateway,
   type ToolSource,
   zonedParts,
 } from "../src";
@@ -65,9 +68,10 @@ import { listenLiveSteering } from "../src/live-steer";
 
 export const SECRET = "test-secret-".padEnd(48, "x");
 
+/** A person who reads Portuguese, as the tests' people do (a person with no language reads English). */
 export async function addUser(db: Database, name: string) {
   const id = `user_${name}_${crypto.randomUUID().slice(0, 8)}`;
-  await db.insert(schema.users).values({ id, name, email: `${name}-${id.slice(-8)}@example.com` });
+  await db.insert(schema.users).values({ id, name, email: `${name}-${id.slice(-8)}@example.com`, locale: "pt-BR" });
   return { id, name, email: `${name}-${id.slice(-8)}@example.com` };
 }
 
@@ -182,6 +186,8 @@ export async function setup(
     handOff?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
     artifactTools?: boolean;
+    /** Add `show_block` and `start_poll` (ADR 0113). */
+    blockTools?: boolean;
     chatTools?: boolean;
     /** Add the issue tools (create_issue, comment_issue…). */
     issueTools?: boolean;
@@ -219,6 +225,12 @@ export async function setup(
      * own stickers only.
      */
     gifs?: GifProvider | null;
+    /** How long a run started on a person's message waits for their next one (`waitForBurst`). None: no wait. */
+    quietMs?: number;
+    /** Add long work's tools (work_in_background, post_update, steer_work, stop_work; ADR 0121). */
+    workTools?: boolean;
+    /** Long work's safety net (ADR 0121 §1). None: off (no test moves by accident). */
+    workAuto?: { afterMs?: number; afterCalls?: number; minMs?: number; tickMs?: number };
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -312,7 +324,9 @@ export async function setup(
   };
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
-    ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.askUser
+      ? [createAskUserToolSource({ judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      : []),
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent
       ? [
@@ -323,12 +337,18 @@ export async function setup(
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.mediaTools ? [createMediaToolSource({ pubsub, gifs: options.gifs ?? null })] : []),
     ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
-    ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
+    ...(options.workTools ? [createWorkToolSource({ pubsub })] : []),
+    ...(options.handOff
+      ? [createHandOffToolSource({ pubsub, judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
+    ...(options.blockTools ? [createBlockToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
-    ...(options.skillTools ? [createSkillToolSource({ db, blobs: artifactDeps.blobs })] : []),
+    ...(options.skillTools
+      ? [createSkillToolSource({ db, blobs: artifactDeps.blobs, pubsub, judge: context.judge })]
+      : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.scheduleTools ? [createScheduleToolSource({ pubsub, context })] : []),
     ...(options.forumTools ? [createForumToolSource({ pubsub, artifacts: artifactDeps })] : []),
@@ -345,7 +365,8 @@ export async function setup(
       : []),
     ...(options.toolSources ?? []),
   ];
-  const tools = sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
+  const tools: ToolGateway | undefined =
+    sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
   machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const jobDeps = {
     db,
@@ -364,6 +385,11 @@ export async function setup(
     toolsOnDemand: options.toolsOnDemand ?? false,
     ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
     ...(options.gifs ? { gifs: options.gifs } : {}),
+    ...(options.quietMs ? { quietMs: options.quietMs } : {}),
+    workAutoAfterMs: options.workAuto?.afterMs ?? 24 * 3600_000,
+    workAutoAfterCalls: options.workAuto?.afterCalls ?? 100_000,
+    workAutoMinMs: options.workAuto?.minMs,
+    workTickMs: options.workAuto?.tickMs ?? 60_000,
   };
   const handlers = createJobHandlers(jobDeps);
 

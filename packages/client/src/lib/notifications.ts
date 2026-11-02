@@ -186,6 +186,8 @@ export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
 export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
   if (n.kind === "composio_limit") return "connectors.composio.limitNotice" as const;
+  if (n.kind === "connector_tool_changed") return "connectors.toolChanges.notice" as const;
+  if (n.kind === "computer_disk_full") return "machines.shared.diskFullNotice" as const;
   if (n.kind !== "org_standing") return null;
   const to = n.latest.statusTo;
   const billing = billingHoldOf({ state: "hold", reason: n.latest.billingHold ?? null });
@@ -262,7 +264,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
-  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" | "members" | "usage" } };
+  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" | "members" | "usage" | "connectors" } };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
 export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
@@ -275,7 +277,8 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
 /**
  * An agent that needs a person in its browser (ADR 0040) goes to its request card in the
  * conversation, like any message: the browser opens in that card (the page asks for it with
- * the notification's `handoffId`).
+ * the notification's `handoffId`). One sent to someone who can't open that conversation names
+ * none (`opensOnComputer`).
  */
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
@@ -289,12 +292,25 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       ? { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id } }
       : { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   }
+  // What an AI app created as me: the newest agent, else the newest routine.
+  if (n.kind === "app_created")
+    return s.agentId
+      ? { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } }
+      : s.routineId
+        ? { to: "/org/$orgId/routines", search: { open: s.routineId } }
+        : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
-  if (n.kind === "machine_connected" || n.kind === "computer_ready")
+  // A server changed approved tools: accepted in Conectores.
+  if (n.kind === "connector_tool_changed")
+    return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };
+  if (n.kind === "machine_connected" || n.kind === "computer_ready" || n.kind === "computer_disk_full")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
       : { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
+  // Someone asks for a browser profile for an agent: the computers, where profiles are given.
+  if (n.kind === "browser_profile_request")
+    return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   // A routine couldn't call the agent: its page, where who talks to it is set (the report's room may be private).
   if (n.kind === "agent_unreached" && s.agentId)
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } };
@@ -304,8 +320,8 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // What a routine found opens the agent's message in its conversation (below); without one, the routine.
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return s.routineId ? { to: "/org/$orgId/routines", search: { open: s.routineId } } : { to: "/org/$orgId/routines" };
-  // An agent's answer in its DM opens that DM, like a message there.
-  if (n.kind === "agent_reply" && s.dmId && n.actors[0]?.type === "agent")
+  // An agent's answer or request in my DM with it opens that DM (a DM has no channel page of its own).
+  if (s.dmId && n.actors[0]?.type === "agent" && (n.kind === "agent_reply" || !s.threadId))
     return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: n.actors[0].id } };
   if (n.kind === "dm") {
     const who = n.actors[0];
@@ -323,6 +339,12 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (s.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };
   return null;
 }
+
+/** A help request whose card is in a conversation I can't open: it opens on the agent's computer, in a dialog. */
+export const opensOnComputer = (n: Pick<AppNotification, "kind" | "source" | "actors">): string | null =>
+  n.kind === "browser_handoff" && !n.source.channelId && !n.source.dmId && !n.source.threadId
+    ? (n.source.agentId ?? (n.actors[0]?.type === "agent" ? n.actors[0].id : null))
+    : null;
 
 /**
  * The workspace's computer is ready and its agents have no AI yet: opening it opens "Conectar uma IA" (the one

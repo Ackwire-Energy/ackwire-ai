@@ -81,6 +81,12 @@ function withRoutines(list: Routine[], runs: Record<string, RoutineRun[]> = {}, 
         calls.push(`takeOver:${id}`);
         return structuredClone(find(id));
       },
+      continueUsage: async (_orgId, id) => {
+        calls.push(`continueUsage:${id}`);
+        const r = find(id);
+        Object.assign(r, { state: "running", usagePause: null });
+        return structuredClone(r);
+      },
     },
   };
   return { api, calls, state, machines: fakeMachinesOf.get(base) };
@@ -169,6 +175,88 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     const off = card("Pausada à mão");
     expect(off.querySelector(".ac-chip--waiting")).toBeNull();
     expect(within(off).queryByRole("button", { name: "Retomar" })).toBeNull();
+  });
+
+  test("paused near its plan's limit: until when, quietly; Continuar agora for its people, greyed with the reason for others", async () => {
+    const resetsAt = new Date(Date.now() + 2 * 3_600_000).toISOString();
+    const clock = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(resetsAt));
+    const paused = (over: Partial<Routine> & Pick<Routine, "id" | "name">) =>
+      routine({
+        state: "usage_paused",
+        usagePause: { source: "plan", resetsAt, extraOff: false },
+        brain: { kind: "claude_code", machineName: null },
+        ...over,
+      });
+    const { calls, state } = await open([
+      paused({ id: "rt-plan", name: "Revisar deploys" }),
+      paused({ id: "rt-other", name: "Resumo do suporte", canManage: false }),
+      paused({
+        id: "rt-extra",
+        name: "Triagem de issues",
+        usagePause: { source: "plan", resetsAt, extraOff: true },
+      }),
+    ]);
+    const row = card("Revisar deploys");
+    expect(row.textContent).toContain(`Pausada até ${clock} (limite do plano)`);
+    // Quiet: no chip asking for a look, no fix on the row.
+    expect(row.querySelector(".ac-chip--waiting")).toBeNull();
+    // Its run is still at work: Parar stops it, not "Rodar agora" (which would throw its progress away).
+    expect(within(row).getByRole("button", { name: "Parar Revisar deploys" })).toBeTruthy();
+    expect(within(row).queryByRole("button", { name: "Rodar agora" })).toBeNull();
+
+    const mine = await details("Revisar deploys");
+    expect(mine.textContent).toContain(`Pausada até ${clock} (limite do plano)`);
+    expect(within(mine).getByRole("button", { name: "Parar" })).toBeTruthy();
+    expect(within(mine).queryByRole("button", { name: "Rodar agora" })).toBeNull();
+    const go = within(mine).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement;
+    expect(go.disabled).toBe(false);
+    await click(go);
+    await settle(6);
+    expect(calls).toEqual(["continueUsage:rt-plan"]);
+    expect(screen().getByText("Execução continuando.")).toBeTruthy();
+    // Nothing is posted in the conversation.
+    expect(state.calls.some((c) => c.method.startsWith("chat."))).toBe(false);
+    await click(within(mine).getByRole("button", { name: "Fechar detalhes" }));
+    await settle(4);
+
+    const theirs = await details("Resumo do suporte");
+    expect((within(theirs).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(theirs.textContent).toContain("Só quem criou a rotina, o dono do agente ou um admin pode continuar agora");
+    await click(within(theirs).getByRole("button", { name: "Fechar detalhes" }));
+    await settle(4);
+
+    const off = await details("Triagem de issues");
+    expect((within(off).getByRole("button", { name: "Continuar agora" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(off.textContent).toContain(
+      "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago",
+    );
+  });
+
+  test("Continuar agora on a run its timed job already holds: no 'Execução continuando.'", async () => {
+    const resetsAt = new Date(Date.now() + 3_600_000).toISOString();
+    const r = withRoutines([
+      routine({
+        id: "rt-late",
+        name: "Revisar deploys",
+        state: "usage_paused",
+        usagePause: { source: "plan", resetsAt, extraOff: false },
+      }),
+    ]);
+    const routines = r.api.routines;
+    r.api.routines = {
+      ...routines,
+      continueUsage: async (_orgId, id) => {
+        r.calls.push(`continueUsage:${id}`);
+        return structuredClone((await routines.list(ORG_ID)).find((x) => x.id === id) as Routine);
+      },
+    };
+    await renderApp(`/org/${ORG_ID}/routines`, { api: r.api });
+    await settle(8);
+    const panel = await details("Revisar deploys");
+    await click(within(panel).getByRole("button", { name: "Continuar agora" }));
+    await settle(6);
+    expect(r.calls).toEqual(["continueUsage:rt-late"]);
+    expect(screen().queryByText("Execução continuando.")).toBeNull();
   });
 
   test("a run a person stopped reads 'Parada', not 'Não rodou'; every N minutes in Portuguese", async () => {
@@ -279,8 +367,8 @@ describe("Rotinas: a routine's details", () => {
     expect(text).not.toContain("Claude Code no");
     // Hourly on someone's computer: how often it wakes it, with when it runs.
     expect(region("Quando").textContent).toContain("Roda 24 vezes por dia no MacBook do Walter");
-    expect(text).toContain("Pode agir");
-    expect(text).toContain("Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.");
+    // Every routine does what its agent can (ADR 0109): no access section.
+    expect(text).not.toContain("Pode agir");
     // When it posts: the answer, and what the choice means behind its ⓘ.
     const posts = region("Quando posta");
     expect(posts.textContent).toContain("Toda vez");
@@ -288,14 +376,11 @@ describe("Rotinas: a routine's details", () => {
     expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
       "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
     );
-    // Short sections two to a row when there's room: the week with where it delivers, then the two rules.
+    // Short sections two to a row when there's room: the week with where it delivers.
     const pairs = [...panel.querySelectorAll(".routine-details__pair")].map((p) =>
       [...p.querySelectorAll("section")].map((x) => x.getAttribute("aria-label")),
     );
-    expect(pairs).toEqual([
-      ["Esta semana", "Onde entrega"],
-      ["O que pode fazer sozinha", "Quando posta"],
-    ]);
+    expect(pairs).toEqual([["Esta semana", "Onde entrega"]]);
     expect(text).toContain("Trabalhando agora");
     expect(text).toContain("Contou o que achou");
     expect(text).toContain("3 erros novos no checkout");
@@ -354,13 +439,12 @@ describe("Rotinas: a routine's details", () => {
     expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem isto.");
     expect(panel.textContent).toContain("Contou o que achou");
     expect(within(panel).queryByRole("button", { name: "Editar" })).toBeNull();
-    // What it may do on its own and when it posts: each answer, and its meaning behind the section's ⓘ.
-    for (const name of ["O que pode fazer sozinha", "Quando posta"]) {
-      const section = within(panel).getByRole("region", { name });
-      expect(within(section).getByRole("button", { name: `Sobre ${name}` })).toBeTruthy();
-      expect(section.querySelector(".small.muted")).toBeNull();
-      expect(section.querySelectorAll("p")).toHaveLength(1);
-    }
+    // Every routine does what its agent can (ADR 0109): no access section; when it posts: the answer, its meaning behind the ⓘ.
+    expect(within(panel).queryByRole("region", { name: "O que pode fazer sozinha" })).toBeNull();
+    const section = within(panel).getByRole("region", { name: "Quando posta" });
+    expect(within(section).getByRole("button", { name: "Sobre Quando posta" })).toBeTruthy();
+    expect(section.querySelector(".small.muted")).toBeNull();
+    expect(section.querySelectorAll("p")).toHaveLength(1);
   });
 });
 
@@ -434,30 +518,25 @@ describe("Rotinas: the form's two plain questions", () => {
     expect(document.querySelector(".routines-head")?.querySelectorAll("p")).toHaveLength(1);
   });
 
-  test("Quando posta and O que pode fazer sozinha, sent with the routine", async () => {
+  test("Quando posta, sent with the routine; no access choice", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/routines`, { api });
     await settle(8);
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
-    // The defaults: only when there's news, only look and tell.
+    // The default: only when there's news. Every routine does what its agent can: nothing to choose there.
     expect(within(dialog).getByRole("radio", { name: "Só quando tiver novidade" }).getAttribute("aria-checked")).toBe(
       "true",
     );
-    expect(within(dialog).getByRole("radio", { name: "Só olhar e contar" }).getAttribute("aria-checked")).toBe("true");
-    // What each answer means is one ⓘ beside each question; no line under either.
+    expect(within(dialog).queryByRole("radio", { name: "Só olhar e contar" })).toBeNull();
+    expect(within(dialog).queryByRole("radio", { name: "Pode agir" })).toBeNull();
+    // What each answer means is one ⓘ beside the question; no line under it.
     const posts = within(dialog).getByRole("button", { name: "Sobre Quando posta" });
     expect(document.getElementById(posts.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
       "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
     );
-    const about = within(dialog).getByRole("button", { name: "Sobre O que pode fazer sozinha" });
-    const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
-    expect(hint?.textContent).toBe(
-      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
-    );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
-    await click(within(dialog).getByRole("radio", { name: "Pode agir" }));
     expect(dialog.querySelectorAll(".routine-kind p")).toHaveLength(0);
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("O que fazer"), { target: { value: "Revise os PRs abertos." } }),
@@ -468,7 +547,8 @@ describe("Rotinas: the form's two plain questions", () => {
     await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
     await settle(6);
     const made = (await api.routines.list(ORG_ID)).find((r) => r.name === "PRs abertos");
-    expect(made).toMatchObject({ access: "act", report: "always" });
+    expect(made).toMatchObject({ report: "always" });
+    expect(made?.access).toBe("act");
   });
 });
 

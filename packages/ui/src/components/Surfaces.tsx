@@ -3,6 +3,7 @@ import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 import { InfoHint } from "./InfoHint";
 import { SkyGlow } from "./PixelSky";
+import { ProviderLogo } from "./ProviderLogo";
 
 /** Neutral card (`surface-raised` + `line`). State never tints it: use a Chip. */
 export function Card({
@@ -20,6 +21,7 @@ export function Card({
  */
 export function CardHeader({
   icon,
+  mark,
   title,
   subtitle,
   action,
@@ -27,6 +29,8 @@ export function CardHeader({
   hint,
 }: {
   icon?: IconName;
+  /** A provider's official logo (`ProviderLogo` id) in place of the icon. */
+  mark?: string;
   title: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
@@ -37,10 +41,10 @@ export function CardHeader({
   const heading = <h2 id={id}>{title}</h2>;
   return (
     <div className="ac-card__head">
-      <div className={cx("ac-card__lead", icon && "ac-iconline")}>
-        {icon && (
+      <div className={cx("ac-card__lead", (icon || mark) && "ac-iconline")}>
+        {(icon || mark) && (
           <span className="ac-card__key" aria-hidden="true">
-            <Icon name={icon} size={16} />
+            {mark ? <ProviderLogo id={mark} size="xs" /> : icon && <Icon name={icon} size={16} />}
           </span>
         )}
         <div className="ac-card__heading">

@@ -1,5 +1,5 @@
 import type { BrainMachine, Credential, Member, Model } from "@agenteschat/client";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
+
 import { namesComputers } from "@agenteschat/client/lib/machines";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
@@ -39,9 +39,14 @@ export const NO_OWNER = "__none__";
 /** Value of the "Chave padrão do workspace" option (the API takes `credentialId: null`). */
 export const DEFAULT_KEY = "__default__";
 
-/** "US$ 10", "US$ 12,50": whole amounts without cents. */
-export const usd = (t: TFunction, locale: string, n: number) =>
-  t("format.usd", { value: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n) });
+/** "$10", "US$ 12,50": whole amounts without cents, as the language writes dollars. */
+export const usd = (_t: TFunction, locale: string, n: number) =>
+  new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(n);
 
 /** 1–3 bars by price among the catalog's models (cheapest third = 1). */
 export function priceTier(model: Model, models: Model[]) {
@@ -78,7 +83,7 @@ export function modelOptions(t: TFunction, locale: string, choices: [string, Mod
       leading: <ProviderLogo id={provider} size="sm" />,
       description: available
         ? modelDescription(t, locale, m)
-        : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
+        : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
     })),
   );
 }
@@ -120,7 +125,13 @@ export function ModelSelect({
  * Key choices by their provider's mark: the workspace default first (with its masked hint), then the other
  * stored keys.
  */
-export function keyOptions(t: TFunction, credentials: Credential[], defaultId: string | null): SelectOption[] {
+/** `provider`: whose key the default would be when the workspace has none set (the chosen model's maker). */
+export function keyOptions(
+  t: TFunction,
+  credentials: Credential[],
+  defaultId: string | null,
+  provider?: string,
+): SelectOption[] {
   const live = credentials.filter((c) => !c.revokedAt);
   const def = live.find((c) => c.id === defaultId);
   return [
@@ -130,13 +141,14 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
       description: def
         ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
         : undefined,
-      leading: def ? (
-        <ProviderLogo id={def.provider} size="sm" />
-      ) : (
-        <span className="newag__ib">
-          <Icon name="key" size={16} />
-        </span>
-      ),
+      leading:
+        def || provider ? (
+          <ProviderLogo id={def?.provider ?? provider ?? ""} size="sm" />
+        ) : (
+          <span className="newag__ib">
+            <Icon name="key" size={16} />
+          </span>
+        ),
     },
     ...live
       .filter((c) => c.id !== defaultId)
@@ -490,7 +502,9 @@ function ModelCard({
       {/* Other models describe themselves by price: only for those who see money. */}
       {(money || !available || claudeFamily(model)) && (
         <span className="newag__model-desc">
-          {available ? modelDescription(t, locale, model) : t("newAgent.modelNeedsKey", providerGrammar(t, provider))}
+          {available
+            ? modelDescription(t, locale, model)
+            : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) })}
         </span>
       )}
       {available ? (
@@ -509,8 +523,8 @@ function ModelCard({
         </span>
       ) : (
         <span className="newag__cost">
-          <Icon name="key" size={14} />
-          {t("newAgent.noKeyFor", providerGrammar(t, provider))}
+          <ProviderLogo id={provider} size="xs" />
+          {t("newAgent.noKeyFor", { provider: providerLabel(provider) })}
         </span>
       )}
     </>
@@ -587,22 +601,23 @@ export function ModelCards({
   );
 }
 
-/** A plan brain (Claude Code, Codex) on a computer, chosen while creating an agent. */
+/** A plan brain (Claude Code, Codex, Cursor) on a computer, chosen while creating an agent. */
 export interface PlanChoice {
-  kind: "claude_code" | "codex";
+  kind: "claude_code" | "codex" | "cursor";
   machineId: string;
   /** One account there (an agent's proposal suggests a free one, ADR 0081); none: the computer's own sign-in. */
   accountId?: string;
   label?: string;
 }
 
-const PLAN_KINDS = ["claude_code", "codex"] as const;
-/** Whose models each plan runs, for the mark in the corner (the same as the API cards'). */
-const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai" } as const;
+const PLAN_KINDS = ["claude_code", "codex", "cursor"] as const;
+/** Whose models each plan runs, for the mark in the corner (the same as the API cards'); Cursor runs several makers'. */
+const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai", cursor: "cursor" } as const;
 
 /**
- * "Pelo plano, num computador": Claude Code and Codex on each computer that has them, as cards like the models';
- * one that no computer offers says why ("Sem computador", "Indisponível") instead. A card names its computer only
+ * "Pelo plano, num computador": Claude Code, Codex and Cursor on each computer that has them, as cards like the models';
+ * one that no computer offers says why ("Sem computador", "Indisponível") instead, except Cursor, which only shows where
+ * it runs. A card names its computer only
  * where there is more than one (`namesComputers`), or when it is offline.
  */
 export function PlanCards({
@@ -621,7 +636,7 @@ export function PlanCards({
       <b>{t(`brain.card.${kind}`)}</b>
       <span className="newag__model-prov">
         <ProviderLogo id={PLAN_PROVIDER[kind]} size="xs" />
-        {providerLabel(PLAN_PROVIDER[kind])}
+        {kind === "cursor" ? t("brain.card.cursor") : providerLabel(PLAN_PROVIDER[kind])}
       </span>
     </span>
   );
@@ -630,6 +645,8 @@ export function PlanCards({
     <div className="newag__models" role="group" aria-label={t("newAgent.plans")}>
       {PLAN_KINDS.flatMap((kind) => {
         const on = machines.filter((m) => m.options.some((o) => o.kind === kind && o.available));
+        // Cursor (ADR 0114) only where a computer runs it; Claude Code and Codex say why they can't.
+        if (on.length === 0 && kind === "cursor") return [];
         if (on.length === 0)
           return [
             <button key={kind} type="button" className="newag__model" aria-disabled="true">

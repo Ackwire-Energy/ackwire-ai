@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { LineIcon, Text } from "@/ui";
+import { withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { ConsultationCard } from "./cards";
 import { eventLineOf } from "./logic";
@@ -37,15 +38,22 @@ export function EventLine({
   if (fold?.fold === "hide") return null;
   const far = fold?.fold === "line" ? fold : null;
   if (far) {
-    const asker = agentGrammar(t, dir.agentById.get(far.consultation.agentId)?.name ?? t("mobile.chat.someone"));
+    const asker = agentGrammar(dir.agentById.get(far.consultation.agentId)?.name ?? t("mobile.chat.someone"));
     const to = dir.agentById.get(far.consultation.consultedAgentId)?.name ?? t("mobile.chat.someone");
     return (
       <View style={styles.line}>
         <View style={styles.head}>
           <LineIcon name="agent" size={13} color={c.faint} variant="caption" />
           <Text variant="caption" tone="faint" style={styles.grow}>
-            {t(consultFarKey(far.consultation), { to, from: asker.name, of: asker.of })} ·{" "}
-            {when.time(message.createdAt)}
+            {withAgentFaces(
+              t(consultFarKey(far.consultation), { to, from: asker.name, context: asker.context }),
+              [
+                { name: to, agentId: far.consultation.consultedAgentId },
+                { name: asker.name, agentId: far.consultation.agentId },
+              ],
+              12,
+            )}{" "}
+            · {when.time(message.createdAt)}
             {" · "}
             <Text
               variant="caption"

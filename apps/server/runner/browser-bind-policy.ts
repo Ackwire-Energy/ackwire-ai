@@ -225,6 +225,10 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
  * earlier policy, and copies of it, all enforced. Re-executing systemd closes the copies (on exec) and attaches each
  * slice's program anew from its policy, stopping nothing; a reload keeps the copies. With every policy set first,
  * the agents whose probe found an older one share one re-execution.
+ *
+ * Setting the policy (`systemctl set-property` on the slice) also applies the rest of the slice's drop-ins to it,
+ * which neither a reload nor a re-execution does for a running slice (systemd 257, checked 2026-11-02): so an agent
+ * already running gets new limits (`agentLimits`) here, as the runner starts.
  */
 export function prepareAgents(
   users: AgentUser[],

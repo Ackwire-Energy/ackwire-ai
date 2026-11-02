@@ -49,7 +49,7 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
   // Opened from here (Abrir, a push): the browser card that takes the request's place starts open.
   const [open, setOpen] = useState(false);
 
-  if (state === "done" || state === "failed" || state === "expired" || state === "cancelled") {
+  if (state === "done" || state === "failed" || state === "expired" || state === "cancelled" || state === "withdrawn") {
     const ok = state === "done";
     return (
       <View style={[styles.done, surface]}>
@@ -57,7 +57,10 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
         <Text variant="small" tone="muted" style={styles.grow}>
           {state === "failed" && h.note
             ? t("mobile.browser.card.failedNote", { note: h.note })
-            : t(`mobile.browser.card.${state}`, { title: h.instructions })}
+            : t(`mobile.browser.card.${state}`, {
+                title: h.instructions,
+                name: dir.agentById.get(h.agentId)?.name ?? t("channel.unknownAgent"),
+              })}
         </Text>
       </View>
     );

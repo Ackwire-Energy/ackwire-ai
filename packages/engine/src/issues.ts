@@ -15,7 +15,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
-import { audienceError, canTalkTo, talksToAgents } from "./audience";
+import { audienceError, canTalkTo, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
 import { runAuthorityById } from "./authority";
 import { openDm } from "./dms";
@@ -32,6 +32,7 @@ import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { promptAnswer, promptPoll, toolDetail } from "./tool-detail";
 import { syncWikiLinks } from "./wiki-links";
+import { type WorkRow, type WorkView, workViews } from "./works";
 
 const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts, agentRuns, agentRunSteps } = schema;
 
@@ -45,7 +46,7 @@ export type IssueSource =
   | { type: "manual" }
   | { type: "message"; channelId: string; messageId: string }
   | { type: "forum"; threadId: string }
-  | { type: "agent"; agentId: string }
+  | { type: "agent"; agentId: string; workId?: string; channelId?: string; messageId?: string }
   | { type: "webhook"; provider: string };
 
 /** An issue as the app shows it. */
@@ -74,6 +75,10 @@ export interface IssueView {
   artifacts: { id: string; title: string; createdBy: WorkActor }[];
   /** The assigned agent's work on it, from its runs (null: a person has it, nobody, or it is closed). */
   work: IssueWork | null;
+  /** Long work stopped on something (ADR 0121 §4): a badge, the card stays in its stage. */
+  blocked: { reason: string; since: string; text?: string } | null;
+  /** The agent's background work this card tracks (its plan, last update and line), newest. */
+  backgroundWork: WorkView | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -353,6 +358,7 @@ async function workOf(db: Database, rows: IssueRow[]): Promise<Map<string, Issue
 
 async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
   const work = await workOf(db, rows);
+  const works = await backgroundWorksOf(db, rows);
   const ids = [...new Set(rows.flatMap((r) => r.artifactIds))];
   const files = ids.length
     ? await db
@@ -386,9 +392,36 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
       return f ? [{ id: f.id, title: f.title, createdBy: { type: f.type as WorkActor["type"], id: f.by } }] : [];
     }),
     work: work.get(r.id) ?? null,
+    blocked: r.blocked ?? null,
+    backgroundWork: works.get(r.id) ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }));
+}
+
+/** The newest background work each card tracks (ADR 0121 §4). */
+async function backgroundWorksOf(db: Database, rows: IssueRow[]): Promise<Map<string, WorkView>> {
+  const ids = rows.map((r) => r.id);
+  const out = new Map<string, WorkView>();
+  if (ids.length === 0) return out;
+  const w = schema.agentWorks;
+  const latest = await db
+    .selectDistinctOn([w.issueId], { id: w.id, issueId: w.issueId, orgId: w.orgId })
+    .from(w)
+    .where(inArray(w.issueId, ids))
+    .orderBy(w.issueId, desc(w.createdAt));
+  const orgId = rows[0]?.orgId;
+  if (!orgId || latest.length === 0) return out;
+  const views = await workViews(
+    db,
+    orgId,
+    latest.map((l) => l.id),
+  );
+  for (const l of latest) {
+    const v = views.get(l.id);
+    if (v && l.issueId) out.set(l.issueId, v);
+  }
+  return out;
 }
 
 async function one(db: Database, row: IssueRow) {
@@ -466,6 +499,12 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
             ...(s(data.threadId) ? { threadId: s(data.threadId) as string } : {}),
           })
         : {};
+    case "work_update":
+      return s(data.text) ? out(event, { text: s(data.text) as string }) : {};
+    case "work_stopped":
+      return out(event, s(data.byUserId) ? { byUserId: s(data.byUserId) as string } : {});
+    case "shared_everyone":
+      return out(event, {});
     case "forum_opened":
     case "forum_evaluated":
       return s(data.title) ? out(event, { title: s(data.title) as string, topicId: s(data.topicId) ?? "" }) : {};
@@ -1040,7 +1079,7 @@ export async function askAgentToImplement(
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // The person must be able to talk to the agent; the DM needs nothing else.
-  if (!canTalkTo(agent, userId, await talksToAgents(db, orgId, userId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, userId, await speakerFor(db, orgId, userId))) throw await audienceError(db, agent);
   const dm = await openDm(db, userId, orgId, { agentId });
   const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
   const card: IssueWorkMeta = { issueId: issue.id, number: issue.number, title: issue.title, agentId };
@@ -1215,3 +1254,166 @@ registerDocumentBuilder("issue", async (db, orgId, id) => {
     createdAt: i.createdAt,
   };
 });
+
+/**
+ * Links a background work to its card (ADR 0121 §4): issue `number` when the agent named one it can see, else the issue
+ * the run already works on, else a new card assigned to the agent in the conversation's channel (who reads the
+ * conversation sees it). An existing card's criteria are never touched. Returns the issue's id.
+ */
+export async function linkIssueToWork(
+  deps: IssueDeps,
+  work: WorkRow,
+  run: { id: string; orgId: string; agentId: string; channelId: string; issueId: string | null },
+  input: { number?: number; description: string },
+): Promise<string | null> {
+  const actor: IssueActor = { type: "agent", agentId: run.agentId, channelId: run.channelId, runId: run.id };
+  let issueId: string | null = null;
+  if (input.number !== undefined) {
+    // Only a card the person behind the work can read, in this conversation or workspace-wide: its updates must not
+    // carry the conversation to readers it doesn't have.
+    const found = work.requestedByUserId
+      ? await findVisible(deps.db, { type: "person", userId: work.requestedByUserId }, run.orgId, {
+          number: input.number,
+        }).catch(() => null)
+      : null;
+    issueId = found && (found.channelId === null || found.channelId === work.channelId) ? found.id : null;
+  }
+  issueId ??= run.issueId;
+  if (!issueId) {
+    const created = await createIssue(deps, actor, run.orgId, {
+      title: work.title,
+      description: input.description,
+      assignee: { type: "agent", id: run.agentId },
+      source: {
+        type: "agent",
+        agentId: run.agentId,
+        workId: work.id,
+        channelId: work.channelId,
+        messageId: work.anchorMessageId,
+      },
+      channelId: work.channelId,
+    });
+    issueId = created.id;
+  }
+  await deps.db.update(schema.agentWorks).set({ issueId }).where(eq(schema.agentWorks.id, work.id));
+  await deps.db
+    .update(agentRuns)
+    .set({ issueId })
+    .where(and(eq(agentRuns.workId, work.id), isNull(agentRuns.issueId)));
+  await setWorkIssueState(deps, { ...work, issueId }, {});
+  return issueId;
+}
+
+/**
+ * A card follows its work (ADR 0121 §4): queued → A fazer, working → Em andamento, waiting on a person, paused or
+ * failed → the blocked badge in its stage, done → Feito (left in review when the agent moved it there), stopped →
+ * back to A fazer. An update is an activity event on it.
+ */
+export async function setWorkIssueState(
+  deps: IssueDeps,
+  work: Pick<WorkRow, "id" | "orgId" | "agentId" | "issueId">,
+  input: { update?: string; plan?: boolean; ended?: "done" | "failed" | "canceled" },
+) {
+  if (!work.issueId) return;
+  const view = (await workViews(deps.db, work.orgId, [work.id])).get(work.id);
+  const [current] = await deps.db.select().from(issues).where(eq(issues.id, work.issueId));
+  if (!view || !current || current.status === "canceled") return;
+  const now = new Date();
+  let status: IssueStatus = current.status;
+  let blocked: IssueRow["blocked"] = null;
+  const ended = input.ended ?? (view.status === "live" || view.status === "queued" ? null : view.status);
+  if (ended === "done") status = current.status === "in_review" ? "in_review" : "done";
+  else if (ended === "canceled") status = "todo";
+  else if (ended === "failed") blocked = { reason: "failed", since: now.toISOString(), text: view.errorCode ?? "" };
+  else if (view.state === "queued") status = current.status === "done" ? current.status : "todo";
+  else {
+    if (current.status === "todo" || current.status === "done") status = "in_progress";
+    if (view.state && view.state !== "working")
+      blocked = { reason: view.state, since: current.blocked?.since ?? now.toISOString() };
+  }
+  const author: WorkActor = { type: "agent", id: work.agentId };
+  const row = await deps.db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(issues)
+      .set({
+        blocked,
+        updatedAt: now,
+        ...(status !== current.status ? { status, columnId: null, boardRank: topRank() } : {}),
+      })
+      .where(eq(issues.id, current.id))
+      .returning();
+    if (!updated) return null;
+    if (status !== current.status) {
+      await addActivity(tx, updated, {
+        kind: "event",
+        author,
+        text: `changed the status to ${STATUS_WORDS[status]} (automatic: background work)`,
+        event: "status_changed",
+        data: { from: current.status, to: status, auto: true },
+      });
+    }
+    if (input.update) {
+      await addActivity(tx, updated, {
+        kind: "event",
+        author,
+        text: input.update,
+        event: "work_update",
+        data: { text: input.update, workId: work.id, auto: true },
+      });
+    }
+    if (ended === "canceled" && view.canceledByUserId) {
+      await addActivity(tx, updated, {
+        kind: "event",
+        author,
+        text: "stopped",
+        event: "work_stopped",
+        data: { byUserId: view.canceledByUserId, workId: work.id, auto: true },
+      });
+    }
+    return updated;
+  });
+  if (!row) return;
+  await announce(deps.pubsub, work.orgId, await one(deps.db, row), "issue.updated");
+}
+
+/**
+ * "Mostrar para todos" (ADR 0121 §4): a card made from an agent's background work, seen by who reads its conversation,
+ * is shared with the whole workspace by who asked for that work, who created the card or an admin. Any other issue
+ * keeps its channel.
+ */
+export async function shareIssueWithEveryone(deps: IssueDeps, actor: IssueActor, orgId: string, issueId: string) {
+  const current = await findVisible(deps.db, actor, orgId, { id: issueId });
+  if (!current.channelId) return one(deps.db, current);
+  if (actor.type !== "person") throw new ForbiddenError();
+  const [work] = await deps.db
+    .select({ requestedByUserId: schema.agentWorks.requestedByUserId })
+    .from(schema.agentWorks)
+    .where(and(eq(schema.agentWorks.orgId, orgId), eq(schema.agentWorks.issueId, current.id)))
+    .orderBy(desc(schema.agentWorks.createdAt))
+    .limit(1);
+  const source = current.source as { type?: string; workId?: string };
+  if (!work && !(source.type === "agent" && source.workId)) throw new ForbiddenError();
+  const membership = await requireActiveMembership(deps.db, actor.userId, orgId);
+  const creator = current.createdByType === "person" && current.createdById === actor.userId;
+  if (work?.requestedByUserId !== actor.userId && !creator && !can(membership, "manage_agents"))
+    throw new ForbiddenError();
+  const row = await deps.db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(issues)
+      .set({ channelId: null, updatedAt: new Date() })
+      .where(eq(issues.id, current.id))
+      .returning();
+    if (updated)
+      await addActivity(tx, updated, {
+        kind: "event",
+        author: actorOf(actor),
+        text: "showed the card to everyone in the workspace",
+        event: "shared_everyone",
+        data: { channelId: current.channelId },
+      });
+    return updated;
+  });
+  const view = await one(deps.db, row ?? current);
+  await announce(deps.pubsub, orgId, view, "issue.updated");
+  return view;
+}

@@ -13,6 +13,18 @@
   gap: 10px;
 }
 
+/* Here the faces are a step bigger and sit in the middle of their two lines, not on the name's line (layout.css). */
+.members-page .ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) {
+  align-items: center;
+}
+.members-page .ac-list__row > .ac-avatar:first-child:has(+ .list-col > :nth-child(2)) {
+  translate: none;
+}
+/* The 12px the bigger face takes come off the words' basis, so a row breaks onto two lines at the width it did. */
+.members-page .ac-list__row > .ac-avatar:first-child + .list-col {
+  flex-basis: 188px;
+}
+
 /* A request or an invitation: face, two lines, its state, its actions; a note in a well under the words. */
 .members-row__name {
   overflow: hidden;
@@ -64,7 +76,7 @@
 /* What the person wrote: under the words, as quoted, in a well. Its edge on the words' edge (the face and the gap). */
 .members-row__note {
   flex-basis: 100%;
-  margin: 0 0 2px calc(24px + var(--space-3));
+  margin: 0 0 2px calc(36px + var(--space-3));
   padding: 8px 12px;
   border-radius: 12px 12px 12px 3px;
   background: var(--card-well);
@@ -88,6 +100,22 @@
   gap: 6px;
   min-width: 0;
 }
+/* A person: the name beside the face, when they were last here on the right, their roles under the name, on its edge. */
+.ac-list__row.members-person {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px var(--space-3);
+}
+.members-person__seen {
+  white-space: nowrap;
+}
+.members-person > .members-roles {
+  grid-column: 2 / -1;
+  justify-content: flex-start;
+}
+.members-person > .members-roles:empty {
+  display: none;
+}
 @media (max-width: 760px) {
   /* The state and the actions go under the words, on the words' edge. */
   .members-row__state,
@@ -100,4 +128,15 @@
   .members-row__note {
     margin-left: calc(24px + var(--space-3));
   }
+}
+
+/* Remover do workspace: what goes with the person, one fact per line. */
+.members-remove__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  line-height: 1.45;
 }

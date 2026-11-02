@@ -71,6 +71,7 @@ const STATE: WorkerState = {
     folders: [
       { path: "/srv/ana", agents: [ANA.id] },
       { path: "/srv/shared", agents: [ANA.id, BIA.id] },
+      { path: "/srv/agentes/shared", agents: ["*"] },
     ],
     tools: { claude: true, codex: false, commands: true, browser: true },
   },
@@ -345,8 +346,10 @@ test("the computer's own ops stay in the supervisor; an agent's go to its worker
   const bia = t.last(BIA.id);
   bia.hello();
   const r2 = await requestOn(bia);
+  // The computer's shared folder (granted to every agent) reaches every worker.
   expect((bia.got[0] as unknown as WorkerState).access.folders).toEqual([
     { path: "/srv/shared", agents: [ANA.id, BIA.id] },
+    { path: "/srv/agentes/shared", agents: ["*"] },
   ]);
   bia.send({ type: "result", id: r2.id, ok: false, error: { code: "not_found", message: "No such file" } });
   expect(await errorCode(() => read)).toBe("not_found");
@@ -418,6 +421,39 @@ test("a brain turn's account goes to its agent's user before the turn reaches th
   });
   await plain;
   expect(lends).toHaveLength(1);
+});
+
+test("a Cursor turn's account is lent as a Cursor account, never as Claude's", async () => {
+  const lends: [string, string, number][] = [];
+  const t = setup({
+    lend: async (kind, id, uid) => {
+      lends.push([kind, id, uid]);
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000009";
+  const run = handleRequest(
+    t.ctx,
+    {
+      op: "brain.turn",
+      kind: "cursor",
+      runId: "run-00000009",
+      session: { id: "0193aaaa-0000-7000-8000-000000000009", resume: false },
+      prompt: "hi",
+      account: ACCOUNT,
+      agent: BIA,
+    } as MachineRequest,
+    scope().scope,
+  );
+  await waitFor(() => t.workers.length === 1);
+  expect(lends).toEqual([["cursor", ACCOUNT, 21001]]);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const q = await requestOn(bia);
+  const final = { type: "done", text: "ok" };
+  bia.send({ type: "result", id: q.id, ok: true, data: { runId: "run-00000009", final } });
+  expect(await run).toEqual({ runId: "run-00000009", final });
 });
 
 test("an account root keeps goes with each turn as root's own grant, never the server's; usage only for its turn", async () => {
@@ -745,14 +781,16 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
   };
   const asked: string[][] = [];
   let systemd: "moves" | "refuses" | "never" = "moves";
+  let oomPolicy = true;
   let clock = Date.UTC(2026, 9, 27, 12);
   const t = setup({
     proc,
     now: () => clock,
+    scopeOomPolicy: () => oomPolicy,
     busctl: async (args) => {
       asked.push(args);
       if (systemd === "refuses") return { code: 1, output: "Unit agentes-browser-21000-4242.scope already exists." };
-      const [pid, slice, unit] = [args[13], args[16], args[7]];
+      const [pid, slice, unit] = [args[args.indexOf("PIDs") + 3], args[args.indexOf("Slice") + 2], args[7]];
       if (systemd === "moves") {
         setTimeout(
           () =>
@@ -781,6 +819,7 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
 
   pidAt(4242, [21000, 21000, 21000, 21000], "/agents.slice/agents-21000.slice/run-r1.scope");
   expect(await answer({ enterId: "e1", pid: 4242, kind: "browser" })).toEqual({ type: "scope.entered", enterId: "e1" });
+  // A tab the kernel stops for memory takes only itself, not the agent's whole Chrome (systemd 253 and later).
   expect(asked).toEqual([
     [
       "call",
@@ -792,7 +831,10 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
       "ssa(sv)a(sa(sv))",
       "agentes-browser-21000-4242.scope",
       "fail",
-      "3",
+      "4",
+      "OOMPolicy",
+      "s",
+      "continue",
       "PIDs",
       "au",
       "1",
@@ -838,6 +880,11 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
     error: "systemd didn't move it",
   });
   expect(t.logs.some((l) => l.includes("couldn't move a process into agents-21000-cli.slice"))).toBe(true);
+  // An older systemd refuses OOMPolicy on a scope: never asked there.
+  oomPolicy = false;
+  expect((await answer({ enterId: "e3b", pid: 4250, kind: "cli" }))?.error).toBe("systemd didn't move it");
+  expect(asked.at(-1)?.slice(9, 11)).toEqual(["3", "PIDs"]);
+  oomPolicy = true;
   systemd = "never";
   expect(await answer({ enterId: "e4", pid: 4250, kind: "cli" })).toEqual({
     type: "scope.entered",
@@ -846,7 +893,7 @@ test("scope.enter: root moves only its agent's own process, into the agent's sli
   });
 
   // 30 a minute: the 31st waits for the next minute. These already show in their slice.
-  const used = 8; // every ask above that named a process of a kind counted, refused or not
+  const used = 9; // every ask above that named a process of a kind counted, refused or not
   for (let i = used; i < 30; i++) {
     pidAt(5000 + i, [21000, 21000, 21000, 21000], "/agents.slice/agents-21000.slice/agents-21000-cli.slice/x.scope");
     expect(await answer({ enterId: `r${i}`, pid: 5000 + i, kind: "cli" })).toEqual({
@@ -2342,9 +2389,10 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   const ana = USERS[0] as AgentUser;
   const runner = ["/opt/agentes-runner/bin/bun", "/opt/agentes-runner/agentes-runner.mjs"];
   const home = "/var/lib/agentes-runner-agents/ag-a1b2c3d4";
-  const cmd = workerCommand(ana, runner, home, true);
+  // A systemd older than 253 (no OOMPolicy on scopes): the same on any computer the test runs on.
+  const cmd = workerCommand(ana, runner, home, true, false);
   expect(cmd.argv).toEqual([
-    ...systemLauncher(ana, true).prefix,
+    ...systemLauncher(ana, true, false).prefix,
     ...runner,
     "worker",
     "--agent",
@@ -2364,6 +2412,7 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   expect(cmd.cwd).toBe("/home/ag-a1b2c3d4");
   // Only the launcher's environment: never the root runner's own (its token, its home).
   expect(Object.keys(cmd.env).sort()).toEqual([
+    "AGENTES_SHARED_BIN",
     "ANDROID_ADB_SERVER_PORT",
     "HOME",
     "LANG",
@@ -3059,4 +3108,50 @@ test("a restored owner with a temporarily unavailable network does not prevent c
   await waitFor(() => worker.of("welcome").length === 1);
   expect(worker.user).toMatchObject(target);
   expect(t.sup.list()).toMatchObject([{ taskId: "restored", agentId: ANA.id }]);
+});
+
+test("clone slots are the computer's: two at once across every agent's worker; a stopped worker gives its back; the cache sees the worker's own uid", async () => {
+  const filled: { repo: string; uid: number }[] = [];
+  const t = setup({
+    gitCache: async (input) => {
+      filled.push({ repo: input.repo, uid: input.uid });
+      return `/var/cache/agentes-git/conn/${input.repo}.git`;
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  // Both agents' workers running (each started by a request of its agent).
+  for (const agent of [ANA, BIA]) handleRequest(t.ctx, exec(agent), scope().scope).catch(() => {});
+  await waitFor(() => t.workers.length === 2);
+  const ana = t.last(ANA.id);
+  const bia = t.last(BIA.id);
+  ana.hello();
+  bia.hello();
+  const slotted = (w: FakeWorker, slotId: string) => w.of("clone.slotted").filter((f) => f.slotId === slotId);
+
+  ana.send({ type: "clone.slot", slotId: "1" });
+  ana.send({ type: "clone.slot", slotId: "2" });
+  await waitFor(() => ana.of("clone.slotted").length === 2);
+  bia.send({ type: "clone.slot", slotId: "1" });
+  await waitFor(() => slotted(bia, "1").length === 1);
+  expect(slotted(bia, "1")[0]?.waiting).toBe(true);
+
+  // Ana's first clone ends: Bia's starts.
+  ana.send({ type: "clone.release", slotId: "1" });
+  await waitFor(() => slotted(bia, "1").length === 2);
+  expect(slotted(bia, "1")[1]?.waiting).toBeUndefined();
+
+  // A third one waits until Ana's worker stops, which gives back the slot it held.
+  bia.send({ type: "clone.slot", slotId: "2" });
+  await waitFor(() => slotted(bia, "2").length === 1);
+  ana.crash();
+  await waitFor(() => slotted(bia, "2").length === 2);
+  bia.send({ type: "clone.release", slotId: "1" });
+  bia.send({ type: "clone.release", slotId: "2" });
+
+  // The cache is filled for the worker's own agent, whatever the frame says.
+  bia.send({ type: "cache.fill", fillId: "f1", connection: "conn", repo: "acme/app", github: "ghs_x", uid: 0 });
+  await waitFor(() => bia.of("cache.filled").length === 1);
+  expect(filled).toEqual([{ repo: "acme/app", uid: 21001 }]);
+  expect(bia.of("cache.filled")[0]?.dir).toBe("/var/cache/agentes-git/conn/acme/app.git");
 });

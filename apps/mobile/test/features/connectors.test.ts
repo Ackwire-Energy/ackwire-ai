@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Connection, ConnectorDef, CustomServer } from "@agenteschat/client";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
-import { choiceOf, MAIL_BRANDS } from "@agenteschat/client/lib/mail";
 import type { TFunction } from "i18next";
 import {
   accountActions,
@@ -18,7 +17,6 @@ import {
   markFinishing,
   monogram,
   needsKeyText,
-  noResults,
   ownMarkUri,
   searchConnectors,
   shownMailboxes,
@@ -188,41 +186,13 @@ describe("connectors gallery", () => {
     ]);
   });
 
-  test("a MillionSend inbox's sheet says what agents can do there as the web's card does, in both languages", async () => {
-    const routines = { "pt-BR": "Acordar rotinas quando chega um email", en: "Wake routines when an email arrives" };
-    for (const lng of ["pt-BR", "en"] as const) {
-      const tr = (await translator(lng)) as unknown as (key: string) => string;
-      const lines = capabilityLines(
-        tr,
-        (k) => tr(k) !== k,
-        { id: "mail-millionsend", scopes: [] },
-        () => "",
-      );
-      expect(lines).toHaveLength(4);
-      expect(lines[2]).toEqual({ text: routines[lng], asks: false });
-      expect(lines[3]?.asks).toBe(true);
-    }
-    // Its tile and a connected inbox's: MillionSend's M, tinted in the ink like the connector's.
-    const mark = MAIL_BRANDS[choiceOf({ provider: "millionsend", preset: null })];
-    expect(mark).toEqual({ name: "MillionSend", iconUrl: "/connectors/millionsend.svg", brandColor: null });
-    expect(iconUri("https://app.agentes.chat", mark?.iconUrl ?? null)).toBe(
-      "https://app.agentes.chat/connectors/millionsend.svg",
-    );
-  });
-
-  test("the connected row leaves out sign-ins still pending; a search the Email card matches isn't 'no results'", () => {
+  test("the connected row leaves out sign-ins still pending", () => {
     const boxes = [
       { id: "m1", status: "active", label: "Suporte" },
       { id: "m2", status: "pending", label: "" },
       { id: "m3", status: "needs_reconnect", label: "Vendas" },
     ];
     expect(shownMailboxes(boxes).map((a) => a.id)).toEqual(["m1", "m3"]);
-    // "caixa" matches only the MillionSend card under Email.
-    expect(noResults(0, true, true)).toBe(false);
-    expect(noResults(0, true, false)).toBe(true);
-    // Not searching, the card is always there: a category with no tiles still says so.
-    expect(noResults(0, false, true)).toBe(true);
-    expect(noResults(2, true, false)).toBe(false);
   });
 });
 

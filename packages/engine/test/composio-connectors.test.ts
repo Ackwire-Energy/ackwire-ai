@@ -349,6 +349,8 @@ describe("tools through Composio", () => {
     });
     const ctx = await runOf(f);
     expect((await gateway.list(ctx)).map((t) => t.name)).toContain("google_drive_find_file");
+    // Composio pins its tools by toolkit version: ours never do (ADR 0117).
+    expect(await f.db.select().from(schema.connectorToolPins)).toEqual([]);
 
     w.fake.answer("GOOGLEDRIVE_FIND_FILE", { files: [{ id: "f1", name: "Relatório" }] });
     const found = await call(gateway, ctx, "google_drive_find_file", { q: "relatório" });

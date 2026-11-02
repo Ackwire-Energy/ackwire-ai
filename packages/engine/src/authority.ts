@@ -1,5 +1,5 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
-import { caches } from "./cache";
+import { caches, cachesEnabled } from "./cache";
 import { type RoutineBrief, routineBriefOf } from "./routine-brief";
 
 const { agentRuns, messages, routineRuns } = schema;
@@ -15,7 +15,7 @@ const { agentRuns, messages, routineRuns } = schema;
  *   follow-up). Tools act on their behalf, within their permissions and the agent's scopes.
  * - `routine`: a routine's background run. Nobody is behind it: its creator set it up and stays
  *   accountable (notifications, approvals), but the run never acts as them. What it may do comes only
- *   from the routine's access level (`brief.access`): one set to only look and tell reads.
+ *   from the agent's own permissions, like any run (ADR 0109), within a routine's bounds (`run-policy.ts`).
  * - `unattended`: no person at the root: the conversation run a routine's report woke, an agent's own
  *   message, work either started. It works as the agent itself, with the tools a person's run has (one a
  *   routine's report or work woke keeps within that routine's `brief`: see `run-policy.ts`); what
@@ -87,11 +87,25 @@ function returnsTo(meta: Record<string, unknown>): string | null {
  * stops at the first link it already knows, and a long chain costs what its newest link does.
  */
 export async function messageRoot(db: Executor, orgId: string, messageId: string): Promise<MessageRoot> {
+  if (!cachesEnabled()) return (await walkAndRemember(db, orgId, messageId)) ?? { kind: "agent" };
+  // A run's parallel reads ask for the same root at once: one walk answers them all.
+  const key = `${orgId}:${messageId}`;
+  let walk = walking.get(key);
+  if (!walk) {
+    walk = walkAndRemember(db, orgId, messageId).finally(() => walking.delete(key));
+    walking.set(key, walk);
+  }
+  return (await walk) ?? { kind: "agent" };
+}
+
+const walking = new Map<string, Promise<MessageRoot | null>>();
+
+async function walkAndRemember(db: Executor, orgId: string, messageId: string): Promise<MessageRoot | null> {
   const walked: string[] = [];
   const found = await walkRoot(db, orgId, messageId, walked);
   if (found)
     for (const id of walked) await caches.messageRoots.getOrLoad(`${orgId}:${id}`, () => Promise.resolve(found));
-  return found ?? { kind: "agent" };
+  return found;
 }
 
 /** The walk, collecting the ids it passed in `walked`; null when the chain is broken or too long (never remembered). */
@@ -212,7 +226,7 @@ async function feedingBrief(
 
 /**
  * Whether what a routine read feeds this run: a routine's own run, or a run nobody is behind that its report or its
- * work woke. Such text may come from outside (inbound mail, a webhook) through a routine set to only read, so the run
+ * work woke. Such text may come from outside (inbound mail, a webhook, the web) through the routine, so the run
  * never sends a credential, its writes to connected apps and its mail sends always ask a person (ADR 0038, 0053 §3).
  */
 export const fedByRoutine = (authority: RunAuthority | null): boolean =>

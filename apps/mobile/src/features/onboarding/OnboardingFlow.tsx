@@ -47,6 +47,7 @@ import {
   Text,
   useTheme,
 } from "@/ui";
+import { AiAppImport } from "../agents/ImportAgents";
 import { IMPORT_LOGO } from "../agents/import-logos";
 import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
@@ -225,7 +226,6 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
         await Promise.all([
           zone ? api.orgs.updateSettings(target.orgId, { timezone: zone }) : null,
           zone ? api.orgs.updateMe(target.orgId, { timezone: zone }) : null,
-          api.account.updateMe({ locale: i18n.language.startsWith("en") ? "en" : "pt-BR" }),
         ]).catch(() => undefined);
       } else {
         await api.orgs.updateSettings(target.orgId, { name: orgName });
@@ -600,6 +600,7 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
         </>
       ) : null}
 
+      {step === "import" && created ? <AiAppImport orgId={created.orgId} /> : null}
       {step === "import" ? <ImportStep /> : null}
 
       {step === "agents" ? (

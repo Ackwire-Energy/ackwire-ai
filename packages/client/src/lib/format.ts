@@ -1,3 +1,4 @@
+import { dayMonthOrder, formatMoneyUsd } from "@agenteschat/i18n/format";
 import type { TFunction } from "i18next";
 
 /**
@@ -6,16 +7,12 @@ import type { TFunction } from "i18next";
  */
 
 /**
- * US$ with 2 decimals, or more for tiny amounts (US$ 0,004, a few Jev decisions' US$ 0,0003); a spend too small for
- * 4 decimals reads "<US$ 0,0001", like formatPercent's "<1%", never as zero.
+ * Dollars as the language writes them ("$0.42", "US$ 0,42", "0,42 $"), with more decimals for tiny amounts (a few
+ * Jev decisions' 0.0003); a spend too small for 4 decimals reads "<$0.0001", like formatPercent's "<1%", never zero.
  */
-export function formatUsd(t: TFunction, locale: string, value: number) {
-  const abs = Math.abs(value);
-  const digits = abs === 0 ? 2 : abs < 0.001 ? 4 : abs < 0.01 ? 3 : 2;
-  const fmt = (v: number) =>
-    new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
-  if (value > 0 && value < 0.00005) return `<${t("format.usd", { value: fmt(0.0001) })}`;
-  return t("format.usd", { value: fmt(value) });
+export function formatUsd(locale: string, value: number) {
+  if (value > 0 && value < 0.00005) return `<${formatMoneyUsd(locale, 0.0001)}`;
+  return formatMoneyUsd(locale, value);
 }
 
 /** Budget use: "37,5%", "12%", "<1%" (members never see money, only this). */
@@ -41,20 +38,40 @@ export function formatTokensShort(t: TFunction, locale: string, value: number) {
   return formatInt(locale, value);
 }
 
-/** "10:42" */
+/** Whether the locale writes 12-hour times ("1 PM") rather than 24-hour ("13:00"). */
+export function uses12h(locale: string) {
+  try {
+    return new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hour12 === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The `hour` option for a clock time: "8:39 PM" in 12-hour locales (no leading zero), "08:39" / "20:39" in 24-hour
+ * ones. Not plain "numeric" everywhere: some ICU builds then drop the 24-hour zero too ("8:39").
+ */
+export const clockHour = (locale: string): "numeric" | "2-digit" => (uses12h(locale) ? "numeric" : "2-digit");
+
+/** "10:42", "8:39 PM" */
 export const formatTime = (locale: string, iso: string) =>
-  new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  new Intl.DateTimeFormat(locale, { hour: clockHour(locale), minute: "2-digit" }).format(new Date(iso));
 
 /** "14:05" today, "24 out 14:05" another day (a pause's end, when a computer went offline). */
 export const clockAt = (locale: string, iso: string, now = new Date()) =>
   daysBetween(iso, now) === 0 ? formatTime(locale, iso) : `${formatShortDate(locale, iso)} ${formatTime(locale, iso)}`;
 
-/** "12 out" */
-export const formatShortDate = (locale: string, iso: string) =>
-  new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" })
-    .format(new Date(iso))
-    .replace(/\.$/, "")
-    .replace(" de ", " ");
+/**
+ * "12 out", "Oct 12", "10月12日", with the year when asked ("12 out 2025", "Oct 12, 2025"): each language's own order,
+ * the short month without its period and without the "de" Portuguese and Spanish put around it.
+ */
+export const formatShortDate = (locale: string, iso: string, year = false) =>
+  new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}) })
+    .formatToParts(new Date(iso))
+    .map((p) =>
+      p.type === "month" ? p.value.replace(/\.$/, "") : p.type === "literal" ? p.value.replace(/^ de $/, " ") : p.value,
+    )
+    .join("");
 
 /** "outubro" */
 export const formatMonth = (locale: string, date: Date) =>
@@ -66,10 +83,17 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 export const daysBetween = (iso: string, now: Date) =>
   Math.round((startOfDay(now) - startOfDay(new Date(iso))) / 86_400_000);
 
+/** A line's first letter in upper case, by the language's rules (Turkish "i" → "İ"). */
 export const capitalize = (s: string, locale?: string) => s.charAt(0).toLocaleUpperCase(locale) + s.slice(1);
 
-/** A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). */
-export const lowerFirst = (s: string, locale?: string) => (s ? s.charAt(0).toLocaleLowerCase(locale) + s.slice(1) : s);
+/**
+ * A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). German keeps it: its
+ * nouns are capitalized, so only a translator knows a lowercase form there. A name ("GitHub", "PDF") stays as it is.
+ */
+export const lowerFirst = (s: string, locale?: string) =>
+  !s || locale?.startsWith("de") || /^\p{Lu}\p{L}*\p{Lu}/u.test(s)
+    ? s
+    : s.charAt(0).toLocaleLowerCase(locale) + s.slice(1);
 
 /** "Segunda-feira" */
 export const formatWeekday = (locale: string, iso: string) =>
@@ -81,8 +105,7 @@ export function dayLabel(t: TFunction, locale: string, iso: string, now = new Da
   if (days === 0) return t("common.today");
   if (days === 1) return t("common.yesterday");
   if (days > 1 && days < 7) return formatWeekday(locale, iso);
-  const year = new Date(iso).getFullYear();
-  return year === now.getFullYear() ? formatShortDate(locale, iso) : `${formatShortDate(locale, iso)} ${year}`;
+  return formatShortDate(locale, iso, new Date(iso).getFullYear() !== now.getFullYear());
 }
 
 /** "terça-feira, 14 de outubro de 2026 às 21:10" (tooltip on a message's time). */
@@ -96,7 +119,8 @@ export function relativeTime(t: TFunction, locale: string, iso: string, now = ne
   if (diff < 3_600_000) return t("format.minutesAgo", { count: Math.floor(diff / 60_000) });
   const days = daysBetween(iso, now);
   if (days === 0) return t("format.hoursAgo", { count: Math.floor(diff / 3_600_000) });
-  if (days === 1) return t("common.yesterday").toLowerCase();
+  // "ontem", "yesterday", "昨日": Intl's own word, lowercase where the language writes it so.
+  if (days === 1) return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-1, "day");
   return formatShortDate(locale, iso);
 }
 
@@ -115,7 +139,7 @@ export const nextLabel = (locale: string, iso: string) =>
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "2-digit",
+    hour: clockHour(locale),
     minute: "2-digit",
   })
     .format(new Date(iso))
@@ -133,23 +157,22 @@ export function upcomingAt(t: TFunction, locale: string, iso: string, now = new 
   return formatShortDate(locale, iso);
 }
 
-/** Time left: "23 h", "5 dias", "12 min". */
+/** Time left: "24 h", "5 dias", "45 min", to the nearest unit shown, so a fresh day reads "24 h" (at least 1 min). */
 export function timeLeft(t: TFunction, iso: string, now = new Date()) {
   const ms = new Date(iso).getTime() - now.getTime();
   if (ms <= 0) return null;
-  if (ms < 3_600_000) return t("format.inMinutes", { count: Math.max(1, Math.floor(ms / 60_000)) });
-  if (ms < 2 * 86_400_000) return t("format.inHours", { count: Math.floor(ms / 3_600_000) });
-  return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) return t("format.inMinutes", { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return t("format.inHours", { count: hours });
+  return t("format.inDays", { count: Math.round(hours / 24) });
 }
 
 /** "Ana" for "Ana Souza". */
 export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-/** "Ada e Atlas", "Ada, Atlas e Theo". */
-export function joinNames(names: string[], and: string) {
-  if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")}${and}${names[names.length - 1]}`;
-}
+/** "Ada, Atlas, and Theo", "Ada, Atlas e Theo", "Ada、Atlas、Theo": the language's own list (Intl.ListFormat), in `t`'s language. */
+export const joinNames = (names: readonly string[], t: TFunction): string => t("format.list", { names });
 
 /** How many names a list of a team says before "and N more" (`namesText`): a ready-made team's four, whole. */
 export const NAMES_SHOWN = 4;
@@ -157,8 +180,8 @@ export const NAMES_SHOWN = 4;
 /** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total`. */
 export function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
   const shown = names.slice(0, max);
-  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
-  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
+  if (total <= shown.length) return joinNames(shown, t);
+  return joinNames([...shown, t("notifications.namesMore", { count: total - shown.length })], t);
 }
 
 /** Short model label for message meta: "Claude Sonnet 5.5" → "sonnet 5.5". */
@@ -171,16 +194,51 @@ export const toYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 /** Due date: "hoje", "24 out". */
-export function dueLabel(t: TFunction, locale: string, ymd: string, now = new Date()) {
+export function dueLabel(_t: TFunction, locale: string, ymd: string, now = new Date()) {
   const iso = dateOnly(ymd).toISOString();
-  return daysBetween(iso, now) === 0 ? t("common.today").toLowerCase() : formatShortDate(locale, iso);
+  return daysBetween(iso, now) === 0
+    ? new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(0, "day")
+    : formatShortDate(locale, iso);
 }
 
-/** "24/10" or "24/10/2026" → `YYYY-MM-DD` (this year when omitted); null when invalid. */
-export function parseDayInput(value: string, now = new Date()): string | null {
-  const m = value.trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+/**
+ * "24/10" or "24/10/2026" (10/24 where the language puts the month first) → `YYYY-MM-DD`, this year when omitted;
+ * null when invalid. Dots and dashes work as the slash does ("24.10.2026").
+ */
+export function parseDayInput(value: string, now: Date, locale: string): string | null {
+  const m = value.trim().match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{4}))?\.?$/);
   if (!m) return null;
-  const d = new Date(Number(m[3] ?? now.getFullYear()), Number(m[2]) - 1, Number(m[1]));
-  if (d.getDate() !== Number(m[1]) || d.getMonth() !== Number(m[2]) - 1) return null;
+  const [day, month] = dayMonthOrder(locale) === "dm" ? [Number(m[1]), Number(m[2])] : [Number(m[2]), Number(m[1])];
+  const d = new Date(Number(m[3] ?? now.getFullYear()), month - 1, day);
+  if (d.getDate() !== day || d.getMonth() !== month - 1) return null;
   return toYmd(d);
+}
+
+/**
+ * A step's target cut to what names it on one short line, never with an ellipsis that hides what it is: a URL is its
+ * host ("console.example.com", with or without its scheme), a path its last part ("refresh.ts"), anything else its first `max` characters, cut at
+ * a word when one is near.
+ */
+export function shortTarget(text: string, max = 40) {
+  const s = text.trim();
+  let out = s;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
+    try {
+      out = new URL(s).host || s;
+    } catch {
+      out = s;
+    }
+  } else if (/^\S*\/\S*$/.test(s)) {
+    const parts = s.split("/").filter(Boolean);
+    const first = parts[0] ?? "";
+    const last = parts.at(-1) ?? s;
+    // "acme/repo", "10/31", "and/or" name nothing shorter: only a path or a host without its scheme is cut.
+    if (/^(\/|\.{1,2}\/|~)/.test(s)) out = last;
+    else if (first.includes(".")) out = first;
+    else if (/\.[a-z0-9]{1,6}$/i.test(last)) out = last;
+  }
+  if (out.length <= max) return out;
+  const cut = out.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return space > max / 2 ? cut.slice(0, space) : cut;
 }

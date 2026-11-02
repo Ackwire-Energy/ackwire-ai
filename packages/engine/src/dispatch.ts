@@ -7,7 +7,7 @@ import { enqueue } from "./outbox";
 import { routineCreatorOf } from "./requester";
 import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
-import { inChannelRun } from "./run-scope";
+import { inChannelRun, workKeepsThread } from "./run-scope";
 import type { AgentRun } from "./runs";
 import { holdOf, hopLimitReached, pauseStretch, stretchOf, stretchStop } from "./stretch";
 
@@ -111,6 +111,7 @@ export async function startOrJoinRun(
           eq(agentRuns.channelId, message.channelId),
           inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
           eq(agentRuns.background, false),
+          workKeepsThread(sql`${agentRuns}`),
           // In a DM the main timeline is one conversation; each thread (a mission's) is its own.
           sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or ${
             message.threadId
@@ -258,7 +259,7 @@ export async function dispatchMentions(
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
   // An agent asking another one acts for the person behind its run, who must be allowed to talk to it;
-  // a routine set to act wakes only agents its creator can talk to.
+  // a routine wakes only agents its creator can talk to.
   const behind = message.agentRunId ?? (await routinePostRun(db, message));
   const requester =
     (await requesterOf(db, message)) ??

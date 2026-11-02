@@ -15,10 +15,12 @@ import { actionRoutes } from "./routes/app/actions";
 import { agentImportRoutes } from "./routes/app/agent-imports";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
+import { appRoutes } from "./routes/app/apps";
 import { artifactRoutes } from "./routes/app/artifacts";
 import { auditRoutes } from "./routes/app/audit";
 import { billingRoutes } from "./routes/app/billing";
 import { browserRoutes } from "./routes/app/browser";
+import { browserProfileRoutes } from "./routes/app/browser-profiles";
 import { calendarRoutes } from "./routes/app/calendar";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
@@ -64,6 +66,7 @@ import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
 import { registerInstance } from "./routes/instance";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
+import { type AppsRouteOptions, registerAppsRoot, registerOauthRoutes } from "./routes/oauth";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerRoutineHooks, registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
@@ -79,6 +82,8 @@ export interface AppOptions {
   moduleContext?: ModuleContext;
   /** Database, auth and adapters. Without them only system routes are mounted (some tests). */
   services?: AppDeps;
+  /** AI apps (ADR 0119): how an app's metadata document is fetched; swapped in tests. */
+  appsFetchDocument?: AppsRouteOptions["fetchDocument"];
   /** Directory with the built web app (Vite SPA). Skipped when absent. */
   webDir?: string;
   log?: Logger;
@@ -102,6 +107,8 @@ export interface AppOptions {
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
  * - `/api/hooks/*`        public: a webhook routine's own address (POST, ADR 0106)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
+ * - `/api/oauth/*`        public: the OAuth 2.1 authorization server for AI apps (ADR 0119)
+ * - `/mcp`                AI apps' MCP endpoint, bearer tokens only (ADR 0119); `/.well-known/oauth-*` its discovery
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
@@ -109,6 +116,9 @@ export interface AppOptions {
  * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
  */
+const APP_CSP =
+  "frame-ancestors 'none'; base-uri 'self'; frame-src 'self' blob: data: https://challenges.cloudflare.com";
+
 export function createApp(options: AppOptions) {
   const log = options.log ?? createLogger("warn");
   const version = options.services?.config.APP_VERSION ?? options.version;
@@ -151,6 +161,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", actionRoutes(deps));
     api.route("/app", channelRoutes(deps));
     api.route("/app", approvalRoutes(deps));
+    api.route("/app", appRoutes(deps));
     api.route("/app", auditRoutes(deps));
     api.route("/app", customConnectorRoutes(deps));
     api.route("/app", connectorRoutes(deps));
@@ -162,6 +173,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
     api.route("/app", browserRoutes(deps));
+    api.route("/app", browserProfileRoutes(deps));
     api.route("/app", desktopRoutes(deps));
     api.route("/app", notificationRoutes(deps));
     api.route("/app", pushRoutes(deps));
@@ -189,6 +201,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", gifKeyRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
+    registerOauthRoutes(api, deps, { version, fetchDocument: options.appsFetchDocument });
     registerWebhookReceiver(api, deps);
     registerRoutineHooks(api, deps);
     registerGitHubAppWebhook(api, deps);
@@ -255,13 +268,16 @@ export function createApp(options: AppOptions) {
   // Ties a request's failure in the log to its report, and to what the client saw (`X-Request-Id`).
   app.use("/api/*", requestId());
   // Security headers on every response: the app may not be framed (clickjacking of approval, merge and deploy
-  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS.
+  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS. `frame-src`
+  // keeps a frame on our pages from navigating itself to another site with what it holds: an agent's page has no
+  // other way out (ADR 0019), and no policy inside the page can stop that. Frames are our own blobs (pages, PDFs)
+  // and the bot check.
   const httpsPublicUrl = options.services?.config.PUBLIC_URL?.startsWith("https:") ?? false;
   app.use("*", async (c, next) => {
     await next();
     const h = c.res.headers;
     if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
-    if (!h.has("content-security-policy")) h.set("content-security-policy", "frame-ancestors 'none'; base-uri 'self'");
+    if (!h.has("content-security-policy")) h.set("content-security-policy", APP_CSP);
     if (httpsPublicUrl && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=63072000");
   });
   // A CDN in front may cache by the path's extension, whatever the type: without this, a private
@@ -271,7 +287,10 @@ export function createApp(options: AppOptions) {
     if (!c.res.headers.has("cache-control")) c.res.headers.set("cache-control", "no-store");
   });
   app.route("/api", api);
-  if (options.services) registerAppLinks(app, options.services.config);
+  if (options.services) {
+    registerAppLinks(app, options.services.config);
+    registerAppsRoot(app, { log, ...options.services }, { version, fetchDocument: options.appsFetchDocument });
+  }
   app.notFound((c) =>
     c.req.path.startsWith("/api/") ? apiError(c, 404, "not_found", "Route not found") : c.text("Not found", 404),
   );

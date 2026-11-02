@@ -1,3 +1,5 @@
+import { useApps } from "@agenteschat/client";
+import { aiAppImport, appsSettingsUrl } from "@agenteschat/client/lib/apps";
 import {
   bundleOrigin,
   cardName,
@@ -7,20 +9,33 @@ import {
   importFailureText,
   kindsLine,
   retryable,
+  todoLine,
 } from "@agenteschat/client/lib/import/flow";
-import { EXPORT_PROMPT, groupLeftOut } from "@agenteschat/client/lib/import/index";
+import { EXPORT_PROMPT } from "@agenteschat/client/lib/import/index";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { serverUrl } from "@/lib/server";
 import { AgentAvatar, Button, Card, Icon, LogoMark, Text, Toggle, useTheme } from "@/ui";
+import { openPage } from "../ai/parts";
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { fullLook } from "./edit";
-import { agentRows, isRequestCard, kindGroups, pasteAction, phoneOffline, phonePicks } from "./import";
+import {
+  agentRows,
+  isRequestCard,
+  kindGroups,
+  pasteAction,
+  phoneOffline,
+  phonePicks,
+  takesFiles,
+  todoHref,
+} from "./import";
 import { IMPORT_LOGO } from "./import-logos";
 import type { AgentImport } from "./useAgentImport";
 
@@ -29,7 +44,81 @@ import type { AgentImport } from "./useAgentImport";
  * files or paste its reply; the plan shows the agents found and what comes with them. The footer's button imports.
  */
 export function ImportAgents({ imp, orgId }: { imp: AgentImport; orgId: string }) {
-  return imp.planned ? <Preview imp={imp} orgId={orgId} /> : <Picker imp={imp} />;
+  return imp.planned ? (
+    <Preview imp={imp} orgId={orgId} />
+  ) : (
+    <>
+      <AiAppImport orgId={orgId} />
+      <Picker imp={imp} />
+    </>
+  );
+}
+
+/**
+ * "Do seu app de IA" (ADR 0119): the person connects their AI app to this server and asks it to create here what it
+ * has, the most reliable way. Where apps on the internet can't reach this server, one line says why instead.
+ */
+export function AiAppImport({ orgId }: { orgId: string }) {
+  const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  const option = aiAppImport(t, useApps(orgId).data);
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+  if (!option) return null;
+  if (!option.available) return <Note icon="info">{t("onboarding.import.aiApp.private")}</Note>;
+  return (
+    <Card>
+      <View style={styles.request}>
+        <View style={styles.previewHead}>
+          <View style={[styles.tile, { width: 34, height: 34, backgroundColor: c.sunken, borderColor: c.line }]}>
+            <Icon name="agent" size={18} color={c.muted} />
+          </View>
+          <Text variant="body" style={[styles.bold, styles.fill]} accessibilityRole="header">
+            {t("onboarding.import.aiApp.title")}
+          </Text>
+        </View>
+        <Text variant="footnote" tone="muted">
+          {t("onboarding.import.aiApp.lead")}
+        </Text>
+        <Text variant="footnote" tone="ink2">
+          {`1. ${t("onboarding.import.aiApp.connect")} ${option.url}`}
+        </Text>
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t("onboarding.import.aiApp.howTo")}
+          onPress={() => openPage(appsSettingsUrl(serverUrl(), orgId))}
+        />
+        <Text variant="footnote" tone="ink2">
+          {`2. ${t("onboarding.import.aiApp.allow")}`}
+        </Text>
+        <Text variant="footnote" tone="ink2">
+          {`3. ${t("onboarding.import.aiApp.paste")}`}
+        </Text>
+        <View style={[styles.prompt, { backgroundColor: c.sunken, borderColor: c.line }]}>
+          <Text selectable variant="footnote" tone="ink2">
+            {option.prompt}
+          </Text>
+        </View>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={copied === "ok" ? "check" : "copy"}
+          label={copied === "ok" ? t("common.copied") : t("onboarding.import.aiApp.copy")}
+          onPress={() =>
+            void Clipboard.setStringAsync(option.prompt).then(
+              () => setCopied("ok"),
+              () => setCopied("failed"),
+            )
+          }
+        />
+        {copied ? (
+          <Text variant="footnote" tone="muted" accessibilityLiveRegion="polite">
+            {copied === "ok" ? t("onboarding.import.aiApp.copied") : t("mobile.newAgent.import.copyFailed")}
+          </Text>
+        ) : null}
+      </View>
+    </Card>
+  );
 }
 
 /** A source's logo on a neutral tile: our own mark for our export, an icon for any other app. */
@@ -93,36 +182,38 @@ function Picker({ imp }: { imp: AgentImport }) {
           const on = imp.card === card;
           const name = cardName(t, card);
           return (
-            <Pressable
-              key={card}
-              onPress={() => {
-                tapHaptic();
-                imp.setCard(on ? null : card);
-              }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={name}
-              style={({ pressed }) => [
-                styles.source,
-                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-                pressed && { backgroundColor: c.sunken },
-              ]}
-            >
-              <SourceMark card={card} />
-              <Text variant="body" style={styles.fill}>
-                {name}
-              </Text>
-              {on ? <Icon name="checkc" size={22} color={c.ink} /> : null}
-            </Pressable>
+            <View key={card}>
+              <Pressable
+                onPress={() => {
+                  tapHaptic();
+                  imp.setCard(on ? null : card);
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={name}
+                style={({ pressed }) => [
+                  styles.source,
+                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                  pressed && { backgroundColor: c.sunken },
+                ]}
+              >
+                <SourceMark card={card} />
+                <Text variant="body" style={styles.fill}>
+                  {name}
+                </Text>
+                {on ? <Icon name="checkc" size={22} color={c.ink} /> : null}
+              </Pressable>
+              {on && !isRequestCard(card) ? (
+                <View style={styles.where}>
+                  <Note icon="info">{t(`mobile.newAgent.import.where.${card}`)}</Note>
+                </View>
+              ) : null}
+            </View>
           );
         })}
       </Card>
 
-      {isRequestCard(imp.card) ? (
-        <RequestSteps key={imp.card} card={imp.card} />
-      ) : imp.card ? (
-        <Note icon="info">{t(`mobile.newAgent.import.where.${imp.card}`)}</Note>
-      ) : null}
+      {isRequestCard(imp.card) ? <RequestSteps key={imp.card} card={imp.card} /> : null}
 
       {busy ? (
         <View style={styles.reading}>
@@ -132,14 +223,14 @@ function Picker({ imp }: { imp: AgentImport }) {
           </Text>
           <Button variant="secondary" size="sm" label={t("common.cancel")} onPress={imp.cancel} />
         </View>
-      ) : (
+      ) : takesFiles(imp.card) ? (
         <Button
           variant="secondary"
           icon="file"
           label={t("mobile.newAgent.import.pick")}
           onPress={() => void pickFiles()}
         />
-      )}
+      ) : null}
 
       <Text variant="footnote" tone="faint" style={styles.gapTop}>
         {t("mobile.newAgent.import.pasteTitle")}
@@ -255,31 +346,28 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
   const agents = agentRows(bundle, items, pick, imp.blocked);
   const groups = kindGroups(items, pick, imp.blocked);
   const summary = kindsLine(t, (kind) => items.filter((i) => i.kind === kind && i.action !== "skip").length);
-  const left = groupLeftOut(bundle.leftOut);
   const nameOf = (key: string) => bundle.agents.find((a) => a.key === key)?.name ?? key;
 
   return (
     <>
       <View style={styles.previewHead}>
         <SourceMark card={origin.card} size={44} />
-        <View style={styles.fill}>
-          <Text variant="title" accessibilityRole="header" numberOfLines={2}>
-            {bundle.source.name}
-          </Text>
-          <Text variant="footnote" tone="muted">
-            {[origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther"), summary]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-        </View>
+        <Text variant="title" accessibilityRole="header" numberOfLines={2} style={styles.fill}>
+          {bundle.source.name}
+        </Text>
         <Button
           variant="secondary"
           size="sm"
-          label={t("onboarding.import.change")}
+          label={planned.from === "files" ? t("onboarding.import.change") : t("mobile.newAgent.import.change")}
           disabled={applying}
           onPress={imp.reset}
         />
       </View>
+      <Text variant="footnote" tone="muted">
+        {[origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther"), summary]
+          .filter(Boolean)
+          .join(" · ")}
+      </Text>
       {bundle.source.ref === `agenteschat:${orgId}` ? (
         <Note icon="info">{t("onboarding.import.sameWorkspace")}</Note>
       ) : null}
@@ -289,8 +377,11 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
       </Text>
       <Card>
         {agents.map((a, i) => {
-          const status = t(`onboarding.import.status.${a.status}`);
+          // A new agent says nothing: it's what every row would say.
+          const status = a.status === "create" ? "" : t(`onboarding.import.status.${a.status}`);
           const why = a.reason ? t(`onboarding.import.why.${a.reason}`) : "";
+          const renamed = a.wanted ? t("onboarding.import.renamed", { handle: a.handle, wanted: a.wanted }) : "";
+          const note = [status, why, renamed].filter(Boolean).join(" · ");
           return (
             <Pressable
               key={a.id}
@@ -301,7 +392,14 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
               }}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: a.on, disabled: !a.free || applying }}
-              accessibilityLabel={[t("onboarding.import.bring", { name: a.name }), a.role, `@${a.handle}`, status, why]
+              accessibilityLabel={[
+                t("onboarding.import.bring", { name: a.name }),
+                a.role,
+                a.handle && `@${a.handle}`,
+                status,
+                why,
+                renamed,
+              ]
                 .filter(Boolean)
                 .join(". ")}
               style={[styles.agent, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
@@ -312,11 +410,13 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
                   {a.name}
                 </Text>
                 <Text variant="footnote" tone="muted" numberOfLines={2}>
-                  {[a.role, `@${a.handle}`].filter(Boolean).join(" · ")}
+                  {[a.role, !a.wanted && a.handle && `@${a.handle}`].filter(Boolean).join(" · ")}
                 </Text>
-                <Text variant="footnote" tone="faint">
-                  {why ? `${status} · ${why}` : status}
-                </Text>
+                {note ? (
+                  <Text variant="footnote" tone="faint">
+                    {note}
+                  </Text>
+                ) : null}
               </View>
               {a.free ? <Icon name={a.on ? "checkc" : "circle"} size={22} color={a.on ? c.ink : c.faint} /> : null}
             </Pressable>
@@ -346,44 +446,33 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
               );
             })}
           </Card>
-          {groups.some((g) => g.kind === "skill" || g.kind === "routine") ? (
-            <Text variant="footnote" tone="faint">
-              {groups
-                .filter((g) => g.kind === "skill" || g.kind === "routine")
-                .map((g) => `${t(`onboarding.import.groups.${g.kind}`)}: ${t(`onboarding.import.groupHelp.${g.kind}`)}`)
-                .join(" ")}
-            </Text>
-          ) : null}
         </>
       ) : null}
 
       {bundle.todo.length > 0 ? (
-        <>
-          <Text variant="footnote" tone="faint" style={styles.gapTop}>
-            {t("onboarding.import.todoTitle")}
-          </Text>
-          {bundle.todo.map((todo) => (
-            <Text key={`${todo.kind}:${todo.label}`} variant="footnote" tone="ink2">
-              {[
-                t(`onboarding.import.todo.${todo.kind}`, { label: todo.label }),
-                todo.agents.length > 0
-                  ? t("onboarding.import.todoFor", { names: todo.agents.map(nameOf).join(", ") })
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </Text>
-          ))}
-        </>
+        <View style={styles.todos}>
+          {bundle.todo.map((todo) => {
+            const href = todoHref(todo.kind);
+            return (
+              <View key={`${todo.kind}:${todo.label}`} style={styles.todo}>
+                <Text variant="footnote" tone="ink2" style={styles.fill}>
+                  {todoLine(t, todo, nameOf)}
+                </Text>
+                {href ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t(`onboarding.import.needDo.${todo.kind as "connection" | "app" | "file"}`)}
+                    disabled={applying}
+                    onPress={() => router.push(href)}
+                  />
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
       ) : null}
 
-      {left.length > 0 ? (
-        <Text variant="footnote" tone="faint" style={styles.gapTop}>
-          {t("mobile.newAgent.import.leftOut", {
-            groups: left.map((g) => t(`onboarding.import.leftOut.${g.kind}`)).join(", "),
-          })}
-        </Text>
-      ) : null}
       <Note icon="lock">{t("onboarding.import.never")}</Note>
 
       {imp.progress ? (
@@ -435,8 +524,12 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
   failure: { gap: 8, alignItems: "flex-start" },
   request: { gap: 8, padding: 14, alignItems: "flex-start" },
+  prompt: { alignSelf: "stretch", padding: 10, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
   previewHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   agent: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
   kindRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
+  where: { paddingLeft: 60, paddingRight: 14, paddingBottom: 12 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 6 },
+  todos: { gap: 10, marginTop: 14 },
+  todo: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

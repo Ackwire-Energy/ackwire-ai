@@ -61,6 +61,7 @@ import {
   publishMachineStatus,
   publishMachineUpdated,
 } from "./machines";
+import { DISK_REARM_USE, DISK_WARN_USE, notifyComputerDiskFull } from "./notification-producers";
 import { enqueue } from "./outbox";
 import { assertCanWork, standingRefusal } from "./standing";
 
@@ -833,24 +834,55 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.lastSeenWrite = Date.now();
     const now = new Date();
     const at = now.toISOString();
+    const machineId = conn.machineId;
+    const stored = load
+      ? await db
+          .select({ load: machines.load, orgId: machines.orgId, name: machines.name })
+          .from(machines)
+          .where(eq(machines.id, machineId))
+          .then(([m]) => m ?? null)
+          .catch(() => null)
+      : null;
+    const prev = stored?.load;
+    // ADR 0115: a report without the disk's figures (a runner that just started) keeps the last ones.
+    const next =
+      load && load.diskUse === undefined && prev?.diskUse !== undefined
+        ? {
+            ...load,
+            diskUse: prev.diskUse,
+            ...(prev.diskFreeGb === undefined ? {} : { diskFreeGb: prev.diskFreeGb }),
+            ...(prev.sharedGb === undefined ? {} : { sharedGb: prev.sharedGb }),
+          }
+        : load;
+    const wasWarned = prev?.diskWarned === true;
+    const use = next?.diskUse;
+    const diskWarned = use === undefined ? wasWarned : use >= DISK_WARN_USE || (wasWarned && use >= DISK_REARM_USE);
     const changed = await db
       .update(machines)
       .set({
         lastSeenAt: now,
         online: true,
         ...(networkTransition !== undefined ? { networkTransition } : {}),
-        ...(load ? { load: { ...load, at } } : {}),
+        ...(next ? { load: { ...next, ...(diskWarned ? { diskWarned } : {}), at } } : {}),
         ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
         ...(conn.kind !== "managed" ? { egress: null } : egress ? { egress: { ...egress, at } } : {}),
       })
-      .where(and(eq(machines.id, conn.machineId), eq(machines.connectedReplica, replicaId)))
+      .where(and(eq(machines.id, machineId), eq(machines.connectedReplica, replicaId)))
       .returning({ id: machines.id })
       .catch(() => []);
     if (networkTransition !== undefined && changed.length && conn.orgId) {
-      await publishMachineUpdated(pubsub, conn.orgId, conn.machineId, { networkTransition });
+      await publishMachineUpdated(pubsub, conn.orgId, machineId, { networkTransition });
     }
     if (egress && changed.length && conn.orgId) {
-      await publishMachineUpdated(pubsub, conn.orgId, conn.machineId, { egress: egress.ip ? { ...egress, at } : null });
+      await publishMachineUpdated(pubsub, conn.orgId, machineId, { egress: egress.ip ? { ...egress, at } : null });
+    }
+    if (stored && diskWarned && !wasWarned && use !== undefined) {
+      await notifyComputerDiskFull(
+        { db, pubsub },
+        { id: machineId, orgId: stored.orgId, name: stored.name },
+        { diskUse: use, ...(next?.diskFreeGb === undefined ? {} : { diskFreeGb: next.diskFreeGb }) },
+        now,
+      ).catch((error) => deps.log?.warn("disk warning failed", { machineId, error: String(error) }));
     }
   }
 

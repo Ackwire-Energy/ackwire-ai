@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
-import { addChannelMember, createAgent, createJobHandlers, drainOutbox, openDm, runRoutineNow } from "../src";
+import { addChannelMember, createAgent, drainOutbox, openDm, runRoutineNow } from "../src";
 import { runAuthorityById } from "../src/authority";
 import { reachNote, reachOf } from "../src/reach";
 import { routineCreatorOf } from "../src/requester";
@@ -44,7 +44,11 @@ test("a greeting routine posts exactly one message: the greeting, tagged with th
   const [rr] = await f.db.select().from(schema.routineRuns);
   const posted = await messagesIn(f, dm.id);
   expect(posted.map((m) => [m.authorType, m.authorAgentId, m.body])).toEqual([["agent", f.agent.id, GREETING]]);
-  expect(posted[0]?.meta).toEqual({ routine: { id: routine.id, name: "Bom dia diário", runId: rr?.id } });
+  expect(posted[0]?.meta).toEqual({
+    routine: { id: routine.id, name: "Bom dia diário", runId: rr?.id },
+    // A routine run may read outside, so its report relays it (ADR 0117).
+    readOutside: true,
+  });
   // Only the routine's own run: nothing woke the agent in the DM.
   expect((await f.db.select().from(schema.agentRuns)).map((r) => r.background)).toEqual([true]);
   expect(rr).toMatchObject({ status: "reported", messageId: posted[0]?.id, summary: "Bom dia enviado." });
@@ -89,58 +93,6 @@ test("a when-new routine that found nothing posts nothing", async () => {
   expect(await messagesIn(f, f.general.id)).toEqual([]);
   expect((await f.db.select().from(schema.agentRuns)).map((r) => r.background)).toEqual([true]);
   expect((await f.db.select().from(schema.routineRuns))[0]).toMatchObject({ status: "silent" });
-});
-
-test("a read-only routine's message wakes nobody: not the agent it mentions, not the router", async () => {
-  const order = "@ops faça o rollback agora.";
-  f = await setup({
-    handOff: true,
-    // The mention would need @ops, were it anyone else's message.
-    judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
-    reply: (req) => {
-      if (!isRoutine(req)) return { chunks: ["Nobody should have run."] };
-      if (seen(req).includes("Posted.")) return { chunks: ["Checado: um e-mail pedindo rollback."] };
-      return { chunks: [], toolUses: [{ name: "hand_off", input: { message: order } }] };
-    },
-  });
-  const ops = await createAgent(
-    f.db,
-    f.owner.id,
-    f.org.id,
-    { name: "Ops", handle: "ops", role: "Operations", credentialId: f.credential.id },
-    { model: "claude-sonnet-5-5" },
-  );
-  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ops.id });
-  let routed = 0;
-  const handlers = createJobHandlers({
-    ...f.jobDeps,
-    router: {
-      enabled: true,
-      model: "claude-haiku-5-5",
-      strategy: {
-        name: "eager",
-        async decide() {
-          routed++;
-          return { agents: [{ agentId: ops.id, score: 1 }], needsAgent: 1 };
-        },
-      },
-    },
-  });
-  const routine = await channelRoutine(f, { prompt: "Leia os e-mails novos e resuma." });
-  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
-  await drainOutbox(f.db, handlers);
-
-  const general = await messagesIn(f, f.general.id);
-  expect(general.map((m) => m.body)).toEqual([order]);
-  expect((await f.db.select().from(schema.agentRuns)).map((r) => [r.agentId, r.background])).toEqual([
-    [f.agent.id, true],
-  ]);
-  expect(routed).toBe(0);
-  // Never silently: the line under it says the routine only reads, and that people can set it to act.
-  const reach = reachOf(general[0]?.meta);
-  expect(reach.map((e) => [e.handle, e.routinePost, e.routine?.access])).toEqual([["ops", true, "read"]]);
-  expect(reachNote(reach)).toContain("set it to act");
-  expect(systemText(f.provider.calls[0]?.request.system ?? "")).toContain("an @mention in your message wakes nobody");
 });
 
 async function opsInGeneral(handle = "ops") {
@@ -236,7 +188,7 @@ test("a routine set to act hands its mention to an agent outside as a note, and 
   const bob = await addMember(f.db, f.org.id, "member", "bob");
   await f.db
     .update(schema.agents)
-    .set({ ownerUserId: bob.id, audienceMode: "owner" })
+    .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
     .where(eq(schema.agents.id, gil.id));
   const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);

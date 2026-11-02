@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, SHARED_COMPUTER_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -174,7 +174,7 @@ describe("notices", () => {
 });
 
 describe("the prompt's rules", () => {
-  test("the honesty line, another way before giving up, and what comes of ask_agent and tell_agent", async () => {
+  test("the honesty line, another way before giving up (ADR 0109), and what comes of ask_agent and tell_agent", async () => {
     f = await setup();
     const infra = await addAgent("Infra", "infra");
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: infra.id });
@@ -186,10 +186,13 @@ describe("the prompt's rules", () => {
     const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30, toolsAvailable: true });
     const text = systemText(ctx.system);
     expect(text).toContain(
-      "When a way is closed (no access, a refusal, nothing found), take another that still gets the people what they need: another tool, the colleague whose role covers it, a document or a copy instead of a move.",
+      "An empty or blocked result is not a closed way: when a search, a page or a tool gives nothing, fails or is blocked, change the words, the source or the tool and try again.",
     );
     expect(text).toContain(
-      "Only when none works, say so plainly: what you tried, who has the access (a person or another agent here) and the one thing a person must do. Never say you haven't looked yet",
+      "Before saying you can't or don't have a tool, check your means (listed under Your means): your tools and find_tools, your computer, browser and terminal, and the teammates whose role covers it.",
+    );
+    expect(text).toContain(
+      "A real blocker is only something a person must give: a code, a sign-in, a payment, a permission, a decision. Only then stop, and say in one line what you tried and the one thing a person must do.",
     );
     expect(text).toContain(
       "ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself.",
@@ -200,7 +203,11 @@ describe("the prompt's rules", () => {
     expect(turnAt).toBeGreaterThan(1);
     expect(ctx.system.slice(turnAt).every((b) => b.turn)).toBe(true);
     const perTurn = ctx.system.slice(turnAt).map((b) => b.text.split("\n")[0]);
-    expect(perTurn).toEqual(["# Now", "# Where you are"]);
+    expect(perTurn).toEqual([
+      "# Now",
+      "The person's app language: pt-BR, Portuguese (Brazil). Still reply in the language they write in.",
+      "# Where you are",
+    ]);
   });
 });
 
@@ -293,6 +300,16 @@ describe("# This turn", () => {
       .update(schema.agents)
       .set({ machineId: paired.machineId, brain: "claude_code" })
       .where(eq(schema.agents.id, f.agent.id));
+    // The computer's shared folder (ADR 0115): granted to every agent, told in a block of its own.
+    await f.db
+      .update(schema.machines)
+      .set({
+        access: {
+          folders: [{ path: "/Users/w/agentes/shared", agents: ["*"] }],
+          tools: { claude: true, codex: true, cursor: true, commands: true },
+        },
+      })
+      .where(eq(schema.machines.id, paired.machineId));
     const status = (id: string): MachineStatus => ({
       id,
       orgId: f.org.id,
@@ -300,8 +317,12 @@ describe("# This turn", () => {
       online: true,
       execAllowed: true,
       os: "darwin",
-      protocol: 8,
-      executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+      protocol: MACHINE_PROTOCOL_VERSION,
+      executors: {
+        claude: { version: "2.1.300", loggedIn: true },
+        cursor: { version: "2026.10.1" },
+        detectedAt: new Date().toISOString(),
+      },
     });
     const seen: { prompt: string; system: string; resume: boolean }[] = [];
     const brain: Brain = {
@@ -314,7 +335,7 @@ describe("# This turn", () => {
     };
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      brains: { claude_code: () => brain },
+      brains: { claude_code: () => brain, cursor: () => ({ ...brain, kind: "cursor" }) },
       machines: { status: async (id) => status(id) },
     });
     const question = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -336,6 +357,11 @@ describe("# This turn", () => {
       expect(turn.system).not.toContain("# Now");
       expect(turn.system).not.toContain("# Where you are");
       expect(turn.system).toContain("Acme builds rockets.");
+      expect(turn.system).toContain("Only your own folder there");
+      expect(turn.system).toContain('# Shared folder on "MacBook"\n/Users/w/agentes/shared is shared by every agent');
+      expect(turn.system).not.toContain("~/shared");
+      // One person's own computer: no agents' slices, so nothing to look at with agentes-runner computer.
+      expect(turn.system).not.toContain("# Sharing");
     }
     // The resumed turn reads where it is now: in the thread.
     expect(seen[1]?.prompt).toContain("replying in a thread");
@@ -344,6 +370,36 @@ describe("# This turn", () => {
     const stored = (second?.transcript as { system: ContextBlock[] } | undefined)?.system ?? [];
     expect(stored.at(-1)?.turn).toBe(true);
     expect(stored.some((b) => b.text.startsWith("# Now"))).toBe(true);
+
+    // On Cursor, whose sandbox can't write outside the turn's workspace, no shared folder to be told to use.
+    await f.db.update(schema.agents).set({ brain: "cursor" }).where(eq(schema.agents.id, f.agent.id));
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, handlers);
+    expect(seen).toHaveLength(3);
+    expect(seen[2]?.system).toContain("Only your own folder there");
+    expect(seen[2]?.system).not.toContain("# Shared folder");
+
+    // System mode: the agents share the computer's CPUs and memory, of the size its runner reported, once its runner
+    // has `agentes-runner computer` and caps no agent (an older one still does).
+    const [row] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId));
+    const ask = async (protocol: number) => {
+      await f.db
+        .update(schema.machines)
+        .set({
+          executors: { ...row?.executors, mode: "system" },
+          size: { cpus: 4, memoryGb: 8, diskGb: 100 },
+          protocol,
+        })
+        .where(eq(schema.machines.id, paired.machineId));
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+      await drainOutbox(f.db, handlers);
+      return seen.at(-1)?.system ?? "";
+    };
+    expect(await ask(SHARED_COMPUTER_PROTOCOL - 1)).not.toContain("# Sharing");
+    expect(await ask(SHARED_COMPUTER_PROTOCOL)).toContain(
+      '# Sharing "MacBook"\nAll the agents on "MacBook" share its 4 CPUs and most of its 8 GB',
+    );
+    expect(seen).toHaveLength(5);
   });
 });
 
@@ -478,10 +534,10 @@ describe("a routine's background run", () => {
     const { ctx, text } = await routineRun();
     expect(text).toContain("# This is a routine run\nYour routine «Vigiar e-mails» started this run");
     expect(text).toContain("Its instructions, set up by ana:\nLeia a caixa de suporte e conte o que é novo.");
-    // A read-only run is told why: its creator set it to only look and tell.
-    expect(text).toContain(
-      "What it may do: look and tell. ana set this routine to only look and tell, so this run is read-only",
-    );
+    // Every routine does what its agent can (ADR 0109), the web included.
+    expect(text).toContain("What it may do: what you can do in any other run.");
+    expect(text).toContain("The web is yours to read (search, open pages, your browser) like anywhere else.");
+    expect(text).not.toContain("look and tell");
     expect(text).toContain("When it speaks: only when there is news.");
     expect(text).toContain("Do not manage routines from a routine run");
     // Its last record and its event: outside content, in the envelope, markers neutralised.
@@ -513,7 +569,7 @@ describe("a routine's background run", () => {
   test("access act and report always say what they allow; a late run says how late and since when", async () => {
     f = await setup();
     const { text } = await routineRun({ access: "act", report: "always", lateMinutes: 310 });
-    expect(text).toContain("What it may do: look and act.");
+    expect(text).toContain("What it may do: what you can do in any other run.");
     expect(text).toContain("agentes/dev/");
     expect(text).toContain("Any change in a connected app asks a person first: an approval card in #general");
     expect(text).toContain("When it speaks: every run.");

@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { OrgRole, PermissionArea, Person } from "../api/types";
 import { joinNames } from "./format";
-import type { RolePermission } from "./permissions";
+import { can, type RolePermission } from "./permissions";
 
 /**
  * A workspace's roles on screen (ADR 0085): each area of permissions at a level, the line that sums a role up, and
@@ -115,7 +115,7 @@ export function summaryKeys(role: OrgRole, everyone: OrgRole | undefined): RoleP
 const wordList = (t: TFunction, locale: string, items: string[]) =>
   typeof Intl.ListFormat === "function"
     ? new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items)
-    : joinNames(items, t("notifications.and"));
+    : joinNames(items, t);
 
 /** The sentence that sums a role up: its own keys past what `everyone` gives, the first three, "and N more". */
 export function roleSummary(t: TFunction, locale: string, role: OrgRole, everyone: OrgRole | undefined) {
@@ -146,6 +146,20 @@ export const isBelow = (
   viewer.role === "owner" ||
   (person.role !== "owner" &&
     (person.userId === viewer.userId || rankOf(person, roles) > (viewer.rank ?? Number.POSITIVE_INFINITY)));
+
+/**
+ * Whether the viewer may remove this person from the workspace (the server checks it again, `removeMember`): who may
+ * manage members, above them (an owner above all). Their own row leaves instead (`leaves`).
+ */
+export const removes = (
+  viewer: { role: string; rank?: number | null; userId: string; permissions?: readonly string[] },
+  person: Pick<Person, "userId" | "role" | "roleIds">,
+  roles: readonly OrgRole[],
+) => person.userId !== viewer.userId && can(viewer, "manage_members") && isBelow(viewer, person, roles);
+
+/** Whether the viewer may leave the workspace: anyone but its last owner. */
+export const leaves = (viewer: { role: string }, people: readonly Pick<Person, "role">[]) =>
+  viewer.role !== "owner" || people.filter((p) => p.role === "owner").length > 1;
 
 /** Whether the viewer holds every key of a role (an owner all): only then may they copy it or give it. */
 export function holdsAll(viewer: { role: string; permissions?: readonly string[] }, keys: readonly string[]) {

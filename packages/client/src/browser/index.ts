@@ -1,8 +1,10 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
 import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, ScreenKind } from "../api/types";
+import { timeLeft } from "../lib/format";
 import { isBlankPage } from "../lib/sites";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
@@ -10,6 +12,7 @@ import { noteHandoffPlace } from "./held";
 export * from "./held";
 export * from "./input";
 export * from "./live";
+export * from "./profiles";
 export * from "./trail";
 export * from "./watches";
 
@@ -65,12 +68,9 @@ export function handoffIsMine(
   return h.requestedForUserId ? h.requestedForUserId === meId : mayControlComputers;
 }
 
-/** Whole minutes left before a waiting request expires (at least 1 while it lasts); null without a deadline. */
-export function handoffMinutesLeft(h: Pick<BrowserHandoff, "expiresAt">, now = Date.now()): number | null {
-  if (!h.expiresAt) return null;
-  const ms = new Date(h.expiresAt).getTime() - now;
-  if (ms <= 0) return 0;
-  return Math.max(1, Math.ceil(ms / 60_000));
+/** The time a waiting request has left ("24 h", "45 min"); null without a deadline or once it passed. */
+export function handoffTimeLeft(t: TFunction, h: Pick<BrowserHandoff, "expiresAt">, now = Date.now()): string | null {
+  return h.expiresAt ? timeLeft(t, h.expiresAt, new Date(now)) : null;
 }
 
 /** How much of a waiting request's time is left, 0–1 (the card's fuse). */

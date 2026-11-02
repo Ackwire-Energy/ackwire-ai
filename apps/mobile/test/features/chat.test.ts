@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
-import { activitySentence, barElapsed, barFaces, barWords, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
+import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
+import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
@@ -11,6 +12,7 @@ import {
   buildRows,
   consultationsOf,
   eventLineOf,
+  hangsUnder,
   hidesBody,
   type LineWords,
   leavingWords,
@@ -42,8 +44,7 @@ import {
 } from "../../src/features/chat/logic";
 import {
   fadeTail,
-  OPENERS,
-  openingRuns,
+  openerDelayMs,
   outputTail,
   pruneMarks,
   recentTurn,
@@ -52,8 +53,11 @@ import {
   stoppedOf,
   turnItems,
   turnOpener,
+  turnOrder,
   turnPhase,
   turnRuns,
+  turnShows,
+  waitDot,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -82,6 +86,70 @@ describe("timeline", () => {
     ]);
     const shape = rows.map((r) => (r.kind === "day" ? "day" : `${r.message.id}${r.grouped ? "+" : ""}`));
     expect(shape).toEqual(["day", "1", "day", "2", "3+", "4", "5", "6"]);
+  });
+
+  test("a run of one author's rows: start, mid, end, and solo for one alone (my bubbles' corners and time)", () => {
+    const rows = buildRows([
+      message({ id: "1", createdAt: "2026-10-17T12:00:00.000Z" }),
+      message({ id: "2", createdAt: "2026-10-17T12:01:00.000Z" }),
+      message({ id: "3", createdAt: "2026-10-17T12:02:00.000Z" }),
+      message({ id: "4", createdAt: "2026-10-17T12:03:00.000Z", author: { type: "agent", id: "dev" } }),
+      message({ id: "5", createdAt: "2026-10-17T12:04:00.000Z" }),
+      message({ id: "6", createdAt: "2026-10-17T12:20:00.000Z" }),
+      message({ id: "7", createdAt: "2026-10-17T12:21:00.000Z" }),
+    ]);
+    const runs = rows.flatMap((r) =>
+      r.kind === "message" ? [`${r.message.id}:${runPosition(r.grouped, r.continued ?? false)}`] : [],
+    );
+    expect(runs).toEqual(["1:start", "2:mid", "3:end", "4:solo", "5:solo", "6:start", "7:end"]);
+    expect([
+      runPosition(false, false),
+      runPosition(false, true),
+      runPosition(true, true),
+      runPosition(true, false),
+    ]).toEqual(["solo", "start", "mid", "end"]);
+  });
+
+  test("what hangs under a bubble (reactions, a thread, files, a send in flight) cuts the run there", () => {
+    const rows = buildRows([
+      message({ id: "1", createdAt: "2026-10-17T12:00:00.000Z" }),
+      message({
+        id: "2",
+        createdAt: "2026-10-17T12:01:00.000Z",
+        reactions: [{ reaction: "+1", count: 1, userIds: ["joao"] }] as Message["reactions"],
+      }),
+      message({ id: "3", createdAt: "2026-10-17T12:02:00.000Z" }),
+      message({ id: "4", createdAt: "2026-10-17T12:03:00.000Z" }),
+    ]);
+    const runs = rows.flatMap((r) =>
+      r.kind === "message"
+        ? [
+            runAround(
+              runPosition(r.grouped, r.continued ?? false),
+              r.above ? hangsUnder(r.above, false, undefined, "me") : false,
+              hangsUnder(r.message, false, undefined, "me"),
+            ),
+          ]
+        : [],
+    );
+    expect(runs).toEqual(["start", "end", "start", "end"]);
+    const plain = message({ id: "5" });
+    expect([
+      hangsUnder(plain, false, undefined, "me"),
+      hangsUnder(plain, true, undefined, "me"),
+      hangsUnder({ ...plain, local: "pending" } as Message, false, undefined, "me"),
+      hangsUnder(plain, false, [{ reaction: "+1", count: 1, userIds: ["joao"] }] as Message["reactions"], "me"),
+    ]).toEqual([false, true, true, true]);
+    expect(runAround("mid", true, true)).toBe("solo");
+  });
+
+  test("my row takes its place in the run: the bubble's corners and the time under the run's last", async () => {
+    expect(await source("features/chat/ChatScreen.tsx")).toContain(
+      "run={runPosition(item.grouped, item.continued ?? false)}",
+    );
+    const row = await source("features/chat/MessageRow.tsx");
+    expect(row).toContain("BUBBLE_RUN[run]");
+    expect(row).toContain('(run === "end" || run === "solo")');
   });
 
   test("hidden messages leave no row", () => {
@@ -269,12 +337,7 @@ describe("working line", () => {
     const people: Record<string, string> = { u1: "Maria Fernanda Albuquerque" };
     const entries = workingEntries([run({ runId: "r", agentId: "ada" })], [], name, ["u1"], (id) => people[id]);
     // The shared pieces, in the order they give way: the agents' words (and their " · "), then the names.
-    expect(barWords(t, entries, [], 0, 0)).toEqual([
-      "Ada is working",
-      " · ",
-      "Maria Fernanda Albuquerque",
-      " is typing…",
-    ]);
+    expect(barWords(t, entries)).toEqual(["Ada is working", " · ", "Maria Fernanda Albuquerque", " is typing…"]);
     // What iOS drew of each: a cut-off "A" beside someone typing leaves, " · " with it.
     expect(lineFit({ agents: 4.7, typers: 170.3 }, true)).toEqual({ agents: null, typers: 171 });
     expect(lineFit({ agents: AGENT_WORDS_MIN }, true).agents).toBe(AGENT_WORDS_MIN);
@@ -375,9 +438,9 @@ describe("working line", () => {
     let clock = pacedClock({ every: 60_000, now: U - 50_000 }, 1000, U);
     const shown = [{ at: U, took: barElapsed(en, alone, [ada], clock.now) }];
     expect(shown[0]?.took).toBe("2m 28s");
-    // Each second its interval reads the time; the phrase turning (every 2.6 s) redraws the line in between.
+    // Each second its interval reads the time; an event redraws the line in between (every 2.6 s here).
     const reads = Array.from({ length: 12 }, (_, k) => U + 4 + (k + 1) * 1000);
-    const turns = Array.from({ length: 4 }, (_, k) => U + 4 + (k + 1) * PHRASE_TURN_MS);
+    const turns = Array.from({ length: 4 }, (_, k) => U + 4 + (k + 1) * 2600);
     for (const at of [...reads, ...turns].sort((a, b) => a - b)) {
       clock = reads.includes(at) ? { every: 1000, now: at } : pacedClock(clock, 1000, at);
       const took = barElapsed(en, alone, [ada], clock.now);
@@ -391,22 +454,24 @@ describe("working line", () => {
     expect(line).not.toContain("Date.now()");
   });
 
-  test("each time the bar comes back it opens on who is at work: the phrase's tick mounts with the pill, as on the web", async () => {
+  test("one agent on its own: the line says its name (its row says what it does), with no face of its own", async () => {
     const en = await translator("en");
     const ada = run({ runId: "r", agentId: "ada" });
-    const entries = workingEntries([ada], [], name);
-    // A turn opens thinking: its first tick says who it is, where a tick kept from the last turn could open on a light
-    // line without the name.
-    expect(barWords(en, entries, [ada], 0, 0)[0]).toBe("Ada is working…");
-    expect(barWords(en, entries, [ada], 7, 0)[0]).not.toContain("Ada");
-    // The line stays mounted while the bar is gone; the words under the pill don't, and the tick is theirs.
+    const atlas = run({ runId: "s", agentId: "atlas" });
+    expect(barWords(en, workingEntries([ada], [], name), markName)[0]).toBe(markName("Ada"));
+    expect(barWords(en, workingEntries([ada, atlas], [], name))[0]).toBe("Ada and Atlas are working…");
     const lines = await source("features/chat/LiveRows.tsx");
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
-    const words = lines.slice(lines.indexOf("function TurningWords("), lines.indexOf("function BarWords("));
-    expect(line).toContain("if (entries.length === 0) return null;");
-    expect(line).not.toContain("PHRASE_TURN_MS");
-    expect(words).toContain("const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));");
-    expect(words).toContain("PHRASE_TURN_MS");
+    expect(line).toContain(
+      "entries.length === 1 && soloRun && turnShows(soloRun, now) && !asking ? [] : barFaces(entries)",
+    );
+  });
+
+  test("once its words arrive, the block's header says the name and its start time, as on the web (no orbit)", async () => {
+    const lines = await source("features/chat/LiveRows.tsx");
+    const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function WaitLine("));
+    expect(row).toContain("when.time(new Date(since ?? mountedAt).toISOString())");
+    expect(row).not.toContain("PixelOrbit");
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
@@ -646,6 +711,10 @@ describe("an agent's question (ask_user)", () => {
       status: "answered",
       answer: "Agora",
     });
+    // Taken back by the agent: the card says it no longer needs an answer.
+    expect(
+      questionOf({ question: { ...question, status: "answered", answer: null, withdrawn: true } })?.withdrawn,
+    ).toBe(true);
     expect(questionOf({ question: { id: "q", text: "" } })).toBeNull();
     expect(questionOf({})).toBeNull();
     expect(questionOf(undefined)).toBeNull();
@@ -733,6 +802,15 @@ describe("an agent's turn as one block", () => {
     running,
   });
 
+  test("its block shows after a moment, or once it has something of its own (the line keeps its face till then)", () => {
+    const fresh = run({ runId: "a", status: "running", startedAt: 10_000 });
+    const due = 10_000 + openerDelayMs("a");
+    expect(turnShows(fresh, 10_500)).toBe(false);
+    expect(turnShows(fresh, due)).toBe(true);
+    expect(turnShows({ ...fresh, text: "Oi" }, 10_500)).toBe(true);
+    expect(turnShows({ ...fresh, work: [call("1", "sentry_list_issues", true)] }, 10_500)).toBe(true);
+  });
+
   test("the header word: thinking, working on steps, writing, stopped", () => {
     expect(turnPhase(run({ runId: "a" }))).toBe("thinking");
     expect(turnPhase(run({ runId: "b", tool: "sentry_list_issues" }))).toBe("working");
@@ -814,29 +892,44 @@ describe("an agent's turn as one block", () => {
     ]);
   });
 
-  test("it opens as if it had answered: a generic phrase, then the first thing it said", () => {
+  test("it opens with the first thing it said; no placeholder before it", () => {
     const quiet = run({ runId: "r" });
-    const generic = turnOpener(quiet, turnItems(quiet));
-    expect(generic.said).toBeNull();
-    expect(generic.opener).toBeGreaterThanOrEqual(0);
-    expect(generic.opener).toBeLessThan(OPENERS);
-    expect(turnOpener(quiet, []).opener).toBe(generic.opener);
-
+    expect(turnOpener(turnItems(quiet))).toEqual({ said: null, lines: [] });
     const said = run({
       runId: "r",
       work: [call("1", "sentry_list_issues", false), { kind: "say", text: "Vou pedir pro Josh", turn: 1 }],
     });
-    const opened = turnOpener(said, turnItems(said));
-    expect(opened).toMatchObject({ said: "Vou pedir pro Josh", opener: null });
+    const opened = turnOpener(turnItems(said));
+    expect(opened.said).toBe("Vou pedir pro Josh");
     expect(opened.lines.map((x) => x.kind)).toEqual(["call"]);
-
-    expect(turnOpener(run({ runId: "w", status: "running", text: "Ontem" }), []).opener).toBeNull();
-    expect(turnOpener(run({ runId: "s", status: "canceled" }), []).opener).toBeNull();
+    // Then posted as the saved reply (the lead before a card): the reply shows it, never twice.
+    const posted = turnOpener(turnItems(said), "Vou pedir pro Josh.\n\nEle sabe onde está.");
+    expect(posted.said).toBeNull();
+    expect(posted.lines.map((x) => x.kind)).toEqual(["call"]);
+    expect(turnOpener(turnItems(said), "Vou pedir pro Joshua").said).toBe("Vou pedir pro Josh");
   });
 
-  test("one block at a time: the first at work, plus any stopped one (the order on screen never changes)", () => {
-    const runs = [run({ runId: "a" }), run({ runId: "b", text: "Ontem" }), run({ runId: "c", status: "canceled" })];
-    expect(openingRuns(runs).map((r) => r.runId)).toEqual(["a", "c"]);
+  test("every agent at work has its block; the ones waiting for words go last, each group in its order", () => {
+    const runs = [
+      run({ runId: "a" }),
+      run({ runId: "b", text: "Ontem" }),
+      run({ runId: "c", status: "canceled" }),
+      run({ runId: "d", work: [call("1", "sentry_list_issues", true)] }),
+    ];
+    expect(turnOrder(runs).map((r) => r.runId)).toEqual(["b", "c", "a", "d"]);
+  });
+
+  test("the waiting row's pixels light up in turn, 2px up, stepped; still at 60% with Reduce Motion", () => {
+    const at = (t: number) => [0, 1, 2].map((i) => waitDot(t, i));
+    expect(at(0)).toEqual([
+      { opacity: 1, lift: -2 },
+      { opacity: 0.3, lift: 0 },
+      { opacity: 0.3, lift: 0 },
+    ]);
+    expect(at(0.25).map((d) => d.opacity)).toEqual([0.6, 1, 0.3]);
+    expect(at(0.45).map((d) => d.opacity)).toEqual([0.3, 0.6, 1]);
+    expect(at(1.2)).toEqual(at(0));
+    expect(waitDot(0, 0, true)).toEqual({ opacity: 0.6, lift: 0 });
   });
 
   test("a stopped run's call that was running shows as stopped", () => {
@@ -1126,6 +1219,20 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(secretWhere(pt, { ...request, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
       "Vai para o arquivo .npmrc no computador de Theo.",
     );
+    // Asked again under a name the agent holds (a key that was refused): the card says it replaces that one.
+    const again = { ...request, name: "TYPESAFE_API_KEY", target: { kind: "env" as const }, replaces: true };
+    expect(secretWhere(pt, again, "Theo")).toBe(
+      "Vai como a variável TYPESAFE_API_KEY no computador de Theo. Substitui a chave com esse nome que Theo já tem.",
+    );
+    expect(secretWhere(en, again, "Theo")).toBe(
+      "Goes in as the variable TYPESAFE_API_KEY on Theo's computer. Replaces the key Theo already has under this name.",
+    );
+    // Answered or closed, nothing is being replaced: the details say only where it goes.
+    for (const status of ["delivered", "declined", "expired"] as const) {
+      expect(secretWhere(pt, { ...again, status }, "Theo")).toBe(
+        "Vai como a variável TYPESAFE_API_KEY no computador de Theo.",
+      );
+    }
   });
 
   test("an empty or too large value is caught before it is sealed", async () => {

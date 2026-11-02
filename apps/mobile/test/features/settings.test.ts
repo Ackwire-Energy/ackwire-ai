@@ -78,6 +78,7 @@ const preparing = (): SetupView =>
 describe("the workspace's settings on the phone: who opens what (the web's sub-nav)", () => {
   test("in the web's order and groups", () => {
     expect(SETTINGS_SECTIONS.map((s) => `${s.group}:${s.id}`)).toEqual([
+      "you:apps",
       "org:general",
       "org:members",
       "org:audit",
@@ -99,9 +100,19 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     const all = ["read", "invite_people", "view_audit", "manage_agents", "configure", "create_agents"];
     expect(visibleSections(as("owner", all)).length).toBe(SETTINGS_SECTIONS.length);
     // Membros is everyone's, as on the web: a member who may not invite suggests someone there (ADR 0090).
-    expect(ids(["read", "post"])).toEqual(["general", "members", "media", "connectors", "computers", "usage", "keys"]);
+    expect(ids(["read", "post"])).toEqual([
+      "apps",
+      "general",
+      "members",
+      "media",
+      "connectors",
+      "computers",
+      "usage",
+      "keys",
+    ]);
     const agents = ids(["read", "manage_agents"]);
     expect(agents).toEqual([
+      "apps",
       "general",
       "members",
       "media",
@@ -115,7 +126,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     expect(ids(["read", "view_audit"])).toContain("audit");
     expect(ids(["read", "create_agents"])).toContain("import");
     expect(ids(["read", "configure"])).toContain("storage");
-    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["general", "media", "connectors", "usage"]);
+    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["apps", "general", "media", "connectors", "usage"]);
   });
 
   test("each section opens a screen the app has", () => {

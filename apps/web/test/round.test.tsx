@@ -66,6 +66,18 @@ describe("sidebar: no agent twice", () => {
   });
 });
 
+/** Canais' + → Novo canal. */
+const newChannel = async () => {
+  const plus = within(nav()).getByRole("button", { name: "Novo canal ou categoria" });
+  await act(async () => {
+    fireEvent.keyDown(plus, { key: "Enter" });
+    fireEvent.keyUp(plus, { key: "Enter" });
+  });
+  await settle(2);
+  await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Novo canal" }));
+  await settle(2);
+};
+
 describe("Criar canal", () => {
   /** Opens "Criar canal" in a workspace with `count` agents. */
   const openWith = async (count: number) => {
@@ -75,7 +87,7 @@ describe("Criar canal", () => {
       state.agents.push({ ...first, id: `agent-${i}`, name: `Agente ${i}`, handle: `agente${i}` });
     }
     await go(`c/${ENG_ID}`, state);
-    await click(within(nav()).getByRole("button", { name: "Criar canal" }));
+    await newChannel();
     return screen().getByRole("dialog", { name: "Criar canal" });
   };
   const sheet = (path: string) => Bun.file(join(import.meta.dir, path)).text();
@@ -137,7 +149,7 @@ describe("Criar canal", () => {
 
   test("dialog from the '+': validates, picks initial members, creates and opens the channel", async () => {
     const { state, router } = await go(`c/${ENG_ID}`);
-    await click(within(nav()).getByRole("button", { name: "Criar canal" }));
+    await newChannel();
     const dialog = screen().getByRole("dialog", { name: "Criar canal" });
     const name = within(dialog).getByLabelText("Nome");
     await type(name, "eng");
@@ -352,7 +364,7 @@ describe("models by provider and the default key", () => {
     ]);
     const gpt = within(models).getByRole("button", { name: /GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
-    expect(gpt.textContent).toContain("Precisa de uma chave da OpenAI");
+    expect(gpt.textContent).toContain("Precisa de uma chave de API OpenAI");
     const key = screen().getByRole("combobox", { name: "Chave" });
     expect(key.textContent).toContain("Chave padrão do workspace");
   });
@@ -600,7 +612,7 @@ describe("flat DM replies", () => {
     const composer = screen().getByRole("combobox", { name: /Mensagem para/ });
     await act(async () => fireEvent.change(composer, { target: { value: "oi" } }));
     await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
-    expect(document.querySelector(".ac-typing__text")?.textContent).toBe("Ada está trabalhando…");
+    expect(document.querySelector(".ac-typing__text")?.textContent).toBe("Ada");
     await settle(4);
     const dm = state.dms[0];
     await act(async () =>

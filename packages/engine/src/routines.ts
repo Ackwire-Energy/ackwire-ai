@@ -18,7 +18,7 @@ import {
 import { getAgent } from "./agents";
 import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceError, canTalkTo, talksToAgents } from "./audience";
+import { audienceError, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
 import { brainOf } from "./brain-settings";
 import type { BrainKind } from "./brains/types";
@@ -60,7 +60,6 @@ import {
   liveHookUrl,
   type RoutineHookConfig,
   routineHookKeys,
-  testOnlyEvent,
   WEBHOOK_EVENT,
 } from "./routine-hooks";
 import { afterRoutineRunEnded, endRoutineRun } from "./routine-ledger";
@@ -78,7 +77,13 @@ import {
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { standingRefusal } from "./standing";
-import { USAGE_WAIT_CODES } from "./usage-pause";
+import {
+  assertMayContinuePause,
+  overrideUsagePause,
+  type PastPlanReason,
+  pauseContinuesPastPlan,
+  USAGE_WAIT_CODES,
+} from "./usage-pause";
 
 export { startRoutineRun } from "./routine-room";
 
@@ -240,6 +245,7 @@ export type RoutineState =
   | "running"
   | "waiting_computer"
   | "waiting_person"
+  | "usage_paused"
   | "failing"
   | "needs_webhook";
 
@@ -262,6 +268,13 @@ export interface RoutineView {
   state: RoutineState;
   /** Its run waits for the agent's computer since then. */
   waitingFor: { machineId: string; machineName: string; since: string } | null;
+  /**
+   * Its run paused near its plan's or budget's limit (ADR 0118, `usage_paused`): it picks up at `resetsAt` (null:
+   * not known yet). `extraOff`: a plan pause whose window is used up, on an agent whose switch keeps long work
+   * off paid extra usage, so Continuar agora is refused (`pauseContinuesPastPlan`); `extraUsedUp`: the same with the
+   * switch on but no extra usage left. Who may press it: `canManage`.
+   */
+  usagePause: { source: "plan" | "budget"; resetsAt: string | null; extraOff: boolean; extraUsedUp: boolean } | null;
   /** Where it thinks: the agent's brain and, for a computer brain, the computer's name. */
   brain: { kind: BrainKind; machineName: string | null };
   /**
@@ -295,6 +308,8 @@ export interface RoutineInput {
   access?: RoutineAccess;
   /** When it speaks (default `when_new`). */
   report?: RoutineReport;
+  /** Created paused: no next run, so the active-routine cap doesn't apply. */
+  paused?: boolean;
 }
 
 export type RoutineTriggerInput =
@@ -394,6 +409,11 @@ type AgentRunInfo = {
   waitingMachineId: string | null;
   /** What it waits on when that's its plan's limit or its budget (`USAGE_WAIT_CODES`). */
   waitingCode: string | null;
+  /** A long-work pause's (`usage_pause`): on what and when the limit resets. */
+  waitSource: string | null;
+  resetsAt: string | null;
+  /** Continuar agora was pressed on it: back at work as soon as its job runs. */
+  continued: boolean;
   updatedAt: Date;
 };
 
@@ -408,6 +428,15 @@ const agentWaiting = (a: AgentRunInfo | undefined) =>
   a?.status === "waiting_approval" || (a?.status === "waiting_input" && !USAGE_WAIT_CODES.has(a.waitingCode ?? ""));
 /** Waiting for its computer (ADR 0032 §5), not for a person. */
 const agentAway = (a: AgentRunInfo | undefined) => a?.status === "waiting_input" && Boolean(a.waitingMachineId);
+/**
+ * Long work paused near a limit (ADR 0118), not continued, whose reset hasn't passed: continued or past its reset,
+ * its job picks it up any moment.
+ */
+const usagePausedAt = (a: AgentRunInfo, now: Date) =>
+  a.status === "waiting_input" &&
+  a.waitingCode === "usage_pause" &&
+  !a.continued &&
+  !(a.resetsAt && Date.parse(a.resetsAt) <= now.getTime());
 /**
  * Not an email run held for the next email (§6.8): that row stays queued with no job on purpose and is no
  * run yet, so no view shows it and it never makes a routine look busy.
@@ -462,6 +491,9 @@ async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<
           error: agentRuns.error,
           waitingMachineId: agentRuns.waitingMachineId,
           waitingCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+          waitSource: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
+          resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+          continued: sql<boolean>`(${agentRuns.transcript}->'usagePause'->'override') is not null`,
           updatedAt: agentRuns.updatedAt,
         })
         .from(agentRuns)
@@ -639,7 +671,7 @@ async function viewerRights(
   return out;
 }
 
-const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex"];
+const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor"];
 const brainKindOf = (v: unknown): BrainKind => (BRAINS.includes(v as BrainKind) ? (v as BrainKind) : "model");
 
 /** Who paid the week: a computer brain's plan, the API, or both; no usage yet: what its brain would bill. */
@@ -721,7 +753,11 @@ async function views(
       .where(inWeek)
       .groupBy(routineRuns.routineId),
     db
-      .select({ id: agents.id, brain: agents.brain, machineId: agents.machineId })
+      .select({
+        id: agents.id,
+        brain: agents.brain,
+        machineId: agents.machineId,
+      })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), inArray(agents.id, [...new Set(rows.map((r) => r.agentId))]))),
     lookup(wantedHooks, () =>
@@ -765,6 +801,13 @@ async function views(
       if (rights.get(routineId)?.manages) hookUrls.set(routineId, await liveHookUrl(db, hooks, hook));
     }
   }
+  // Paused plan runs Continuar agora would take past the plan with extra usage off: their button is greyed.
+  const pastPlan = new Map<string, PastPlanReason>();
+  for (const a of details.agentRuns.values()) {
+    if (a.waitSource === "budget" || !usagePausedAt(a, now)) continue;
+    const reason = await pauseContinuesPastPlan(db, orgId, a.id);
+    if (reason) pastPlan.set(a.id, reason);
+  }
   return rows.map((r): RoutineView => {
     const right = rights.get(r.id) as ViewerRights;
     const lastRuns = recent.get(r.id) ?? [];
@@ -789,6 +832,16 @@ async function views(
           since: away.updatedAt.toISOString(),
         }
       : null;
+    const agent = agentById.get(r.agentId);
+    const paused = openAgents.find((a) => usagePausedAt(a, now));
+    const usagePause = paused
+      ? {
+          source: paused.waitSource === "budget" ? ("budget" as const) : ("plan" as const),
+          resetsAt: paused.resetsAt,
+          extraOff: pastPlan.get(paused.id) === "extra_off",
+          extraUsedUp: pastPlan.get(paused.id) === "extra_used_up",
+        }
+      : null;
     const hook = webhookOf(r);
     // A run at work says what it does first (a manual run of a paused routine, a one-off's run after it
     // fired: both inactive, both stoppable); paused, unable to run, failing or active only when nothing is at work.
@@ -796,15 +849,17 @@ async function views(
       ? "waiting_computer"
       : openAgents.some(agentWaiting)
         ? "waiting_person"
-        : open.length > 0
-          ? "running"
-          : !r.active
-            ? "paused"
-            : hook && !hooked.has(hook)
-              ? "needs_webhook"
-              : r.failuresInRow > 0
-                ? "failing"
-                : "active";
+        : usagePause
+          ? "usage_paused"
+          : open.length > 0
+            ? "running"
+            : !r.active
+              ? "paused"
+              : hook && !hooked.has(hook)
+                ? "needs_webhook"
+                : r.failuresInRow > 0
+                  ? "failing"
+                  : "active";
     const outcomes = new Map<string, number>();
     let started = 0;
     for (const w of week.get(r.id) ?? []) {
@@ -822,7 +877,6 @@ async function views(
       skipped: count("skipped") + count("superseded"),
       missed: count("missed"),
     };
-    const agent = agentById.get(r.agentId);
     const kind = brainKindOf(agent?.brain);
     const used = usageOf.get(r.id);
     const hookKey = hookKeys.get(r.id);
@@ -842,6 +896,7 @@ async function views(
       failuresInRow: r.failuresInRow,
       state,
       waitingFor,
+      usagePause,
       brain: {
         kind,
         machineName: kind !== "model" && agent?.machineId ? (machineName.get(agent.machineId) ?? null) : null,
@@ -872,7 +927,9 @@ export async function getRoutineView(
   hooks?: RoutineHookConfig,
 ) {
   await requirePermission(db, actorId, orgId, "read");
-  const [view] = await views(db, [await loadRoutine(db, orgId, id)], actorId, hooks);
+  const row = await loadRoutine(db, orgId, id);
+  if (!(await routineSeer(db, orgId, actorId))(row)) throw new NotFoundError("Routine not found");
+  const [view] = await views(db, [row], actorId, hooks);
   return view as RoutineView;
 }
 
@@ -1124,13 +1181,13 @@ export async function createRoutine(
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // A routine asks the agent on its creator's behalf: only people who can talk to it create one.
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
   await checkTarget(db, orgId, agent.id, input.target, actorId);
   const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
   checkFrequency(trigger, input.target);
-  if (startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
+  if (!input.paused && startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
   if (input.trigger.type === "email") await checkWatchable(db, orgId, agent.id, input.trigger.accountId);
   const hooks = input.trigger.type === "webhook" ? hooksOf(deps) : null;
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Routine";
@@ -1143,6 +1200,7 @@ export async function createRoutine(
       prompt,
       target: input.target as unknown as Record<string, unknown>,
       ...trigger,
+      ...(input.paused ? { active: false, nextRunAt: null } : {}),
       access: routineAccessOf(input.access),
       report: routineReportOf(input.report),
       createdByUserId: actorId,
@@ -1176,7 +1234,39 @@ export async function listRoutines(db: Database, actorId: string, orgId: string,
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
-  return views(db, rows, actorId, hooks);
+  const sees = await routineSeer(db, orgId, actorId);
+  return views(db, rows.filter(sees), actorId, hooks);
+}
+
+/**
+ * Whether `viewerId` sees a routine at all (its name, schedule, runs): who manages it (its creator, admins, the
+ * agent's owner), who manages agents, or who the agent answers. The agents list's own rule (`listsAgent` in the
+ * apps), so an agent hidden from someone doesn't show through its routines on Início, Rotinas or the calendar.
+ */
+export async function routineSeer(
+  db: Database,
+  orgId: string,
+  viewerId: string,
+): Promise<(r: Pick<RoutineRow, "agentId" | "createdByUserId">) => boolean> {
+  const [membership, agentRows] = await Promise.all([
+    getMembership(db, viewerId, orgId),
+    db
+      .select({
+        id: agents.id,
+        ownerUserId: agents.ownerUserId,
+        audienceMode: agents.audienceMode,
+        audienceUserIds: agents.audienceUserIds,
+        audienceRoleIds: agents.audienceRoleIds,
+        consultable: agents.consultable,
+        brain: agents.brain,
+      })
+      .from(agents)
+      .where(eq(agents.orgId, orgId)),
+  ]);
+  if (can(membership, "manage_routines") || can(membership, "manage_agents")) return () => true;
+  const talks = speakerOf(membership);
+  const listed = new Set(agentRows.filter((a) => canTalkTo(a, viewerId, talks)).map((a) => a.id));
+  return (r) => r.createdByUserId === viewerId || listed.has(r.agentId);
 }
 
 /**
@@ -1273,7 +1363,7 @@ export async function updateRoutine(
   }
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (set.agentId && !canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId)))
+  if (set.agentId && !canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId)))
     throw await audienceError(db, agent);
   if (patch.name !== undefined) {
     const name = patch.name.trim().slice(0, 120);
@@ -1292,15 +1382,11 @@ export async function updateRoutine(
   }
   if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
   if (patch.report !== undefined) set.report = routineReportOf(patch.report);
-  // A routine set to act reaches what its creator reaches (their rooms, the agents they talk to), so
-  // only its creator may decide what it does with that; anyone else takes it over first.
-  const access = set.access ?? current.access;
+  // A routine reaches what its creator reaches (their rooms, the agents they talk to), so only its
+  // creator may decide what it does with that; anyone else takes it over first.
   if (
     actorId !== current.createdByUserId &&
-    access === "act" &&
-    (access !== current.access ||
-      (set.prompt !== undefined && set.prompt !== current.prompt) ||
-      set.agentId !== undefined)
+    ((set.prompt !== undefined && set.prompt !== current.prompt) || set.agentId !== undefined)
   ) {
     throw new ForbiddenError("Take the routine over before setting what it does as it acts", "routine.act_take_over");
   }
@@ -1353,10 +1439,10 @@ export async function updateRoutine(
     .where(and(eq(routines.id, current.id), eq(routines.orgId, orgId)))
     .returning();
   if (!row) throw new NotFoundError("Routine not found");
-  // What was approved ahead covered its next run at that time, for that agent, while it may act: a run moved or
-  // gone (paused: a one-off resumed never fires again), another agent or only looking needs a new approval.
+  // What was approved ahead covered its next run at that time, for that agent: a run moved or gone (paused: a
+  // one-off resumed never fires again) or another agent needs a new approval.
   const moved = current.nextRunAt?.getTime() !== row.nextRunAt?.getTime();
-  if (moved || row.agentId !== current.agentId || (row.access !== "act" && current.access === "act")) {
+  if (moved || row.agentId !== current.agentId) {
     await cancelRoutineAhead(deps, orgId, row.id, actorId);
   }
   if (mailTrigger || watched.has(current.id)) {
@@ -1438,7 +1524,7 @@ export async function duplicateRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   // Whoever copies it becomes its creator: they must be able to post where it reports.
   await checkTarget(db, orgId, agent.id, targetOf(current), actorId);
   const { id: _id, createdAt: _c, updatedAt: _u, lastRunAt: _l, deletedAt: _d, ...copy } = current;
@@ -1545,6 +1631,7 @@ export async function listRoutineRuns(
 ): Promise<RoutineRunView[]> {
   await requirePermission(db, actorId, orgId, "read");
   const routine = await loadRoutine(db, orgId, id, { deleted: true });
+  if (!(await routineSeer(db, orgId, actorId))(routine)) throw new NotFoundError("Routine not found");
   const [runs, rights] = await Promise.all([
     db
       .select()
@@ -1715,7 +1802,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const agent = await getAgent(db, routine.orgId, routine.agentId);
   if (!agent || agent.archivedAt) return paused("agent_archived");
   // Its creator can no longer talk to the agent.
-  if (!canTalkTo(agent, creator, can(membership, "talk_to_agents"))) return paused("audience");
+  if (!canTalkTo(agent, creator, speakerOf(membership))) return paused("audience");
   const once = routine.triggerType === "once";
   // It ran: a one-off is done (it stays listed, inactive).
   const ran = async () => {
@@ -1839,7 +1926,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     name: routine.name,
     creatorUserId: creator,
     deliverTo,
-    access: testOnlyEvent(run.event) ? "read" : routineAccessOf(routine.access),
+    access: routineAccessOf(routine.access),
     report: routineReportOf(routine.report),
     trigger: run.trigger,
     dueAt: run.at.toISOString(),
@@ -1883,6 +1970,55 @@ export async function stopRoutineRun(
 }
 
 /**
+ * Continuar agora on a routine paused near its plan's or budget's limit (ADR 0118): its creator, admins or the
+ * agent's owner (as for stopping it). The run goes on now past the pause line until that window resets, up to the
+ * plan's own allowance; going past it with extra usage off is refused with that reason (`assertMayContinuePause`, the
+ * card's rule too). Nothing is posted where it reports. Once: a second press, or the run already picked up, does nothing.
+ */
+export async function continueRoutineUsagePause(
+  deps: { db: Database },
+  actorId: string,
+  orgId: string,
+  routineId: string,
+): Promise<{ continued: boolean }> {
+  const { db } = deps;
+  const routine = await loadRoutine(db, orgId, routineId);
+  await requireRoutineEditor(db, actorId, orgId, routine);
+  const [paused] = await db
+    .select({
+      runId: agentRuns.id,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      source: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
+      resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+    })
+    .from(routineRuns)
+    .innerJoin(agentRuns, eq(agentRuns.id, routineRuns.agentRunId))
+    .where(
+      and(
+        eq(routineRuns.orgId, orgId),
+        eq(routineRuns.routineId, routine.id),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'usage_pause'`,
+      ),
+    )
+    .orderBy(desc(routineRuns.createdAt))
+    .limit(1);
+  if (!paused?.waitId) return { continued: false };
+  await assertMayContinuePause(db, orgId, paused.runId, "routine");
+  const continued = await db.transaction((tx) =>
+    overrideUsagePause(tx, {
+      orgId,
+      runId: paused.runId,
+      waitId: paused.waitId as string,
+      until: paused.resetsAt,
+      userId: actorId,
+      details: { routineId: routine.id, source: paused.source ?? "plan" },
+    }),
+  );
+  return { continued };
+}
+
+/**
  * Take over (§6.2): an admin or the agent's owner becomes the routine's creator (the one it reports
  * for and who hears about it), after the same checks as creating it: they can talk to the agent and
  * post where it reports. Why it paused itself is cleared; resuming stays a separate choice.
@@ -1898,7 +2034,7 @@ export async function takeOverRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   const target = targetOf(current);
   if (
     (target.type === "channel" || target.type === "conversation") &&
@@ -1983,7 +2119,7 @@ export async function createReminder(
   const membership = await requirePermission(db, requesterId, orgId, "post");
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, requesterId, can(membership, "talk_to_agents"))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, requesterId, speakerOf(membership))) throw await audienceError(db, agent);
   const message = input.message.trim().slice(0, 2000);
   if (!message) throw new ValidationError("Say what to remind", "reminder.text_required");
   if (input.forUserId && input.forUserId !== requesterId) {
@@ -2010,8 +2146,7 @@ export async function createReminder(
       prompt: message,
       target: target as unknown as Record<string, unknown>,
       triggerType: "once",
-      // Asked to do something at that time, not only to look and tell (ADR 0053, addendum of 2026-10-31).
-      ...(input.askAgent ? { access: "act" } : {}),
+      access: "act",
       timezone: input.timezone,
       description: input.description,
       nextRunAt: input.at,
@@ -2158,7 +2293,7 @@ export async function createReminderFromApp(
   } else if (message?.authorType === "agent" && message.authorAgentId && here.includes(message.authorAgentId)) {
     agentId = message.authorAgentId;
   } else {
-    const talks = await talksToAgents(db, orgId, requesterId);
+    const talks = await speakerFor(db, orgId, requesterId);
     for (const id of here) {
       const agent = await getAgent(db, orgId, id);
       if (agent && !agent.archivedAt && canTalkTo(agent, requesterId, talks)) {

@@ -555,6 +555,11 @@ export function createMockPlanning(
         c.done = done;
         return clone(i);
       },
+      share: async (orgId, id) => {
+        const i = await findIssue(orgId, id);
+        i.channelId = null;
+        return clone(i);
+      },
       activity: async (orgId, id) => clone((await store(orgId)).activity.get(id) ?? []),
       comment: async (orgId, id, text) =>
         clone(await log(orgId, await findIssue(orgId, id), { kind: "comment", author: await me(), text: text.trim() })),
@@ -660,7 +665,7 @@ export function createMockPlanning(
           active: true,
           nextRunAt: trigger.type === "schedule" ? (nextCronRun(trigger.cron, ctx.now())?.toISOString() ?? null) : null,
           createdAt: ctx.now().toISOString(),
-          access: input.access ?? "read",
+          access: "act",
           report: input.report ?? "when_new",
         };
         s.routines.push(r);
@@ -673,7 +678,6 @@ export function createMockPlanning(
         if (patch.prompt !== undefined) r.prompt = patch.prompt;
         if (patch.agentId !== undefined) r.agentId = patch.agentId;
         if (patch.target !== undefined) r.target = patch.target;
-        if (patch.access !== undefined) r.access = patch.access;
         if (patch.report !== undefined) r.report = patch.report;
         if (patch.active !== undefined) setActive(r, patch.active);
         if (patch.trigger?.type === "schedule") r.trigger = scheduleOf(patch.trigger);
@@ -751,6 +755,12 @@ export function createMockPlanning(
       takeOver: async (orgId, id) => {
         record("routines.takeOver", id);
         const r = await findRoutine(orgId, id);
+        return clone(r);
+      },
+      continueUsage: async (orgId, id) => {
+        record("routines.continueUsage", id);
+        const r = await findRoutine(orgId, id);
+        if (r.state === "usage_paused") Object.assign(r, { state: "running", usagePause: null });
         return clone(r);
       },
       runs: async (orgId, id) => {

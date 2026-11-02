@@ -59,7 +59,7 @@ export function AgentUsageScreen({ agentId }: { agentId: string }) {
   }
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("usageViews.agent.title", agentGrammar(t, name))} solid={false} grouped />
+      <PushedHeader title={t("usageViews.agent.title", agentGrammar(name))} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
@@ -91,7 +91,7 @@ export function AgentUsageScreen({ agentId }: { agentId: string }) {
 
 function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tones: Map<string, string> }) {
   const { t, i18n } = useTranslation();
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const month = formatMonth(i18n.language, new Date(`${data.month}-15T12:00:00`));
   const total = (d: { tokens: Record<string, number> }) => Object.values(d.tokens).reduce((a, b) => a + b, 0);
   const max = Math.max(1, ...data.days.map(total));
@@ -125,11 +125,11 @@ function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tone
               tokens: formatTokensShort(t, i18n.language, data.tokens),
               parts: joinNames(
                 used.map((s) => usageSourcePart(t, i18n.language, s)),
-                t("usageViews.and"),
+                t,
               ),
             })}
             {typeof data.equivalentUsd === "number" && data.equivalentUsd > 0
-              ? ` ${t("usageViews.agent.equivalent", { amount: formatUsd(t, i18n.language, data.equivalentUsd) })}`
+              ? ` ${t("usageViews.agent.equivalent", { amount: formatUsd(i18n.language, data.equivalentUsd) })}`
               : ""}
           </Text>
           <UsageDays
@@ -156,7 +156,7 @@ function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tone
 function Now({ data, agentId, name }: { data: AgentPlanUsage; agentId: string; name: string }) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const current = data.current;
   if (!current) return null;
   // Who else thinks with it now; one that used it earlier this month only counts in the windows' parts.
@@ -171,9 +171,7 @@ function Now({ data, agentId, name }: { data: AgentPlanUsage; agentId: string; n
     >
       <AccountHead
         account={current}
-        extra={
-          others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t("usageViews.and")) }) : null
-        }
+        extra={others.length ? t("usageViews.agent.sharedWith", { names: joinNames(others, t) }) : null}
       />
       {current.usage ? (
         <PlanMeter
@@ -211,7 +209,7 @@ function BySource({
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   return (
     <UsageCard icon="drive" title={t("usageViews.agent.byAccount")}>
       <View>
@@ -225,12 +223,12 @@ function BySource({
           const money =
             s.type === "api"
               ? s.costUsd !== undefined
-                ? t("usageViews.paid", { amount: formatUsd(t, i18n.language, s.costUsd) })
+                ? t("usageViews.paid", { amount: formatUsd(i18n.language, s.costUsd) })
                 : s.budgetPercent !== undefined
                   ? t("usageViews.budgetShare", { percent: formatPercent(i18n.language, s.budgetPercent) })
                   : null
               : typeof s.equivalentUsd === "number"
-                ? t("usageViews.equivalent", { amount: formatUsd(t, i18n.language, s.equivalentUsd) })
+                ? t("usageViews.equivalent", { amount: formatUsd(i18n.language, s.equivalentUsd) })
                 : t("usageViews.agent.ofMonth", { percent: formatPercent(i18n.language, s.share) });
           return (
             <View

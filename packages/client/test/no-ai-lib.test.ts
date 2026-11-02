@@ -23,6 +23,7 @@ import {
   type PlanChoice,
   type PlanGate,
   planGate,
+  planOfAccount,
   planOfKind,
   signInAgainPlan,
   signsInOnce,
@@ -63,6 +64,7 @@ const brain = (over: Partial<AgentBrain> = {}): AgentBrain => ({
   model: null,
   effectiveModel: null,
   fallback: true,
+  extraUsage: true,
   computer: { machineId: "m1", name: "MacBook", online: true },
   options: [option("claude_code"), option("codex")],
   machines: [],
@@ -242,11 +244,12 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(firstAgent([], () => false)).toBeUndefined();
   });
 
-  test("Claude, ChatGPT, then the coding plans; ChatGPT alone signs in through Codex", () => {
-    expect(PLAN_CHOICES).toEqual(["claude", "chatgpt", "zai", "kimi", "minimax", "opencode"]);
+  test("Claude, ChatGPT, Cursor, then the coding plans; ChatGPT signs in through Codex, Cursor through its own CLI", () => {
+    expect(PLAN_CHOICES).toEqual(["claude", "chatgpt", "cursor", "zai", "kimi", "minimax", "opencode"]);
     expect(PLAN_CHOICES.map((c: PlanChoice) => kindOf(c))).toEqual([
       "claude_code",
       "codex",
+      "cursor",
       "claude_code",
       "claude_code",
       "claude_code",
@@ -257,7 +260,7 @@ describe("the agent a plan starts on, and the order of the plans", () => {
 
 describe("All agents: one login per agent, the key pasted once", () => {
   test("Claude and the coding plans sign in once per agent; ChatGPT stays one agent per account", () => {
-    expect(LOGIN_PER_AGENT).toEqual({ claude_code: true, codex: false, key: true });
+    expect(LOGIN_PER_AGENT).toEqual({ claude_code: true, codex: false, cursor: false, key: true });
     expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(["claude", "zai", "kimi", "minimax", "opencode"]);
   });
 
@@ -459,5 +462,20 @@ describe("a card whose plan's sign-in ended", () => {
       "chat.body.no_ai_not_signed_in:Claude Code",
     );
     expect(serverBody(t, "…", own("gemini"))).toBe("chat.body.no_ai_signed_out:");
+  });
+});
+
+describe("Cursor (ADR 0114): a plan of its own, signed in through its CLI", () => {
+  test("its accounts and agents read as Cursor's plan, one agent per sign-in, and a signed-out CLI names Cursor", () => {
+    expect(planOfKind("cursor")).toBe("cursor");
+    expect(planOfAccount({ kind: "cursor", provider: null })).toBe("cursor");
+    // An account made with a Cursor API key is still Cursor's plan.
+    expect(planOfAccount({ kind: "cursor", provider: "cursor" })).toBe("cursor");
+    expect(agentAi({ brain: { kind: "cursor", model: null } }, "ready")).toBe("cursor");
+    expect(signsInPerAgent("cursor")).toBe(false);
+    const t = ((key: string, o?: { brain?: string }) => `${key}:${o?.brain ?? ""}`) as unknown as TFunction;
+    expect(serverBody(t, "…", { bodyCode: "no_ai", noAi: { reason: "not_signed_in", own: "cursor" } })).toBe(
+      "chat.body.no_ai_not_signed_in:Cursor",
+    );
   });
 });

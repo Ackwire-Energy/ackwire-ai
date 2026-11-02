@@ -71,6 +71,8 @@ export async function resumeRunWithResult(
     late?: Omit<Notice, "refs">;
     /** Publishes a late notice (none: written only; the agent reads it all the same). */
     pubsub?: PubSub;
+    /** Only a run still waiting on it: no late notice (the agent itself ended the wait, nothing to tell it). */
+    waitingOnly?: boolean;
   },
 ): Promise<{ runId: string; notice?: Message } | null> {
   const resumed = await db.transaction(async (tx) => {
@@ -80,6 +82,7 @@ export async function resumeRunWithResult(
     const waiting = row.status === "waiting_input" || row.status === "waiting_approval";
     const call = waiting ? t?.pending?.calls.find((c) => c.waitId === input.waitId && !c.result) : undefined;
     if (!t || !call) {
+      if (input.waitingOnly) return null;
       // Not waiting on it (anymore): a wait it stopped waiting on gets its result as a notice, once.
       const detached = t?.detachedWaits?.find((d) => d.waitId === input.waitId);
       if (!detached || (await lateNoticeSent(tx, row, input.waitId))) return null;
@@ -242,7 +245,7 @@ export async function resumeRunsWaitingForMachine(
         eq(agentRuns.waitingMachineId, machineId),
         eq(agentRuns.status, "waiting_input"),
         // The computer coming back says nothing about a plan's limit or a budget.
-        sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget')`,
+        sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget', 'usage_pause')`,
       ),
     )
     .limit(200);

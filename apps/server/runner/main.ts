@@ -31,7 +31,9 @@ import {
 } from "./browser-bind-check";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import { browserPortsForUid } from "./browser-ports";
+import { computerNow } from "./computer-now";
 import {
+  accessToStore,
   configPath,
   DEFAULT_AGENT_UID_RANGE,
   effectiveAccess,
@@ -115,6 +117,9 @@ Usage:
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
       The connection, the service, and whether the agents' desktops and the terminal can run here.
+  agentes-runner computer
+      What this computer has, what is free now, and which agents use the most of it (they share it).
+      Agents run it before something heavy.
   agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...]
       Folders agents may use besides their own (an agent's handle, as on the site).
   agentes-runner tools [list | enable <tool> | disable <tool>]
@@ -319,7 +324,7 @@ async function pair(p: Parsed): Promise<number> {
     grant,
     workspace: workspaceReal,
     ...(name ? { name } : {}),
-    tools: { claude: exec, codex: exec, commands: exec },
+    tools: { claude: exec, codex: exec, cursor: exec, commands: exec },
     desktop: false,
   });
   writeConfig(next, home);
@@ -781,7 +786,7 @@ function pairedOrExit(home: string) {
 }
 
 function saveAccess(home: string, access: ReturnType<typeof effectiveAccess>) {
-  updateConfig((c) => ({ ...c, access, exec: access.tools.commands }), home);
+  updateConfig((c) => ({ ...c, access: accessToStore(c, access), exec: access.tools.commands }), home);
 }
 
 /** What `--agent <handle>` says when no agent by that handle uses this computer. */
@@ -884,6 +889,7 @@ function tools(p: Parsed): number {
   const label: Record<keyof RunnerTools, string> = {
     claude: "Claude Code",
     codex: "Codex",
+    cursor: "Cursor",
     commands: "Commands",
     browser: "Browser",
     desktop: "Desktops (each agent's own screen, watched and controlled from the app)",
@@ -1235,6 +1241,9 @@ async function main(argv: string[]): Promise<number> {
       return app();
     case "status":
       return status();
+    case "computer":
+      console.log(await computerNow());
+      return 0;
     case "folders":
       return folders(p);
     case "tools":

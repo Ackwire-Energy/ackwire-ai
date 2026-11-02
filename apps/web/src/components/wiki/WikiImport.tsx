@@ -403,7 +403,7 @@ export function WikiImportDialog({
             ? t("wiki.import.agentsRead", {
                 names: joinNames(
                   agents.map((a) => a.name),
-                  t("wiki.import.and"),
+                  t,
                 ),
                 count: agents.length,
               })

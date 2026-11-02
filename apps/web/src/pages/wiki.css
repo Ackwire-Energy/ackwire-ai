@@ -133,6 +133,51 @@ html:not([data-pointer]) .wiki-row:focus-visible {
 .wiki-row__car {
   transition: transform 0.2s var(--out);
 }
+/* A row of "Quem vê": who, and what they may do. */
+.wiki-access-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wiki-access-row .scope-row {
+  flex: 1;
+  min-width: 0;
+}
+/* A folder's "Quem vê": on hover, and always once the folder is limited. */
+.wiki-folder-row {
+  position: relative;
+}
+.wiki-folder-row__act {
+  position: absolute;
+  top: 5px;
+  right: 30px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  opacity: 0;
+}
+button.wiki-folder-row__act {
+  cursor: pointer;
+}
+button.wiki-folder-row__act:hover {
+  color: var(--ink2);
+}
+.wiki-folder-row:hover .wiki-folder-row__act,
+.wiki-folder-row__act:focus-visible,
+.wiki-folder-row__act[data-on] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .wiki-folder-row__act {
+    opacity: 1;
+  }
+}
 .wiki-row[aria-expanded="false"] .wiki-row__car {
   transform: rotate(-90deg);
 }
@@ -194,7 +239,7 @@ html:not([data-pointer]) .wiki-tag:focus-visible {
   align-items: center;
   gap: 10px;
   margin-top: auto;
-  padding: 10px 12px;
+  padding: 12px;
   border: 0;
   border-radius: 14px;
   background: var(--raised);
@@ -939,7 +984,7 @@ a.wiki-embed:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 14px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);

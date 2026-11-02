@@ -13,6 +13,8 @@ import {
   BROWSER_TOOL_SCOPE,
   DESKTOP_TOOL_SCOPE,
   keys,
+  profilesApply,
+  profilesOfAgent,
   useAgentBrain,
   useAgentBrowserSettings,
   useAgentScopes,
@@ -20,6 +22,8 @@ import {
   useAiAccounts,
   useAiStatus,
   useApi,
+  useBrowserProfileMutations,
+  useBrowserProfiles,
   useComputer,
   useCredentials,
   useMachines,
@@ -59,7 +63,7 @@ import {
 } from "@agenteschat/client/lib/brain-advanced";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
-import { firstName, lowerFirst } from "@agenteschat/client/lib/format";
+import { firstName } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
   commandInReason,
@@ -87,7 +91,7 @@ import {
   planModel as planModelOf,
   planOf,
 } from "@agenteschat/client/lib/plans";
-import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
   BrainLogo,
@@ -115,6 +119,7 @@ import {
   SettingNote,
   Switch,
 } from "@agenteschat/ui";
+import { extraUsageOn } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
@@ -252,6 +257,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
     : kind === "model"
       ? "key"
       : planOfAccount({ kind, provider: agent.brain?.provider ?? null });
+  const keyProvider = apiProviderOf(saved.model, models.data?.models ?? []);
   const orgModel = isAuto(saved.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);
@@ -276,7 +282,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
-    !view || (kind !== "claude_code" && kind !== "codex")
+    !view || (kind !== "claude_code" && kind !== "codex" && kind !== "cursor")
       ? null
       : view.account
         ? view.accounts.find((a) => a.id === view.account)?.usage
@@ -288,9 +294,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const effort =
     kind !== "model" && view
       ? t("agentPage.work.cell.effort", {
-          level: t(
-            `agentPage.work.brain.efforts.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`,
-          ).toLowerCase(),
+          level: t(`agentPage.work.brain.effortsLower.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`),
         })
       : null;
   const target = work.target;
@@ -335,7 +339,15 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
             />
           ) : (
             <Cell
-              icon={ai === "key" ? <Icon name="brainAgent" size={16} /> : <ProviderLogo id={planMark(ai)} size="sm" />}
+              icon={
+                ai !== "key" ? (
+                  <ProviderLogo id={planMark(ai)} size="sm" />
+                ) : keyProvider ? (
+                  <ProviderLogo id={keyProvider} size="sm" />
+                ) : (
+                  <Icon name="brainAgent" size={16} />
+                )
+              }
               label={t("agentPage.work.cell.brain")}
               value={ai === "key" ? orgModel : planModel}
               more={ai === "key" ? null : effort}
@@ -677,6 +689,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const kind: BrainKind = card === "key" ? "model" : kindOf(card);
   const [planModel, setPlanModel] = useState<string | null>(view.effectiveModel);
   const [fallback, setFallback] = useState(view.fallback);
+  const [extraUsage, setExtraUsage] = useState(view.extraUsage);
   const [model, setModel] = useState(saved.model);
   const [key, setKey] = useState(saved.key ?? DEFAULT_KEY);
   const [account, setAccount] = useState<string | null>(view.account);
@@ -700,6 +713,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // "Atende outras pessoas" (ADR 0059 §5): moved onto a plan, the agent answers only its owner until they turn it on.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
   const offId = useId();
+  const extraId = useId();
   // Opening it is looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -726,7 +740,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const moves = home && home.machineId !== work.machineId ? home : null;
   const option = (home?.options ?? view.options).find((o) => o.kind === kind);
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
-  const accountKind = kind === "claude_code" || kind === "codex" ? kind : null;
+  const accountKind = kind === "claude_code" || kind === "codex" || kind === "cursor" ? kind : null;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
   const computerName = view.computer?.name ?? "";
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
@@ -749,6 +763,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     "key",
     "claude",
     "chatgpt",
+    // Cursor (ADR 0114) only where a computer here runs it, or the agent thinks with it: Connect an AI shows it always.
+    ...(savedCard === "cursor" ||
+    [view.options, ...machines.map((m) => m.options)].flat().some((o) => o.kind === "cursor" && o.available)
+      ? (["cursor"] as const)
+      : []),
     ...PLAN_IDS.filter(
       (p) => p === savedCard || allAccounts.some((a) => a.provider === p && (a.mine || a.id === view.account)),
     ),
@@ -839,6 +858,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const unchanged =
     card === savedCard &&
     fallback === view.fallback &&
+    extraUsage === view.extraUsage &&
     !accountChanged &&
     !effortChanged &&
     !shareChanged &&
@@ -883,10 +903,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       return;
     }
     if (moves) await setTarget.mutateAsync({ agentId: agent.id, machineId: moves.machineId });
-    await api.agents.setBrain(org.id, agent.id, {
+    return api.agents.setBrain(org.id, agent.id, {
       brain: kind,
       model: planModel === option?.defaultModel ? null : planModel,
       fallback,
+      ...(extraUsage !== view.extraUsage ? { extraUsage } : {}),
       ...(effortChanged ? { effort: effortToSave } : {}),
       ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
       ...(shareChanged ? { onlyOwner } : {}),
@@ -896,7 +917,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const use = async () => {
     setBusy(true);
     try {
-      await saveThis();
+      const result = await saveThis();
       refresh();
       const same =
         !effortChanged &&
@@ -916,15 +937,23 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           : null;
       if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
-        toast.show(t("aiAccounts.share.backOnApi", g), "info", {
-          label: agent.audience?.userIds?.length
-            ? t("aiAccounts.share.letPeople", g)
-            : t("aiAccounts.share.letEveryone", g),
-          run: () =>
-            void api.agents
-              .setBrain(org.id, agent.id, { onlyOwner: false })
-              .then(refresh, () => toast.show(t("agentPage.work.failed"), "error")),
-        });
+        // "Só algumas pessoas ou papéis" with nobody picked has no one to let back in: no action.
+        const people = (agent.audience?.userIds?.length ?? 0) + (agent.audience?.roleIds?.length ?? 0);
+        toast.show(
+          t("aiAccounts.share.backOnApi", g),
+          "info",
+          agent.audience?.mode === "people" && people === 0
+            ? undefined
+            : {
+                label: people ? t("aiAccounts.share.letPeople", g) : t("aiAccounts.share.letEveryone", g),
+                run: () =>
+                  void api.agents
+                    .setBrain(org.id, agent.id, { onlyOwner: false })
+                    .then(refresh, () => toast.show(t("agentPage.work.failed"), "error")),
+              },
+        );
+      } else if (onlyShare && !onlyOwner && result?.onlyOwner) {
+        toast.show(t("aiAccounts.share.pickPeople", g), "info");
       } else
         toast.show(
           onlyShare
@@ -934,7 +963,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? // Chosen only where it is its owner's: the computer's own sign-in, the account their agents share.
                   t("aiAccounts.done.savedAgent", {
                     agent: agent.name,
-                    label: lowerFirst(t("connectAi.own.shared"), i18n.language),
+                    label: t("connectAi.own.sharedLower"),
                   })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
@@ -1066,7 +1095,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "", program });
   };
   const whereName = home?.name ?? "";
-  const keyChoices = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
+  const keyChoices = keyOptions(
+    t,
+    credentials.data ?? [],
+    settings.data?.defaultCredentialId ?? null,
+    apiProviderOf(model, all),
+  );
   const accountIcon = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
   const shownModel = brainModelChoice(kind, plan, planModel ?? option?.defaultModel ?? "");
   const accountOptions: SelectOption[] = [
@@ -1136,6 +1170,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
       {accountNote && <SettingNote icon={signedOut ? "alert" : "lock"}>{accountNote}</SettingNote>}
       {usage && <PlanMeter usage={usage} text={meterText} />}
+      {usage && extraUsageOn(usage) && (
+        <div className="agp-advswitch">
+          <SwitchLabel htmlFor={extraId} label={t("usageCard.extraTitle")} hint={t("usageCard.extraHint")} />
+          <Switch
+            id={extraId}
+            aria-describedby={`${extraId}-hint`}
+            checked={extraUsage}
+            disabled={!view.canUsePlans}
+            onCheckedChange={setExtraUsage}
+          />
+        </div>
+      )}
       {limited && view.canUsePlans && (offers.length > 0 || view.canManageAccounts) && (
         <div className="agp-planoffer">
           {offers.map(({ account: a, used }) => (
@@ -1174,11 +1220,21 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // each is for ("O mais capaz…"), a plan's what it's sold as, and what it needs from the plan's account behind its ⓘ;
   // several makers' models are grouped by maker, each beside its logo, the others beside their plan's. An alias the
   // plan leaves out runs its main model: shown as that one (`shownModel`).
-  const planLogo = card === "key" ? null : <ProviderLogo id={planMark(card)} size="sm" />;
+  const apiProvider = apiProviderOf(model, all);
+  const planLogo =
+    card !== "key" ? (
+      <ProviderLogo id={planMark(card)} size="sm" />
+    ) : apiProvider ? (
+      <ProviderLogo id={apiProvider} size="sm" />
+    ) : null;
+  // Cursor (ADR 0114): the models its plan includes, and where the CLI said so, the rest at API prices.
+  const cursorPlanSays = kind === "cursor" && modelOptions.some((m) => m.inPlan);
   const modelLine = (m: BrainModelChoice) =>
     !plan && kind === "claude_code" && isClaudeAlias(m.value)
       ? t(`agentPage.work.brain.modelLine.${m.value}`)
-      : m.tag && t(`brain.modelTag.${m.tag}`);
+      : cursorPlanSays
+        ? t(m.inPlan ? "brain.cursorModel.inPlan" : "brain.cursorModel.apiPrice")
+        : m.tag && t(`brain.modelTag.${m.tag}`);
   const planModelOptionsShown: SelectOption[] = [
     { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
     ...modelOptions.map((m) => {
@@ -1309,15 +1365,19 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             const off = c !== "key" && away(c);
             return {
               value: c,
-              // Each plan by its maker's mark; the API key by the agent itself, which it pays for per use.
+              // Each plan by its maker's mark; the API key by its model's maker, or the agent itself when none is known.
               leading:
                 c === "key" ? (
-                  <BrainPortrait kind="agent" state={card === c ? "working" : "idle"} agent={draft.look} />
+                  apiProvider ? (
+                    <ProviderLogo id={apiProvider} />
+                  ) : (
+                    <BrainPortrait kind="agent" state={card === c ? "working" : "idle"} agent={draft.look} />
+                  )
                 ) : (
                   <ProviderLogo id={planMark(c)} off={off} />
                 ),
               title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
-              tag: c === "chatgpt" ? t("brain.testing") : undefined,
+              tag: c === "chatgpt" || c === "cursor" ? t("brain.testing") : undefined,
               description:
                 c === "key"
                   ? t("agentPage.work.brain.modelText", g)
@@ -1767,6 +1827,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
     const list = [
       ...(has(m.id, "claude_code") ? [t("brain.card.claude_code")] : []),
       ...(has(m.id, "codex") ? [t("brain.card.codex")] : []),
+      ...(has(m.id, "cursor") ? [t("brain.card.cursor")] : []),
       ...(browserOf(m) === "ready"
         ? [t("agentPage.work.computer.browser")]
         : browserOf(m) === "pending"
@@ -1906,6 +1967,9 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
 
 // ── Navegador ───────────────────────────────────────────────────────────────
 
+/** The agent's own browser in its profile choice (ADR 0110): any value that isn't a profile's id. */
+const OWN_BROWSER = "own";
+
 function BrowserDialog({ onClose }: { onClose: () => void }) {
   const work = useWork();
   if (!work.browser.data || !work.scopes.data || !work.computer.data || !work.machines.data) return null;
@@ -1924,6 +1988,13 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   const pickable = usePickable();
   const setTarget = useSetComputerTarget(org.id);
   const saveSites = useUpdateAgentBrowserSettings(org.id, agent.id);
+  const profileActions = useBrowserProfileMutations(org.id);
+  const profiles = useBrowserProfiles(org.id);
+  const dir = useDirectory(org.id);
+  const mine = profilesOfAgent(profiles.data, agent.id);
+  const savedProfile = work.browser.data?.profileId ?? null;
+  const [profile, setProfile] = useState<string>(savedProfile ?? OWN_BROWSER);
+  const profileId = profile === OWN_BROWSER ? null : profile;
   const admin = viewer === "admin";
   const domains = work.browser.data?.allowedDomains ?? [];
   const [mode, setMode] = useState<"any" | "only" | "off">(
@@ -1949,8 +2020,13 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   };
   const on = mode !== "off";
   const sitesNow = mode === "only" ? sites : [];
-  const unchanged = on === work.granted && (!on || JSON.stringify(sitesNow) === JSON.stringify(domains));
+  const unchanged =
+    on === work.granted &&
+    (!on || (JSON.stringify(sitesNow) === JSON.stringify(domains) && profileId === savedProfile));
   const noComputer = on && work.machineId === NO_COMPUTER && !moveTo;
+  // Profiles only where they exist: its browser's computer is single mode, or it already has one (on such a computer).
+  const browserMachineId = moveTo?.id ?? work.browser.data?.machine?.id ?? work.machineId;
+  const withProfiles = mine.length > 0 || profilesApply(work.machines.data?.find((m) => m.id === browserMachineId));
   // On the Cloud the agent's browser comes with the workspace's computer: it can be turned on while that one is prepared.
   const blocked = noComputer && edition !== "cloud";
   const use = async () => {
@@ -1962,6 +2038,8 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
       }
       if (on && JSON.stringify(sitesNow) !== JSON.stringify(domains))
         await saveSites.mutateAsync(sitesNow.length ? sitesNow : null);
+      if (on && profileId !== savedProfile)
+        await profileActions.setDefault.mutateAsync({ agentId: agent.id, profileId });
       refresh();
       const where = moveTo ?? pickable.find((m) => m.id === work.machineId);
       toast.show(
@@ -2086,7 +2164,63 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
               machineId={moveTo?.id ?? work.browser.data?.machine?.id}
             />
           )}
-          {on && <SettingNote icon="lock">{t("browser.agent.signedIn", g)}</SettingNote>}
+          {on && !withProfiles && <SettingNote icon="lock">{t("browser.agent.signedIn", g)}</SettingNote>}
+          {on && withProfiles && (
+            <div className="ac-field">
+              <span className="ac-field__label" id="agent-browser-profile">
+                {t("browser.profiles.agentChoice", g)}
+              </span>
+              <OptionList
+                aria-labelledby="agent-browser-profile"
+                value={profile}
+                onValueChange={setProfile}
+                options={[
+                  {
+                    value: OWN_BROWSER,
+                    leading: lead("person"),
+                    title: t("browser.profiles.own", g),
+                    description: t("browser.profiles.ownText", g),
+                    ...(savedProfile === null ? { tag: t("browser.profiles.default") } : {}),
+                  },
+                  ...mine.map((p) => {
+                    const holder = p.holder?.type === "agent" ? dir.agentById.get(p.holder.agentId)?.name : undefined;
+                    return {
+                      value: p.id,
+                      leading: lead("globe"),
+                      title: p.name,
+                      description: p.holder
+                        ? t("browser.profiles.inUsePerson", {
+                            name:
+                              holder ??
+                              (p.holder.type === "person" ? dir.memberById.get(p.holder.userId)?.name : "") ??
+                              "",
+                          })
+                        : t("browser.profiles.free"),
+                      ...(savedProfile === p.id ? { tag: t("browser.profiles.default") } : {}),
+                    };
+                  }),
+                ]}
+              />
+              {!canDo(org, "manage_connectors") && (
+                <div className="row">
+                  <Button
+                    size="sm"
+                    icon="plus"
+                    loading={profileActions.request.isPending}
+                    onClick={() =>
+                      profileActions.request.mutate(agent.id, {
+                        onSuccess: () => toast.show(t("browser.profiles.asked")),
+                        onError: () => toast.show(t("browser.profiles.failed"), "error"),
+                      })
+                    }
+                  >
+                    {t("browser.profiles.askMore")}
+                  </Button>
+                  <span className="small muted">{t("browser.profiles.askHelp", g)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </DialogBody>
       <Footer

@@ -112,12 +112,18 @@ export const agents = pgTable(
     /** Spend cap per calendar month (UTC) in nano-USD (1e-9 USD). Null = the organization's default (`organization_settings.default_agent_budget_nano_usd`). */
     monthlyBudgetNanoUsd: bigint({ mode: "number" }),
     /**
-     * Who can talk to it: `everyone`, `people` (`audience_user_ids`,
-     * plus the owner) or `owner`. Enforced wherever a person's message can
-     * start a run; nothing else is restricted (it still reads the channel).
+     * Who can talk to it: `everyone`, `people` (`audience_user_ids`, anyone holding one of `audience_role_ids`
+     * at the time, plus the owner) or `owner`. Enforced wherever a person's message can start a run; nothing else
+     * is restricted (it still reads the channel).
      */
     audienceMode: text().$type<"everyone" | "people" | "owner">().notNull().default("everyone"),
     audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /**
+     * Other agents may consult it for a person outside its audience (ADR 0085 addendum): it answers the agent that
+     * asked, never that person. A plan only answering its owner (ADR 0059 §5) still keeps them out.
+     */
+    consultable: boolean().notNull().default(true),
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /**
@@ -139,6 +145,11 @@ export const agents = pgTable(
     brainModel: text(),
     /** When the computer brain can't answer, answer through the API (counts against the budget). */
     brainFallback: boolean().notNull().default(true),
+    /**
+     * Long work may go on into the plan's paid extra usage, where the provider reports it on (ADR 0118); off, it
+     * pauses at 95% of the plan like any other.
+     */
+    brainExtraUsage: boolean().notNull().default(true),
     /**
      * The account its computer brain runs with (ADR 0041), on its machine and
      * of its brain's kind (checked in code); null = the computer's own sign-in.
@@ -167,6 +178,8 @@ export const agents = pgTable(
      * or its own. The live view, take over and Stop follow it.
      */
     browserMachineId: uuid(),
+    /** Its default browser (ADR 0110): a profile it is granted; null = its own browser. */
+    browserProfileId: uuid(),
     /**
      * Held by the people who run this server (operator API, ADR 0056): it starts nothing, the rest of the
      * workspace works (`standing.ts`). The reason is theirs: the workspace only reads that it is paused.
@@ -278,7 +291,7 @@ export const organizationSettings = pgTable("organization_settings", {
  * agents, is what new agents start with. Validated in code (`agent-setup.ts`).
  */
 export interface AgentSetup {
-  brain: "model" | "claude_code" | "codex";
+  brain: "model" | "claude_code" | "codex" | "cursor";
   /** The API brain: the agent's model (`auto` included). A computer brain: its model as stored (null: the default). */
   model: string | null;
   /** The API brain's key (null: the workspace's default). */

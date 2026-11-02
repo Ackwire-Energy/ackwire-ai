@@ -14,7 +14,7 @@ import {
 } from "@agenteschat/client";
 import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { formatPercent } from "@agenteschat/client/lib/format";
+import { formatPercent, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -177,7 +177,7 @@ function Profile({ id }: { id: string }) {
   // On a plan, its limits first and the budget only once it spent through the API (ADR 0063 §5).
   const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);
   const money = (v: number) =>
-    new Intl.NumberFormat(i18n.language || "pt-BR", { style: "currency", currency: "USD" }).format(v);
+    new Intl.NumberFormat(i18n.language || "en", { style: "currency", currency: "USD" }).format(v);
   const originText = useMemoryOriginText();
 
   const openDm = () =>
@@ -223,10 +223,7 @@ function Profile({ id }: { id: string }) {
     : owner
       ? t("mobile.intentAgents.owner", { name: owner })
       : null;
-  const roleLine = [
-    roleName || null,
-    plain ? (roleName ? plain.charAt(0).toLowerCase() + plain.slice(1) : plain) : null,
-  ]
+  const roleLine = [roleName || null, plain ? (roleName ? lowerFirst(plain, i18n.language) : plain) : null]
     .filter(Boolean)
     .join(" · ");
   const shownDid = allDid ? did : did.slice(0, DID_SHOWN);
@@ -293,7 +290,7 @@ function Profile({ id }: { id: string }) {
           {noAi ? (
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
-              label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
+              label={t("noAi.agent", agentGrammar(agent?.name ?? ""))}
               onPress={() => openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })}
             />
           ) : null}
@@ -326,7 +323,7 @@ function Profile({ id }: { id: string }) {
 
         {forYou.data || forYou.isError ? (
           <Section
-            title={t("mobile.intentAgents.did.title", agentGrammar(t, name))}
+            title={t("mobile.intentAgents.did.title", agentGrammar(name))}
             {...(did.length > DID_SHOWN
               ? {
                   action: {
@@ -386,7 +383,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {knows.data ? (
-          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(t, name))}>
+          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(name))}>
             {memories.length > 0 ? (
               <>
                 <Card>
@@ -433,7 +430,7 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         {access.data ? (
-          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(t, name))}>
+          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(name))}>
             {uses.lines.length > 0 ? (
               <Card>
                 {uses.lines.map((u) => (
@@ -552,7 +549,7 @@ function Profile({ id }: { id: string }) {
             <Card>
               <Row
                 leading={<Tile icon="chart" />}
-                title={t("usageViews.agent.title", agentGrammar(t, name))}
+                title={t("usageViews.agent.title", agentGrammar(name))}
                 chevron
                 onPress={() => openAgentUsage(id)}
               />

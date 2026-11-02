@@ -22,6 +22,7 @@ import { ApprovalCard, Button, cx, Icon } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
+import { AgentWho } from "@/components/AgentAvatar";
 import { EmailLetter } from "@/components/EmailLetter";
 import { RequestDone } from "@/components/RequestCard";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
@@ -83,7 +84,7 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
   const openPanel = useOpenAgentPanel();
   const decide = useDecideApproval(org.id);
   if (!approveAlwaysOffered(approval)) return null;
-  const g = agentGrammar(t, agent?.name ?? t("channel.unknownAgent"));
+  const g = agentGrammar(agent?.name ?? t("channel.unknownAgent"));
   const kind = approval.approveAlways;
   // In a conversation: the agent's Acesso in the panel beside it; elsewhere, its page.
   const open = () =>
@@ -105,7 +106,7 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
             t("approval.always.done", { name: g.name }),
             "info",
             { label: t("approval.always.open"), run: open },
-            t("approval.always.undoHere", { of: g.of, name: g.name }),
+            t("approval.always.undoHere", { context: g.context, name: g.name }),
           );
         },
       },
@@ -262,7 +263,14 @@ export function InlineApproval({
       status="waiting"
       aria-label={t("approval.group")}
       sky={<CardSky color={colorOf(agent)} />}
-      who={<Trans i18nKey="approval.asks" values={{ agent: name }} components={{ b: <b /> }} {...TYPED_VALUES} />}
+      who={
+        <Trans
+          i18nKey="approval.asks"
+          values={{ agent: name }}
+          components={{ b: <AgentWho agentId={approval.agentId} name={name} /> }}
+          {...TYPED_VALUES}
+        />
+      }
       statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, agent, members)}
       origin={origin ? tt(origin.key, origin.values) : undefined}
       title={approvalTitle(t, approval)}

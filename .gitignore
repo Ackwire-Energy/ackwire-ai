@@ -21,3 +21,6 @@ packages/engine/scripts/out/
 docs/design/telas/
 *.keystore
 *.jks
+
+# Translation work files (bun run i18n:missing)
+i18n-work/

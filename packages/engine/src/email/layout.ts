@@ -1,4 +1,5 @@
 import type { InlinePart } from "@agenteschat/adapters";
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import { dark, light, type ThemeColors } from "@agenteschat/tokens";
 import {
   type AccessoryName,
@@ -11,8 +12,8 @@ import { COMPUTER_ART, COMPUTER_ROWS } from "@agenteschat/ui/computer/portrait";
 import { initialsOf } from "@agenteschat/ui/names";
 import { mix, opaque } from "@agenteschat/ui/sky/math";
 
-/** The languages emails are written in. */
-export type EmailLocale = "pt-BR" | "en";
+/** The recipient's language: every language of the app (`@agenteschat/i18n/locale`). */
+export type EmailLocale = AppLocale;
 
 /**
  * Plain text; `{ b }` is bold. `{ mail }` is an address as a mailto link: already a link, no client links it on its
@@ -150,7 +151,9 @@ const palette = (t: ThemeColors) => ({
 const L = palette(light);
 const D = palette(dark);
 
-const SANS = "'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+/** Japanese, Chinese and Korean fall back to each system's own fonts before the generic one. */
+const SANS =
+  "'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif";
 
 /**
  * The bottom margin of the card's last block, by what its lowest ink is: the room under that ink then matches the

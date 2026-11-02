@@ -43,7 +43,6 @@ import {
   useAiStatus,
   useApproval,
   useApprovals,
-  useArchiveChannel,
   useCardApprovals,
   useChannelCategories,
   useChannelMembers,
@@ -69,7 +68,16 @@ import {
   useWikiTree,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
-import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import {
+  activityVerb,
+  barAsking,
+  barElapsed,
+  barEntries,
+  barFaces,
+  isWriting,
+  toolActivity,
+  waitsForWords,
+} from "@agenteschat/client/lib/activity";
 import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
@@ -82,6 +90,8 @@ import {
   isScrollUpKey,
   messageUsage,
   nearBottom,
+  type RunPosition,
+  runPosition,
   usageLine,
 } from "@agenteschat/client/lib/chat";
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
@@ -90,9 +100,10 @@ import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
@@ -115,9 +126,11 @@ import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
+import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
-import { splitCanceled } from "@agenteschat/client/lib/work";
+import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { appVia } from "@agenteschat/client/lib/via";
+import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,
   Avatar,
@@ -180,14 +193,15 @@ import { useBrowserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
-  drawsBehind,
   nextSlots,
   openerDelayMs,
   openerOf,
   type RunSlot,
+  rowShows,
   SLOT_HOLD_MS,
   sameSlots,
   saysNothingYet,
+  waitingLast,
 } from "@/chat/run-slots";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { ActionCard } from "@/components/ActionCard";
@@ -199,14 +213,16 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
+import { MessageWorkLine } from "@/components/BackgroundWork";
 import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/browser/BrowserCard";
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
+import { ChannelPinsButton } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
-import { NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
+import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -220,6 +236,7 @@ import {
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { MenuEntries } from "@/components/DesktopMenus";
+import { useArchiveChannelWithUndo, useChannelMenu } from "@/components/entity-menus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
@@ -288,15 +305,17 @@ import {
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine";
+import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
+import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { useDocumentTitle } from "@/lib/desktop";
+import { entityMenu } from "@/lib/entity-menu";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -646,6 +665,16 @@ function ChannelView({
     setConsultId(null);
     setProfile({ agentId, tab });
   }, []);
+  // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
+  useEffect(() => {
+    if (chrome?.panel) return;
+    const open = () => {
+      const ask = takeAgentPanel();
+      if (ask) openAgentPanel(ask.agentId, ask.tab);
+    };
+    open();
+    return onAgentPanel(open);
+  }, [chrome?.panel, openAgentPanel]);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
   // `/summary` and `/plan`: a card only I see, under the conversation.
@@ -657,11 +686,17 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
+  const [addFirst, setAddFirst] = useState(false);
+  const channelEntries = useChannelMenu();
   // "Editar canal" from the sidebar's right click: the details open once this channel shows.
   useEffect(() => {
     if (chrome?.header) return;
     const open = () => {
-      if (takeChannelDetails(channel.id)) setDetailsOpen(true);
+      const ask = takeChannelDetails(channel.id);
+      if (!ask) return;
+      setAddFirst(ask === "add");
+      setDetailsOpen(true);
     };
     open();
     return onChannelDetails(open);
@@ -1226,7 +1261,7 @@ function ChannelView({
   const commandAgent = dmAgent ?? suggestedAgent;
   const navigateTo = useNavigate();
   const commandPrefix = dmAgent || !commandAgent ? "" : `@${commandAgent.handle} `;
-  const cg = agentGrammar(t, commandAgent?.name ?? "");
+  const cg = agentGrammar(commandAgent?.name ?? "");
   const commands: ComposerCommand[] = commandAgent
     ? [
         {
@@ -1486,7 +1521,7 @@ function ChannelView({
   // While an agent works here: the send button turns into stop (box empty), and typing offers
   // "Juntar ao que ele faz" (↵) or "Parar e mandar" (⌘↵).
   const stopName = stopTarget ? (dir.agentById.get(stopTarget.agentId)?.name ?? t("channel.unknownAgent")) : "";
-  const stopGrammar = agentGrammar(t, stopName);
+  const stopGrammar = agentGrammar(stopName);
   const working = stopTarget
     ? {
         stopLabel: t("run.stopAgent", stopGrammar),
@@ -1496,7 +1531,6 @@ function ChannelView({
     : null;
   // The choice is for anyone who writes while an agent works (the stop button only for who may stop it).
   const busyGrammar = agentGrammar(
-    t,
     busyTarget ? (dir.agentById.get(busyTarget.agentId)?.name ?? t("channel.unknownAgent")) : "",
   );
   const choice = busyTarget
@@ -1684,7 +1718,7 @@ function ChannelView({
   const Tag = chrome?.panel ? "section" : "main";
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
-    t("newAgent.and"),
+    t,
   );
   const subtitle = [
     channel.topic,
@@ -1704,7 +1738,10 @@ function ChannelView({
             {chrome?.header ?? (
               <header className="channel__header">
                 <NavToggle />
-                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}
+                  {...entityMenu(() => channelEntries(channel))}
+                >
                   <h1 className="channel__title"># {channel.name}</h1>
                   {subtitle && <span className="channel__topic">{subtitle}</span>}
                 </div>
@@ -1716,6 +1753,7 @@ function ChannelView({
                     onDetails={() => setDetailsOpen(true)}
                   />
                   {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+                  {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
                   <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
                 </div>
               </header>
@@ -2059,7 +2097,17 @@ function ChannelView({
               </>
             )}
 
-            {!chrome?.header && <ChannelDetails open={detailsOpen} onOpenChange={setDetailsOpen} channel={channel} />}
+            {!chrome?.header && (
+              <ChannelDetails
+                open={detailsOpen}
+                onOpenChange={(open) => {
+                  setDetailsOpen(open);
+                  if (!open) setAddFirst(false);
+                }}
+                channel={channel}
+                startAdding={addFirst}
+              />
+            )}
             {missionDraft !== null && (
               <NewMissionDialog
                 open
@@ -2181,7 +2229,7 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
-  /** A DM with this person: my rows keep the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turns' time lines keep the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** The agents' questions to other agents: inside the replies that asked, and how their answers draw. */
   consultGroups: ConsultGroups;
@@ -2270,14 +2318,20 @@ const Timeline = memo(function Timeline({
         out.set(i.message.agentRunId, i.key);
     return out;
   }, [items]);
-  // The block that opens is the first one at work: a failed or stopped block draws anyway and never hides it.
-  const opener = useStreams(
-    (s) =>
-      slots.find((x) => {
+  // Every agent at work has its block; the ones still waiting for their first words stay last.
+  const waitingKey = useStreams((s) =>
+    slots
+      .filter((x) => {
         const r = s.runs[x.runId];
-        return !r || !drawsBehind(r);
-      })?.runId,
+        return r && waitsForWords(r);
+      })
+      .map((x) => x.runId)
+      .join(" "),
   );
+  const drawn = useMemo(() => {
+    const waiting = new Set(waitingKey.split(" "));
+    return waitingLast(slots, (runId) => waiting.has(runId));
+  }, [slots, waitingKey]);
   // A take over whose run has no live block and no message here: its card at the end (`HeldBrowserRow`).
   const heldPlaces = useHeldPlaces();
   const held = useMemo(
@@ -2293,8 +2347,11 @@ const Timeline = memo(function Timeline({
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
   const newestKey = items.findLast((i) => i.kind === "message")?.key;
-  for (const item of items) {
+  for (const [at, item] of items.entries()) {
     const grouped = item.kind === "message" && item.grouped && !afterUnshown();
+    const after = items[at + 1];
+    // Where it sits in its author's run: my own rows' bubbles square the corners they share.
+    const run = runPosition(grouped, after?.kind === "message" && after.grouped && !unshown.has(item.key));
     if (divider?.key === item.key) {
       rows.push(
         <div key="unread-divider" className="channel__unread" data-fade={divider.fading || undefined}>
@@ -2329,6 +2386,7 @@ const Timeline = memo(function Timeline({
           replyContext={item.context}
           lastOfRun={lastByRun.get(m.agentRunId) === item.key}
           latest={item.key === newestKey}
+          run={run}
         />
       ) : (
         <TimelineMessage
@@ -2344,21 +2402,17 @@ const Timeline = memo(function Timeline({
           seen={m.id === seenId}
           helping={m.agentRunId && !isMediaAfterReply(m.meta) ? consultGroups.helping.get(m.agentRunId) : undefined}
           latest={item.key === newestKey}
+          run={run}
         />
       ),
     );
   }
-  // The first block at work follows the last message: under the agent's own, it has no header of its own.
-  const lastItem = items.at(-1);
-  const after = lastItem?.kind === "message" && !afterUnshown() ? lastItem.message : null;
-  slots.forEach((slot, i) => {
+  drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
       <RunBlock
         key={slot.key}
         runId={slot.runId}
-        after={i === 0 ? after : null}
-        opens={slot.runId === (opener ?? slots[0]?.runId)}
         grouped={false}
         entering={blockEnters.current.get(slot.key) ?? false}
         modelLabels={modelLabels}
@@ -2440,17 +2494,11 @@ function liveMessageOf(r: LiveRun): MessageType {
 function RunBlock({
   runId,
   message,
-  after,
-  opens = true,
   grouped,
   ...rest
 }: {
   runId: string;
   message?: MessageType;
-  /** At work: the message right above it (the agent's own groups it, as a saved message would). */
-  after?: Pick<MessageType, "author" | "createdAt"> | null;
-  /** At work: the first block, the only one drawn while others work too (`drawsBehind`). */
-  opens?: boolean;
   grouped: boolean;
   entering: boolean;
   modelLabels: Map<string, string>;
@@ -2458,6 +2506,7 @@ function RunBlock({
   replyContext?: ReplyRef;
   lastOfRun?: boolean;
   latest?: boolean;
+  run?: RunPosition;
 }) {
   const run = useStreams((s) => (message ? undefined : s.runs[runId]));
   const last = useRef<LiveRun | undefined>(undefined);
@@ -2473,15 +2522,15 @@ function RunBlock({
     () => (live ? liveMessageOf(live) : null),
     [liveId, liveAgent, liveChannel, liveThread, liveStart],
   );
-  // Just started and nothing of its own yet: it waits a moment, as a person would before answering.
+  // Just started and nothing of its own yet: its waiting row comes after a moment (the bar says it works at once).
   const quiet = Boolean(live && saysNothingYet(live));
   const due = useDue(liveStart ?? null, live ? openerDelayMs(live.runId) : 0, quiet);
   const shown = message ?? placeholder;
-  if (!shown || (live && !opens && !drawsBehind(live))) return null;
+  if (!shown) return null;
   if (live && !message && quiet && !due) return null;
-  const together = message
-    ? grouped
-    : Boolean(placeholder && groupsWith(after, placeholder.author, placeholder.createdAt));
+  // At work it never groups under the agent's own message: it starts as the waiting row with its face, and taking the
+  // face away when the words arrive would move the row. Its saved message groups as any other.
+  const together = message ? grouped : false;
   return (
     <TimelineMessage
       message={shown}
@@ -2507,7 +2556,7 @@ function LiveNotices({ channelId }: { channelId: string }) {
     <>
       {notices.map((n) => {
         const agent = dir.agentById.get(n.agentId);
-        const known = agent ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name) : "";
+        const known = agent ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName) : "";
         return (
           <p key={n.key} className="channel__notice ac-iconline" role="status">
             <Icon name="lock" size={16} />
@@ -2546,11 +2595,6 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
   );
 }
 
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
-
-/** The generic phrases a block opens with (`openerOf`). */
-const OPENER_KEYS = ["run.opener0", "run.opener1", "run.opener2"] as const;
-
 /**
  * The block's header: the time it started, as any message. What it is doing and for how long is the
  * bar's above the composer (saying it twice was noise).
@@ -2562,8 +2606,14 @@ function RunClock({ run }: { run: LiveRun }) {
 }
 
 /** Under a live block: "sem notícias há 4 min · Atualizar", or what it is doing between its steps. */
-function LiveRunStatus({ run }: { run: LiveRun }) {
-  const { t } = useTranslation();
+function LiveRunStatus({
+  run,
+  quietOnly = false,
+}: {
+  run: LiveRun /** The waiting row's step line says what it does. */;
+  quietOnly?: boolean;
+}) {
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -2592,7 +2642,11 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
   };
   const doing = run.tool ? toolActivity(run.tool, run.connector, null, run) : null;
   const showDoing =
-    !quiet && doing && doing.kind !== "thinking" && !(run.work ?? []).some((w) => w.kind === "call" && w.running);
+    !quietOnly &&
+    !quiet &&
+    doing &&
+    doing.kind !== "thinking" &&
+    !(run.work ?? []).some((w) => w.kind === "call" && w.running);
   if (!quiet && !showDoing) return null;
   return (
     <div className="run-status">
@@ -2609,7 +2663,7 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
       ) : (
         doing && (
           <p className="ac-msg__activity" aria-live="polite">
-            {capitalize(activityVerb(t, doing))}…
+            {capitalize(activityVerb(t, doing), i18n.language)}…
           </p>
         )
       )}
@@ -2918,6 +2972,10 @@ function ActivityBar({
   // The time, "Ver" and the stop are one agent's: with several, the line can't say whose (the composer still stops).
   const soloRun = agents.length === 1 && firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
   const took = barElapsed(t, entries, runs, now);
+  // One agent on its own: its face is on its row in the conversation once the row shows, not here again. With no
+  // faces in the bar, the orbit stands in for them.
+  const stackShown = !(entries.length === 1 && soloRun && rowShows(soloRun, now) && !barAsking(entries));
+  const facesShown = stackShown && barFaces(entries).length > 0;
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
     (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
@@ -2991,9 +3049,12 @@ function ActivityBar({
         {pill && (
           <>
             {firstAgent && <ActivitySky color={colorOf(dir.agentById.get(firstAgent.id))} />}
-            {/* Agents at work: the pixel orbit in the first one's color; people only typing: the dots. */}
+            {/* Agents at work: their faces open the pill, else the pixel orbit in the first one's color; people only
+                typing: the dots. */}
             {firstAgent ? (
-              <AgentSpinner agentId={firstAgent.id} size={14} />
+              facesShown ? null : (
+                <AgentSpinner agentId={firstAgent.id} size={14} />
+              )
             ) : (
               <span className="ac-typing__dots" aria-hidden="true">
                 <span />
@@ -3001,10 +3062,10 @@ function ActivityBar({
                 <span />
               </span>
             )}
-            <WorkingStack entries={entries} />
+            {stackShown && <WorkingStack entries={entries} />}
             {/* The phrase turns: the old one leaves upward, the new one comes from below. Names in ink. */}
             <span className="ac-typing__text">
-              <BarPhrase entries={entries} runs={runs} />
+              <BarPhrase entries={entries} />
             </span>
             <ConsultClock entries={entries} now={now} />
             {took && <span className="ac-typing__elapsed ac-num">{took}</span>}
@@ -3056,6 +3117,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   helping,
   readOnly = false,
   latest = true,
+  run = "solo",
 }: {
   message: MessageType;
   grouped: boolean;
@@ -3071,7 +3133,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   seenLive?: LiveRun;
   /** The last message of its run here: it carries the run's browser card while a take over holds it. */
   lastOfRun?: boolean;
-  /** A DM with this person: my row keeps the slot of their face (`SeenMark`). */
+  /** A DM with this person: my turn's time line keeps the slot of their face (`SeenMark`). */
   dmPersonId?: string;
   /** My latest message, which they read: their face in that slot. */
   seen?: boolean;
@@ -3084,6 +3146,8 @@ export const TimelineMessage = memo(function TimelineMessage({
    * responder sem @"); older ones keep the check, with the same words in its popover.
    */
   latest?: boolean;
+  /** Its place in its author's run (`runPosition`): on my own rows, which bubble corners square off. */
+  run?: RunPosition;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -3096,10 +3160,12 @@ export const TimelineMessage = memo(function TimelineMessage({
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
-  const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
-  // Nothing said and no steps yet: its words stream where the opener stands, so the line it opens with
-  // stays put when a tool call turns it into narration (and the answer, with no tools, starts there too).
+  const opening = live ? openerOf(live) : { said: null, work: [] };
+  // Nothing said and no steps yet: its words stream at the top, so the line it opens with stays put when a tool
+  // call turns it into narration (and the answer, with no tools, starts there too).
   const wordsOnTop = !opening.said && opening.work.length === 0;
+  // At work with no words shown yet: the waiting row (its face, the pixels and what it does now), no name or time.
+  const waiting = Boolean(live && waitsForWords({ ...live, text: revealed }));
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
   const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
@@ -3118,7 +3184,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // An agent's message that mentions agents has one too: whom it handed work to, and who it only mentioned (ADR 0089).
   const receipted = (m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local;
   // Mine in a DM between people: the slot of their face, from the moment it is sent, so it never rewraps a line.
-  const seenSlot = dmPersonId !== undefined && m.author.type === "person" && m.author.id === me.user.id;
+  const own = m.author.type === "person" && m.author.id === me.user.id;
+  const seenSlot = dmPersonId !== undefined && own;
   const name = dir.authorName(m.author);
   // What a routine found, told by its agent (`meta.routine`): a tag that opens the routine, and the report
   // it answers on demand (that report's own line folds into this message).
@@ -3157,6 +3224,8 @@ export const TimelineMessage = memo(function TimelineMessage({
     [t, m.body, m.meta, i18n.language],
   );
   const body = reminderBody(stopped.body, m.meta);
+  // My own message with a code block or a table: the bubble takes the row's whole width.
+  const wide = useMemo(() => own && hasWideBlock(body), [own, body]);
   // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
   const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
   const atLimit = ended ? (ended.stuck === true ? "stuck" : "steps") : undefined;
@@ -3164,10 +3233,15 @@ export const TimelineMessage = memo(function TimelineMessage({
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
   const reminder = isReminderMessage(m.meta);
+  const via = m.author.type === "person" ? appVia(m.meta) : null;
+  const myHandle = dir.memberById.get(me.user.id)?.handle?.toLowerCase();
+  const mentionsMe =
+    !!myHandle && !(m.author.type === "person" && m.author.id === me.user.id) && mentionsHandle(body, myHandle);
   const renderMention = (handle: string, key: string) => {
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
     if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
+    const isMe = !!p && p.userId === me.user.id;
     const actor = a ? { type: "agent" as const, id: a.id } : { type: "person" as const, id: p?.userId ?? "" };
     const shown = a?.name ?? p?.name ?? handle;
     return (
@@ -3177,7 +3251,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         label={t("profile.of", { name: shown })}
         className="profile-trigger--mention"
       >
-        <Mention>@{shown}</Mention>
+        <Mention className={isMe ? "ac-mention--me" : undefined}>@{shown}</Mention>
       </ProfileTrigger>
     );
   };
@@ -3193,14 +3267,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   const browserHandoff = m.author.type === "agent" ? browserHandoffOf(meta) : null;
   // Where it browsed (`meta.browser`) and what it did on its desktop (`meta.desktop`): each card stays
   // after the run, and its steps leave the work list.
-  const browserTrail = useMemo(
-    () => (m.author.type === "agent" ? browserTrailOf(m.meta) : []),
-    [m.author.type, m.meta],
-  );
-  const desktopTrail = useMemo(
-    () => (m.author.type === "agent" ? desktopTrailOf(m.meta) : []),
-    [m.author.type, m.meta],
-  );
+  // Step summaries, no picture: activity, so the person's setting hides them like the tool block.
+  const trailsShown = m.author.type === "agent" && showsActivity(org);
+  const browserTrail = useMemo(() => (trailsShown ? browserTrailOf(m.meta) : []), [trailsShown, m.meta]);
+  const desktopTrail = useMemo(() => (trailsShown ? desktopTrailOf(m.meta) : []), [trailsShown, m.meta]);
   const onCards = useMemo(
     (): ScreenKind[] => [
       ...(browserTrail.length > 0 ? (["browser"] as const) : []),
@@ -3245,7 +3315,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
   // Nobody called it: it joined the conversation on its own (`meta.joined`).
   const joined = m.author.type === "agent" && meta.joined === true;
-  const joinedTip = joined ? t("chat.joined.tip", agentGrammar(t, name)) : null;
+  const joinedTip = joined ? t("chat.joined.tip", agentGrammar(name)) : null;
   // The root of an issue's work thread (the person asked the agent to implement it): the issue card, no text.
   const issueWork = issueWorkOf(meta);
   // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
@@ -3270,6 +3340,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live && !mediaAfter;
   const menu = useMessageMenu(m, channelName ?? "", {
     feedback,
+    readOnly,
     agentName: agent?.name ?? t("channel.unknownAgent"),
   });
   // A row with a bar has the same actions in a menu that a tap opens on touch (an agent's sticker gets a person's).
@@ -3282,8 +3353,10 @@ export const TimelineMessage = memo(function TimelineMessage({
       ? keptAll.filter((w) => !(w.kind === "call" && onCards.some((s) => isScreenTool(w.tool, s))))
       : keptAll;
   // The line it opened with live stays where it was, above the steps: it never vanishes into the fold.
-  const keptSaid = keptWork?.find((w) => w.kind === "say");
-  const keptSteps = keptSaid && keptWork ? keptWork.filter((w) => w !== keptSaid) : keptWork;
+  const keptFirst = keptWork?.find((w) => w.kind === "say");
+  const keptSteps = keptFirst && keptWork ? keptWork.filter((w) => w !== keptFirst) : keptWork;
+  // Said before a call and then posted as this message (the lead before a card): the body already shows it.
+  const keptSaid = keptFirst?.kind === "say" && !holdsText(body, keptFirst.text) ? keptFirst : undefined;
   // People see name, time and text; the date, model and tokens wait behind the time. An agent's sticker after its
   // reply carries the reply's run: its model and tokens are the reply's, never said twice.
   const usage = m.author.type === "agent" && !mediaAfter ? messageUsage(m) : null;
@@ -3310,10 +3383,18 @@ export const TimelineMessage = memo(function TimelineMessage({
               ? m.id
               : undefined
       }
-      grouped={grouped}
+      grouped={grouped && !waiting}
+      own={own}
+      run={run}
+      waiting={waiting}
       entering={entering && !replacesLive}
       streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
-      className={cx(local && `ac-msg--local ac-msg--${local}`, contextMark && "msg--context")}
+      className={cx(
+        local && `ac-msg--local ac-msg--${local}`,
+        contextMark && "msg--context",
+        mentionsMe && "ac-msg--mentions-me",
+        wide && "ac-msg--wide",
+      )}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
       onContextMenu={live || readOnly ? undefined : menu.onContextMenu}
@@ -3369,6 +3450,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 onToggle={() => setReportOpen((o) => !o)}
               />
             )}
+            {via && <AppViaTag via={via} person={name} />}
             {talker && (
               <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
                 {t("chat.notice.talker")}
@@ -3416,9 +3498,19 @@ export const TimelineMessage = memo(function TimelineMessage({
       }
       stacked={Boolean(card)}
     >
-      {live ? (
+      {live && waiting ? (
         <Parts resetKey={m}>
-          {/* It opens as if it had answered: a generic phrase until the first thing it says takes its place. */}
+          <WaitLine work={live.work} color={colorOf(agent)} />
+          <LiveRunStatus run={live} quietOnly />
+          {m.author.id && m.agentRunId && (
+            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          )}
+          <RunBrowserCard run={live} name={name} />
+          <span className="ac-visually-hidden">{t("channel.writing")}</span>
+        </Parts>
+      ) : live ? (
+        <Parts resetKey={m}>
+          {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
           {wordsOnTop && !liveFailed && revealed ? (
             <MessageText>
               <MessageBody
@@ -3429,12 +3521,9 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </MessageText>
           ) : (
-            (opening.said || opening.opener !== null) && (
+            opening.said && (
               <MessageText>
-                <MessageBody
-                  body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
-                  resolveMention={dir.mentionName}
-                />
+                <MessageBody body={opening.said} resolveMention={dir.mentionName} />
               </MessageText>
             )
           )}
@@ -3511,6 +3600,8 @@ export const TimelineMessage = memo(function TimelineMessage({
           {!missionCard &&
             // A request says its action itself ("Pedido de aprovação: …" would repeat it).
             !approvalId &&
+            // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
+            !secretRequest &&
             !forumSuggestion &&
             !issueWork &&
             !waitNotice &&
@@ -3660,6 +3751,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
             />
           )}
+          {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
+          {m.longWork && !m.local && <MessageWorkLine message={m} threaded={Boolean(threadLine)} />}
           {/* A "Responder" thread went on from here: its line (opens the panel). */}
           {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
           {feedback && (
@@ -3669,12 +3762,12 @@ export const TimelineMessage = memo(function TimelineMessage({
               active={active}
               initial={m.reactions}
               quick={<ReplyButton message={m} />}
-              more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
+              more={<MessageMoreMenu entries={menu.more} />}
             />
           )}
           {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
           {personBar && !(mediaAfter && readOnly) && (
-            <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
+            <PersonMessageActions message={m} authorName={name} more={menu.more} />
           )}
           {menu.dialog}
         </Parts>
@@ -3774,10 +3867,13 @@ function ChannelDetails({
   open,
   onOpenChange,
   channel,
+  startAdding = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   channel: Channel;
+  /** Open on adding members (who manages the channel), with no details under it. */
+  startAdding?: boolean;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -3789,11 +3885,10 @@ function ChannelDetails({
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
   const editable = managesChannel(channel, me.user.id, org);
-  const navigate = useNavigate();
   const toast = useToast();
   const categories = useChannelCategories(org.id);
   const place = usePlaceChannel(org.id);
-  const archive = useArchiveChannel(org.id);
+  const archive = useArchiveChannelWithUndo();
   // Name: saved on blur or Enter, like the description.
   const [name, setName] = useState(channel.name);
   const [nameError, setNameError] = useState<string | undefined>();
@@ -3802,7 +3897,8 @@ function ChannelDetails({
   const [q, setQ] = useState("");
   const [topic, setTopic] = useState(channel.topic);
   const [saved, setSaved] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [addingHere, setAdding] = useState(false);
+  const adding = addingHere || (startAdding && editable);
   // Who is about to be removed: asked first, in a dialog of its own.
   const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
   // The last description sent: blur and close both save, and closing with the X does both.
@@ -3874,22 +3970,7 @@ function ChannelDetails({
         onError: (e) => toast.show(errorText(t, e), "error"),
       },
     );
-  const archiveIt = () =>
-    archive.mutate(channel.id, {
-      onSuccess: () => {
-        onOpenChange(false);
-        void navigate({ to: "/org/$orgId", params: { orgId: org.id } });
-        toast.show(t("channel.archived", { channel: channel.name }), "info", {
-          label: t("channelCategories.undo"),
-          run: () =>
-            void api.chat.unarchive(org.id, channel.id).then(async () => {
-              await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
-              await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
-            }),
-        });
-      },
-      onError: (e) => toast.show(errorText(t, e), "error"),
-    });
+  const archiveIt = () => archive.run(channel, () => onOpenChange(false));
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
@@ -4022,10 +4103,10 @@ function ChannelDetails({
                   {!r.autoReply
                     ? t("channelMembers.mentionLine", { handle: r.handle })
                     : !picksForMe(routing)
-                      ? t(replyAloneKey(routing), agentGrammar(t, r.name))
+                      ? t(replyAloneKey(routing), agentGrammar(r.name))
                       : dir.agentById.get(r.id)?.coordinator
                         ? t("channelMembers.coordinatorLine")
-                        : t("channelMembers.aloneLine", agentGrammar(t, r.name))}
+                        : t("channelMembers.aloneLine", agentGrammar(r.name))}
                 </span>
               </span>
               {r.setsReply && (
@@ -4044,7 +4125,7 @@ function ChannelDetails({
                   }
                 >
                   <MenuRadioGroup
-                    label={t("channelMembers.replyHeading", agentGrammar(t, r.name))}
+                    label={t("channelMembers.replyHeading", agentGrammar(r.name))}
                     value={r.autoReply ? "alone" : "mention"}
                     onValueChange={(v) => autoReply.mutate({ agentId: r.id, on: v === "alone" })}
                     options={[
@@ -4052,8 +4133,8 @@ function ChannelDetails({
                         value: "alone",
                         label: (
                           <>
-                            {t("channelMembers.replyAlone", agentGrammar(t, r.name))}
-                            <span className="ac-menu__desc">{t(replyAloneKey(routing), agentGrammar(t, r.name))}</span>
+                            {t("channelMembers.replyAlone", agentGrammar(r.name))}
+                            <span className="ac-menu__desc">{t(replyAloneKey(routing), agentGrammar(r.name))}</span>
                           </>
                         ),
                       },
@@ -4138,7 +4219,7 @@ function ChannelDetails({
               variant="ghost"
               icon="archive"
               className="channel-details__archive"
-              loading={archive.isPending}
+              loading={archive.pending}
               onClick={archiveIt}
             >
               {t("channel.archive")}
@@ -4154,7 +4235,7 @@ function ChannelDetails({
         title={t("channelMembers.removeTitle", { name: removing?.name ?? "", channel: channel.name })}
         description={t(
           removing?.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody",
-          agentGrammar(t, removing?.name ?? ""),
+          agentGrammar(removing?.name ?? ""),
         )}
         closeLabel={t("common.close")}
         width={440}
@@ -4168,7 +4249,10 @@ function ChannelDetails({
       </Dialog>
       <AddMembersDialog
         open={open && adding}
-        onClose={() => setAdding(false)}
+        onClose={() => {
+          setAdding(false);
+          if (startAdding) onOpenChange(false);
+        }}
         onInvite={inviteInstead}
         channel={channel}
         exclude={inChannel}

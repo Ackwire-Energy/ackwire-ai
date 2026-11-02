@@ -2,7 +2,7 @@ import { type Agent, type Message, useAddChannelMember, useChannels, useUpdateAg
 import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { type ReachEntry, reachKey, reachOf } from "@agenteschat/client/lib/reach";
+import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
 import { Icon } from "@agenteschat/ui";
 import { Trans, useTranslation } from "react-i18next";
 import { useChannelActions } from "@/components/channel-actions";
@@ -53,7 +53,7 @@ function ReachRow({
   const toast = useToast();
   const add = useAddChannelMember(org.id);
   const agent = dir.agentById.get(e.agentId);
-  const g = agentGrammar(t, agent?.name ?? `@${e.handle}`);
+  const g = agentGrammar(agent?.name ?? `@${e.handle}`);
   const values = { ...g, place };
   const handed = Boolean(e.consultationId);
   const detail = [
@@ -73,7 +73,7 @@ function ReachRow({
         </span>
         {detail && <span className="ag-rc__by">{detail}</span>}
       </span>
-      {handed && actions?.openConsultation && (
+      {reachOpens(e) && actions?.openConsultation && (
         <button
           type="button"
           className="ag-rc__btn"
@@ -82,7 +82,7 @@ function ReachRow({
           {t("reach.see")}
         </button>
       )}
-      {(handed || e.private) && addable && can(org, "manage_channels") && (
+      {((handed && e.reason === "not_in_channel") || e.private) && addable && can(org, "manage_channels") && (
         <button
           type="button"
           className="ag-rc__btn"
@@ -115,7 +115,7 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
   const person = dir.memberById.get(userId)?.name;
   const audience = audienceWith(agent, userId);
   if (!person || !audience || modeOf(agent) === "everyone" || !canEditAudience(org, agent, me.user.id)) return null;
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   return (
     <button
       type="button"
@@ -126,7 +126,7 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
         update.mutate({ audience }, { onSuccess: () => toast.show(t("reach.allowed", { person, name: g.name })) });
       }}
     >
-      {t("reach.allow", { person, pronoun: g.pronoun })}
+      {t("reach.allow", { person, context: g.context })}
     </button>
   );
 }

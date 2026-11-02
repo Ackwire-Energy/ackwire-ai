@@ -1,4 +1,10 @@
-import { type Adapters, type BrainTurnRequest, type S3Fetch, STREAM_CLOSE } from "@agenteschat/adapters";
+import {
+  type Adapters,
+  type BrainTurnRequest,
+  type ErrorReporter,
+  type S3Fetch,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
@@ -8,13 +14,14 @@ import {
   type BrainTurn,
   CodexBrain,
   type ContextDeps,
+  CursorBrain,
   composioConnectorsOf,
-  computerTurnProfile,
   connectOverHttp,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
+  createBlockToolSource,
   createBrowserHandoffToolSource,
   createBrowserLive,
   createBrowserToolSource,
@@ -56,8 +63,11 @@ import {
   createTalker,
   createToolGateway,
   createUsageToolSource,
+  createWebToolSource,
   createWikiToolSource,
+  createWithdrawRequestToolSource,
   createWorkspaceToolSource,
+  createWorkToolSource,
   type EmailArt,
   emailArtAt,
   type GitProxyDeps,
@@ -81,6 +91,7 @@ import {
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  setWorkOrgCap,
   smallModelFor,
   standingJudge,
   streamClosed,
@@ -110,7 +121,10 @@ export interface EngineOptions {
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
   /** Tests: fake TypeSafe transport. */
   jevFetch?: typeof fetch;
-  /** Tests: how long a person's message waits for their next one before the router decides (`ROUTER_QUIET_MS`). */
+  /**
+   * Tests: how long a person's message waits for their next one before the router decides, or before the run it
+   * started makes its first model call (`ROUTER_QUIET_MS`).
+   */
   routerQuietMs?: number;
   /** Tests: a fake judge (no model calls for "is this a stop?" and the like). */
   judge?: Judge;
@@ -133,6 +147,8 @@ export interface EngineOptions {
     info(message: string, data?: Record<string, unknown>): void;
     warn(message: string, data?: Record<string, unknown>): void;
   };
+  /** Error reports (ADR 0104) for failures nothing logs: learning's (`reportLearnFailure`). */
+  errors?: ErrorReporter;
 }
 
 /**
@@ -168,10 +184,16 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
     judge: o.judge,
     schedules: o.schedules,
+    errors: o.errors,
     reflect: {
       everyMessages: config.REFLECT_EVERY_MESSAGES,
       idleMinutes: config.REFLECT_IDLE_MINUTES,
       maxPerThread: config.REFLECT_MAX_PER_THREAD,
+    },
+    learn: {
+      maxPerAgentDay: config.LEARN_MAX_PER_AGENT_DAY,
+      minToolCalls: config.LEARN_MIN_TOOL_CALLS,
+      skillAfter: config.LEARN_SKILL_AFTER,
     },
   };
   // The installation's Jev key (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in Settings.
@@ -268,13 +290,27 @@ export function buildEngine(o: EngineOptions) {
     upstream: o.github,
     app: githubApp,
   };
+  // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
+  // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
+  const browserTools = createBrowserToolSource({
+    machines: { hub: machineHub },
+    pubsub: adapters.pubsub,
+    judge: context.judge,
+    vision,
+    publicUrl: config.PUBLIC_URL,
+  });
+  // The workspace's cap of live background works (ADR 0121 §7).
+  setWorkOrgCap(config.AGENT_WORK_MAX_PER_ORG);
   const tools = createToolGateway({
     sources: [
-      createAskUserToolSource(),
+      // A question for what the agent could find, or a secret asked in the chat, is held first (ADR 0109).
+      createAskUserToolSource({ judge: context.judge, tools: () => tools }),
       // Missing something a request needs: ask for it (an approval card) instead of failing.
       createPermissionToolSource(),
       // The agent browser asks a person for help (ADR 0040 §6).
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
+      // The agent takes back a request for a person it no longer needs (listed while it has one open).
+      createWithdrawRequestToolSource({ pubsub: adapters.pubsub }),
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
@@ -284,19 +320,23 @@ export function buildEngine(o: EngineOptions) {
       createReactToolSource({ pubsub: adapters.pubsub }),
       // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
       createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
+      // Long work goes to the background and reports back by itself, on every brain (ADR 0121).
+      createWorkToolSource({ pubsub: adapters.pubsub }),
       // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
-      createHandOffToolSource({ pubsub: adapters.pubsub }),
+      createHandOffToolSource({ pubsub: adapters.pubsub, judge: context.judge, tools: () => tools }),
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
       createPassToolSource(),
       createArtifactToolSource(artifacts),
+      // Live blocks and votes in the agent's own conversation (ADR 0113).
+      createBlockToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
       // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.
       createSetupToolSource({ pubsub: adapters.pubsub, ai: { gateway }, context }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
-      createSkillToolSource({ db, blobs: artifacts.blobs }),
+      createSkillToolSource({ db, blobs: artifacts.blobs, pubsub: adapters.pubsub, judge: context.judge }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
       createScheduleToolSource({
         pubsub: adapters.pubsub,
@@ -307,7 +347,7 @@ export function buildEngine(o: EngineOptions) {
       createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
-      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log }),
+      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log, pubsub: adapters.pubsub }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
       createMailToolSource({
         keyWrappers,
@@ -328,14 +368,15 @@ export function buildEngine(o: EngineOptions) {
         skills: { blobs: artifacts.blobs },
         pubsub: adapters.pubsub,
       }),
-      // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
-      // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
-      createBrowserToolSource({
-        machines: { hub: machineHub },
-        pubsub: adapters.pubsub,
-        judge: context.judge,
-        vision,
-        publicUrl: config.PUBLIC_URL,
+      browserTools,
+      // Reading the web, for every agent and run (ADR 0109): a search service when configured, else the agent's
+      // own browser, else DuckDuckGo's HTML page.
+      createWebToolSource({
+        braveKey: config.BRAVE_SEARCH_API_KEY,
+        searxngUrl: config.SEARXNG_URL,
+        browser: browserTools.readPage,
+        resolveHost: o.resolveHost,
+        usage: gateway,
       }),
       // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
       createDesktopToolSource({
@@ -396,21 +437,25 @@ export function buildEngine(o: EngineOptions) {
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
   /**
    * A computer turn's permission profile (ADR 0053 §3), the same for Claude Code and Codex: a mission run
-   * keeps its own (plan before Start, while a write item is live and for a routine's run that only looks,
-   * work otherwise; ADR 0044); any other run follows who is behind it, read every turn
-   * (`computerTurnProfile`: `plan` only for a routine that only looks and tells, `work` for every other run,
-   * whoever woke it). Its own branches are agentes/<handle>/… (what the git proxy accepts).
+   * keeps its own (plan before Start and while a write item is live, work otherwise; ADR 0044); every other
+   * run works, whoever woke it (ADR 0109: one permission model, the agent's own). Its own branches are
+   * agentes/<handle>/… (what the git proxy accepts).
    */
   const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
     (await missionTurnPermissions(db, turn)) ?? {
-      mode: await computerTurnProfile(db, turn),
+      mode: "work",
       branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
     };
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
     prepareAgentCode(
-      { db, hub: machineHub, git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET } },
+      {
+        db,
+        hub: machineHub,
+        git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
+        github: githubApp ? { app: githubApp, http: o.github ?? { apiUrl: "https://api.github.com", fetch } } : null,
+      },
       turn,
       {
         signal,
@@ -435,6 +480,15 @@ export function buildEngine(o: EngineOptions) {
         agent: agentScope,
         permissions: turnPermissions,
         keepAlive: !run.background,
+        prepare: prepareCode,
+      }),
+    // ADR 0114: Cursor's CLI, one process per turn (nothing kept alive between turns).
+    cursor: (_agent, _run, setup) =>
+      new CursorBrain({
+        link: brainLink,
+        mcp: async () => ({ token: setup.mcpToken() }),
+        agent: agentScope,
+        permissions: turnPermissions,
         prepare: prepareCode,
       }),
   };
@@ -462,6 +516,8 @@ export function buildEngine(o: EngineOptions) {
     gifs: adapters.gifs ?? null,
     log: o.log,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
+    // A run started on a person's message reads what they add in the next seconds with it (ADR 0112).
+    quietMs: o.routerQuietMs ?? ROUTER_QUIET_MS,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
     warmBrowser,

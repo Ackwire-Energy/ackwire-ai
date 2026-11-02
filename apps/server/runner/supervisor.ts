@@ -20,6 +20,7 @@ import type { Readable, Writable } from "node:stream";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
+  grantedTo,
   HEARTBEAT_MS,
   inRange,
   isObject,
@@ -41,6 +42,7 @@ import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
 import { errnoCode, RunnerError, toMachineError } from "./errors";
+import { localCloneSlot } from "./git";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
@@ -48,7 +50,7 @@ import { type NetworkConfig, networkConfig, networkKey } from "./network-state";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
 import type { ScopeKind } from "./scope-gate";
 import { type ActivatedSecret, activatedSecret, handleSecret } from "./secrets";
-import { agentCategorySlice, agentSlice } from "./service";
+import { agentCategorySlice, agentSlice, scopeOomPolicy } from "./service";
 import type { RelayCount } from "./streams";
 
 /**
@@ -105,6 +107,8 @@ const SCOPE_ENTERS_PER_MINUTE = 30;
 const SCOPE_SHOW_MS = 2000;
 const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
+/** Clone slots one worker may hold or wait for at once. */
+const MAX_WORKER_SLOTS = 64;
 
 /** The broker is a child of the root runner home, never of an agent-owned home. */
 function secureSecretRoot(home: string, requireRoot = false): string {
@@ -151,7 +155,7 @@ export type WorkerDesktopUse = "desktop" | "browser";
 const BROWSER_SETUP_OPS: ReadonlySet<string> = new Set(["browser.act", "browser.batch", "browser.warm"]);
 
 /** The account a request's CLI signs in with: a turn's or route's, or a Claude Code or Codex task's (protocol 31). */
-function accountOf(req: MachineRequest): { kind: "claude_code" | "codex"; account: string } | null {
+function accountOf(req: MachineRequest): { kind: "claude_code" | "codex" | "cursor"; account: string } | null {
   const cli =
     req.op === "brain.turn" || req.op === "brain.route"
       ? req.kind
@@ -159,7 +163,7 @@ function accountOf(req: MachineRequest): { kind: "claude_code" | "codex"; accoun
         ? req.executor
         : null;
   if (cli === null || !("account" in req) || typeof req.account !== "string" || !req.account) return null;
-  return { kind: cli === "codex" ? "codex" : "claude_code", account: req.account };
+  return { kind: cli === "codex" || cli === "cursor" ? cli : "claude_code", account: req.account };
 }
 
 /** What a request the server sent may use its agent's desktop for; null when it may not. */
@@ -200,11 +204,20 @@ export type WorkerLinkFrame =
   /** From the worker: what its agent's Chrome sent and received since it last said (protocol 23). */
   | { type: "browser.traffic"; up: number; down: number }
   /** From the worker: a turn's plan usage (`rate_limit_event`, Codex's rate limits), for the account it thinks with. */
-  | { type: "usage"; kind: "claude_code" | "codex"; account: string; info: unknown }
+  | { type: "usage"; kind: "claude_code" | "codex" | "cursor"; account: string; info: unknown }
   /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */
   | { type: "scope.entered"; enterId: string; error?: string }
+  /** From the worker: one of the computer's clone slots (ADR 0116), until it sends `clone.release`. */
+  | { type: "clone.slot"; slotId: string }
+  /** To the worker: it waits for another download (`waiting`), then it has the slot. */
+  | { type: "clone.slotted"; slotId: string; waiting?: boolean }
+  | { type: "clone.release"; slotId: string }
+  /** From the worker: fill root's shared cache with its agent's GitHub token (`systemGitCache`). */
+  | { type: "cache.fill"; fillId: string; connection: string; repo: string; github: string }
+  /** To the worker: the cached repository its agent may borrow from, when there is one. */
+  | { type: "cache.filled"; fillId: string; dir?: string }
   | { type: "secret.install"; installId: string; agent: AgentScope; secret: ActivatedSecret }
   | {
       type: "secret.installed";
@@ -259,20 +272,22 @@ export interface SupervisorOptions {
    */
   prepareExisting?: (users: AgentUser[]) => void;
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
-  lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
+  lend?: (kind: "claude_code" | "codex" | "cursor", accountId: string, uid: number) => Promise<unknown>;
   /**
    * Protocol 29: what a brain turn or route on an account root keeps gets with it (`AccountManager.grant`); null for
    * one whose folder is lent instead.
    */
-  grant?: (kind: "claude_code" | "codex", accountId: string) => Promise<AccountGrant | null>;
+  grant?: (kind: "claude_code" | "codex" | "cursor", accountId: string) => Promise<AccountGrant | null>;
   /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
-  usage?: (kind: "claude_code" | "codex", accountId: string, info: unknown) => void;
+  usage?: (kind: "claude_code" | "codex" | "cursor", accountId: string, info: unknown) => void;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
   desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
   /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */
   desktopViewers?: (agentId: string) => number;
   /** The account an agent thinks with now, still on this computer (the agents frame); null: none. */
   account?: (agentId: string) => string | null;
+  /** Root's shared git cache (`systemGitCache`); without it a worker's clones get none. */
+  gitCache?: (input: { connection: string; repo: string; github: string; uid: number }) => Promise<string | null>;
   /** Tests: the clock of the browser's lease. */
   now?: () => number;
   /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
@@ -282,6 +297,8 @@ export interface SupervisorOptions {
   /** Tests: where processes are read (`/proc`), and how systemd is asked to move one. */
   proc?: string;
   busctl?: (args: string[]) => Promise<{ code: number; output: string }>;
+  /** Tests: whether systemd takes `OOMPolicy=` on scopes (`scopeOomPolicy`). */
+  scopeOomPolicy?: () => boolean;
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -322,6 +339,8 @@ interface Worker {
   browserLeaseAt: number;
   /** When it asked for its processes to be moved, in the last minute (`scope.enter`). */
   enters: number[];
+  /** Its clone slots, by its id (`release` once it has one): a worker that stops gives them back. */
+  slots: Map<string, { release?: () => void }>;
 }
 
 interface Show {
@@ -730,6 +749,7 @@ export class Supervisor {
         shows: new Map(),
         browserLeaseAt: 0,
         enters: [],
+        slots: new Map(),
       };
       this.workers.set(user.id, w);
     }
@@ -843,6 +863,8 @@ export class Supervisor {
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
     );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
+    for (const slot of w.slots.values()) slot.release?.();
+    w.slots.clear();
     w.attempt = retired || Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
@@ -902,7 +924,7 @@ export class Supervisor {
   private sendState(w: Worker) {
     if (!w.ready) return;
     const s = this.opts.state();
-    const folders = s.access.folders.filter((f) => f.agents.includes(w.user.id));
+    const folders = s.access.folders.filter((f) => grantedTo(f, w.user.id));
     const viewers = this.opts.desktopViewers?.(w.user.id) ?? 0;
     const frame: WorkerLinkFrame = {
       type: "worker.state",
@@ -1072,6 +1094,19 @@ export class Supervisor {
       );
       return;
     }
+    // A clone outlives the worker's session (ADR 0116): its slot and its cache too.
+    if (f?.type === "clone.slot") return this.cloneSlot(w, typeof f.slotId === "string" ? f.slotId.slice(0, 64) : "");
+    if (f?.type === "clone.release") {
+      const id = typeof f.slotId === "string" ? f.slotId : "";
+      const slot = w.slots.get(id);
+      w.slots.delete(id);
+      slot?.release?.();
+      return;
+    }
+    if (f?.type === "cache.fill") {
+      void this.cacheFill(w, f);
+      return;
+    }
     // Counted whenever it comes: the worker's Chrome ran between its sessions too.
     if (f?.type === "browser.traffic") {
       if (inRange(f.up, [0, TRAFFIC_DELTA_MAX]) && inRange(f.down, [0, TRAFFIC_DELTA_MAX])) {
@@ -1151,6 +1186,36 @@ export class Supervisor {
   }
 
   /**
+   * A clone slot of the computer's (`localCloneSlot`: root's process holds them all), so the cap is per computer,
+   * whichever agents clone. One the worker no longer waits for (it stopped, or let go) goes to the next.
+   */
+  private cloneSlot(w: Worker, slotId: string) {
+    if (!slotId || w.slots.has(slotId) || w.slots.size >= MAX_WORKER_SLOTS) return;
+    const slot: { release?: () => void } = {};
+    w.slots.set(slotId, slot);
+    void localCloneSlot(() => this.write(w, { type: "clone.slotted", slotId, waiting: true })).then((release) => {
+      if (w.slots.get(slotId) !== slot) return release();
+      slot.release = release;
+      this.write(w, { type: "clone.slotted", slotId });
+    });
+  }
+
+  /** Root's shared cache, for the worker's own agent (its uid, never one the frame names). */
+  private async cacheFill(w: Worker, f: Record<string, unknown>) {
+    const fillId = typeof f.fillId === "string" ? f.fillId.slice(0, 64) : "";
+    const str = (v: unknown) => (typeof v === "string" ? v : "");
+    const dir = this.opts.gitCache
+      ? await this.opts
+          .gitCache({ connection: str(f.connection), repo: str(f.repo), github: str(f.github), uid: w.user.uid })
+          .catch((err: unknown) => {
+            this.opts.log(`[${w.user.user}] the git cache failed: ${err instanceof Error ? err.message : String(err)}`);
+            return null;
+          })
+      : null;
+    this.write(w, { type: "cache.filled", fillId, ...(dir ? { dir } : {}) });
+  }
+
+  /**
    * The worker's agent's desktop, only while it serves a request the server sent it that uses the desktop that
    * way (desktop use, or a browser command the server put on the desktop), or, for its Chrome, a click on Browser
    * on that desktop (`showBrowser`): the agent's own code runs as the worker's user and could ask at any other time.
@@ -1198,6 +1263,8 @@ export class Supervisor {
     const cgroup = async () => /^0::(\/.*)$/m.exec(await read("cgroup"))?.[1] ?? "";
     if (!(await cgroup()).startsWith(agentDir)) return "That process isn't in this agent's slice";
     const slice = agentCategorySlice(uid, kind);
+    // As the launcher's scopes (`systemLauncher`): a tab or a tool's command stopped for memory takes only itself.
+    const oom = (this.opts.scopeOomPolicy ?? scopeOomPolicy)() ? ["OOMPolicy", "s", "continue"] : [];
     const asked = await (this.opts.busctl ?? busctl)([
       "call",
       "--timeout=5",
@@ -1208,7 +1275,8 @@ export class Supervisor {
       "ssa(sv)a(sa(sv))",
       `agentes-${kind}-${uid}-${pid}.scope`,
       "fail",
-      "3",
+      String(oom.length > 0 ? 4 : 3),
+      ...oom,
       "PIDs",
       "au",
       "1",
@@ -1366,8 +1434,8 @@ export function retireLegacyPending(
 }
 
 /** `agentes-runner worker` for one agent through its launcher (its user, its slice, only its environment). */
-export function workerCommand(user: AgentUser, runner: string[], home: string, systemd?: boolean) {
-  const l = systemLauncher(user, systemd);
+export function workerCommand(user: AgentUser, runner: string[], home: string, systemd?: boolean, oomPolicy?: boolean) {
+  const l = systemLauncher(user, systemd, oomPolicy);
   return {
     argv: [...l.prefix, ...runner, "worker", "--agent", user.id, "--dir", l.home, "--home", home],
     cwd: l.home,

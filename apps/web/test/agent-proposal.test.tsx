@@ -273,7 +273,7 @@ describe("one request, one card: what it gets, created in one click", () => {
       "GitHub · só consulta",
       "walter@acme.com.br · só consulta",
       "joao@acme.com.br · consulta e muda · só João libera",
-      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · Só olhar e contar",
+      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília)",
     ]);
     // What each run is told, folded under its line: one click makes it under my name.
     expect(card.querySelector(".waitcard__prompt")?.textContent).toContain(ROUTINE.prompt);
@@ -313,7 +313,7 @@ describe("one request, one card: what it gets, created in one click", () => {
     if (!card) throw new Error("no card");
     await click(within(card).getByRole("button", { name: "Ver detalhes" }));
     expect(lines(card).at(-1)).toBe(
-      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · Só olhar e contar · um admin libera · não criada",
+      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · um admin libera · não criada",
     );
     await click(within(card).getByRole("button", { name: "Criar a rotina E-mails do dia" }), 6);
     expect(state.calls.find((c) => c.method === "agents.proposalRoutine")?.args).toEqual([ORG_ID, "p-1"]);

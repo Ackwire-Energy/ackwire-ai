@@ -1,3 +1,4 @@
+import { joinNames } from "@agenteschat/client/lib/format";
 import {
   agentWaitingPhrase,
   type ComputerBrain,
@@ -57,7 +58,11 @@ export interface MoveAgentsResult {
 export const OUTAGES_POLL_MS = 30_000;
 
 /** The brains' product names (not translated). */
-export const BRAIN_NAME: Record<ComputerBrain, string> = { claude_code: "Claude Code", codex: "Codex" };
+export const BRAIN_NAME: Record<ComputerBrain, string> = {
+  claude_code: "Claude Code",
+  codex: "Codex",
+  cursor: "Cursor",
+};
 
 // ── Words ───────────────────────────────────────────────────────────────────
 
@@ -146,7 +151,10 @@ export function targetText(t: TFunction, x: TargetOption) {
   }
   // The workspace's own computer: always on, a user of its own for each agent.
   if (x.managed) return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.managedDesc") };
-  const brains = x.brains.map((b) => BRAIN_NAME[b]).join(t("mobile.outage.sheet.and"));
+  const brains = joinNames(
+    x.brains.map((b) => BRAIN_NAME[b]),
+    t,
+  );
   return {
     title,
     tag: t("mobile.outage.sheet.on"),

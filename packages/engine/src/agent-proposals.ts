@@ -5,7 +5,7 @@ import { orgToolCatalog, setAgentAccess } from "./access";
 import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS, takenHandles } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
-import { canTalkTo, talksToAgents } from "./audience";
+import { canTalkTo, speakerFor } from "./audience";
 import { setAgentBrain } from "./brain-settings";
 import { requireChannelAccess } from "./channels";
 import { prefixService, toolPrefixOf, toolPrefixOfConnection } from "./connectors/connections";
@@ -50,7 +50,7 @@ export const AGENT_PROPOSAL_CARD = "agent_proposal";
  * else the workspace's model when it has a key, else none (connected after it is created).
  */
 export type SuggestedAi =
-  | { kind: "account"; brain: "claude_code" | "codex"; machineId: string; accountId: string; label: string }
+  | { kind: "account"; brain: "claude_code" | "codex" | "cursor"; machineId: string; accountId: string; label: string }
   | { kind: "model" }
   | { kind: "none" };
 
@@ -469,7 +469,7 @@ export async function suggestAgentAi(
           eq(machineAccounts.orgId, orgId),
           eq(machineAccounts.createdBy, userId),
           eq(machineAccounts.status, "active"),
-          inArray(machineAccounts.kind, ["claude_code", "codex"]),
+          inArray(machineAccounts.kind, ["claude_code", "codex", "cursor"]),
           notInArray(machineAccounts.id, used),
         ),
       )
@@ -478,7 +478,7 @@ export async function suggestAgentAi(
     if (free) {
       return {
         kind: "account",
-        brain: free.kind === "codex" ? "codex" : "claude_code",
+        brain: free.kind === "codex" || free.kind === "cursor" ? free.kind : "claude_code",
         machineId: free.machineId,
         accountId: free.id,
         label: free.label,
@@ -918,7 +918,7 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
   for (const m of mail) {
     if (
       !mailAccountIds.includes(m.accountId) &&
-      !canTalkTo(now, m.ownerUserId, await talksToAgents(db, orgId, m.ownerUserId))
+      !canTalkTo(now, m.ownerUserId, await speakerFor(db, orgId, m.ownerUserId))
     )
       unheard.add(m.ownerUserId);
   }

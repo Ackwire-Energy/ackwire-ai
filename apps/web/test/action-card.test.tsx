@@ -169,8 +169,8 @@ describe("a stretch's pause card (ADR 0089)", () => {
       ),
     );
     await open(state);
-    // Ada's own budget is US$ 40: 20% of it.
-    const spend = cardRow("Ada parou para te consultar · usou US$ 8 (20% do orçamento do mês) nisso sem você");
+    // Ada's own budget is US$\u00a040: 20% of it.
+    const spend = cardRow("Ada parou para te consultar · usou US$\u00a08 (20% do orçamento do mês) nisso sem você");
     expect(within(spend).getByRole("button", { name: "Continuar" })).toBeTruthy();
     const done = cardRow("Atlas parou para te consultar · 10 passos sem você desde o seu pedido");
     expect(done.textContent).toContain("Você deixou continuar");

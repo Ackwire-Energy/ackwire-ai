@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { splitAtNames } from "@agenteschat/client/lib/text";
+import { Fragment, type ReactNode } from "react";
+import { Text as RNText, StyleSheet, View } from "react-native";
 import type { AgentLookInput } from "@/agent/looks";
 import { agentLayout, framedByDefault } from "@/agent/poses";
 import { AgentAvatar, PersonAvatar, WithPresence } from "@/ui";
@@ -116,3 +118,53 @@ function Badged({
     </WithPresence>
   );
 }
+
+/**
+ * An agent named in a line of text: its still face, the text's size, then its name (the web's `.ac-who`). A child of a
+ * `<Text>`; the face is an inline view lifted onto the capitals.
+ */
+export function AgentWho({
+  agentId,
+  name,
+  size = 14,
+}: {
+  agentId: string | null | undefined;
+  name: string;
+  size?: number;
+}) {
+  return (
+    <RNText style={whoStyles.who}>
+      <View style={[whoStyles.face, { width: size, height: size, marginRight: Math.round(size * 0.25) }]}>
+        <AgentFace agentId={agentId} size={size} live={false} />
+      </View>
+      {name}
+    </RNText>
+  );
+}
+
+/** `text` with each agent's name, where it first stands as a word, drawn as `AgentWho`: children for a `<Text>`. */
+export function withAgentFaces(
+  text: string,
+  who: { name: string; agentId: string | null | undefined }[],
+  size?: number,
+) {
+  const parts = splitAtNames(
+    text,
+    who.map((w) => w.name),
+  );
+  if (parts.every((p) => typeof p === "string")) return text;
+  return parts.map((p, i) =>
+    typeof p === "string" ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+      <Fragment key={i}>{p}</Fragment>
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: same
+      <AgentWho key={i} agentId={who[p]?.agentId} name={who[p]?.name ?? ""} size={size} />
+    ),
+  );
+}
+
+const whoStyles = StyleSheet.create({
+  who: { fontWeight: "600" },
+  face: { transform: [{ translateY: 2 }] },
+});

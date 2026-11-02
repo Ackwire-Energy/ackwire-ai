@@ -91,7 +91,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
     actions.stop.mutate(agentId, {
       onSuccess: () => {
         setConfirming(null);
-        toast.show(t("browser.machine.stopped", agentGrammar(t, name)));
+        toast.show(t("browser.machine.stopped", agentGrammar(name)));
       },
       onError: () => toast.show(t("browser.live.actionFailed"), "error"),
     });
@@ -171,7 +171,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
           ) : (
             <div className="brw-uses">
               {uses.map(({ agent, open }) => {
-                const g = agentGrammar(t, agent.name);
+                const g = agentGrammar(agent.name);
                 const waiting = open?.status === "pending";
                 return (
                   <div key={agent.id} className="brw-use">

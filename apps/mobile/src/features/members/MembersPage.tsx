@@ -1,16 +1,22 @@
 import {
   type InvitationWithStatus,
+  type Person,
   useAllInvitations,
+  useApi,
   useCancelSuggestion,
   useJoinRequests,
   useMe,
   useMySuggestions,
   usePeople,
+  useRemoveMember,
   useRoles,
 } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { namesText } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { removalLines } from "@agenteschat/client/lib/removal";
+import { leaves, removes } from "@agenteschat/client/lib/roles";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -56,6 +62,10 @@ function Members() {
   const roles = useRoles(orgId).data?.roles ?? [];
   const invites = can(org, "invite_people");
   const list = people.data;
+  const remove = useRemoveFlow();
+  const viewer = { role: org?.role ?? "member", rank: org?.rank, userId: meId ?? "", permissions: org?.permissions };
+  // Remover do workspace for whoever may, Sair on one's own row (not the last owner); the server checks it again.
+  const removable = (m: Person) => (m.userId === meId ? leaves(viewer, list ?? []) : removes(viewer, m, roles));
 
   return (
     <Page title={invites ? t("settings.section.members") : t("members.title")}>
@@ -81,6 +91,7 @@ function Members() {
               leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} presence ring={c.raised} />}
               label={m.userId === meId ? `${m.name}${t("common.youSuffix")}` : m.name}
               sub={memberLine(t, i18n.language, m, roles)}
+              {...(removable(m) ? { more: true, onPress: () => void remove(m) } : {})}
             />
           ))}
         </GroupedList>
@@ -89,6 +100,66 @@ function Members() {
       )}
     </Page>
   );
+}
+
+/**
+ * "Remover do workspace" (or "Sair do workspace"): what goes with the person, as the server reads it, in the system's
+ * confirmation; then the removal, and the person's own leaving goes back to the start.
+ */
+function useRemoveFlow() {
+  const { t, i18n } = useTranslation();
+  const { orgId, org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const meId = useMeId();
+  const toast = useToast();
+  const remove = useRemoveMember(orgId);
+  const orgName = org?.name ?? "";
+  const failed = (e: unknown) =>
+    toast({ title: knownErrorText(t, e, i18n.language) ?? t("mobile.app.failed"), icon: "x" });
+  return async (m: Person) => {
+    const mine = m.userId === meId;
+    let lines: string[];
+    try {
+      const preview = await qc.fetchQuery({
+        queryKey: ["org", orgId, "removal", m.userId],
+        queryFn: () => api.orgs.removal(orgId, m.userId),
+        staleTime: 0,
+      });
+      lines = removalLines(t, preview, { name: m.name, org: orgName, mine, meId: meId ?? "" });
+    } catch (e) {
+      return failed(e);
+    }
+    const go = async () => {
+      try {
+        await remove.mutateAsync(m.userId);
+        toast({
+          title: mine
+            ? t("members.remove.left", { org: orgName })
+            : t("members.remove.done", { name: m.name, org: orgName }),
+        });
+        if (mine) router.replace("/");
+      } catch (e) {
+        failed(e);
+      }
+    };
+    Alert.alert(
+      mine
+        ? t("members.remove.leaveTitle", { org: orgName })
+        : t("members.remove.title", { name: m.name, org: orgName }),
+      lines.join("\n\n"),
+      [
+        { text: t("mobile.common.back"), style: "cancel" },
+        {
+          text: mine
+            ? t("members.remove.confirmLeave", { org: orgName })
+            : t("members.remove.confirm", { name: m.name }),
+          style: "destructive",
+          onPress: () => void go(),
+        },
+      ],
+    );
+  };
 }
 
 /** Esperando você: who asked through the link and whom members suggested, each opening the review (ADR 0068, 0090). */

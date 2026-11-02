@@ -1,4 +1,5 @@
-import { Button, Dialog, DialogFooter, Input, Switch } from "@agenteschat/ui";
+import { type AppLocale, localeInfo } from "@agenteschat/i18n/locale";
+import { Button, Dialog, DialogFooter, Input, Select, Switch } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
@@ -10,13 +11,14 @@ import { homeServer } from "../../control/server";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
 import { useLocalServer, usePref } from "../../hooks";
+import { detectedLocale, LOCALE_PREF, locales, switchDesktopLocale } from "../../i18n";
 import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
 
 export function General() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const host = useHost();
   const store = useStore();
   const snap = useSnapshot();
@@ -37,6 +39,7 @@ export function General() {
   const [notch, setNotch] = usePref(NOTCH_PREF, false);
   const [dock, setDock] = usePref(DOCK_PREF, true);
   const [menuBar, setMenuBar] = usePref<boolean | null>(MENU_BAR_PREF, null);
+  const [language, setLanguage] = usePref<AppLocale | "auto">(LOCALE_PREF, "auto");
   const [leaving, setLeaving] = useState<Home | null>(null);
   const [busy, setBusy] = useState(false);
   const iconShown = menuBarShown(menuBar, dock, works || local.run);
@@ -203,6 +206,26 @@ export function General() {
 
       <CardTitle>{t("desktop.prefs.general.behavior")}</CardTitle>
       <PrefCard>
+        <PrefRow
+          title={t("shell.language")}
+          htmlFor="language"
+          end={
+            <Select
+              id="language"
+              size="sm"
+              align="end"
+              value={language}
+              onValueChange={(v) => {
+                setLanguage(v);
+                switchDesktopLocale(i18n, v === "auto" ? detectedLocale() : v, host.platform);
+              }}
+              options={[
+                { value: "auto", label: t("shell.languageAuto", { language: localeInfo(detectedLocale()).native }) },
+                ...locales.map((l) => ({ value: l.code, label: l.label })),
+              ]}
+            />
+          }
+        />
         <PrefRow
           title={t("desktop.prefs.general.launchTitle")}
           hint={launchHint ? hintFor(t, t("desktop.prefs.general.launchTitle"), t(launchHint)) : undefined}

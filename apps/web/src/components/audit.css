@@ -137,6 +137,11 @@ html:not([data-pointer]) .audit-row:focus-visible {
 }
 
 /* ── The panel's body ── */
+/* It hangs from the shell, outside .shell__main, so it brings the page's surfaces along. */
+.audit-panel {
+  --bg: var(--pane);
+  --surface: var(--pane);
+}
 .audit-panel__body {
   display: flex;
   flex-direction: column;

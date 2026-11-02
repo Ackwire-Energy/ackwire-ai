@@ -15,6 +15,8 @@ import {
   cacheMessageActions,
   cacheMessageMemories,
   cacheMessageMeta,
+  cacheMessageWork,
+  cachePinned,
   catchUpChannel,
   consultSeeds,
   consultsIn,
@@ -171,20 +173,6 @@ function cacheReactions(
 }
 
 /**
- * A message was pinned or unpinned: its mark in every loaded list of the
- * channel (the pins list itself is refetched). Also used optimistically by
- * "Fixar" / "Desafixar".
- */
-export function cachePinned(qc: QueryClient, orgId: string, channelId: string, messageId: string, pinned: boolean) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) => (m.id === messageId ? { ...m, pinned } : m));
-  });
-}
-
-/**
  * A stopped reply was continued (my own "Continuar"; others' arrive as `run.continued`, `useContinuedRun`):
  * its "Continuar" goes away in every loaded list of the channel (`meta.canceled.continuedRunId`).
  */
@@ -258,6 +246,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "message.reactions":
       cacheReactions(qc, orgId, channelId, event.messageId, event.reactions);
       break;
+    case "poll.updated":
+      qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
+      break;
     case "message.memories":
       // What an agent saved from a person's message: the memory mark under it.
       cacheMessageMemories(qc, orgId, channelId, event.messageId, event.memories);
@@ -265,6 +256,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "message.actions":
       // An agent's receipts changed (undone, redone, a new one): replace the list.
       cacheMessageActions(qc, orgId, channelId, event.messageId, event.actions);
+      break;
+    case "agent.work":
+      // A long work moved, updated or ended (ADR 0121): its anchor's line redraws.
+      cacheMessageWork(qc, orgId, channelId, event.work);
       break;
     case "approval.created":
     case "approval.decided":

@@ -42,7 +42,7 @@ import {
   useOriginShort,
 } from "../approvals/parts";
 import { chatHref } from "../links/logic";
-import { AgentFace, Face } from "../shared/Face";
+import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
@@ -82,7 +82,7 @@ export function ConsultationCard({
       : cs.status === "expired"
         ? t(`mobile.chat.consult.expired${gn}`, { name })
         : cs.kind === "note"
-          ? t("chat.consultation.failedNote", { name, The: agentGrammar(t, name).The })
+          ? t("chat.consultation.failedNote", { name, context: agentGrammar(name).context })
           : t(`mobile.chat.consult.failed${gn}`, { name });
   return (
     <View style={[styles.box, styles.cs, surface]}>
@@ -106,7 +106,7 @@ export function ConsultationCard({
       {open ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
-            {t(consultAskedKey(cs), { name: asker })}
+            {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
           </Text>
           <Text variant="small" tone="muted">
             {cs.question}
@@ -634,11 +634,13 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       <AskDone
         done
         words={
-          q.answer === null
-            ? t("mobile.chat.question.closed")
-            : who
-              ? t("mobile.chat.question.answered", { name: who, answer: said })
-              : t("mobile.chat.question.answeredByYou", { answer: said })
+          q.withdrawn
+            ? t("question.withdrawn", agentGrammar(dir.anyAgent(q.agentId)?.name ?? t("channel.unknownAgent")))
+            : q.answer === null
+              ? t("mobile.chat.question.closed")
+              : who
+                ? t("mobile.chat.question.answered", { name: who, answer: said })
+                : t("mobile.chat.question.answeredByYou", { answer: said })
         }
       />
     );

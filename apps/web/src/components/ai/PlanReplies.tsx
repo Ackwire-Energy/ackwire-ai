@@ -22,7 +22,7 @@ export function PlanReplies({
   onChange: (on: boolean) => void;
   /** The agent's name, or null for every agent of a plan's panel ("Atendem outras pessoas"). */
   agent: string | null;
-  brain: "claude_code" | "codex";
+  brain: "claude_code" | "codex" | "cursor";
   /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
   plan?: string | null;
   /** A coding plan, named by the line, its maker's words behind the ⓘ. */
@@ -59,7 +59,7 @@ export function PlanRepliesOf({ on, owner, agentName }: { on: boolean; owner: st
     <div className="plan-replies">
       <b>{on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { owner })}</b>
       <span className="plan-replies__terms">
-        {t("aiAccounts.share.onOther", { ...agentGrammar(t, agentName), owner })}
+        {t("aiAccounts.share.onOther", { ...agentGrammar(agentName), owner })}
       </span>
     </div>
   );

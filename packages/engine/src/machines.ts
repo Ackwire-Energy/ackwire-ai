@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  BROWSER_PROFILE_PROTOCOL,
   DESKTOP_PROTOCOL,
   HEARTBEAT_MS,
   MACHINE_TOKEN_PREFIX,
@@ -369,6 +370,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       runnerVersion: m.runnerVersion,
       /** The runner's machine protocol (9+: pause; 10+: access on the machine). */
       protocol: m.protocol,
+      /** Its runner can hold browser profiles (ADR 0110); a system-mode computer has none at all (`mode`). */
+      browserProfiles: m.protocol >= BROWSER_PROFILE_PROTOCOL,
       execAllowed: m.execAllowed,
       /** The owner paused it (ADR 0036 §6); `until` null: until they resume. */
       paused: pause ? { until: pause.until } : null,
@@ -378,6 +381,18 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       workspace: (admin || mine) && !managed ? m.workspace : null,
       /** Folders and tools allowed on the machine (protocol 10); admins and the pairer only, null otherwise or unknown. */
       access: admin || mine ? (m.access ?? null) : null,
+      /**
+       * Its workspace disk and shared folder (ADR 0115) as its runner last measured them; admins and the pairer
+       * only, null otherwise or from a runner that doesn't say.
+       */
+      disk:
+        (admin || mine) && m.load?.diskFreeGb !== undefined
+          ? {
+              freeGb: m.load.diskFreeGb,
+              use: m.load.diskUse ?? null,
+              sharedGb: m.load.sharedGb ?? null,
+            }
+          : null,
       /** Whether the agent browser can run there (protocol 12, ADR 0040); null when its runner doesn't say. */
       browser: m.executors?.browser
         ? {

@@ -111,12 +111,17 @@ export const extraIcons = {
     ["circle", { cx: "8", cy: "7", r: "2.8" }],
     ["path", { d: "M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4" }],
   ],
+  /** "Adicionar pessoas ou agentes" (a channel row's hover): a person and a plus. */
+  personAdd: [
+    ["circle", { cx: "8", cy: "7", r: "2.8" }],
+    ["path", { d: "M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4M15 7.5v5M12.5 10h5" }],
+  ],
   /** Memory: "Sempre no contexto". */
   pin: [["path", { d: "M7 3h6l-1 5 3 3H5l3-3zM10 11v6" }]],
   /** Memory, proposals: back link. */
   chevronLeft: [["path", { d: "M12 5 7 10l5 5" }]],
   /** Receipts: an agent answered (two checks, same stroke as `check`). */
-  checks: [["path", { d: "m2.5 10.5 3 3 6-7M9 13l.5.5 6-7" }]],
+  checks: [["path", { d: "m2 10.5 3 3 6-7M10 12.5l1 1 7-8" }]],
   /** Feedback on an agent reply: helpful. Not in the screens yet; drawn on the same grid. */
   thumbUp: [["path", { d: "M7 9v8H4V9zM7 9l3-6a2 2 0 0 1 2 2v3h4a1.6 1.6 0 0 1 1.6 1.9l-1.2 6A2 2 0 0 1 14.4 17H7" }]],
   /** Feedback on an agent reply: not helpful. */

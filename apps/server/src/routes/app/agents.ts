@@ -42,11 +42,12 @@ import {
   requirePermission,
   revokeCredential,
   SETUP_AGENTS_MAX,
+  type Speaker,
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
   setCoordinator,
-  talksToAgents,
+  speakerFor,
   updateAgent,
   updateAgentGroup,
   usageSummary,
@@ -93,10 +94,10 @@ const toAgent = (
   a: AgentRow,
   viewerId: string,
   seesCost: boolean,
-  budgetUsedPercent?: number,
-  brain?: AgentBrainSummary,
-  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0085). */
-  talks = true,
+  budgetUsedPercent: number | undefined,
+  brain: AgentBrainSummary | undefined,
+  /** The viewer as the audience rule reads them (`speakerFor`, ADR 0085). */
+  talks: Speaker,
 ) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
@@ -200,7 +201,7 @@ const AgentProposal = z
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
-            brain: z.enum(["claude_code", "codex"]),
+            brain: z.enum(["claude_code", "codex", "cursor"]),
             machineId: z.uuid(),
             accountId: z.uuid(),
             label: z.string(),
@@ -381,7 +382,7 @@ export function agentRoutes(deps: AppDeps) {
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
-        talksToAgents(db, orgId, actor),
+        speakerFor(db, orgId, actor),
         oldHandlesByAgent(db, orgId),
       ]);
       const percent = (id: string) => {
@@ -435,7 +436,7 @@ export function agentRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 state: z.enum(["ready", "no_ai", "waiting"]),
                 reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
-                own: z.enum(["claude_code", "codex"]).optional(),
+                own: z.enum(["claude_code", "codex", "cursor"]).optional(),
               }),
             ),
             routing: z.object({
@@ -507,12 +508,20 @@ export function agentRoutes(deps: AppDeps) {
                         "waiting_plan",
                         "waiting_budget",
                         "provider_down",
+                        "work",
                       ])
                       .nullable()
                       .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
                     subject: z.string().nullable(),
                     emoji: z.string().nullable(),
                     until: z.string().nullable(),
+                    since: z.string().optional().openapi({ description: "Background work: since when." }),
+                    count: z.number().optional().openapi({ description: "Background work: how many at once." }),
+                    second: z.string().nullable().optional().openapi({ description: "A second work's title." }),
+                    wait: z
+                      .enum(["approval", "answer", "plan", "computer", "line"])
+                      .optional()
+                      .openapi({ description: "One background work that waits: on what." }),
                   })
                   .nullable(),
                 activeAt: z.string().nullable(),
@@ -614,7 +623,12 @@ export function agentRoutes(deps: AppDeps) {
           db,
           c.get("user").id,
           orgId,
-          { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
+          {
+            ...input,
+            monthlyBudgetNanoUsd: budget(monthlyBudgetUsd),
+            // A restricted one is born answering only its owner, so an audience refused below never leaves it open.
+            ...(audience && audience.mode !== "everyone" ? { audienceMode: "owner" as const } : {}),
+          },
           // New agents start on "Automático".
           NEW_AGENT_DEFAULTS,
           // The person's Criar agente: what they pick is what the next one starts with (ADR 0094).
@@ -627,7 +641,9 @@ export function agentRoutes(deps: AppDeps) {
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
-      return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
+      const userId = c.get("user").id;
+      const [seesCost, talks] = await Promise.all([canViewCost(db, userId, orgId), speakerFor(db, orgId, userId)]);
+      return c.json(toAgent(agent, userId, seesCost, undefined, undefined, talks), 201);
     },
   );
 
@@ -680,7 +696,14 @@ export function agentRoutes(deps: AppDeps) {
       if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(
         {
-          agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)),
+          agent: toAgent(
+            made.agent,
+            userId,
+            await canViewCost(db, userId, orgId),
+            undefined,
+            undefined,
+            await speakerFor(db, orgId, userId),
+          ),
           proposal: made.proposal,
           ai: made.ai,
         },
@@ -790,7 +813,7 @@ export function agentRoutes(deps: AppDeps) {
       const [seesCost, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
-        talksToAgents(db, orgId, actor),
+        speakerFor(db, orgId, actor),
         oldHandlesByAgent(db, orgId),
       ]);
       return c.json(
@@ -1011,6 +1034,10 @@ export function agentRoutes(deps: AppDeps) {
                 "Claude Code: `opus`, `sonnet`, `haiku`, a Claude model id or one of a coding plan's models by id (`@agenteschat/providers/plans`; another account runs `sonnet` for it); Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
+            extraUsage: z.boolean().optional().openapi({
+              description:
+                "Long work may go on into the plan's paid extra usage when the provider reports it on (ADR 0118; Claude's plans); false: it pauses at 95% of the plan like any other. Omitted = keep.",
+            }),
             onlyOwner: z.boolean().optional().openapi({
               description:
                 "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",

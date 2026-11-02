@@ -2,13 +2,15 @@ import {
   type BrowserHandoff,
   browserSteps,
   handoffFuse,
-  handoffMinutesLeft,
+  handoffTimeLeft,
   isOpenHandoff,
   type LiveRun,
+  profileLiveKey,
   rememberHeldPlace,
   useAgentBrowserHandoff,
   useAgentScreenControl,
   useBrowserHandoffActions,
+  useBrowserProfileMutations,
   useBrowserStuck,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -29,7 +31,7 @@ import { Sky } from "@/sky/Sky";
 import { Button, Fuse, Icon, PixelOrbit, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useEdition, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
-import { tapHaptic, useSurface } from "../shared/parts";
+import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { pageGapKey, pageNoteOf, siteOf, skyBehind, stepText, waitsForPage } from "./logic";
 import { AddressBar, browserTyping, FrameView, TypeBar, useLiveConnection } from "./parts";
 import { useFinishHandoff } from "./useFinishHandoff";
@@ -58,8 +60,11 @@ export function BrowserCard({
   canTakeOver = true,
   onClosed,
   style,
+  profile,
 }: {
   agentId: string;
+  /** A shared browser profile (ADR 0110) instead of the agent's browser: "Fazer login" from the computer's page. */
+  profile?: { id: string; name: string };
   /** The agent's run in its browser (what it does now, the log). */
   run?: LiveRun | null;
   /** At work with no run to show here (its profile): closed, the card still shows its small live picture. */
@@ -96,6 +101,7 @@ export function BrowserCard({
   const cloud = useEdition() === "cloud";
   const now = useNow(15_000);
   const actions = useBrowserHandoffActions(orgId);
+  const profileActions = useBrowserProfileMutations(orgId);
   const [ownOpen, setOwnOpen] = useState(false);
   const open = surface || (openProp ?? ownOpen);
   const setOpen = (next: boolean) => {
@@ -104,21 +110,21 @@ export function BrowserCard({
   };
 
   const agent = dir.agentById.get(agentId);
-  const name = agent?.name ?? "";
+  const name = profile?.name ?? agent?.name ?? "";
   const g = genderOf(name);
   const color = agentLook(agent).color;
   // A take over has no message of its own: the agent's open request, while this card is open.
-  const ofAgent = useAgentBrowserHandoff(orgId, agentId, open && !given);
+  const ofAgent = useAgentBrowserHandoff(orgId, agentId, open && !given && !profile);
   const handoff = given ?? (ofAgent.data && isOpenHandoff(ofAgent.data) ? ofAgent.data : null);
   // Watching is for everyone behind its work; driving it only for admins, its owner and who it asked (ADR 0040).
-  const control = useAgentScreenControl(orgId, agentId, !given);
-  const mayDrive = given !== null || control.data !== false;
+  const control = useAgentScreenControl(orgId, agentId, !given && !profile);
+  const mayDrive = Boolean(profile) || given !== null || control.data !== false;
   // Open, or closed while the agent works in it (its small live picture); a finished one keeps the last frame.
   // The person in control keeps watching even closed: their watching is what keeps their control.
   const holding = Boolean(meId) && handoff?.status === "active" && handoff.controllerUserId === meId;
   const working = Boolean(run) || busy;
   const watching = open || working || holding;
-  const live = useLiveConnection(agentId, watching);
+  const live = useLiveConnection(profile ? profileLiveKey(profile.id) : agentId, watching || Boolean(profile));
   const controller = live.handoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
   const mine = Boolean(meId) && controller === meId;
   const waiting = handoff?.status === "pending";
@@ -142,7 +148,7 @@ export function BrowserCard({
   const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
   const hiddenNote = surface
-    ? t("browser.inCard.hiddenHelp", agentGrammar(t, name))
+    ? t("browser.inCard.hiddenHelp", agentGrammar(name))
     : t("mobile.browser.live.hidden", { name: helper });
   const sky = !live.frame && skyBehind(note);
   const doneLabel = handoff?.kind === "takeover" ? t("mobile.browser.live.handBack") : t("mobile.browser.live.done");
@@ -172,6 +178,10 @@ export function BrowserCard({
     tapHaptic();
     setOpen(true);
     try {
+      if (profile) {
+        await profileActions.takeover.mutateAsync(profile.id);
+        return;
+      }
       // From a run's card: bound to that run, so the card stays in this conversation while the run waits.
       const h = await actions.takeover(agentId, run?.runId);
       if (h.kind === "takeover" && h.runId && run) {
@@ -182,7 +192,14 @@ export function BrowserCard({
       else failedToast();
     }
   };
-  const { handBack, couldnt } = useFinishHandoff(handoff, name, doneLabel);
+  const finishing = useFinishHandoff(handoff, name, doneLabel);
+  const couldnt = finishing.couldnt;
+  // A profile's control has no task to report on: Devolver just hands it back.
+  const handBack = () => {
+    if (!profile) return finishing.handBack();
+    tapHaptic();
+    void profileActions.handback.mutateAsync(profile.id).then(successHaptic, failedToast);
+  };
   const stop = () => {
     tapHaptic();
     Alert.alert(t(`mobile.browser.card.stopAsk${g}`, { name }), undefined, [
@@ -199,7 +216,7 @@ export function BrowserCard({
   const retry = () => {
     tapHaptic();
     setAttempt((n) => n + 1);
-    if (mayDrive) void actions.restart(agentId).catch(failedToast).finally(live.retry);
+    if (mayDrive && !profile) void actions.restart(agentId).catch(failedToast).finally(live.retry);
     else live.retry();
   };
 
@@ -209,18 +226,16 @@ export function BrowserCard({
   // Nothing going on (its profile, the agent idle): the agent's browser and where it runs, not "in the browser".
   const idle = !working && !handoff && !host;
   const title =
-    asked ||
-    host ||
-    (surface ? "" : idle ? t("browser.inCard.group", agentGrammar(t, name)) : t("browser.watch.title"));
+    asked || host || (surface ? "" : idle ? t("browser.inCard.group", agentGrammar(name)) : t("browser.watch.title"));
   const hasAction = Boolean(mine && handoff) || waiting || (!controller && canTake);
-  const minutes = waiting ? handoffMinutesLeft(handoff, now) : null;
+  const left = waiting ? handoffTimeLeft(t, handoff, now) : null;
   const subtitle = mine
     ? host
       ? t("mobile.browser.card.inControlAt", { host })
       : t("mobile.browser.live.inControl")
     : waiting
-      ? minutes !== null
-        ? t("mobile.browser.card.needsFor", { name, count: minutes })
+      ? left !== null
+        ? t("mobile.browser.card.needsFor", { name, time: left })
         : t("mobile.browser.card.needs", { name })
       : helper
         ? t("mobile.browser.live.helping", { name: helper })
@@ -301,7 +316,7 @@ export function BrowserCard({
                       onPress={takeover}
                     />
                   ) : null}
-                  {ready && !surface ? (
+                  {ready && !surface && !profile ? (
                     <Pressable
                       onPress={stop}
                       accessibilityRole="button"
@@ -365,7 +380,17 @@ export function BrowserCard({
           </View>
           {mine ? (
             <View style={styles.control}>
-              {goShown ? <AddressBar name={name} cloud={cloud} onOpen={(url) => actions.open(agentId, url)} /> : null}
+              {goShown ? (
+                <AddressBar
+                  name={name}
+                  cloud={cloud}
+                  onOpen={(url) =>
+                    profile
+                      ? profileActions.open.mutateAsync({ profileId: profile.id, url })
+                      : actions.open(agentId, url)
+                  }
+                />
+              ) : null}
               <TypeBar {...browserTyping(live.sendInput)} />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (

@@ -300,6 +300,13 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     byName: "Ana Souza",
     url: `${APP}/org/${ORG}`,
   },
+  "app_connected.en": {
+    kind: "app_connected",
+    locale: "en",
+    appName: "Claude",
+    orgName: "Souza Bakery",
+    url: `${APP}/org/${ORG}/settings/apps`,
+  },
   /** Two workspaces closed with it, on a server with a support address. */
   "account_deleted.en": {
     kind: "account_deleted",

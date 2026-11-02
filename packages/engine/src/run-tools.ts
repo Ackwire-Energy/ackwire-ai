@@ -32,7 +32,7 @@ import { withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
+const { agentRuns, agents, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
 
 /**
  * Tool access for runs, shared by the engine loop and the runner's `agentes`
@@ -133,6 +133,9 @@ export interface BrowserTrailStep {
   detail?: string;
   at: string;
   failed?: true;
+  /** It ran in a shared browser profile (ADR 0110): its id and its name then (a renamed one still reads). */
+  profileId?: string;
+  profileName?: string;
 }
 
 /** The most browser steps one message keeps (the latest ones); as many desktop steps. */
@@ -170,7 +173,8 @@ export function absorbBrowserCall(
   at = new Date(),
 ) {
   const found = screenTool(call.name);
-  if (!found || found.tool === TRAIL_DATA[found.screen].plan) return;
+  // A plan's steps come in its result; the profile switch is no step on the page.
+  if (!found || found.tool === TRAIL_DATA[found.screen].plan || found.tool === "browser_profile") return;
   const { tool, screen } = found;
   const detail = toolDetail(tool, call.input as Record<string, unknown> | undefined);
   t[screen] = withTrail(t[screen], [
@@ -226,6 +230,15 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
     });
     if (steps.length > 0) t[screen] = withTrail(t[screen], steps);
   }
+  // The call ran in a profile: its steps (a plan's, else the call's own, absorbed just before) say which.
+  const profile = data.browserProfile as { id?: unknown; name?: unknown } | undefined;
+  if (profile && typeof profile.id === "string" && typeof profile.name === "string" && t.browser?.length) {
+    const planned = Array.isArray(data.browserTrail) ? data.browserTrail.length : 1;
+    for (const step of t.browser.slice(-Math.max(1, planned))) {
+      step.profileId = profile.id;
+      step.profileName = profile.name;
+    }
+  }
   const update = data.memoryUpdate as MemoryUpdate | undefined;
   if (update) t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
   return update ?? null;
@@ -280,8 +293,8 @@ async function recordBridgeEffects(
   outcome: InvokeResult,
 ) {
   const effects: ToolSideEffects = {};
-  const update = outcome.type === "result" ? absorbToolData(effects, outcome.output.data) : null;
   absorbBrowserCall(effects, call, outcome.type === "result" && outcome.output.isError === true);
+  const update = outcome.type === "result" ? absorbToolData(effects, outcome.output.data) : null;
   if (!hasEffects(effects)) return;
   await deps.db.transaction(async (tx) => {
     const [row] = await tx
@@ -723,6 +736,11 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
     return message;
   };
 
+  const [asker] =
+    requests.secretRequestIds.length > 0
+      ? await tx.select({ name: agents.name }).from(agents).where(eq(agents.id, run.agentId))
+      : [];
+  const agentName = asker?.name ?? "An agent";
   for (const requestId of requests.secretRequestIds) {
     const [request] = await tx
       .update(secretRequests)
@@ -730,8 +748,9 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .where(eq(secretRequests.id, requestId))
       .returning();
     if (!request) continue;
-    const message = await card(asked, `Secret request: ${request.name}`, {
-      ...bodyCode("secret_request", { name: request.name }),
+    // The card names the key itself: this text is for previews and notifications, a sentence of its own.
+    const message = await card(asked, `${agentName} asked for a key: ${request.name}`, {
+      ...bodyCode("secret_request", { agent: agentName, name: request.name }),
       secretRequestId: request.id,
       secretRequest: secretRequestView(request),
     });

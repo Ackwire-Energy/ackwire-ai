@@ -1,3 +1,4 @@
+import type { WikiAudience } from "../api/types";
 import { headingId, parseMarkdown, wikiLinksIn } from "./markdown";
 
 /** "Guia de deploy" → "guia-de-deploy" (unique in the org, like the backend; the folder isn't in it). */
@@ -204,4 +205,80 @@ export function layoutGraph(
     }
   }
   return pos.map(({ slug, x, y }) => ({ slug, x: Math.round(x), y: Math.round(y) }));
+}
+
+/** What someone may do with a wiki page or folder. */
+export type WikiLevel = "none" | "view" | "edit";
+
+/** Who sees and who edits a page or a folder, as the server takes it: `null` lists mean everyone. */
+export interface WikiAccess {
+  audience: WikiAudience | null;
+  agentIds: string[] | null;
+  editors: WikiAudience | null;
+  agentEditorIds: string[] | null;
+}
+
+/** The same as the "Quem vê" form holds it: a level for everyone, and one per role, person and agent. */
+export interface WikiAccessDraft {
+  people: WikiLevel;
+  agents: WikiLevel;
+  roles: Record<string, WikiLevel>;
+  users: Record<string, WikiLevel>;
+  agentRows: Record<string, WikiLevel>;
+}
+
+export const OPEN_WIKI_ACCESS: WikiAccess = { audience: null, agentIds: null, editors: null, agentEditorIds: null };
+
+const rowLevels = (seen: string[] | null, editors: string[] | null) => {
+  const rows: Record<string, WikiLevel> = {};
+  for (const id of seen ?? []) rows[id] = !editors || editors.includes(id) ? "edit" : "view";
+  if (!seen) for (const id of editors ?? []) rows[id] = "edit";
+  return rows;
+};
+
+const baseLevel = (seen: unknown, editors: unknown): WikiLevel => (seen ? "none" : editors ? "view" : "edit");
+
+export function wikiAccessDraft(a: WikiAccess): WikiAccessDraft {
+  return {
+    people: baseLevel(a.audience, a.editors),
+    agents: baseLevel(a.agentIds, a.agentEditorIds),
+    roles: rowLevels(a.audience?.roleIds ?? null, a.editors?.roleIds ?? null),
+    users: rowLevels(a.audience?.userIds ?? null, a.editors?.userIds ?? null),
+    agentRows: rowLevels(a.agentIds, a.agentEditorIds),
+  };
+}
+
+const idsAt = (rows: Record<string, WikiLevel>, levels: WikiLevel[]) =>
+  Object.keys(rows).filter((id) => levels.includes(rows[id] ?? "none"));
+
+/** The lists a draft saves as. With a list of who sees, an editors' list exists only if someone on it just views. */
+export function wikiAccessOf(d: WikiAccessDraft): WikiAccess {
+  const viewers = [...idsAt(d.roles, ["view"]), ...idsAt(d.users, ["view"])];
+  const editors = { roleIds: idsAt(d.roles, ["edit"]), userIds: idsAt(d.users, ["edit"]) };
+  const agentEditors = idsAt(d.agentRows, ["edit"]);
+  return {
+    audience:
+      d.people === "none"
+        ? { roleIds: idsAt(d.roles, ["view", "edit"]), userIds: idsAt(d.users, ["view", "edit"]) }
+        : null,
+    agentIds: d.agents === "none" ? idsAt(d.agentRows, ["view", "edit"]) : null,
+    editors: d.people === "view" || (d.people === "none" && viewers.length > 0) ? editors : null,
+    agentEditorIds:
+      d.agents === "view" || (d.agents === "none" && idsAt(d.agentRows, ["view"]).length > 0) ? agentEditors : null,
+  };
+}
+
+/** Whether a draft limits anything. */
+export const wikiAccessLimited = (a: WikiAccess) => Boolean(a.audience || a.agentIds || a.editors || a.agentEditorIds);
+
+/** Levels for "everyone" that stay inside a limited folder: it can only be narrower. */
+export function wikiBaseLevels(cap: WikiLevel): WikiLevel[] {
+  return cap === "edit" ? ["edit", "view", "none"] : cap === "view" ? ["view", "none"] : ["none"];
+}
+
+/** The most one row may reach inside a limited folder (`base`: the folder's level for everyone). */
+export function wikiRowCap(base: WikiLevel, row: WikiLevel | undefined): WikiLevel {
+  if (base === "edit") return "edit";
+  if (base === "view") return row === "edit" ? "edit" : "view";
+  return row ?? "none";
 }

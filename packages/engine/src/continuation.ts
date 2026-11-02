@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { accountablePerson, runAuthority } from "./authority";
 import { getChannelCached } from "./context";
@@ -12,6 +12,7 @@ import { notifyRunFailed } from "./notification-producers";
 import { ANSWER_NUDGE } from "./reply-policy";
 import { deliverNoticeToRun } from "./run-resume";
 import type { AgentRun } from "./runs";
+import { neutralizeUntrusted, untrustedBlock } from "./untrusted";
 
 /**
  * The continuation controller (ADR 0097): every turn of every run kind that reaches its final answer ends in exactly
@@ -33,21 +34,95 @@ export interface ContinuationState {
   askNudged?: boolean;
   /** The last turn was told to ask: this one is judged past the cap, and turns into the question if it didn't. */
   askPending?: boolean;
+  /** It was told once to say whether it still needs its open requests (`openRequestNudge`). */
+  requestNudged?: boolean;
+  /** It was told once to ask for a secret securely: the next secret verdict ends the run as it is. */
+  secretNudged?: boolean;
 }
 
-export type ContinuationVerdict = "done" | "continue" | "ask";
+export type ContinuationVerdict = "done" | "continue" | "ask" | "untried" | "secret";
+
+/**
+ * What a run reads when it ended saying it couldn't while it still had ways to try (ADR 0109): its means and what it
+ * already tried, so it varies the attempt instead of handing the problem to a person.
+ */
+export function untriedNudge(means: string[], tried: string[]) {
+  const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
+  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried:\n${triedBlock(tried)}\nUse the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. ${SAFETY_FINAL} If none works, say what you tried and the one thing a person must give.`;
+}
+
+/**
+ * A refusal for safety ends that path for that data (ADR 0117): the nudges and HOW_YOU_WORK say so, so "take another
+ * way" never reads as "send it some other way".
+ */
+export const SAFETY_FINAL =
+  "A refusal for safety (a credential, private data in an address, secrets, sending data out) is final: never send that data another way. Say what was refused.";
+
+/** What a tried line starts with when its call was refused for safety (`triedCalls`). */
+export const SAFETY_TAG = "[refused for safety]";
+
+/**
+ * Refusal codes (a tool result's `data.code`) that stop data from going out: the gateway's credential check,
+ * `remember`'s unasked destination and the outbound checks on web addresses. A command held for a person's approval
+ * (`command.approval_needed`) is not one: the person may let it run.
+ */
+const SAFETY_CODES = new Set([
+  "tool.credential",
+  "memory.unasked_destination",
+  "outbound.private_text",
+  "outbound.credential",
+  "outbound.long",
+]);
+
+const isSafetyCode = (code: unknown) => typeof code === "string" && SAFETY_CODES.has(code);
+
+/**
+ * A computer brain's own call the command policy refused because it reads secrets or sends data out
+ * (`mission-commands.ts`). Inline code, a remote host or a shell are refused with another way to do it, so they
+ * aren't final.
+ */
+const HARNESS_SAFETY =
+  /→ failed: (?:This command was refused because (?:it touches secrets|it sends data)|Agents never read secrets)/;
+
+/** The tried lines as a run reads them: inside the envelope, since their outcomes quote tool results. */
+const triedBlock = (tried: string[]) =>
+  tried.length > 0 ? untrustedBlock("what you tried", tried.slice(-8).join("\n")) : "nothing yet";
+
+/** Every failed tried line was refused for safety (and at least one failed). */
+export function onlySafetyRefusals(tried: string[]): boolean {
+  const failed = tried.filter((l) => l.includes("→ failed: "));
+  return failed.length > 0 && failed.every((l) => l.startsWith(SAFETY_TAG));
+}
+
+/**
+ * What an `ask_user` call reads when its question asks for something the run could find itself (ADR 0109
+ * addendum): held once, its means and what it already tried, and the next ask goes through.
+ */
+export function findableNudge(means: string[], tried: string[]) {
+  const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
+  return `Not asked yet: ask a person only for what only they can give, and this you can find. Your means: ${have}. Already tried:\n${triedBlock(tried)}\n${SAFETY_FINAL} Find it first: search the web for the docs and read them, try it (on your computer, or with web_fetch), search the workspace for a name the person uses. When something stays unclear, state your assumption and go on. Ask only for what only a person can give (a key through request_secret, a decision, an approval). If you still need to ask, call ask_user again: that one is asked.`;
+}
 
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */
 export const ASK_NUDGE =
-  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few. Do not end with a list of what's missing.";
+  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few (a key or a password through request_secret). Do not end with a list of what's missing.";
+
+/**
+ * What a run reads, once, when its reply asks a person for a secret in the chat (ADR 0109 addendum): its reply is not
+ * posted, and a question card is never made of it, since the answer would stay in the conversation in plain text.
+ */
+export const SECRET_NUDGE =
+  "Not posted: never ask for a secret (a key, a token, a password) in the chat, where it stays in plain text. If you have request_secret, call it: the person types it into a secure card. Otherwise say which key is needed and where it is set up, without asking for it here.";
 
 /** The run's last judged turn, kept for the mission's keep-going check (`keepGoingBlocker` reads `waiting`). */
-export const verdictRecord = (v: ContinuationVerdict) => (v === "continue" ? "unkept" : v === "ask" ? "waiting" : v);
+export const verdictRecord = (v: ContinuationVerdict) =>
+  v === "continue" || v === "untried" ? "unkept" : v === "ask" || v === "secret" ? "waiting" : v;
 
 /**
  * One judge call on a turn's end (kind `follow_through`, recorded on the agent's and the workspace's usage like
- * every judgment, not billed to the agent's budget). `continue` at p ≥ 0.45 and at least p(ask); `ask` at
- * p ≥ 0.45; otherwise done. A missed continuation is silent lost work, a needless one is one turn.
+ * every judgment, not billed to the agent's budget). `continue` at p ≥ 0.45 and at least p(ask); `untried` at
+ * p ≥ 0.45 and at least p(continue) and p(ask); `ask` at p ≥ 0.45; otherwise done. A missed continuation is silent
+ * lost work, a needless one is one turn.
  */
 export async function continuationVerdict(
   judge: Judge,
@@ -57,43 +132,179 @@ export async function continuationVerdict(
     runId: string;
     request: string;
     reply: string;
-    did: string[];
+    /** What the turn really has (`turnMeans`, its computer's own tools on a computer brain). */
+    means: string[];
+    /**
+     * Each tool call of the run with its argument and outcome (`triedCalls`): the gateway's run steps (API brains,
+     * and computer brains through the MCP bridge) plus a computer brain's own tools (`transcript.harnessTried`).
+     */
+    tried: string[];
     runKind: TurnKind;
     /** Agents its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
     unreached?: string;
+    /**
+     * Asks the same call whether the turn taught something worth keeping (ADR 0120) and hands the answer here: no
+     * extra model call on any turn.
+     */
+    onLearn?: (signal: LearnSignal) => void;
+    /** The call with the `learn` question failed and the verdict was asked again without it (error reports). */
+    onLearnFailed?: (error: unknown) => void;
   },
 ): Promise<ContinuationVerdict> {
-  const answers = await judge.ask({
-    orgId: input.orgId,
-    agentId: input.agentId,
-    runId: input.runId,
-    kind: "follow_through",
-    state: {
-      request: cutText(input.request, 2000),
-      reply: cutTextEnd(input.reply, 3000),
-      did: input.did.slice(-20),
-      runKind: input.runKind,
-      ...(input.unreached ? { unreached: input.unreached } : {}),
-    },
-    questions: {
-      verdict: {
-        type: "choice",
-        instructions:
-          "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message (`did`: the tools it ran this turn). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, or does it need something only a person can give?",
-        criteria: {
-          done: "It gave the result or the answer, or said plainly what it couldn't do and why. An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
-          continue:
-            "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
-          ask: "To go on it needs something only a person can give (a credential, a decision, a test, access), but it described the need or listed what's missing instead of asking one direct question.",
-        },
+  const ask = (learn: boolean) =>
+    judge.ask({
+      orgId: input.orgId,
+      agentId: input.agentId,
+      runId: input.runId,
+      kind: "follow_through",
+      state: {
+        request: cutText(input.request, 2000),
+        reply: cutTextEnd(input.reply, 3000),
+        means: input.means,
+        tried: input.tried.slice(-20).map(neutralizeUntrusted),
+        runKind: input.runKind,
+        ...(input.unreached ? { unreached: input.unreached } : {}),
       },
-    },
-  });
+      questions: {
+        verdict: {
+          type: "choice",
+          instructions:
+            "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
+          criteria: {
+            done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
+            untried:
+              "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
+            continue:
+              "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
+            ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
+            secret:
+              "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
+          },
+        },
+        ...(learn ? { learn: LEARN_QUESTION } : {}),
+      },
+    });
+  let learned = input.onLearn !== undefined;
+  let answers: Awaited<ReturnType<typeof ask>>;
+  try {
+    answers = await ask(learned);
+  } catch (error) {
+    // Some providers' filters refuse a wording (a Claude subscription sign-in's misleading 400): the follow-through
+    // verdict must never fail because of the extra question, so it is asked again alone.
+    if (!learned) throw error;
+    learned = false;
+    input.onLearnFailed?.(error);
+    answers = await ask(false);
+  }
+  if (input.onLearn) {
+    const choice = learned ? answers.learn?.choice : undefined;
+    input.onLearn(LEARN_SIGNALS.includes(choice as LearnSignal) ? (choice as LearnSignal) : "none");
+  }
   const a = answers.verdict;
   const p = (k: ContinuationVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
-  if (p("continue") >= 0.45 && p("continue") >= p("ask")) return "continue";
-  if (p("ask") >= 0.45) return "ask";
-  return "done";
+  const verdict: ContinuationVerdict =
+    p("secret") >= 0.45 && (["untried", "continue", "ask"] as const).every((k) => p("secret") >= p(k))
+      ? "secret"
+      : p("untried") >= 0.45 && p("untried") >= p("continue") && p("untried") >= p("ask")
+        ? "untried"
+        : p("continue") >= 0.45 && p("continue") >= p("ask")
+          ? "continue"
+          : p("ask") >= 0.45
+            ? "ask"
+            : "done";
+  // What failed was only refused for safety: no way is left to try for that data. Work it said it will still do
+  // (`continue`) goes on.
+  return verdict === "untried" && onlySafetyRefusals(input.tried) ? "done" : verdict;
+}
+
+/** What a finished turn taught, as the turn-end judgment reads it (ADR 0120): `none` starts no learning. */
+export type LearnSignal = "none" | "method" | "correction" | "fact";
+const LEARN_SIGNALS: readonly LearnSignal[] = ["none", "method", "correction", "fact"];
+
+const LEARN_QUESTION = {
+  type: "choice" as const,
+  instructions:
+    "Did this turn show something durable the agent should keep for next time, as `request`, `reply` and `tried` show it?",
+  criteria: {
+    method:
+      "It worked out a way it will reuse: several tries before one worked, a new API or address, a command or a script it wrote.",
+    correction:
+      "A person corrected it or said how they want things done from now on ('always…', 'from now on…', 'don't… again').",
+    fact: "A person's message or a tool result gave a lasting fact about the company, its people or its systems.",
+    none: "Anything else: a one-off request, a passing error, a plain answer or a story.",
+  },
+};
+
+/** One tool call as the judge reads it: `name(argument) → outcome`, short. */
+export function callLine(name: string, input: unknown, result?: { content: string; isError?: boolean } | null) {
+  const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  // `use_tool` runs another tool: the judge reads that one.
+  if (typeof i.tool === "string" && i.arguments && typeof i.arguments === "object")
+    return callLine(i.tool, i.arguments, result);
+  const arg = ["query", "url", "command", "q", "prompt", "question", "message", "text", "path", "name"]
+    .map((k) => i[k])
+    .find((v): v is string => typeof v === "string" && v.trim() !== "");
+  const outcome = !result ? "" : ` → ${result.isError ? "failed: " : ""}${oneLineCut(result.content, 90) || "(empty)"}`;
+  return `${name}${arg ? `(${oneLineCut(arg, 80)})` : ""}${outcome}`;
+}
+
+const oneLineCut = (text: string, max: number) => cutText(text.replace(/\s+/g, " ").trim(), max);
+
+/**
+ * Every tool call of a run, oldest first (the last 20), as the judge reads them (`tried`): the gateway's run steps
+ * (every brain's calls to our tools, a computer brain's through the MCP bridge) and then `harness`, a computer
+ * brain's own tools (Claude Code's Bash, WebSearch…, Codex's commands), which the runner forwards as `brain.event`
+ * `tool_call` events with `executed` and the run keeps in `transcript.harnessTried`.
+ */
+export async function triedCalls(db: Database, run: { id: string; orgId: string }, harness: string[] = []) {
+  const calls = await runCalls(db, run);
+  const tag = (line: string, safety: boolean | undefined) => (safety ? `${SAFETY_TAG} ${line}` : line);
+  return [
+    ...calls.map((c) => tag(callLine(c.name, c.input, c.result), c.safety)),
+    ...harness.map((l) => tag(l, !l.startsWith(SAFETY_TAG) && HARNESS_SAFETY.test(l))),
+  ].slice(-20);
+}
+
+/** A run's tool calls through the gateway, oldest first, each with its result once it came. */
+export async function runCalls(db: Database, run: { id: string; orgId: string }) {
+  const steps = await db
+    .select({ kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
+    .from(schema.agentRunSteps)
+    .where(
+      and(
+        eq(schema.agentRunSteps.orgId, run.orgId),
+        eq(schema.agentRunSteps.runId, run.id),
+        inArray(schema.agentRunSteps.kind, ["tool_call", "tool_result"]),
+      ),
+    )
+    .orderBy(schema.agentRunSteps.seq);
+  const calls = new Map<string, RunCall>();
+  for (const { kind, data } of steps) {
+    const id = typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`;
+    const name = typeof data.name === "string" ? data.name : "";
+    if (kind === "tool_call") calls.set(id, { name, input: data.input });
+    else {
+      const call = calls.get(id) ?? { name, input: undefined };
+      call.result = {
+        content: String(data.content ?? ""),
+        isError: data.isError === true,
+        // `data.data.outside`: the gateway's mark for any outside read, which survives `shown` dropping the envelope.
+        external: data.external === true || (data.data as { outside?: unknown } | undefined)?.outside === true,
+      };
+      call.safety = data.isError === true && isSafetyCode((data.data as { code?: unknown } | undefined)?.code);
+      calls.set(id, call);
+    }
+  }
+  return [...calls.values()];
+}
+
+export interface RunCall {
+  name: string;
+  input: unknown;
+  /** `external`: an answer read from outside (an MCP server, a screen), recorded without its envelope. */
+  result?: { content: string; isError?: boolean; external?: boolean };
+  /** Refused for safety (`SAFETY_CODES`): final for that data. */
+  safety?: boolean;
 }
 
 export type TurnKind = "conversation" | "agents_dm" | "routine";
@@ -119,10 +330,17 @@ export interface TurnEnd {
   /** What is judged ("" skips the judgment: nothing to read, or an agents' DM run that owes no answer). */
   judged: string;
   mission: boolean;
+  /**
+   * Requests for a person it made in this run and stopped waiting on, still open (`openRequestNudge`, "" none): it
+   * says once whether it still needs them before ending.
+   */
+  openRequest?: string;
   /** Something durable brings it back (`wakesLater`), read only when the judgment would run. */
   wakesLater(): Promise<boolean>;
   /** The judgment; null when the workspace has no judge. */
   verdict: (() => Promise<ContinuationVerdict>) | null;
+  /** What an `untried` turn is reminded of (`untriedNudge`): its means and what it tried, filled by `verdict`. */
+  evidence?: { means: string[]; tried: string[] };
 }
 
 export type TurnEndDecision = {
@@ -146,6 +364,8 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   if (t.quiet) return { outcome: "done", rule: "quiet" };
   if (t.decided && canNudge) return { outcome: "continue", rule: "decision", nudge: decisionNudge(t.decided) };
   if (t.unanswered && canNudge) return { outcome: "continue", rule: "answer", nudge: ANSWER_NUDGE };
+  if (t.openRequest && !t.state.requestNudged)
+    return { outcome: "continue", rule: "open_request", nudge: t.openRequest };
   if (!t.judged || !t.verdict) return { outcome: "done", rule: t.verdict ? "nothing_to_judge" : "no_judge" };
   if (!canNudge && !t.state.askPending && (t.state.askNudged || t.kind !== "conversation"))
     return { outcome: "done", rule: "cap" };
@@ -158,7 +378,13 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   }
   // No person reads a routine's run or an agents' DM: what it lacks goes out in its report or its answer, and
   // the controller of the run that reads it can ask.
-  if (verdict === "ask" && t.kind !== "conversation") return { outcome: "done", rule: "ask_elsewhere", verdict };
+  if ((verdict === "ask" || verdict === "secret") && t.kind !== "conversation")
+    return { outcome: "done", rule: "ask_elsewhere", verdict };
+  // A secret asked in the chat is never posted nor made a question card: once told the secure way, then as it is.
+  if (verdict === "secret")
+    return t.state.secretNudged
+      ? { outcome: "done", rule: "secret_cap", verdict }
+      : { outcome: "continue", rule: "secret", verdict, nudge: SECRET_NUDGE };
   // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
   if (verdict === "continue" && t.unreached && canNudge)
     return { outcome: "continue", rule: "unreached", verdict, nudge: t.unreached };
@@ -174,6 +400,18 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
     // Promising again without acting: a person is asked what it needs instead.
     if (t.kind !== "conversation") return { outcome: "done", rule: "cap", verdict };
   }
+  // It said it couldn't with ways left: once more with its means, while it still acts between nudges.
+  if (verdict === "untried") {
+    const progressed = t.state.count === 0 || t.executed > (t.state.executedAtNudge ?? 0);
+    if (canNudge && progressed)
+      return {
+        outcome: "continue",
+        rule: "untried",
+        verdict,
+        nudge: untriedNudge(t.evidence?.means ?? [], t.evidence?.tried ?? []),
+      };
+    return { outcome: "done", rule: "untried_cap", verdict };
+  }
   if (verdict === "done") return { outcome: "done", rule: "judged", verdict };
   if (!t.state.askNudged)
     return { outcome: "continue", rule: "ask", verdict, nudge: t.mission ? MISSION_ASK_NUDGE : ASK_NUDGE };
@@ -185,6 +423,8 @@ export function advance(state: ContinuationState, d: TurnEndDecision, executed: 
   const { askPending: _, ...rest } = state;
   if (d.outcome !== "continue") return rest;
   if (d.rule === "ask") return { ...rest, askNudged: true, askPending: true };
+  if (d.rule === "secret") return { ...rest, secretNudged: true };
+  if (d.rule === "open_request") return { ...rest, requestNudged: true };
   return { ...rest, count: state.count + 1, executedAtNudge: executed };
 }
 

@@ -252,7 +252,7 @@ export function TeamPage() {
                 size="sm"
                 variant="ghost"
                 icon="trash"
-                aria-label={t("agentPage.delete.action", agentGrammar(t, a.name))}
+                aria-label={t("agentPage.delete.action", agentGrammar(a.name))}
                 onClick={() => setDeleting(a)}
               >
                 {t("agentPage.delete.button")}
@@ -474,7 +474,7 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
   const summary = excerpt(dir.agentById.get(agent.id)?.instructions ?? "", SUMMARY_MAX, 1);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const catalog = useCatalog();
   const serviceOf = (k: CapKey) => {
     const def = catalog.data?.connectors.find((c) => c.id === CAP_CONNECTOR[k]);

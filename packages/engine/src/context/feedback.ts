@@ -213,6 +213,7 @@ export async function addAgentReaction(
   db: Database,
   input: { orgId: string; agentId: string; messageId: string; reaction: string },
   pubsub?: PubSub,
+  options: { notify?: boolean } = {},
 ) {
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
@@ -230,7 +231,7 @@ export async function addAgentReaction(
     reactions,
   });
   // A person's message: its author hears the agent reacted.
-  if (inserted.length > 0 && message.authorType === "person") {
+  if (inserted.length > 0 && message.authorType === "person" && options.notify !== false) {
     await notifyReaction(
       { db, pubsub },
       { orgId: input.orgId, messageId: input.messageId, agentId: input.agentId },
@@ -285,7 +286,8 @@ export async function recordContextUse(db: Database, orgId: string, runId: strin
     .update(contextItems)
     .set({
       useCount: sql`${contextItems.useCount} + 1`,
-      relevance: sql`least(1, ${contextItems.relevance} + 0.05)`,
+      // Each use moves it less the more it already has, so the most used items stop climbing (ADR 0120).
+      relevance: sql`${contextItems.relevance} + 0.05 * (1 - ${contextItems.relevance})`,
       lastUsedAt: new Date(),
     })
     .where(and(eq(contextItems.orgId, orgId), inArray(contextItems.id, itemIds)));

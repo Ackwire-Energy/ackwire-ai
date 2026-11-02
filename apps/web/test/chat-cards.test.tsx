@@ -134,6 +134,145 @@ describe("one call is its own line, with no 'Usou 1 ferramenta' to open", () => 
   });
 });
 
+describe("a lone quick read that only fed the answer shows no card", () => {
+  test("live: checking its usage shows while it runs, then goes; a second step brings the block", async () => {
+    const api = createFakeApi(seedState());
+    await renderPage(<Live work={[call("1", "get_my_usage", { running: true })]} done={false} />, { api, org: true });
+    expect(document.querySelector(".ac-tools__row b")?.textContent).toBe("Conferindo o próprio uso…");
+    await rerender([call("1", "get_my_usage", { ms: 33 })], true);
+    await settle(2);
+    expect(document.querySelector(".ac-tools")).toBeNull();
+    expect(document.body.textContent).not.toContain("Conferiu o próprio uso");
+    await rerender([call("1", "get_my_usage", { ms: 33 }), call("2", "search_context")], true);
+    await settle(2);
+    expect(document.querySelector(".ac-tools__head .ac-tools__text")?.textContent).toBe("Usou 2 ferramentas");
+    // One that failed, or took long, keeps its line.
+    await rerender([call("1", "get_my_usage", { failed: true })], true);
+    await settle(2);
+    expect(document.querySelector(".ac-tools__row b")?.textContent).toBe("Deu erro conferindo o próprio uso");
+    await rerender([call("1", "get_my_usage", { ms: 6000 })], true);
+    await settle(2);
+    expect(document.querySelector(".ac-tools__row b")?.textContent).toBe("Conferiu o próprio uso");
+  });
+
+  test("saved: the run's lone quick read is no card; one that failed or changed something is", async () => {
+    const api = createFakeApi(seedState());
+    await renderPage(
+      <>
+        <SavedTools
+          runId="r-1"
+          meta={{ work: { steps: 1, calls: [{ name: "get_my_usage" }], durationMs: 2000, ms: 33 } }}
+          agentName="Ada"
+        />
+        <SavedTools
+          runId="r-2"
+          meta={{ work: { steps: 1, calls: [{ name: "get_my_usage" }], durationMs: 2000, ms: 40, failed: true } }}
+          agentName="Ada"
+        />
+        <SavedTools
+          runId="r-3"
+          meta={{ work: { steps: 1, calls: [{ name: "create_routine" }], durationMs: 2000, ms: 40 } }}
+          agentName="Ada"
+        />
+      </>,
+      { api, org: true },
+    );
+    await settle(2);
+    expect([...document.querySelectorAll(".ac-tools__row b")].map((b) => b.textContent)).toEqual([
+      "Deu erro conferindo o próprio uso",
+      "Criou uma rotina",
+    ]);
+  });
+});
+
+describe("the browser's card says what it did: no 'Ver o que ele fez' that opens on nothing", () => {
+  test("only browser steps (on their card): no block; besides them, the one call left is its own line", async () => {
+    const api = createFakeApi(seedState());
+    const asked: string[] = [];
+    api.agents.run = async (_orgId, runId) => {
+      asked.push(runId);
+      return {
+        run: { id: runId, createdAt: at(0), finishedAt: at(43) } as Run,
+        steps: [1, 2, 3].flatMap((i) => [
+          {
+            seq: i * 2 - 1,
+            kind: "tool_call" as const,
+            data: { toolUseId: `t${i}`, name: "browser_navigate", input: {} },
+            createdAt: at(i),
+          },
+          {
+            seq: i * 2,
+            kind: "tool_result" as const,
+            data: { toolUseId: `t${i}`, isError: false, content: "ok" },
+            createdAt: at(i),
+          },
+        ]),
+      };
+    };
+    await renderPage(
+      <>
+        <SavedTools
+          runId="r-1"
+          meta={{ work: { steps: 3, calls: [{ name: "browser_navigate" }], durationMs: 43_000 } }}
+          agentName="Ada"
+          skipScreens={["browser"]}
+        />
+        <SavedTools
+          runId="r-2"
+          meta={{
+            work: {
+              steps: 4,
+              calls: [
+                { name: "browser_navigate", n: 3 },
+                { name: "create_issue", n: 1 },
+              ],
+              durationMs: 43_000,
+            },
+          }}
+          agentName="Ada"
+          skipScreens={["browser"]}
+        />
+      </>,
+      { api, org: true },
+    );
+    await settle(2);
+    const blocks = [...document.querySelectorAll<HTMLElement>(".ac-tools")];
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.querySelector(".ac-tools__head")).toBeNull();
+    expect(blocks[0]?.querySelector(".ac-tools__row b")?.textContent).toBe("Criou uma tarefa");
+    expect(document.body.textContent).not.toContain("Ver o que");
+    expect(document.body.textContent).not.toContain("sem usar ferramentas");
+    expect(asked).toEqual([]);
+  });
+});
+
+describe("beside the browser's card, a lone quick read shows nothing, kept or saved", () => {
+  test("saved: the call left beside the browser's steps is quiet when the server timed it", async () => {
+    const api = createFakeApi(seedState());
+    const meta = (extra: Record<string, unknown>) => ({
+      work: {
+        steps: 4,
+        calls: [
+          { name: "browser_navigate", n: 3 },
+          { name: "get_my_usage", n: 1, ...extra },
+        ],
+        durationMs: 43_000,
+      },
+    });
+    await renderPage(
+      <>
+        <SavedTools runId="r-1" meta={meta({ ms: 33 })} agentName="Ada" skipScreens={["browser"]} />
+        <SavedTools runId="r-2" meta={meta({ ms: 33, failed: true })} agentName="Ada" skipScreens={["browser"]} />
+      </>,
+      { api, org: true },
+    );
+    await settle(2);
+    expect([...document.querySelectorAll(".ac-tools__row b")].map((b) => b.textContent)).toEqual([
+      "Deu erro conferindo o próprio uso",
+    ]);
+  });
+});
+
 /** Ada's answer with what it changed (a routine) and its one call, as the channel shows it. */
 const ANSWER = "Pronto: toda segunda às 9h eu posto o relatório de pagamentos aqui.";
 function answer(routineId: string, actions: Partial<AgentAction>[] = [{}]): Message {

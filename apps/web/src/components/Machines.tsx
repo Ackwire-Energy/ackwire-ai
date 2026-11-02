@@ -1,5 +1,6 @@
 import type { Machine, MachineAccessReduce, MachineOs, MachinePause, MachineToolName } from "@agenteschat/client";
 import {
+  profilesApply,
   useAgents,
   useAuthConfig,
   useDesktopLatest,
@@ -15,6 +16,7 @@ import { formatBytes } from "@agenteschat/client/lib/files";
 import { clockAt, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  allowedFolders,
   allowsInApp,
   canReduceAccess,
   computerKind,
@@ -29,6 +31,8 @@ import {
   MACHINE_TOOLS,
   machineTitle,
   platformOf,
+  sharedFolderFacts,
+  sharedFolderOf,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -65,6 +69,7 @@ import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ThisMacButton, useAgentsHere, useIsThisMac } from "@/components/ThisMac";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
+import { BrowserProfilesCard } from "./browser/BrowserProfiles";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 import { Egress } from "./computer/Egress";
 import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
@@ -121,14 +126,29 @@ function useCopy() {
     try {
       await navigator.clipboard?.writeText(text);
       toast.show(done);
+      return true;
     } catch {
       toast.show(t("common.unknownError"), "error");
+      return false;
     }
   };
 }
 
-/** A terminal command (or anything to paste) in a code block, with Copiar; `copied`: what the toast says. */
-export function CommandBlock({ command, copied }: { command: string; copied?: string }) {
+/**
+ * A terminal command (or anything to paste) in a code block, with Copiar; `copied`: what the toast says, `onCopied`:
+ * after it reached the clipboard.
+ */
+export function CommandBlock({
+  command,
+  copied,
+  copyLabel,
+  onCopied,
+}: {
+  command: string;
+  copied?: string;
+  copyLabel?: string;
+  onCopied?: () => void;
+}) {
   const { t } = useTranslation();
   const copy = useCopy();
   return (
@@ -142,9 +162,13 @@ export function CommandBlock({ command, copied }: { command: string; copied?: st
         iconOnly
         icon="copy"
         className="machine-command__copy"
-        aria-label={t("common.copy")}
-        title={t("common.copy")}
-        onClick={() => void copy(command, copied ?? t("machines.commandCopied"))}
+        aria-label={copyLabel ?? t("common.copy")}
+        title={copyLabel ?? t("common.copy")}
+        onClick={() =>
+          void copy(command, copied ?? t("machines.commandCopied")).then((ok) => {
+            if (ok) onCopied?.();
+          })
+        }
       />
     </div>
   );
@@ -375,7 +399,7 @@ function MachineRow({
             title={t("machines.usedBy", {
               names: joinNames(
                 m.agents.map((a) => a.name),
-                t("newAgent.and"),
+                t,
               ),
             })}
           >
@@ -716,12 +740,14 @@ function ReduceDialog({ machine, reduce, onClose }: { machine: Machine; reduce: 
 
 /** Pastas liberadas: each folder, which agents use it, and (for the owner) Remover. */
 function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: Reduce) => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const agents = useAgents(org.id);
   const nameOf = (id: string) =>
     agents.data?.find((a) => a.id === id)?.name ?? m.agents.find((a) => a.id === id)?.name ?? "";
   const access = m.access;
+  const shared = sharedFolderOf(access);
+  const folders = allowedFolders(access);
   // This very Mac with an app too old to report: update it from here (agentes for Mac, ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   return (
@@ -752,12 +778,25 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
               <span className="small muted">{t("machines.access.ownFolderText")}</span>
             </span>
           </div>
-          {access.folders.length === 0 && (
+          {shared && (
+            <div className="ac-list__row machine-folder" data-shared-folder>
+              <span className="machine-row__icon">
+                <Icon name="members" />
+              </span>
+              <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
+                <span className="machine-folder__name">{t("machines.shared.title")}</span>
+                <span className="small muted">{t("machines.shared.text")}</span>
+                <code className="machine-folder__path">{shared}</code>
+                <span className="small muted">{sharedFolderFacts(t, i18n.language, m.disk)}</span>
+              </span>
+            </div>
+          )}
+          {folders.length === 0 && (
             <div className="ac-list__row machine-folder">
               <span className="small muted">{t("machines.access.noFolders")}</span>
             </div>
           )}
-          {access.folders.map((f) => {
+          {folders.map((f) => {
             const folder = folderName(f.path);
             const label = t("machines.access.folderActions", { folder });
             return (
@@ -772,7 +811,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
                 {f.agents.length > 0 ? (
                   <span className="machine-folder__agents">
                     <span className="ac-visually-hidden">
-                      {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t("newAgent.and"))}
+                      {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t)}
                     </span>
                     <AvatarStack aria-hidden="true">
                       {f.agents.map((id) => (
@@ -825,7 +864,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
       </h2>
       <List aria-label={t("machines.access.tools")}>
         {MACHINE_TOOLS.map((tool) => {
-          const on = access.tools[tool];
+          const on = tool === "cursor" ? (access.tools.cursor ?? access.tools.codex) : access.tools[tool];
           const name = t(`machines.access.tool.${tool}`);
           return (
             <div key={tool} className="ac-list__row machine-tool" data-tool={tool}>
@@ -923,7 +962,7 @@ function OpenComputerButton({ agentId, name }: { agentId: string; name: string }
       variant="ghost"
       icon="computer"
       className="machine-page__screen"
-      aria-label={`${t("agentComputer.open")}: ${t("agentComputer.title", agentGrammar(t, name))}`}
+      aria-label={`${t("agentComputer.open")}: ${t("agentComputer.title", agentGrammar(name))}`}
       onClick={() => openComputer(agentId)}
     >
       {t("agentComputer.open")}
@@ -1053,10 +1092,10 @@ export function MachinePage({ machineId }: { machineId: string }) {
                           <span className="small muted">
                             {folders.length > 0
                               ? t("machines.page.agentFolders", {
-                                  ...agentGrammar(t, a.name),
-                                  folders: joinNames(folders, t("newAgent.and")),
+                                  ...agentGrammar(a.name),
+                                  folders: joinNames(folders, t),
                                 })
-                              : t("machines.page.agentOwnFolder", agentGrammar(t, a.name))}
+                              : t("machines.page.agentOwnFolder", agentGrammar(a.name))}
                           </span>
                         )}
                       </span>
@@ -1085,6 +1124,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
           <FoldersCard machine={m} onReduce={setReduce} />
           <ToolsCard machine={m} onReduce={setReduce} />
           <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
+          {profilesApply(m) && <BrowserProfilesCard machine={m} />}
           <MachineDesktopUseCard machine={m} />
           <GrantCard machine={m} />
         </>

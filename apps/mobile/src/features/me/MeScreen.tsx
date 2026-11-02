@@ -7,6 +7,7 @@ import {
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -74,7 +75,6 @@ export function MeScreen() {
   const sounds = useSoundChoice();
   const styleLabel = useSoundLabel();
   const startLabel = useStartLabel();
-  const en = i18n.language.startsWith("en");
   const withMe = openIssuesWithMe(issues.data, meId);
   const version = Constants.expoConfig?.version ?? "";
 
@@ -125,6 +125,17 @@ export function MeScreen() {
     ...(org.org?.start !== undefined
       ? [{ icon: "home" as const, label: t("mobile.me.start"), value: startLabel, href: "/me/start" }]
       : []),
+    // Likewise: a server from before the choice sends no `showActivity`.
+    ...(org.org?.showActivity !== undefined
+      ? [
+          {
+            icon: "eye" as const,
+            label: t("mobile.me.activity"),
+            value: org.org.showActivity ? t("mobile.me.on") : t("mobile.me.off"),
+            href: "/me/activity",
+          },
+        ]
+      : []),
     {
       icon: "sound",
       label: t("mobile.me.sounds"),
@@ -140,7 +151,7 @@ export function MeScreen() {
     {
       icon: "globe",
       label: t("mobile.me.language"),
-      value: en ? t("mobile.me.langEn") : t("mobile.me.langPt"),
+      value: isAppLocale(i18n.language) ? localeInfo(i18n.language).native : i18n.language,
       href: "/me/language",
     },
   ];

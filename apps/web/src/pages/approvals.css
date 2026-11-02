@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   border-radius: var(--radius-section);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);

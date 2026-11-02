@@ -1,4 +1,10 @@
-import { BRAIN_PROTOCOL, type BrainEffort, isBrainEffort, type PlanUsage } from "@agenteschat/adapters";
+import {
+  BRAIN_PROTOCOL,
+  type BrainEffort,
+  CURSOR_PROTOCOL,
+  isBrainEffort,
+  type PlanUsage,
+} from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
 import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
@@ -10,9 +16,9 @@ import { missionTurnFor } from "../missions-engine";
 import type { AgentRun } from "../runs";
 import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
-import type { BrainAccount, BrainKind, BrainSession } from "./types";
+import { BRAIN_NAMES, BRAIN_PLAN_NAMES, type BrainAccount, type BrainKind, type BrainSession } from "./types";
 
-const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex"];
+const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor"];
 const kindOf = (v: unknown): BrainKind => (KINDS.includes(v as BrainKind) ? (v as BrainKind) : "model");
 
 /** A mission's choice for a run in its thread (`missionTurnFor`). */
@@ -55,8 +61,10 @@ export async function recordRunBrain(db: Executor, runId: string, kind: BrainKin
  * Never a background run (ADR 0053 §6.4): a routine thinks with its agent's own brain and waits quietly
  * for its computer instead; the agent's owner may also turn the fallback off.
  */
-export const mayFallBack = (agent: Pick<Agent, "brainFallback">, run: Pick<AgentRun, "background">) =>
-  !run.background && agent.brainFallback !== false;
+export const mayFallBack = (
+  agent: Pick<Agent, "brainFallback">,
+  run: Pick<AgentRun, "background"> & { workId?: string | null },
+) => !run.background && !run.workId && agent.brainFallback !== false;
 
 /**
  * Plan limits seen on this process (`limit` events), by machine, brain and account: a cache in front of the
@@ -184,12 +192,12 @@ export function computerBrainUnavailable(
   usage?: PlanUsage | null,
 ): BrainUnavailability | null {
   if (kind === "model") return null;
-  const name = kind === "codex" ? "Codex" : "Claude Code";
+  const name = BRAIN_NAMES[kind];
   if (!machineId) return { code: "no_computer", message: `The agent has no computer for ${name}.` };
   // The computer's own sign-in thinks only for agents of whoever connected the computer (ADR 0059 §3): on one
   // nobody connected, no person signs in at its terminal, so for its agents it isn't signed in.
   if (!account && status?.pairedByUserId === null) {
-    const plan = kind === "codex" ? "ChatGPT" : "Claude";
+    const plan = BRAIN_PLAN_NAMES[kind];
     return {
       code: "not_logged_in",
       message: `${name} isn't signed in on ${status.name}. Connect a ${plan} account on the agent's page.`,
@@ -219,7 +227,7 @@ export function computerBrainUnavailable(
     return { code: e.code, message: e.message, ...(e.code === "machine_paused" ? pausedUntil : {}) };
   }
   if (!status?.online) {
-    return { code: "machine_offline", message: `Codex${status ? ` on ${status.name}` : ""} is offline.` };
+    return { code: "machine_offline", message: `${name}${status ? ` on ${status.name}` : ""} is offline.` };
   }
   if (status.paused) {
     return {
@@ -227,6 +235,20 @@ export function computerBrainUnavailable(
       message: pausedMessage(status.name, status.paused.until, status.paused.timezone),
       ...pausedUntil,
     };
+  }
+  if (kind === "cursor") {
+    const off = toolOff(status, "cursor");
+    if (off) return off;
+    if (status.protocol < CURSOR_PROTOCOL) {
+      return {
+        code: "runner_outdated",
+        message: `The runner on ${status.name} is too old for Cursor agents. Update it.`,
+      };
+    }
+    if (status.executors?.detectedAt && !status.executors.cursor) {
+      return { code: "cursor_missing", message: `Cursor's CLI is not installed on ${status.name}.` };
+    }
+    return accountUnavailable(status, account, "cursor");
   }
   const off = toolOff(status, "codex");
   if (off) return off;
@@ -260,6 +282,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "not_logged_in",
   "codex_missing",
   "codex_too_old",
+  "cursor_missing",
   "plan_limit",
   "plan_not_owner",
 ]);
@@ -273,6 +296,7 @@ export const NO_AI_CODES: ReadonlySet<string> = new Set([
   "cli_missing",
   "not_logged_in",
   "codex_missing",
+  "cursor_missing",
 ]);
 
 /** What the engine runs a turn with. */
@@ -465,6 +489,12 @@ async function sessionFor(
           ...(conversation === run.channelId ? [] : [eq(agentRuns.threadRootId, conversation)]),
           isNotNull(agentRuns.brainSessionId),
           ne(agentRuns.id, run.id),
+          // Never a session a run still going on uses (a paused long job picks up there, ADR 0118), nor background
+          // work's (ADR 0121: its process may be mid-turn): whichever row carries it, an earlier finished one included.
+          sql`not exists (select 1 from ${agentRuns} r3
+            where r3.org_id = "agent_runs"."org_id" and r3.brain_session_id = "agent_runs"."brain_session_id"
+              and r3.id <> ${run.id}
+              and (r3.work_id is not null or r3.status in ('queued', 'running', 'waiting_input', 'waiting_approval')))`,
           // Never a session background work thought in (a routine's: it was told to answer NO_REPLY, and a
           // conversation that picked it up answered that). Any run that shared it counts, older rows too.
           sql`not exists (select 1 from ${agentRuns} r2

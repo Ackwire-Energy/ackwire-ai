@@ -1,6 +1,6 @@
 # 0045. The conversation run stays short: long work goes to background work the agent reports on
 
-- Status: Proposed
+- Status: Superseded by ADR 0121 (never built)
 - Date: 2026-10-21
 - Extends: ADR 0008 (agent runs), ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other)
 - Related: ADR 0029 (missions, and sending while the agent works)

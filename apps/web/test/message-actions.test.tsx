@@ -65,7 +65,7 @@ const said = (id: string, body: string, minutes: number, receipts?: Message["rec
   }) as Message;
 
 describe("message action bars", () => {
-  test("people's messages get the glass bar with '…': Salvar na wiki, Copiar link, Responder", async () => {
+  test("people's messages get the glass bar with '…': the same list as the right click", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
@@ -74,8 +74,20 @@ describe("message action bars", () => {
     expect(
       within(menu)
         .getAllByRole("menuitem")
-        .map((i) => i.textContent),
-    ).toEqual(["Salvar na wiki", "Copiar link", "Responder"]);
+        .map((i) => i.getAttribute("aria-label") ?? i.textContent),
+    ).toEqual([
+      "👍",
+      "🎉",
+      "👀",
+      "✅",
+      "❤️",
+      "Adicionar reação",
+      "Responder",
+      "Copiar texto",
+      "Copiar link",
+      "Fixar mensagem",
+      "Salvar na wiki",
+    ]);
   });
 
   test("agents keep 👍 👎 ✏️, get Reagir and Responder, and the same '…'", async () => {
@@ -88,7 +100,9 @@ describe("message action bars", () => {
     expect(within(bar).getByRole("button", { name: "Reagir" })).toBeTruthy();
     expect(within(bar).getByRole("button", { name: "Responder" })).toBeTruthy();
     const menu = await openMenu(within(bar).getByRole("button", { name: "Mais ações da mensagem" }));
-    expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
+    // Não ajudou and Corrigir stay on the bar: the "…" is the right click's list.
+    expect(within(menu).queryByRole("menuitem", { name: "Não ajudou" })).toBeNull();
+    expect(within(menu).getByRole("menuitem", { name: "Fixar mensagem" })).toBeTruthy();
   });
 
   test("Copiar link copies the message's address", async () => {
@@ -182,7 +196,7 @@ describe("message action bars", () => {
     // The part a message doesn't use is left empty, which the kit hides and reads: the bar stands left of a check
     // only where there is one, and a grouped row with a line under its text centres the bar above that line.
     for (const id of ["j1", "j2"]) expect(row(id).querySelector(".ac-msg__foot")?.childNodes.length).toBe(0);
-    for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__aside")?.childNodes.length).toBe(0);
+    for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__aside")?.childNodes.length ?? 0).toBe(0);
     // The bar's place is the kit's (components.test.tsx): no stylesheet of the app moves it, and a row's side padding
     // is set through `--msg-inline`, which the bar reads to stand left of the check.
     const src = join(import.meta.dir, "../src");
@@ -269,7 +283,7 @@ describe("message action bars", () => {
           .filter((i) => !i.classList.contains("ac-menu__reaction"))
           .map((i) => i.textContent);
       // What the bar and its "…" have, as the desktop app's right click lists it.
-      expect(items(menu)).toEqual(["Responder", "Copiar texto", "Copiar link", "Salvar na wiki"]);
+      expect(items(menu)).toEqual(["Responder", "Copiar texto", "Copiar link", "Fixar mensagem", "Salvar na wiki"]);
       expect(document.querySelector('article[data-message-id="m-1"]')?.getAttribute("data-menu-open")).toBe("true");
       await click(within(reactions).getByRole("menuitem", { name: "Adicionar reação" }));
       await settle(1);
@@ -284,6 +298,7 @@ describe("message action bars", () => {
       expect(items(screen().getByRole("menu", { name: "Ações da mensagem de João" }))).toEqual([
         "Responder",
         "Copiar link",
+        "Fixar mensagem",
       ]);
       await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
       expect(screen().queryByRole("menu")).toBeNull();
@@ -295,6 +310,7 @@ describe("message action bars", () => {
         "Corrigir resposta",
         "Copiar texto",
         "Copiar link",
+        "Fixar mensagem",
         "Salvar na wiki",
       ]);
       await click(within(agent).getByRole("menuitem", { name: "Corrigir resposta" }));

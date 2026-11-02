@@ -9,7 +9,6 @@ import {
   greetingKey,
   initialOf,
   isSafeId,
-  joinNames,
   minutesLeft,
   previewOf,
   whenKind,
@@ -40,8 +39,6 @@ describe("shared helpers", () => {
   });
 
   test("names and initials", () => {
-    expect(joinNames(["Ana"], " e ")).toBe("Ana");
-    expect(joinNames(["Ana", "Theo", "Iris"], " e ")).toBe("Ana, Theo e Iris");
     expect(initialOf(" walter")).toBe("W");
     expect(initialOf("")).toBe("?");
     expect(firstName("Walter Nogueira")).toBe("Walter");

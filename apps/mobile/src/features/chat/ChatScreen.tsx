@@ -37,12 +37,14 @@ import {
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
+import { runPosition } from "@agenteschat/client/lib/chat";
 import {
   type ConsultNoticeFold,
   consultBlocksNearEnd,
   consultNoticeFolds,
   consultsForLine,
 } from "@agenteschat/client/lib/consult-group";
+import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import {
@@ -169,7 +171,8 @@ import {
   type PlusPick,
   ThreadOptions,
 } from "./sheets";
-import { openingRuns, turnRuns, withOpacity } from "./turn";
+import { turnOrder, turnRuns, withOpacity } from "./turn";
+import { JumpToMessageContext } from "./WorkLine";
 
 /** A run's messages this recent are asked whether a take over still holds the agent's browser. */
 const HELD_RECENT_MS = 12 * 60 * 60_000;
@@ -255,7 +258,7 @@ export function ChatScreen({
 }
 
 function Chat({ channelId, threadId }: { channelId: string; threadId: string | null }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
   const api = useApi();
@@ -522,7 +525,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-        ...runRowsOf(openingRuns(shownRuns)),
+        ...runRowsOf(turnOrder(shownRuns)),
       ];
     }
     // A thread's replies live in the thread; the channel shows its link.
@@ -531,7 +534,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-      ...runRowsOf(openingRuns(shownRuns)),
+      ...runRowsOf(turnOrder(shownRuns)),
     ];
   }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
   const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
@@ -953,6 +956,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     if (target.threadId !== threadId) router.push(chatHref(channelId, target.threadId));
   };
   const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
+  // "Ver resultado" on a work's line: its report, when this conversation shows it.
+  const jumpToMessage = useCallback((messageId: string) => {
+    const index = rowsRef.current.findIndex((r) => r.kind === "message" && r.message.id === messageId);
+    if (index < 0) return false;
+    void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+    return true;
+  }, []);
   // "Ver" on an answer's line: the two agents' conversation on its own screen, as the block's line opens it.
   const seeConsult = useCallback(
     (fold: Extract<ConsultNoticeFold, { fold: "line" }>) =>
@@ -1019,9 +1029,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       (e) => e.type === "agent" && e.id === dmAgentId,
     );
     if (!entry) return null;
-    const verb = activityVerb(t, entry.activity);
-    return verb.charAt(0).toUpperCase() + verb.slice(1);
-  }, [dmAgentId, isThread, runs, lineConsults, dir.agentById, t]);
+    return capitalize(activityVerb(t, entry.activity), i18n.language);
+  }, [dmAgentId, isThread, runs, lineConsults, dir.agentById, t, i18n.language]);
   // A DM's pill says how the other side is (ADR 0084): an agent's presence and what it does, a person's line.
   const dmLine = useDmStatusLine(
     dm && !isThread ? { type: dm.with.type, id: dm.with.id } : null,
@@ -1192,14 +1201,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           dmAgentId ? (
             <AgentFace
               agentId={dmAgentId}
-              size={26}
+              size={32}
               framed={false}
               mode={dmDoing ? "run" : "idle"}
               presence
               ring={c.glassSolid}
             />
           ) : (
-            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} presence ring={c.glassSolid} />
+            <Face who={{ type: dm.with.type, id: dm.with.id }} size={32} live={false} presence ring={c.glassSolid} />
           )
         }
         title={dm.with.name}
@@ -1383,6 +1392,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               <MessageRow
                 message={item.message}
                 grouped={item.grouped}
+                run={runPosition(item.grouped, item.continued ?? false)}
+                above={item.above}
+                aboveThread={item.above && !isThread ? linkThreads.has(item.above.id) : false}
                 meId={meId}
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
                 onLongPress={onLongPress}
@@ -1600,51 +1612,53 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 {/* The list's frame, where the waiting requests' cards are measured from (never flattened away). */}
                 <View ref={listFrame} collapsable={false} style={styles.grow} onLayout={watchAsks}>
                   <StickerStageContext.Provider value={stickers}>
-                    <KeyboardAwareLegendList
-                      ref={listRef}
-                      style={styles.grow}
-                      data={shownRows}
-                      keyExtractor={rowKey}
-                      getItemType={rowType}
-                      renderItem={renderItem}
-                      // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
-                      // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-                      extraData={renderItem}
-                      estimatedItemSize={72}
-                      // Opens at the latest message, short conversations sit at the bottom like any chat.
-                      initialScrollAtEnd
-                      alignItemsAtEnd
-                      // New messages, a reply growing word by word and the working line keep the end in view, but
-                      // only while the person is near it.
-                      maintainScrollAtEnd={!readHold}
-                      maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-                      // Older pages above and rows changing size keep what is on screen still.
-                      maintainVisibleContentPosition
-                      // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's
-                      // room is the content's top padding, the indicator kept below the bar.
-                      contentInsetAdjustmentBehavior="never"
-                      automaticallyAdjustContentInsets={false}
-                      scrollIndicatorInsets={{ top: headerHeight }}
-                      // Still while a sheet or the agent's computer covers the conversation.
-                      freeze={freeze}
-                      onReady={revealList}
-                      onStartReached={loadOlder}
-                      // A look at the waiting requests' cards, once a frame and only while one waits.
-                      onScroll={watchAsks}
-                      onViewableItemsChanged={onViewable}
-                      viewabilityConfig={STICKER_VIEW}
-                      onScrollBeginDrag={() => {
-                        dragging.current = true;
-                      }}
-                      onScrollEndDrag={releaseAtEnd}
-                      onMomentumScrollEnd={releaseAtEnd}
-                      onStartReachedThreshold={0.5}
-                      keyboardDismissMode="interactive"
-                      keyboardShouldPersistTaps="handled"
-                      keyboardOffset={lift}
-                      contentInsetEndAdjustment={contentInsetEndAdjustment}
-                      contentContainerStyle={listPad}
-                    />
+                    <JumpToMessageContext.Provider value={jumpToMessage}>
+                      <KeyboardAwareLegendList
+                        ref={listRef}
+                        style={styles.grow}
+                        data={shownRows}
+                        keyExtractor={rowKey}
+                        getItemType={rowType}
+                        renderItem={renderItem}
+                        // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+                        // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+                        extraData={renderItem}
+                        estimatedItemSize={72}
+                        // Opens at the latest message, short conversations sit at the bottom like any chat.
+                        initialScrollAtEnd
+                        alignItemsAtEnd
+                        // New messages, a reply growing word by word and the working line keep the end in view, but
+                        // only while the person is near it.
+                        maintainScrollAtEnd={!readHold}
+                        maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+                        // Older pages above and rows changing size keep what is on screen still.
+                        maintainVisibleContentPosition
+                        // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's
+                        // room is the content's top padding, the indicator kept below the bar.
+                        contentInsetAdjustmentBehavior="never"
+                        automaticallyAdjustContentInsets={false}
+                        scrollIndicatorInsets={{ top: headerHeight }}
+                        // Still while a sheet or the agent's computer covers the conversation.
+                        freeze={freeze}
+                        onReady={revealList}
+                        onStartReached={loadOlder}
+                        // A look at the waiting requests' cards, once a frame and only while one waits.
+                        onScroll={watchAsks}
+                        onViewableItemsChanged={onViewable}
+                        viewabilityConfig={STICKER_VIEW}
+                        onScrollBeginDrag={() => {
+                          dragging.current = true;
+                        }}
+                        onScrollEndDrag={releaseAtEnd}
+                        onMomentumScrollEnd={releaseAtEnd}
+                        onStartReachedThreshold={0.5}
+                        keyboardDismissMode="interactive"
+                        keyboardShouldPersistTaps="handled"
+                        keyboardOffset={lift}
+                        contentInsetEndAdjustment={contentInsetEndAdjustment}
+                        contentContainerStyle={listPad}
+                      />
+                    </JumpToMessageContext.Provider>
                   </StickerStageContext.Provider>
                 </View>
               </Animated.View>

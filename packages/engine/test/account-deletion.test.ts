@@ -157,7 +157,7 @@ describe("deleting an account", () => {
     expect(await f.db.select({ status: schema.agentRuns.status }).from(schema.agentRuns)).toEqual([
       { status: "canceled" },
     ]);
-    expect(told).toContainEqual({ type: "membership.revoked", orgId: f.org.id, userId: f.owner.id });
+    expect(told).toContainEqual({ type: "membership.revoked", orgId: f.org.id, userId: f.owner.id, quiet: true });
     expect(told).toContainEqual(
       expect.objectContaining({ type: "org.broadcast", event: expect.objectContaining({ type: "org.deleting" }) }),
     );

@@ -7,3 +7,11 @@ import { type SQL, sql } from "@agenteschat/db";
  * beside it. Same rule as `replyThreadOf`.
  */
 export const inChannelRun = (r: SQL) => sql`(${r}.thread_root_id = ${r}.trigger_message_id)`;
+
+/**
+ * SQL: the run `r` may take a new message where it is. Background work (ADR 0121) stepped out of the conversation it
+ * was asked in: only a work with its own thread (the anchor's) still takes replies there; one asked inside a thread
+ * leaves that thread to the agent's other runs.
+ */
+export const workKeepsThread = (r: SQL) =>
+  sql`(${r}.work_id is null or exists (select 1 from agent_works w where w.id = ${r}.work_id and w.own_thread))`;

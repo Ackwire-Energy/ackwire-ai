@@ -8,7 +8,7 @@
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
 // of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate,
-// "RATE" says the 5-hour window is at 84%; "STEER…" and "BGSELF" below (live
+// "RATE" says the 5-hour window is at 84%, "PWTOOL" runs a shell call with $AGENT_PW in its command; "STEER…" and "BGSELF" below (live
 // steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN and "ECHOTOKEN" with
 // the OAuth token it holds (as an agent's shell could print them), "ECHOSPLIT" with that token in two
 // deltas, each 150 ms before the next line, "KEY401" is refused by the endpoint and retries for good
@@ -339,7 +339,23 @@ async function answer(line) {
     if (prompt.includes("ECHOSPLIT")) await sleep(150);
   }
   out({ type: "assistant", message: { content: [{ type: "text", text: "Hello world" }] }, parent_tool_use_id: null });
-  if (prompt.includes("TOOL")) {
+  if (prompt.includes("PWTOOL")) {
+    // A shell call with $AGENT_PW written out in its command (a password with quotes and a backslash).
+    out({
+      type: "assistant",
+      message: {
+        content: [
+          { type: "tool_use", id: "p1", name: "Bash", input: { command: `login --pw '${process.env.AGENT_PW}'` } },
+        ],
+      },
+      parent_tool_use_id: null,
+    });
+    out({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "p1", content: "ok" }] },
+      parent_tool_use_id: null,
+    });
+  } else if (prompt.includes("TOOL")) {
     out({
       type: "assistant",
       message: {

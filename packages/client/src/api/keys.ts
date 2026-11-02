@@ -53,6 +53,7 @@ export const keys = {
   githubRepos: (orgId: string) => ["org", orgId, "github-repositories"] as const,
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
+  toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   /** What the agent runs without asking ("Aprovar sempre"). */
   approvalRules: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "approval-rules"] as const,
@@ -122,12 +123,17 @@ export const keys = {
   computerSetup: (orgId: string) => ["org", orgId, "computer-setup"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
   machineDevice: (userCode: string) => ["machine-device", userCode] as const,
+  /** Settings → AI apps: mine, or the whole workspace's (`all`), both under `apps`. */
+  apps: (orgId: string, all = false) => ["org", orgId, "apps", all ? "all" : "mine"] as const,
+  /** An app's consent (`/autorizar?req=`): not under an organization, it is picked on that page. */
+  appConsent: (requestId: string) => ["app-consent", requestId] as const,
   desktopLatest: (target: string, arch: string) => ["desktop-latest", target, arch] as const,
   artifactBlob: (orgId: string, id: string, version: number) =>
     ["org", orgId, "artifacts", "blob", id, version] as const,
   skills: (orgId: string) => ["org", orgId, "skills"] as const,
   skill: (orgId: string, id: string) => ["org", orgId, "skills", "one", id] as const,
   agentSkills: (orgId: string, agentId: string) => ["org", orgId, "skills", "agent", agentId] as const,
+  learnedSkills: (orgId: string, agentId: string) => ["org", orgId, "skills", "learned", agentId] as const,
   access: (orgId: string) => ["org", orgId, "access"] as const,
   agentAccess: (orgId: string, agentId: string) => ["org", orgId, "access", "agent", agentId] as const,
   issues: (orgId: string) => ["org", orgId, "issues"] as const,
@@ -161,6 +167,7 @@ export const keys = {
   artifact: (orgId: string, id: string, version?: number) =>
     ["org", orgId, "artifacts", "one", id, version ?? "latest"] as const,
   artifactVersions: (orgId: string, id: string) => ["org", orgId, "artifacts", "versions", id] as const,
+  poll: (orgId: string, id: string) => ["org", orgId, "polls", id] as const,
   storageMigration: (orgId: string) => ["org", orgId, "storage", "migration"] as const,
   search: (orgId: string, q: string, kinds: string) => ["org", orgId, "search", q, kinds] as const,
   reactions: (orgId: string, messageId: string) => ["org", orgId, "reactions", messageId] as const,
@@ -170,6 +177,7 @@ export const keys = {
   notificationCount: (orgId: string) => ["org", orgId, "notifications", "count"] as const,
   noticePrefs: (orgId: string) => ["org", orgId, "notice-prefs"] as const,
   sidebarItems: (orgId: string) => ["org", orgId, "sidebar-items"] as const,
+  sidebarOrder: (orgId: string) => ["org", orgId, "sidebar-order"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,
@@ -201,6 +209,8 @@ export const keys = {
   /** The agent browser (ADR 0040): an agent's settings, its open request on each screen, one request (prefix). */
   browser: (orgId: string) => ["org", orgId, "browser"] as const,
   agentBrowser: (orgId: string, agentId: string) => ["org", orgId, "browser", "agent", agentId] as const,
+  /** The workspace's browser profiles (ADR 0110). */
+  browserProfiles: (orgId: string) => ["org", orgId, "browser", "profiles"] as const,
   agentBrowserHandoff: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
     ["org", orgId, "browser", "agent", agentId, "handoff", screen] as const,
   agentBrowserControl: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>

@@ -33,6 +33,8 @@ const CLOSE_DRAG = 90;
 const INSET = 8;
 /** The sheet's top corners (and the least for its bottom ones). */
 const RADIUS = 34;
+/** The sheet's width with the phone sideways: a form as wide as the phone is hard to read. */
+const WIDE_WIDTH = 560;
 
 /**
  * The bottom sheet (no dialogs on the phone): floats 8 points from the edges, its bottom corners following
@@ -50,6 +52,8 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
     RADIUS,
   );
   const corners = { borderBottomLeftRadius: bottomRadius, borderBottomRightRadius: bottomRadius };
+  const room = width - 2 * Math.max(insets.left, insets.right);
+  const wide = width > height ? { width: Math.min(WIDE_WIDTH, room), alignSelf: "center" as const } : null;
   const [mounted, setMounted] = useState(open);
   const y = useSharedValue(height);
   const scrim = useSharedValue(0);
@@ -102,7 +106,15 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
 
   if (!mounted) return null;
   return (
-    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={hintBackOr(onClose)}>
+    // Both ways, or iOS aborts: a modal's default is portrait, and a view lying down shares no orientation with it.
+    <Modal
+      transparent
+      visible
+      animationType="none"
+      statusBarTranslucent
+      supportedOrientations={["portrait", "landscape"]}
+      onRequestClose={hintBackOr(onClose)}
+    >
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }, scrimStyle]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("mobile.a11y.closeSheet")} />
       </Animated.View>
@@ -113,7 +125,7 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
       >
         <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, corners, { maxHeight: height * 0.86, boxShadow: shadows.e3 }, sheetStyle]}
+          style={[styles.sheet, corners, wide, { maxHeight: height * 0.86, boxShadow: shadows.e3 }, sheetStyle]}
         >
           <Glass solid={solid} intensity={70} style={[styles.surface, corners]}>
             <View

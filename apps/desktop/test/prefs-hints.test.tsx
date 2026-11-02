@@ -99,6 +99,8 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         expect(el.querySelector(".dk-phead .dk-lead")).toBeNull();
         const behavior = [...el.querySelectorAll(".dk-card")].at(-1) as HTMLElement;
         expect(rows(behavior)).toEqual([
+          // The language this computer shows the app in (ADR 0122): nothing to explain.
+          { title: "Language", hint: null, line: null },
           {
             title: "Open at login",
             hint: "Agents only use this Mac while the app is open.",

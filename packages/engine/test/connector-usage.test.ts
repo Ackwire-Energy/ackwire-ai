@@ -271,7 +271,6 @@ describe("keys and labels", () => {
     expect(connectorKeyOf({ provider: "outlook", via: "composio", preset: null })).toBe("outlook");
     expect(connectorKeyOf({ provider: "imap", via: "imap", preset: "custom" })).toBe("imap");
     expect(connectorKeyOf({ provider: "imap", via: "imap", preset: null })).toBe("imap");
-    expect(connectorKeyOf({ provider: "millionsend", via: "millionsend", preset: null })).toBe("millionsend");
     expect(connectorKeyOf({ toolkit: "metaads" })).toBe("meta-ads");
     expect(connectorKeyOf({ toolkit: "Vercel" })).toBe("vercel");
     expect(connectorKeyOf({ toolkit: "two words" })).toBe("other");

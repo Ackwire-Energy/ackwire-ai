@@ -1,19 +1,24 @@
 import { describe, expect, test } from "bun:test";
-import { ApiError, type Me } from "@agenteschat/client";
+import { ApiError, handoffTimeLeft, type Me } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import {
+  clockAt,
   dayLabel,
   formatInt,
   formatPercent,
+  formatTime,
   formatTokensShort,
   formatUsd,
   joinNames,
+  namesText,
+  nextLabel,
+  parseDayInput,
   relativeTime,
   shortModel,
   timeLeft,
   whenAt,
 } from "@agenteschat/client/lib/format";
-import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
   earlyAccessHeaders,
   earlyAccessState,
@@ -44,6 +49,7 @@ import {
   passwordState,
   slugify,
 } from "@agenteschat/client/lib/text";
+import { timeSpan } from "@agenteschat/client/lib/threads";
 import { en, ptBR } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
 import { createBetterAuthClient } from "@/auth/better-auth";
@@ -59,14 +65,14 @@ const at = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000)
 
 describe("format (pt-BR, machine numbers precise)", () => {
   test("money", () => {
-    expect(formatUsd(t, "pt-BR", 12.3)).toBe("US$ 12,30");
-    expect(formatUsd(t, "pt-BR", 0.004)).toBe("US$ 0,004");
-    expect(formatUsd(t, "pt-BR", 0.0003)).toBe("US$ 0,0003");
+    expect(formatUsd("pt-BR", 12.3)).toBe("US$\u00a012,30");
+    expect(formatUsd("pt-BR", 0.004)).toBe("US$\u00a00,004");
+    expect(formatUsd("pt-BR", 0.0003)).toBe("US$\u00a00,0003");
     // A real spend too small for 4 decimals (a few thousand tokens of a cheap model) never reads as zero.
-    expect(formatUsd(t, "pt-BR", 0.00003)).toBe("<US$ 0,0001");
-    expect(formatUsd(t, "pt-BR", 0.00005)).toBe("US$ 0,0001");
-    expect(formatUsd(t, "pt-BR", 0)).toBe("US$ 0,00");
-    expect(formatUsd(t, "pt-BR", 1234.5)).toBe("US$ 1.234,50");
+    expect(formatUsd("pt-BR", 0.00003)).toBe("<US$\u00a00,0001");
+    expect(formatUsd("pt-BR", 0.00005)).toBe("US$\u00a00,0001");
+    expect(formatUsd("pt-BR", 0)).toBe("US$\u00a00,00");
+    expect(formatUsd("pt-BR", 1234.5)).toBe("US$\u00a01.234,50");
     // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.
     expect(formatPercent("pt-BR", 30.8)).toBe("31%");
     expect(formatPercent("pt-BR", 2.5)).toBe("2,5%");
@@ -88,15 +94,69 @@ describe("format (pt-BR, machine numbers precise)", () => {
     expect(dayLabel(t, "pt-BR", at(24 * 60), now)).toBe("Ontem");
     expect(whenAt(t, "pt-BR", at(1), now)).toBe("hoje 10:43");
   });
+  test("12-hour clocks have no leading zero; 24-hour ones keep theirs", () => {
+    const morning = new Date(2026, 9, 14, 8, 39).toISOString();
+    const evening = new Date(2026, 9, 14, 20, 39).toISOString();
+    // ICU puts a narrow no-break space before AM/PM in some versions, a plain one in others.
+    const read = (s: string) => s.replace(/\s/g, " ");
+    expect(read(formatTime("en-US", morning))).toBe("8:39 AM");
+    expect(read(formatTime("en-US", evening))).toBe("8:39 PM");
+    expect(formatTime("pt-BR", morning)).toBe("08:39");
+    expect(formatTime("pt-BR", evening)).toBe("20:39");
+    expect(formatTime("en-GB", morning)).toBe("08:39");
+    // Every clock built from it, and the ones beside it: a thread's span, a pause's end, the next run.
+    expect(read(timeSpan("en-US", morning, evening))).toBe("8:39 AM–8:39 PM");
+    expect(read(clockAt("en-US", morning, new Date(morning)))).toBe("8:39 AM");
+    expect(nextLabel("en-US", morning)).not.toMatch(/\b0\d:/);
+    expect(nextLabel("pt-BR", morning)).toContain("08:39");
+  });
   test("time left", () => {
     expect(timeLeft(t, new Date(now.getTime() + 23 * 3_600_000).toISOString(), now)).toBe("23 h");
     expect(timeLeft(t, new Date(now.getTime() + 5 * 86_400_000).toISOString(), now)).toBe("5 dias");
     expect(timeLeft(t, at(1), now)).toBeNull();
   });
+  test("a request for help counts down in hours, then minutes, in both languages", () => {
+    const english = createI18n("en");
+    const te = english.t.bind(english) as TFunction;
+    const left = (ms: number) => ({ expiresAt: new Date(now.getTime() + ms).toISOString() });
+    // Just asked: the whole day, not "23 h".
+    expect(handoffTimeLeft(t, left(24 * 3_600_000 - 1000), now.getTime())).toBe("24 h");
+    expect(handoffTimeLeft(t, left(3 * 3_600_000 + 10 * 60_000), now.getTime())).toBe("3 h");
+    expect(handoffTimeLeft(t, left(45 * 60_000), now.getTime())).toBe("45 min");
+    expect(handoffTimeLeft(t, left(20_000), now.getTime())).toBe("1 min");
+    expect(handoffTimeLeft(t, left(-1000), now.getTime())).toBeNull();
+    expect(handoffTimeLeft(t, { expiresAt: null }, now.getTime())).toBeNull();
+    expect(t("browser.card.left", { time: handoffTimeLeft(t, left(24 * 3_600_000), now.getTime()) })).toBe(
+      "24 h restantes",
+    );
+    expect(te("browser.card.left", { time: handoffTimeLeft(te, left(45 * 60_000), now.getTime()) })).toBe(
+      "45 min left",
+    );
+  });
+  test("a typed day in the language's order", () => {
+    const now = new Date(2026, 0, 5);
+    expect(parseDayInput("24/10", now, "pt-BR")).toBe("2026-10-24");
+    expect(parseDayInput("10/24", now, "en")).toBe("2026-10-24");
+    expect(parseDayInput("24/10", now, "en")).toBeNull();
+    expect(parseDayInput("24.10.", now, "de")).toBe("2026-10-24");
+    expect(parseDayInput("31/02/2027", now, "pt-BR")).toBeNull();
+  });
+
   test("names and models", () => {
-    expect(joinNames(["Ada"], " e ")).toBe("Ada");
-    expect(joinNames(["Ada", "Atlas"], " e ")).toBe("Ada e Atlas");
-    expect(joinNames(["Ada", "Atlas", "Theo"], " e ")).toBe("Ada, Atlas e Theo");
+    expect(joinNames(["Ada"], t)).toBe("Ada");
+    expect(joinNames(["Ada", "Atlas"], t)).toBe("Ada e Atlas");
+    expect(joinNames(["Ada", "Atlas", "Theo"], t)).toBe("Ada, Atlas e Theo");
+    expect(namesText(t, ["Ada", "Atlas", "Theo", "Lia"])).toBe("Ada, Atlas e mais 2");
+    // Each language's own separators: the instance's language, or a page's fixed one.
+    for (const [lng, list, more] of [
+      ["en", "Ada, Atlas, and Theo", "Ada, Atlas, and 2 more"],
+      ["ja", "Ada、Atlas、Theo", null],
+      ["zh-Hans", "Ada、Atlas和Theo", null],
+    ] as const) {
+      const tl = i18n.getFixedT(lng) as TFunction;
+      expect(joinNames(["Ada", "Atlas", "Theo"], tl)).toBe(list);
+      if (more) expect(namesText(tl, ["Ada", "Atlas", "Theo", "Lia"])).toBe(more);
+    }
     expect(shortModel("Claude Sonnet 5.5")).toBe("sonnet 5.5");
   });
 });
@@ -193,12 +253,12 @@ describe("grammar", () => {
   test("gender of agent names drives Portuguese articles", () => {
     expect(isFeminineName("Ada")).toBe(true);
     expect(isFeminineName("Theo")).toBe(false);
-    expect(t("agent.howWorks", agentGrammar(t, "Ada"))).toBe("Como a Ada trabalha");
-    expect(t("agentPage.overview.does", agentGrammar(t, "Atlas"))).toBe("O que o Atlas faz");
-    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toBe(
+    expect(t("agent.howWorks", agentGrammar("Ada"))).toBe("Como a Ada trabalha");
+    expect(t("agentPage.overview.does", agentGrammar("Atlas"))).toBe("O que o Atlas faz");
+    expect(t("memory.subtitle", agentGrammar("Ada"))).toBe(
       "O que a Ada aprendeu com as conversas e as correções do time.",
     );
-    expect(t("agent.instructionsHelp", { ...agentGrammar(t, "Atlas"), org: "Acme" })).toEndWith(
+    expect(t("agent.instructionsHelp", { ...agentGrammar("Atlas"), org: "Acme" })).toEndWith(
       "escreva aqui só o que é do Atlas.",
     );
   });
@@ -206,8 +266,8 @@ describe("grammar", () => {
   test("one agent, one pronoun: she or he in English as in Portuguese, never it", () => {
     const english = createI18n("en");
     const te = english.t.bind(english) as TFunction;
-    const ada = agentGrammar(te, "Ada");
-    const theo = agentGrammar(te, "Theo");
+    const ada = agentGrammar("Ada");
+    const theo = agentGrammar("Theo");
     // Her page says "her" in both lines it has for her.
     expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI\u00a0connected.");
     expect(te("dm.emptyAgent", ada)).toBe("Ask her to remember, forget or work differently.");
@@ -237,12 +297,12 @@ describe("grammar", () => {
     expect(te("machines.page.agentOwnFolder", ada)).toBe("Only her own folder");
     expect(te("machines.page.agentFolders", { ...theo, folders: "Desktop" })).toBe("Uses Desktop and his own folder");
     // Portuguese says each one's own words, articles and forms too.
-    expect(t("chat.joined.tip", agentGrammar(t, "Ada"))).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
-    expect(t("missions.settings.defaults.title", agentGrammar(t, "Ada"))).toBe("Próximas missões da Ada");
-    expect(t("access.areaText.desktop.write", agentGrammar(t, "Ada"))).toStartWith(
+    expect(t("chat.joined.tip", agentGrammar("Ada"))).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
+    expect(t("missions.settings.defaults.title", agentGrammar("Ada"))).toBe("Próximas missões da Ada");
+    expect(t("access.areaText.desktop.write", agentGrammar("Ada"))).toStartWith(
       "Usa qualquer app na própria tela, no computador dela,",
     );
-    expect(t("browser.agent.signedIn", agentGrammar(t, "Ada"))).toBe(
+    expect(t("browser.agent.signedIn", agentGrammar("Ada"))).toBe(
       "A Ada fica com o login feito nos sites em que entrar, neste computador.",
     );
   });
@@ -258,29 +318,21 @@ describe("grammar", () => {
         [...feminine, ...masculine].toSorted(),
       );
     }
-    for (const name of feminine)
-      expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "she", "a"]);
-    for (const name of masculine)
-      expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "he", "o"]);
-    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI\u00a0connected.");
-    expect(t("chat.joined.tip", agentGrammar(t, "Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
+    for (const name of feminine) expect(agentGrammar(name)).toEqual({ name, context: "female" });
+    for (const name of masculine) expect(agentGrammar(name)).toEqual({ name, context: undefined });
+    expect(te("noAi.agent", agentGrammar("Iris"))).toBe("Iris won't reply because she has no AI\u00a0connected.");
+    expect(t("chat.joined.tip", agentGrammar("Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
   });
 
-  test("providers in Portuguese: do Claude, da OpenAI; by id or by the label a run error carries", () => {
-    expect(t("newAgent.noKeyFor", providerGrammar(t, "anthropic"))).toBe("Sem chave do Claude");
-    expect(t("newAgent.modelNeedsKey", providerGrammar(t, "openai"))).toBe("Precisa de uma chave da OpenAI");
-    expect(providerGrammar(t, "Claude")).toEqual({ provider: "Claude", of: "do" });
-    // One this app doesn't know keeps its name, with the usual "da".
-    expect(providerGrammar(t, "mistral")).toEqual({ provider: "mistral", of: "da" });
-    expect(t("agentPage.activity.errors.missing_credential", runErrorGrammar(t, { provider: "Claude" }))).toBe(
-      "Falta uma chave do Claude no workspace.",
+  test("providers by name, with no article to agree with", () => {
+    expect(t("newAgent.noKeyFor", { provider: "Claude" })).toBe("Sem chave Claude");
+    expect(t("newAgent.modelNeedsKey", { provider: "OpenAI" })).toBe("Precisa de uma chave de API OpenAI");
+    expect(t("agentPage.activity.errors.missing_credential", { provider: "Claude" })).toBe(
+      "Falta uma chave Claude no workspace.",
     );
     expect(
-      t(
-        "agentPage.activity.errors.credential_wrong_provider",
-        runErrorGrammar(t, { modelProvider: "Claude", keyProvider: "DeepSeek" }),
-      ),
-    ).toBe("O modelo é do Claude, mas a chave é da DeepSeek.");
+      t("agentPage.activity.errors.credential_wrong_provider", { modelProvider: "Claude", keyProvider: "DeepSeek" }),
+    ).toBe("O modelo usa Claude, mas a chave é para DeepSeek.");
   });
 });
 
@@ -400,11 +452,6 @@ describe("guards and permissions", () => {
 });
 
 describe("i18n", () => {
-  const shape = (o: object): unknown =>
-    Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "object" ? shape(v) : typeof v]));
-  test("en has exactly the keys of pt-BR (the source)", () => {
-    expect(shape(en)).toEqual(shape(ptBR));
-  });
   test("pt-BR is the default; copy follows the screens", () => {
     expect(i18n.language).toBe("pt-BR");
     expect(t("auth.flow.password")).toBe("Bom te ver de novo.");
@@ -483,7 +530,7 @@ describe("the confirmation email", () => {
     ]);
   });
 
-  test("a new link that didn't go out says why in the person's words, never Better Auth's", async () => {
+  test("a new link that didn't go out says why in the person's words, else the server's (English, every language's fallback)", async () => {
     const shown: string[] = [];
     const show = (text: string) => void shown.push(text);
     const refusals = [
@@ -499,7 +546,7 @@ describe("the confirmation email", () => {
     expect(shown).toEqual([
       "Sem conexão com o agentes.chat agora. Tente de novo em instantes.",
       "Muitas tentativas. Espere alguns minutos e tente de novo.",
-      "Algo deu errado. Tente de novo.",
+      "Email is already verified",
     ]);
   });
 

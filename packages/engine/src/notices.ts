@@ -8,7 +8,7 @@ import { untrustedBlock } from "./untrusted";
  * note from before notes were tracked (`agent_note`), the late result of a wait it
  * stopped waiting on (`wait_result`), a fast reply it gave while it worked
  * (`talker_reply`), what people decided on its proposal of a new agent or of
- * a change (`proposal_result`), its own follow-up (`follow_up`: the line it set, and at
+ * a change (`proposal_result`), how a vote it started came out (`poll_result`), its own follow-up (`follow_up`: the line it set, and at
  * its time the notice that wakes it, `refs.wake`), agents its @mention couldn't wake (`wake_skipped`, ADR 0097). Stored on the notice
  * message as `meta.notice`; the agent's context reads it as an event, never
  * as a person's words.
@@ -25,8 +25,10 @@ export type NoticeKind =
   | "wait_result"
   | "talker_reply"
   | "proposal_result"
+  | "poll_result"
   | "follow_up"
-  | "wake_skipped";
+  | "wake_skipped"
+  | "work_check_in";
 
 /**
  * Notices only for the agent they are for: another agent's note, the late result of a wait it stopped waiting on, what
@@ -34,7 +36,13 @@ export type NoticeKind =
  * count, no notification, no preview): what matters to them, the agent says in its reply. Mirrored by the apps'
  * `AGENT_ONLY_NOTICES` (packages/client/src/lib/notices.ts).
  */
-export const AGENT_ONLY_NOTICES: readonly NoticeKind[] = ["agent_note", "wait_result", "proposal_result"];
+export const AGENT_ONLY_NOTICES: readonly NoticeKind[] = [
+  "agent_note",
+  "wait_result",
+  "proposal_result",
+  "poll_result",
+  "work_check_in",
+];
 
 /** Whether a message is a notice only its agent reads (`AGENT_ONLY_NOTICES`). */
 export const isAgentOnlyNotice = (meta: Record<string, unknown> | null | undefined) =>
@@ -135,6 +143,8 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       return `[You already told them, while you worked]: ${n.text}`;
     case "wake_skipped":
       return `[Not woken]: ${n.text}`;
+    case "work_check_in":
+      return `[Your background work]: ${n.text}`;
     case "follow_up": {
       const at = n.refs?.at ?? "";
       if (n.refs?.wake)
@@ -151,6 +161,10 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
         current
           ? "\nOnly you see this. Tell the people here in a line what it means for them (what the new agent does and when, what still waits on someone), then do what is left of what they asked."
           : ""
+      }`;
+    case "poll_result":
+      return `[${from ?? "Your poll"} closed]: ${n.text}${
+        current ? "\nOnly you see this: say here what the group decided, then do what comes of it." : ""
       }`;
     default:
       return `[${from ?? "Notice"}]: ${n.text}`;

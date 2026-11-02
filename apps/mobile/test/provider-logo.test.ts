@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrainLine } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { KEY_MARKS, PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
 import { keyStepHint, PROVIDERS } from "@agenteschat/client/lib/providers";
 import { resources } from "@agenteschat/i18n";
@@ -117,14 +116,17 @@ describe("the marks as the phone draws them", () => {
     expect(pt("onboarding.keyInvalid.openrouter")).toBe(
       "As chaves da OpenRouter começam com sk-or-v1-. Confira e cole de novo.",
     );
-    expect(pt("connectAi.key.create", providerGrammar(pt, "openrouter"))).toBe("Crie a sua chave de API da OpenRouter");
+    expect(pt("connectAi.key.create", { provider: "OpenRouter" })).toBe("Crie a sua chave de API OpenRouter");
   });
 
   test("an image mark has no shapes: ProviderLogo draws the phone's own copy of the web's file", async () => {
     const images = Object.entries(PROVIDER_MARKS).flatMap(([id, mark]) =>
       "image" in mark ? [{ id, image: mark.image }] : [],
     );
-    expect(images).toEqual([{ id: "gemini", image: "/brands/gemini.png" }]);
+    expect(images).toEqual([
+      { id: "gemini", image: "/brands/gemini.png" },
+      { id: "vscode", image: "/brands/vscode.png" },
+    ]);
     const source = await Bun.file(new URL("../src/ui/ProviderLogo.tsx", import.meta.url).pathname).text();
     for (const { id, image } of images) {
       expect(markShapes(id, "dark", INK)).toEqual({ key: id, image: true, gradient: null, shapes: [] });

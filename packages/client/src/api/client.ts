@@ -1,4 +1,6 @@
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { OnboardingStepId } from "../lib/onboarding";
+import type { WikiAccess } from "../lib/wiki";
 import type {
   AccessInput,
   AccountDeletionPlan,
@@ -33,9 +35,12 @@ import type {
   AiAccounts,
   AiStatus,
   ApiRule,
+  AppConsent,
+  AppConsentDecision,
   AppNotification,
   Approval,
   ApprovalRule,
+  AppsList,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -50,6 +55,7 @@ import type {
   BrainKind,
   BrainMachine,
   BrowserHandoff,
+  BrowserProfile,
   CalendarEvent,
   CalendarEventInput,
   CalendarEventPatch,
@@ -67,6 +73,7 @@ import type {
   ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
+  CreatedPersonalToken,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -120,6 +127,7 @@ import type {
   JoinApproval,
   JoinClaim,
   JoinRequest,
+  LearnedSkill,
   Machine,
   MachineAccess,
   MachineAccessReduce,
@@ -137,8 +145,6 @@ import type {
   Memory,
   Message,
   MessagePin,
-  MillionSendInbox,
-  MillionSendKeyInput,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -176,7 +182,9 @@ import type {
   OrgRoles,
   OrgSettings,
   Person,
+  PersonalTokenInput,
   PhoneSignIn,
+  Poll,
   PostMedia,
   Proposal,
   PushDeviceInput,
@@ -184,6 +192,7 @@ import type {
   ReadOnlyOrgSettings,
   Reminder,
   ReminderInput,
+  RemovalPreview,
   Role,
   RoleInput,
   RosterMember,
@@ -211,6 +220,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarPlace,
+  SidebarSection,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -233,11 +243,12 @@ import type {
   ThreadInfo,
   ThreadPage,
   ThreadPatch,
+  ToolChange,
   ToolDecision,
   TrashedArtifact,
   UndoAllResult,
   UsageReport,
-  WikiAudience,
+  WikiFolderAudience,
   WikiGraph,
   WikiImportInput,
   WikiImportResult,
@@ -286,7 +297,7 @@ export interface ApiClient {
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
-    updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
+    updateMe(input: { locale: AppLocale; auto?: boolean }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
     /**
@@ -354,12 +365,18 @@ export interface ApiClient {
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** What opens when the app starts here, on every device (ADR 0108; `start.channel_unknown`). */
     setStart(orgId: string, input: { page: StartPage; channelId?: string | null }): Promise<StartChoice>;
+    /** Whether I see what agents did under each reply here, on every device. */
+    setShowActivity(orgId: string, show: boolean): Promise<boolean>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
     setSidebarItem(orgId: string, item: SidebarItem, place: SidebarPlace | null): Promise<SidebarItems>;
     /** Replaces my choices (`{}`: every tool back on its default). */
     setSidebarItems(orgId: string, items: SidebarItems): Promise<SidebarItems>;
+    /** The sidebar's sections in my order here. */
+    sidebarOrder(orgId: string): Promise<SidebarSection[]>;
+    /** Saves my section order here (`null`: the default). */
+    setSidebarOrder(orgId: string, order: SidebarSection[] | null): Promise<SidebarSection[]>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
@@ -377,6 +394,8 @@ export interface ApiClient {
     members(orgId: string): Promise<Member[]>;
     /** Makes a member an owner or not (owners only). What anyone may do is their roles (`roles.setFor`). */
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
+    /** What removing them (or leaving) does; refused as the removal would be. */
+    removal(orgId: string, userId: string): Promise<RemovalPreview>;
     removeMember(orgId: string, userId: string): Promise<void>;
     invitations(orgId: string): Promise<Invitation[]>;
     invite(
@@ -788,6 +807,12 @@ export interface ApiClient {
     /** Every library skill with `enabled` for this agent. */
     forAgent(orgId: string, agentId: string): Promise<AgentSkill[]>;
     setForAgent(orgId: string, agentId: string, skills: { skillId: string; enabled: boolean }[]): Promise<AgentSkill[]>;
+    /** Skills the agent made from its own how-tos, archived ones too (older servers: absent). */
+    learned?(orgId: string, agentId: string): Promise<LearnedSkill[]>;
+    /** Undo the agent's last change to its own skill. */
+    revert?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Bring back a skill archived for disuse. */
+    restore?(orgId: string, id: string): Promise<SkillDetail>;
   };
   access: {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
@@ -841,6 +866,10 @@ export interface ApiClient {
       input: { label: string; tools: { name: string; access: ToolDecision; label: string; confirmed?: boolean }[] },
     ): Promise<CustomServer>;
     disconnect(orgId: string, serverId: string): Promise<void>;
+    /** Approved tools whose server changed them (ADR 0117), for connector admins. */
+    toolChanges(orgId: string): Promise<ToolChange[]>;
+    /** Accepts a tool's new description and input: agents get them now. */
+    acceptToolChange(orgId: string, connectionId: string, toolName: string): Promise<void>;
   };
   dms: {
     /** My direct conversations, with unread counts. */
@@ -870,6 +899,8 @@ export interface ApiClient {
     create(orgId: string, input: IssueInput): Promise<Issue>;
     update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
+    /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
+    share(orgId: string, id: string): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
@@ -1051,6 +1082,8 @@ export interface ApiClient {
     stop(orgId: string, id: string): Promise<Routine>;
     /** An admin or the agent's owner becomes its creator (a routine paused because its creator left). */
     takeOver(orgId: string, id: string): Promise<Routine>;
+    /** Continuar agora on a run paused near its plan's or budget's limit (`usagePause`): it goes on now. */
+    continueUsage(orgId: string, id: string): Promise<Routine>;
     runs(orgId: string, id: string): Promise<RoutineRun[]>;
     /** A phrase → rule, its description, cron and next 5 runs. */
     parseRule(orgId: string, phrase: string, timezone?: string): Promise<RuleInfo>;
@@ -1093,7 +1126,14 @@ export interface ApiClient {
     /** "Fixadas": at the top of the wiki for everyone. */
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
     /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
-    audience(orgId: string, slug: string, audience: WikiAudience | null): Promise<WikiPage>;
+    audience(orgId: string, slug: string, access: WikiAccess): Promise<WikiPage>;
+    /** A folder's audience, and the closest limited folder above it. */
+    folderAudience(
+      orgId: string,
+      folder: string,
+    ): Promise<{ own: WikiFolderAudience | null; above: WikiFolderAudience | null }>;
+    /** Reaches the pages in it and its subfolders, and the pages that land in it later. */
+    setFolderAudience(orgId: string, folder: string, access: WikiAccess): Promise<{ folder: string; pages: number }>;
     /** To the trash (the server can restore it). */
     remove(orgId: string, slug: string): Promise<void>;
     /** What the agents read most in the last 7 days. */
@@ -1182,6 +1222,13 @@ export interface ApiClient {
     list(orgId: string, filters?: ArtifactFilters): Promise<Artifact[]>;
     /** One artifact at `version` (default: latest), with content. */
     get(orgId: string, id: string, version?: number): Promise<ArtifactDetail>;
+    /** Keeps a block in the Drive (ADR 0113). */
+    keep(orgId: string, id: string): Promise<Artifact>;
+    /** Sends what a person picked in a block to the agent that made it, as their own message. */
+    reply(orgId: string, id: string, text: string, clientId: string): Promise<{ id: string }>;
+    poll(orgId: string, id: string): Promise<Poll>;
+    /** Replaces the viewer's marks in a vote; empty takes them back. */
+    vote(orgId: string, id: string, options: number[]): Promise<Poll>;
     versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
     /** Short-lived signed URL for the stored file. */
     download(orgId: string, id: string, version?: number): Promise<{ url: string; expiresAt: string }>;
@@ -1216,6 +1263,8 @@ export interface ApiClient {
     trash(orgId: string): Promise<TrashedArtifact[]>;
     /** Back from the trash (409 `artifact.purged` after 30 days). */
     restore(orgId: string, id: string): Promise<ArtifactDetail | undefined>;
+    /** Out of the trash for good, now. */
+    purge(orgId: string, id: string): Promise<void>;
   };
   storage: {
     get(orgId: string): Promise<StorageConfig>;
@@ -1319,13 +1368,6 @@ export interface ApiClient {
     accounts(orgId: string): Promise<MailAccount[]>;
     /** Tests the login and both servers first; a `422` carries `MailConnectError` as its code. */
     connectImap(orgId: string, input: MailImapInput): Promise<MailAccount>;
-    /** The inboxes a MillionSend key reaches (the key isn't kept); a `422 auth` when MillionSend refuses it. */
-    millionsendInboxes(orgId: string, input: MillionSendKeyInput): Promise<MillionSendInbox[]>;
-    /** Connects one; `instant`: a webhook brings its new mail at once (else it's checked every few minutes). */
-    connectMillionSend(
-      orgId: string,
-      input: MillionSendKeyInput & { inboxId: string; label?: string },
-    ): Promise<{ account: MailAccount; instant: boolean }>;
     /**
      * Gmail/Outlook: the page to open; the server sends the person back with `?mail=connected|failed`.
      * `desktop`: started in the desktop app's window, which opens the page in the browser and gets the return back.
@@ -1403,6 +1445,28 @@ export interface ApiClient {
     restart(orgId: string, agentId: string): Promise<void>;
   };
   /**
+   * Browser profiles (ADR 0110): named, shared logins on one computer. Everyone sees the list; creating, choosing
+   * who may use one and deleting take "apps e computadores" (403 otherwise); logging in also takes driving
+   * computers. The live view is `browser.watch` with `agentId: "profile:<id>"`.
+   */
+  browserProfiles?: {
+    list(orgId: string, machineId?: string): Promise<BrowserProfile[]>;
+    /** 409 `browser_profile.name_taken`; 400 `browser_profile.machine` (outdated runner); 400 `browser_profile.system_mode` (never offered there). */
+    create(orgId: string, input: { machineId: string; name: string; agentIds: string[] }): Promise<BrowserProfile>;
+    update(orgId: string, profileId: string, input: { name?: string; agentIds?: string[] }): Promise<BrowserProfile>;
+    remove(orgId: string, profileId: string): Promise<void>;
+    /** "Fazer login": this person takes control (agents wait); 409 `browser_profile.busy` while another has it. */
+    takeover(orgId: string, profileId: string): Promise<BrowserProfile>;
+    /** "Devolver". */
+    handback(orgId: string, profileId: string): Promise<BrowserProfile>;
+    /** The person in control opens a site. */
+    open(orgId: string, profileId: string, url: string): Promise<void>;
+    /** The agent's default browser: a profile it may use, or null for its own. */
+    setDefault(orgId: string, agentId: string, profileId: string | null): Promise<void>;
+    /** "Pedir mais um perfil": the people who grant profiles hear of it. */
+    request(orgId: string, agentId: string): Promise<void>;
+  };
+  /**
    * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which
    * starts it when it isn't running; control and "Devolver" are the browser's screen routes with `desktop`.
    */
@@ -1417,6 +1481,21 @@ export interface ApiClient {
   gifs?: {
     /** Free text (`q`), a category, or neither (what is trending), at the workspace's rating. */
     search(orgId: string, query: GifQuery): Promise<GifPage>;
+  };
+  /**
+   * AI apps (ADR 0119): the consent page an app's sign-in opens (`/autorizar?req=`), and Settings → AI apps. A
+   * consent answers once (409 `request_used`); 410 `request_expired` past its 30 minutes.
+   */
+  apps: {
+    consent(requestId: string): Promise<AppConsent>;
+    /** Where the browser goes next, back in the app (with `error=access_denied` on deny): go there once. */
+    decide(requestId: string, input: AppConsentDecision): Promise<{ redirectTo: string }>;
+    /** Yours here; `all`: everyone's, with `person` (needs `manage_members`). */
+    list(orgId: string, all?: boolean): Promise<AppsList>;
+    disconnect(orgId: string, grantId: string): Promise<void>;
+    /** 409 `token_limit` past 10 live tokens per person here. */
+    createToken(orgId: string, input: PersonalTokenInput): Promise<CreatedPersonalToken>;
+    revokeToken(orgId: string, grantId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

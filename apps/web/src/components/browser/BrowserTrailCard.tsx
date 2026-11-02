@@ -7,11 +7,12 @@ import {
   browserTrailPages,
   browserTrailSpanMs,
   type ScreenKind,
+  trailProfile,
 } from "@agenteschat/client";
-import { formatTime } from "@agenteschat/client/lib/format";
+import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatDuration } from "@agenteschat/client/lib/work";
-import { agentGradient, BrowserMark, BrowserStrip, Icon } from "@agenteschat/ui";
+import { agentGradient, BrowserMark, BrowserStrip, Chip, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,7 +27,6 @@ import "./browser.css";
 /** A step in the person's words, from the saved trail. */
 const said = (t: TFunction, s: BrowserTrailStep, screen: ScreenKind) =>
   stepText(t, { id: "", tool: s.tool, detail: s.detail, running: false }, screen);
-const lower = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
 
 /**
  * Where the agent browsed, on its message after the run: the closed card stays, still, with a drawn
@@ -63,7 +63,7 @@ export function BrowserTrailCard({
   const [open, setOpen] = useState(false);
   // A take over that holds the browser has its live card on the chat; the desktop's has its panel.
   const held = useHeldTakeover(agentId, runId ?? "", recent && runId !== null && screen === "browser");
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const color = colorOf(dir.agentById.get(agentId));
   const last = steps.at(-1);
   if (!last || held) return null;
@@ -78,6 +78,8 @@ export function BrowserTrailCard({
         ? tt("after.stoppedBy", { person: dir.memberById.get(by)?.name, time })
         : tt("after.stoppedAt", { time });
   const hosts = browserTrailHosts(steps);
+  // A shared profile (ADR 0110): its name then, before the site; the agent's own browser has none.
+  const profile = screen === "browser" ? trailProfile(steps) : null;
   // The site alone, short ("web.whatsapp.com" → "whatsapp.com"): the drawn page already says it browsed.
   const site = screen === "browser" ? hosts[0]?.replace(/^(www|web|m)\./, "") : hosts[0];
   const title = !site
@@ -108,6 +110,7 @@ export function BrowserTrailCard({
         title={toggle}
         onClick={() => setOpen((o) => !o)}
       >
+        {profile && <Chip>{profile}</Chip>}
         {hosts[0] ? (
           <SiteIcon host={hosts[0]} letterOnly={screen !== "browser"} />
         ) : (
@@ -157,7 +160,7 @@ export function BrowserTrailCard({
                     const [a, b] = line.steps;
                     if (!a) return null;
                     const text = b
-                      ? tt("after.pair", { a: said(t, a, screen), b: lower(said(t, b, screen)) })
+                      ? tt("after.pair", { a: said(t, a, screen), b: lowerFirst(said(t, b, screen), i18n.language) })
                       : a.failed
                         ? tt("after.failed", { step: said(t, a, screen) })
                         : said(t, a, screen);

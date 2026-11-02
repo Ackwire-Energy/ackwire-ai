@@ -99,6 +99,10 @@ export const Organization = z
     start: StartChoice.optional().openapi({
       description: "In `GET /me`: what opens when the app starts here (`PUT …/me/start`). Absent elsewhere.",
     }),
+    showActivity: z.boolean().optional().openapi({
+      description:
+        "In `GET /me`: whether you see what agents did under each reply (`PUT …/me/activity`), off by default. Absent elsewhere.",
+    }),
   })
   .openapi("Organization");
 
@@ -141,9 +145,24 @@ export const Credential = z
   })
   .openapi("Credential");
 
-/** Who can talk to an agent. `userIds` for `people` (under `owner`: the people a plan kept out); the owner always can. */
+/**
+ * Who can talk to an agent. `userIds` and `roleIds` for `people` (under `owner`: the ones a plan kept out); the owner
+ * always can. A role lets in whoever holds it at the time; `everyone` isn't one to pick (that's `mode: everyone`).
+ */
 export const AgentAudience = z
-  .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
+  .object({
+    mode: z.enum(["everyone", "people", "owner"]),
+    userIds: z.array(z.string()).max(500),
+    roleIds: z
+      .array(z.uuid())
+      .max(100)
+      .optional()
+      .openapi({ description: "Absent (older apps): a change keeps the roles already picked." }),
+    consultable: z.boolean().optional().openapi({
+      description:
+        "Other agents may consult it for people outside this audience; it answers them, never those people. On by default; absent = keep. A plan answering only its owner (ADR 0059 §5) still keeps them out.",
+    }),
+  })
   .openapi("AgentAudience");
 
 export const AgentAppearance = z
@@ -240,7 +259,7 @@ export const Agent = z
     }),
     brain: z
       .object({
-        kind: z.enum(["model", "claude_code", "codex"]),
+        kind: z.enum(["model", "claude_code", "codex", "cursor"]),
         model: z
           .string()
           .nullable()
@@ -331,7 +350,7 @@ export const AgentAction = z
       .nullable()
       .openapi({ description: "The person the agent worked for: they, admins and the agent's owner may undo." }),
     target: z.object({
-      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread"]),
+      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill"]),
       id: z.string(),
       number: z.number().optional().openapi({ description: "Issues." }),
       title: z.string().optional().openapi({ description: "Issue, routine, page or thread title; channel name." }),
@@ -362,6 +381,41 @@ export const AgentAction = z
     redoneAt: z.string().nullable(),
   })
   .openapi("AgentAction", { description: "A change an agent made, shown as a receipt with Undo (ADR 0037)." });
+
+/** A long work's view (ADR 0121): its anchor's line, its card's block, the agent's status. */
+export const WorkView = z
+  .object({
+    id: z.uuid(),
+    agentId: z.uuid(),
+    channelId: z.uuid(),
+    title: z.string(),
+    status: z.enum(["queued", "live", "done", "failed", "canceled"]),
+    state: z
+      .enum(["working", "waiting_approval", "waiting_input", "paused", "waiting_computer", "queued"])
+      .nullable()
+      .openapi({ description: "While live: what its run does now." }),
+    how: z.enum(["agent", "auto"]),
+    anchorMessageId: z.uuid(),
+    threadId: z.uuid().nullable().openapi({ description: "Where its updates are." }),
+    homeThreadId: z.uuid().nullable().openapi({ description: "Where it was asked (its report goes there)." }),
+    runId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "Its current run: Parar stops it (`POST …/runs/{runId}/cancel`)." }),
+    requestedByUserId: z.string().nullable(),
+    startedAt: z.string(),
+    finishedAt: z.string().nullable(),
+    nextUpdateAt: z.string().nullable(),
+    lastUpdate: z.object({ text: z.string(), at: z.string(), seq: z.number() }).nullable(),
+    plan: z.array(z.object({ id: z.string(), text: z.string(), state: z.enum(["todo", "doing", "done"]) })),
+    issue: z.object({ id: z.uuid(), number: z.number() }).nullable(),
+    resultMessageId: z.uuid().nullable(),
+    queuePosition: z.number().nullable(),
+    pausedUntil: z.string().nullable(),
+    canceledByUserId: z.string().nullable(),
+    errorCode: z.string().nullable(),
+  })
+  .openapi("WorkView");
 
 const MessageBase = z.object({
   id: z.uuid(),
@@ -470,6 +524,9 @@ const MessageBase = z.object({
     description:
       "Agents' messages in lists: the changes made with this reply, as receipts with Undo; live via `message.actions`.",
   }),
+  longWork: WorkView.optional().openapi({
+    description: "A long work's anchor (`meta.longWork`, ADR 0121): its line; live via `agent.work`.",
+  }),
   createdAt: z.string(),
 });
 
@@ -526,7 +583,7 @@ export const Model = z
   .openapi("Model");
 
 /** ADR 0032: who thinks for an agent. */
-export const BrainKind = z.enum(["model", "claude_code", "codex"]).openapi("BrainKind");
+export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor"]).openapi("BrainKind");
 
 export const BrainOption = z
   .object({
@@ -536,7 +593,7 @@ export const BrainOption = z
       .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
       .optional()
       .openapi({ description: "Why it can't be chosen now (computer brains)." }),
-    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex.' }),
+    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex and Cursor.' }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
@@ -548,6 +605,10 @@ export const BrainOption = z
           .int()
           .optional()
           .openapi({ description: "Its context window in tokens: the context limits worth offering with it." }),
+        inPlan: z
+          .boolean()
+          .optional()
+          .openapi({ description: "Cursor: its CLI said the person's plan includes it (others cost API prices)." }),
       }),
     ),
     defaultModel: z.string().nullable(),
@@ -622,6 +683,10 @@ export const AgentBrain = z
     fallback: z
       .boolean()
       .openapi({ description: "When the computer can't answer, answer through the API (agent's budget)." }),
+    extraUsage: z.boolean().openapi({
+      description:
+        "Long work may go on into the plan's paid extra usage where the provider reports it on (ADR 0118); false: it pauses at 95%.",
+    }),
     computer: z.object({ machineId: z.uuid(), name: z.string(), online: z.boolean() }).nullable(),
     options: z.array(BrainOption),
     machines: z.array(BrainMachine).openapi({

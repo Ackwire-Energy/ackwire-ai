@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import {
   BROWSER_DRAG_FLUSH_MS,
   BROWSER_HOVER_MS,
@@ -17,7 +18,7 @@ import {
   frameMetadata,
   framePoint,
   handoffFuse,
-  handoffMinutesLeft,
+  handoffTimeLeft,
   jpegSize,
   keyboardEvents,
   keyEvents,
@@ -488,9 +489,11 @@ describe("agent browser requests (ADR 0040)", () => {
 
   test("time left and the fuse", () => {
     const now = new Date("2026-10-19T10:05:00.000Z").getTime();
-    expect(handoffMinutesLeft(base, now)).toBe(5);
+    const t = ((key: string, o?: { count?: number }) => `${o?.count} ${key}`) as unknown as TFunction;
+    expect(handoffTimeLeft(t, base, now)).toBe("5 format.inMinutes");
     expect(handoffFuse(base, now)).toBeCloseTo(0.5);
-    expect(handoffMinutesLeft({ expiresAt: null }, now)).toBeNull();
+    expect(handoffTimeLeft(t, { expiresAt: null }, now)).toBeNull();
+    expect(handoffTimeLeft(t, base, now + 6 * 60_000)).toBeNull();
   });
 
   test("the watching log keeps the browser calls only", () => {

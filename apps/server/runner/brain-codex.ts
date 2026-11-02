@@ -483,6 +483,8 @@ export interface CodexTurnOptions {
   /** The agent's secrets: env for Codex, redaction for what leaves the machine (ADR 0027). */
   env?: Record<string, string>;
   redact?: (text: string) => string;
+  /** Streamed text holds back this many characters (the longest secret − 1), as for Claude Code. */
+  redactHold?: number;
   /** The first line of `codex --version` (default: the cached detection). */
   codexVersion?: () => string | undefined;
   /** Tests: the codex executable. */
@@ -770,7 +772,7 @@ export async function handleCodexBrainTurn(
       signal: scope.signal,
       runnerHome: ctx.runnerHome,
       ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
-      ...(secrets ? { env: secrets.env, redact: secrets.redact } : {}),
+      ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
       ...(ctx.codexVersion ? { codexVersion: ctx.codexVersion } : {}),
       ...(ctx.bin ? { bin: ctx.bin } : {}),
       ...(ctx.app ? { app: ctx.app } : {}),

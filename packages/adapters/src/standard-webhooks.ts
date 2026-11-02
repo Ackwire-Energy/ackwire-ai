@@ -9,7 +9,7 @@ const keysOf = (secret: string): (string | Uint8Array)[] =>
   secret.startsWith("whsec_") ? [secret, decodeBase64(secret.slice(6))] : [secret];
 
 /**
- * Whether a Standard Webhooks delivery (Composio, MillionSend) is signed with `secret`: an HMAC-SHA256 of
+ * Whether a Standard Webhooks delivery (Composio) is signed with `secret`: an HMAC-SHA256 of
  * `{webhook-id}.{webhook-timestamp}.{raw body}`, any `v1,` candidate of `webhook-signature` matching (a rotation
  * sends two), and a timestamp within 5 minutes of `nowMs`.
  */
@@ -33,10 +33,4 @@ export function verifyStandardWebhook(secret: string, headers: Headers, rawBody:
       const received = Buffer.from(comma === -1 ? part : part.slice(comma + 1), "base64");
       return expected.some((digest) => digest.length === received.length && timingSafeEqual(digest, received));
     });
-}
-
-/** The `webhook-signature` a Standard Webhooks sender puts on `rawBody` (tests sign deliveries with it). */
-export function standardWebhookSignature(secret: string, id: string, timestamp: number, rawBody: string) {
-  const key = keysOf(secret).at(-1) ?? secret;
-  return `v1,${createHmac("sha256", key).update(`${id}.${timestamp}.${rawBody}`).digest("base64")}`;
 }

@@ -4,12 +4,14 @@ import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
+import type { PollView } from "./blocks";
 import type { BrowserHandoffView } from "./browser/handoff";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
 import type { MessageMemory } from "./message-memories";
 import type { MessageView, ReactionCount } from "./messages";
+import type { WorkView } from "./works";
 
 /** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
 export interface MemoryUpdate {
@@ -226,8 +228,34 @@ export type ChannelEvent =
       stream: "stdout" | "stderr";
       text: string;
     }
+  /**
+   * A browser command of the agent waits for a profile another agent or a person holds (ADR 0110): its card says
+   * who has it. `wait: null` once it got the turn or gave up.
+   */
+  | {
+      type: "agent.browser.waiting";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      wait: {
+        profileId: string;
+        name: string;
+        holder: { type: "agent"; agentId: string; since: string } | { type: "person"; userId: string; since: string };
+      } | null;
+    }
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws from `work`. */
+  | {
+      type: "agent.work";
+      channelId: string;
+      /** Where the anchor is (the ask's thread; null: the main timeline). */
+      threadId: string | null;
+      agentId: string;
+      runId: string | null;
+      work: WorkView;
+    }
   /** The agent stopped (done, failed or waiting for approval). */
   | {
       type: "agent.idle";
@@ -462,6 +490,8 @@ export type ChannelEvent =
     }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /** A vote came in or the poll closed (ADR 0113). */
+  | { type: "poll.updated"; channelId: string; poll: PollView }
   /** A message was pinned in this channel (`GET …/channels/{id}/pins` lists them, newest first). */
   | {
       type: "message.pinned";
@@ -603,8 +633,11 @@ export async function publishRouted(
  * instead of waiting for a reconnect (docs/adr/0010-realtime.md).
  */
 export type OrgEvent =
-  /** `userId` left or was removed: from one channel (`channelId`), or from the whole organization. */
-  | { type: "membership.revoked"; orgId: string; userId: string; channelId?: string }
+  /**
+   * `userId` left or was removed: from one channel (`channelId`), or from the whole organization. `quiet` when it
+   * wasn't someone else taking them out (they left, deleted their account, or were blocked): their apps say nothing.
+   */
+  | { type: "membership.revoked"; orgId: string; userId: string; channelId?: string; quiet?: true }
   /** The channel is gone for everyone. */
   | { type: "channel.archived"; orgId: string; channelId: string }
   /** Something every member of the org may see (org-wide issues, calendar): forwarded as `scope: "org"`. */

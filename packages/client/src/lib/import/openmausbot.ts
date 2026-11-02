@@ -190,13 +190,7 @@ function fromPackage(pkg: Record<string, unknown>, d: Draft) {
 
   for (const c of list(pkg.connections).map(obj)) {
     const mcp = obj(c.mcp);
-    // Header names only: the values never travel in a package.
-    d.connection(
-      str(c.label) || str(c.key),
-      str(mcp.url),
-      list(mcp.valueNames).map(str),
-      connectionUsers.get(str(c.key)) ?? [],
-    );
+    d.connection(str(c.label) || str(c.key), str(mcp.url), connectionUsers.get(str(c.key)) ?? []);
   }
   for (const app of list(obj(pkg.requirements).apps).map(obj)) d.need("app", str(app.label) || str(app.slug));
   for (const preset of list(pkg.presets).map(obj)) d.left("preset", str(preset.name));

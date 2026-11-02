@@ -45,13 +45,16 @@ export function ComputerScreen({ agentId }: { agentId: string }) {
   const actions = useBrowserHandoffActions(useOrg().orgId);
   const leave = (held: BrowserHandoff | null) => {
     if (!held) return;
-    const g = agentGrammar(t, dir.agentById.get(agentId)?.name ?? "");
+    const agent = dir.agentById.get(agentId);
+    const g = agentGrammar(agent?.name ?? "");
+    // The toast names the agent: its face leads it.
+    const face = agentLook(agent);
     if (held.kind === "takeover") {
       actions.done(held.id).then(
-        () => toast({ title: t("browser.now.handedBack", g), icon: "check" }),
+        () => toast({ title: t("browser.now.handedBack", g), agent: face }),
         () => toast({ title: t("mobile.app.failed"), icon: "x" }),
       );
-    } else toast({ title: t("agentComputer.closeAsk", g), icon: "clock" });
+    } else toast({ title: t("agentComputer.closeAsk", g), agent: face });
   };
   return (
     <ToastHost>
@@ -102,7 +105,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const now = useNow(15_000);
   const agent = dir.agentById.get(agentId);
   const name = agent?.name ?? "";
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const machine = view.machine;
   const computer = computerName(t, org?.name ?? "", machine);
   const manages = can(org, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
@@ -134,7 +137,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       help={t("machines.pausedHint")}
     />
   ) : null;
-  const top = (line: string, action?: ReactNode) => (
+  const top = (line: string, action?: ReactNode, info?: ReactNode) => (
     <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
       <IconButton icon="x" plate label={t("mobile.common.close")} onPress={goBack} />
       <View style={styles.title}>
@@ -142,9 +145,18 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
           {t("agentComputer.title", g)}
         </Text>
         {line ? (
-          <Text variant="footnote" tone="faint" numberOfLines={1} accessibilityLiveRegion="polite">
-            {line}
-          </Text>
+          <View style={styles.line}>
+            <Text
+              variant="footnote"
+              tone="faint"
+              numberOfLines={1}
+              accessibilityLiveRegion="polite"
+              style={styles.lineText}
+            >
+              {line}
+            </Text>
+            {info}
+          </View>
         ) : null}
       </View>
       {action}
@@ -309,6 +321,8 @@ function Banner({ icon, text, help, tone }: { icon: IconName; text: string; help
 }
 
 const styles = StyleSheet.create({
+  line: { flexDirection: "row", alignItems: "center", gap: 5 },
+  lineText: { flexShrink: 1 },
   screen: { flex: 1 },
   fill: { flex: 1 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 10 },

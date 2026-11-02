@@ -1,6 +1,6 @@
 # 0102. A MillionSend inbox is a mailbox: its API with a key of its own, a signed webhook, polling behind it
 
-- Status: Accepted
+- Status: Withdrawn (2026-11-02): the owner removed the path, which was never planned this way; the MillionSend connector and our transactional email through MillionSend stay. Mailboxes already connected are disconnected once at boot, their webhooks deleted with their own keys (`retireMillionSendMailboxes`, `packages/engine/src/mail/retire-millionsend.ts`)
 - Date: 2026-10-31
 - Extends 0038 (mailboxes for agents), 0053 (routines) and 0088 (deleting a workspace).
 - Code: `packages/adapters/src/millionsend-mail.ts` (client, `MailProvider`, poller, `readMillionSendWebhook`), `packages/adapters/src/standard-webhooks.ts`, `packages/engine/src/mail/accounts.ts` (`listMillionSendInboxes`, `createMillionSendAccount`, `millionSendConnectorKey`, `millionSendWebhookUrl`, `forgetAtMillionSend`), `packages/engine/src/mail/inbound.ts` (`handleMillionSendWebhook`, `pollMailWatches`), `packages/engine/src/schedule-tools.ts` (`NO_MAILBOX_TEXT`, `MAILBOX_NOT_GIVEN_TEXT`), `packages/engine/src/workspace-deletion.ts`, `apps/server/src/routes/app/mail.ts`, `apps/server/src/routes/webhooks.ts`, `apps/web/src/components/MailConnect.tsx`, `apps/mobile/src/features/connectors/MailboxSheet.tsx` and `ToolReview.tsx` (`MailReview`), `packages/client/src/lib/mail.ts` (`millionSendErrorText`), `MILLIONSEND_INBOXES_API_URL` in `packages/config/src/schema.ts`

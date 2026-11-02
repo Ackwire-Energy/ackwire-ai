@@ -10,6 +10,7 @@ import {
   grantKey,
   grantScopes,
   importSkillZip,
+  KILLED_NOTE,
   NO_COMPUTER_MESSAGE,
   NotFoundError,
   notAllowedMessage,
@@ -94,7 +95,9 @@ describe("binary files", () => {
     );
     expect(await call(ctx, "export_file", { path: "out/data.zip" })).toMatchObject({ isError: true });
     expect((await call(ctx, "write_file", { path: "notes.md", content: "olá 🐝" })).isError).toBeFalsy();
-    expect((await call(ctx, "read_file", { path: "notes.md" })).content).toEndWith(":\nolá 🐝");
+    expect((await call(ctx, "read_file", { path: "notes.md" })).content).toEndWith(
+      ':\n<external_data source="file notes.md">\nolá 🐝\n</external_data>',
+    );
   });
 });
 
@@ -143,6 +146,22 @@ describe("access", () => {
 });
 
 describe("limits", () => {
+  test("a command the system killed (137) most likely ran out of memory; one a person stopped didn't", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await connectedComputer(f, {
+      exec: (req) =>
+        req.command.includes("python3")
+          ? { exitCode: 137, stdout: "", stderr: "", canceled: { killed: true } }
+          : { exitCode: 137, stdout: "", stderr: "Killed\n" },
+    });
+    const ctx = await runCtx();
+    const killed = await call(ctx, "run_code", { language: "bash", code: "./gradlew assembleDebug" });
+    expect(killed.content).toStartWith("run_code bash: exit code 137");
+    expect(killed.content).toEndWith(`\n${KILLED_NOTE}`);
+    const stopped = await call(ctx, "run_code", { language: "python", code: "import time; time.sleep(60)" });
+    expect(stopped.content).not.toContain(KILLED_NOTE);
+  });
+
   test("timeouts and long output are cut; approval and the org's switch", async () => {
     f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
     const { runner } = await connectedComputer(f, {
@@ -160,6 +179,11 @@ describe("limits", () => {
     const long = await call(ctx, "run_code", { language: "bash", code: "yes x" });
     expect(long.content.length).toBeLessThan(21_000);
     expect(long.content).toContain("characters cut");
+    // What a command prints reaches the model inside the outside-content envelope (ADR 0117), cut once.
+    expect(long.content).toStartWith("run_code bash: exit code 0");
+    expect(long.content).toContain('\n<external_data source="run_code output">\nstdout:\n');
+    expect(long.content).toEndWith("\n</external_data>");
+    expect(long.content.match(/characters cut/g)).toHaveLength(1);
 
     // A member can't change the Run code settings (`configure`).
     const member = await addMember(f.db, f.org.id, "member", "bia");

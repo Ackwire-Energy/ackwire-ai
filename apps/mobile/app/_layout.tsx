@@ -2,6 +2,7 @@ import { keys, useApi } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { ThemeProvider as NavigationThemeProvider, router, Stack, usePathname } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +27,8 @@ import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+// Upright everywhere but the agent's screen (`useSideways`). iOS starts this way (the plugin); Android only from here.
+void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
 keepLastCrash();
 
 /**

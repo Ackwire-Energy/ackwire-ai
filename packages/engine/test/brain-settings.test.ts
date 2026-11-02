@@ -7,6 +7,7 @@ import {
   canTalkTo,
   ForbiddenError,
   getAgentBrain,
+  NO_PERSON,
   newAgentBrainMachines,
   releaseAgents,
   setAgentAudience,
@@ -97,31 +98,34 @@ describe("brain settings", () => {
       ["model", true, null],
       ["claude_code", false, "no_computer"],
       ["codex", false, "no_computer"],
+      ["cursor", false, "no_computer"],
     ]);
     expect(reasons(mac())).toEqual([
       ["model", true, null],
       ["claude_code", true, null],
       ["codex", false, "not_installed"],
+      // Cursor needs runner protocol 36 (`CURSOR_PROTOCOL`).
+      ["cursor", false, "runner_old"],
     ]);
     expect(reasons(mac({ execAllowed: false }))[1]).toEqual(["claude_code", false, "exec_off"]);
     expect(reasons(mac({ protocol: MISSION_PROTOCOL - 1 }))[1]).toEqual(["claude_code", false, "runner_old"]);
     // A runner with missions (protocol 5–7) but without `brain.turn`: the engine would refuse every run.
-    expect(reasons(mac({ protocol: BRAIN_PROTOCOL - 1 })).slice(1)).toEqual([
+    expect(reasons(mac({ protocol: BRAIN_PROTOCOL - 1 })).slice(1, 3)).toEqual([
       ["claude_code", false, "runner_old"],
       ["codex", false, "runner_old"],
     ]);
     expect(reasons(mac({ protocol: BRAIN_PROTOCOL }))[1]).toEqual(["claude_code", true, null]);
     const oldCodex = mac({ executors: { codex: { version: "codex-cli 0.100.0" }, detectedAt: "x" } });
-    expect(reasons(oldCodex).slice(1)).toEqual([
+    expect(reasons(oldCodex).slice(1, 3)).toEqual([
       ["claude_code", false, "not_installed"],
       ["codex", false, "outdated"],
     ]);
     const both = mac({ executors: { claude: { version: "2" }, codex: { version: "0.170.0" }, detectedAt: "x" } });
-    expect(brainOptions(both).every((o) => o.available)).toBe(true);
+    expect(brainOptions(both).every((o) => o.available || o.kind === "cursor")).toBe(true);
     expect(brainOptions(both).find((o) => o.kind === "codex")?.experimental).toBe(true);
     // Installed but turned off in the app's Tools: says so (not "not installed"); turned on, available.
     const off = mac({ ...both, access: { tools: { claude: false, codex: true } } });
-    expect(reasons(off).slice(1)).toEqual([
+    expect(reasons(off).slice(1, 3)).toEqual([
       ["claude_code", false, "tool_off"],
       ["codex", true, null],
     ]);
@@ -235,8 +239,8 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(await row()).toMatchObject({ audienceMode: "owner", audienceUserIds: [bia.id] });
     const changes = async () => (await audits("agent.audience_changed")).map((a) => a.details);
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "people", userIds: [bia.id] },
-      to: { mode: "owner", userIds: [] },
+      from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
     });
 
     // On, it replies to whoever its "who can talk" list lets in: Bia, not the whole workspace.
@@ -245,8 +249,8 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(shared.onlyOwner).toBe(false);
     expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "owner", userIds: [bia.id] },
-      to: { mode: "people", userIds: [bia.id] },
+      from: { mode: "owner", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
     });
     // Nothing about what it thinks with changed: no brain entry for it.
     expect(await audits("agent.brain")).toHaveLength(brainAudits);
@@ -257,14 +261,14 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: true })).onlyOwner).toBe(true);
     expect(await row()).toMatchObject({ audienceMode: "owner", audienceUserIds: [bia.id] });
     expect((await changes()).at(-1)).toEqual({
-      from: { mode: "people", userIds: [bia.id] },
-      to: { mode: "owner", userIds: [] },
+      from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
+      to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
     });
     // Off and on again never widens it: still Bia alone.
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
     const again = await row();
     expect(again).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
-    expect([canTalkTo(again, bia.id), canTalkTo(again, caio.id)]).toEqual([true, false]);
+    expect([canTalkTo(again, bia.id, NO_PERSON), canTalkTo(again, caio.id, NO_PERSON)]).toEqual([true, false]);
   });
 
   test("moved onto a plan with it on, an agent keeps its list as it was: nothing widens, nothing to record", async () => {
@@ -278,8 +282,32 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(moved).toMatchObject({ brain: "claude_code", onlyOwner: false });
     const after = await row();
     expect(after).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
-    expect([canTalkTo(after, bia.id), canTalkTo(after, caio.id)]).toEqual([true, false]);
+    expect([canTalkTo(after, bia.id, NO_PERSON), canTalkTo(after, caio.id, NO_PERSON)]).toEqual([true, false]);
     expect(await audits("agent.audience_changed")).toHaveLength(changes);
+  });
+
+  test("restricted with nobody picked yet stays restricted when it answers other people: never everyone", async () => {
+    const { fx, deps, bia, row } = await world();
+    await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [] });
+    // Moved onto a plan with "Atende outras pessoas" on (a sign-in for a new agent): its owner alone, as before.
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code", onlyOwner: false });
+    const moved = await row();
+    expect(moved).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    expect([canTalkTo(moved, fx.owner.id, NO_PERSON), canTalkTo(moved, bia.id, NO_PERSON)]).toEqual([true, false]);
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+  });
+
+  test("restricted with nobody picked yet keeps its mode through the move onto a plan, and after", async () => {
+    const { fx, deps, row } = await world();
+    await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [] });
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    // A remembered "only me" changes nothing: it already answers its owner alone.
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: true });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
   });
 
   test("only the plan's owner lets more people in; an admin only narrows; a member can't touch it", async () => {
@@ -415,5 +443,12 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
       .where(eq(schema.agents.id, fx.agent.id));
     await updateAgent(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { ownerUserId: fx.owner.id });
     expect(await row()).toMatchObject({ brain: "claude_code", audienceMode: "owner" });
+    // Restricted with nobody picked already answers its owner alone: the handover keeps it restricted.
+    await fx.db
+      .update(schema.agents)
+      .set({ ownerUserId: bia.id, audienceMode: "people", audienceUserIds: [] })
+      .where(eq(schema.agents.id, fx.agent.id));
+    await updateAgent(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { ownerUserId: fx.owner.id });
+    expect(await row()).toMatchObject({ brain: "claude_code", audienceMode: "people", audienceUserIds: [] });
   });
 });

@@ -12,16 +12,15 @@ import {
   selectedTextAt,
   setMenuHost,
 } from "@/lib/context-menu";
-import { thisMac } from "@/lib/desktop";
+import { inDesktopApp, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { openPalette } from "./CommandMenu";
 import { useOrg } from "./org-context";
 import { NEW_CHANNEL_EVENT, toggleSidebar } from "./Sidebar";
 
 /**
- * The desktop app's right click: draws our menu when a screen opens one, and gives
- * links and empty space theirs. Mounted only in the app (__root.tsx); typing and selected text keep the
- * system's menu.
+ * The right click: draws our menu when a screen opens one (a message, a channel). In the desktop app links and empty
+ * space get theirs too; in the browser they keep the browser's menu. Typing and selected text keep the system's menu.
  */
 export function ContextMenuHost() {
   const { t } = useTranslation();
@@ -36,6 +35,7 @@ export function ContextMenuHost() {
   }, []);
 
   useEffect(() => {
+    if (!inDesktopApp()) return;
     const onContextMenu = (e: MouseEvent) => {
       if (e.defaultPrevented || keepsSystemMenu(e.target)) return;
       const selected = selectedTextAt(e.target);

@@ -126,7 +126,7 @@ test("system prompt carries org context, agent instructions and channel; history
   expect(withTools).toContain("Read whole files, not just search snippets");
   expect(withTools).toContain("Choosing the fix is your job");
   expect(withTools).toContain("don't just say someone must take it");
-  expect(withTools).toContain("when a search finds nothing, say so");
+  expect(withTools).toContain("when your searches find nothing, say so");
   expect(withTools).toContain("ask the one question that decides it");
   expect(withTools).toContain("it posts only the text of that same turn");
   // Eval 2026-10-23: an issue it opened on its own cut the data out of a product answer; a thanks
@@ -439,4 +439,17 @@ test("the hand-offs block: only this agent's, from this conversation, the last d
   expect(systemText((await buildRunContext(f.db, between, infra, { maxMessages: 30 })).system)).not.toContain(
     "# Work you handed off here",
   );
+});
+
+test("the person's app language is a line of the turn", async () => {
+  await f.db.update(schema.users).set({ locale: "ja" }).where(eq(schema.users.id, f.owner.id));
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev hi",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const { system } = await buildRunContext(f.db, run, f.agent, { maxMessages: 10 });
+  const line = system.find((b) => b.text.startsWith("The person's app language"));
+  expect(line?.text).toBe("The person's app language: ja, Japanese. Still reply in the language they write in.");
+  expect((line as { turn?: boolean } | undefined)?.turn).toBe(true);
 });

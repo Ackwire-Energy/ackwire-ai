@@ -8,7 +8,7 @@ import {
   loginReadPasses,
   otherThanHint,
 } from "@agenteschat/client/lib/machines";
-import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
+import { type PlanId, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad } from "@agenteschat/client/lib/secret-box";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
@@ -26,7 +26,8 @@ import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waitin
  * shows goes to the computer by itself as soon as it lands in the field ("Colar", a paste or typed) when it is this
  * sign-in's; anything else waits for "Enviar", with a line under it. Either way it is sealed on the phone to the
  * computer's key (ADR 0027). ChatGPT: device code sign-in allowed in its settings first, then
- * the device page and the one-time code to type there. A coding plan: its own key page, then the key, sealed the
+ * the device page and the one-time code to type there. Cursor: its sign-in page, and the computer finishes by itself;
+ * or, chosen under it, a Cursor API key, sent like a plan's key. A coding plan: its own key page, then the key, sealed the
  * same way; it never reaches our server. Every start is a tap; leaving stops the sign-in on the computer. Reads that
  * fail while the server restarts or the computer reconnects say Reconectando, and the same sign-in goes on
  * (`loginRead`).
@@ -77,7 +78,7 @@ function AddAccountFlow({
   machineId,
   kind,
   computer,
-  provider,
+  provider: planId,
   again,
   email: hint,
   local,
@@ -93,7 +94,9 @@ function AddAccountFlow({
   const api = useApi();
   const qc = useQueryClient();
   const { colors: c } = useTheme();
-  const plan = planOf(provider);
+  // Cursor: its sign-in, or (chosen under it) its API key, which goes like a coding plan's key.
+  const [cursorKey, setCursorKey] = useState(false);
+  const { plan, provider } = signInKey(planId, kind, cursorKey);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
@@ -342,6 +345,34 @@ function AddAccountFlow({
           {key && !keyOk ? <Note icon="x">{t("aiAccounts.add.keyShape", { plan: plan.label })}</Note> : null}
           <StepText>{t("aiAccounts.add.keySafe", { computer })}</StepText>
         </Step>
+      </>
+    );
+  } else if (kind === "cursor") {
+    steps = (
+      <>
+        <Step
+          n={1}
+          state={login && opened ? "done" : "now"}
+          title={t("agentPage.work.brain.add.stepOne.cursor")}
+          hint={signInHint}
+          side={login ? openAgain(login.url) : startButton(t("agentPage.work.brain.add.open.cursor"), !ready)}
+        >
+          {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
+          {!login && !again ? (
+            <View style={styles.send}>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="lock"
+                label={t("agentPage.work.brain.add.cursorKey")}
+                onPress={() => setCursorKey(true)}
+              />
+            </View>
+          ) : null}
+        </Step>
+        {login && opened ? (
+          <Step n={2} divider title={t("agentPage.work.brain.add.cursorFinish", { computer })} side={waiting} />
+        ) : null}
       </>
     );
   } else if (kind === "codex") {

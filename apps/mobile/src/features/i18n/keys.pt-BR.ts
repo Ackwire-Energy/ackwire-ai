@@ -1,5 +1,7 @@
+import type { LocaleStrings } from "@agenteschat/i18n/plurals";
+
 /**
- * The screens' strings (pt-BR, the primary locale), under `mobile.*`, next
+ * The screens' strings (pt-BR; English, `keys.en.ts`, is the source), under `mobile.*`, next
  * to the foundation's (`src/i18n/keys.pt-BR.ts`: `common`, `auth`, `account`,
  * `theme`, `push`, `a11y`, `composer`, `search`), which these never repeat.
  * They merge into the same `mobile` object; `keys.en.ts` has exactly this
@@ -29,6 +31,26 @@ export const featureKeysPtBR = {
     channelPosition: "{{at}}º de {{count}}.",
     itsChannels: "Canais",
     seeAll: "Ver todos",
+  },
+  blocks: {
+    send: "Mandar",
+    more: "Mais",
+    thousand: "mil",
+    building: "Montando…",
+    openBig: "Abrir na tela toda",
+    keep: "Guardar no Drive",
+    kept: "Guardado no Drive",
+    wake: "Toque para abrir",
+    goesTo: "Vai para {{name}}:",
+    sentAt: "Você mandou às {{time}}",
+    sendFailed: "Não deu certo. Tente de novo.",
+    someone: "Alguém",
+    pollCloses: "Fecha em {{time}}",
+    pollClosed: "Votação encerrada",
+    pollMultiple: "Pode marcar mais de uma.",
+    pollAnswered_one: "{{count}} de {{total}} respondeu",
+    pollAnswered_other: "{{count}} de {{total}} responderam",
+    voteFailed: "Não deu para registrar seu voto.",
   },
   chart: {
     pending: "Montando o gráfico…",
@@ -297,9 +319,6 @@ export const featureKeysPtBR = {
       working: "trabalhando",
       writing: "escrevendo",
       stopped: "parado",
-      opener0: "Deixa eu ver…",
-      opener1: "Já vejo isso…",
-      opener2: "Um instante…",
     },
     steer: {
       waiting: "{{name}} lê na próxima pausa",
@@ -703,7 +722,7 @@ export const featureKeysPtBR = {
         "O celular não abre .zip nem .tar.gz. No app Arquivos, toque no .zip para descompactar e escolha os arquivos de dentro, ou importe pelo computador.",
       privacy: "Lido neste celular. Arquivos de chaves e logins nunca são abertos.",
       also: "Também vem junto",
-      leftOut: "Não vem junto: {{groups}}",
+      change: "Trocar",
       arrived_one: "{{name}} chegou",
       arrived_other: "{{count}} agentes chegaram",
       partial: "{{done}} de {{total}} chegaram. Importar de novo traz o resto.",
@@ -800,6 +819,14 @@ export const featureKeysPtBR = {
       invitation_accepted_other: "{{names}} aceitaram seu convite",
       composio_limit_one: "As chamadas da Composio deste mês acabaram",
       composio_limit_other: "As chamadas da Composio deste mês acabaram",
+      browser_profile_request_one: "{{names}} pede mais um perfil do navegador",
+      browser_profile_request_other: "{{names}} pedem mais um perfil do navegador",
+      connector_tool_changed_one: "Um servidor conectado mudou ferramentas que você aprovou",
+      connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
+      computer_disk_full_one: "O disco de um computador está quase cheio",
+      computer_disk_full_other: "O disco de um computador está quase cheio",
+      app_created_one: "Um app de IA criou coisas para você",
+      app_created_other: "Um app de IA criou coisas para você",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
@@ -862,8 +889,11 @@ export const featureKeysPtBR = {
     startChannels: "Um canal",
     startHint: "Vale para este workspace, aqui e no computador, onde o início é a página Início.",
     startFailed: "Não deu para salvar. Tente de novo.",
-    langPt: "Português",
-    langEn: "English",
+    activity: "Respostas dos agentes",
+    activityShow: "Mostrar o que os agentes fizeram em cada resposta",
+    activityHint:
+      "As ferramentas que usaram e quanto tempo levou, neste workspace, aqui e no computador. Enquanto trabalham, você continua vendo o que estão fazendo.",
+    activityFailed: "Não deu para salvar. Tente de novo.",
     sounds: "Sons",
     soundsOn: "Sons no app",
     soundsOff: "Desligados",
@@ -982,6 +1012,7 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para abrir o arquivo.",
     openImage: "Abrir imagem",
     imageOf: "Imagem {{index}} de {{count}}",
+    place: "{{index}} de {{count}}",
     noPreview: "Este arquivo não abre no app. Compartilhe para abrir em outro app.",
   },
   issues: {
@@ -1195,7 +1226,8 @@ export const featureKeysPtBR = {
     ownerYou: "Responsável: você",
     nowWaiting: "Espera seu ok: {{title}}",
     did: {
-      title: "O que {{she}} fez por você",
+      title: "O que ele fez por você",
+      title_female: "O que ela fez por você",
       month_one: "{{count}} este mês",
       month_other: "{{count}} este mês",
       seeAll: "Ver tudo",
@@ -1229,7 +1261,8 @@ export const featureKeysPtBR = {
       },
     },
     knows: {
-      title: "O que {{she}} sabe sobre você",
+      title: "O que ele sabe sobre você",
+      title_female: "O que ela sabe sobre você",
       footF: "Toque para corrigir ou esquecer.",
       footM: "Toque para corrigir ou esquecer.",
       footOwner: "Só {{name}} ou quem administra pode corrigir.",
@@ -1255,7 +1288,8 @@ export const featureKeysPtBR = {
     },
     thinks: "Pensa com",
     uses: {
-      title: "O que {{she}} pode usar",
+      title: "O que ele pode usar",
+      title_female: "O que ela pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },
       area: {
         context: "Memória",
@@ -1312,7 +1346,6 @@ export const featureKeysPtBR = {
       cloudTag: "Sempre ligado",
       managedDesc: "Só deste workspace · um usuário para cada agente",
       has: "Tem o {{brains}}",
-      and: " e o ",
       none: "Nenhum outro computador pode receber esses agentes agora. Conecte um pelo site.",
       gone: "O {{computer}} voltou. Ninguém precisa trocar.",
       reason: {
@@ -1362,8 +1395,7 @@ export const featureKeysPtBR = {
   browser: {
     card: {
       needs: "{{name}} precisa de ajuda",
-      needsFor_one: "{{name}} precisa de ajuda · {{count}} min",
-      needsFor_other: "{{name}} precisa de ajuda · {{count}} min",
+      needsFor: "{{name}} precisa de ajuda · {{time}}",
       inControlAt: "Você no controle · {{host}}",
       doing: "{{name}} · {{doing}}",
       startingF: "Abrindo o navegador da {{name}}…",
@@ -1381,6 +1413,7 @@ export const featureKeysPtBR = {
       failedNote: "Não deu: {{note}}",
       expired: "Ninguém abriu a tempo: {{title}}",
       cancelled: "Cancelado: {{title}}",
+      withdrawn: "{{name}} não precisa mais disso: {{title}}",
     },
     live: {
       inControl: "Você está no controle",
@@ -1401,8 +1434,8 @@ export const featureKeysPtBR = {
       page: "A página do navegador. Toque para clicar.",
       graceF: "Se você sair, a {{name}} espera 2 min.",
       graceM: "Se você sair, o {{name}} espera 2 min.",
-      closedHelpF: "Os logins continuam salvos.",
-      closedHelpM: "Os logins continuam salvos.",
+      closedHelpF: "Os logins continuam salvos para a próxima vez.",
+      closedHelpM: "Os logins continuam salvos para a próxima vez.",
       stuckHelpF: "Tentar de novo reinicia o navegador. Os logins continuam salvos.",
       stuckHelpM: "Tentar de novo reinicia o navegador. Os logins continuam salvos.",
       hidden: "{{name}} está no controle · tela oculta",
@@ -1634,7 +1667,8 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Quem {{she}} atende",
+    audience: "Quem ele atende",
+    audience_female: "Quem ela atende",
     another: "Outra IA",
   },
   crash: {
@@ -1672,9 +1706,4 @@ export const featureKeysPtBR = {
     cleared: "Status limpo",
     bySelfUntil: "Escrito por {{name}} · {{when}}",
   },
-};
-
-type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
-
-/** Every locale of the screens' strings has this shape. */
-export type FeatureTranslations = Shape<typeof featureKeysPtBR>;
+} satisfies LocaleStrings;

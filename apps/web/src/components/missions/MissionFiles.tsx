@@ -50,7 +50,7 @@ export function MissionFilesPanel({
     mission.data?.executor ?? "claude",
     dir.agentById.get(mission.data?.agentId ?? "")?.name ?? "",
   );
-  const xg = agentGrammar(t, executor);
+  const xg = agentGrammar(executor);
   const content = file?.content ?? "";
   const key = `${missionId}:${tab}`;
   // The lines new since we last drew this file, and when they came.
@@ -63,7 +63,7 @@ export function MissionFilesPanel({
   const subtitle: Record<string, string> = {
     "mission.md": t("missions.files.missionSub"),
     "decisions.md": t("missions.files.decisionsSub"),
-    "notes.md": t("missions.files.notesSub", { executor, of: xg.of }),
+    "notes.md": t("missions.files.notesSub", { executor, context: xg.context }),
   };
   const synced = file?.writtenAt ?? file?.updatedAt;
   return (
@@ -83,7 +83,9 @@ export function MissionFilesPanel({
         <div className="mi-files__foot ac-iconline">
           <Icon name="info" size={14} />
           <span>
-            {tab === "notes.md" ? t("missions.files.notesFoot", { executor, The: xg.The }) : t("missions.files.foot")}
+            {tab === "notes.md"
+              ? t("missions.files.notesFoot", { executor, context: xg.context })
+              : t("missions.files.foot")}
           </span>
         </div>
       }

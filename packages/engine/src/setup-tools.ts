@@ -22,7 +22,7 @@ import { insertMessage, messageView } from "./messages";
 import { personBehindCall } from "./requester";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
-import { ACCESS_SCHEMA, REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
+import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
 import { noAgentText } from "./team";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -370,7 +370,6 @@ export function createSetupToolSource(deps: {
               },
               title: { type: "string", maxLength: 120 },
               report: REPORT_SCHEMA,
-              access: ACCESS_SCHEMA,
             },
             required: ["schedule", "prompt"],
             additionalProperties: false,

@@ -1,6 +1,7 @@
 import { connectorOAuthApps } from "@agenteschat/config";
 import {
   acceptCustomSuggestion,
+  acceptToolChange,
   type CustomDeps,
   composioConnectorsOf,
   connectCustomServer,
@@ -8,6 +9,7 @@ import {
   connectorIconFile,
   connectorListing,
   listCustomServers,
+  listToolChanges,
   MCP_PRESETS,
   mcpPreset,
   NotFoundError,
@@ -93,6 +95,18 @@ const CustomServer = z
   .openapi("CustomServer");
 
 const ServerParams = OrgParams.extend({ serverId: z.uuid() });
+
+const ToolVersion = z.object({ description: z.string(), inputSchema: z.record(z.string(), z.unknown()) });
+const ToolChange = z
+  .object({
+    connectionId: z.uuid(),
+    connectionLabel: z.string(),
+    toolName: z.string(),
+    before: ToolVersion.openapi({ description: "What agents see now: the approved version." }),
+    after: ToolVersion.openapi({ description: "What the server lists now." }),
+    changedAt: z.string(),
+  })
+  .openapi("ToolChange");
 
 const ConnectStart = z.union([
   z.object({ status: z.literal("connected"), server: CustomServer, outcome: Outcome }),
@@ -357,6 +371,53 @@ export function customConnectorRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, serverId } = c.req.valid("param");
       await revokeConnection(db, c.get("user").id, orgId, serverId, composio);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/connectors/tool-changes",
+      tags,
+      security,
+      summary: "Approved MCP tools whose server changed their description or input (connector admins)",
+      description:
+        "Agents keep the approved text (`before`) until an admin accepts the change (ADR 0117). Composio's tools and ours are never listed.",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ changes: z.array(ToolChange) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ changes: await listToolChanges(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/connectors/{connectionId}/tools/{toolName}/accept-change",
+      tags,
+      security,
+      summary: "Accept a tool's new description and input: agents get it now, and a custom server is classified again",
+      request: { params: OrgParams.extend({ connectionId: z.uuid(), toolName: z.string().min(1).max(200) }) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, connectionId, toolName } = c.req.valid("param");
+      const actor = c.get("user").id;
+      await acceptToolChange(
+        {
+          db,
+          pubsub: adapters.pubsub,
+          // A catalog connection isn't custom: nothing to classify, and the refresh's not-found is ignored.
+          resync: (id) => refreshCustomServer(custom, actor, orgId, id),
+        },
+        actor,
+        orgId,
+        connectionId,
+        toolName,
+      );
       return c.body(null, 204);
     },
   );

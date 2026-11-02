@@ -2,29 +2,39 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { BRAIN_PROTOCOL, userTopic } from "@agenteschat/adapters";
 import { eq, rowsOf, schema, sql } from "@agenteschat/db";
 import {
+  acceptInvitation,
   addChannelMember,
   audienceOf,
   audienceSql,
   canTalkTo,
   createAgent,
   createOrganization,
+  createRole,
   createRoutine,
   dispatchMentions,
   drainOutbox,
   executeRoutineRun,
   ForbiddenError,
   getAgentBrain,
+  getTeam,
   insertMessageWithRuns,
+  inviteMany,
+  listRoutines,
+  NO_PERSON,
   NotFoundError,
   openDm,
   postPersonMessage,
   type RouterStrategy,
+  removeMember,
   routeMessage,
   setAgentAudience,
   setAgentBrain,
+  setInvitationRoles,
+  setMemberRoles,
+  speakerFor,
   ValidationError,
 } from "../src";
-import { addMember, addUser, type Fixture, makeAdmin, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -67,15 +77,13 @@ describe("who can talk to the agent", () => {
       "owner",
     );
     const zed = await addUser(f.db, "zed");
-    await expect(
-      setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [zed.id] }),
-    ).rejects.toBeInstanceOf(ValidationError);
     const updated = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, {
       mode: "people",
-      userIds: [bia.id],
+      userIds: [bia.id, zed.id],
     });
-    expect(canTalkTo(updated, bia.id)).toBe(true);
-    expect(canTalkTo(updated, f.owner.id)).toBe(true); // the owner always can
+    expect(updated.audienceUserIds).toEqual([bia.id]);
+    expect(canTalkTo(updated, bia.id, NO_PERSON)).toBe(true);
+    expect(canTalkTo(updated, f.owner.id, NO_PERSON)).toBe(true); // the owner always can
     const audit = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
     expect(audit).toHaveLength(2);
     // Another organization can't touch it.
@@ -83,6 +91,47 @@ describe("who can talk to the agent", () => {
     await expect(
       setAgentAudience(f.db, zed.id, organization.id, f.agent.id, { mode: "everyone", userIds: [] }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test("removing the last person keeps it restricted: only its owner, never everyone", async () => {
+    const { bia } = await world();
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
+    const emptied = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [] });
+    expect(emptied).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    expect([canTalkTo(emptied, f.owner.id, NO_PERSON), canTalkTo(emptied, bia.id, NO_PERSON)]).toEqual([true, false]);
+  });
+
+  test("someone invited with a role changed before accepting can be given the agent; one who left drops out", async () => {
+    const { bia } = await world();
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    const [sent] = await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["teo@example.com"], secret: SECRET });
+    if (sent?.status !== "invited") throw new Error("expected an invitation");
+    await setInvitationRoles(f.db, f.owner.id, f.org.id, sent.invitationId, [support.id]);
+    await f.db.insert(schema.users).values({ id: "u_teo", name: "Teo", email: "teo@example.com" });
+    await acceptInvitation(f.db, { id: "u_teo", email: "teo@example.com" }, sent.token);
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
+    // bia leaves: her id no longer stays on the agent, and the list the apps still hold is saved without her.
+    await removeMember(f.db, bia.id, f.org.id, bia.id);
+    const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(row?.audienceUserIds).toEqual([]);
+    const updated = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, {
+      mode: "people",
+      userIds: [bia.id, "u_teo"],
+    });
+    expect(updated.audienceUserIds).toEqual(["u_teo"]);
+  });
+
+  test("the migration takes people no longer in the workspace off the agents' lists, keeping the order", async () => {
+    const { bia } = await world();
+    const cid = await addMember(f.db, f.org.id, "member", "cid");
+    const gone = await addUser(f.db, "gone");
+    const stale = [cid.id, gone.id, bia.id];
+    await f.db.update(schema.agents).set({ audienceMode: "people", audienceUserIds: stale });
+    const file = await Bun.file(new URL("../../db/migrations/0162_agent_audience_members.sql", import.meta.url)).text();
+    await f.db.execute(sql.raw(file));
+    await f.db.execute(sql.raw(file));
+    const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(row?.audienceUserIds).toEqual([cid.id, bia.id]);
   });
 
   test("a mention from someone not allowed starts nothing and only they get the notice", async () => {
@@ -97,7 +146,7 @@ describe("who can talk to the agent", () => {
         agentId: f.agent.id,
         text: "Dev only replies to ana.",
         code: "audience.only",
-        params: { agentId: f.agent.id, agentName: "Dev", userIds: [f.owner.id], names: ["ana"] },
+        params: { agentId: f.agent.id, agentName: "Dev", userIds: [f.owner.id], roleIds: [], names: ["ana"] },
       },
     ]);
     await Bun.sleep(5);
@@ -237,14 +286,16 @@ describe("who can talk to the agent", () => {
       .update(schema.agents)
       .set({ brain: "claude_code", audienceMode: "owner" })
       .where(eq(schema.agents.id, f.agent.id));
-    const everyone = { mode: "everyone" as const, userIds: [] };
-    const some = { mode: "people" as const, userIds: [bia.id] };
+    const everyone = { mode: "everyone" as const, userIds: [], roleIds: [] };
+    const some = { mode: "people" as const, userIds: [bia.id], roleIds: [] };
     const widen = (actor: string, to: typeof everyone | typeof some) =>
       setAgentAudience(f.db, actor, f.org.id, f.agent.id, to).catch((e) => e);
     expect(await widen(caio.id, everyone)).toMatchObject({ code: "audience.plan_owner_only" });
-    expect(audienceOf(await widen(f.owner.id, some))).toEqual(some);
+    expect(audienceOf(await widen(f.owner.id, some))).toEqual({ ...some, consultable: true });
     const audits = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
-    expect(audits.map((a) => a.details)).toEqual([{ from: { mode: "owner", userIds: [] }, to: some }]);
+    expect(audits.map((a) => a.details)).toEqual([
+      { from: { mode: "owner", userIds: [], roleIds: [], consultable: true }, to: { ...some, consultable: true } },
+    ]);
     expect((await widen(f.owner.id, everyone)).audienceMode).toBe("everyone");
     expect((await widen(caio.id, some)).audienceMode).toBe("people");
     expect(await widen(caio.id, everyone)).toBeInstanceOf(ForbiddenError);
@@ -253,15 +304,112 @@ describe("who can talk to the agent", () => {
     expect((await widen(caio.id, everyone)).audienceMode).toBe("everyone");
   });
 
+  test("a role lets in whoever holds it, now and later, in every path; leaving the role takes it away", async () => {
+    const { bia } = await world();
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    const agent = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, {
+      mode: "people",
+      userIds: [],
+      roleIds: [support.id],
+    });
+    expect(audienceOf(agent)).toEqual({ mode: "people", userIds: [], roleIds: [support.id], consultable: true });
+    const mention = () => postPersonMessage(deps(), bia.id, f.org.id, f.general.id, { body: "@dev faz o relatório" });
+    const teamSays = async () =>
+      (await getTeam(f.db, bia.id, f.org.id)).agents.find((a) => a.id === f.agent.id)?.canTalk;
+    // Before Bia holds it: no run, the notice names the role, and every list says no.
+    const before = await mention();
+    expect(await runsOf(before.id)).toEqual([]);
+    expect(before.notices?.[0]).toMatchObject({ text: "Dev only replies to Suporte and ana." });
+    expect(before.notices?.[0]?.params).toEqual({
+      agentId: f.agent.id,
+      agentName: "Dev",
+      userIds: [f.owner.id],
+      roleIds: [support.id],
+      names: ["Suporte", "ana"],
+    });
+    await expect(openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id })).rejects.toMatchObject({
+      code: "audience.only",
+    });
+    expect(await teamSays()).toBe(false);
+    // She joins the role: the mention starts a run (SQL), the DM opens (code), the team screen lets her talk.
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [support.id]);
+    const joined = await mention();
+    expect(await runsOf(joined.id)).toHaveLength(1);
+    expect(joined.notices).toBeUndefined();
+    expect((await openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id })).kind).toBe("dm");
+    expect(await teamSays()).toBe(true);
+    // She leaves it: back to nothing, with no change to the agent.
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, []);
+    const left = await mention();
+    expect(await runsOf(left.id)).toEqual([]);
+    expect(await teamSays()).toBe(false);
+  });
+
+  test("routines of an agent show only to who may talk to it: a role grants them, leaving it hides them", async () => {
+    const { bia } = await world();
+    const routine = await createRoutine({ db: f.db, pubsub: f.pubsub, context: f.context }, f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Resuma o dia.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: { type: "schedule", phrase: "todo dia às 9h" },
+    });
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, {
+      mode: "people",
+      userIds: [],
+      roleIds: [support.id],
+    });
+    const seen = async (userId: string) => (await listRoutines(f.db, userId, f.org.id)).map((r) => r.id);
+    expect(await seen(bia.id)).toEqual([]);
+    expect(await seen(f.owner.id)).toEqual([routine.id]);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [support.id]);
+    expect(await seen(bia.id)).toEqual([routine.id]);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, []);
+    expect(await seen(bia.id)).toEqual([]);
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });
+    expect(await seen(bia.id)).toEqual([]);
+  });
+
+  test("roles to pick: the workspace's own, never `everyone` nor another workspace's; an app that sends none keeps them", async () => {
+    await world();
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    const [everyone] = await f.db
+      .select()
+      .from(schema.orgRoles)
+      .where(eq(schema.orgRoles.orgId, f.org.id))
+      .then((rows) => rows.filter((r) => r.kind === "everyone"));
+    const pick = (roleIds: string[]) =>
+      setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [], roleIds });
+    await expect(pick([everyone?.id ?? ""])).rejects.toBeInstanceOf(ValidationError);
+    const other = await createOrganization(f.db, f.owner.id, { name: "Outra" });
+    const theirs = await createRole(f.db, f.owner.id, other.organization.id, { name: "Deles" });
+    await expect(pick([theirs.id])).rejects.toBeInstanceOf(ValidationError);
+    // A role alone is enough, even with no owner.
+    await f.db.update(schema.agents).set({ ownerUserId: null }).where(eq(schema.agents.id, f.agent.id));
+    expect((await pick([support.id])).audienceRoleIds).toEqual([support.id]);
+    const bia = await addMember(f.db, f.org.id, "member", "bia2");
+    const kept = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
+    expect(kept).toMatchObject({ audienceUserIds: [bia.id], audienceRoleIds: [support.id] });
+    // Everyone again clears both lists.
+    const open = await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "everyone", userIds: [] });
+    expect(open).toMatchObject({ audienceUserIds: [], audienceRoleIds: [] });
+  });
+
   test("the gate in SQL and in code agree: every audience, on a plan or the API, with an owner or none", async () => {
     const { bia } = await world();
     const cara = await addMember(f.db, f.org.id, "member", "cara");
-    const people = [f.owner.id, bia.id, cara.id, null];
+    const dora = await addMember(f.db, f.org.id, "member", "dora");
+    // Cara holds the agent's role; Dora holds another one.
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    const tech = await createRole(f.db, f.owner.id, f.org.id, { name: "Tecnologia" });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, cara.id, [support.id]);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, dora.id, [tech.id]);
+    const people = [f.owner.id, bia.id, cara.id, dora.id, null];
     let checked = 0;
     for (const brain of ["model", "claude_code", "codex"] as const)
       for (const audienceMode of ["everyone", "people", "owner"] as const)
         for (const ownerUserId of [f.owner.id, null]) {
-          const set = { brain, audienceMode, ownerUserId, audienceUserIds: [bia.id] };
+          const set = { brain, audienceMode, ownerUserId, audienceUserIds: [bia.id], audienceRoleIds: [support.id] };
           const [row] = await f.db.update(schema.agents).set(set).where(eq(schema.agents.id, f.agent.id)).returning();
           if (!row) throw new Error("no agent");
           for (const person of people) {
@@ -270,11 +418,15 @@ describe("who can talk to the agent", () => {
                 sql`select ${audienceSql("a", sql`${person}::text`)} as ok from agents a where a.id = ${f.agent.id}::uuid`,
               ),
             );
-            expect({ ...set, person, ok: found?.ok }).toEqual({ ...set, person, ok: canTalkTo(row, person) });
+            expect({ ...set, person, ok: found?.ok }).toEqual({
+              ...set,
+              person,
+              ok: canTalkTo(row, person, await speakerFor(f.db, f.org.id, person)),
+            });
             checked++;
           }
         }
-    expect(checked).toBe(72);
+    expect(checked).toBe(90);
   });
 
   test("an agent that thinks with its owner's plan: a DM from anyone else gets the notice until its owner lets everyone in", async () => {
@@ -297,7 +449,7 @@ describe("who can talk to the agent", () => {
         agentId: f.agent.id,
         text: "Dev only replies to ana.",
         code: "audience.only",
-        params: { agentId: f.agent.id, agentName: "Dev", userIds: [f.owner.id], names: ["ana"] },
+        params: { agentId: f.agent.id, agentName: "Dev", userIds: [f.owner.id], roleIds: [], names: ["ana"] },
       },
     ]);
     await drainOutbox(f.db, f.handlers);

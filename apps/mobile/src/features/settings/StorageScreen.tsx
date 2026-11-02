@@ -276,7 +276,9 @@ function BucketForm({ config }: { config: StorageConfig }) {
           {t("storage.required")}
         </Text>
       ) : (
-        <GroupedFooter>{`${t("storage.endpointHelp")} ${t("storage.prefixHelp")}`}</GroupedFooter>
+        <GroupedFooter>
+          {t("common.joinSentences", { a: t("storage.endpointHelp"), b: t("storage.prefixHelp") })}
+        </GroupedFooter>
       )}
       <Gap />
       <GroupedList>

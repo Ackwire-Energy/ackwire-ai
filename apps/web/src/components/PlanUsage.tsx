@@ -1,7 +1,8 @@
 import type { OrgPlanUsage, PlanAccountInfo, PlanAccountUsage } from "@agenteschat/client";
-import { useApi, usePlanUsage } from "@agenteschat/client";
+import { useApi, useModels, usePlanUsage } from "@agenteschat/client";
 import { formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { planName } from "@agenteschat/client/lib/plans";
+import { AUTO, apiProviderOf } from "@agenteschat/client/lib/providers";
 import { Card, CardHeader, Icon, Meter, PlanMeter, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -141,7 +142,7 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
           <span className="plan-block__month">
             {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
             {money && typeof account.equivalentUsd === "number" && (
-              <> · {t("usageViews.equivalent", { amount: formatUsd(t, i18n.language, account.equivalentUsd) })}</>
+              <> · {t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}</>
             )}
           </span>
         </div>
@@ -165,10 +166,11 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
+  const provider = apiProviderOf(AUTO, useModels().data?.models ?? []);
   if (data.api.length === 0) return null;
   return (
     <Card aria-labelledby="sec-usage-api">
-      <CardHeader id="sec-usage-api" icon="key" title={t("usageViews.api.title")} />
+      <CardHeader id="sec-usage-api" icon="key" mark={provider} title={t("usageViews.api.title")} />
       <div className="plan-api">
         {data.api.map((a) => {
           const name = dir.agentById.get(a.agentId)?.name ?? a.name;
@@ -196,8 +198,8 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
                   <small>
                     {noteWhole(
                       t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
-                        spent: formatUsd(t, i18n.language, a.costUsd),
-                        budget: formatUsd(t, i18n.language, a.budgetUsd),
+                        spent: formatUsd(i18n.language, a.costUsd),
+                        budget: formatUsd(i18n.language, a.budgetUsd),
                       }),
                     )}
                   </small>

@@ -46,6 +46,10 @@ const AgentBrowser = z
       }),
     detail: z.string().nullable().openapi({ description: "The computer's own words when it isn't ready." }),
     machine: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    profileId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "Its default browser: a shared browser profile it may use (ADR 0110); null = its own." }),
   })
   .openapi("AgentBrowser");
 

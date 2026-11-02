@@ -29,6 +29,9 @@ export async function holdsMessages(
     transcript = row?.transcript ?? null;
   }
   const t = transcript as StoredTranscript | null;
+  // Long work paused near a limit (ADR 0118): a person's message gets a quick run of its own, so the reserve left
+  // goes to replies, not to the long job.
+  if (t?.waitingForBrain?.code === "usage_pause") return true;
   // Parked waiting for its computer: a message makes it look again (`steering.ts`).
   if (t?.waitingForBrain) return false;
   const calls = (t?.pending?.calls ?? []).filter((c) => !c.result);

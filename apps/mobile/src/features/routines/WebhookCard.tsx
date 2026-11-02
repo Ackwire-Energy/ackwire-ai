@@ -118,7 +118,10 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
         ) : null}
       </GroupedList>
       <GroupedFooter>
-        {`${t(data.signed ? "routines.webhook.signedOn" : "routines.webhook.signedOff")} ${t("routines.webhook.signedHelp")}`}
+        {t("common.joinSentences", {
+          a: t(data.signed ? "routines.webhook.signedOn" : "routines.webhook.signedOff"),
+          b: t("routines.webhook.signedHelp"),
+        })}
       </GroupedFooter>
       {secret && data.signed ? (
         <>

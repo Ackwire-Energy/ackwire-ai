@@ -26,8 +26,8 @@ import {
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { lowerFirst, NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
-import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
+import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
@@ -300,7 +300,7 @@ export function ExistingRows({
       await api.agents.update(org.id, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
       return { label: key.label, choice: "key", onlyOwner: false };
     });
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   const items = rows.map((r) => {
     if (r.kind === "key") {
       const k = r.key;
@@ -376,7 +376,10 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
     setOn(next);
     setBusy(true);
     try {
-      await api.agents.setBrain(org.id, agent.id, { onlyOwner: !next });
+      const saved = await api.agents.setBrain(org.id, agent.id, { onlyOwner: !next });
+      // The server keeps "Só algumas pessoas" with nobody picked as it is: the switch shows what it saved.
+      setOn(!saved.onlyOwner);
+      if (next && saved.onlyOwner) toast.show(t("aiAccounts.share.pickPeople", agentGrammar(agent.name)), "info");
       void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, agent.id) });
       void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
     } catch {
@@ -586,7 +589,7 @@ function PlanSteps({
   agent: PlanSetAgent;
   everyAgent: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -696,8 +699,15 @@ function PlanSteps({
     if (now.length === 0) return;
     setReplying(true);
     try {
-      for (const id of now) await api.agents.setBrain(org.id, id, { onlyOwner: !on });
+      const saved = [];
+      for (const id of now) saved.push(await api.agents.setBrain(org.id, id, { onlyOwner: !on }));
       refresh(now);
+      // The server keeps "Só algumas pessoas" with nobody picked as it is: the switch shows what it saved.
+      if (on && saved.every((s) => s.onlyOwner)) {
+        setReplies(false);
+        const one = now.length === 1 ? forWhom.find((a) => a.id === now[0]) : undefined;
+        if (one) toast.show(t("aiAccounts.share.pickPeople", agentGrammar(one.name)), "info");
+      }
     } catch {
       setReplies(!on);
       toast.show(t("agentPage.work.failed"), "error");
@@ -751,7 +761,7 @@ function PlanSteps({
     );
   }
   if (ownSaved) {
-    const label = lowerFirst(t("connectAi.own.shared"), i18n.language);
+    const label = t("connectAi.own.sharedLower");
     return (
       <>
         <SettingNote icon="check" live>
@@ -1020,7 +1030,7 @@ function PlanSteps({
                   ? t("connectAi.another")
                   : everyone
                     ? t("connectAi.own.each")
-                    : t("connectAi.own.one", agentGrammar(t, agent.name))}
+                    : t("connectAi.own.one", agentGrammar(agent.name))}
               </span>
             </span>
           </OptionCard>
@@ -1039,7 +1049,7 @@ function PlanSteps({
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(t, turn.name)) } : {})}
+          {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(turn.name)) } : {})}
           {...(everyone && coding && !once ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}
           onSent={() => {
             setSent(true);
@@ -1140,7 +1150,10 @@ export function KeyPanel({
                   </OpenPage>
                 }
               >
-                <StepTitle title={t("connectAi.key.create", providerGrammar(t, keyOf))} hint={hint && t(hint)} />
+                <StepTitle
+                  title={t("connectAi.key.create", { provider: providerLabel(keyOf) })}
+                  hint={hint && t(hint)}
+                />
               </Step>
               <Step n={2}>
                 <label htmlFor={fieldId}>

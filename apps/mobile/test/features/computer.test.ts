@@ -95,8 +95,10 @@ describe("the agent's computer on the phone: its words by edition", () => {
       const t = await translator(lng);
       for (const g of ["F", "M"]) expect(t(`mobile.browser.live.closedHelp${g}`)).not.toMatch(/Abre quando|opens when/);
     }
-    expect((await translator("pt-BR"))("mobile.browser.live.closedHelpF")).toBe("Os logins continuam salvos.");
-    expect((await translator("en"))("mobile.browser.live.closedHelpM")).toBe("Its sign-ins stay saved.");
+    expect((await translator("pt-BR"))("mobile.browser.live.closedHelpF")).toBe(
+      "Os logins continuam salvos para a próxima vez.",
+    );
+    expect((await translator("en"))("mobile.browser.live.closedHelpM")).toBe("Logins stay saved for next time.");
   });
 
   test("the phone's own Cloud words name no off, pairing, cloud or terminal", () => {
@@ -115,7 +117,7 @@ describe("the agent's computer on the phone: its words by edition", () => {
       expect(at(keys, "browser.profile")).toBeUndefined();
     }
     expect(at(resources["pt-BR"].translation, "agentComputer.button")).toBe("Computador");
-    expect(at(resources["pt-BR"].translation, "agentComputer.title")).toBe("Computador {{of}} {{name}}");
+    expect(at(resources["pt-BR"].translation, "agentComputer.title")).toBe("Computador do {{name}}");
   });
 });
 
@@ -221,11 +223,11 @@ describe("the agent's computer full screen on the phone: what its stage shows", 
     // Someone else in control: the header says who, and the page only why nothing shows.
     const joao = request({ status: "active", controllerUserId: "u-joao", kind: "takeover", expiresAt: null });
     expect(liveSubLine(pt, facts({ handoff: joao }), words)).toBe("João no controle");
-    expect(pt("browser.inCard.hiddenHelp", agentGrammar(pt, "Ada"))).toBe(
+    expect(pt("browser.inCard.hiddenHelp", agentGrammar("Ada"))).toBe(
       "Por privacidade, a tela fica oculta até voltar para a Ada.",
     );
     const card = await Bun.file(new URL("../../src/features/browser/BrowserCard.tsx", import.meta.url).pathname).text();
-    expect(card).toContain('? t("browser.inCard.hiddenHelp", agentGrammar(t, name))');
+    expect(card).toContain('? t("browser.inCard.hiddenHelp", agentGrammar(name))');
   });
 });
 

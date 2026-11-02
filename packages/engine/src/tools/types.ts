@@ -1,6 +1,5 @@
 import type { Database, schema } from "@agenteschat/db";
 import type { OutcomeKind } from "../context/outcomes";
-import type { RoutineAccess } from "../routine-brief";
 import type { JsonSchema } from "./json-schema";
 
 type ApprovalRow = typeof schema.approvals.$inferSelect;
@@ -11,8 +10,6 @@ export interface AheadRequest {
   tool: string;
   input: Record<string, unknown>;
   why: string;
-  /** What the routine may do at its time (a new one-off acts). */
-  access: RoutineAccess;
   /** Makes or finds the run it is for, called only once the call passed every check. */
   slot(): Promise<{ routineId: string; runAt: Date }>;
 }
@@ -134,6 +131,12 @@ export interface ToolDefinition {
    * frame their own untrusted part (mail, databases, browser_read) leave it off.
    */
   external?: boolean;
+  /**
+   * The output is text from outside the org that the tool frames itself (a web page, an email, a desktop
+   * screen, a routine's event): like `external`, its tool_result step is marked `outside`, so what the run
+   * posts next carries `meta.readOutside` (ADR 0117). It changes nothing about the call itself.
+   */
+  readsOutside?: true;
   /** A mission's tool (agent mode, ADR 0029): its approvals are bound to that mission too. */
   missionId?: string;
   /**

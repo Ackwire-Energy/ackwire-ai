@@ -75,16 +75,13 @@ export function useFileActions(detail: ArtifactDetail | undefined) {
 
 /** "hoje 10:03", "ontem 18:20", "12 de out. 09:15": when the file was saved. */
 export function useSavedWhen() {
-  const { t } = useTranslation();
   const when = useWhen();
   return (iso: string) => {
     const kind = whenKind(iso);
     const day =
-      kind === "time"
-        ? t("mobile.time.today").toLocaleLowerCase(when.locale)
-        : kind === "yesterday"
-          ? t("mobile.time.yesterday").toLocaleLowerCase(when.locale)
-          : when.short(iso);
+      kind === "time" || kind === "yesterday"
+        ? new Intl.RelativeTimeFormat(when.locale, { numeric: "auto" }).format(kind === "time" ? 0 : -1, "day")
+        : when.short(iso);
     return `${day} ${when.time(iso)}`;
   };
 }

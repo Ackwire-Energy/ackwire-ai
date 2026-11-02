@@ -2,17 +2,26 @@ import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { resources } from "@agenteschat/i18n";
+import { LOCALES } from "@agenteschat/i18n/locale";
+import { checkLocale } from "@agenteschat/i18n/testing";
+import identical from "../../../packages/i18n/test/identical.json";
 import { leaves as entries } from "../../../packages/i18n/test/leaves";
 import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
 import { unplainLeaves } from "../../../packages/i18n/test/plain-marks";
 import { misplaced, staleLines } from "../../../packages/i18n/test/setups";
+import appConfig from "../app.config";
 import nativeEn from "../assets/locales/en.json";
 import nativePtBR from "../assets/locales/pt-BR.json";
 import { featureKeysEn } from "../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../src/features/i18n/keys.pt-BR";
+import { FEATURES } from "../src/features/i18n/locales";
 import { mobileEn } from "../src/i18n/keys.en";
 import { mobilePtBR } from "../src/i18n/keys.pt-BR";
-import { pickLocale, withMobileKeys } from "../src/i18n/merge";
+import { MOBILE, pickLocale, withMobileKeys } from "../src/i18n/merge";
+
+/** Words a language writes as English does ("Online", "PDF"), by surface and language. */
+const same = (surface: "mobile-base" | "mobile-features", code: string) =>
+  (identical[surface] as Record<string, string[]>)[code] ?? [];
 
 function leaves(o: object, prefix = ""): string[] {
   return Object.entries(o).flatMap(([k, v]) =>
@@ -20,16 +29,35 @@ function leaves(o: object, prefix = ""): string[] {
   );
 }
 
-test("pt-BR and en have the same keys", () => {
-  expect(leaves(mobileEn).sort()).toEqual(leaves(mobilePtBR).sort());
+test("every language against English: keys, plural forms, placeholders, tags (ADR 0122)", () => {
+  for (const { code, ready } of LOCALES.filter((l) => l.code !== "en")) {
+    const problems = [
+      ...checkLocale({ source: mobileEn, target: MOBILE[code], code, ready, identical: same("mobile-base", code) }),
+      ...checkLocale({
+        source: featureKeysEn,
+        target: FEATURES[code],
+        code,
+        ready,
+        identical: same("mobile-features", code),
+      }),
+    ];
+    expect({ code, problems }).toEqual({ code, problems: [] });
+  }
 });
 
-test("placeholders match between locales", () => {
-  const vars = (s: string) => (s.match(/{{\w+}}/g) ?? []).sort();
-  const get = (o: object, path: string) =>
-    path.split(".").reduce<unknown>((a, k) => (a as Record<string, unknown>)[k], o);
-  for (const key of leaves(mobilePtBR))
-    expect(vars(get(mobileEn, key) as string)).toEqual(vars(get(mobilePtBR, key) as string));
+test("the stores and the system list only ready languages, each with its iOS permission texts", () => {
+  const ready = LOCALES.filter((l) => l.ready).map((l) => l.code);
+  const config = appConfig({ config: {} } as never);
+  const localization = config.plugins?.find((p) => Array.isArray(p) && p[0] === "expo-localization") as
+    | [string, { supportedLocales: string[] }]
+    | undefined;
+  expect(localization?.[1].supportedLocales).toEqual(ready);
+  expect(Object.keys(config.locales ?? {})).toEqual(ready);
+  const keys = (o: object) => leaves(o).sort();
+  for (const code of ready)
+    expect(keys(JSON.parse(readFileSync(join(import.meta.dir, `../assets/locales/${code}.json`), "utf8")))).toEqual(
+      keys(nativeEn),
+    );
 });
 
 test("every key the phone reads by name exists in both languages, so a deleted line can't come back empty", () => {
@@ -75,14 +103,14 @@ test("the phone's words are true in every setup", () => {
 test("the app's strings are added under `mobile` in every namespace", () => {
   const merged = withMobileKeys({ "pt-BR": { translation: { a: "1" } }, en: { translation: { a: "2" } } });
   expect(merged["pt-BR"]?.translation?.a).toBe("1");
-  expect(merged["pt-BR"]?.translation?.mobile).toBe(mobilePtBR);
-  expect(merged.en?.translation?.mobile).toBe(mobileEn);
+  expect(merged["pt-BR"]?.translation?.mobile).toMatchObject(mobilePtBR);
+  expect(merged.en?.translation?.mobile).toMatchObject(mobileEn);
 });
 
-test("the phone's language picks pt-BR or en", () => {
+test("the phone's language: the first one people can pick, else English", () => {
   expect(pickLocale(["pt-PT"])).toBe("pt-BR");
   expect(pickLocale(["en-GB", "pt-BR"])).toBe("en");
-  expect(pickLocale(["fr-FR"])).toBe("pt-BR");
+  expect(pickLocale(["xx-XX"])).toBe("en");
   expect(pickLocale([null, "en-US"])).toBe("en");
 });
 
@@ -100,7 +128,7 @@ test("extra keys merge deeply into the app's strings", () => {
 test("the plan's notifications have their own Activity line in both languages, not the agent's name alone", () => {
   for (const keys of [featureKeysEn, featureKeysPtBR]) {
     const kind = keys.activity.kind as Record<string, string>;
-    for (const k of ["plan_reset_unknown", "routine_waiting_plan"]) {
+    for (const k of ["plan_reset_unknown", "routine_waiting_plan", "browser_profile_request", "computer_disk_full"]) {
       expect(kind[`${k}_one`]).toBeString();
       expect(kind[`${k}_other`]).toBeString();
     }

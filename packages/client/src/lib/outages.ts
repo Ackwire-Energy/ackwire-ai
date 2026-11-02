@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ComputerBrain, MachineOutage, MachineOutages, OutageAgent, OutageTarget } from "../api/types";
+import { joinNames } from "./format";
 
 /**
  * "Computador desconectado": who waits for an offline computer, where
@@ -7,7 +8,8 @@ import type { ComputerBrain, MachineOutage, MachineOutages, OutageAgent, OutageT
  */
 
 /** The brain's product name (never translated). */
-export const brainName = (brain: string | null | undefined) => (brain === "codex" ? "Codex" : "Claude Code");
+export const brainName = (brain: string | null | undefined) =>
+  brain === "codex" ? "Codex" : brain === "cursor" ? "Cursor" : "Claude Code";
 
 /** `meta.brainUnavailable` of an agent's notice ("the computer brain can't answer; I'll answer when it's back"). */
 export interface BrainUnavailable {
@@ -29,7 +31,12 @@ export function brainUnavailableOf(meta: Record<string, unknown> | null | undefi
   const str = (v: unknown) => (typeof v === "string" && v ? v : null);
   const params =
     meta.bodyParams && typeof meta.bodyParams === "object" ? (meta.bodyParams as Record<string, unknown>) : {};
-  const brain = o.brain === "codex" || params.brain === "Codex" ? "codex" : "claude_code";
+  const brain =
+    o.brain === "codex" || params.brain === "Codex"
+      ? "codex"
+      : o.brain === "cursor" || params.brain === "Cursor"
+        ? "cursor"
+        : "claude_code";
   return {
     brain,
     code: str(o.code),
@@ -82,7 +89,7 @@ export function waitingText(t: TFunction, waiting: OutageAgent["waiting"]): stri
     waiting.conversations > 0 ? t("outage.count.conversations", { count: waiting.conversations }) : null,
   ].filter((x): x is string => Boolean(x));
   if (parts.length === 0) return null;
-  return t("outage.count.waiting", { what: parts.join(t("outage.count.and")) });
+  return t("outage.count.waiting", { what: joinNames(parts, t) });
 }
 
 /** "há 12 min" since it went offline; "agora" under a minute. */

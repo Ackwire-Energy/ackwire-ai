@@ -105,7 +105,7 @@ function OutageNotice({
   }, []);
   const names = joinNames(
     o.agents.map((a) => a.name),
-    t("newAgent.and"),
+    t,
   );
   const sub = [
     cloud ? t("outage.cloudSub") : null,
@@ -167,7 +167,7 @@ function OutageNotice({
   );
 }
 
-const brainList = (t: TFunction, brains: string[]) => joinNames(brains.map(brainName), t("newAgent.and"));
+const brainList = (t: TFunction, brains: string[]) => joinNames(brains.map(brainName), t);
 
 /** A target's row: its computer, whether it can take these agents, and why not in plain words. */
 function targetOption(t: TFunction, target: OutageTarget, brains: ComputerBrain[]) {
@@ -223,7 +223,7 @@ export function SwitchComputerDialog({
   const value = valid ? target : firstOpen;
   const names = joinNames(
     o.agents.map((a) => a.name),
-    t("newAgent.and"),
+    t,
   );
   const nameOf = (agentId: string) => o.agents.find((a) => a.agentId === agentId)?.name ?? agentId;
   const submit = () => {
@@ -242,7 +242,7 @@ export function SwitchComputerDialog({
             r.moved.length > 0
               ? t("outage.done.moved", {
                   count: r.moved.length,
-                  names: joinNames(r.moved.map(nameOf), t("newAgent.and")),
+                  names: joinNames(r.moved.map(nameOf), t),
                   target: targetName,
                 })
               : t("outage.done.none");

@@ -108,8 +108,8 @@ describe("agent page: tabs and the URL", () => {
     const work = screen().getByRole("region", { name: "Como trabalha" });
     expect(hero.contains(work)).toBe(false);
     expect(work.closest(".agp-aside")).toBeTruthy();
-    expect(work.textContent).toContain("US$ 12,30");
-    expect(work.textContent).toContain("de US$ 40");
+    expect(work.textContent).toContain("US$\u00a012,30");
+    expect(work.textContent).toContain("de US$\u00a040");
     expect(within(cover).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
     );
@@ -191,7 +191,7 @@ describe("agent page: its usage (ADR 0063)", () => {
     const month = screen().getByRole("region", { name: "Uso da Ada" });
     // The MacBook's own sign-in, the viewer's: the account their agents share, as the Connect cards name it.
     expect(month.textContent).toContain("97% na conta que os seus agentes dividem e 2,6% pela API.");
-    expect(month.textContent).toContain("Pelo preço da API, seria ≈ US$ 77,00.");
+    expect(month.textContent).toContain("Pelo preço da API, seria ≈ US$\u00a077,00.");
     expect(within(month).getByRole("img", { name: /^Tokens por dia em / })).toBeTruthy();
     const now = screen().getByRole("region", { name: "Agora" });
     expect(now.textContent).toContain("A conta que os seus agentes dividem");
@@ -205,8 +205,8 @@ describe("agent page: its usage (ADR 0063)", () => {
     // It informs: changing the account is "Quem pensa"'s.
     expect(within(now).queryByRole("button")).toBeNull();
     const sources = screen().getByRole("region", { name: "Por conta, este mês" });
-    expect(sources.textContent).toContain("≈ US$ 76,00 pela API");
-    expect(sources.textContent).toContain("US$ 0,80 pagos");
+    expect(sources.textContent).toContain("≈ US$\u00a076,00 pela API");
+    expect(sources.textContent).toContain("US$\u00a00,80 pagos");
   });
 
   test("a member sees the tokens and the percentages, never money", async () => {
@@ -289,16 +289,16 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
     await go("", onPlan(12.3));
     const work = screen().getByRole("region", { name: "Como trabalha" }).textContent ?? "";
     expect(work.indexOf("Claude Team · semana 40%")).toBeGreaterThanOrEqual(0);
-    expect(work.indexOf("Claude Team · semana 40%")).toBeLessThan(work.indexOf("US$ 12,30 de US$ 40"));
+    expect(work.indexOf("Claude Team · semana 40%")).toBeLessThan(work.indexOf("US$\u00a012,30 de US$\u00a040"));
     const card = screen().getByRole("region", { name: "Uso" });
-    expect(card.textContent).toMatch(/^Uso.*Claude Team · semana 40% · 5h 12%.*US\$ 12,30 de US\$ 40 em /);
+    expect(card.textContent).toMatch(/^Uso.*Claude Team · semana 40% · 5h 12%.*US\$\u00a012,30 de US\$\u00a040 em /);
   });
 
   test("on the API: the budget as before, and no plan line", async () => {
     await go();
     const work = screen().getByRole("region", { name: "Como trabalha" });
     expect(work.querySelector(".ac-planmeter")).toBeNull();
-    expect(work.textContent).toContain("US$ 12,30");
+    expect(work.textContent).toContain("US$\u00a012,30");
     expect(screen().getByRole("region", { name: "Orçamento" })).toBeTruthy();
     expect(screen().queryByRole("region", { name: "Uso" })).toBeNull();
   });
@@ -336,7 +336,7 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
     cleanup();
     await go("?tab=activity", onPlan(12.3));
     expect(legend()).toContain("Gasto");
-    expect(legend()).toContain("US$ 12,30");
+    expect(legend()).toContain("US$\u00a012,30");
   });
 });
 
@@ -697,9 +697,31 @@ describe("agent page: memory and proposals", () => {
         .getAllByRole("radio")
         // The count is a separate chip (CountChip): no text space between label and number.
         .map((r) => r.textContent?.replace(/(\D)(\d+)$/, "$1 $2")),
-    ).toEqual(["Fatos e decisões 4", "Lições 2", "Arquivados 1"]);
+    ).toEqual(["Fatos e decisões 4", "Lições 2", "Aprendizados", "Arquivados 1"]);
     await type(screen().getByRole("searchbox", { name: "Buscar" }), "zzz-nada");
     expect(document.body.textContent).toContain("Nada encontrado com “zzz-nada”.");
+  });
+
+  test("what it learned: its own saves with where and how sure, and Esquecer archives one", async () => {
+    const state = seedState();
+    const mine = state.memories.find((m) => m.agentId === ADA_ID && !m.archived);
+    if (!mine) throw new Error("no memory");
+    Object.assign(mine, {
+      learned: true,
+      howTo: true,
+      lowTrust: false,
+      verified: false,
+      text: "GET the models with the key.",
+    });
+    await go("?tab=memory", state);
+    await click(
+      within(screen().getByRole("radiogroup", { name: "Tipo" })).getByRole("radio", { name: /Aprendizados/ }),
+    );
+    const row = screen().getByText("GET the models with the key.").closest("li") as HTMLElement;
+    expect(row.textContent).toContain("Como fazer");
+    expect(row.textContent).toContain("Não verificado");
+    await click(within(row).getByRole("button", { name: "Esquecer" }));
+    expect(state.memories.find((m) => m.id === mine.id)?.archived).toBe(true);
   });
 });
 
@@ -744,7 +766,7 @@ describe("agent page: activity", () => {
     await click(within(filters).getByRole("radio", { name: /^Falhas/ }));
     expect(runs.textContent).toContain("roda a suíte de checkout");
     expect(runs.textContent).toContain("O orçamento do mês acabou.");
-    expect(runs.textContent).toContain("Falta uma chave do Claude no workspace.");
+    expect(runs.textContent).toContain("Falta uma chave Claude no workspace.");
     expect(runs.textContent).not.toContain("faz o merge");
     await click(within(filters).getByRole("radio", { name: /^Esperando/ }));
     expect(runs.textContent).toContain("faz o merge do PR #42");
@@ -753,7 +775,7 @@ describe("agent page: activity", () => {
     await type(within(runs).getByRole("searchbox", { name: "Buscar execuções" }), "PR #39");
     expect(runs.textContent).toContain("Mostrando 1 de 1.");
     // Admins see what the month cost.
-    expect(document.body.textContent).toContain("US$ 12,30");
+    expect(document.body.textContent).toContain("US$\u00a012,30");
   });
 });
 

@@ -38,6 +38,7 @@ import {
   installSystemService,
   SYSTEM_UNIT_PATH,
   systemdSystemUnit,
+  systemdVersion,
 } from "../../runner/service";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
@@ -55,6 +56,12 @@ function home() {
 
 const BUN = "/opt/agentes-runner/bin/bun";
 const BUNDLE = "/opt/agentes-runner/agentes-runner.mjs";
+
+test("systemd's version, which says whether a scope takes OOMPolicy (253 and later)", () => {
+  expect(systemdVersion("systemd 257 (257.13-1~deb13u1)\n+PAM +AUDIT +BPF_FRAMEWORK")).toBe(257);
+  expect(systemdVersion("systemd 252 (252.39-1~deb12u1)")).toBe(252);
+  expect(systemdVersion("bash: systemctl: command not found")).toBe(0);
+});
 
 test("the system unit: root, from boot, a PATH root owns, and tasks outlive a restart", () => {
   expect(SYSTEM_UNIT_PATH).toBe("/etc/systemd/system/agentes-runner.service");
@@ -150,8 +157,8 @@ test.if(posix)("service install --system: a system home, and it starts only when
     });
   };
 
-  // A computer an earlier runner set up: its installer's run writes the new limits over the old, and the reload
-  // applies them to the agents running there (systemd sets a running slice's limits again as it reloads).
+  // A computer an earlier runner set up: its installer's run writes the new limits over the old, and the reload gives
+  // them to slices that start from now (running ones get them as the runner starts: `prepareAgents`).
   mkdirSync(path.dirname(agentSliceLimitsPath(unitPath)), { recursive: true });
   writeFileSync(agentSliceLimitsPath(unitPath), "[Slice]\nMemoryMax=1536M\nTasksMax=1024\nCPUQuota=200%\n");
   // install.sh's first step: before pairing, nothing starts.
@@ -159,22 +166,21 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(calls).toEqual(["systemctl daemon-reload"]);
   expect(readFileSync(unitPath, "utf8")).toBe(systemdSystemUnit(launch));
   expect(readStoredConfig(h)).toEqual({ mode: "system", agentUidRange: [21000, 21099] });
-  // Every agent's slice (agents-<uid>.slice) gets the same limits, from one drop-in for the prefix: a share of the
-  // computer's RAM (systemd works it out as it loads the units) where it stops, nothing that only slows it down,
-  // swap for a third of that (8 GiB here: 1638 MiB), and room for threads.
+  // Every agent's slice (agents-<uid>.slice) gets the same drop-in for the prefix: the agents share the computer's
+  // memory and CPUs, so one agent has none of its own, only an equal weight when they all want the CPUs, and room
+  // for threads.
   expect(agentSlice(21003)).toBe("agents-21003.slice");
   expect(agentSliceLimitsPath(unitPath)).toBe(path.join(h, "etc/systemd/system/agents-.slice.d/limits.conf"));
   expect(agentSliceLimitsPath()).toBe("/etc/systemd/system/agents-.slice.d/limits.conf");
   expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8").split("\n")).toEqual([
     "[Slice]",
-    "MemoryMax=60%",
-    "MemorySwapMax=1638M",
+    "CPUWeight=100",
     "TasksMax=4096",
-    "CPUQuota=200%",
     "",
   ]);
-  // All of them together (agents.slice): with their swap in RAM at 2:1, 87.5% of it, and the rest of the computer
-  // stays for the system, the runner and the guard.
+  // All of them together (agents.slice): a share of the computer's RAM (systemd works it out as it loads the units)
+  // where it stops, nothing that only slows it down, and swap for a third of that (8 GiB here: 2048 MiB). With their
+  // swap in RAM at 2:1, 87.5% of it, and the rest of the computer stays for the system, the runner and the guard.
   expect(allAgentsLimitsPath(unitPath)).toBe(path.join(h, "etc/systemd/system/agents.slice.d/limits.conf"));
   expect(allAgentsLimitsPath()).toBe("/etc/systemd/system/agents.slice.d/limits.conf");
   expect(readFileSync(allAgentsLimitsPath(unitPath), "utf8").split("\n")).toEqual([
@@ -252,17 +258,17 @@ test.if(posix)(
       });
     const dropIns = () =>
       [agentSliceLimitsPath(unitPath), allAgentsLimitsPath(unitPath)].map((f) => readFileSync(f, "utf8"));
-    // The smallest computer the setup makes the agents' (4 GB): one agent stops about where the fixed cap stood
-    // (1.5 GiB), all of them at half the RAM, and with their swap in RAM at 2:1 they leave 42% (1.7 GiB here).
+    // The smallest computer the setup makes the agents' (4 GB): all of them at half the RAM, and with their swap in
+    // RAM at 2:1 they leave 42% (1.7 GiB here). One agent may use all of it.
     expect(install({ args: ["host", "--server", "http://127.0.0.1:3000", "--token-file", `${h}/token`] })).toBe(0);
     expect(dropIns()).toEqual([
-      "[Slice]\nMemoryMax=40%\nMemorySwapMax=546M\nTasksMax=4096\nCPUQuota=200%\n",
+      "[Slice]\nCPUWeight=100\nTasksMax=4096\n",
       "[Slice]\nMemoryMax=50%\nMemorySwapMax=682M\nTasksMax=50%\n",
     ]);
     // The same computer for agents alone: theirs is more of it.
     expect(install()).toBe(0);
     expect(dropIns()).toEqual([
-      "[Slice]\nMemoryMax=60%\nMemorySwapMax=819M\nTasksMax=4096\nCPUQuota=200%\n",
+      "[Slice]\nCPUWeight=100\nTasksMax=4096\n",
       "[Slice]\nMemoryMax=75%\nMemorySwapMax=1024M\nTasksMax=50%\n",
     ]);
   },
@@ -382,6 +388,8 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
     "account",
     "access.request",
     "access.reduce",
+    // Root refuses it, and every op with a browser profile, until profiles have OS users of their own (ADR 0110).
+    "browser.profile.delete",
     "desktop.session.start",
     "desktop.session.stop",
     "desktop.session.status",

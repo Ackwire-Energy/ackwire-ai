@@ -1,5 +1,5 @@
 import { type LegalBlock, type LegalKind, legalDocument, legalInline } from "@agenteschat/i18n/legal";
-import { Logo, Segmented } from "@agenteschat/ui";
+import { Logo, Select } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -29,9 +29,9 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
         <Link to="/" aria-label={t("legal.home")}>
           <Logo size={24} />
         </Link>
-        <Segmented
+        <Select
           size="sm"
-          label={t("shell.language")}
+          aria-label={t("shell.language")}
           value={lang}
           onValueChange={(v) => setLang(v as LocaleCode)}
           options={locales.map((l) => ({ value: l.code, label: l.label }))}
@@ -42,6 +42,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
           <h1 className="page-title">{doc.title}</h1>
           <p className="page-sub">{doc.summary}</p>
           <p className="legal__date">{t("legal.updated", { date: updated })}</p>
+          {doc.courtesy && <p className="legal__courtesy">{doc.courtesy}</p>}
         </header>
         <nav className="legal__toc" aria-label={t("legal.contents")}>
           <ol>

@@ -6,10 +6,11 @@ import {
   useDms,
   useNoticePrefs,
   useSetNoticePref,
+  useSetShowActivity,
   useSetStart,
 } from "@agenteschat/client";
+import { type AppLocale, localeInfo, readyLocales } from "@agenteschat/i18n/locale";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
-import { useMutation } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +18,7 @@ import { StyleSheet, View } from "react-native";
 import { pushPermission, unregisterPush } from "@/lib/push";
 import { setSoundChoice, useSoundChoice } from "@/lib/sounds";
 import { readValue, STORED } from "@/lib/storage";
+import { deviceLocale, readLocaleState, rememberLocale, setLocale } from "@/providers/i18n";
 import { useOrg } from "@/providers/org";
 import { usePush } from "@/providers/push";
 import {
@@ -33,8 +35,8 @@ import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 
 /**
- * Você's smaller screens, each pushed from its row: Workspaces, Notificações, Ao abrir o app, Sons, Aparência and
- * Idioma.
+ * Você's smaller screens, each pushed from its row: Workspaces, Notificações, Ao abrir o app, Respostas dos agentes,
+ * Sons, Aparência and Idioma.
  */
 
 const SOUND_LABELS: Record<SoundStyle, string> = {
@@ -227,6 +229,28 @@ export function StartPage() {
   );
 }
 
+/** Respostas dos agentes: whether each reply shows what the agent did, the same on every device. */
+export function ActivityPage() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { orgId, org } = useOrg();
+  const set = useSetShowActivity(orgId);
+  const on = org?.showActivity === true;
+  return (
+    <Page title={t("mobile.me.activity")}>
+      <View style={styles.gap} />
+      <GroupedList>
+        <GroupedRow
+          label={t("mobile.me.activityShow")}
+          toggle={on}
+          onPress={() => set.mutate(!on, { onError: () => toast({ title: t("mobile.me.activityFailed"), icon: "x" }) })}
+        />
+      </GroupedList>
+      <GroupedFooter>{t("mobile.me.activityHint")}</GroupedFooter>
+    </Page>
+  );
+}
+
 /** Sons: on or off, then the style. */
 export function SoundsPage() {
   const { t } = useTranslation();
@@ -283,33 +307,35 @@ export function AppearancePage() {
   );
 }
 
-/** Idioma: Português or English. */
-export function LanguagePage() {
-  const { t, i18n } = useTranslation();
+/**
+ * Idioma: Automático (the phone's language) first, then each language by its own name. Signed out, the pick waits on
+ * the phone for the next sign-in.
+ */
+export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
+  const { t } = useTranslation();
   const api = useApi();
-  const language = useMutation({
-    mutationFn: (locale: "pt-BR" | "en") => api.account.updateMe({ locale }),
-    onSuccess: (_data, locale) => {
-      void i18n.changeLanguage(locale);
-    },
-  });
-  const en = i18n.language.startsWith("en");
+  const [choice, setChoice] = useState(() => readLocaleState().stored ?? "auto");
+  const pick = (next: AppLocale | "auto") => {
+    setChoice(next);
+    const code = next === "auto" ? deviceLocale() : next;
+    rememberLocale(next, !signedIn);
+    setLocale(code);
+    // Not heard: kept as pending, so the next start sends it.
+    if (signedIn)
+      void api.account.updateMe({ locale: code, auto: next === "auto" }).catch(() => rememberLocale(next, true));
+  };
   return (
     <Page title={t("mobile.me.language")}>
       <View style={styles.gap} />
       <GroupedList>
         <GroupedRow
-          label={t("mobile.me.langPt")}
-          checked={!en}
-          disabled={language.isPending}
-          onPress={() => language.mutate("pt-BR")}
+          label={t("shell.languageAuto", { language: localeInfo(deviceLocale()).native })}
+          checked={choice === "auto"}
+          onPress={() => pick("auto")}
         />
-        <GroupedRow
-          label={t("mobile.me.langEn")}
-          checked={en}
-          disabled={language.isPending}
-          onPress={() => language.mutate("en")}
-        />
+        {readyLocales().map((l) => (
+          <GroupedRow key={l.code} label={l.native} checked={choice === l.code} onPress={() => pick(l.code)} />
+        ))}
       </GroupedList>
     </Page>
   );

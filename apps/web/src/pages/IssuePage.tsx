@@ -43,6 +43,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
+import { IssueWorkBlock } from "@/components/BackgroundWork";
 import { IssueForumCard, NewTopicDialog } from "@/components/Forum";
 import { useOrg } from "@/components/org-context";
 import { useEmojiLabels } from "@/components/Reactions";
@@ -174,6 +175,7 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
       )}
       {variant === "dialog" && <Details issue={i} />}
       <WorkBox issue={i} />
+      <IssueWorkBlock issue={i} />
       {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
       <DetailsSection title={t("issues.description")}>
         {i.description ? (
@@ -248,9 +250,9 @@ function IssueForum({ issue: i }: { issue: Issue }) {
   const topics = i.forumTopics ?? [];
   const requester = i.createdBy.type === "person" ? i.createdBy.id : null;
   const requesterName = requester ? actors.name(i.createdBy) : "";
-  const g = agentGrammar(t, requesterName);
+  const g = agentGrammar(requesterName);
   const originText = requester
-    ? t("forum.origin.issueBy", { number: i.number, name: requesterName, of: g.of })
+    ? t("forum.origin.issueBy", { number: i.number, name: requesterName, context: g.context })
     : t("forum.origin.issue", { number: i.number });
   const going = topics.some((x) => x.status === "open" || x.status === "stalled");
   if (subs.length === 0 && topics.length === 0 && !isOpen(i)) return null;
@@ -335,7 +337,7 @@ function WorkBox({ issue: i }: { issue: Issue }) {
   const w = i.work;
   if (!w || !i.assignee || i.assignee.type !== "agent") return null;
   const name = actors.name(i.assignee);
-  const g = agentGrammar(t, name);
+  const g = agentGrammar(name);
   const stalled = w.state === "stalled";
   const waiting = w.state === "waiting_approval" || w.state === "waiting_input";
   const when = relativeTime(t, i18n.language, w.since);
@@ -435,19 +437,19 @@ function AskAgent({ issue }: { issue: Issue }) {
   const [agent, ...others] = useAgentChoices();
   if (!agent) return null;
   const ask = (a: { id: string; name: string }) => {
-    const g = agentGrammar(t, a.name);
+    const g = agentGrammar(a.name);
     action.mutate(
       { type: "ask", id: issue.id, agentId: a.id },
-      { onSuccess: () => toast.show(t("issues.asked", { The: g.The, name: a.name })) },
+      { onSuccess: () => toast.show(t("issues.asked", { context: g.context, name: a.name })) },
     );
   };
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   return (
     <section aria-label={t("issues.askSection")} className="issue-ask">
       <div className="issue-ask__row">
         {avatar({ type: "agent", id: agent.id }, "sm")}
         <span className="issue-ask__text">
-          <b>{t("issues.askTitle", { to: g.to, name: agent.name })}</b>
+          <b>{t("issues.askTitle", { context: g.context, name: agent.name })}</b>
           <span className="small muted">{t("issues.askText", g)}</span>
         </span>
       </div>
@@ -460,7 +462,7 @@ function AskAgent({ issue }: { issue: Issue }) {
           loading={action.isPending}
           onClick={() => ask(agent)}
         >
-          {t("issues.askButton", { to: g.to, name: agent.name })}
+          {t("issues.askButton", { context: g.context, name: agent.name })}
         </Button>
         {others.slice(0, 3).map((a) => (
           <button key={a.id} type="button" className="issue-ask__other" onClick={() => ask(a)}>

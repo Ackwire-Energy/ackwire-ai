@@ -351,6 +351,15 @@ describe("talkerPolicy", () => {
     expect(talkerPolicy({ ...base, run: { status: "waiting_input", background: false } })).toBeNull();
     expect(talkerPolicy({ ...base, waited: { waitKind: "approval", outcome: "held" } })).toBeNull();
   });
+  test("a computer brain that only just started reads it with its first turn: no 'noted' for the rest of a burst", () => {
+    const run = (ago: number) => ({
+      status: "running" as const,
+      background: false,
+      startedAt: new Date(now.getTime() - ago),
+    });
+    expect(talkerPolicy({ ...base, brain: "claude_code", run: run(3000) })).toBe("reads_soon");
+    expect(talkerPolicy({ ...base, brain: "codex", run: run(25_000) })).toBeNull();
+  });
   test("skips background work, stops, a wait the message ended, and replies too close", () => {
     expect(talkerPolicy({ ...base, brain: "claude_code", run: { status: "running", background: true } })).toBe(
       "background",

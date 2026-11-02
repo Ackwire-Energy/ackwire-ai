@@ -1,5 +1,7 @@
+import type { TFunction } from "i18next";
 import type { ApiRule, AppNotification, Routine, RoutineRun, RoutineRunStatus, RoutineTarget } from "../api/types";
 import type { RunStatus } from "./calendar";
+import { clockAt, whenAt } from "./format";
 
 /**
  * How Rotinas says a routine (ADR 0053 §11), as pure rules: its state and the one-tap fix for a pause,
@@ -19,6 +21,9 @@ export interface Words {
 /** A run still at work: queued, running, or waiting for a person or the computer. */
 export const isRunAtWork = (status: RoutineRunStatus) =>
   status === "queued" || status === "running" || status === "waiting";
+
+/** Parar, not "Rodar agora": a run working now, or one paused near its plan's limit (it picks up again by itself). */
+export const isStoppable = (r: Pick<Routine, "state">) => r.state === "running" || r.state === "usage_paused";
 
 /**
  * A run as the pixel strip and the calendar draw it: told people (`ok`), nothing new (`silent`),
@@ -179,6 +184,50 @@ export function pausedFix(r: Pick<Routine, "active" | "pausedReason" | "target">
   }
 }
 
+/**
+ * The time word in the state chip: when a run paused near its limit picks up ("14:00", "24 out 14:00"), or since when
+ * it waits for its computer ("hoje 09:12"); '' when neither.
+ */
+export function routineStateTime(
+  t: TFunction,
+  locale: string,
+  r: Pick<Routine, "state" | "waitingFor" | "usagePause">,
+  now = new Date(),
+) {
+  if (r.state === "usage_paused") return r.usagePause?.resetsAt ? clockAt(locale, r.usagePause.resetsAt, now) : "";
+  return r.waitingFor ? whenAt(t, locale, r.waitingFor.since, now) : "";
+}
+
+/**
+ * Milliseconds until the earliest reset among routines paused near a limit, so the list is read again then (the
+ * server says the next state once `resetsAt` passes). False: nothing to wait for.
+ */
+export function usagePauseRefetchMs(
+  list: readonly Pick<Routine, "state" | "usagePause">[] | undefined,
+  now = Date.now(),
+) {
+  const resets = (list ?? [])
+    .map((r) => (r.state === "usage_paused" && r.usagePause?.resetsAt ? Date.parse(r.usagePause.resetsAt) : Number.NaN))
+    .filter((at) => Number.isFinite(at));
+  if (resets.length === 0) return false as const;
+  return Math.max(Math.min(...resets) - now, 0) + 1000;
+}
+
+/**
+ * Why Continuar agora on a run paused near its limit is greyed for this viewer (`routines.usagePause.<reason>`):
+ * only its creator, the agent's owner and admins (`canManage`) may press it, and not once the plan's window is used
+ * up while the agent's long work may not use paid extra usage (`extra_off`) or the plan has none left
+ * (`extra_used_up`). Null: they may.
+ */
+export const usageContinueBlock = (r: Pick<Routine, "canManage" | "usagePause">) =>
+  !r.canManage
+    ? ("forbidden" as const)
+    : r.usagePause?.extraOff
+      ? ("extra_off" as const)
+      : r.usagePause?.extraUsedUp
+        ? ("extra_used_up" as const)
+        : null;
+
 /** Paused reasons with their own words (`routines.pausedReason.<reason>`). */
 const PAUSED_REASONS = [
   "creator_left",
@@ -196,7 +245,7 @@ const PAUSED_REASONS = [
  * it apart (`namesComputer`, from `namesComputers`): else "Esperando o computador desde 09:12".
  */
 export function routineStateWords(
-  r: Pick<Routine, "state" | "active" | "pausedReason" | "failuresInRow" | "waitingFor" | "trigger">,
+  r: Pick<Routine, "state" | "active" | "pausedReason" | "failuresInRow" | "waitingFor" | "trigger" | "usagePause">,
   since = "",
   namesComputer = false,
 ): Words & { icon: "repeat" | "pause" | "alert" | "computer" | "waiting" | "spinner"; tone: "neutral" | "waiting" } {
@@ -221,6 +270,14 @@ export function routineStateWords(
     }
     case "waiting_person":
       return { key: "routines.state.waitingPerson", values: {}, icon: "waiting", tone: "waiting" };
+    // Quiet: it picks up by itself at the reset (`since` is that time here, `clockAt`).
+    case "usage_paused":
+      return {
+        key: `routines.state.${r.usagePause?.source === "budget" ? "usagePausedBudget" : "usagePaused"}${since ? "" : "Unknown"}`,
+        values: { until: since },
+        icon: "pause",
+        tone: "neutral",
+      };
     case "failing":
       return {
         key: "routines.state.failing",
@@ -323,7 +380,8 @@ export function busyOnComputer(
   perDay: number,
   where: { selfHost: boolean; namesComputer: boolean },
 ): Words | null {
-  if (!where.selfHost || !brain || (brain.kind !== "claude_code" && brain.kind !== "codex")) return null;
+  if (!where.selfHost || !brain || (brain.kind !== "claude_code" && brain.kind !== "codex" && brain.kind !== "cursor"))
+    return null;
   if (perDay < BUSY_RUNS_PER_DAY) return null;
   const machine = where.namesComputer ? brain.machineName : null;
   return machine

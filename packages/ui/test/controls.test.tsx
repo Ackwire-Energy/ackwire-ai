@@ -198,6 +198,9 @@ describe("Tabs", () => {
     expect(tabs.map((t) => t.textContent)).toEqual(["Pendentes 2", "Decididas 2"]);
     expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
     expect(body().getByRole("tabpanel").textContent).toBe("Lista pendente");
+    // An inactive panel stays out of the layout: no inline display to beat its `hidden`.
+    const inactive = document.querySelector(".ac-tabpanel[hidden]") as HTMLElement;
+    expect(inactive.style.display).toBe("");
     await act(async () => {
       fireEvent.mouseDown(tabs[1] as HTMLElement, { button: 0 });
     });

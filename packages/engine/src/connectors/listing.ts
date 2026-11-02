@@ -257,9 +257,9 @@ const MAILBOXES: {
   },
   {
     label: "Email",
-    description: "A mailbox: a MillionSend inbox, Gmail, Outlook, iCloud or another provider.",
+    description: "A mailbox: Gmail, Outlook, iCloud or another provider.",
     names: ["mail", "mailbox", "inbox"],
-    offered: (m) => m.composio || m.imap || m.millionsend,
+    offered: (m) => m.composio || m.imap,
     holds: () => true,
   },
 ];

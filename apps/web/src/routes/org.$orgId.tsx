@@ -24,6 +24,7 @@ import { BootSplash } from "@/components/Sky";
 import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standing";
 import { useWebPushClear, useWebPushRefresh, WebPushAsk } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
+import { useServerLocale } from "@/i18n";
 import { inDesktopApp } from "@/lib/desktop";
 import { rememberPlace, showWorkspace } from "@/lib/start";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -56,6 +57,7 @@ function OrgLayout() {
   const focused = /\/agents\/new\/?$/.test(path) && can(membership, "create_agents");
   // Notifications in this browser (ADR 0071), when already on: the server hears of them again, quietly.
   useWebPushRefresh(me.user.id);
+  useServerLocale(me.user);
   // …and the ones it still shows for what was already read elsewhere close.
   useWebPushClear();
   useEffect(() => {
@@ -69,6 +71,10 @@ function OrgLayout() {
   const closing = useRef<string | null>(null);
   if (membership) closing.current = membership.deletion ? orgId : null;
   const gone = !membership && closing.current === orgId;
+  // A workspace on screen that leaves `GET /me` otherwise: they were taken out of it (`membership_revoked`).
+  const shown = useRef<{ id: string; name: string } | null>(null);
+  if (membership) shown.current = { id: orgId, name: membership.name };
+  const removedFrom = !membership && shown.current?.id === orgId ? shown.current.name : null;
   const navigate = useNavigate();
   useEffect(() => {
     if (gone) void navigate({ to: "/", replace: true });
@@ -82,7 +88,9 @@ function OrgLayout() {
       <div className="page page--mid">
         {strip}
         <header className="page__header">
-          <h1 className="page-title">{t("empty.noOrgTitle")}</h1>
+          <h1 className="page-title">
+            {removedFrom ? t("members.remove.goneTitle", { org: removedFrom }) : t("empty.noOrgTitle")}
+          </h1>
         </header>
         <EmptyState
           icon="members"
@@ -92,7 +100,7 @@ function OrgLayout() {
             </Button>
           }
         >
-          {t("empty.noOrgText")}
+          {removedFrom ? t("members.remove.goneText") : t("empty.noOrgText")}
         </EmptyState>
       </div>
     );

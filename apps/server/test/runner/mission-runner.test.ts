@@ -431,4 +431,8 @@ test("coding CLIs are looked up on the current PATH (the app adopts the login sh
   expect(resolveCommand("claude", `/nope:${dir}`)).toBe(join(dir, "claude"));
   expect(resolveCommand("codex", dir)).toBe("codex");
   expect(resolveCommand("/abs/claude", dir)).toBe("/abs/claude");
+  // System mode: the runner never launches what an agent put in the shared bin/ (it would run with another
+  // agent's sign-in), not even through a bare name looked up again on the PATH.
+  expect(resolveCommand("claude", `/nope:${dir}`, dir)).toBe("/nope/claude");
+  expect(resolveCommand("claude", `${dir}:/usr/bin`, dir)).toBe("/usr/bin/claude");
 });

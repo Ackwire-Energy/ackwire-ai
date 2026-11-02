@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -10,7 +10,23 @@ import { BrowserCard, titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
 import { onScreen, renderApp, renderPage, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+let untouch: (() => void) | undefined;
+afterEach(() => {
+  cleanup();
+  untouch?.();
+  untouch = undefined;
+});
+
+/** A touch screen until the test ends: `(pointer: coarse)` matches. */
+const onTouch = () => {
+  const real = window.matchMedia.bind(window);
+  const media = spyOn(window, "matchMedia").mockImplementation((query: string) =>
+    query === "(pointer: coarse)"
+      ? ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} } as unknown as MediaQueryList)
+      : real(query),
+  );
+  untouch = () => media.mockRestore();
+};
 
 const HANDOFF_ID = "h-card";
 
@@ -66,7 +82,8 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(document.querySelector(".brw-rq--settled")?.textContent).toContain("pediu ajuda · expirou");
   }, 15_000);
 
-  test("Abrir aqui takes control in place: Pronto in the header, the app's own text field, no page change", async () => {
+  test("Abrir aqui takes control in place: Pronto in the header, on touch the app's own text field, no page change", async () => {
+    onTouch();
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
     fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
@@ -94,7 +111,15 @@ describe("a help request opens the agent's browser in its card", () => {
     const top = card.querySelector(".brw-mf__top") as HTMLElement;
     expect(top.querySelector("b")?.textContent).toBe("Entrar no painel com a conta de teste");
     expect(within(top).getByRole("button", { name: "Pronto" })).toBeTruthy();
-    expect(within(card).getByRole("textbox", { name: "Texto para a página" })).toBeTruthy();
+    const field = within(card).getByRole("textbox", { name: "Texto para a página" }) as HTMLInputElement;
+    // Nothing marked yet: the field says where to start, the line before it only its pointer.
+    expect(field.placeholder).toBe("Toque num campo da página e digite aqui");
+    expect(card.querySelector(".brw-tfield__to")?.textContent).toBe("");
+    // On touch "Abrir um site" stays in the bar, not the header.
+    expect(within(top).queryByRole("button", { name: "Abrir um site" })).toBeNull();
+    expect(
+      within(card.querySelector(".brw-tfield") as HTMLElement).getByRole("button", { name: "Abrir um site" }),
+    ).toBeTruthy();
     // Desistir next to Pronto (the old "Não consegui" under the field is gone).
     expect(within(top).getByRole("button", { name: "Desistir" })).toBeTruthy();
     expect(within(card).queryByRole("button", { name: "Não consegui" })).toBeNull();
@@ -144,6 +169,24 @@ describe("a help request opens the agent's browser in its card", () => {
       [ORG_ID, HANDOFF_ID, "Entrei com a conta de teste"],
     ]);
     expect(document.querySelector(".brw-ac")).toBeNull();
+  });
+
+  test("with a mouse: no text bar (keys go to the page), Abrir um site in the header, Devolver asks for a note", async () => {
+    const { state, handoff } = seedRequest();
+    const active: BrowserHandoff = { ...handoff, kind: "takeover", status: "active", controllerUserId: "u-walter" };
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, active);
+    await renderPage(<BrowserCard agentId={ADA_ID} name="Ada" handoff={active} canTakeOver />, { api, org: true });
+    await settle(6);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    expect(card.querySelector(".brw-type")).toBeNull();
+    expect(within(card).queryByRole("textbox", { name: "Texto para a página" })).toBeNull();
+    const top = card.querySelector(".brw-mf__top") as HTMLElement;
+    expect(within(top).getByRole("button", { name: "Abrir um site" })).toBeTruthy();
+    await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Devolver" })));
+    expect(card.textContent).toContain("Devolver à Ada");
+    expect(within(card).getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    expect(within(top).queryByRole("button", { name: "Devolver" })).toBeNull();
   });
 });
 
@@ -264,27 +307,71 @@ describe("the card in the message", () => {
     clientY: y,
   });
 
+  const HINT = "Rolar agora move a página. Esc para sair";
+  const wheelOnPage = async (page: HTMLElement) => {
+    const e = new WheelEvent("wheel", { deltaY: 120, clientX: 100, clientY: 100, bubbles: true, cancelable: true });
+    await act(async () => page.dispatchEvent(e));
+    return e;
+  };
+
   test("the wheel scrolls the conversation until the page is pressed; Esc gives it back", async () => {
     const { card, page } = await inControlOfPage();
-    const wheelOn = async () => {
-      const e = new WheelEvent("wheel", { deltaY: 120, clientX: 100, clientY: 100, bubbles: true, cancelable: true });
-      await act(async () => page.dispatchEvent(e));
-      return e;
-    };
+    const hint = () => card.querySelector(".brw-ac__capture")?.textContent ?? null;
 
     // Not pressed yet: the wheel is the conversation's (not taken by the page).
-    expect((await wheelOn()).defaultPrevented).toBe(false);
-    expect(card.querySelector(".brw-ac__capture")).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
+    expect(hint()).toBeNull();
 
-    // A click into the page takes the wheel: the hint says how to scroll it, and the page keeps the wheel.
+    // A click into the page takes the wheel, with no hint for the click itself; the hint shows once it scrolls.
     await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
     await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
-    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolar agora move a página. Esc para sair");
-    expect((await wheelOn()).defaultPrevented).toBe(true);
+    expect(hint()).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(true);
+    expect(hint()).toBe(HINT);
 
-    // Esc gives the wheel back to the conversation.
+    // Esc gives the wheel back to the conversation, also with the focus outside the page.
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    expect(hint()).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
+  });
+
+  test("the scroll hint goes on its own after the wheel stops, on a click and when the mouse leaves", async () => {
+    const { card, page, sentToPage } = await inControlOfPage();
+    const hint = () => card.querySelector(".brw-ac__capture")?.textContent ?? null;
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
+
+    await wheelOnPage(page);
+    expect(hint()).toBe(HINT);
+    await act(() => new Promise((r) => setTimeout(r, 1300)));
+    expect(hint()).toBeNull();
+    // Still the page's wheel: idle only hides the hint.
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(true);
+
+    // A click while it shows: the hint goes and the click reaches the page.
+    expect(hint()).toBe(HINT);
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 10, 20)));
+    expect(hint()).toBeNull();
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 10, 20)));
+    expect(hint()).toBeNull();
+    expect(sentToPage().slice(-2)).toEqual(["pressed@20,40", "released@20,40"]);
+
+    // The mouse leaving the page: the hint goes and the wheel is the conversation's again.
+    await wheelOnPage(page);
+    expect(hint()).toBe(HINT);
+    await act(async () => fireEvent.pointerLeave(page, { pointerId: 1, pointerType: "mouse" }));
+    expect(hint()).toBeNull();
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
+  });
+
+  test("Esc with no hint showing still reaches the page", async () => {
+    const { page, sentToPage } = await inControlOfPage();
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
     await act(async () => fireEvent.keyDown(page, { key: "Escape" }));
-    expect(card.querySelector(".brw-ac__capture")).toBeNull();
+    expect(sentToPage().filter((m) => m.startsWith("key"))).not.toHaveLength(0);
+    // And the wheel is the conversation's again.
+    expect((await wheelOnPage(page)).defaultPrevented).toBe(false);
   });
 
   test("a press and a move drag on the page with the button held, past its edge too; a click stays a click", async () => {
@@ -327,13 +414,13 @@ describe("the card in the message", () => {
     });
   }
 
-  test("no scroll hint while the mouse is held; it shows once the press lifts", async () => {
+  test("no scroll hint for a press, a drag or its release", async () => {
     const { card, page } = await inControlOfPage();
     await act(async () => fireEvent.pointerDown(page, pointer(1, 50, 100)));
     await act(async () => fireEvent.pointerMove(page, pointer(1, 90, 100)));
     expect(card.querySelector(".brw-ac__capture")).toBeNull();
     await act(async () => fireEvent.pointerUp(page, pointer(1, 90, 100)));
-    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolar agora move a página. Esc para sair");
+    expect(card.querySelector(".brw-ac__capture")).toBeNull();
   });
 
   test("a release lost elsewhere: the next move with no button down lets go, never drags", async () => {
@@ -402,6 +489,30 @@ describe("the card in the message", () => {
     await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Ver a tela inteira" })));
     await settle(6);
     expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
+  });
+});
+
+describe("the frame's stop", () => {
+  test("asks 'Parar a Ada?' with her name, its words off the toolbar's edge; the frame's top is a dark surface", async () => {
+    const api = createFakeApi(seedState());
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-stop", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    expect(card.querySelector(".brw-mf__top")?.classList.contains("ac-on-dark")).toBe(true);
+    const over = card.querySelector(".brw-mf__over") as HTMLElement;
+    await act(async () => fireEvent.click(within(over).getByRole("button", { name: "Parar" })));
+    await settle(2);
+    const ask = over.querySelector(".brw-stopask") as HTMLElement;
+    expect(ask.textContent).toBe("Parar a Ada?");
+    expect(within(over).getByRole("button", { name: "Não" })).toBeTruthy();
   });
 });
 
@@ -557,6 +668,10 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     );
     await act(async () => socket.push(page()));
     expect(card.querySelector(".brw-dim")).toBeNull();
+    // Closed, nothing waiting: the cover says so plainly, and the logins sentence once, not under the title too.
+    await act(async () => socket.push({ type: "browser.unavailable", agentId: ADA_ID, reason: "closed" }));
+    expect(cover()).toContain("O navegador da Ada está fechado.");
+    expect(card.textContent?.split("Os logins continuam salvos").length).toBe(2);
   });
 
   test("off screen the wait doesn't count: shown after 75 s it's still opening; too many browsers says so", async () => {

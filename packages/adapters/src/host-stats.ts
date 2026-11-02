@@ -70,7 +70,12 @@ export const inContainer = () =>
 
 /** `MemAvailable` from `/proc/meminfo`, in bytes. */
 export function memAvailable(meminfo: string): number | null {
-  const kb = /^MemAvailable:\s+(\d+) kB/m.exec(meminfo)?.[1];
+  return meminfoBytes(meminfo, "MemAvailable");
+}
+
+/** A line of `/proc/meminfo` (`MemAvailable`, `SwapTotal`…), in bytes; null when it isn't there. */
+export function meminfoBytes(meminfo: string, key: string): number | null {
+  const kb = new RegExp(`^${key}:\\s+(\\d+) kB`, "m").exec(meminfo)?.[1];
   return kb ? Number(kb) * 1024 : null;
 }
 
@@ -135,6 +140,17 @@ export async function sampleLoad(): Promise<Omit<LoadSample, "at"> | null> {
   return { load: fiveMinutes / machineCpus(), memory: await memoryInUse() };
 }
 
+type DiskFigures = Pick<MachineLoad, "diskFreeGb" | "diskUse" | "sharedGb">;
+
+/** `diskSpace`'s bytes as `pong.load` carries them: free GB (one decimal) and the share in use. */
+export const diskFigures = (d: { sizeBytes: number; freeBytes: number } | null): DiskFigures =>
+  d && d.sizeBytes > 0
+    ? {
+        diskFreeGb: round1(d.freeBytes / GIB),
+        diskUse: round2(Math.min(1, Math.max(0, 1 - d.freeBytes / d.sizeBytes))),
+      }
+    : {};
+
 /**
  * The last day of samples, summarized; `summary()` is the same object until the next sample. A new
  * process starts from the `samples` the last one kept, so a restart keeps the day.
@@ -148,7 +164,8 @@ export class LoadWindow {
     return this.kept;
   }
 
-  add(sample: Omit<LoadSample, "at"> | null, at = Date.now()) {
+  /** `disk`: the disk's latest figures (ADR 0115), carried as they are, never averaged. */
+  add(sample: Omit<LoadSample, "at"> | null, at = Date.now(), disk: DiskFigures = {}) {
     if (!sample) return;
     this.kept = [...this.kept, { at, ...sample }].filter((s) => s.at > at - DAY_MS);
     const n = this.kept.length;
@@ -161,6 +178,7 @@ export class LoadWindow {
       memoryPeak: peak((s) => s.memory),
       hours: hoursOf(n),
       ...(sample.oomKills === undefined ? {} : { oomKills: risen(this.kept.map((s) => s.oomKills)) }),
+      ...disk,
     };
   }
 

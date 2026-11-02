@@ -22,6 +22,7 @@ import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
 import { RUNNER_VERSION, RunnerError, toMachineError } from "./errors";
+import type { CacheFill, CloneSlots } from "./git";
 import { type HandlerContext, handleRequest } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { readLines } from "./lines";
@@ -30,7 +31,7 @@ import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
 import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from "./secrets";
-import { agentCgroup, systemdBooted } from "./service";
+import { AGENTS_CGROUP, agentCgroup, systemdBooted } from "./service";
 import { systemStartPage } from "./start-page";
 import {
   BROWSER_LEASE_MS,
@@ -115,6 +116,9 @@ export class WorkerLink {
   private nextEnsure = 0;
   private readonly enters = new Map<string, () => void>();
   private nextEnter = 0;
+  private readonly slots = new Map<string, (waiting: boolean) => void>();
+  private readonly fills = new Map<string, (dir: string | null) => void>();
+  private nextGit = 0;
   onState: (state: WorkerState) => void = () => {};
   onSecretInstall: (id: string, agent: AgentScope, secret: ActivatedSecret) => void = () => {};
   /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
@@ -139,6 +143,9 @@ export class WorkerLink {
 
   private ended() {
     this.unanswered("The runner is stopping. Try again in a minute.");
+    // Root is gone: its slots and cache with it; the clones go on as they can.
+    for (const granted of [...this.slots.values()]) granted(false);
+    for (const filled of [...this.fills.values()]) filled(null);
     this.onEnd();
   }
 
@@ -190,6 +197,12 @@ export class WorkerLink {
         return;
       case "desktop.ensured":
         if (typeof f.ensureId === "string") this.desktops.get(f.ensureId)?.(f as never);
+        return;
+      case "clone.slotted":
+        if (typeof f.slotId === "string") this.slots.get(f.slotId)?.(f.waiting === true);
+        return;
+      case "cache.filled":
+        if (typeof f.fillId === "string") this.fills.get(f.fillId)?.(typeof f.dir === "string" ? f.dir : null);
         return;
       case "scope.entered":
         if (typeof f.enterId === "string") this.enters.get(f.enterId)?.();
@@ -277,6 +290,31 @@ export class WorkerLink {
       late.unref?.();
       this.enters.set(enterId, done);
       this.write(JSON.stringify({ type: "scope.enter", enterId, pid, kind } satisfies WorkerLinkFrame));
+    });
+  };
+
+  /** One of the computer's clone slots, from root (ADR 0116): every agent's clones count against one cap. */
+  readonly cloneSlot: CloneSlots = (onWait) => {
+    const slotId = String(++this.nextGit);
+    return new Promise((resolve) => {
+      this.slots.set(slotId, (waiting) => {
+        if (waiting) return onWait();
+        this.slots.delete(slotId);
+        resolve(() => this.write(JSON.stringify({ type: "clone.release", slotId } satisfies WorkerLinkFrame)));
+      });
+      this.write(JSON.stringify({ type: "clone.slot", slotId } satisfies WorkerLinkFrame));
+    });
+  };
+
+  /** Root's shared cache (`systemGitCache`), filled with this agent's GitHub token; null when there's none. */
+  readonly cacheFill: CacheFill = (input) => {
+    const fillId = String(++this.nextGit);
+    return new Promise((resolve) => {
+      this.fills.set(fillId, (dir) => {
+        this.fills.delete(fillId);
+        resolve(dir);
+      });
+      this.write(JSON.stringify({ type: "cache.fill", fillId, ...input } satisfies WorkerLinkFrame));
     });
   };
 
@@ -441,7 +479,11 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     },
     onChange: () => queueMicrotask(lease),
     ...(chrome ? { startChrome: (exe, args, profile, env) => launchChrome(exe, args, profile, env, chrome) } : {}),
-    memoryEvents: path.join(agentCgroup(process.getuid?.() ?? 0), "memory.events"),
+    // The agents share their memory (`agentLimits`): the limit a page dies at is all of theirs.
+    memoryEvents: {
+      agent: path.join(agentCgroup(process.getuid?.() ?? 0), "memory.events"),
+      agents: path.join(AGENTS_CGROUP, "memory.events"),
+    },
     ...o.browser,
   });
   const leases = setInterval(lease, BROWSER_LEASE_MS / 3);
@@ -483,6 +525,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     fetch: link.fetch,
     secretsDir,
     gitDir: path.join(home, "git"),
+    cloneSlot: link.cloneSlot,
+    cacheFill: link.cacheFill,
     tasks,
     brains,
     codex: {

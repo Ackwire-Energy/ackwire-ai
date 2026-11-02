@@ -1348,8 +1348,9 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
       threadId: report ? report.threadId : row.threadRootId,
       author: { type: "agent", agentId: row.agentId, runId: null, hop, stretchId },
       body: notice.body,
-      // The run that started it: the work it ends continues for whoever is behind that run (`authority.ts`).
-      meta: { ...notice.meta, machineTask },
+      // The run that started it: the work it ends continues for whoever is behind that run (`authority.ts`). Its
+      // result is command output, so the run it wakes counts as having read outside (ADR 0117).
+      meta: { ...notice.meta, machineTask, readOutside: true },
     });
     const runs =
       !blocked && eligible.length > 0 && !(await hopLimitReached(tx, message, options.maxHops))

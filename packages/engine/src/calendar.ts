@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gte, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
+import { localeInfo } from "@agenteschat/i18n/locale";
 import { currentHandles, getAgent } from "./agents";
 import { zonedParts, zonedTime } from "./cron";
 import { type EmailLocale, emailLocale, queueEmail } from "./email";
@@ -8,7 +9,7 @@ import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./
 import { getOrgSettings } from "./management";
 import { insertMessage, messageView } from "./messages";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
-import { routineSlots } from "./routines";
+import { routineSeer, routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
 import { replyThreadOf } from "./runs";
 
@@ -282,7 +283,7 @@ async function checkParticipants(db: Database, orgId: string, participants: Cale
  * naming the zone, which may be the event's rather than the reader's.
  */
 const formatWhen = (d: Date, timeZone: string, locale: EmailLocale) =>
-  new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
+  new Intl.DateTimeFormat(localeInfo(locale).intl, {
     timeZone,
     year: "numeric",
     month: "short",
@@ -908,8 +909,9 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
     .from(routines)
     .where(and(eq(routines.orgId, orgId), eq(routines.active, true), eq(routines.triggerType, "schedule")));
   const routineRuns: { routineId: string; name: string; agentId: string; at: string; target: unknown }[] = [];
+  const sees = await routineSeer(db, orgId, userId);
   for (const r of routineRows) {
-    if (r.deletedAt) continue;
+    if (r.deletedAt || !sees(r)) continue;
     for (const at of routineSlots(r, from, to)) {
       routineRuns.push({ routineId: r.id, name: r.name, agentId: r.agentId, at: at.toISOString(), target: r.target });
     }

@@ -348,6 +348,12 @@ export const envVars = {
       "Maximum model calls in one agent run (each tool round trip is one, browser and desktop steps included). A backstop for runaway runs: a run that goes in circles stops long before it. Near it the agent wraps up, and a conversation run ends with Continuar.",
     section: "Agents",
   },
+  AGENT_WORK_MAX_PER_ORG: {
+    schema: z.coerce.number().int().min(1).max(1000).default(10),
+    description:
+      "How many background works (long tasks agents moved out of a conversation) may run at once in one workspace. Past it a new one waits in line and starts by itself when one ends. Each agent runs at most 3 at once.",
+    section: "Agents",
+  },
   AGENT_CONTEXT_MESSAGES: {
     schema: z.coerce.number().int().min(1).max(500).default(30),
     description: "How many recent channel (or thread) messages are included in an agent's context.",
@@ -393,6 +399,23 @@ export const envVars = {
     description: "Upper bound on reflections per thread (bounds cost and agent-to-agent loops).",
     section: "Agents",
   },
+  LEARN_MAX_PER_AGENT_DAY: {
+    schema: z.coerce.number().int().min(0).max(1000).default(20),
+    description:
+      "Upper bound on background learning jobs per agent and day (an agent's run that figured something out or was corrected). 0 turns them off.",
+    section: "Agents",
+  },
+  LEARN_MIN_TOOL_CALLS: {
+    schema: z.coerce.number().int().min(1).max(100).default(6),
+    description:
+      "Without a judge, a run learns after a failed tool call later fixed only when it made at least this many tool calls.",
+    section: "Agents",
+  },
+  LEARN_SKILL_AFTER: {
+    schema: z.coerce.number().int().min(2).max(100).default(3),
+    description: "A how-to an agent reused successfully this many times becomes one of its skills.",
+    section: "Agents",
+  },
   EMBEDDINGS_PROVIDER: {
     schema: z.enum(["none", "voyage"]).default("none"),
     description:
@@ -408,6 +431,19 @@ export const envVars = {
   EMBEDDING_MODEL: {
     schema: z.string().default("voyage-3.5"),
     description: "Embedding model (1024 dimensions). After changing it, reindex (`search.reindex`).",
+    section: "Search",
+  },
+  BRAVE_SEARCH_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "Brave Search API key (https://brave.com/search/api), optional. Agents' `web_search` uses it first when set. Without it: `SEARXNG_URL` when set, else the agent's own browser on its computer (Google, then Bing or DuckDuckGo), else DuckDuckGo's HTML page, with no key.",
+    section: "Search",
+    secret: true,
+  },
+  SEARXNG_URL: {
+    schema: z.url().optional(),
+    description:
+      "Base URL of a SearXNG instance with the JSON format turned on (`search.formats: [html, json]`), optional. Agents' `web_search` uses it when `BRAVE_SEARCH_API_KEY` isn't set. It may be on your own network: only this server calls it.",
     section: "Search",
   },
   GIPHY_API_KEY: {
@@ -589,17 +625,9 @@ export const envVars = {
     description: "IMAP/SMTP mailboxes for agents (iCloud, hosting providers, any server). `false` hides them.",
     section: "Email for agents",
   },
-  MILLIONSEND_INBOXES_API_URL: {
-    // Its own setting: MILLIONSEND_API_URL may point at Resend, which has no inboxes and mustn't see these keys.
-    schema: z.union([z.literal("off"), z.url()]).default("https://api.millionsend.com"),
-    description:
-      "MillionSend's API, for MillionSend inboxes connected as mailboxes for agents (each with its own key): MillionSend Cloud, or a self-hosted MillionSend. `off` hides them. Their new mail arrives at once when MillionSend can reach `{PUBLIC_URL}/api/webhooks/millionsend` over https, else within `MAIL_POLL_SECONDS`.",
-    section: "Email for agents",
-  },
   MAIL_POLL_SECONDS: {
     schema: z.coerce.number().int().min(60).max(3600).default(300),
-    description:
-      "How often IMAP folders and MillionSend inboxes watched by routines are checked for new mail (MillionSend's webhook brings it sooner).",
+    description: "How often IMAP folders watched by routines are checked for new mail.",
     section: "Email for agents",
   },
   EMAIL_REPLY_TO: {

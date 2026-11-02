@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   customType,
+  date,
   foreignKey,
   index,
   integer,
@@ -73,9 +74,12 @@ export const contextKindEnum = pgEnum("context_kind", [
 export const trustEnum = pgEnum("context_trust", ["high", "low"]);
 export const contextStatusEnum = pgEnum("context_status", ["active", "archived"]);
 
-/** One piece of evidence behind an item. Weight order: outcome > human > agent > self. */
+/**
+ * One piece of evidence behind an item. Weight order: outcome > human > agent = app > self. `app`: a person's text
+ * sent through a connected AI app (`ref` is the person); outside content, so it never verifies an item (ADR 0119).
+ */
 export interface ContextEvidence {
-  type: "outcome" | "human" | "agent" | "self";
+  type: "outcome" | "human" | "agent" | "app" | "self";
   /** Message id, outcome id or approval id. */
   ref: string;
   /** For `agent`/`self`: the agent that made the claim. */
@@ -168,6 +172,7 @@ export const proposalTargetEnum = pgEnum("proposal_target", [
   "org_context",
   "agent_role",
   "agent_access",
+  "skill",
 ]);
 export const proposalStatusEnum = pgEnum("proposal_status", ["pending", "accepted", "rejected", "stale"]);
 
@@ -271,6 +276,20 @@ export const messageReactions = pgTable(
     index().on(t.orgId, t.messageId),
     check("message_reactions_one_reactor", sql`(${t.userId} is null) <> (${t.agentId} is null)`),
   ],
+);
+
+/** `context.learn` jobs per agent and day (UTC), against `LEARN_MAX_PER_AGENT_DAY` (ADR 0120). */
+export const agentLearningDays = pgTable(
+  "agent_learning_days",
+  {
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    day: date().notNull(),
+    jobs: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.agentId, t.day] }), index().on(t.orgId)],
 );
 
 /** Reflection bookkeeping per thread: bounded runs, never twice over the same messages. */

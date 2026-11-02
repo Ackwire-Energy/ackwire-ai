@@ -46,8 +46,11 @@ describe("a receipt never changes a message's height", () => {
     };
     state.messages = [
       said("s1", "Corrige o login.", 30, { receipts: answering }),
+      said("j1", "Pode deixar.", 29.8, { author: { type: "person", id: "u-joao" } }),
       said("s2", "Olha também o refresh.", 29.5, { receipts: answering }),
+      said("j2", "Bom dia.", 21, { author: { type: "person", id: "u-joao" } }),
       said("p1", "Bom dia.", 20),
+      said("j3", "Sobre o quê?", 19.8, { author: { type: "person", id: "u-joao" } }),
       said("p2", "Sobre a reunião.", 19.5),
     ];
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
@@ -65,13 +68,12 @@ describe("a receipt never changes a message's height", () => {
       steerStore.apply({ type: "agent.run.read", channelId: ENG_ID, runId: "r1", agentId: ADA_ID, messageIds: ["s2"] });
     });
     await settle(4);
-    expect(row("s2").className).toContain("ac-msg--grouped");
-    // Waiting for the next pause: the spinner at the end of the name's line.
-    const waiting = row("s1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__check");
+    // My own rows: the mark ends the time's line. Waiting for the next pause: the spinner.
+    const waiting = row("s1").querySelector(".ac-msg__own-foot .ac-receipt__check");
     expect(waiting?.getAttribute("data-steer")).toBe("waiting");
     expect(waiting?.querySelector("canvas.ac-pixspin")).not.toBeNull();
-    // Read: Ada's face at the end of the grouped message's first line, which wraps before it.
-    const read = row("s2").querySelector(".ac-msg__aside--floating .ac-receipt__check");
+    // Read: Ada's face, in the same place.
+    const read = row("s2").querySelector(".ac-msg__own-foot .ac-receipt__check");
     expect(read?.getAttribute("data-steer")).toBe("read");
     expect(read?.querySelector(".ac-avatar")).not.toBeNull();
     // Nothing under the text: the same parts as the messages beside them that no task read.
@@ -95,13 +97,13 @@ describe("a receipt never changes a message's height", () => {
       }),
     );
     await settle(2);
-    const clock = row("k1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__check") as HTMLElement;
+    const clock = row("k1").querySelector(".ac-msg__own-foot .ac-receipt__check") as HTMLElement;
     expect(clock.getAttribute("aria-label")).toBe("Escolhendo quem responde");
     expect(clock.querySelector("path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
     expect(row("k1").querySelector(".ac-msg__foot")?.childNodes.length).toBe(0);
   });
 
-  test("in a DM between people, who read my latest message is their face where its check goes, in a slot each of my messages keeps", async () => {
+  test("in a DM between people, who read my latest message is their face where its check goes, in a slot each turn's time line keeps", async () => {
     const state = seedState();
     state.dms = [{ channelId: DM_ID, with: { type: "person", id: "u-joao", name: "João", handle: null } }];
     state.channelMembers[DM_ID] = [
@@ -118,26 +120,20 @@ describe("a receipt never changes a message's height", () => {
     api.dms.reads = async () => [{ userId: "u-joao", lastReadAt: NOW.toISOString() }];
     await renderApp(`/org/${ORG_ID}/dm/person/u-joao`, { api });
     await settle(8);
-    const seen = row("d3").querySelector(".ac-msg__aside--floating .ac-receipt__seen");
+    const seen = row("d3").querySelector(".ac-msg__own-foot .ac-receipt__seen");
     expect(seen).not.toBeNull();
     expect((seen as HTMLElement).querySelector(".ac-avatar")).not.toBeNull();
-    // My other messages keep the same slot, empty, so the face moving on to a newer one never rewraps a line.
+    // The turn's other bubbles have no time line, so no mark.
     expect(row("d2").className).toContain("ac-msg--grouped");
-    for (const [id, where] of [
-      ["d1", ".ac-msg__head .ac-msg__aside"],
-      ["d2", ".ac-msg__aside--floating"],
-    ] as const) {
-      const slot = row(id).querySelector(`${where} .ac-receipt__seen`);
-      expect(slot).not.toBeNull();
-      expect((slot as HTMLElement).childNodes.length).toBe(0);
-    }
+    for (const id of ["d1", "d2"]) expect(row(id).querySelector(".ac-receipt__seen")).toBeNull();
     // Not on João's: no face ever comes there.
     expect(row("j1").querySelector(".ac-receipt__seen")).toBeNull();
-    // No line after it: the row ends the list as the one before it ends its own.
-    expect(parts("d3")).toEqual(parts("d2"));
+    // No line after it: the row ends the list as the one before it ends its own, but for the time a run's last bubble
+    // has under it, face or not.
+    expect(parts("d3").filter((part) => part !== "ac-msg__own-foot")).toEqual(parts("d2"));
     expect(screen().queryByText("Visto")).toBeNull();
     expect(document.querySelector(".channel__seen")).toBeNull();
-    // I write again: the face leaves until João reads it, its slot stays, and the new message has one while it sends.
+    // I write again: the face leaves until João reads it, and a message still sending has no time line.
     let release = () => {};
     state.holdPosts = new Promise<void>((r) => {
       release = r;
@@ -146,12 +142,12 @@ describe("a receipt never changes a message's height", () => {
     await act(async () => fireEvent.change(composer, { target: { value: "Mais uma coisa." } }));
     await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
     await settle(2);
-    expect(row("d3").querySelector(".ac-msg__aside--floating .ac-receipt__seen")?.childNodes.length).toBe(0);
+    expect(row("d3").querySelector(".ac-receipt__seen .ac-avatar")).toBeNull();
     const sending = screen()
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Mais uma coisa.")) as HTMLElement;
     expect(sending.className).toContain("ac-msg--pending");
-    expect(sending.querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__seen")).not.toBeNull();
+    expect(sending.querySelector(".ac-msg__own-foot")).toBeNull();
     await act(async () => release());
     await settle(2);
   });
@@ -179,12 +175,15 @@ describe("a receipt never changes a message's height", () => {
     expect(px(value(kit, ".ac-avatar--xs", "height"))).toBeLessThanOrEqual(
       px(value(kit, ".ac-msg__head", "line-height")),
     );
-    // A DM's face slot is that box, with or without the face in it.
-    expect(px(value(app, ".ac-receipt__seen", "width"))).toBe(check);
-    expect(px(value(app, ".ac-receipt__seen", "height"))).toBe(px(value(kit, ".ac-avatar--xs", "height")));
+    // A DM's face slot takes no width of its own: empty, it leaves the time on the bubble's edge.
+    expect(value(app, ".ac-receipt__seen", "width")).toBeUndefined();
+    expect(px(value(app, ".ac-receipt__seen", "height"))).toBe(16);
     // The mark ends the first line: in the name's line, or floated on a grouped message's text.
     expect(value(kit, ".ac-msg__head > .ac-msg__aside", "align-self")).toBe("center");
     expect(value(kit, ".ac-msg__aside--floating", "float")).toBe("right");
+    // On my own rows it ends the time's line, no taller than the time, so it never adds a line either.
+    expect(px(value(kit, ".ac-msg__own-foot > .ac-msg__aside", "height"))).toBe(16);
+    expect(px(value(kit, ".ac-msg__own-time", "min-height"))).toBe(16);
     // No line of words under a message, nor a row after it, for a receipt.
     const src = join(import.meta.dir, "../src");
     const sheets = (dir: string): string[] =>
@@ -255,7 +254,7 @@ describe("its words stay reachable", () => {
     await renderApp(`/org/${ORG_ID}/dm/person/u-joao`, { api });
     await settle(8);
     // The slot is a polite live region that is there before the face, so the face coming in is said.
-    const seen = row("d1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__seen") as HTMLElement;
+    const seen = row("d1").querySelector(".ac-msg__own-foot .ac-receipt__seen") as HTMLElement;
     expect(seen.getAttribute("aria-live")).toBe("polite");
     const face = within(seen).getByRole("button", { name: "Vista por João" });
     expect(face.querySelector(".ac-avatar")?.getAttribute("aria-hidden")).toBe("true");

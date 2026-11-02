@@ -172,7 +172,7 @@ describe("the working line's sentence", () => {
   });
 
   test("the bar's words come in pieces that give way in turn: the agents', then who types, never what they do", () => {
-    const words = (tf: TFunction, list: ActivityEntry[]) => barWords(tf, list, [], 0, 0);
+    const words = (tf: TFunction, list: ActivityEntry[]) => barWords(tf, list);
     const busy = [agent("theo"), agent("iris")];
     expect(words(t, [...busy, person("Ana")])).toEqual([
       "Theo e Iris estão trabalhando",
@@ -187,12 +187,12 @@ describe("the working line's sentence", () => {
       " are typing…",
     ]);
     expect(words(t, [person("Ana"), person("Bia")])).toEqual(["", "", "Ana e Bia", " estão digitando…"]);
-    // Nobody typing: the agents' phrase alone (it turns for one on its own).
+    // Nobody typing: the agents' phrase alone (one on its own is just its name).
     expect(words(t, busy)).toEqual(["Theo e Iris estão trabalhando…", "", "", ""]);
     // Joined, the pieces are the sentence, names marked the same.
     const mark = (n: string) => `[${n}]`;
     const list = [agent("theo"), person("Ana")];
-    expect(barWords(t, list, [], 0, 0, mark).join("")).toBe(activitySentence(t, list, mark));
+    expect(barWords(t, list, mark).join("")).toBe(activitySentence(t, list, mark));
   });
 
   test("names can be marked (bold in the bar) without changing the words", () => {
@@ -213,7 +213,7 @@ describe("the working line's sentence", () => {
     };
     const entries = (status: "asking" | "answered" | "expired" | "failed", runs: LiveRun[] = []) =>
       barEntries(runs, [], nameOf, () => undefined, [{ ...asking, status }]);
-    expect(activityText(t, entries("asking"))).toBe("Dev está perguntando ao Bento…");
+    expect(activityText(t, entries("asking"))).toBe("Dev está perguntando para Bento…");
     expect(activityText(tEn, entries("asking"))).toBe("Dev is asking Bento…");
     expect(activityText(t, entries("answered"))).toBe("Bento respondeu. Dev está escrevendo…");
     expect(activityText(t, entries("expired"))).toBe("Dev está escrevendo…");
@@ -222,7 +222,7 @@ describe("the working line's sentence", () => {
     const toNina = barEntries([], [], nameOf, () => undefined, [
       { ...asking, consultedAgentId: "nina", status: "asking" as const },
     ]);
-    expect(activityText(t, toNina)).toBe("Dev está perguntando à Nina…");
+    expect(activityText(t, toNina)).toBe("Dev está perguntando para Nina…");
     // Its resumed run doesn't add a second Dev; with others at work the line just says who works (its reply tells the rest).
     expect(activityText(t, entries("answered", [run("dev", "r-dev"), run("theo"), run("nina")]))).toBe(
       "Dev e mais 2 estão trabalhando…",

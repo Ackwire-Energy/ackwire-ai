@@ -315,7 +315,7 @@ export type EarlyAccessResult = { email: string; outcome: EarlyAccessOutcome; in
  * another form answers once, where it first came). An address whose invitation was used gets nothing. One that has
  * an account gets no link: the account is allowed at once (`allowed`). One invited already gets its link again
  * unless `resend` is false. The email is in the language of the account, else of the invitation, else of the
- * waiting list's entry, else `locale`, else pt-BR.
+ * waiting list's entry, else `locale`, else English.
  */
 export async function inviteEarlyAccess(
   db: Database,

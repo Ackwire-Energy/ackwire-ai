@@ -24,6 +24,8 @@ import {
   listInvitations,
   listMembers,
   listMemberships,
+  myLocale,
+  NotFoundError,
   needsWorkspaceAllowance,
   noticeInvitationAccepted,
   ONBOARDING_STEPS,
@@ -31,6 +33,7 @@ import {
   pinnedOwner,
   previewInvitation,
   queueInvitationEmail,
+  removalPreview,
   removeAvatar,
   removeMember,
   removeOrgLogo,
@@ -456,6 +459,12 @@ export function accountRoutes(deps: AppDeps) {
               emailVerified: z.boolean().openapi({
                 description: "The person opened the link that confirms their email address.",
               }),
+              locale: z.string().nullable().openapi({
+                description: "The app's language (`PATCH /me`); null until an app said one.",
+              }),
+              localeAuto: z.boolean().openapi({
+                description: "The language follows each device's own until the person picks one (ADR 0122).",
+              }),
               canCreateWorkspace: z.boolean().openapi({
                 description:
                   "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078). `org.create_refused` and `org.create_unpaid` (ADR 0079) can still refuse it.",
@@ -469,12 +478,13 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
-      const [memberships, password, verified, creates, unfinished] = await Promise.all([
+      const [memberships, password, verified, creates, unfinished, language] = await Promise.all([
         listMemberships(db, user.id),
         hasPassword(db, user.id),
         isEmailVerified(db, user.id),
         canCreateWorkspace(db, user.id, workspacePolicy(config)),
         unfinishedWorkspaces(db, user.id),
+        myLocale(db, user.id),
       ]);
       // A deleted account's session lives on in a cached cookie for minutes: its other tabs and devices learn it here.
       if (verified === null) {
@@ -496,6 +506,8 @@ export function accountRoutes(deps: AppDeps) {
             image: user.image ?? null,
             hasPassword: password,
             emailVerified: verified,
+            locale: language.locale,
+            localeAuto: language.localeAuto,
             canCreateWorkspace: creates,
           },
           organizations: memberships.map((m) => {
@@ -509,6 +521,7 @@ export function accountRoutes(deps: AppDeps) {
               rank: m.rank,
               logo: m.orgLogo ?? null,
               ...(m.start ? { start: m.start } : {}),
+              showActivity: m.showActivity ?? false,
               ...(m.standing
                 ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
                 : {}),
@@ -539,12 +552,16 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Change your app language",
-      description: "The language of the emails and pushes sent to you. The onboarding saves the one in use.",
-      request: { body: body(z.object({ locale: z.enum(USER_LOCALES) })) },
+      description:
+        "The language of the apps on every device and of the emails and pushes sent to you (ADR 0122). `auto: true` when a device detected it (Automático: each device follows its own until you pick one), false when you picked it.",
+      request: {
+        body: body(z.object({ locale: z.enum(USER_LOCALES), auto: z.boolean().default(false) })),
+      },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
-      await setMyLocale(db, c.get("user").id, c.req.valid("json").locale, deps.adapters.pubsub);
+      const { locale, auto } = c.req.valid("json");
+      await setMyLocale(db, c.get("user").id, locale, auto, deps.adapters.pubsub);
       return c.body(null, 204);
     },
   );
@@ -1163,6 +1180,37 @@ export function accountRoutes(deps: AppDeps) {
         pubsub: deps.adapters.pubsub,
       });
       return c.body(null, 204);
+    },
+  );
+
+  const Named = z.object({ id: z.string(), name: z.string() });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/members/{userId}/removal",
+      tags,
+      security,
+      summary: "What removing a member (or leaving) does",
+      description: "Refused exactly as the removal would be. 404 when they aren't a member.",
+      request: { params: MemberParams },
+      responses: {
+        200: json(
+          z.object({
+            heir: z.object({ userId: z.string(), name: z.string() }).nullable(),
+            agents: z.array(Named),
+            losePlan: z.array(Named),
+            computers: z.array(Named),
+            routines: z.number().int(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      const preview = await removalPreview(db, c.get("user").id, orgId, userId);
+      if (!preview) throw new NotFoundError("That user is not a member");
+      return c.json(preview, 200);
     },
   );
 

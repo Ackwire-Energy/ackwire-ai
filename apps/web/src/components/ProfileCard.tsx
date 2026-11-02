@@ -2,7 +2,7 @@ import type { Actor, Agent } from "@agenteschat/client";
 import { useAgentDetail, useModels, usePeople, useRoles, useSettings } from "@agenteschat/client";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
+import { clockHour, formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
@@ -11,7 +11,7 @@ import { timezoneName } from "@agenteschat/client/lib/routines";
 import { Avatar, Button, Meter, PlanMeter, Popover, ProviderLogo, useHoverCard } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
@@ -20,7 +20,9 @@ import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
+import { useAgentMenu, usePersonMenu } from "./entity-menus";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
@@ -47,6 +49,19 @@ export function ProfileTrigger({
   const { t } = useTranslation();
   // Hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
   const card = useHoverCard(HOVER_OPEN_MS);
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const agentEntries = useAgentMenu();
+  const personEntries = usePersonMenu();
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = entityMenu(() => {
+    if (actor.type === "agent") {
+      const agent = dir.agentById.get(actor.id);
+      return agent ? agentEntries(agent) : [];
+    }
+    const member = dir.memberById.get(actor.id);
+    return member ? personEntries(member, () => button.current?.click()) : [];
+  });
   return (
     <Popover
       hover={card}
@@ -55,7 +70,9 @@ export function ProfileTrigger({
       className="profile-card"
       trigger={
         <button
+          ref={button}
           type="button"
+          {...menu}
           className={className ? `profile-trigger ${className}` : "profile-trigger"}
           aria-label={label}
           aria-haspopup="dialog"
@@ -101,7 +118,7 @@ function PersonCard({ userId }: { userId: string }) {
   let localTime: string | null = null;
   try {
     localTime = new Intl.DateTimeFormat(i18n.language, {
-      hour: "2-digit",
+      hour: clockHour(i18n.language),
       minute: "2-digit",
       ...(timezone ? { timeZone: timezone } : {}),
     }).format(new Date());
@@ -257,7 +274,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         {modeOf(agent) !== "everyone" && (
           <>
             <dt>{t("profile.audience")}</dt>
-            <dd>{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</dd>
+            <dd>{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</dd>
           </>
         )}
         <dt>{t("profile.model")}</dt>
@@ -274,7 +291,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       </dl>
       {seesSpend && <Spend agent={agent} locale={i18n.language} />}
       {!canTalk(agent) && (
-        <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name)}</p>
+        <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</p>
       )}
       <div className="profile-card__actions">
         <Button asChild size="sm" variant="primary">

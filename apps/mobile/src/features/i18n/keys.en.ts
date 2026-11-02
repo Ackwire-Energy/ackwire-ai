@@ -1,7 +1,7 @@
-import type { FeatureTranslations } from "./keys.pt-BR";
+import type { Widen } from "@agenteschat/i18n/widen";
 
-/** The screens' strings in English: the same shape as `keys.pt-BR.ts` (the type checks it). */
-export const featureKeysEn: FeatureTranslations = {
+/** The screens' strings in English, the source: every other language follows this shape. */
+export const featureKeysEn = {
   app: {
     failed: "That didn't work. Try again.",
     send: "Send",
@@ -25,6 +25,26 @@ export const featureKeysEn: FeatureTranslations = {
     channelPosition: "{{at}} of {{count}}.",
     itsChannels: "Channels",
     seeAll: "See all",
+  },
+  blocks: {
+    send: "Send",
+    more: "More",
+    thousand: "k",
+    building: "Putting it together…",
+    openBig: "Open full screen",
+    keep: "Keep in Drive",
+    kept: "Kept in Drive",
+    wake: "Tap to open",
+    goesTo: "Goes to {{name}}:",
+    sentAt: "You sent this at {{time}}",
+    sendFailed: "That didn't work. Try again.",
+    someone: "Someone",
+    pollCloses: "Closes {{time}}",
+    pollClosed: "Voting closed",
+    pollMultiple: "You can pick more than one.",
+    pollAnswered_one: "{{count}} of {{total}} answered",
+    pollAnswered_other: "{{count}} of {{total}} answered",
+    voteFailed: "Your vote didn't go through.",
   },
   chart: {
     pending: "Building the chart…",
@@ -291,9 +311,6 @@ export const featureKeysEn: FeatureTranslations = {
       working: "working",
       writing: "writing",
       stopped: "stopped",
-      opener0: "Let me see…",
-      opener1: "Looking into it…",
-      opener2: "One moment…",
     },
     steer: {
       waiting: "{{name}} reads it at the next pause",
@@ -697,7 +714,7 @@ export const featureKeysEn: FeatureTranslations = {
         "The phone doesn't open .zip or .tar.gz files. In the Files app, tap the .zip to unzip it and pick the files inside, or import on the computer.",
       privacy: "Read on this phone. Key and login files are never opened.",
       also: "Also comes along",
-      leftOut: "Doesn't come along: {{groups}}",
+      change: "Change",
       arrived_one: "{{name}} arrived",
       arrived_other: "{{count}} agents arrived",
       partial: "{{done}} of {{total}} arrived. Importing again brings the rest.",
@@ -794,6 +811,14 @@ export const featureKeysEn: FeatureTranslations = {
       invitation_accepted_other: "{{names}} accepted your invitation",
       composio_limit_one: "This workspace used its Composio calls for the month",
       composio_limit_other: "This workspace used its Composio calls for the month",
+      browser_profile_request_one: "{{names}} asks for one more browser profile",
+      browser_profile_request_other: "{{names}} ask for one more browser profile",
+      connector_tool_changed_one: "A connected server changed tools you approved",
+      connector_tool_changed_other: "A connected server changed tools you approved",
+      computer_disk_full_one: "A computer's disk is almost full",
+      computer_disk_full_other: "A computer's disk is almost full",
+      app_created_one: "An AI app created things for you",
+      app_created_other: "An AI app created things for you",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",
@@ -856,8 +881,11 @@ export const featureKeysEn: FeatureTranslations = {
     startChannels: "A channel",
     startHint: "For this workspace, here and on your computer, where home is the Home page.",
     startFailed: "Couldn't save that. Try again.",
-    langPt: "Português",
-    langEn: "English",
+    activity: "Agents' replies",
+    activityShow: "Show what agents did under each reply",
+    activityHint:
+      "The tools they used and how long it took, in this workspace, here and on your computer. While they work, you still see what they're doing.",
+    activityFailed: "Couldn't save that. Try again.",
     sounds: "Sounds",
     soundsOn: "Sounds in the app",
     soundsOff: "Off",
@@ -979,6 +1007,7 @@ export const featureKeysEn: FeatureTranslations = {
     loadFailed: "Couldn't open the file.",
     openImage: "Open picture",
     imageOf: "Picture {{index}} of {{count}}",
+    place: "{{index}} of {{count}}",
     noPreview: "This file doesn't open in the app. Share it to open it in another app.",
   },
   issues: {
@@ -1192,7 +1221,8 @@ export const featureKeysEn: FeatureTranslations = {
     ownerYou: "Owner: you",
     nowWaiting: "Needs your ok: {{title}}",
     did: {
-      title: "What {{she}} did for you",
+      title: "What he did for you",
+      title_female: "What she did for you",
       month_one: "{{count}} this month",
       month_other: "{{count}} this month",
       seeAll: "See all",
@@ -1226,7 +1256,8 @@ export const featureKeysEn: FeatureTranslations = {
       },
     },
     knows: {
-      title: "What {{she}} knows about you",
+      title: "What he knows about you",
+      title_female: "What she knows about you",
       footF: "Tap to correct or forget.",
       footM: "Tap to correct or forget.",
       footOwner: "Only {{name}} or an admin can correct these.",
@@ -1252,7 +1283,8 @@ export const featureKeysEn: FeatureTranslations = {
     },
     thinks: "Thinks with",
     uses: {
-      title: "What {{she}} can use",
+      title: "What he can use",
+      title_female: "What she can use",
       level: { read: "Read", write: "Read and write", some: "Partly" },
       area: {
         context: "Memory",
@@ -1309,7 +1341,6 @@ export const featureKeysEn: FeatureTranslations = {
       cloudTag: "Always on",
       managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
-      and: " and ",
       none: "No other computer can take these agents right now. Connect one on the website.",
       gone: "{{computer}} is back. Nobody needs to switch.",
       reason: {
@@ -1359,8 +1390,7 @@ export const featureKeysEn: FeatureTranslations = {
   browser: {
     card: {
       needs: "{{name}} needs help",
-      needsFor_one: "{{name}} needs help · {{count}} min",
-      needsFor_other: "{{name}} needs help · {{count}} min",
+      needsFor: "{{name}} needs help · {{time}}",
       inControlAt: "You're in control · {{host}}",
       doing: "{{name}} · {{doing}}",
       startingF: "Opening {{name}}'s browser…",
@@ -1378,6 +1408,7 @@ export const featureKeysEn: FeatureTranslations = {
       failedNote: "Couldn't: {{note}}",
       expired: "Nobody opened it in time: {{title}}",
       cancelled: "Canceled: {{title}}",
+      withdrawn: "{{name}} no longer needs this: {{title}}",
     },
     live: {
       inControl: "You're in control",
@@ -1398,10 +1429,10 @@ export const featureKeysEn: FeatureTranslations = {
       page: "The browser's page. Tap to click.",
       graceF: "If you leave, {{name}} waits 2 min.",
       graceM: "If you leave, {{name}} waits 2 min.",
-      closedHelpF: "Its sign-ins stay saved.",
-      closedHelpM: "Its sign-ins stay saved.",
-      stuckHelpF: "Try again restarts the browser. Its sign-ins stay saved.",
-      stuckHelpM: "Try again restarts the browser. Its sign-ins stay saved.",
+      closedHelpF: "Logins stay saved for next time.",
+      closedHelpM: "Logins stay saved for next time.",
+      stuckHelpF: "Try again restarts the browser. Logins stay saved.",
+      stuckHelpM: "Try again restarts the browser. Logins stay saved.",
       hidden: "{{name}} is in control · screen hidden",
       key: {
         Tab: "Tab",
@@ -1631,7 +1662,8 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who {{she}} answers",
+    audience: "Who he answers",
+    audience_female: "Who she answers",
     another: "Another AI",
   },
   crash: {
@@ -1670,3 +1702,6 @@ export const featureKeysEn: FeatureTranslations = {
     bySelfUntil: "Written by {{name}} · {{when}}",
   },
 };
+
+/** Every language of these strings has this shape (English is the source). */
+export type FeatureTranslations = Widen<typeof featureKeysEn>;

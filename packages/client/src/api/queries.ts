@@ -27,10 +27,12 @@ import {
 } from "../lib/notifications";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
+import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
-import { SIDEBAR_DEFAULTS, withSidebarPlace } from "../lib/sidebar-items";
+import { SIDEBAR_DEFAULTS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
+import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
@@ -50,6 +52,7 @@ import type {
   AgentSetup,
   AiStatus,
   ApiRule,
+  AppConsentDecision,
   AppNotification,
   Approval,
   ArtifactContent,
@@ -89,7 +92,6 @@ import type {
   Me,
   Message,
   MessageMemory,
-  MillionSendKeyInput,
   MoveAgentsInput,
   NoticeCategory,
   NoticePrefs,
@@ -98,6 +100,7 @@ import type {
   NotificationFilter,
   OrgRoles,
   Person,
+  PersonalTokenInput,
   Proposal,
   ReactionCount,
   ReminderInput,
@@ -114,6 +117,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarPlace,
+  SidebarSection,
   SkillInput,
   SkillPatch,
   StartChoice,
@@ -125,10 +129,10 @@ import type {
   ThreadInfo,
   ThreadPatch,
   ToolDecision,
-  WikiAudience,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
+  WorkView,
 } from "./types";
 
 /**
@@ -459,6 +463,43 @@ export function useSetMemberRoles(orgId: string) {
       if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
     },
     onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** What removing this person (or leaving) does, while the confirmation is open. */
+export const useRemovalPreview = (orgId: string, userId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["org", orgId, "removal", userId],
+    queryFn: () => api.orgs.removal(orgId, userId ?? ""),
+    enabled: userId !== null,
+    staleTime: 0,
+  });
+};
+
+/** Removes a member, or leaves: the row goes at once; their agents' new owner and the counts follow. */
+export function useRemoveMember(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId),
+    onMutate: async (userId) => {
+      await qc.cancelQueries({ queryKey: keys.people(orgId) });
+      const before = qc.getQueryData<Person[]>(keys.people(orgId));
+      if (before)
+        qc.setQueryData<Person[]>(
+          keys.people(orgId),
+          before.filter((p) => p.userId !== userId),
+        );
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
+    },
+    onSettled: () => {
+      for (const key of [keys.people(orgId), keys.members(orgId), keys.overview(orgId), keys.agents(orgId), keys.me])
+        void qc.invalidateQueries({ queryKey: key });
+    },
   });
 }
 
@@ -1596,17 +1637,6 @@ export function useMailAction(orgId: string) {
       mutationFn: (input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean }) =>
         api.mail.connectComposio(orgId, input),
     }),
-    millionsendInboxes: useMutation({
-      mutationFn: (input: MillionSendKeyInput) => api.mail.millionsendInboxes(orgId, input),
-      // The form says why (a key MillionSend refused).
-      meta: { silent: true },
-    }),
-    connectMillionSend: useMutation({
-      mutationFn: (input: MillionSendKeyInput & { inboxId: string; label?: string }) =>
-        api.mail.connectMillionSend(orgId, input),
-      onSuccess: done,
-      meta: { silent: true },
-    }),
     update: useMutation({
       mutationFn: ({ accountId, ...input }: MailAccountUpdate & { accountId: string }) =>
         api.mail.update(orgId, accountId, input),
@@ -1724,6 +1754,29 @@ export function useSetStart(orgId: string) {
       return { before };
     },
     onError: (_e, _input, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: put,
+  });
+}
+
+/** Shows or hides what agents did under each reply, for me in this workspace: the switch moves at once. */
+export function useSetShowActivity(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const put = (showActivity: boolean) =>
+    qc.setQueryData<Me | null>(keys.me, (me) =>
+      me ? { ...me, organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, showActivity } : o)) } : me,
+    );
+  return useMutation({
+    mutationFn: (show: boolean) => api.orgs.setShowActivity(orgId, show),
+    onMutate: async (show) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      put(show);
+      return { before };
+    },
+    onError: (_e, _show, ctx) => {
       if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
     },
     onSuccess: put,
@@ -2223,6 +2276,25 @@ export function cacheMessageMemories(
 }
 
 /**
+ * `message.pinned` / `message.unpinned` (and "Fixar" / "Desafixar" optimistically): the message's pin mark in every
+ * cached list of that channel (timeline and threads).
+ */
+export function cachePinned(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  pinned: boolean,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, pinned } : m));
+  });
+}
+
+/**
  * `message.actions` (and undo/redo results): an agent message's receipts, in
  * every cached list of that channel (timeline and threads). Replaces the list.
  */
@@ -2238,6 +2310,21 @@ export function cacheMessageActions(
     const list = data as Message[];
     if (!list.some((m) => m && m.id === messageId)) return data;
     return list.map((m) => (m.id === messageId ? { ...m, actions } : m));
+  });
+}
+
+/** A long work changed (`agent.work`, ADR 0121): its anchor's cached message carries the new view. */
+export function cacheMessageWork(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  work: WorkView,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === work.anchorMessageId)) return data;
+    return list.map((m) => (m.id === work.anchorMessageId ? { ...m, longWork: work } : m));
   });
 }
 
@@ -2297,6 +2384,30 @@ export const useCustomServers = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId), enabled });
 };
+
+/** Approved MCP tools whose server changed them (ADR 0117): connector admins only (`enabled`). */
+export const useToolChanges = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.toolChanges(orgId),
+    queryFn: () => api.customConnectors.toolChanges(orgId),
+    enabled,
+  });
+};
+
+export function useAcceptToolChange(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (c: { connectionId: string; toolName: string }) =>
+      api.customConnectors.acceptToolChange(orgId, c.connectionId, c.toolName),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+      ]),
+  });
+}
 
 export function useCustomServerAction(orgId: string) {
   const api = useApi();
@@ -2558,6 +2669,42 @@ export const useArtifact = (orgId: string, id: string | null, version?: number) 
   });
 };
 
+/** A vote: the answers come in over the socket (`poll.updated`). */
+export const usePoll = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.poll(orgId, id ?? ""),
+    queryFn: () => api.artifacts.poll(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export const useVote = (orgId: string, id: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (options: number[]) => api.artifacts.vote(orgId, id, options),
+    onSuccess: (poll) => qc.setQueryData(keys.poll(orgId, id), poll),
+  });
+};
+
+export const useKeepBlock = (orgId: string, id: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.artifacts.keep(orgId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
+  });
+};
+
+export const useBlockReply = (orgId: string, id: string) => {
+  const api = useApi();
+  return useMutation({
+    mutationFn: ({ text, clientId }: { text: string; clientId: string }) =>
+      api.artifacts.reply(orgId, id, text, clientId),
+  });
+};
+
 export const useArtifactVersions = (orgId: string, id: string | null) => {
   const api = useApi();
   return useQuery({
@@ -2711,7 +2858,11 @@ export function useIssueColumnAction(orgId: string) {
 
 export const useRoutines = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+  return useQuery({
+    queryKey: keys.routines(orgId),
+    queryFn: () => api.routines.list(orgId),
+    refetchInterval: (q) => usagePauseRefetchMs(q.state.data),
+  });
 };
 
 export const useRoutineRuns = (orgId: string, id: string | null) => {
@@ -2797,6 +2948,8 @@ export function useRoutineAction(orgId: string) {
         | { type: "active"; id: string; active: boolean }
         | { type: "run"; id: string }
         | { type: "stop"; id: string }
+        /** Continuar agora on a run paused near its plan's or budget's limit. */
+        | { type: "continueUsage"; id: string }
         | { type: "update"; id: string; patch: RoutinePatch }
         | { type: "delete"; id: string }
         | { type: "duplicate"; id: string; name?: string }
@@ -2811,6 +2964,7 @@ export function useRoutineAction(orgId: string) {
       if (action.type === "duplicate") return api.routines.duplicate(orgId, action.id, action.name);
       if (action.type === "active") return api.routines.setActive(orgId, action.id, action.active);
       if (action.type === "stop") return api.routines.stop(orgId, action.id);
+      if (action.type === "continueUsage") return api.routines.continueUsage(orgId, action.id);
       if (action.type === "takeOver") {
         await api.routines.takeOver(orgId, action.id);
         return api.routines.setActive(orgId, action.id, true);
@@ -2915,6 +3069,16 @@ export const useAgentSkills = (orgId: string, agentId: string, enabled = true) =
   });
 };
 
+/** Skills the agent made from its own how-tos ("Aprendizados"); empty on a server without them. */
+export const useLearnedSkills = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.learnedSkills(orgId, agentId),
+    queryFn: () => api.skills.learned?.(orgId, agentId) ?? Promise.resolve([]),
+    retry: false,
+  });
+};
+
 /** Which agents use each skill (the API lists skills per agent): skillId → agents. */
 export function useSkillUsage(orgId: string, enabled: boolean) {
   const api = useApi();
@@ -2953,6 +3117,8 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
         | { type: "remove"; id: string }
+        | { type: "revert"; id: string }
+        | { type: "restore"; id: string }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
       switch (action.type) {
@@ -2970,8 +3136,13 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
           return api.skills.remove(orgId, action.id);
         case "assign":
           return api.skills.setForAgent(orgId, action.agentId, action.skills);
+        case "revert":
+          return api.skills.revert?.(orgId, action.id) ?? Promise.resolve();
+        case "restore":
+          return api.skills.restore?.(orgId, action.id) ?? Promise.resolve();
       }
     },
+    // The library and every agent's lists (`keys.skills` is their prefix).
     onSettled: () => qc.invalidateQueries({ queryKey: keys.skills(orgId) }),
   });
 }
@@ -3457,7 +3628,7 @@ export function useWikiAction(orgId: string) {
         | { type: "move"; slug: string; folder: string }
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
-        | { type: "audience"; slug: string; audience: WikiAudience | null }
+        | { type: "audience"; slug: string; access: WikiAccess }
         | {
             type: "append";
             slug: string;
@@ -3479,13 +3650,36 @@ export function useWikiAction(orgId: string) {
         case "pin":
           return api.wiki.pin(orgId, action.slug, action.pinned);
         case "audience":
-          return api.wiki.audience(orgId, action.slug, action.audience);
+          return api.wiki.audience(orgId, action.slug, action.access);
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }
     },
     onSuccess: (page) => {
       qc.setQueryData(keys.wikiPage(orgId, page.slug), page);
+      void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
+    },
+  });
+}
+
+/** A wiki folder's audience and the closest limited folder above it. */
+export function useWikiFolderAudience(orgId: string, folder: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    enabled,
+    queryKey: [...keys.wiki(orgId), "folder-audience", folder],
+    queryFn: () => api.wiki.folderAudience(orgId, folder),
+  });
+}
+
+/** Saves a folder's audience: it reaches its pages, so everything in the wiki is read again. */
+export function useSetWikiFolderAudience(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { folder: string; access: WikiAccess }) =>
+      api.wiki.setFolderAudience(orgId, input.folder, input.access),
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
     },
   });
@@ -3736,6 +3930,36 @@ export function useSetSidebarItem(orgId: string) {
     onSuccess: (items) => {
       if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(keys.sidebarItems(orgId), items);
     },
+  });
+}
+
+/** The sidebar's sections in my order in this workspace (the default until it loads). */
+export const useSidebarOrder = (orgId: string): SidebarSection[] => {
+  const api = useApi();
+  return (
+    useQuery({
+      queryKey: keys.sidebarOrder(orgId),
+      queryFn: () => api.orgs.sidebarOrder(orgId),
+      staleTime: 60_000,
+    }).data ?? [...SIDEBAR_SECTIONS]
+  );
+};
+
+/** Saves my section order (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
+export function useSetSidebarOrder(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    scope: { id: `sidebar-order:${orgId}` },
+    mutationFn: (order: SidebarSection[] | null) => api.orgs.setSidebarOrder(orgId, order),
+    onMutate: async (order) => {
+      await qc.cancelQueries({ queryKey: keys.sidebarOrder(orgId) });
+      const before = qc.getQueryData<SidebarSection[]>(keys.sidebarOrder(orgId));
+      qc.setQueryData<SidebarSection[]>(keys.sidebarOrder(orgId), order ?? [...SIDEBAR_SECTIONS]);
+      return { before };
+    },
+    onError: (_error, _order, context) => qc.setQueryData(keys.sidebarOrder(orgId), context?.before),
+    onSuccess: (order) => qc.setQueryData(keys.sidebarOrder(orgId), order),
   });
 }
 
@@ -4183,4 +4407,59 @@ export function useSetAgentDatabase(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
     },
   });
+}
+
+/** `/autorizar?req=`: the app asking and the workspaces it could get (ADR 0119). Asked once: it answers once. */
+export const useAppConsent = (requestId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.appConsent(requestId),
+    queryFn: () => api.apps.consent(requestId),
+    enabled: requestId.length > 0,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    meta: { quiet: true },
+  });
+};
+
+/** Permitir or Cancelar on the consent page; the page goes to `redirectTo` once. */
+export function useDecideAppConsent(requestId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AppConsentDecision) => api.apps.decide(requestId, input),
+    meta: { silent: true },
+    onSuccess: (_r, input) => {
+      if (input.orgId) void qc.invalidateQueries({ queryKey: ["org", input.orgId, "apps"] });
+    },
+  });
+}
+
+/** Settings → AI apps. `pollMs`: also refetch this often (while waiting for an app to connect). */
+export const useApps = (orgId: string, all = false, pollMs: number | false = false) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.apps(orgId, all),
+    queryFn: () => api.apps.list(orgId, all),
+    refetchInterval: pollMs,
+  });
+};
+
+/** Desconectar an app, Revogar a token, Criar token: both lists refresh. */
+export function useAppActions(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const done = () => void qc.invalidateQueries({ queryKey: ["org", orgId, "apps"] });
+  return {
+    disconnect: useMutation({ mutationFn: (grantId: string) => api.apps.disconnect(orgId, grantId), onSuccess: done }),
+    revokeToken: useMutation({
+      mutationFn: (grantId: string) => api.apps.revokeToken(orgId, grantId),
+      onSuccess: done,
+    }),
+    createToken: useMutation({
+      mutationFn: (input: PersonalTokenInput) => api.apps.createToken(orgId, input),
+      meta: { silent: true },
+      onSuccess: done,
+    }),
+  };
 }

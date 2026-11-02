@@ -16,6 +16,8 @@ export function enableCaches(on = true) {
   if (!on) clearCaches();
 }
 
+export const cachesEnabled = () => enabled;
+
 export class TtlCache<V> {
   private readonly entries = new Map<string, { value: V; expires: number }>();
   constructor(
@@ -91,6 +93,8 @@ export const caches = {
    * (a follow-up, CI, an approval) walks only its newest links, never the whole chain again (2 queries a link).
    */
   messageRoots: new TtlCache<unknown>(24 * 3600_000, 20_000),
+  /** Runs that read outside content (`runReadOutside`): only `true` is kept, since it never turns false. */
+  readOutsideRuns: new TtlCache<true>(3600_000, 20_000),
 };
 
 /** Forgets everything about an org (used after broad changes and in tests). */

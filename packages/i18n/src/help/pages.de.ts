@@ -1,0 +1,523 @@
+import type { HelpSlug } from "./index";
+import type { HelpDocument } from "./types";
+
+/** The help pages in de: a page not here shows in English. */
+export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
+  "run-on-your-computer": {
+    title: "agentes.chat auf deinem Computer ausführen",
+    summary:
+      "Die agentes.chat-App kann agentes.chat auch selbst ausführen, auf einem Mac, einem PC oder einem Linux-Computer, für dich oder ein kleines Team.",
+    sections: [
+      {
+        id: "how",
+        heading: "Wie es läuft",
+        blocks: [
+          "Es läuft in der App, mit einer eigenen eingebauten Datenbank, und speichert alles in einem Ordner auf diesem Computer, `.agentes` in deinem Benutzerordner. Sonst musst du nichts installieren: kein Docker, keine Datenbank zum Einrichten.",
+          "Es startet mit der App und stoppt, wenn du sie beendest. Vor dem Beenden fragt die App nach, denn bis sie wieder offen ist, kann niemand agentes.chat nutzen.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Für wen es ist",
+        blocks: [
+          "Gemacht für dich oder ein kleines Team, solange dieser Computer an ist. Für ein größeres Team oder einen Server, der immer läuft, installiere agentes.chat auf einem Server und wähle in der App **Mit meinem Server verbinden**. Deine Daten können später dorthin umziehen.",
+        ],
+      },
+      {
+        id: "agents",
+        heading: "Deine Agenten arbeiten auch hier",
+        blocks: [
+          "Deine Agenten arbeiten auch auf diesem Computer, in eigenen Ordnern, mit einem Browser und mit Claude Code oder Codex, wenn sie hier installiert sind. Befehle bleiben aus, bis du sie unter **Einstellungen\u00a0›\u00a0Tools** einschaltest.",
+        ],
+      },
+      {
+        id: "reach",
+        heading: "Vom Handy und für dein Team",
+        blocks: [
+          "**Von deinem Handy und deinem Team erreichbar** bringt agentes.chat in Tailscale, ein privates Netzwerk für deine Geräte: Dein Handy und die Personen, die du einlädst, treten ihm bei, und sonst kann niemand agentes.chat erreichen. Tailscale ist kostenlos: https://tailscale.com/download. Ist es aus, funktioniert agentes.chat nur auf diesem Computer.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "Backups und Umzug",
+        blocks: [
+          "**Jetzt sichern** unter **Einstellungen\u00a0›\u00a0Server** speichert die Datenbank, die Dateien und die Einstellungen in `.agentes/backups` in deinem Benutzerordner.",
+        ],
+      },
+    ],
+  },
+  computers: {
+    title: "Computer für deine Agenten",
+    summary:
+      "Agenten führen Code aus und arbeiten mit Dateien auf Computern, die du verbindest: einem Mac oder PC mit der agentes.chat-App oder einem Server.",
+    sections: [
+      {
+        id: "mac",
+        heading: "Ein Mac oder PC, mit der App",
+        blocks: [
+          "Die agentes.chat-App öffnet deinen Server in einem eigenen Fenster, und mit einem Klick arbeiten seine Agenten auf diesem Computer, in eigenen Ordnern. Installiere die App, öffne sie, wähle **Eigenen Server nutzen\u00a0›\u00a0Mit meinem Server verbinden** und gib die Adresse deines Servers ein. Klick dann, angemeldet, unter **Einstellungen\u00a0›\u00a0Computer** auf **Diesen Mac nutzen** (**Diesen PC nutzen** unter Windows, **Diesen Computer nutzen** unter Linux).",
+        ],
+      },
+      {
+        id: "server",
+        heading: "Ein Server oder Linux-Computer",
+        blocks: [
+          "Kopiere unter **Einstellungen\u00a0›\u00a0Computer** den Befehl bei **Andere Wege** und führe ihn im Terminal dieses Computers aus. Er zeigt einen Code und einen Link: Öffne den Link, prüfe, ob der Code übereinstimmt, und bestätige mit deinem Konto. Vorher musst du nichts installieren.",
+        ],
+      },
+      {
+        id: "folders",
+        heading: "Ordner",
+        blocks: [
+          "Jeder Agent hat immer einen eigenen Ordner, in `~/agentes/<workspace>`. Weitere Ordner gibst du nur auf dem Computer selbst frei, nie über die Website: in der App unter **Einstellungen\u00a0›\u00a0Ordner** oder auf einem Server mit `agentes-runner folders allow`. Jeder Workspace gibt seine eigenen Ordner frei: Was du für einen freigibst, gilt nur für dessen Agenten. Einen Ordner zu entfernen löscht nichts. Es nimmt nur den Zugriff weg.",
+        ],
+      },
+      {
+        id: "pausing",
+        heading: "Pausieren",
+        blocks: [
+          "Mit der App kann die Person, die einen Computer verbunden hat, dessen Agenten dort pausieren, über das agentes.chat-Symbol neben der Uhr. Bis sie fortsetzt, startet nichts Neues. Was gerade läuft, wird noch fertig.",
+        ],
+      },
+      {
+        id: "organizations",
+        heading: "Mehrere Workspaces",
+        blocks: [
+          "Ein Computer kann für mehrere Workspaces arbeiten. Jeder hat dort eigene Agenten, Ordner und Aufgaben, und wenn du einen trennst, bleiben die anderen unberührt.",
+        ],
+      },
+    ],
+  },
+  "workspace-computer": {
+    title: "Der Computer des Workspace",
+    summary: "Jeder Workspace bekommt einen eigenen Computer, der immer läuft und auf dem seine Agenten arbeiten.",
+    sections: [
+      {
+        id: "what",
+        heading: "Was er ist",
+        blocks: [
+          "Ein Computer nur für diesen Workspace, der immer läuft. Jeder Agent hat darauf einen eigenen Benutzer, mit eigenem Ordner, Bildschirm, Browser und eigenen Dateien. Auf der Seite eines Agenten kannst du ihm bei der Arbeit zusehen und die Steuerung übernehmen, wenn nötig.",
+        ],
+      },
+      {
+        id: "plans",
+        heading: "Deine KI-Abos",
+        blocks: [
+          "Deine Agenten können mit deinem eigenen KI-Abo denken, etwa Claude, ChatGPT, GLM oder Kimi, angemeldet auf diesem Computer: Du brauchst keinen API-Schlüssel. Das Konto bleibt auf diesem Computer, und agentes.chat sieht nie das Passwort oder den Zugang.",
+          "Die Abos AI Pro und Ultra von Google funktionieren hier nicht: Die Bedingungen von Google erlauben sie nicht in anderen Produkten. Ein Gemini-API-Schlüssel funktioniert.",
+        ],
+      },
+      {
+        id: "size",
+        heading: "Seine Größe",
+        blocks: ["CPUs, Arbeitsspeicher und Speicherplatz siehst du unter **Einstellungen\u00a0›\u00a0Computer**."],
+      },
+      {
+        id: "trouble",
+        heading: "Wenn er nicht mehr antwortet",
+        blocks: ["Meist ist er nach ein paar Minuten wieder da, und wir kümmern uns darum: Du musst nichts tun."],
+      },
+    ],
+  },
+  import: {
+    title: "Bring deine Agenten mit",
+    summary:
+      "Hol Agenten aus einer anderen App oder einem anderen agentes.chat-Workspace, mit ihren Anweisungen, Skills, Routinen und ihrem Gedächtnis.",
+    sections: [
+      {
+        id: "comes",
+        heading: "Was mitkommt",
+        blocks: [
+          {
+            list: [
+              "Agenten, mit Name, Rolle, Anweisungen und Aussehen.",
+              "Skills, eingeschaltet für die Agenten, die sie hatten.",
+              "Öffentliche Kanäle, mit den Agenten darin.",
+              "Routinen, aktiv und nach ihrem Zeitplan. Pausiere sie unter **Routinen**, wenn du willst.",
+              "Gedächtnis: was sich jeder Agent merkt.",
+              "Die eigenen Dateien jedes Agenten (der Dateiordner von OpenBot.run, ein OpenClaw-Workspace), in einem Ordner mit seinem Namen im **Drive**. Schlüssel, Logins und Systemdateien bleiben zurück, und nichts, was schon da ist, wird ersetzt.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "never",
+        heading: "Was nie mitkommt",
+        blocks: [
+          "Schlüssel, Passwörter, Logins und Chatverläufe kommen nie mit: Die Agenten denken mit der KI des Workspace. Manches hat hier noch keine Entsprechung oder sollte nie in einer Datei reisen. Du kannst es später neu anlegen.",
+          "Dateien und Ordner werden in deinem Browser gelesen. Ein GitHub-Link geht über den Server des Workspace. Schlüssel- und Login-Dateien werden nie geöffnet, und nichts ändert sich, bevor du bestätigst.",
+        ],
+      },
+      {
+        id: "other-apps",
+        heading: "Aus einer anderen App",
+        blocks: [
+          "Wähle **Grok Bot**, **ChatGPT dots** oder **Andere App**. Kopiere die Anfrage, füge sie in dieser App ein und bring dann zurück, was sie liefert: Zieh die Datei hinein oder füge die ganze Antwort ein. Wo das in jeder App geht:",
+          {
+            list: [
+              "**Grok Bot**: im Chat mit deinem Bot. Er antwortet mit dem JSON: Kopiere die ganze Antwort.",
+              "**ChatGPT dots**: in einem neuen Chat. Lade die Datei herunter, die es erstellt.",
+              "**Claude**: in einer neuen Unterhaltung oder im Projekt deiner Agenten. Lade die Datei herunter, die es erstellt.",
+              "**Manus**: in einer neuen Aufgabe. Die Datei steht in den Ergebnissen der Aufgabe.",
+              "**Rakazo**: Schick sie an deinen Agenten. Er antwortet mit dem JSON: Kopiere die ganze Antwort.",
+              "**OpenBot**: keine Anfrage nötig. Zieh den Tenant-Ordner hinein (agents.yaml, agents/, model.yaml, skills.yaml) oder füge seinen GitHub-Link ein.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "export",
+        heading: "Einen Workspace exportieren",
+        blocks: [
+          "**Einstellungen\u00a0›\u00a0Import und Export\u00a0›\u00a0Export** lädt eine .json-Datei herunter, um deine Agenten in einen anderen Workspace mitzunehmen oder eine Kopie zu behalten. In der Datei:",
+          {
+            list: [
+              "Agenten, mit Anweisungen, Modell und Aussehen",
+              "Skills, mit der ganzen SKILL.md",
+              "Öffentliche Kanäle, mit ihren Agenten",
+              "Geplante Routinen (sie kommen auf der anderen Seite aktiv an)",
+              "Das Gedächtnis, das alle im Workspace sehen können",
+            ],
+          },
+          "Nie darin:",
+          {
+            list: [
+              "API-Schlüssel und Passwörter",
+              "Konnektoren und Logins",
+              "Computer",
+              "Unterhaltungen, Nachrichten und private Kanäle",
+              "Nutzung, Kosten und Aktivitätsverlauf",
+            ],
+          },
+          "Um die Datei zu nutzen, öffne im anderen Workspace **Einstellungen\u00a0›\u00a0Import und Export** und zieh die .json hinein.",
+        ],
+      },
+    ],
+  },
+  wiki: {
+    title: "Das Wiki",
+    summary: "Was das Unternehmen weiß, in Seiten, die miteinander verlinkt sind.",
+    sections: [
+      {
+        id: "links",
+        heading: "Links",
+        blocks: [
+          "Tippe [[, um eine andere Seite zu verlinken. Rückverweise und der Graph zeigen, wie Seiten zusammenhängen.",
+        ],
+      },
+      {
+        id: "agents",
+        heading: "Wie Agenten es nutzen",
+        blocks: ["Agenten lesen das Wiki, wenn sie antworten. Sie schreiben nur darin, wenn jemand darum bittet."],
+      },
+      {
+        id: "obsidian",
+        heading: "Einen Obsidian-Vault mitbringen",
+        blocks: [
+          "Zieh den Ordner des Vaults oder eine .zip davon in den Schritt Kontext der Einrichtung oder in den Import des Wikis. [[Links]], [[notiz|alias]] und [[notiz#abschnitt]] funktionieren weiter. Tags kommen aus dem Frontmatter und dem Text. Anhänge landen im Drive, und eingebettete Bilder und Dateien werden zu Karten auf der Seite. Callouts bleiben Callouts. Dataview-Abfragen kommen als Text an: Bitte einen Agenten, die Tabelle zu bauen. Canvases und die Einstellungen von Obsidian (.obsidian) bleiben draußen.",
+        ],
+      },
+    ],
+  },
+  memory: {
+    title: "Gedächtnis",
+    summary: "Was jeder Agent aus Unterhaltungen und den Korrekturen des Teams lernt.",
+    sections: [
+      {
+        id: "learns",
+        heading: "Wie Agenten lernen",
+        blocks: [
+          "Agenten lernen aus Unterhaltungen und aus den Korrekturen des Teams. Was ein Agent weiß, kommt in seinen Kontext, wenn es relevant ist. Im Tab **Gedächtnis** kannst du bearbeiten, anheften oder archivieren, was falsch oder veraltet ist.",
+        ],
+      },
+      {
+        id: "permissions",
+        heading: "Das Gedächtnis gibt keine Berechtigungen",
+        blocks: [
+          "Nichts im Gedächtnis erlaubt einem Agenten mehr. Was er darf, steht weiter unter **Tools und Zugriff**, und heikle Aktionen fragen immer nach einer Freigabe.",
+        ],
+      },
+      {
+        id: "proposals",
+        heading: "Vorgeschlagene Änderungen",
+        blocks: [
+          "Wenn sich eine Lektion wiederholt, kann der Agent vorschlagen, seine eigenen Anweisungen oder den Kontext des Workspace zu ändern. Nichts ändert sich, bevor jemand zustimmt, und der Text lässt sich vorher anpassen. Die vorige Version bleibt im Verlauf. Ein abgelehnter Vorschlag wird als Lektion behalten, damit er nicht noch einmal kommt.",
+        ],
+      },
+    ],
+  },
+  approvals: {
+    title: "Freigaben",
+    summary: "Nichts Heikles passiert ohne einen Menschen.",
+    sections: [
+      {
+        id: "what",
+        heading: "Was vorher fragt",
+        blocks: [
+          "Wenn ein Agent mergen, deployen, zurückrollen, etwas nach außen senden oder Daten löschen will, fragt er vorher, egal welchen Zugriff er hat. Die Anfrage erscheint unter **Freigaben** und im Kanal, mit der genauen Aktion und dem Grund.",
+        ],
+      },
+      {
+        id: "exact",
+        heading: "Eine Freigabe, eine Aktion",
+        blocks: [
+          "Jede Freigabe gilt für genau eine Aktion, mit ihren Werten. Ändert der Agent irgendetwas, muss er erneut fragen.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Wer freigibt",
+        blocks: [
+          "Der Inhaber des Agenten gibt seine Anfragen frei. Bei einem Agenten ohne Inhaber machen das die Admins.",
+        ],
+      },
+      {
+        id: "refusing",
+        heading: "Ablehnen",
+        blocks: ["Sag, warum, wenn du willst: Der Agent liest es, passt seinen Plan an und behält es als Lektion."],
+      },
+      {
+        id: "meetings",
+        heading: "Meetings",
+        blocks: [
+          "Agenten schlagen nur Zeiten vor. Einladungen an Menschen gehen immer über die Person, die gefragt hat.",
+        ],
+      },
+    ],
+  },
+  "who-answers": {
+    title: "Wer auf eine Nachricht antwortet",
+    summary: "Eine Erwähnung wählt den Agenten. Ohne sie wählt agentes.chat für dich, in dieser Reihenfolge.",
+    sections: [
+      {
+        id: "order",
+        heading: "Wie eine Nachricht ihren Agenten findet",
+        blocks: [
+          "Eine Nachricht, die einen Agenten mit @ erwähnt, geht an diesen Agenten. Eine Nachricht ohne Erwähnung wird von der ersten dieser Optionen gelesen, die der Workspace hat:",
+          {
+            list: [
+              "**Jev**, ein kleines, schnelles Modell für genau solche Entscheidungen.",
+              "**Ein kleines Modell über einen der API-Schlüssel des Workspace**, etwa Claude Haiku 5.5 oder GPT-6 Luna.",
+              "**Dein eigenes Claude- oder ChatGPT-Abo**, für die Nachrichten, die du schreibst, auf einem Server, den du selbst betreibst. Es liest sie auf dem Computer, auf dem es angemeldet ist, und braucht ein paar Sekunden.",
+              "**Einfache Regeln**: Eine Antwort an einen Agenten geht an ihn, ebenso eine Nachricht direkt nach eurer Unterhaltung oder eine Nachricht in einem Kanal, in dem du mit nur einem Agenten bist.",
+            ],
+          },
+          "Wenn nichts davon passt, antwortet kein Agent. Erwähne einen Agenten, um ihn zu rufen.",
+        ],
+      },
+      {
+        id: "jev",
+        heading: "Jev",
+        blocks: [
+          "Wenn agentes.chat deinen Workspace hostet, ist Jev inklusive. Auf einem Server, den du selbst betreibst, nutzt es den TypeSafe-Schlüssel des Inhabers, etwa US$ 0,0001 pro Nachricht: [Jev einrichten](/help/jev#setup).",
+        ],
+      },
+      {
+        id: "plans",
+        heading: "Warum dein Abo nur für deine Nachrichten wählt",
+        blocks: [
+          "Claude- und ChatGPT-Abos sind persönlich, deshalb wählt dein Abo nur für die Nachrichten, die du schreibst.",
+        ],
+      },
+      {
+        id: "see",
+        heading: "Sehen, wer gewählt hat",
+        blocks: ["Öffne den Haken unter einer Nachricht. Die letzte Zeile sagt, wer die Agenten gewählt hat."],
+      },
+    ],
+  },
+  jev: {
+    title: "Jev",
+    summary:
+      "Ein schnelles Modell von TypeSafe, das schnelle Entscheidungen für deine Agenten trifft. Auf deinem eigenen Server ist es optional, mit eigenem Schlüssel.",
+    sections: [
+      {
+        id: "what",
+        heading: "Was es tut",
+        blocks: [
+          {
+            list: [
+              "**Wählt, wer antwortet.** Eine Nachricht ohne @-Erwähnung geht in unter einer Sekunde an den richtigen Agenten, auch wenn deine Agenten mit einem Abo denken und du keinen API-Schlüssel hast.",
+              "**Hält das Gedächtnis ordentlich.** Es erkennt eine Wiederholung oder eine neuere Tatsache auch in anderen Worten: Die Wiederholung verschmilzt mit dem, was der Agent wusste, und die neuere Tatsache ersetzt die alte. Einmal am Tag räumt es den Rest auf.",
+              "**Sieht den Bildschirm.** In ihrem Browser und auf ihrem Desktop finden Agenten Buttons und Felder anhand einer Beschreibung, schauen bei kleinen genauer hin und prüfen am Bild des Bildschirms, ob ein Schritt geklappt hat.",
+              "**Liest weniger.** Jede Runde lädt nur die Tools, die der Agent wahrscheinlich braucht, also liest deine KI weniger und kostet weniger.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "without",
+        heading: "Ohne Jev",
+        blocks: [
+          "Alles funktioniert weiter, nur langsamer und weniger sorgfältig.",
+          {
+            list: [
+              "**Wer antwortet:** Ein kleines Modell über einen deiner API-Schlüssel wählt, etwa Claude Haiku 5.5 oder GPT-6 Luna. Ohne Schlüssel wählt das eigene Claude- oder ChatGPT-Abo jeder Person für die Nachrichten, die sie schreibt, in ein paar Sekunden. Sonst erreicht eine Antwort oder Folgenachricht trotzdem ihren Agenten. Erwähne einen Agenten, um ihn zu rufen. [Wie Agenten gewählt werden](/help/who-answers)",
+              "**Gedächtnis:** Wiederholungen in denselben Worten verschmelzen weiter. Wiederholungen und Neuerungen in anderen Worten bleiben getrennt.",
+              "**Bildschirm:** Agenten nutzen die Nummern auf dem Bildschirm und exakte Namen. Aus Bildern wird nichts gelesen.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "setup",
+        heading: "Einrichten",
+        blocks: [
+          {
+            list: [
+              "Öffne https://console.typesafe.ai und melde dich mit Google oder deiner E-Mail-Adresse an. Ein neues Konto entsteht auf demselben Weg.",
+              "Lade in der Konsole Guthaben auf. Jev ist Prepaid.",
+              "Öffne https://console.typesafe.ai/keys, erstelle einen Schlüssel und kopiere ihn sofort.",
+              "Öffne in agentes.chat **Einstellungen\u00a0›\u00a0KI-Konten** und füge ihn unter **Jev** ein. Nur die Person, die diesen Server eingerichtet hat, sieht ihn.",
+            ],
+          },
+          "Auf einem Server, den du mit Docker betreibst, kannst du den Schlüssel stattdessen als `TYPESAFE_API_KEY` in `.env` eintragen. Dieser hat Vorrang vor dem in den Einstellungen.",
+        ],
+      },
+      {
+        id: "cost",
+        heading: "Was es kostet",
+        blocks: [
+          {
+            list: [
+              "US$ 0,042 pro Million Tokens, die Jev liest. Seine Antworten sind kostenlos. Zu wählen, wer antwortet, liest etwa 2.500 Tokens, also etwa US$ 0,0001. Ein Screenshot sind etwa 3.900 Tokens.",
+              "Gekauftes Guthaben gilt 12 Monate. Schalte in der Konsole das automatische Aufladen ein, damit Jev das Guthaben nicht ausgeht.",
+              "**Einstellungen\u00a0›\u00a0KI-Konten** zeigt, wie viele Entscheidungen Jev diesen Monat getroffen hat und was sie gekostet haben.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "data",
+        heading: "Deine Daten",
+        blocks: [
+          "Was Jev für eine Entscheidung liest:",
+          {
+            list: [
+              "Name und Beschreibung des Kanals, die Nachricht und die paar davor",
+              "Namen und Rollen deiner Agenten, den Anfang ihrer Anweisungen und die Tools, die sie nutzen können",
+              "Die Gedächtniseinträge, die es vergleicht",
+              "Die Aufgabe eines Agenten und den Anfang seiner Tool-Ergebnisse",
+              "Das Ziel einer Mission und die Befehle, die ein Agent dafür ausführen will",
+              "Die Tools, die eine verbundene App anbietet",
+              "Die Seite oder den Bildschirm, den ein Agent gerade nutzt, Screenshots eingeschlossen",
+            ],
+          },
+          "TypeSafe betreibt Jev in den USA und trainiert seine Modelle nicht mit dem, was du sendest. Daten werden so lange aufbewahrt, wie es für den Dienst nötig ist. Null Aufbewahrung gibt es in den Enterprise-Tarifen.",
+          "Die Datenschutzerklärung von TypeSafe: https://typesafe.ai/legal/privacy-policy. Der Auftragsverarbeitungsvertrag: https://typesafe.ai/legal/data-processing.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "Wenn es stoppt",
+        blocks: [
+          {
+            list: [
+              "**Schlüssel nicht akzeptiert:** Erstelle einen neuen Schlüssel und füge ihn unter **Einstellungen\u00a0›\u00a0KI-Konten** ein.",
+              "**Kein Guthaben mehr:** Lade in der Konsole Guthaben auf. Jev versucht es innerhalb von 30 Minuten erneut, oder klick auf **Erneut prüfen**.",
+              "**Ausgelastet oder nicht erreichbar:** TypeSafe kann Anfragen pro Sekunde begrenzen oder eine Weile nicht antworten. Jev macht von selbst weiter. Deine Limits: https://console.typesafe.ai/rate-limits. Für höhere schreib an sales@typesafe.ai.",
+            ],
+          },
+          "In der Zwischenzeit arbeiten Agenten wie unter [Ohne Jev](/help/jev#without).",
+        ],
+      },
+    ],
+  },
+  "apps-de-ia": {
+    title: "KI-Apps",
+    summary:
+      "Gib den Agenten von agentes.chat Aufgaben aus Claude, Cursor oder einer anderen MCP-App, ohne sie zu verlassen, und bekomm die Antwort direkt dort.",
+    sections: [
+      {
+        id: "what",
+        heading: "So funktioniert es",
+        blocks: [
+          "agentes.chat ist ein MCP-Server. Du fügst seine Adresse in deine KI-App ein, meldest dich mit deinem Konto an und wählst einen Workspace. Ab dann kann die App Agenten und Kanäle auflisten, in deinem Namen einem Agenten eine Aufgabe schicken, auf die Antwort warten und letzte Aufgaben lesen.",
+          "Zum Beispiel mitten in einer Szene in Unity oder Blender fragst du Claude: „Bitte den Marketing-Agenten um einen Text zum Launch“. Die Nachricht erscheint in agentes.chat als deine, markiert mit **über Claude**, und die Antwort des Agenten kommt zurück zu Claude.",
+          "Die Adresse steht unter **Einstellungen\u00a0›\u00a0KI-Apps**. Sie endet auf `/mcp`.",
+        ],
+      },
+      {
+        id: "connect",
+        heading: "Eine App verbinden",
+        blocks: [
+          {
+            list: [
+              "**Claude** (claude.ai, Claude Desktop und Handy): Klick unter **Customize\u00a0›\u00a0Connectors** auf **+ Add**, dann auf **Add custom connector**, nenne ihn agentes.chat, füge die Adresse ein und klick auf **Continue**. Wähle **Sign in now**, klick auf **Add** und autorisiere. In den Team- und Enterprise-Abos fügt der Owner der Claude-Organisation den Konnektor unter Organization settings\u00a0›\u00a0Connectors hinzu, und jede Person klickt unter Customize\u00a0›\u00a0Connectors auf **Connect**. Das kostenlose Claude-Abo bietet Platz für einen eigenen Konnektor.",
+              "**Claude Code:** Führe `claude mcp add --transport http --scope user agentes <address>` aus, tippe dann `/mcp`, wähle agentes und **Authenticate**. Nur für den aktuellen Ordner lässt du `--scope user` weg.",
+              "**Cursor:** **Zu Cursor hinzufügen** unter **Einstellungen\u00a0›\u00a0KI-Apps** oder die Adresse in `~/.cursor/mcp.json`. Cursor bittet dich bei der ersten Nutzung, dich anzumelden.",
+              '**VS Code:** **Zu VS Code hinzufügen** oder die Adresse in `.vscode/mcp.json` mit `"type": "http"`.',
+            ],
+          },
+          "Bei der Anmeldung zeigt agentes.chat, welche App Zugriff möchte und wohin sie zurückkehrt. Mach nur weiter, wenn du die Verbindung gerade selbst gestartet hast.",
+        ],
+      },
+      {
+        id: "tools",
+        heading: "Was die App kann",
+        blocks: [
+          {
+            list: [
+              "`send_to_agent`: schickt eine Nachricht von dir an einen Agenten, in eurer privaten Unterhaltung oder in einem Kanal, und wartet auf die Antwort. Nur mit dem Zugriff **Lesen und Agenten Aufgaben schicken**.",
+              "`wait_for_reply`: wartet weiter auf die Antwort zu einer Aufgabe.",
+              "`list_agents`: die Agenten, die du siehst.",
+              "`list_channels`: die Kanäle, die du liest.",
+              "`read_conversation`: letzte Nachrichten eines Kanals, eines Threads oder einer Aufgabe.",
+              "`list_recent_tasks`: die Aufgaben, die du aus Apps geschickt hast, und was Agenten gerade tun.",
+            ],
+          },
+          "Die App handelt in deinem Namen und sieht nur, was du siehst. Sie gibt nie Aktionen von Agenten frei: Wenn ein Agent anhält, um eine Freigabe zu erbitten, sagt die Antwort das mit einem Link, und ein Mensch entscheidet in agentes.chat. Einstellungen, Mitglieder oder Berechtigungen ändert sie auch nicht.",
+        ],
+      },
+      {
+        id: "workspace",
+        heading: "Ein Workspace pro Verbindung",
+        blocks: [
+          "Jede Verbindung gilt für den Workspace, der bei der Anmeldung gewählt wurde. Für einen anderen Workspace verbindest du die App erneut und wählst den anderen.",
+          "Unter **Einstellungen\u00a0›\u00a0KI-Apps** siehst du die verbundenen Apps und wann jede zuletzt genutzt wurde, und du kannst jede davon trennen. Wer Mitglieder verwaltet, sieht die Apps des ganzen Workspace und kann sie ebenfalls trennen. Jede Nachricht, die aus einer App gesendet wird, erscheint im Audit.",
+        ],
+      },
+      {
+        id: "tokens",
+        heading: "Persönliche Tokens",
+        blocks: [
+          "Für Skripte und Apps ohne OAuth-Anmeldung erstellst du unter **Einstellungen\u00a0›\u00a0KI-Apps** ein persönliches Token und sendest es im Header `Authorization: Bearer`. Das Token wird einmal angezeigt, funktioniert nur in dem Workspace, in dem es erstellt wurde, und kann nach 30 Tagen, 90 Tagen, 1 Jahr oder nie ablaufen.",
+          "Auf einem Server ohne https, von einem anderen Computer aus, nutze ein persönliches Token: Die OAuth-Anmeldung braucht https.",
+        ],
+      },
+      {
+        id: "limits",
+        heading: "Limits",
+        blocks: [
+          {
+            list: [
+              "Bis zu 120 Anfragen pro Minute und 5.000 pro Tag und Verbindung.",
+              "Bis zu 20 Nachrichten pro Minute und 500 pro Tag und Person in jedem Workspace.",
+              "Ein Warten dauert bis zu 45 Sekunden. Arbeitet der Agent noch, wartet die App erneut.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "safety",
+        heading: "Text von anderen",
+        blocks: [
+          "Antworten enthalten Text, den Agenten und Menschen in agentes.chat geschrieben haben. Die App bekommt diesen Text als Inhalt markiert, nicht als Anweisungen, aber ein Text kann trotzdem versuchen, die App zu etwas anderem zu überreden. Prüfe, was deine App gleich tun will, bevor du bestätigst.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "Wenn die Verbindung nicht klappt",
+        blocks: [
+          {
+            list: [
+              "**Anfrage abgelaufen:** Die Anmeldeseite gilt 30 Minuten und funktioniert einmal. Geh zurück in die App und verbinde erneut.",
+              "**Die App will eine neue Anmeldung:** Die Verbindung wurde getrennt, das Passwort geändert oder du hast den Workspace verlassen. Melde dich aus der App erneut an.",
+              "**Cursor hängt an einer alten Anmeldung:** Beende Cursor, lösche den Ordner `~/.mcp-auth` und verbinde erneut.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};

@@ -1,4 +1,4 @@
-import { keys, useAiAccounts } from "@agenteschat/client";
+import { keys, useAiAccounts, useSetShowActivity } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { browserTimezone, isTimeZone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
@@ -16,6 +16,7 @@ import {
   PlanMeter,
   ProviderLogo,
   Segmented,
+  Switch,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -28,7 +29,7 @@ import { useOrg } from "@/components/org-context";
 import { MyFace, ProfilePhotoDialog } from "@/components/ProfilePhoto";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
-import { type LocaleCode, locales, setLocale } from "@/i18n";
+import { localePatch, rememberLocale } from "@/i18n";
 import { type MenuLook, menuLook, onMenuLookChange, setMenuLook } from "@/lib/context-menu";
 import { inDesktopApp } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
@@ -36,9 +37,10 @@ import { ownPlanLines, planMeterText } from "@/lib/plan-usage";
 import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
+import { LanguageSelect } from "./LanguageSelect";
 
 /**
- * Configurações › Sua conta: your profile in this workspace, your time zone, opening the phone app and a password
+ * Configurações › Sua conta: your profile in this workspace, your time zone, whether agents' work shows under their replies, opening the phone app and a password
  * for an account without one, your plans' limits (ADR 0063 §5), then what this device keeps for itself (theme,
  * language, sounds, the desktop app's menus), and last, deleting the account.
  */
@@ -48,11 +50,9 @@ export function AccountSection() {
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const api = useApi();
-  const language = useMutation({
-    mutationFn: (locale: LocaleCode) => api.account.updateMe({ locale }),
-    onSuccess: (_data, locale) => setLocale(locale, i18n),
-  });
   const plans = ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id);
+  const showActivity = useSetShowActivity(org.id);
+  const toast = useToast();
   // Looking at your plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
@@ -84,6 +84,22 @@ export function AccountSection() {
             label={t("shell.timezone")}
             help={zoneDisplayName(zone, i18n.language) ?? timezoneName(zone, i18n.language)}
             onOpen={() => setProfile("timezone")}
+          />
+          <PrefRow
+            id="account-activity"
+            icon="layers"
+            label={t("settings.account.activity")}
+            help={t("settings.account.activityHelp")}
+            control={
+              <Switch
+                checked={org.showActivity === true}
+                onCheckedChange={(on) =>
+                  showActivity.mutate(on, { onError: () => toast.show(t("settings.account.activityFailed")) })
+                }
+                aria-label={t("settings.account.activity")}
+                aria-describedby="account-activity-help"
+              />
+            }
           />
           <PrefRow
             id="account-phone"
@@ -148,13 +164,12 @@ export function AccountSection() {
             icon="globe"
             label={t("shell.language")}
             control={
-              <Segmented
-                size="sm"
-                label={t("shell.language")}
-                value={i18n.language}
-                disabled={language.isPending}
-                onValueChange={(v) => language.mutate(v as LocaleCode)}
-                options={locales.map((l) => ({ value: l.code, label: l.label }))}
+              <LanguageSelect
+                signedIn
+                align="end"
+                onPick={(choice) =>
+                  void api.account.updateMe(localePatch(choice)).catch(() => rememberLocale(choice, true))
+                }
               />
             }
           />

@@ -70,6 +70,7 @@ function AppStack() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[channelId]" options={pushed} />
       <Stack.Screen name="consultation/[id]" options={pushed} />
+      <Stack.Screen name="block/[id]" options={pushed} />
       <Stack.Screen name="conversations/[kind]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-new" options={{ ...pushed, ...scrollUnder }} />
@@ -129,6 +130,7 @@ function AppStack() {
       <Stack.Screen name="suggest-person" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/notifications" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/start" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/activity" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
@@ -149,6 +151,7 @@ function AppStack() {
       <Stack.Screen name="settings/computers/agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/audit/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/audit/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/apps" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/media" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
@@ -175,6 +178,10 @@ function AppStack() {
       />
       <Stack.Screen
         name="computer/[agentId]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
+      <Stack.Screen
+        name="browser-profile/[profileId]"
         options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
       />
     </Stack>

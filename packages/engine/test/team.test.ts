@@ -11,6 +11,7 @@ import {
   enableCaches,
   insertMessage,
   type MachineStatus,
+  NO_PERSON,
   postPersonMessage,
   rosterScopeNames,
   summarizeScopes,
@@ -44,8 +45,11 @@ test("a big team is only a count with a pointer to find_agent", () => {
     ownerUserId: null,
     audienceMode: "everyone" as const,
     audienceUserIds: [],
+    audienceRoleIds: [],
+    consultable: true,
+    brain: "model",
   }));
-  const text = teamPrompt(team, "a0", null, new Set());
+  const text = teamPrompt(team, "a0", null, new Set(), NO_PERSON);
   expect(text).toContain("19 other agents work in this organization.");
   expect(text).not.toContain("@a1");
   // Who to ask and who to hand work to, and that what comes of either comes back by itself (ADR 0095).
@@ -70,7 +74,7 @@ test("an agent knows the org's other agents it can work with, even outside its c
   const hidden = await addAgent("Secret", "secret", "Finance");
   await f.db
     .update(schema.agents)
-    .set({ audienceMode: "owner", ownerUserId: null })
+    .set({ audienceMode: "owner", ownerUserId: null, consultable: false })
     .where(eq(schema.agents.id, hidden.id));
 
   await post("@dev oi");

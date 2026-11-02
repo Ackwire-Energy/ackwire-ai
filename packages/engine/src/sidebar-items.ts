@@ -95,6 +95,64 @@ export async function setMySidebarItems(
 ): Promise<SidebarItems> {
   await requirePermission(db, userId, orgId, "read");
   const clean = sidebarItemsOf(items);
-  await db.update(organizationMembers).set({ sidebarItems: clean }).where(mine(orgId, userId));
+  const column = organizationMembers.sidebarItems;
+  // The section order shares the row (`setMySidebarOrder`) and stays as it was.
+  await db
+    .update(organizationMembers)
+    .set({
+      sidebarItems: sql`${JSON.stringify(clean)}::jsonb || jsonb_strip_nulls(jsonb_build_object('order', ${column} -> 'order'))`,
+    })
+    .where(mine(orgId, userId));
   return clean;
+}
+
+/**
+ * The sidebar's sections in the person's order (`order` in the same `sidebar_items` row, beside the tools' places):
+ * the tools on top, the channels (with their categories), the agents (with their groups), the direct messages.
+ * Mirrors `SIDEBAR_SECTIONS` in packages/client/src/lib/sidebar-items.ts.
+ */
+export const SIDEBAR_SECTIONS = ["tools", "channels", "agents", "people"] as const;
+export type SidebarSection = (typeof SIDEBAR_SECTIONS)[number];
+const ORDER_KEY = "order";
+
+/** Every section exactly once, else the default: a stored order is never trusted as is. */
+export function sidebarOrderOf(raw: unknown): SidebarSection[] {
+  const list = Array.isArray(raw) ? raw : [];
+  const valid =
+    list.length === SIDEBAR_SECTIONS.length && SIDEBAR_SECTIONS.every((s) => list.filter((x) => x === s).length === 1);
+  return valid ? (list as SidebarSection[]) : [...SIDEBAR_SECTIONS];
+}
+
+/** The person's section order in this workspace. */
+export async function mySidebarOrder(db: Database, orgId: string, userId: string): Promise<SidebarSection[]> {
+  await requirePermission(db, userId, orgId, "read");
+  const [row] = await db
+    .select({ items: organizationMembers.sidebarItems })
+    .from(organizationMembers)
+    .where(mine(orgId, userId));
+  return sidebarOrderOf((row?.items as Record<string, unknown> | undefined)?.[ORDER_KEY]);
+}
+
+/** Saves the person's section order in this workspace (`null`: back to the default); the tools' places stay. */
+export async function setMySidebarOrder(
+  db: Database,
+  orgId: string,
+  userId: string,
+  order: readonly string[] | null,
+): Promise<SidebarSection[]> {
+  await requirePermission(db, userId, orgId, "read");
+  if (order !== null && sidebarOrderOf(order).join() !== order.join())
+    throw new ValidationError("the order must list every section once");
+  const items = organizationMembers.sidebarItems;
+  const [row] = await db
+    .update(organizationMembers)
+    .set({
+      sidebarItems:
+        order === null
+          ? sql`${items} - ${ORDER_KEY}::text`
+          : sql`${items} || jsonb_build_object(${ORDER_KEY}::text, ${JSON.stringify(order)}::jsonb)`,
+    })
+    .where(mine(orgId, userId))
+    .returning({ items });
+  return sidebarOrderOf((row?.items as Record<string, unknown> | undefined)?.[ORDER_KEY]);
 }

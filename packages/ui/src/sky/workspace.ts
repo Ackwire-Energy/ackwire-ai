@@ -7,7 +7,7 @@
  * functions in a shader (apps/mobile src/sky/shaders.ts `workspace`). Clouds and stars come from the time alone,
  * so two skies side by side (the title bar's and the sidebar's) show the same ones.
  */
-import { mix, parseColor } from "./math";
+import { bayerAt, mix, parseColor } from "./math";
 
 export type SkyHour = "day" | "dusk";
 
@@ -37,11 +37,21 @@ export function workspaceTones(hour: SkyHour, surface: string): string[] {
   return [surface, ...stops.map((s, i) => mix(surface, s, reach * (0.35 + 0.65 * ((i + 1) / stops.length))))];
 }
 
+/** How much of its ink a faint field's clouds and stars show: a touch in the sky, not shapes on it. */
+const FAINT_INK = 0.55;
+
 /**
  * What is drawn over the field: a cloud's lit top or a bright star, and a cloud's body or a dim star. `faint`:
- * over a faint field (the header's), where white would vanish on a light surface: the sky's own deeper tones.
+ * over a faint field (the header's), where white would vanish on a light surface: the sky's own deeper tones, thinned
+ * toward the surface.
  */
 export function workspaceInk(hour: SkyHour, surface: string, faint = false): { bright: string; dim: string } {
+  const ink = fullInk(hour, surface, faint);
+  if (!faint) return ink;
+  return { bright: mix(surface, ink.bright, FAINT_INK), dim: mix(surface, ink.dim, FAINT_INK) };
+}
+
+function fullInk(hour: SkyHour, surface: string, faint: boolean): { bright: string; dim: string } {
   const dark = isDarkSurface(surface);
   const tones = workspaceTones(hour, surface);
   const deepest = tones[tones.length - 1] ?? surface;
@@ -77,15 +87,19 @@ export function phoneField(u: number, v: number, t: number): number {
   return down * (0.6 + 0.3 * u) + 0.05 * Math.sin(u * 5 + v * 4 + t * 0.5);
 }
 
-/** Where clouds and stars may be, as shares of the sky's box: between `x0` and `x1`, `y0` and `y1`. */
+/**
+ * Where clouds and stars may be, as shares of the sky's box: between `x0` and `x1`, `y0` and `y1`. `fade`: how far in
+ * from `x0` and `x1` a cloud dissolves, where the area ends in open sky and a straight cut would show.
+ */
 export interface SkyArea {
   x0: number;
   x1: number;
   y0: number;
   y1: number;
+  fade?: number;
 }
 /** In the title bar's band, past the back and forward buttons, short of the sidebar's edge (none over the name). */
-export const HEADER_AREA: SkyArea = { x0: 0.6, x1: 0.88, y0: 0.04, y1: 0.3 };
+export const HEADER_AREA: SkyArea = { x0: 0.6, x1: 0.88, y0: 0.04, y1: 0.3, fade: 0.08 };
 /** Above Conversas' title, on the right. */
 export const PHONE_AREA: SkyArea = { x0: 0.5, x1: 1, y0: 0.05, y1: 0.42 };
 
@@ -142,6 +156,8 @@ export function cloudOrigin(i: number, w: number, h: number, t: number, area: Sk
 export function cloudAt(x: number, y: number, w: number, h: number, t: number, area: SkyArea): 0 | 1 | 2 {
   // Only inside the area: never over the name, never at the sidebar's edge.
   if (x < w * area.x0 || x >= w * area.x1) return 0;
+  // Near those edges, cell by cell in the sky's own dither, so a cloud comes and goes without a straight cut.
+  if (area.fade && Math.min(x - w * area.x0, w * area.x1 - x) / (w * area.fade) <= bayerAt(x, y)) return 0;
   for (let i = 0; i < CLOUDS.length; i++) {
     const cloud = CLOUDS[i] as (typeof CLOUDS)[number];
     const [cx, cy] = cloudOrigin(i, w, h, t, area);

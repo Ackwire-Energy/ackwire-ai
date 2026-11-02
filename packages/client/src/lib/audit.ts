@@ -3,6 +3,7 @@ import type { AuditQuery, AuditRow } from "../api/types";
 import { toolActivity } from "./activity";
 import { billingHoldOf } from "./billing";
 import { reviewFlaggedOf } from "./errors";
+import { lowerFirst } from "./format";
 import { stepLabel } from "./work";
 
 /*
@@ -39,7 +40,6 @@ export function auditReason(t: TFunction, row: AuditRow): string | null {
   const flagged = reviewFlaggedOf(reason);
   return flagged ? t(`standing.cloud.reviewWhat.${flagged}`) : reason;
 }
-const lowerFirst = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
 
 /** Who did it, by name; null for the system (its sentence stands alone). */
 export function auditActorName(t: TFunction, row: AuditRow): string | null {
@@ -72,6 +72,14 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
     const what = (["joined", "left", "role_changed"] as const).find((s) => s === rest);
     if (what) return t(`audit.change.member.${what}`);
   }
+  // AI apps (ADR 0119): the app's or the token's name, as it was shown when it happened.
+  if (area === "apps") {
+    const what = (
+      ["connected", "scopes_changed", "disconnected", "token_created", "token_revoked", "message_sent"] as const
+    ).find((s) => s === rest);
+    const app = auditStr(row.details.app) ?? auditStr(row.details.client);
+    if (what && app) return t(`audit.change.apps.${what}`, { app });
+  }
   const last = (rest.split("_").at(-1) ?? "").replace("cancelled", "canceled");
   const verb = VERBS.find((v) => v === last) ?? "other";
   const where = AREAS.find((a) => a === area) ?? "other";
@@ -82,10 +90,10 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
 }
 
 /** The sentence in two parts, so the name can be drawn bold: `name` null for the system. */
-export function auditSentence(t: TFunction, row: AuditRow): { name: string | null; text: string } {
+export function auditSentence(t: TFunction, row: AuditRow, locale: string): { name: string | null; text: string } {
   const name = auditActorName(t, row);
   const text = auditPhrase(t, row);
-  return { name, text: name ? lowerFirst(text) : text };
+  return { name, text: name ? lowerFirst(text, locale) : text };
 }
 
 /** A change's action is `area.what_happened`: its last word is the verb ("page_created" → created). */

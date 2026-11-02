@@ -25,7 +25,7 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
-import { joinNames, NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
+import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { isFeminineName } from "@agenteschat/client/lib/grammar";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
@@ -494,12 +494,9 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         target = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
         setCreated(target);
         await api.orgs.updateSettings(target.orgId, { timezone: zone });
-        // The person's own zone and language, detected here: agents read the local time from it.
+        // The person's own zone, detected here: agents read the local time from it (the language is `useServerLocale`'s).
         const mine = browserTimezone();
-        await Promise.all([
-          mine ? api.orgs.updateMe(target.orgId, { timezone: mine }) : null,
-          api.account.updateMe({ locale: i18n.language.startsWith("en") ? "en" : "pt-BR" }),
-        ]).catch(() => undefined);
+        if (mine) await api.orgs.updateMe(target.orgId, { timezone: mine }).catch(() => undefined);
         // The platform key is only offered where the server has one (Cloud).
         const available = await api.agents.platformKeyAvailable(target.orgId).catch(() => false);
         setPlatform(available);
@@ -1254,8 +1251,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
           ? {
               title: hostsTeam.length
                 ? t("onboarding.computer.payment.title", {
-                    names:
-                      hostsTeam.length > besideHost ? namesText(t, hostsTeam, besideHost) : joinNames(hostsTeam, ", "),
+                    names: hostsTeam.length > besideHost ? namesText(t, hostsTeam, besideHost) : hostsTeam.join(", "),
                   })
                 : t("onboarding.computer.payment.titleAlone"),
               lead: t("onboarding.computer.payment.lead"),

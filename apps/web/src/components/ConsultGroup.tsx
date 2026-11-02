@@ -27,7 +27,7 @@ import type { TFunction } from "i18next";
 import { createContext, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageBody } from "@/chat/MessageBody";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, withAgentFace, withAgentFaces } from "@/components/AgentAvatar";
 import { useChannelActions } from "@/components/channel-actions";
 import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
@@ -116,7 +116,7 @@ export const consultLineLabel = (
   state: ConsultLineState,
   c: RunConsultation,
   to: ReturnType<typeof agentGrammar>,
-) => t(consultLineKey(state, c), { name: to.name, The: to.The });
+) => t(consultLineKey(state, c), { name: to.name, context: to.context });
 
 /**
  * The questions the agent asked other agents in this turn (`ask_agent`) and the work it handed them (`tell_agent`),
@@ -151,10 +151,10 @@ export function ConsultGroup({
   if (!group || group.length === 0) return null;
   const summary = consultGroupSummary(group, now);
   const words = consultGroupKeys(group);
-  const from = agentGrammar(t, dir.agentById.get(askerId)?.name ?? t("channel.unknownAgent"));
+  const from = agentGrammar(dir.agentById.get(askerId)?.name ?? t("channel.unknownAgent"));
   const items: ToolBlockItem[] = group.map((c) => {
     const state = consultLineState(c, now);
-    const to = agentGrammar(t, dir.agentById.get(c.consultedAgentId)?.name ?? t("channel.unknownAgent"));
+    const to = agentGrammar(dir.agentById.get(c.consultedAgentId)?.name ?? t("channel.unknownAgent"));
     const answer = state === "answered" ? (c.answer ?? "") : null;
     const progress = consultProgress(c);
     return {
@@ -179,13 +179,13 @@ export function ConsultGroup({
         // The consultation card's words and type (prose, never the tools' mono): the question, the answer, who saw it.
         detail: openConsultation ? undefined : (
           <div className="ac-consult__body ac-consult__body--inline">
-            <small>{t(consultAskedKey(c), { name: from.name })}</small>
+            <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
             <div className="ac-consult__text ac-consult__text--q">
               <MessageBody body={c.question} resolveMention={dir.mentionName} />
             </div>
             {answer !== null && (
               <>
-                <small>{t("chat.consultation.answerOf", { name: to.name, of: to.of })}</small>
+                <small>{t("chat.consultation.answerOf", { name: to.name, context: to.context })}</small>
                 <div className="ac-consult__text">
                   <MessageBody body={answer} resolveMention={dir.mentionName} />
                 </div>
@@ -195,9 +195,7 @@ export function ConsultGroup({
               <Icon name="eyeOff" size={14} />
               {t("chat.consultation.private", {
                 from: from.name,
-                articleFrom: from.article,
                 to: to.name,
-                articleTo: to.article,
               })}
             </p>
           </div>
@@ -229,7 +227,7 @@ export function ConsultGroup({
       }}
       items={items}
       color={color}
-      label={t(words.label, { name: from.name, of: from.of })}
+      label={t(words.label, { name: from.name, context: from.context })}
       defaultOpen={summary.open || asked !== null}
       // One question: its own line ("Atlas respondeu"), with no "Perguntou a 1 colega" to open.
       one={group.length === 1}
@@ -255,13 +253,17 @@ export function ConsultAnswerLine({
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
   const c = fold.consultation;
-  const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
+  const from = agentGrammar(dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
   const to = dir.agentById.get(c.consultedAgentId)?.name ?? t("channel.unknownAgent");
   return (
     <div className="cn-line ac-iconline" data-message-id={message.id}>
       <Icon name="agent" size={14} />
       <span className="cn-line__text">
-        {t(consultFarKey(c), { to, from: from.name, of: from.of })} · {formatTime(i18n.language, message.createdAt)}
+        {withAgentFaces(t(consultFarKey(c), { to, from: from.name, context: from.context }), [
+          { name: to, agentId: c.consultedAgentId },
+          { name: from.name, agentId: c.agentId },
+        ])}{" "}
+        · {formatTime(i18n.language, message.createdAt)}
         {" · "}
         <button
           type="button"
@@ -292,10 +294,10 @@ export function ConsultHelpingTag({ consultation: c }: { consultation: RunConsul
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
-  const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
+  const from = agentGrammar(dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
   return (
     <span className="msg-reminder msg-talker">
-      {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+      {withAgentFace(t("chat.consultPanel.helping", { name: from.name, context: from.context }), from.name, c.agentId)}
       {actions?.openConsultation && (
         <>
           <span aria-hidden="true">·</span>

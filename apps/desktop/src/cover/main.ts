@@ -28,8 +28,7 @@ import {
 } from "../control/local-server";
 import { platformOf } from "../control/platform";
 import { SITE_URL } from "../control/version";
-import { DESKTOP_STRINGS, systemLocale } from "../i18n";
-import type { DesktopTranslations } from "../i18n/keys.pt-BR";
+import { desktopStrings, systemLocale } from "../i18n";
 import { elapsedClock, fillIn } from "../ui/time";
 
 /** How long the cover waits before it asks whether the site can be reached, and how often after. */
@@ -37,7 +36,7 @@ const CHECK_MS = 3000;
 /** Reachable but never said it painted (an older site): the cover steps aside after this. */
 const GIVE_UP_MS = 15_000;
 
-const strings = DESKTOP_STRINGS[systemLocale()] as DesktopTranslations;
+const strings = desktopStrings(systemLocale());
 const words = strings.cover;
 const platform = platformOf(navigator.userAgent);
 const device = strings.device[platform];

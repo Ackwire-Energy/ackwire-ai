@@ -43,6 +43,7 @@ import {
   MAX_COMPUTER_DROPS,
   type MachineStatus,
   notePlanLimit,
+  openDm,
   postPersonMessage,
   recoverStaleRuns,
   resolveBrain,
@@ -2438,4 +2439,244 @@ test("a run that waited for its computer reads its teammates as they are when it
   const thisTurn = (seen[0] as BrainTurn & { thisTurn?: string }).thisTurn ?? "";
   expect(thisTurn).toContain("## Your teammates now\n- @rui: has an AI, answers when called\n");
   expect(thisTurn).not.toContain("no AI connected yet");
+});
+
+/** Opens once, from outside the turn. */
+function opening<T = void>() {
+  let open!: (v: T) => void;
+  const promise = new Promise<T>((r) => {
+    open = r;
+  });
+  return { promise, open };
+}
+
+/**
+ * A computer brain whose first turn goes to the background through the bridge (`work_in_background`), then holds
+ * until `finish`. `live`: it takes messages mid-turn (Claude Code, Codex app-server); without it, like Cursor or
+ * `codex exec`, it reads them at its turn's end.
+ */
+function backgroundBrain(live: boolean) {
+  const seen: BrainTurn[] = [];
+  const handed: string[] = [];
+  const moved = opening();
+  const finish = opening();
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn, io) {
+      const n = seen.length;
+      seen.push({ ...turn, system: "", messages: [] });
+      if (n > 0) {
+        yield { type: "done", text: "Migração pronta: 3 tabelas conferidas." };
+        return;
+      }
+      if (live)
+        io.steerable?.(async (messages) => {
+          handed.push(...messages.map((m) => m.text));
+          return { status: "accepted", accepted: messages.map((m) => m.uuid) };
+        });
+      try {
+        const result = await io.executeTool?.({
+          id: "w1",
+          name: "work_in_background",
+          input: { title: "Migrar a cobrança", say: "Vou cuidar disso em segundo plano." },
+        });
+        yield {
+          type: "tool_call",
+          id: "w1",
+          name: "mcp__agentes__work_in_background",
+          input: {},
+          executed: { content: result?.content ?? "" },
+        };
+        moved.open();
+        await finish.promise;
+        yield { type: "done", text: "Migração pronta: 3 tabelas conferidas." };
+      } finally {
+        if (live) io.steerable?.(null);
+      }
+    },
+  };
+  return { brain, seen, handed, moved, finish };
+}
+
+test("long work on a steerable computer brain: the check-in reaches the turn live, the same session goes on, the conversation gets a new one", async () => {
+  f = await setup({ workTools: true });
+  const fx = f;
+  await computerAgent(fx);
+  const { brain, seen, handed, moved, finish } = backgroundBrain(true);
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(fx, "@dev migra a cobrança");
+  const drained = drainOutbox(fx.db, handlers);
+  await moved.promise;
+  const [work] = await fx.db.select().from(schema.agentWorks);
+  if (!work?.nextUpdateAt) throw new Error("no work");
+  const { checkInWork } = await import("../src/works");
+  const due = new Date(work.nextUpdateAt.getTime() + 1000);
+  expect(
+    await checkInWork({ db: fx.db, pubsub: fx.pubsub }, fx.org.id, { workId: work.id, seq: 0, phase: "nudge" }, due),
+  ).toBe("nudged");
+  // Handed to the turn in flight, like a person's message (ADR 0112).
+  expect(handed.some((h) => h.includes("You promised an update"))).toBe(true);
+  // Meanwhile the conversation is free: a new message starts a run of its own.
+  await post(fx, "@dev quanto é 2+2?");
+  finish.open();
+  await drained;
+  await drainOutbox(fx.db, handlers);
+  const runs = await fx.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
+  expect(runs).toHaveLength(2);
+  expect(runs[0]?.workId).toBe(work.id);
+  expect(runs[1]?.workId).toBeNull();
+  // The work kept its session; the conversation's run never takes it.
+  expect(seen[0]?.session?.id).toBe(runs[0]?.brainSessionId ?? "");
+  expect(runs[1]?.brainSessionId).not.toBe(runs[0]?.brainSessionId);
+  const report = (await timeline(fx)).find((m) => (m.meta?.workEnd as { id?: string } | undefined)?.id === work.id);
+  expect(report?.body).toBe("Migração pronta: 3 tabelas conferidas.");
+});
+
+test("long work on a brain that reads at its turn's end (Cursor, codex exec): the server's line covers the silence, and the unread nudge doesn't turn the report into a thread line", async () => {
+  f = await setup({ workTools: true });
+  const fx = f;
+  await computerAgent(fx);
+  const { brain, seen, moved, finish } = backgroundBrain(false);
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(fx, "@dev migra a cobrança");
+  const drained = drainOutbox(fx.db, handlers);
+  await moved.promise;
+  const [work] = await fx.db.select().from(schema.agentWorks);
+  if (!work?.nextUpdateAt) throw new Error("no work");
+  const { checkInWork, WORK_LIMITS } = await import("../src/works");
+  const deps = { db: fx.db, pubsub: fx.pubsub };
+  const due = new Date(work.nextUpdateAt.getTime() + 1000);
+  expect(await checkInWork(deps, fx.org.id, { workId: work.id, seq: 0, phase: "nudge" }, due)).toBe("nudged");
+  const later = new Date(due.getTime() + WORK_LIMITS.graceMs);
+  expect(await checkInWork(deps, fx.org.id, { workId: work.id, seq: 0, phase: "fallback" }, later)).toBe("posted");
+  finish.open();
+  await drained;
+  await drainOutbox(fx.db, handlers);
+  // The nudge it never read is stale once the turn ends: its text is the report, home, in one turn.
+  expect(seen).toHaveLength(1);
+  const all = await fx.db.select().from(schema.messages);
+  expect(all.filter((m) => (m.meta.workUpdate as { auto?: boolean } | undefined)?.auto)).toHaveLength(1);
+  const report = all.filter((m) => m.body === "Migração pronta: 3 tabelas conferidas.");
+  expect(report).toHaveLength(1);
+  expect(report[0]?.meta.workEnd).toEqual({ id: work.id, status: "done" });
+  expect(report[0]?.threadId).toBeNull();
+  const [done] = await fx.db.select().from(schema.agentWorks);
+  expect(done).toMatchObject({ status: "done", resultMessageId: report[0]?.id });
+});
+
+test("a computer brain's work that waits in line parks at its turn's end instead of ending, and goes on when its turn comes", async () => {
+  f = await setup({ workTools: true });
+  const fx = f;
+  const machineId = await computerAgent(fx);
+  // Three works of this agent already live: the next one waits in line.
+  const busy = [1, 2, 3].map((n) => ({
+    orgId: fx.org.id,
+    agentId: fx.agent.id,
+    channelId: fx.general.id,
+    anchorMessageId: Bun.randomUUIDv7(),
+    ownThread: true,
+    title: `Tarefa ${n}`,
+    status: "live",
+    how: "agent",
+    lastUpdateAt: new Date(),
+  }));
+  const live = await fx.db.insert(schema.agentWorks).values(busy).returning();
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      const result = await executeToolForRun(
+        fx.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+        { id: "w1", name: "work_in_background", input: { title: "Migrar a cobrança", say: "Vou cuidar disso." } },
+      );
+      yield { type: "tool_call", id: "w1", name: "mcp__agentes__work_in_background", input: {}, executed: result };
+      yield { type: "done", text: "Ok, fico na fila." };
+      return;
+    }
+    yield { type: "done", text: "Migração pronta." };
+  });
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(fx, "@dev migra a cobrança");
+  await drainOutbox(fx.db, handlers);
+  const [run] = await fx.db.select().from(schema.agentRuns);
+  const work = (await fx.db.select().from(schema.agentWorks)).find((w) => w.title === "Migrar a cobrança");
+  expect(run?.status).toBe("waiting_input");
+  expect(work).toMatchObject({ status: "queued", finishedAt: null });
+  expect((await fx.db.select().from(schema.messages)).some((m) => m.meta.workEnd)).toBe(false);
+
+  // One of the others ends: it starts, reads that its turn came, and reports home.
+  await fx.db
+    .update(schema.agentWorks)
+    .set({ status: "done", finishedAt: new Date() })
+    .where(eq(schema.agentWorks.id, live[0]?.id ?? ""));
+  const { releaseQueuedWorks } = await import("../src/works");
+  await fx.db.transaction((tx) => releaseQueuedWorks(tx, fx.org.id));
+  await drainOutbox(fx.db, handlers);
+  expect(seen[1]?.trigger).toContain("Your background work's turn came");
+  const report = (await fx.db.select().from(schema.messages)).find((m) => m.meta.workEnd);
+  expect(report).toMatchObject({ body: "Migração pronta.", threadId: null });
+  const [after] = await fx.db
+    .select()
+    .from(schema.agentWorks)
+    .where(eq(schema.agentWorks.id, work?.id ?? ""));
+  expect(after?.status).toBe("done");
+});
+
+test("computer sessions: a conversation run never takes a session an active run or background work shares, even through an earlier finished run", async () => {
+  f = await setup();
+  const fx = f;
+  await computerAgent(fx);
+  const { brain } = scriptedComputerBrain(() => [{ type: "done", text: "ok" }]);
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const dm = await openDm(fx.db, fx.owner.id, fx.org.id, { agentId: fx.agent.id });
+  await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, dm.id, { body: "oi" });
+  await drainOutbox(fx.db, handlers);
+  const [first] = await fx.db.select().from(schema.agentRuns);
+  const [agent] = await fx.db.select().from(schema.agents).where(eq(schema.agents.id, fx.agent.id));
+  if (!first?.brainSessionId || !agent) throw new Error("no session");
+  // A later run picked that session up and is still at it (a flat DM's long job).
+  const holder = { ...first, id: Bun.randomUUIDv7(), status: "running" as const, triggerMessageId: Bun.randomUUIDv7() };
+  await fx.db.insert(schema.agentRuns).values(holder);
+  const next = { ...first, id: Bun.randomUUIDv7(), brainSessionId: null, triggerMessageId: Bun.randomUUIDv7() };
+  await fx.db.insert(schema.agentRuns).values(next);
+  const plan = await resolveBrain({ db: fx.db }, agent, next, dm.id, {});
+  expect(plan.session?.id).not.toBe(first.brainSessionId);
+
+  // It moved to the background and its turn ended: its session is still the work's.
+  const [work] = await fx.db
+    .insert(schema.agentWorks)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: dm.id,
+      anchorMessageId: Bun.randomUUIDv7(),
+      ownThread: true,
+      title: "Relatório",
+      status: "live",
+      how: "agent",
+      lastUpdateAt: new Date(),
+    })
+    .returning();
+  await fx.db
+    .update(schema.agentRuns)
+    .set({ status: "done", workId: work?.id })
+    .where(eq(schema.agentRuns.id, holder.id));
+  const again = { ...next, id: Bun.randomUUIDv7(), triggerMessageId: Bun.randomUUIDv7() };
+  await fx.db.insert(schema.agentRuns).values(again);
+  expect((await resolveBrain({ db: fx.db }, agent, again, dm.id, {})).session?.id).not.toBe(first.brainSessionId);
 });

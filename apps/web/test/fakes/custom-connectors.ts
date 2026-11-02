@@ -10,13 +10,15 @@
  * - PUT    /api/app/organizations/{orgId}/connectors/custom/{id}/tools { label, tools: [{ name, access, label, confirmed? }] }
  *          (`access`: read | write | approval | off; sensitive tools only approval | off)
  * - DELETE /api/app/organizations/{orgId}/connectors/custom/{id}
+ * - GET    /api/app/organizations/{orgId}/connectors/tool-changes → { changes } (seeded with `addToolChange`)
+ * - POST   /api/app/organizations/{orgId}/connectors/{connectionId}/tools/{toolName}/accept-change
  * The mock never talks to the URL: it pretends the server offers a ticket
  * tool set, needs an API key unless the URL contains "oauth", and gains one
  * new tool on the first refresh. Tools come classified as the backend does
  * (annotations, the verb; `close_ticket` is ambiguous: the judge suggests
  * "write" and it waits for a decision; `delete_customer` is sensitive).
  */
-import type { ApiClient, CustomServer, CustomTool, ToolAccess } from "@agenteschat/client";
+import type { ApiClient, CustomServer, CustomTool, ToolAccess, ToolChange } from "@agenteschat/client";
 import { sameServer } from "@agenteschat/client/lib/custom-tools";
 import { partsOf } from "@agenteschat/client/lib/tool-review";
 import { clone, type MockContext, MockNotFoundError, mockId } from "./context";
@@ -67,8 +69,13 @@ export function createMockCustomConnectors(
   log: (method: string, ...args: unknown[]) => void = () => {},
   /** A server's first account connected (the backend gives it to every agent). */
   onConnected: (orgId: string, serverId: string) => Promise<void> = async () => {},
-): ApiClient["customConnectors"] & { rename(orgId: string, id: string, label: string): CustomServer | null } {
+): ApiClient["customConnectors"] & {
+  rename(orgId: string, id: string, label: string): CustomServer | null;
+  /** A server changed an approved tool (ADR 0117): what `toolChanges` lists until it is accepted. */
+  addToolChange(orgId: string, change: ToolChange): void;
+} {
   const byOrg = new Map<string, CustomServer[]>();
+  const changesByOrg = new Map<string, ToolChange[]>();
   const refreshed = new Set<string>();
   const list = (orgId: string) => {
     let l = byOrg.get(orgId);
@@ -151,6 +158,21 @@ export function createMockCustomConnectors(
       }
       s.reviewedAt = ctx.now().toISOString();
       return clone(s);
+    },
+    addToolChange: (orgId, change) => {
+      changesByOrg.set(orgId, [...(changesByOrg.get(orgId) ?? []), change]);
+    },
+    toolChanges: async (orgId) => clone(changesByOrg.get(orgId) ?? []),
+    acceptToolChange: async (orgId, connectionId, toolName) => {
+      log("customConnectors.acceptToolChange", orgId, connectionId, toolName);
+      const list = changesByOrg.get(orgId) ?? [];
+      if (!list.some((c) => c.connectionId === connectionId && c.toolName === toolName)) {
+        throw new MockNotFoundError("No change waits for this tool");
+      }
+      changesByOrg.set(
+        orgId,
+        list.filter((c) => c.connectionId !== connectionId || c.toolName !== toolName),
+      );
     },
     disconnect: async (orgId, id) => {
       log("customConnectors.disconnect", orgId, id);

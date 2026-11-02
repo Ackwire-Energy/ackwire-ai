@@ -7,7 +7,9 @@ import {
   useRoutines,
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
+import { timeLeft } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { restrictionOf } from "@agenteschat/client/lib/notifications";
 import { router, useLocalSearchParams } from "expo-router";
@@ -35,7 +37,7 @@ import { ApprovalWhy } from "../approvals/parts";
 import { notificationHref, routineHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
-import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
+import { agentLook, fuseRemaining } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
@@ -160,7 +162,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
   const kind = t(`mobile.activityNow.kind.${card.kind}`);
-  const minutes = card.expiresAt ? minutesLeft(card.expiresAt, now) : null;
+  const left = card.expiresAt ? timeLeft(t, card.expiresAt, new Date(now)) : null;
   const place = placeOf(n);
   const where = [place ? t("mobile.chats.waitIn", { where: place }) : null, when.short(n.updatedAt)]
     .filter(Boolean)
@@ -213,11 +215,11 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         <ApprovalWhy approval={{ origin: n.latest.origin ?? null, why: n.latest.text ?? null }} name={name} />
       ) : null}
       <View style={styles.ft}>
-        {minutes !== null && card.expiresAt ? (
+        {left !== null && card.expiresAt ? (
           <>
             <Fuse color="amber" remaining={fuseRemaining(n.createdAt, card.expiresAt, now)} style={styles.fuse} />
             <Text variant="caption" numberOfLines={1} style={[styles.when, { color: c.amber }]}>
-              {t("mobile.approval.expiresIn", { count: minutes })}
+              {t("approval.expiresDetail", { time: left })}
             </Text>
           </>
         ) : (
@@ -360,13 +362,15 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })
-    : t(`mobile.activity.kind.${kind}`, {
-        names: NAMES,
-        count: who.total,
-        // `plan_reset_unknown`: the plan's name.
-        plan: n.latest.title ?? "",
-        defaultValue: NAMES,
-      });
+    : n.kind === "app_created"
+      ? appCreatedLine(t, n)
+      : t(`mobile.activity.kind.${kind}`, {
+          names: NAMES,
+          count: who.total,
+          // `plan_reset_unknown`: the plan's name.
+          plan: n.latest.title ?? "",
+          defaultValue: NAMES,
+        });
   const parts = template.split(NAMES);
   const title = parts.join(names);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.

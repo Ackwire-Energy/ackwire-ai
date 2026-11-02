@@ -13,8 +13,10 @@ import {
   agentTmp,
   type RunCommand,
   runSync,
+  scopeOomPolicy,
   systemdBooted,
 } from "./service";
+import { joinShared, SHARED_BIN_ENV, SHARED_LINK, type SharedSpec } from "./shared-folder";
 
 /**
  * System mode: every agent works as its own OS user, `ag-<first 8 of its id>`,
@@ -155,7 +157,17 @@ export class AgentUsers {
   /** Agents already checked by this process, with their user's comment. */
   private readonly ready = new Map<string, { user: AgentUser; comment: string }>();
 
-  constructor(private readonly opts: { home: string; range: [number, number]; run?: RunCommand; etc?: string }) {}
+  constructor(
+    private readonly opts: {
+      home: string;
+      range: [number, number];
+      run?: RunCommand;
+      etc?: string;
+      /** The computer's shared folder (ADR 0115), which every agent's user joins. */
+      shared?: Required<SharedSpec>;
+      log?: (line: string) => void;
+    },
+  ) {}
 
   /**
    * The agent's user, made on its first request. After that, a request only
@@ -197,7 +209,14 @@ export class AgentUsers {
       this.run("usermod", ["--comment", name, user.user]);
       comment = name;
     }
-    if (!known) denySchedulers(user.user, this.opts.etc);
+    if (!known) {
+      denySchedulers(user.user, this.opts.etc);
+      // A computer that can't share still serves the agent, in its own folders.
+      const { shared } = this.opts;
+      for (const p of shared ? joinShared(user.user, agentHome(user.user), shared, this.opts.run) : []) {
+        this.opts.log?.(`${user.user} can't use the shared folder: ${p}`);
+      }
+    }
     this.ready.set(agent.id, { user, comment });
     return user;
   }
@@ -269,11 +288,18 @@ export function denySchedulers(user: string, etc = "/etc") {
  * hold), with its own temporary folders (`AGENT_RAM`, `PRIVATE_TMP`), or with
  * runuser alone where systemd isn't PID 1 (a container). Absolute paths: root
  * never looks these up on a PATH. `--collect`: a scope the OOM killer ended
- * doesn't stay behind as a failed unit. sh, unshare and sh each become the next
- * program (no fork), so runuser still passes SIGTERM on; with slave
- * propagation, what the computer unmounts leaves the agent's namespace too.
+ * doesn't stay behind as a failed unit. `OOMPolicy=continue` (`oomPolicy`): a
+ * process the kernel stops for memory takes only itself, so the command it ran
+ * fails where its caller can tell, and the agent's other work goes on. sh,
+ * unshare and sh each become the next program (no fork), so runuser still
+ * passes SIGTERM on; with slave propagation, what the computer unmounts leaves
+ * the agent's namespace too.
  */
-export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launcher {
+export function systemLauncher(
+  u: AgentUser,
+  systemd = systemdBooted(),
+  oomPolicy = systemd && scopeOomPolicy(),
+): Launcher {
   const home = agentHome(u.user);
   const runuser = ["/usr/sbin/runuser", "-u", u.user, "--"];
   const command = [...networkPrefix(u), ...networkRestrictions(u), ...runuser];
@@ -282,7 +308,9 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
     USER: u.user,
     LOGNAME: u.user,
     SHELL: AGENT_SHELL,
-    PATH: AGENT_PATH,
+    // Last, so a tool an agent put in the shared `bin/` never stands in for the computer's own.
+    PATH: `${AGENT_PATH}:${home}/${SHARED_LINK}/bin`,
+    [SHARED_BIN_ENV]: `${home}/${SHARED_LINK}/bin`,
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: String(adbServerPort(u.uid)),
   };
@@ -293,6 +321,7 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
       "--quiet",
       "--scope",
       "--collect",
+      ...(oomPolicy ? ["--property=OOMPolicy=continue"] : []),
       `--slice=${agentSlice(u.uid)}`,
       "--",
       "/bin/sh",
@@ -363,3 +392,32 @@ export function networkRestrictions(user: AgentUser): string[] {
   validateNetworkMark(user.networkMark);
   return ["/usr/bin/setpriv", "--no-new-privs", "--bounding-set=-net_admin,-net_raw", "--"];
 }
+
+/** Root's shared git cache on a system-mode computer (ADR 0116 §4) and the system user that owns it. */
+export const GIT_CACHE_DIR = "/var/cache/agentes-git";
+export const GIT_CACHE_USER = "agentes-git";
+
+/** The cache's owner, made the first time (a system user nobody signs in as). */
+export function ensureGitCacheUser(run: RunCommand = runSync): { uid: number; gid: number } {
+  const id = (flag: string) => run("id", [flag, GIT_CACHE_USER]);
+  if (id("-u").code !== 0) {
+    run("useradd", [
+      "--system",
+      "--user-group",
+      "--no-create-home",
+      "--home-dir",
+      GIT_CACHE_DIR,
+      "--shell",
+      "/usr/sbin/nologin",
+      GIT_CACHE_USER,
+    ]);
+  }
+  const uid = id("-u");
+  const gid = id("-g");
+  if (uid.code !== 0 || gid.code !== 0) throw new RunnerError("internal", `${GIT_CACHE_USER} couldn't be made`);
+  return { uid: Number(uid.output.trim()), gid: Number(gid.output.trim()) };
+}
+
+/** Lets one agent's uid into one cached repository; false without `setfacl` (the clone then goes without the cache). */
+export const grantGitCache = (dir: string, uid: number, run: RunCommand = runSync) =>
+  run("setfacl", ["-m", `u:${uid}:rx`, dir]).code === 0;

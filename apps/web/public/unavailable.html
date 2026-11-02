@@ -44,7 +44,7 @@ html[data-desktop=mac] .strip{display:block}
 <script>
 // Before the first paint, as index.html does. Mirrors the app's choices: STORAGE_KEYS.theme
 // (apps/web/src/lib/storage.ts), savedLocale (apps/web/src/i18n/index.ts) and appLocale
-// (packages/i18n/src/locale.ts), plus the landing's agentes_locale cookie. index.html's boot box picks the same way.
+// (packages/i18n/src/locale.ts), plus the landing's agentes_locale cookie. index.html's boot box picks the same way, from the same 14 languages.
 (() => {
   const html = document.documentElement;
   const saved = (key) => {
@@ -59,22 +59,22 @@ html[data-desktop=mac] .strip{display:block}
     if (theme !== "light" && theme !== "dark") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     html.dataset.theme = theme;
   } catch {}
-  let lang = saved("agentes.locale");
-  if (lang !== "pt-BR" && lang !== "en") {
-    const cookie = /(?:^|;\s*)agentes_locale=(pt|en)(?![^;])/.exec(document.cookie);
-    lang = cookie ? (cookie[1] === "pt" ? "pt-BR" : "en") : null;
-  }
-  if (!lang) {
+  const CODES = ["en", "pt-BR", "es", "fr", "de", "it", "nl", "ja", "ko", "zh-Hans", "id", "tr", "pl", "ru"];
+  const known = (tag) => {
+    const base = String(tag || "").toLowerCase().replace(/_/g, "-").split("-")[0];
+    const code = base === "pt" ? "pt-BR" : base === "zh" ? "zh-Hans" : base === "in" ? "id" : base;
+    return CODES.includes(code) ? code : null;
+  };
+  const lang = () => {
+    const stored = saved("agentes.locale");
+    if (stored && stored !== "auto" && known(stored)) return known(stored);
+    const cookie = /(?:^|;\s*)agentes_locale=([\w-]+)/.exec(document.cookie);
+    if (stored !== "auto" && cookie && known(cookie[1])) return known(cookie[1]);
     const tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
-    for (const tag of tags) {
-      const t = String(tag || "").toLowerCase();
-      if (t.startsWith("pt") || t.startsWith("en")) {
-        lang = t.startsWith("pt") ? "pt-BR" : "en";
-        break;
-      }
-    }
-  }
-  html.lang = lang || "pt-BR";
+    for (const tag of tags) if (known(tag)) return known(tag);
+    return "en";
+  };
+  html.lang = lang();
   const app = window.__agentesDesktop;
   if (app) html.dataset.desktop = app.platform === "windows" || app.platform === "linux" ? app.platform : "mac";
 })();
@@ -97,17 +97,30 @@ html[data-desktop=mac] .strip{display:block}
 // under /api/ may be a sign-in's one-time return: the server's health stands in for it, so only the load runs it. A
 // redirect is the server's answer, never followed (to the apps' links or another site, fetch would fail).
 (() => {
-  const PT = {
-    title: "O agentes.chat já volta",
-    text: "O servidor não está respondendo agora. Esta página abre sozinha assim que ele voltar.",
-    paid: "Se você acabou de pagar, não precisa pagar de novo.",
-    retry: "Tentar agora",
+  // title, text, paid, retry. The markup is the English.
+  const WORDS = {
+    "pt-BR": ["O agentes.chat já volta", "O servidor não está respondendo agora. Esta página abre sozinha assim que ele voltar.", "Se você acabou de pagar, não precisa pagar de novo.", "Tentar agora"],
+    es: ["agentes.chat vuelve enseguida", "El servidor no responde ahora. Esta página se abre sola en cuanto vuelva.", "Si acabas de pagar, no hace falta pagar de nuevo.", "Intentar ahora"],
+    fr: ["agentes.chat revient tout de suite", "Le serveur ne répond pas pour le moment. Cette page s'ouvre d'elle-même dès qu'il revient.", "Si vous venez de payer, inutile de payer à nouveau.", "Réessayer"],
+    de: ["agentes.chat ist gleich wieder da", "Der Server antwortet gerade nicht. Diese Seite öffnet sich von selbst, sobald er wieder da ist.", "Wenn du gerade bezahlt hast, musst du nicht noch einmal bezahlen.", "Jetzt versuchen"],
+    it: ["agentes.chat torna subito", "Il server non risponde in questo momento. Questa pagina si apre da sola appena torna.", "Se hai appena pagato, non serve pagare di nuovo.", "Riprova ora"],
+    nl: ["agentes.chat is zo terug", "De server reageert nu niet. Deze pagina opent vanzelf zodra hij terug is.", "Heb je net betaald? Dan hoef je niet opnieuw te betalen.", "Nu proberen"],
+    ja: ["agentes.chat はまもなく戻ります", "サーバーが現在応答していません。復旧するとこのページは自動で開きます。", "お支払いが済んでいれば、もう一度支払う必要はありません。", "今すぐ試す"],
+    ko: ["agentes.chat가 곧 돌아와요", "지금 서버가 응답하지 않아요. 서버가 돌아오면 이 페이지가 자동으로 열려요.", "방금 결제했다면 다시 결제할 필요 없어요.", "지금 시도"],
+    "zh-Hans": ["agentes.chat 马上回来", "服务器暂时没有响应。服务器恢复后，此页面会自动打开。", "如果你刚刚付过款，无需再次付款。", "立即重试"],
+    id: ["agentes.chat segera kembali", "Server sedang tidak merespons. Halaman ini akan terbuka sendiri begitu server kembali.", "Kalau kamu baru saja membayar, tidak perlu membayar lagi.", "Coba sekarang"],
+    tr: ["agentes.chat birazdan geri dönecek", "Sunucu şu anda yanıt vermiyor. Bu sayfa, sunucu geri döner dönmez kendiliğinden açılır.", "Ödemeyi az önce yaptıysanız tekrar ödemenize gerek yok.", "Şimdi dene"],
+    pl: ["agentes.chat zaraz wróci", "Serwer teraz nie odpowiada. Ta strona otworzy się sama, gdy tylko wróci.", "Jeśli płatność właśnie została zrealizowana, nie trzeba płacić ponownie.", "Spróbuj teraz"],
+    ru: ["agentes.chat скоро вернётся", "Сервер сейчас не отвечает. Эта страница откроется сама, как только он вернётся.", "Если вы только что оплатили, платить ещё раз не нужно.", "Попробовать сейчас"],
   };
   const MISS = [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530];
   const byId = (id) => document.getElementById(id);
-  if (document.documentElement.lang === "pt-BR") {
-    document.title = PT.title;
-    for (const id of ["title", "text", "paid", "retry"]) byId(id).textContent = PT[id];
+  const words = WORDS[document.documentElement.lang];
+  if (words) {
+    document.title = words[0];
+    ["title", "text", "paid", "retry"].forEach((id, i) => {
+      byId(id).textContent = words[i];
+    });
   }
   if (location.pathname === "/done") byId("paid").hidden = false;
   const target = location.pathname === "/unavailable.html" ? "/" : location.pathname + location.search;

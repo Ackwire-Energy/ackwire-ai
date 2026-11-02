@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
+  CAPABILITIES_LIMIT,
   COMPUTER_TOOLS_NOTE,
   describeCapabilities,
   drainOutbox,
@@ -41,6 +42,22 @@ test("capabilities come from the granted tools, grouped, with what needs approva
   const none = describeCapabilities([]);
   expect(none).toContain("You only write messages in this chat");
   expect(none).not.toContain("Download PDF");
+});
+
+test("## Your means comes last, after what needs a person and the connectors not usable yet", () => {
+  const text = describeCapabilities(
+    [
+      { name: "web_search", description: "Search the web.", scope: "" },
+      { name: "github_merge_pr", description: "Merge a pull request.", scope: "github:pr.merge" },
+    ],
+    [{ label: "Linear", reason: "nobody connected it" }],
+  );
+  const means = text.indexOf("## Your means");
+  expect(means).toBeGreaterThan(text.indexOf("Need a person's approval"));
+  expect(means).toBeGreaterThan(text.indexOf("- Linear: nobody connected it"));
+  expect(text.slice(means)).toStartWith("## Your means\n- the web: `web_search`");
+  // Only the limit line follows it.
+  expect(text.slice(means).split("\n").slice(2)).toEqual([CAPABILITIES_LIMIT]);
 });
 
 test("a computer brain's prompt: its own tools are allowed and the limit line counts them", () => {

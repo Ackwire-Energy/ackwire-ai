@@ -72,6 +72,10 @@ export const MachineAccess = z
     tools: z.object({
       claude: z.boolean(),
       codex: z.boolean(),
+      cursor: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Cursor's CLI (protocol 36, ADR 0114); absent = follows `codex`." }),
       commands: z.boolean(),
       browser: z
         .boolean()
@@ -108,6 +112,10 @@ export const Machine = z
     }),
     runnerVersion: z.string(),
     protocol: z.number().int().openapi({ description: "The runner's machine protocol (9+: pause; 10+: access)." }),
+    browserProfiles: z.boolean().openapi({
+      description:
+        "Its runner can hold browser profiles (protocol 34, ADR 0110); `false`: update the computer. A system-mode computer has none at all (`mode`): the apps hide them there.",
+    }),
     execAllowed: z.boolean().openapi({ description: "`false`: started with `--no-exec` (files and uploads only)." }),
     paused: z
       .object({ until: z.string().nullable() })
@@ -150,6 +158,18 @@ export const Machine = z
       .nullable()
       .optional(),
     egress: z.object({ ip: z.string(), country: z.string().optional(), at: z.string() }).nullable().optional(),
+
+    disk: z
+      .object({
+        freeGb: z.number().openapi({ description: "Free GB on the workspace's disk." }),
+        use: z.number().nullable().openapi({ description: "Share of that disk in use, 0 to 1." }),
+        sharedGb: z.number().nullable().openapi({ description: "The shared folder's size in GB (measured hourly)." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Its disk and shared folder (ADR 0115), as its runner last measured them; null unless admin or the person who paired it, or when the runner doesn't say. The shared folder is the `access` folder granted to every agent (`*`).",
+      }),
     canManage: z.boolean().openapi({ description: "This person may rename, delete or reduce its access." }),
     createdAt: z.string(),
   })
@@ -239,7 +259,7 @@ const DeviceCode = z
 
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
-const ComputerBrain = z.enum(["claude_code", "codex"]);
+const ComputerBrain = z.enum(["claude_code", "codex", "cursor"]);
 const Platform = z.string().openapi({
   description: "`mac`, `windows`, `linux`, `other` (the workspace's own computer), or the runner's `os` as reported.",
 });
@@ -444,7 +464,9 @@ export function machineAppRoutes(deps: AppDeps) {
           z
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
-              disableTool: z.enum(["claude", "codex", "commands", "browser", "desktop", "terminal"]).optional(),
+              disableTool: z
+                .enum(["claude", "codex", "cursor", "commands", "browser", "desktop", "terminal"])
+                .optional(),
             })
             .strict(),
         ),

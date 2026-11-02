@@ -76,7 +76,7 @@ describe("the consultation card (meta.consulted)", () => {
     expect(body.textContent).toContain(QUESTION);
     expect(body.textContent).toContain("Resposta do Atlas");
     expect(body.querySelector("strong")?.textContent).toBe("Staging");
-    expect(body.querySelector(".ac-consult__foot")?.textContent).toBe("Conversa só entre a Ada e o Atlas");
+    expect(body.querySelector(".ac-consult__foot")?.textContent).toBe("Conversa só entre Ada e Atlas");
     await act(async () => fireEvent.click(head));
     expect(card.querySelector(".ac-consult__body")).toBeNull();
   });
@@ -98,7 +98,7 @@ describe("the consultation card (meta.consulted)", () => {
     await act(async () => fireEvent.click(head));
     const body = card.querySelector(".ac-consult__body") as HTMLElement;
     expect(body.textContent).toContain(QUESTION);
-    expect(body.textContent).toContain("Sem resposta em 15 min. A Ada respondeu sem ela.");
+    expect(body.textContent).toContain("Sem resposta em 15 min. Ada respondeu sem ela.");
   });
 
   test("failed, and one card per agent asked", async () => {
@@ -190,19 +190,19 @@ describe("an agent that joined on its own (meta.joined)", () => {
 });
 
 describe("the working line while an agent asks another", () => {
-  test("'Ada está perguntando ao Atlas…' with both bodies and a clock → 'Atlas respondeu. Ada está escrevendo…' → the reply", async () => {
+  test("'Ada está perguntando para Atlas…' with both bodies and a clock → 'Atlas respondeu. Ada está escrevendo…' → the reply", async () => {
     const { socket } = await open();
     const run = { threadId: null, runId: "r-ask", agentId: ADA_ID };
     await push(socket, { type: "agent.thinking", ...run });
     await settle();
-    expect(bar()).toBe("Ada está trabalhando…");
+    expect(bar()).toBe("Ada");
     await push(socket, { type: "agent.tool", ...run, tool: "ask_agent" });
     await push(socket, { type: "agent.consulting", ...run, consultedAgentId: ATLAS_ID });
     // The asking run pauses while it waits.
     await push(socket, { type: "agent.idle", ...run });
     await push(socket, { type: "run.finished", ...run, status: "waiting_input" });
     await settle();
-    expect(bar()).toBe("Ada está perguntando ao Atlas…");
+    expect(bar()).toBe("Ada está perguntando para Atlas…");
     expect(typingBar().querySelectorAll(".ac-typing__text b")).toHaveLength(2);
     expect(typingBar().querySelectorAll(".ac-typing__tok .ac-avatar--agent")).toHaveLength(2);
     expect(typingBar().querySelector(".ac-typing__to svg")).not.toBeNull();
@@ -211,7 +211,8 @@ describe("the working line while an agent asks another", () => {
     const clock = typingBar().querySelector(".ac-typing__clock") as HTMLElement;
     expect(clock.className).toContain("ac-num");
     expect(clock.textContent).toMatch(/^\d+:\d\d$/);
-    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    // Both faces open the pill: no pixel orbit beside them.
+    expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
     await push(socket, { type: "agent.consulted", ...run, consultedAgentId: ATLAS_ID, status: "answered" });
     await push(socket, { type: "agent.thinking", ...run });
     await settle();
@@ -220,7 +221,7 @@ describe("the working line while an agent asks another", () => {
     await push(socket, { type: "agent.delta", ...run, seq: 0, text: "O Atlas me passou" });
     await settle();
     // Writing now: the question is over; the card stays on while she works.
-    expect(bar()).toBe("Ada está escrevendo…");
+    expect(bar()).toBe("Ada");
     expect(typingBar().querySelector(".ac-typing__to")).toBeNull();
   });
 
@@ -233,7 +234,10 @@ describe("the working line while an agent asks another", () => {
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(2);
     await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
     await settle();
-    expect(bar()).toBe("Ada está trabalhando…");
+    expect(bar()).toBe("Ada");
+    // Alone, with its row not in the conversation yet: the bar keeps its face until the row shows.
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
+    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(0);
   });
 });

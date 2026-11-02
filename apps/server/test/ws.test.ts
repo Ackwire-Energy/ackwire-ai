@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { orgTopic } from "@agenteschat/adapters";
-import { authorizeSubscription, currentSubscriptions, parseClientFrame } from "../src/realtime/ws";
+import { createLogger } from "../src/logger";
+import {
+  authorizeSubscription,
+  createRealtime,
+  currentSubscriptions,
+  parseClientFrame,
+  type SocketData,
+} from "../src/realtime/ws";
 import {
   browser,
   createTestServer,
@@ -191,6 +198,71 @@ test("a subscribe whose check can't run (the database is away) answers an error 
   again.ws.close();
 });
 
+/** `db` whose queries settle a couple of ms later, on a timer. */
+function answersLater<T extends object>(target: T): T {
+  return new Proxy(target, {
+    get(obj, key) {
+      const value = Reflect.get(obj, key) as unknown;
+      if (typeof value !== "function") return value;
+      if (key === "then") {
+        return (ok: (v: unknown) => void, fail: (e: unknown) => void) =>
+          value.call(
+            obj,
+            (v: unknown) => setTimeout(() => ok(v), 2),
+            (e: unknown) => setTimeout(() => fail(e), 2),
+          );
+      }
+      return (...args: unknown[]) => {
+        const out = value.apply(obj, args) as unknown;
+        return out !== null && typeof out === "object" ? answersLater(out) : out;
+      };
+    },
+  });
+}
+
+test("a channel subscribed while the periodic membership check runs stays subscribed", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  // The same server with the periodic check every few ms, so subscribes keep landing inside its query, and each
+  // query answering a moment later, as over a network (PGlite answers before any frame can come in between).
+  const realtime = createRealtime({
+    db: answersLater(t.db),
+    auth: t.auth,
+    config: t.config,
+    log: createLogger("error"),
+    ...t.adapters,
+    sessionRecheckMs: 5,
+  });
+  const fast = Bun.serve<SocketData>({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: (req, srv) => realtime.fetch(req, srv, (r) => t.app.fetch(r)),
+    websocket: realtime.websocket,
+  });
+  try {
+    const c = connect(`ws://127.0.0.1:${fast.port}/api/ws?orgId=${orgId}`, { origin: ORIGIN, cookie: owner.cookie() });
+    await c.opened;
+    await c.next((f) => f.type === "ready");
+    const answers = () => c.frames.filter((f) => f.channelId === channelId);
+    for (let i = 0; i < 40; i++) {
+      const before = answers().length;
+      c.send({ type: "subscribe", channelId });
+      c.send({ type: "unsubscribe", channelId });
+      const deadline = Date.now() + 5000;
+      while (answers().length < before + 2 && Date.now() < deadline) await Bun.sleep(1);
+    }
+    c.send({ type: "subscribe", channelId });
+    await Bun.sleep(100);
+    // Each subscribe was `subscribed`, each unsubscribe `unsubscribed` (no reason): nothing refused or dropped.
+    expect(answers().filter((f) => f.type === "error" || f.reason)).toEqual([]);
+    expect(answers().at(-1)).toEqual({ type: "subscribed", channelId });
+    c.ws.close();
+  } finally {
+    await Promise.race([fast.stop(true), Bun.sleep(500)]);
+  }
+}, 30_000);
+
 test("end to end: a subscriber sees the message, the streamed deltas and the agent's reply", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
@@ -288,11 +360,38 @@ test("membership changes drop live subscriptions at once (channel, then organiza
   expect(stillHere).toMatchObject({ event: { type: "message.created" } });
   expect(a.frames.some((f) => f.type === "event" && f.channelId === channelId)).toBe(false);
 
-  // Removed from the organization: every subscription ends and the socket closes.
+  // Removed from the organization: the owner reads what it does first (their agents would pass to them), then every
+  // subscription ends, the socket closes, and her app's requests are refused.
+  const preview = await owner(`/api/app/organizations/${orgId}/members/${anaId}/removal`);
+  expect(((await preview.json()) as { heir: { userId: string } }).heir.userId).toBe((await meId(owner)) ?? "");
   expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
   expect(await closed).toBe(4403);
   expect(a.frames).toContainEqual({ type: "unsubscribed", channelId: other.id, reason: "revoked" });
   expect(a.frames).toContainEqual({ type: "error", code: "membership_revoked" });
+  expect((await ana(`/api/app/organizations/${orgId}/channels`)).status).toBe(403);
+  expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}/removal`)).status).toBe(404);
+  const me = (await (await ana("/api/app/me")).json()) as { organizations: { id: string }[] };
+  expect(me.organizations.map((o) => o.id)).not.toContain(orgId);
+});
+
+test("leaving on one's own closes the socket without saying they were taken out", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const { url } = (await (
+    await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+  ).json()) as { url: string };
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  const anaId = (await meId(ana)) ?? "";
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  const closed = new Promise<number>((resolve) => a.ws.addEventListener("close", (e) => resolve(e.code)));
+  expect((await ana(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
+  expect(await closed).toBe(4403);
+  expect(a.frames).toContainEqual({ type: "error", code: "membership_ended" });
+  expect(a.frames).not.toContainEqual({ type: "error", code: "membership_revoked" });
 });
 
 test("a missed revocation event is reconciled from durable membership", async () => {

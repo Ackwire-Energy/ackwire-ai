@@ -72,6 +72,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SidebarItems,
+  SidebarSection,
   SignInOptions,
   StoragePlatform,
   StorageUsage,
@@ -85,6 +86,7 @@ import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
+import { createFakeApps, type FakeApps } from "./fakes/apps";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
 import type { MockContext } from "./fakes/context";
@@ -177,6 +179,8 @@ export interface FakeState {
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
+  /** Agents that think with a person's plan, by person (`orgs.removal`); unset = none. */
+  removalLosesPlan?: Record<string, { id: string; name: string }[]>;
   agents: Agent[];
   /** The workspace's groups of agents (`agentGroups.*`); unset = none. */
   agentGroups?: AgentGroup[];
@@ -350,6 +354,8 @@ export interface FakeState {
   sidebarItems?: SidebarItems;
   /** Make `orgs.setSidebarItem` and `orgs.setSidebarItems` fail with this error. */
   sidebarItemsError?: ApiError;
+  /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
+  sidebarOrder?: SidebarSection[];
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -566,7 +572,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   return {
     me: {
       user: { id: walter.userId, name: walter.name, email: walter.email, image: null },
-      organizations: [{ id: ORG_ID, name: "Acme", role: "owner" }],
+      // On, so the chat tests read the tool blocks; off (the server's default) is tool-activity.test.tsx's.
+      organizations: [{ id: ORG_ID, name: "Acme", role: "owner", showActivity: true }],
     },
     members: [walter, joao],
     agents: [agent(ADA_ID, "Ada", "Dev", "u-joao", 40), agent(ATLAS_ID, "Atlas", "Ops", "u-joao", 20)],
@@ -1005,6 +1012,7 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 
 /** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
 type FakedParts =
+  | "apps"
   | "wiki"
   | "forum"
   | "notifications"
@@ -1172,7 +1180,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
         return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
       },
-      me: async () => state.me && withPermissions(state.me),
+      // A person who picked Portuguese, as the screens' tests read it (`useServerLocale` keeps the app in it).
+      me: async () =>
+        state.me && withPermissions({ ...state.me, user: { locale: "pt-BR", localeAuto: false, ...state.me.user } }),
       updateMe: async (input) => {
         log("account.updateMe", input);
       },
@@ -1388,6 +1398,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         org.start = { page: input.page, channelId: input.page === "channel" ? (input.channelId ?? null) : null };
         return org.start;
       },
+      setShowActivity: async (orgId, show) => {
+        log("orgs.setShowActivity", orgId, show);
+        const org = state.me?.organizations.find((o) => o.id === orgId);
+        if (!org) throw new ApiError(404, "not_found", "Organization not found");
+        org.showActivity = show;
+        return show;
+      },
       sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
       setSidebarItem: async (orgId, item, place) => {
         log("orgs.setSidebarItem", orgId, item, place);
@@ -1403,6 +1420,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (state.sidebarItemsError) throw state.sidebarItemsError;
         state.sidebarItems = structuredClone(items);
         return structuredClone(items);
+      },
+      sidebarOrder: async () => [...(state.sidebarOrder ?? ["tools", "channels", "agents", "people"])],
+      setSidebarOrder: async (orgId, order) => {
+        log("orgs.setSidebarOrder", orgId, order);
+        state.sidebarOrder = order ? [...order] : undefined;
+        return [...(order ?? ["tools", "channels", "agents", "people"])];
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
@@ -1446,7 +1469,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.role = role;
       },
-      removeMember: async (orgId, userId) => log("orgs.removeMember", orgId, userId),
+      removal: async (_orgId, userId) => {
+        const heir = state.members.find((m) => m.userId === state.me?.user.id);
+        return {
+          heir: heir ? { userId: heir.userId, name: heir.name } : null,
+          agents: state.agents.filter((a) => a.ownerUserId === userId).map((a) => ({ id: a.id, name: a.name })),
+          losePlan: state.removalLosesPlan?.[userId] ?? [],
+          computers: [],
+          routines: 0,
+        };
+      },
+      removeMember: async (orgId, userId) => {
+        log("orgs.removeMember", orgId, userId);
+        state.members = state.members.filter((m) => m.userId !== userId);
+        for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
+      },
       invitations: async () => structuredClone(state.invitations),
       invite: async (orgId, input) => {
         log("orgs.invite", orgId, input);
@@ -2018,7 +2055,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const brain = input.brain ?? b.brain;
         const changed = brain !== b.brain;
         // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's alone.
-        const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
+        const row = state.agents.find((a) => a.id === agentId);
+        // "Só algumas pessoas" with nobody picked already answers its owner alone: the server leaves it as it is.
+        const restricted = row?.audience?.mode === "people" && !answersOthers(audienceOf(row), row.ownerUserId);
+        const onlyOwner = restricted || (input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner));
         if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner) && !b.canUsePlans)
           throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
@@ -2037,8 +2077,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         brains.set(agentId, next);
         // Its row, as the server keeps it: onto a plan only its owner, its "who can talk" list kept; on, back to that
         // list, or everyone with none.
-        const row = state.agents.find((a) => a.id === agentId);
-        if (row && (changed || input.onlyOwner !== undefined)) {
+        if (row && !restricted && (changed || input.onlyOwner !== undefined)) {
           const was = audienceOf(row);
           const base: AgentAudience = changed && brain !== "model" ? { mode: "owner", userIds: was.userIds } : was;
           row.audience =
@@ -2652,7 +2691,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { channelId };
       },
-      markRead: async () => {},
+      markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
       reads: async () => [],
     },
     questions: {
@@ -2909,6 +2948,9 @@ export const fakeDatabasesOf = new WeakMap<ApiClient, FakeDatabases>();
 /** The agent browser fake behind each `createFakeApi` client (tests add settings and handoffs with it). */
 export const fakeBrowserOf = new WeakMap<ApiClient, FakeBrowser>();
 
+/** The AI apps fake behind each `createFakeApi` client (tests add consents and connect apps with it). */
+export const fakeAppsOf = new WeakMap<ApiClient, FakeApps>();
+
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
@@ -2921,6 +2963,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       channels: (orgId) => http.chat.channels(orgId),
       members: (orgId) => http.orgs.members(orgId),
       messages: async () => state.messages,
+      dms: async () => state.dms,
     },
   };
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));
@@ -2944,10 +2987,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   );
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const apps = createFakeApps((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const artifacts = createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args }));
   state.drive = artifacts;
   const client: ApiClient = {
     ...http,
+    apps: apps.client,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
     machines: machines.client,
     forum: createFakeForum(ctx, (method, ...args) => state.calls.push({ method, args })),
@@ -3144,6 +3189,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   fakeMailOf.set(client, mail);
   fakeDatabasesOf.set(client, databases);
   fakeBrowserOf.set(client, browser);
+  fakeAppsOf.set(client, apps);
   return client;
 }
 
@@ -3155,6 +3201,7 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     model: null,
     effectiveModel: null,
     fallback: true,
+    extraUsage: true,
     computer: { machineId: "machine_1", name: "MacBook", online: true },
     options: [
       { kind: "model", available: true, experimental: false, models: [], defaultModel: null },

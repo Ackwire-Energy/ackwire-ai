@@ -17,7 +17,7 @@ import {
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { cutText } from "./format";
-import { noticeOn, noticePrefsOf } from "./notice-prefs";
+import { noticeOn, noticePrefsOf, readNoticePrefs } from "./notice-prefs";
 import { requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
 import type { ApprovalOrigin } from "./tools/run-policy";
@@ -71,7 +71,7 @@ export const NOTIFICATION_KINDS = [
   /** A routine waits for its computer (once per outage), ADR 0053. */
   "routine_stalled",
   /**
-   * A routine set to act named an agent its creator can't talk to (`reach.ts`): the agent's owner, once per routine
+   * A routine named an agent its creator can't talk to (`reach.ts`): the agent's owner, once per routine
    * and agent, `source.agentId` the agent, opening the message.
    */
   "agent_unreached",
@@ -111,6 +111,29 @@ export const NOTIFICATION_KINDS = [
    * connectors hears it once that month, `latest.title` the month (`2026-11`) and `latest.calls` the cap.
    */
   "composio_limit",
+  /**
+   * An agent's owner asks for one more browser profile for it (ADR 0110): the people who can grant profiles
+   * (`manage_connectors`), one row per agent, `source.agentId` and its name in `source.label`. Waiting until seen.
+   */
+  "browser_profile_request",
+  /**
+   * A connected MCP server changed the description or input of tools an admin approved (ADR 0117): who manages
+   * connectors, once per change, `source.label` the connection's name and `latest.title` the tools. Agents keep the
+   * approved text until it is accepted in Settings › Conectores, which resolves it. Waiting.
+   */
+  "connector_tool_changed",
+  /**
+   * A computer's workspace disk passed `DISK_WARN_USE` in use (ADR 0115): who configures the workspace hears it once
+   * each time it crosses, `source.machineId` and its name in `source.label`, `latest.diskUse` the share in use and
+   * `latest.diskFreeGb` what is left.
+   */
+  "computer_disk_full",
+  /**
+   * An AI app connected as the person created agents, routines, skills, memories or channels for them (ADR 0119):
+   * one row per connection merging while unread, `latest.title` the app's name and `latest.created` how many of each
+   * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.
+   */
+  "app_created",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -185,6 +208,13 @@ export interface NotificationLatest {
   suggestedBy?: string;
   /** `composio_limit`: the calls a month allows. */
   calls?: number;
+  /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
+  diskUse?: number;
+  diskFreeGb?: number;
+  /** `app_created`: how many of each kind (`agent`, `routine`, `skill`, `memory`, `channel`), summed as rows merge. */
+  created?: Record<string, number>;
+  /** `browser_handoff` still unanswered an hour later (`remindNotifications`): its push says the agent still needs them. */
+  reminder?: boolean;
 }
 
 export interface NotificationView {
@@ -227,6 +257,7 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "join_request",
   // One per approval card: requests joining it update it, read or not (`notifyApproval`).
   "approval",
+  "app_created",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
@@ -289,6 +320,11 @@ export function mergeActors(newest: NotificationActor | null | undefined, before
 
 /** A merge's `latest`: the newest event's, the names the row had kept first (each once, `MAX_NAMES`). */
 function mergeLatest(next: Record<string, unknown>, before: Record<string, unknown>): Record<string, unknown> {
+  if (next.created && before.created) {
+    const sum = { ...(before.created as Record<string, number>) };
+    for (const [kind, n] of Object.entries(next.created as Record<string, number>)) sum[kind] = (sum[kind] ?? 0) + n;
+    return { ...next, created: sum };
+  }
   if (!Array.isArray(next.names) || !Array.isArray(before.names)) return next;
   return { ...next, names: [...new Set([...before.names, ...next.names])].slice(0, MAX_NAMES) };
 }
@@ -509,6 +545,37 @@ export async function retargetNotifications(
       });
   }
   if (done.length) await resolveNotifications(deps, orgId, { groupKey, userIds: done });
+}
+
+/**
+ * A reminder: a group's open notifications come back unread and on top, `latest` patched, and go to the person's
+ * devices once more (`push.send` keyed by `key`, so once per reminder). Rows done meanwhile stay done.
+ */
+export async function remindNotifications(
+  deps: NotificationDeps,
+  orgId: string,
+  groupKey: string,
+  latest: NotificationLatest,
+  key: string,
+): Promise<number> {
+  const now = nowOf(deps);
+  const rows = await deps.db
+    .update(notifications)
+    .set({ readAt: null, updatedAt: now, latest: sql`${notifications.latest} || ${JSON.stringify(latest)}::jsonb` })
+    .where(and(eq(notifications.orgId, orgId), eq(notifications.groupKey, groupKey), isNull(notifications.doneAt)))
+    .returning();
+  for (const row of rows) {
+    const prefs = await readNoticePrefs(deps.db, orgId, row.userId);
+    if (!(row.snoozedUntil && row.snoozedUntil.getTime() > now.getTime()))
+      await publishUserEvent(deps.pubsub, orgId, row.userId, {
+        type: "notification.upserted",
+        notification: notificationView(row),
+        alert: noticeOn(prefs, row.kind, row.waiting),
+      });
+    await publishCounts(deps, orgId, row.userId);
+    await enqueuePush(deps.db, row, now, prefs, `push.send:${row.id}:${key}`).catch(() => false);
+  }
+  return rows.length;
 }
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);

@@ -56,10 +56,10 @@ const lineOf = (t: TFunction, w: Who, routing: AiRouting | undefined) =>
     ? !w.autoReply
       ? t("channelMembers.mentionLine", { handle: w.handle })
       : !picksForMe(routing)
-        ? t(replyAloneKey(routing), agentGrammar(t, w.name))
+        ? t(replyAloneKey(routing), agentGrammar(w.name))
         : w.coordinator
           ? t("channelMembers.coordinatorLine")
-          : t("channelMembers.aloneLine", agentGrammar(t, w.name))
+          : t("channelMembers.aloneLine", agentGrammar(w.name))
     : w.email;
 
 /**
@@ -193,7 +193,7 @@ function MemberOptions({
   removable: boolean;
 }) {
   const { t } = useTranslation();
-  const g = agentGrammar(t, who.name);
+  const g = agentGrammar(who.name);
   const orgId = useOrgId();
   const api = useApi();
   const sheet = useSheet();

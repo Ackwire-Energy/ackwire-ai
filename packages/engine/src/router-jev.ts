@@ -8,7 +8,9 @@ import {
   type RouterStrategy,
   type RoutingInput,
   type RoutingResult,
+  SOCIAL_REACTIONS,
   SPOKEN_TO,
+  socialChoice,
   withAddressee,
 } from "./router";
 
@@ -96,9 +98,9 @@ export function createJevRouterStrategy(options: {
       const questions: Record<string, unknown> = {
         needs_agent: {
           type: "noul",
-          instructions: `Should any AI agent reply to \`latest_message\`? ${whoFor()} People in a team chat mostly talk among themselves: an agent should reply only when the message speaks to an agent (by @, by name or by its role), asks the agents or anyone something an agent can help with ("does anyone know…", "alguém sabe…"), speaks to the agents as a group, or continues a conversation with an agent. When unsure, no.`,
+          instructions: `Should any AI agent reply to \`latest_message\`? ${whoFor()} People in a team chat mostly talk among themselves: an agent should reply only when the message speaks to an agent (by @, by name or by its role), asks the agents or anyone something an agent can help with ("does anyone know…", "alguém sabe…"), speaks to the agents as a group, or continues a conversation with an agent. Also yes when the person insists or complains that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first): they want an agent's reply. Otherwise, when unsure, no.`,
           criteria: {
-            true: "The message is for an agent or needs an agent's answer.",
+            true: "The message is for an agent or needs an agent's answer, or the person insists that nobody answered.",
             false: "People talking to each other, or unclear; no agent should interrupt.",
           },
         },
@@ -114,7 +116,7 @@ export function createJevRouterStrategy(options: {
               about: c.about || null,
               can: c.can ?? null,
             },
-            question: `Should \`agent\` reply to \`latest_message\`? ${whoFor()} Yes when the message speaks to this agent, even when what it asks needs another agent: it can ask that one. When it speaks to no agent in particular, yes when it asks this agent or anyone something its role and what it \`can\` do cover, or follows up on a conversation this agent was just part of (see \`agent_just_talking\`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer (its name, its computer, its status): then every agent should reply. No when it speaks to another agent, even when it names this one as someone to ask, involve or hand over to; when it is for a person; when it is a greeting or small talk not to this agent; and when it speaks to no agent in particular and this agent can't actually help with it, or it is about an app or tool (Sentry, GitHub, the Drive…) that is not in its \`can\`: it has no access to it.`,
+            question: `Should \`agent\` reply to \`latest_message\`? ${whoFor()} Yes when the message speaks to this agent, even when what it asks needs another agent: it can ask that one. When it speaks to no agent in particular, yes when it asks this agent or anyone something its role and what it \`can\` do cover, or follows up on a conversation this agent was just part of (see \`agent_just_talking\`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer about itself (its name, its own usage limit, its status): then every agent should reply. No when it speaks to another agent, even when it names this one as someone to ask, involve or hand over to; when it is for a person; when it is a greeting or small talk not to this agent; and when it speaks to no agent in particular and this agent can't actually help with it, or it is about an app or tool (Sentry, GitHub, the Drive…) that is not in its \`can\`: it has no access to it.`,
           },
           criteria: {
             true: "This agent should answer (alone, or along with the others when the message is for all of them).",
@@ -137,7 +139,7 @@ export function createJevRouterStrategy(options: {
         questions.for_everyone = {
           type: "noul",
           instructions:
-            'Does `latest_message` speak to all the agents (or the whole room: "everyone", "all of you", "gente", "vocês", "agentes") so that each one should give its own answer (its name, its computer, its status)? A question or task with one answer (a number, a report, a fix) is for one agent, even when several could do it.',
+            'Does `latest_message` speak to all the agents (or the whole room: "everyone", "all of you", "gente", "vocês", "agentes") so that each one should give its own answer about itself (its name, its own usage limit, its status)? A question or task with one answer (a number, a report, a fix) is for one agent, even when several could do it. Something they share (the workspace computer, a repo, the team numbers) has one answer, even when the message says "our" or comes right after a question to each of them.',
           criteria: {
             true: "Every agent should answer for itself.",
             false: "One answer is enough: one agent should take it.",
@@ -162,6 +164,13 @@ export function createJevRouterStrategy(options: {
           type: "choice",
           instructions: `Which agent does \`latest_message\` speak to? ${whoFor()} The agent the person was just talking to is \`agent_just_talking\`. \`${NONE}\` when it speaks to no agent in particular: to a person, to anyone, to all the agents, or a follow-up that names nobody.`,
           criteria: spoken,
+        };
+      }
+      if (input.authorUserId !== null) {
+        questions.social = {
+          type: "choice",
+          instructions: `Is \`latest_message\` purely social, needing no real answer, and which emoji fits it as a reaction? ${whoFor()} \`${NONE}\` when it asks or says anything that needs an answer, or the person wants an actual reply: they insist, or complain that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first).`,
+          criteria: { ...SOCIAL_REACTIONS, [NONE]: "Needs a real answer, or isn't social." },
         };
       }
 
@@ -199,6 +208,8 @@ export function createJevRouterStrategy(options: {
         },
         new Map(input.candidates.map((c) => [c.agentId, clamp(to[c.handle])])),
       );
+      const social = answers.social?.choice;
+      const reaction = social ? socialChoice(social) : null;
       const choice = answers.best_agent?.choice;
       const bestPlaced = input.candidates.find((c) => c.handle === choice);
       const spokenTo = input.candidates.find((c) => c.agentId === scored.addressee);
@@ -218,6 +229,14 @@ export function createJevRouterStrategy(options: {
           ? { best: { agentId: bestPlaced.agentId, confidence: clamp(answers.best_agent?.confidence) } }
           : {}),
         ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
+        ...(social
+          ? {
+              social: {
+                react: reaction !== null && clamp(answers.social?.confidence) >= 0.5,
+                emoji: reaction ?? "",
+              },
+            }
+          : {}),
         ...(reason ? { reason } : {}),
         strategy: "jev",
         decidedBy: { step: "jev" },

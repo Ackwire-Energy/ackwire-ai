@@ -370,6 +370,17 @@ server {
 
     client_max_body_size 110m;
 
+    # AI apps' MCP endpoint (Apps de IA, below): small JSON requests only.
+    location ~ ^/mcp/?$ {
+        client_max_body_size 128k;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_read_timeout 300s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -610,6 +621,45 @@ version's `service install`:
 </details>
 
 <details>
+<summary><b>AI apps (MCP)</b></summary>
+
+Claude (claude.ai, Claude Desktop, the phone), Claude Code, ChatGPT, Cursor, VS Code and any other MCP client
+can ask this server's agents for tasks: the person pastes the server's address, signs in as themselves,
+picks a workspace, and the app can list agents and channels, send a task to an agent as that person, wait for
+and read the reply, and see recent tasks. It acts with exactly the person's permissions, never approves an
+agent's action (approvals stay with people in the chat) and changes no settings. It is on by default, with
+nothing to configure: Settings → Apps de IA shows the address and the steps for each app.
+
+- **The address** is `PUBLIC_URL` + `/mcp`, for example `https://chat.example.com/mcp` (`/mcp/` works too).
+- **Sign-in** is OAuth 2.1 on this server itself (PKCE, the app registers on its own), which needs https
+  except on `localhost`. A server reached over plain http on a LAN: use a **personal token** instead
+  (Settings → Apps de IA → Tokens pessoais), sent as `Authorization: Bearer agp_…`. It works on `/mcp` only, in
+  one workspace. One with no expiry takes a sign-in in the last 10 minutes.
+- **Who calls from where**: claude.ai, the Claude apps and ChatGPT call from their own servers, so the server
+  needs a public https address (a domain, or Tailscale Funnel: What needs a public URL). Claude Code, Cursor and
+  VS Code call from the computer they run on.
+- **Proxies**: the compose file's Caddy needs nothing more (answers are JSON, never streamed) and caps `/mcp`
+  bodies at 128 KB. With nginx, add the `location ~ ^/mcp/?$` block shown above. Behind Cloudflare, never challenge
+  `/mcp`, `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server`,
+  `/.well-known/openid-configuration` and `/api/oauth/*` (a WAF skip rule: no Bot Fight Mode, no managed
+  challenge, no rate limits there). On the free plan, which can't skip Bot Fight Mode per path, allow Claude's
+  connector addresses (`160.79.104.0/21`) and ChatGPT's published ones with an IP Access rule.
+
+Check it from any computer:
+
+```sh
+curl -s https://chat.example.com/.well-known/oauth-protected-resource/mcp
+curl -si -XPOST https://chat.example.com/mcp | grep -i www-authenticate
+npx @modelcontextprotocol/inspector --cli https://chat.example.com/mcp --transport http \
+  --method tools/list --header "Authorization: Bearer agp_…"
+```
+
+The first prints the server's resource document, the second its sign-in challenge, the third the tools (with a
+personal token).
+
+</details>
+
+<details>
 <summary><b>What needs a public URL</b></summary>
 
 On Tailscale, only devices in your tailnet reach the instance. Everything people do in the apps works
@@ -622,8 +672,8 @@ internet instead, and need it public:
 - A GitHub App's events (`/api/github-app/webhook`, with `GITHUB_APP_*`).
 - Composio's events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`): new mail for routines, and connector
   accounts that expired.
-- MillionSend's new mail for a MillionSend inbox connected as a mailbox (`/api/webhooks/millionsend`). Without
-  it, the inbox is checked every `MAIL_POLL_SECONDS` instead.
+- AI apps that call from their own servers (Apps de IA, below): claude.ai, the Claude apps and ChatGPT reach
+  `/mcp` from the internet. Claude Code, Cursor and VS Code on a computer that reaches the server don't need it.
 
 **Tailscale Funnel** opens the same address to the internet, still with no domain and no open port.
 The whole instance becomes public, as on a domain: sign-up stays closed (the default), and the owner
@@ -673,7 +723,6 @@ ones a self-hosted instance usually touches:
 | `LANDING_URL` | | The agentes.chat landing page's address, which turns on its waiting list. Leave it unset. |
 | `SMTP_URL` | | Email through your SMTP server: `smtps://user:password@smtp.example.com:465`, or `smtp://` for STARTTLS on 587, which is then required (`?requireTLS=false` at the end allows a relay without TLS on a trusted network). |
 | `MILLIONSEND_API_KEY`, `MILLIONSEND_API_URL` | `https://api.millionsend.com` for the URL | Email through a Resend-compatible API instead: MillionSend, your own MillionSend, or Resend (`https://api.resend.com`). |
-| `MILLIONSEND_INBOXES_API_URL` | `https://api.millionsend.com` | Where MillionSend inboxes connected as mailboxes for agents are read and sent from: MillionSend Cloud, or your own MillionSend. Apart from `MILLIONSEND_API_URL`, which may be Resend. `off` hides them. |
 | `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes.chat <ping@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
 | `EMAIL_ART` | `auto` | Where emails get their pictures (the logo, agents' faces): from this server's `/email/` when its address is public, else attached to each message. `attach` always attaches them, for a public address people outside still can't open (an access proxy, a VPN, an IP allowlist). |
 | `FILES_DIR` | `/data/files`, set by the compose file | Folder for uploaded files, on the `files` volume. |
@@ -852,9 +901,9 @@ party only when you turn that service on:
 | OpenRouter | An organization's key | What the other model providers receive, passed on by OpenRouter to the model's own provider (the organization's OpenRouter privacy settings decide which may keep it). While a workspace has an OpenRouter key, the server also reads OpenRouter's public model list, with no key: about once an hour, and up to once a minute while agents' runs ask for a model the list lacks. |
 | TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI accounts** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
+| Web search for agents | Always on: DuckDuckGo's HTML page with no key, unless `BRAVE_SEARCH_API_KEY` (Brave Search) or `SEARXNG_URL` (your own SearXNG) is set; an agent with a browser on its computer searches there instead (Google, then Bing or DuckDuckGo) | The words an agent searches for (`web_search`). `web_fetch` opens the public pages an agent asks for, from this server: never an internal or private address. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook mailboxes for agents, and the services connected through it (Google Drive, Calendar, Sheets and Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox and Square): Composio holds those connections, and what agents read or write there passes through it, files included. IMAP mailboxes and the other connectors connect directly. |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
-| MillionSend (inboxes) | An organization connects a MillionSend inbox with its own key (`MILLIONSEND_INBOXES_API_URL` names the API, `off` hides them) | What agents read and send in that inbox, through MillionSend's API. Where it can reach the instance, MillionSend posts each new message's sender, recipients and subject to `/api/webhooks/millionsend`. |
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
 | Your browser's push service (Google, Mozilla, Apple, Microsoft) | Someone turns on **Notifications in this browser** (`WEB_PUSH=off` hides it) | For each push to that browser: the notification encrypted to that browser (RFC 8291), which the push service can't read, the instance's public key, and a contact for the instance: `PUBLIC_URL` when it is a public https address, else the `EMAIL_FROM` address, else agentes.chat's site. |
 | A Sentry-compatible server you choose | `SENTRY_DSN`, `SENTRY_WEB_DSN` | Error reports, below. |
@@ -899,6 +948,16 @@ curl -fsSL https://chat.example.com/api/machines/install.sh | sh
 
 The computer must reach `PUBLIC_URL`: it downloads the runner from there, sends files back through
 it, and clones and pushes the agents' GitHub repositories through it.
+With a GitHub App set up (`GITHUB_APP_*`) and installed for a repository, agents' computers fetch
+that repository straight from github.com (a one-hour, read-only token for that repository alone)
+and still push through your server, so the computer must reach github.com too; without the App,
+clones go through your server. A computer runs at most two clones at once, and a clone goes on when
+your server restarts. Clones fetched from github.com share a cache that is never pruned (checkouts
+borrow its objects): `~/.agentes-runner/git-cache` on a single-user computer, `/var/cache/agentes-git`
+on a computer that runs each agent as its own user (owned by a system user `agentes-git` the runner
+makes; each agent reads only the repositories GitHub let it fetch, through an ACL, so install the
+`acl` package there, or clones go without the cache). Remove a repository's folder there only once no
+agent's checkout of it is left.
 On Tailscale, install Tailscale on it and sign in to the same tailnet first. The runner runs on
 Bun 1.3.5 or newer: the computer's own, or one the installer downloads into
 `~/.agentes-runner/runtime` and checks against the SHA-256 in the script before running it (Linux
@@ -912,10 +971,16 @@ your organization. Then it installs a background service
 no commands) and `--no-service`.
 
 That computer runs the commands agents execute, the browser they drive (Chrome for Testing, which the
-runner installs as it starts once the browser is turned on there), and Claude Code or Codex when an
-agent thinks with a subscription signed in there.
+runner installs as it starts once the browser is turned on there), and Claude Code, Codex or Cursor's
+CLI when an agent thinks with a subscription signed in there. Install the ones you want on that
+computer, as the user that runs the runner: Cursor's with `curl https://cursor.com/install -fsS | bash`
+(it lands in `~/.local/bin`, which the runner's PATH must include). A runner in system mode (each agent
+its own system user) needs the CLI where every agent's user can run it, not in one user's home: install it
+under a shared folder and link it into `/usr/local/bin`, for example
+`sudo env HOME=/opt/cursor sh -c 'curl https://cursor.com/install -fsS | bash'`, then
+`sudo chmod -R a+rX /opt/cursor` and `sudo ln -sf /opt/cursor/.local/bin/agent /usr/local/bin/agent`.
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
-`agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
+`agentes-runner tools disable commands` (or `claude`, `codex` or `cursor`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
 On Linux, Chrome for Testing loads system libraries that a minimal server doesn't have. The
@@ -1017,7 +1082,7 @@ computer (`tailscale serve`, an nginx or a Caddy outside Docker) takes
 `sudo agentes-runner services allow tcp/443` too, or agents can't push to its git. Container and VM
 networks on the computer are closed to agents, except ports published on an address other than
 loopback. Each agent also has its own `/tmp`, `/dev/shm` and `/run/lock`, in memory as the computer's
-are (a tmpfs of its own, which counts in its memory limit), and its own `/var/tmp` on disk (in
+are (a tmpfs of its own, which counts in the agents' memory), and its own `/var/tmp` on disk (in
 `/var/lib/agentes-runner-tmp`), cleared of what is 10 days old (30 in `/var/tmp`), so a socket or file
 another agent leaves there is out of its reach, and its own adb server port
 (`ANDROID_ADB_SERVER_PORT`). Agents can't schedule cron or at jobs, which would run outside their own
@@ -1033,8 +1098,39 @@ organizations share, so Kotlin compiles inside Gradle there. Two things stay sha
 server an agent binds to `0.0.0.0` is as reachable from outside the computer as your firewall lets it
 be, so agents should bind private servers to `127.0.0.1`; and abstract Unix sockets (a name, not a file)
 have no owner, so a program an agent runs that listens on one without checking who connects is open to
-the other agents, and an agent can take a name another agent's program wants (an X display's: its
-desktop then starts on another one).
+the other agents, and an agent can take a name another agent's program wants. An X display's name taken
+before a desktop starts sends that desktop to another display, but an agent holding all 50 stops every new
+or restarted desktop on the computer, and on this server's own computer the names span its
+organizations.
+
+**Memory and CPUs.** With `--system` the agents share the computer: none has memory or CPUs of its own,
+so one agent's build may use every CPU and all the memory the agents have; when several want the CPUs,
+each gets an equal share. All of them together stop at 75% of the RAM (50% on this server's own
+computer), plus swap for a third of that, which keeps the rest for the system, the runner and, here,
+the server. At that limit the kernel stops one process, usually the biggest (Chrome's pages first), and
+only that process: the command it belonged to fails, and the agent is told it was most likely memory
+(with systemd 253 or newer; a desktop or a task already running when you update gets this when it next
+starts).
+`agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what is free
+for new work and which agents use the most; agents are told to run it before something heavy, to tell
+the person when another agent's work leaves no room, and to stop what a finished build left running.
+Expo's default Android debug build fits an 8 GB computer this way, using nearly all the agents' memory.
+
+**The shared folder.** Every computer has one folder all of its agents read and write, so what one of
+them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is
+`/srv/agentes/shared`, owned by root and the group `agentes-shared`, which the runner makes and adds
+every agent's user to; each agent also finds it at `~/shared`, in its desktop's file manager, and its
+`bin/` folder at the end of its `PATH`, so a command-line tool one agent installs there (without root)
+works for all of them. A tool there runs as whichever agent calls it, with that agent's files, so only
+agents you trust with each other's work should share a computer; the runner itself never starts Claude
+Code or Codex from there. Install the `acl` package (`apt install acl`): with it, what an agent makes there
+stays writable by the others whatever its umask; without it, it stays readable only, until the agent runs
+`chmod g+w`. The runner never changes anything inside the folder. On this server's own computer each
+organization gets a folder and a group of its own (`/srv/agentes/shared-<id>`), so nothing crosses between
+organizations. Without `--system` it is `shared` in the runner's workspace. Agents are told to look there
+before downloading anything big, to keep credentials, `.env` files and sign-in folders out of it, and to
+check the free space first. **Settings → Computers** shows its path, its size (measured hourly) and the
+free space on the disk, and the workspace's admins get a notification when that disk passes 85%.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals

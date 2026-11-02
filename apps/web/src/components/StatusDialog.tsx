@@ -90,7 +90,7 @@ export function useSaveStatus() {
         toast.show(
           person.status
             ? t("presence.saved")
-            : t("presence.appearsAs", { presence: t(`presence.${person.presence}`).toLowerCase() }),
+            : t("presence.appearsAs", { presence: t(`presence.lower.${person.presence}`) }),
         ),
     });
 }

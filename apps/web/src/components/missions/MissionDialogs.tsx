@@ -203,7 +203,7 @@ export function NewMissionDialog({
                 onClick={() => onOpenChange(false)}
               >
                 <Icon name="settings" size={14} />
-                {t("missions.new.connectComputer", agentGrammar(t, setupAgent.name))}
+                {t("missions.new.connectComputer", agentGrammar(setupAgent.name))}
               </Link>
             )}
           </div>
@@ -332,7 +332,7 @@ export function NewMissionDialog({
           </div>
           <span className="mi-hint ac-iconline">
             <Icon name="thread" size={14} />
-            {t("missions.new.homeHint", agentGrammar(t, agent?.name ?? ""))}
+            {t("missions.new.homeHint", agentGrammar(agent?.name ?? ""))}
           </span>
         </div>
         {machine && !machine.online && (
@@ -737,7 +737,7 @@ export function ShareMissionDialog({
         title={t("missions.share.handTitle", { name: handing?.name ?? "" })}
         description={t("missions.share.handText", {
           executor,
-          article: agentGrammar(t, executor).article,
+          context: agentGrammar(executor).context,
           name: handing?.name ?? "",
         })}
         closeLabel={t("common.cancel")}

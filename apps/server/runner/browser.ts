@@ -77,6 +77,10 @@ import { prepareStartPage, type StartPageData } from "./start-page";
  *   last command just succeeded. Anything else starts Chrome when it isn't.
  * - The runner stops its Chromes itself: after the idle time (not while a
  *   person watches or a help request is open), on `stop`, and when it stops.
+ *   A help request forgotten on a dropped server connection still holds for
+ *   the idle time (the server says again on reconnect), and `agent-browser`'s
+ *   own idle timeout is kept off meanwhile. A browser that closed anyway under
+ *   an open help request opens again on its last page when a person views it.
  *   Their pids are kept in `<runner home>/browser/chromes.json`, so a runner
  *   that crashed closes what it left on its next start.
  * - The site allowlist is ours: `--allowed-domains` refuses persistent
@@ -295,8 +299,8 @@ export function agentBrowserTarget(
   return null;
 }
 
-/** The counters in the agent's `memory.events` that rise when it runs out of memory (`max`: it reached its limit). */
-const OUT_OF_MEMORY = ["max", "oom", "oom_kill"];
+/** The counters that rise when a page dies for memory (`memoryCounters`). */
+const OUT_OF_MEMORY = ["oom", "oom_kill"];
 
 /** How a tab's page died (`pageCrashed`): `again` before the agent heard of the first time, so it wasn't reloaded. */
 export interface PageCrash {
@@ -1030,8 +1034,13 @@ export interface BrowserManagerOptions {
   connectStream?: (url: string) => StreamSocket;
   /** Tests: opens a Chrome's browser endpoint (its traffic and its pages that die). */
   connectDevtools?: (url: string) => StreamSocket;
-  /** The agent's slice's `memory.events` (system mode): whether a page that died ran out of memory. */
-  memoryEvents?: string;
+  /**
+   * The agent's slice's `memory.events` and the agents' (system mode): a page that died ran out of memory when one of
+   * the agent's own processes was stopped for memory (its `oom_kill`, which counts its sub-slices' too) or an
+   * allocation failed at the limit all agents share (theirs `oom`). Never their `max`: with their cache at that limit,
+   * as it stays once they have filled it, it rises at every allocation.
+   */
+  memoryEvents?: { agent: string; agents: string };
   /** Tests: how long a new stream waits for Chrome's first frame (`FIRST_FRAME_MS`). */
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
@@ -1089,6 +1098,14 @@ interface Session {
   chrome?: OwnChrome;
   /** A Chrome being started: a second command waits for it. */
   chromeStarting?: Promise<OwnChrome>;
+  /** The last web page it showed: a help request's browser that closed anyway opens again there. */
+  url?: string;
+  /** Its last Chrome ran on the agent's desktop. */
+  headed?: boolean;
+  /** When `agent-browser` last got a command: its own idle timeout counts from there, not from frames or input. */
+  commandAt?: number;
+  /** The agent's allowed sites at its last command: a reopened page must still be on them. */
+  allowed?: string[];
   /** For the desktop app: the page's host, what the agent did last, and the conversation it was for. */
   host?: string;
   doing?: ControlBrowserDoing;
@@ -1239,10 +1256,15 @@ function parseAnswer(stdout: string, stderr: string, exitCode: number | null): B
   return { success: false, data: null, error: why.slice(0, 2000) };
 }
 
+/** A browser profile's session key (`profile:<id>`, ADR 0110) rather than an agent's id. */
+export const isProfileKey = (key: string) => key.startsWith("profile:");
+
 export class BrowserManager {
   private readonly sessions = new Map<string, Session>();
   /** A person's turn in each agent's browser, as the server last told (`browser.handoff`). */
   private readonly handoffs = new Map<string, BrowserHandoffInfo>();
+  /** Handoffs forgotten when the server connection dropped: their browsers stay open until it says again, or a while. */
+  private readonly heldUntil = new Map<string, number>();
   private readonly namespace: string;
   private readonly configFile: string;
   private readonly now: () => number;
@@ -1728,6 +1750,7 @@ export class BrowserManager {
     setup?: BrowserSetup,
   ): Promise<BrowserAnswer> {
     const { command, args, timeoutMs } = p;
+    session.allowed = allowed;
     if (command === "agentes:type_secret") {
       const answer = await this.typeSecret(agent, session, args, timeoutMs, signal);
       this.noteAct(session, command, [], answer, link);
@@ -1746,6 +1769,7 @@ export class BrowserManager {
         : { success: true, data: { closed: true } };
       await this.stopChrome(session);
       session.aliveAt = null;
+      session.url = undefined;
       this.noteAct(session, command, args, answer, link);
       return answer;
     }
@@ -1844,7 +1868,7 @@ export class BrowserManager {
     if (live.length >= this.maxSessions) {
       throw new RunnerError(
         "browser_unavailable",
-        `This computer already has ${live.length} agent browsers open (its limit). Try again in a few minutes.`,
+        `This computer already has ${live.length} browsers open (its limit). Try again in a few minutes.`,
       );
     }
     for (const [id, s] of this.sessions) {
@@ -1862,7 +1886,9 @@ export class BrowserManager {
     const session: Session = {
       agent,
       agentId,
-      name: `agent-${agentFolderName(agent).suffix.slice(1)}`,
+      name: isProfileKey(agentId)
+        ? `profile-${agentId.slice(8, 16)}`
+        : `agent-${agentFolderName(agent).suffix.slice(1)}`,
       folder,
       queue: Promise.resolve(),
       lastUsed: this.now(),
@@ -1888,11 +1914,15 @@ export class BrowserManager {
   private async ensureOwnChrome(
     agent: AgentScope,
     session: Session,
-    desktop: boolean,
+    onDesktop: boolean,
     allowed: string[],
     asked = false,
     setup?: BrowserSetup,
   ): Promise<OwnChrome> {
+    // A profile's Chrome never goes on a desktop: there the acting agent's own tools could read the shared account.
+    const profileSession = isProfileKey(session.agentId);
+    if (profileSession && asked) throw new RunnerError("not_allowed", "A browser profile only runs in the background");
+    const desktop = onDesktop && !profileSession;
     const running = session.chrome;
     if (!running && session.chromeStarting) return session.chromeStarting;
     if (running && ((running.display !== undefined) === desktop || (!asked && this.inView(session)))) return running;
@@ -1913,6 +1943,7 @@ export class BrowserManager {
       const exe = this.chromePath ?? this.chrome();
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
       const start = this.opts.startChrome ?? launchChrome;
+      await this.clearStaleLock(profile);
       const launch = async (on: ChromeDisplay | null) => {
         if (on) prepareProfile(profile);
         const startPage =
@@ -1965,6 +1996,7 @@ export class BrowserManager {
         );
       }
       session.chrome = chrome;
+      session.headed = chrome.display !== undefined;
       session.aliveAt = null;
       session.memory = this.memoryCounters();
       await this.rememberChrome(chrome.pid, profile, chrome.display);
@@ -2013,8 +2045,8 @@ export class BrowserManager {
    * A tab's page died: opened again once, and the agent's next action is told. One that dies again before the
    * agent heard of it shows our notice instead, once: a page that can't even start there (the slice's last task
    * taken, or its memory held by another process) would die again at once, and from then on it stays on Chrome's
-   * own page, so nothing starts again and again while the agent isn't there. It ran out of memory when the agent's
-   * slice reached its limit since its Chrome started or a page last died.
+   * own page, so nothing starts again and again while the agent isn't there. It ran out of memory when the agents'
+   * memory, which they share, reached its limit since its Chrome started or a page last died.
    */
   private pageCrashed(session: Session, chrome: OwnChrome, page: CrashedPage) {
     if (session.chrome !== chrome) return;
@@ -2031,8 +2063,11 @@ export class BrowserManager {
     this.opts.log(`the browser of ${session.name}: a page ${memory ? "ran out of memory" : "crashed"}, ${left}`);
   }
 
-  private memoryCounters() {
-    return this.opts.memoryEvents ? cgroupCounters(this.opts.memoryEvents) : null;
+  private memoryCounters(): Record<string, number> | null {
+    const files = this.opts.memoryEvents;
+    if (!files) return null;
+    const [agent, agents] = [cgroupCounters(files.agent), cgroupCounters(files.agents)];
+    return agent || agents ? { oom_kill: agent?.oom_kill ?? 0, oom: agents?.oom ?? 0 } : null;
   }
 
   /**
@@ -2120,9 +2155,7 @@ export class BrowserManager {
 
   /** Someone may be looking at the agent's Chrome, or working in it: its live view, a person's turn, its desktop's viewers. */
   private inView(session: Session) {
-    return (
-      !!session.stream || !!session.streamOpening || this.handoffs.has(session.agentId) || this.desktopWatched(session)
-    );
+    return !!session.stream || !!session.streamOpening || this.held(session.agentId) || this.desktopWatched(session);
   }
 
   /** The agent's Chrome is on its desktop, and someone watches or controls that desktop. */
@@ -2139,7 +2172,7 @@ export class BrowserManager {
   onDesktopInUse(agentId: string): boolean {
     const s = this.sessions.get(agentId);
     if (!s || s.chrome?.display === undefined) return false;
-    return !!s.stream || !!s.streamOpening || this.handoffs.has(agentId) || this.now() - s.lastUsed < this.idleMs;
+    return !!s.stream || !!s.streamOpening || this.held(agentId) || this.now() - s.lastUsed < this.idleMs;
   }
 
   /**
@@ -2150,7 +2183,16 @@ export class BrowserManager {
     for (const [agentId, s] of this.sessions) {
       // A person on its desktop may be working in it without a command: that counts as use.
       if (this.desktopWatched(s)) s.lastUsed = this.now();
-      if (s.stream || s.streamOpening || this.handoffs.has(agentId)) continue;
+      if (s.stream || s.streamOpening || this.held(agentId)) {
+        // `agent-browser` stops on its own idle timeout: a command keeps it up for whoever is still on the page.
+        // Not a use: once nobody holds it, its idle time counts from the last real one.
+        if (s.chrome && this.now() - (s.commandAt ?? 0) >= this.idleMs - 2 * SWEEP_MS) {
+          await this.enqueue(s, () =>
+            this.run(s, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS, notUse: true }),
+          ).catch(() => undefined);
+        }
+        continue;
+      }
       if (this.now() - s.lastUsed < this.idleMs) continue;
       this.sessions.delete(agentId);
       this.changed();
@@ -2215,6 +2257,32 @@ export class BrowserManager {
     return out.stdout.includes(`--user-data-dir=${profile}`);
   }
 
+  /**
+   * Chrome's `Singleton*` files name the host and pid that holds a profile. Restored onto another computer they make
+   * Chrome exit with 21 (in use elsewhere), so before a launch they go when no Chrome this runner recorded for the
+   * folder still runs.
+   */
+  private async clearStaleLock(profile: string) {
+    for (const { pid, profile: held } of await this.readPids()) {
+      if (held === profile && (await this.isOurChrome(pid, profile).catch(() => false))) return;
+    }
+    await Promise.all(
+      ["SingletonLock", "SingletonCookie", "SingletonSocket"].map((f) => rm(path.join(profile, f), { force: true })),
+    );
+  }
+
+  /** A browser profile's folder: under the runner's home, outside every agent's folder. */
+  profileFolder(profileId: string) {
+    return path.join(this.opts.home, "browser-profiles", profileId);
+  }
+
+  /** `browser.profile.delete`: its Chrome stops and its folder goes (logins with it). */
+  async deleteProfile(agent: AgentScope, folder: string): Promise<{ deleted: boolean }> {
+    await this.stop(agent);
+    await rm(folder, { recursive: true, force: true });
+    return { deleted: true };
+  }
+
   /** Chromes a previous run of this runner home left (it crashed or was killed): stopped. */
   private async killLeftovers() {
     const live = new Set([...this.sessions.values()].map((s) => s.chrome?.pid).filter((p) => p !== undefined));
@@ -2272,13 +2340,14 @@ export class BrowserManager {
   private async run(
     session: Session,
     args: string[],
-    opts: { timeoutMs: number; signal?: AbortSignal; stdin?: string },
+    opts: { timeoutMs: number; signal?: AbortSignal; stdin?: string; notUse?: boolean },
   ): Promise<BrowserAnswer> {
     const command = this.presentCommand() ?? (await this.ensureReady());
-    session.lastUsed = this.now();
+    if (!opts.notUse) session.lastUsed = this.now();
     // Never without our Chrome: `agent-browser` would launch its own, with the automation markers.
     const chrome = session.chrome;
     if (!chrome) return { success: false, data: null, error: "The browser isn't open: open a page first" };
+    session.commandAt = this.now();
     const out = await this.spawn(command, [...this.sessionFlags(session, chrome), ...args], {
       timeoutMs: opts.timeoutMs,
       cwd: session.folder,
@@ -2541,11 +2610,13 @@ export class BrowserManager {
           : undefined;
     const host = url ? pageHost(url) : null;
     if (host) session.host = host;
+    if (url && isWebPage(url)) session.url = url;
     this.changed();
   }
 
   /** `browser.handoff` from the server: a request waiting, a person in control, or none (null). */
   setHandoff(agentId: string, handoff: BrowserHandoffInfo | null) {
+    this.heldUntil.delete(agentId);
     if (handoff && (handoff.status === "pending" || handoff.status === "active")) {
       this.handoffs.set(agentId, {
         status: handoff.status,
@@ -2557,6 +2628,11 @@ export class BrowserManager {
     this.changed();
   }
 
+  /** A person's turn is open on the agent's browser, or was when the server connection dropped. */
+  private held(agentId: string) {
+    return this.handoffs.has(agentId) || (this.heldUntil.get(agentId) ?? 0) > this.now();
+  }
+
   /** The agent's Chrome process while it runs: its window on the agent's desktop is the browser's, not the desktop's. */
   chromePid(agentId: string): number | null {
     return this.sessions.get(agentId)?.chrome?.pid ?? null;
@@ -2565,6 +2641,7 @@ export class BrowserManager {
   /** The server connection dropped: what it told about handoffs is stale (it says again on reconnect). */
   clearHandoffs() {
     if (this.handoffs.size === 0) return;
+    for (const agentId of this.handoffs.keys()) this.heldUntil.set(agentId, this.now() + this.idleMs);
     this.handoffs.clear();
     this.changed();
   }
@@ -2577,6 +2654,8 @@ export class BrowserManager {
     const ids = new Set([...this.sessions.keys(), ...this.handoffs.keys()]);
     const out: ControlBrowser[] = [];
     for (const agentId of [...ids].sort()) {
+      // The tray lists agents (Ver, Parar): a profile is the workspace's, watched from its page.
+      if (isProfileKey(agentId)) continue;
       const s = this.sessions.get(agentId);
       const handoff = this.handoffs.get(agentId);
       const open = !!s && (!!s.stream || (s.aliveAt !== null && this.now() - s.lastUsed < this.idleMs));
@@ -2652,7 +2731,7 @@ export class BrowserManager {
       void this.firstFrame(session, session.stream);
       return { mode };
     }
-    const opening = this.openStream(session, mode);
+    const opening = this.openStream(agent, session, mode);
     session.streamOpening = opening;
     try {
       await opening;
@@ -2662,11 +2741,31 @@ export class BrowserManager {
     return { mode };
   }
 
-  private async openStream(session: Session, mode: BrowserStreamMode): Promise<void> {
+  private async openStream(agent: AgentScope, session: Session, mode: BrowserStreamMode): Promise<void> {
     const port = await this.enqueue(session, async () => {
+      // Closed anyway while a person's help is asked for (Chrome crashed or was quit, or `agent-browser` let go of
+      // it): open again where it was, when that page is still on the agent's allowed sites.
+      const held = this.held(session.agentId);
+      let reopened = false;
+      const reopen = async () => {
+        reopened = true;
+        const url = session.url;
+        const page = url && session.allowed && domainAllowed(url, session.allowed) ? url : "about:blank";
+        await this.run(session, ["open", page], { timeoutMs: QUICK_TIMEOUT_MS * 4 });
+      };
+      if (!session.chrome && session.url && held) {
+        await this.ensureOwnChrome(agent, session, session.headed === true, []);
+        await reopen();
+      }
       if (!session.chrome) return null;
+      const disconnected = (a: BrowserAnswer) => isRecord(a.data) && a.data.connected !== true;
       let status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
-      if (isRecord(status.data) && status.data.connected !== true) return null;
+      if (disconnected(status)) {
+        if (!held || reopened) return null;
+        await reopen();
+        status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
+        if (disconnected(status)) return null;
+      }
       if (!isRecord(status.data) || status.data.enabled !== true) {
         await this.run(session, ["stream", "enable"], { timeoutMs: QUICK_TIMEOUT_MS });
         status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
@@ -2755,6 +2854,7 @@ export class BrowserManager {
       if (url === stream.url) return;
       const before = stream.url ? pageHost(stream.url) : null;
       stream.url = url;
+      if (isWebPage(url)) session.url = url;
       // Another page: its title comes with the next tab list.
       stream.title = undefined;
       if (pageHost(url) !== before) this.changed();

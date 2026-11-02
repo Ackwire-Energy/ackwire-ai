@@ -59,6 +59,14 @@ export {
 } from "./brain/portrait.js";
 export { channelQuery, insertChannelRef } from "./channel-refs";
 export {
+  type AccessBase,
+  AccessDialog,
+  type AccessDialogLabels,
+  type AccessDialogProps,
+  type AccessLevel,
+  type AccessSubject,
+} from "./components/AccessDialog";
+export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
   AGENT_EYES,
@@ -342,6 +350,7 @@ export {
 } from "./components/ToolPixels";
 export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./components/UsageDays";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
+export { WorkLine, WorkLineAction, type WorkLineTone, WorkPlan } from "./components/WorkLine";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
 export { hoverPointer, movesByKeys, onScreenKeyboard, onScreenNow, trackInput } from "./device";

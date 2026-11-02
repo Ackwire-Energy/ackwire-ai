@@ -136,7 +136,7 @@ export function MessageReactions({
         const agentIds = r.agentIds ?? [];
         const who = t("reactions.who", {
           count: r.count,
-          names: joinNames([...r.userIds.map(nameOf), ...agentIds.map(agentName)], t("newAgent.and")),
+          names: joinNames([...r.userIds.map(nameOf), ...agentIds.map(agentName)], t),
           emoji,
         });
         return (

@@ -224,7 +224,7 @@ function NewAgentForm({
   const taken = useMemo(() => takenHandles(dir.agents, [...dir.memberById.values()]), [dir.agents, dir.memberById]);
   const draft = { role, name, handle, taken };
   const shownName = name.trim() || t("newAgent.previewName");
-  const g = agentGrammar(t, name.trim() || t("newAgent.defaultName"));
+  const g = agentGrammar(name.trim() || t("newAgent.defaultName"));
   const handleIssue = handle || tried ? handleProblem(handle, taken) : null;
   const handleText =
     handleIssue === "taken"
@@ -403,6 +403,7 @@ function NewAgentForm({
           : ids.length > 0
             ? t("mobile.newAgent.import.arrived", { count: ids.length, name: first?.label ?? "" })
             : t("onboarding.import.report.title"),
+        ...(counts.capped > 0 ? { subtitle: t("onboarding.import.report.capped", { count: counts.capped }) } : {}),
         ...(ids.length === 1 ? { agentId: ids[0] } : {}),
       });
       const land = landingOf(ids, { left: left.current });
@@ -703,7 +704,7 @@ function NewAgentForm({
           ) : null}
           <Text variant="footnote" tone="faint">
             {proposed && listedApps.length + myMail.length > 0
-              ? `${t("mobile.settings.access.how")} ${t("newAgent.approvalsNote")}`
+              ? t("common.joinSentences", { a: t("mobile.settings.access.how"), b: t("newAgent.approvalsNote") })
               : t("newAgent.approvalsNote")}
           </Text>
         </View>

@@ -2,8 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { redactCommon } from "@agenteschat/adapters/redact";
+import { setTool } from "../../runner/access";
 import { ActivityLog } from "../../runner/activity";
 import {
+  accessToStore,
   configPath,
   effectiveAccess,
   normalizeStored,
@@ -68,7 +70,7 @@ test("config: new fields are read and checked; a home without a token isn't pair
   });
   // With `access`, commands come from it, whatever `exec` says.
   expect(c?.exec).toBe(false);
-  expect(effectiveAccess(c).tools).toEqual({ claude: true, codex: false, commands: false });
+  expect(effectiveAccess(c).tools).toEqual({ claude: true, codex: false, cursor: false, commands: false });
 
   // Unpaired from the app: settings stay, the token is gone.
   writeConfig({ managedBy: "desktop", workspace: "/tmp/ws" }, h);
@@ -83,10 +85,40 @@ test("config: new fields are read and checked; a home without a token isn't pair
 test("a home paired before protocol 10 keeps its behaviour: every tool follows exec", () => {
   expect(effectiveAccess({ ...base, exec: true })).toEqual({
     folders: [],
-    tools: { claude: true, codex: true, commands: true },
+    tools: { claude: true, codex: true, cursor: true, commands: true },
   });
-  expect(effectiveAccess({ ...base, exec: false }).tools).toEqual({ claude: false, codex: false, commands: false });
+  expect(effectiveAccess({ ...base, exec: false }).tools).toEqual({
+    claude: false,
+    codex: false,
+    cursor: false,
+    commands: false,
+  });
   expect(effectiveAccess(null).tools.commands).toBe(false);
+});
+
+test("access stored before Cursor's switch: Cursor follows Codex's, and once stored it is its own", () => {
+  const access = (tools: Record<string, boolean>) => ({ ...base, access: { folders: [], tools } }) as never;
+  expect(effectiveAccess(access({ claude: true, codex: true, commands: false })).tools.cursor).toBe(true);
+  expect(effectiveAccess(access({ claude: true, codex: false, commands: true })).tools.cursor).toBe(false);
+  expect(effectiveAccess(access({ claude: true, codex: true, cursor: false, commands: true })).tools.cursor).toBe(
+    false,
+  );
+});
+
+test("a write from an app without Cursor's switch keeps Cursor following Codex's", () => {
+  const stored = { ...base, access: { folders: [], tools: { claude: true, codex: true, commands: true } } } as never;
+  const offCodex = setTool(effectiveAccess(stored), "codex", false);
+  const written = { ...base, access: accessToStore(stored, offCodex) } as never;
+  expect(effectiveAccess(written).tools.cursor).toBe(false);
+  // Turning Cursor itself off stores its own switch.
+  const offCursor = accessToStore(stored, setTool(effectiveAccess(stored), "cursor", false));
+  expect(offCursor.tools.cursor).toBe(false);
+  // Once stored, it no longer follows.
+  const own = {
+    ...base,
+    access: { folders: [], tools: { claude: true, codex: true, cursor: true, commands: true } },
+  } as never;
+  expect(accessToStore(own, setTool(effectiveAccess(own), "codex", false)).tools.cursor).toBe(true);
 });
 
 test("services: what of the computer agents may reach, one TCP or UDP port each, kept as written once", () => {

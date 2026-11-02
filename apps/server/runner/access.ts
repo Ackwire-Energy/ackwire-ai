@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   ACCESS_LIMITS,
+  grantedTo,
   isAccountId,
   type MachineAgent,
   type RunnerAccess,
@@ -38,6 +39,7 @@ export class ControlError extends Error {
 export const TOOL_NAMES: readonly (keyof RunnerTools)[] = [
   "claude",
   "codex",
+  "cursor",
   "commands",
   "browser",
   "desktop",
@@ -234,7 +236,7 @@ export function widens(a: RunnerAccess, b: RunnerAccess): boolean {
 /** The folders allowed for one agent (as stored). */
 export function foldersFor(access: RunnerAccess, agentId: string | undefined): string[] {
   if (!agentId) return [];
-  return access.folders.filter((f) => f.agents.includes(agentId)).map((f) => f.path);
+  return access.folders.filter((f) => grantedTo(f, agentId)).map((f) => f.path);
 }
 
 /** The same, as real paths that exist now (an allowed folder that vanished or moved is skipped). */

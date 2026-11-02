@@ -1,11 +1,13 @@
 import { Logo } from "@agenteschat/ui";
 import { type ReactNode, useRef } from "react";
 import { AuthHorizon } from "@/components/Sky";
+import { LanguageSelect } from "./LanguageSelect";
 import "./auth.css";
 
 /**
  * Sign in, sign up and new password: one calm question at a time in a narrow
- * column, the logo on top and the sky's horizon at the bottom.
+ * column, the logo on top, the language beside it (signed out: the next sign-in sends it) and the sky's horizon at
+ * the bottom.
  */
 export function AuthShell({ children }: { children: ReactNode }) {
   const col = useRef<HTMLElement>(null);
@@ -14,6 +16,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <AuthHorizon clear={() => [col.current]} />
       <span className="auth__logo">
         <Logo size={24} />
+      </span>
+      <span className="auth__lang">
+        <LanguageSelect signedIn={false} align="end" />
       </span>
       <main className="auth__col" ref={col}>
         {children}

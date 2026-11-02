@@ -80,6 +80,7 @@ export async function enqueuePush(
   row: NotificationRow,
   now = new Date(),
   prefs?: NoticePrefs,
+  dedupeKey = `push.send:${row.id}`,
 ): Promise<boolean> {
   if (row.count !== 1) return false;
   if (!pushWorthy(row, now, prefs ?? (await readNoticePrefs(db, row.orgId, row.userId)))) return false;
@@ -93,7 +94,7 @@ export async function enqueuePush(
     orgId: row.orgId,
     kind: "push.send",
     payload: { notificationId: row.id },
-    dedupeKey: `push.send:${row.id}`,
+    dedupeKey,
     maxAttempts: 4,
   });
   return true;
@@ -183,17 +184,23 @@ export async function listPushDevices(db: Database, userId: string) {
  */
 async function pushTargets(db: Database, userId: string, now: Date) {
   const rows = await db
-    .select({ device: pushDevices, sessionEndsAt: sessions.expiresAt })
+    .select({ device: pushDevices, sessionEndsAt: sessions.expiresAt, userLocale: users.locale })
     .from(pushDevices)
     .leftJoin(sessions, eq(sessions.id, pushDevices.sessionId))
+    .innerJoin(users, eq(users.id, pushDevices.userId))
     .where(eq(pushDevices.userId, userId))
     .orderBy(asc(pushDevices.createdAt));
-  const phones = rows.filter((r) => r.device.platform !== "web").map((r) => r.device);
+  // The person's language (ADR 0122), else the one the device registered: a change in the app reaches every push.
+  const phones = rows
+    .filter((r) => r.device.platform !== "web")
+    .map((r) => ({ ...r.device, locale: r.userLocale ?? r.device.locale }));
   const web = rows.filter((r) => r.device.platform === "web");
   const on = (r: (typeof web)[number]) => r.sessionEndsAt !== null && r.sessionEndsAt.getTime() > now.getTime();
   return {
     phones,
-    browsers: web.filter((r) => on(r) && r.device.webKeys).map((r) => r.device),
+    browsers: web
+      .filter((r) => on(r) && r.device.webKeys)
+      .map((r) => ({ ...r.device, locale: r.userLocale ?? r.device.locale })),
     ended: web.filter((r) => !on(r)).map((r) => r.device.token),
   };
 }
@@ -364,6 +371,7 @@ export async function deliverPush(
     highRisk,
     routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     screen: source.screen ?? null,
+    reminder: latest.reminder === true,
   };
 
   let sent = 0;

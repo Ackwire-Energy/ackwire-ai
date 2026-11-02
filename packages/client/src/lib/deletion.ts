@@ -80,11 +80,10 @@ export function accountDeletionLines(
   plan: AccountDeletionPlan,
   { cloud, billing = false, now = new Date() }: { cloud: boolean; billing?: boolean; now?: Date },
 ): AccountDeletionLine[] {
-  const and = t("newAgent.and");
   const names = (items: { name: string }[]) =>
     joinNames(
       items.map((i) => i.name),
-      and,
+      t,
     );
   const orgName = (orgId: string) => plan.leaves.find((o) => o.id === orgId)?.name ?? "";
   const byOrg = <T extends { orgId: string }>(items: T[]) => {

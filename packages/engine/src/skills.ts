@@ -208,6 +208,12 @@ export interface SkillView {
   sourceVia: SkillVia | null;
   defaultForNewAgents: boolean;
   metadata: Record<string, unknown>;
+  /** `person` or `agent` (promoted from an agent's how-tos, ADR 0120). */
+  origin: "person" | "agent";
+  ownerAgentId: string | null;
+  locked: boolean;
+  useCount: number;
+  lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -227,6 +233,11 @@ const view = (s: SkillRow): SkillView => ({
   sourceVia: s.sourceVia as SkillVia | null,
   defaultForNewAgents: s.defaultForNewAgents,
   metadata: s.metadata,
+  origin: s.origin === "agent" ? "agent" : "person",
+  ownerAgentId: s.ownerAgentId,
+  locked: s.locked,
+  useCount: s.useCount,
+  lastUsedAt: s.lastUsedAt?.toISOString() ?? null,
   createdAt: s.createdAt.toISOString(),
   updatedAt: s.updatedAt.toISOString(),
 });
@@ -983,6 +994,132 @@ export async function deleteSkill(db: Database, actorId: string, orgId: string, 
     target: { type: "skill", id: s.id },
     details: { name: s.name },
   });
+}
+
+/**
+ * A skill's body as a new version, its files carried over to it (they are stored per version). For changes that
+ * come from use, not from a person's editor: an agent's own skill (`update_skill`), an accepted proposal, an undo.
+ */
+export async function writeSkillBody(db: Database, s: SkillRow, body: string): Promise<SkillRow> {
+  const [row] = await db
+    .update(skills)
+    .set({ body, version: sql`${skills.version} + 1`, updatedAt: new Date() })
+    .where(eq(skills.id, s.id))
+    .returning();
+  if (!row) throw new NotFoundError("Skill not found");
+  await db.execute(sql`insert into skill_files (org_id, skill_id, version, path, size, mime, status, storage_config_id, blob_key)
+    select org_id, skill_id, ${row.version}, path, size, mime, status, storage_config_id, blob_key
+    from skill_files where skill_id = ${s.id}::uuid and version = ${row.version - 1}`);
+  return row;
+}
+
+/** Who may lock or undo an agent-made skill: who manages agents, or the owner of the agent that made it. */
+async function mayChangeAgentSkill(db: Database, actorId: string, orgId: string, ownerAgentId: string | null) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  if (can(membership, "manage_agents")) return true;
+  if (!ownerAgentId) return false;
+  return (await getAgent(db, orgId, ownerAgentId))?.ownerUserId === actorId;
+}
+
+export async function requireAgentSkillChange(db: Database, actorId: string, orgId: string, s: SkillRow) {
+  if (s.origin !== "agent") await requirePermission(db, actorId, orgId, "manage_agents");
+  else if (!(await mayChangeAgentSkill(db, actorId, orgId, s.ownerAgentId)))
+    throw new ForbiddenError("Only the agent's owner or an admin can change this");
+}
+
+/**
+ * A person locks or unlocks a skill: a locked one agents can't change and is never archived for disuse. An agent-made
+ * one also its agent's owner.
+ */
+export async function setSkillLocked(db: Database, actorId: string, orgId: string, id: string, locked: boolean) {
+  const s = await loadSkill(db, orgId, id);
+  await requireAgentSkillChange(db, actorId, orgId, s);
+  await db.update(skills).set({ locked, updatedAt: new Date() }).where(eq(skills.id, s.id));
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: locked ? "skill.locked" : "skill.unlocked",
+    target: { type: "skill", id: s.id },
+    details: { name: s.name },
+  });
+  return getSkill(db, actorId, orgId, id);
+}
+
+/** Brings back a skill archived for disuse (or deleted), with its agents' assignments. */
+export async function restoreSkill(db: Database, actorId: string, orgId: string, id: string) {
+  const [found] = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.id, id), eq(skills.orgId, orgId)));
+  if (!found) {
+    await requirePermission(db, actorId, orgId, "manage_agents");
+    throw new NotFoundError("Skill not found");
+  }
+  await requireAgentSkillChange(db, actorId, orgId, found);
+  const [s] = await db
+    .update(skills)
+    .set({ deletedAt: null, lastUsedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(skills.id, id), eq(skills.orgId, orgId)))
+    .returning();
+  if (!s) throw new NotFoundError("Skill not found");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "skill.restored",
+    target: { type: "skill", id: s.id },
+    details: { name: s.name },
+  });
+  return getSkill(db, actorId, orgId, id);
+}
+
+/** The skills an agent made itself (`origin` agent), archived ones too, newest first: "What it learned". */
+export async function agentMadeSkills(db: Database, actorId: string, orgId: string, agentId: string) {
+  const canChange = await mayChangeAgentSkill(db, actorId, orgId, agentId);
+  const rows = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.orgId, orgId), eq(skills.origin, "agent"), eq(skills.ownerAgentId, agentId)))
+    .orderBy(sql`${skills.createdAt} desc`);
+  // Each skill's latest change of its own not undone: Desfazer only while the body is still what it left.
+  const changes = rows.length
+    ? await db
+        .selectDistinctOn([schema.agentActions.targetId], {
+          targetId: schema.agentActions.targetId,
+          before: schema.agentActions.before,
+          after: schema.agentActions.after,
+        })
+        .from(schema.agentActions)
+        .where(
+          and(
+            eq(schema.agentActions.orgId, orgId),
+            eq(schema.agentActions.kind, "skill.updated"),
+            inArray(
+              schema.agentActions.targetId,
+              rows.map((r) => r.id),
+            ),
+            isNull(schema.agentActions.undoneAt),
+          ),
+        )
+        .orderBy(schema.agentActions.targetId, sql`${schema.agentActions.createdAt} desc`)
+    : [];
+  const revertible = new Set(
+    changes
+      .filter((c) => {
+        const row = rows.find((r) => r.id === c.targetId);
+        return (
+          typeof (c.before as { body?: unknown } | null)?.body === "string" &&
+          (c.after as { body?: unknown } | null)?.body === row?.body
+        );
+      })
+      .map((c) => c.targetId),
+  );
+  return rows.map((r) => ({
+    ...view(r),
+    body: r.body,
+    archived: r.deletedAt !== null,
+    canChange,
+    canRevert: canChange && revertible.has(r.id),
+  }));
 }
 
 /** The org's skills with whether this agent has each one on. */

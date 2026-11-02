@@ -1,6 +1,5 @@
 import type {
   Routine,
-  RoutineAccess,
   RoutineEvent,
   RoutineHookCall,
   RoutineInput,
@@ -26,9 +25,12 @@ import {
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import {
   capitalize,
+  clockHour,
+  formatTime,
   formatTokensShort,
   formatUsd,
   nextLabel,
@@ -42,15 +44,18 @@ import {
   busyOnComputer,
   healthWords,
   isRunAtWork,
+  isStoppable,
   pausedFix,
   type RoutineFix,
   routineChannelOf,
+  routineStateTime,
   routineStateWords,
   runMessageLink,
   runOutcome,
   runPixelStatus,
   runPixels,
   runsPerDay,
+  usageContinueBlock,
   usageParts,
   type Words,
   whereItRuns,
@@ -82,7 +87,6 @@ import {
   InfoHint,
   Input,
   Menu,
-  MenuItem,
   RecurrencePicker,
   type RecurrenceRule,
   RunKey,
@@ -103,6 +107,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
 import { useActors } from "@/components/actors";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { DetailsLink } from "@/components/details-link";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
@@ -113,6 +118,8 @@ import { useOrg } from "@/components/org-context";
 import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { copyText, type MenuEntry } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
 import { defaultRule, fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
@@ -135,8 +142,9 @@ const mailTrouble = (r: Routine) =>
 
 /** A run of it is working now (Parar stops it). */
 const isRunning = (r: Routine) => r.state === "running";
-/** A run of it is at work: working, or waiting for a person or its computer. */
-const isAtWork = (r: Routine) => isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer";
+/** A run of it is at work: working, waiting for a person or its computer, or paused near its plan's limit. */
+const isAtWork = (r: Routine) =>
+  isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer" || r.state === "usage_paused";
 /** A one-off that already fired (or was cancelled): no switch, no "Rodar agora", nothing left to run. */
 const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
 /** A one-off that fired and whose run ended: shown muted, under "Concluídos" (while its run works, it is live). */
@@ -179,7 +187,7 @@ function useTargetLabel() {
     // From the chat: "na DM com o Jorge", "no #general (thread)".
     if (target.type === "conversation") {
       const dm = dms.data?.find((d) => d.channelId === target.channelId);
-      if (dm) return t("routines.inDm", agentGrammar(t, dm.with.name));
+      if (dm) return t("routines.inDm", agentGrammar(dm.with.name));
       const c = channels.data?.find((x) => x.id === target.channelId);
       if (!c) return t("routines.inConversation");
       return t(target.threadId ? "routines.inThread" : "routines.inChannel", { channel: c.name });
@@ -544,6 +552,15 @@ function useRoutineControls(r: Routine) {
       ),
     run: () => action.mutate({ type: "run", id: r.id }),
     stop: () => action.mutate({ type: "stop", id: r.id }, { onSuccess: () => toast.show(t("routines.stoppedToast")) }),
+    continueUsage: () =>
+      action.mutate(
+        { type: "continueUsage", id: r.id },
+        {
+          onSuccess: (saved) =>
+            (saved as Routine).state !== "usage_paused" && toast.show(t("routines.usagePause.continuedToast")),
+          onError: (error) => toast.show(errorText(t, error), "error"),
+        },
+      ),
     fix: (fix: RoutineFix) => {
       const channelId = routineChannelOf(r.target);
       if (fix === "add_agent" && channelId)
@@ -571,8 +588,7 @@ function RoutineStateChip({ routine: r, className }: { routine: Routine; classNa
   const { org } = useOrg();
   const say = useSay();
   const names = useNamesComputers(org.id);
-  const since = r.waitingFor ? whenAt(t, i18n.language, r.waitingFor.since) : "";
-  const state = routineStateWords(r, since, names);
+  const state = routineStateWords(r, routineStateTime(t, i18n.language, r), names);
   return (
     <Chip
       icon={state.icon}
@@ -582,6 +598,36 @@ function RoutineStateChip({ routine: r, className }: { routine: Routine; classNa
     >
       {say(state)}
     </Chip>
+  );
+}
+
+/**
+ * A run paused near its plan's or budget's limit: it picks up by itself, and Continuar agora lets it go on now for
+ * its creator, the agent's owner and admins. Everyone else sees the button greyed with the reason.
+ */
+function UsagePausedNote({ routine: r }: { routine: Routine }) {
+  const { t } = useTranslation();
+  const controls = useRoutineControls(r);
+  const blocked = usageContinueBlock(r);
+  const reason = blocked ? t(`routines.usagePause.${blocked}`) : null;
+  return (
+    <div className="routine-details__usage-pause">
+      <p className="small muted">{t("routines.usagePause.line")}</p>
+      <span className="routine-details__usage-pause-acts">
+        <Button
+          size="sm"
+          variant="primary"
+          icon="play"
+          disabled={blocked !== null}
+          loading={controls.action.isPending}
+          title={reason ?? t(r.usagePause?.source === "budget" ? "usageCard.hintBudget" : "usageCard.hint")}
+          onClick={controls.continueUsage}
+        >
+          {t("usageCard.continue")}
+        </Button>
+        {reason && <span className="small muted">{reason}</span>}
+      </span>
+    </div>
   );
 }
 
@@ -633,10 +679,81 @@ function RoutineRow({
   const fired = hasFired(r);
   const paused = isPaused(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const more = t("routines.more", { name: title });
   // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
   const needsLook = !done && routineStateWords(r).tone === "waiting";
   const fix = r.canManage && needsLook ? pausedFix(r) : null;
+  // Paused near its plan's limit: said quietly (it picks up by itself), with no fix.
+  const showState = needsLook || r.state === "usage_paused";
+  // Its "…" and its right click: run or stop, pause or resume, then what the "…" always had.
+  const entries = (): MenuEntry[] => [
+    ...(r.canManage && !reminder && (stoppable || !fired)
+      ? ([
+          stoppable
+            ? { kind: "item", id: "stop", label: t("routines.stop"), icon: "stop", run: controls.stop }
+            : { kind: "item", id: "run", label: t("routines.runNow"), icon: "play", run: controls.run },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage && !fired
+      ? ([
+          r.active
+            ? {
+                kind: "item",
+                id: "pause",
+                label: t("routines.pause"),
+                icon: "pause",
+                run: () => controls.setActive(false),
+              }
+            : {
+                kind: "item",
+                id: "resume",
+                label: t("routines.resume"),
+                icon: "play",
+                run: () => controls.setActive(true),
+              },
+          { kind: "separator" },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage
+      ? ([{ kind: "item", id: "edit", label: t("routines.edit"), icon: "edit", run: onEdit }] satisfies MenuEntry[])
+      : []),
+    { kind: "item", id: "runs", label: t("routines.runs"), icon: "waiting", run: () => !selected && onOpen() },
+    ...(r.canManage
+      ? ([
+          {
+            kind: "item",
+            id: "duplicate",
+            label: t("routines.duplicate"),
+            icon: "copy",
+            run: () =>
+              action.mutate(
+                { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
+                {
+                  onSuccess: (copy) =>
+                    toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
+                },
+              ),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage && routineHookUrl(r)
+      ? ([
+          {
+            kind: "item",
+            id: "webhook",
+            label: t("routines.copyWebhook"),
+            icon: "link",
+            run: () => void copyText(routineHookUrl(r) ?? "", () => toast.show(t("routines.webhookCopied"))),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage
+      ? ([
+          { kind: "item", id: "delete", label: t("routines.delete"), icon: "trash", run: () => setDeleting(true) },
+        ] satisfies MenuEntry[])
+      : []),
+  ];
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a mouse shortcut; the title is the keyboard way to the details
     <article
@@ -647,6 +764,7 @@ function RoutineRow({
       data-done={done || undefined}
       data-running={running || undefined}
       data-state={r.state}
+      {...entityMenu(() => [{ kind: "header", label: title }, ...entries()])}
       onClick={(e) => {
         // The row opens the details; its own controls don't.
         if ((e.target as HTMLElement).closest("button, a, [role=switch], [role=menu]")) return;
@@ -675,7 +793,7 @@ function RoutineRow({
               {t(mailTrouble(r) === "error" ? "mail.routine.error" : "mail.routine.needsReconnect")}
             </Chip>
           )}
-          {needsLook && <RoutineStateChip routine={r} className="routine-row__chip" />}
+          {showState && <RoutineStateChip routine={r} className="routine-row__chip" />}
           {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
         </span>
       </div>
@@ -718,8 +836,8 @@ function RoutineRow({
           />
         )}
         {/* Parar for a run at work, also a paused routine's or a fired one-off's; "Rodar agora" while it may run. */}
-        {(running || !fired) && !reminder && r.canManage ? (
-          running ? (
+        {(stoppable || !fired) && !reminder && r.canManage ? (
+          stoppable ? (
             <Button
               size="sm"
               variant="ghost"
@@ -750,46 +868,7 @@ function RoutineRow({
           label={more}
           trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={more} />}
         >
-          {r.canManage && (
-            <MenuItem icon="edit" onSelect={onEdit}>
-              {t("routines.edit")}
-            </MenuItem>
-          )}
-          <MenuItem icon="waiting" onSelect={() => !selected && onOpen()}>
-            {t("routines.runs")}
-          </MenuItem>
-          {r.canManage && (
-            <MenuItem
-              icon="copy"
-              onSelect={() =>
-                action.mutate(
-                  { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
-                  {
-                    onSuccess: (copy) =>
-                      toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
-                  },
-                )
-              }
-            >
-              {t("routines.duplicate")}
-            </MenuItem>
-          )}
-          {r.canManage && routineHookUrl(r) && (
-            <MenuItem
-              icon="link"
-              onSelect={async () => {
-                await navigator.clipboard?.writeText(routineHookUrl(r) ?? "");
-                toast.show(t("routines.webhookCopied"));
-              }}
-            >
-              {t("routines.copyWebhook")}
-            </MenuItem>
-          )}
-          {r.canManage && (
-            <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
-              {t("routines.delete")}
-            </MenuItem>
-          )}
+          <MenuEntries entries={entries()} />
         </Menu>
       </div>
       <Dialog
@@ -869,11 +948,10 @@ function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: D
       day: midnight,
       label: midnight
         ? new Intl.DateTimeFormat(i18n.language, { weekday: "short" }).format(d).replace(/\./g, "")
-        : new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(d),
+        : formatTime(i18n.language, d.toISOString()),
     });
   }
-  const timeOf = (iso: string) =>
-    new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  const timeOf = (iso: string) => formatTime(i18n.language, iso);
   const later = lanes.filter((r) => futureOf(r).length === 0).length;
   const nowAt = pos(now);
   return (
@@ -1032,6 +1110,7 @@ function RoutineDetails({
   const done = isDoneOnce(r);
   const fired = hasFired(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const described = useRuleDescribe(
     org.id,
@@ -1054,7 +1133,7 @@ function RoutineDetails({
         usage.tokens !== null
           ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
           : null,
-        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(i18n.language, usage.costUsd) }) : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -1099,9 +1178,9 @@ function RoutineDetails({
           <Button size="sm" icon="edit" onClick={onEdit}>
             {t("routines.edit")}
           </Button>
-          {(running || !fired) &&
+          {(stoppable || !fired) &&
             !reminder &&
-            (running ? (
+            (stoppable ? (
               <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
                 {t("routines.stop")}
               </Button>
@@ -1117,6 +1196,7 @@ function RoutineDetails({
           )}
         </div>
       )}
+      {r.state === "usage_paused" && <UsagePausedNote routine={r} />}
       {outage && outages.data && (
         <SwitchComputerDialog open={switching} onOpenChange={setSwitching} outage={outage} data={outages.data} />
       )}
@@ -1144,7 +1224,7 @@ function RoutineDetails({
           <p className="routine-details__sentence">{runsOn}</p>
         </DetailsSection>
       )}
-      <DetailsSection title={t("routines.panel.what", agentGrammar(t, name))}>
+      <DetailsSection title={t("routines.panel.what", agentGrammar(name))}>
         {r.canSeeDetails && r.prompt !== null ? (
           <p className="routine-details__prompt">{r.prompt}</p>
         ) : (
@@ -1225,28 +1305,16 @@ function RoutineDetails({
           <p className="small muted">{t("routines.ahead.hint")}</p>
         </DetailsSection>
       )}
-      <div className="routine-details__pair">
-        <DetailsSection title={t("routines.panel.access")}>
-          <p className="routine-details__sentence">
-            <span className="ac-hintline">
-              {t(`routines.access.${r.access}`)}
-              <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
-                {t("routines.access.hint")}
-              </InfoHint>
-            </span>
-          </p>
-        </DetailsSection>
-        <DetailsSection title={t("routines.panel.report")}>
-          <p className="routine-details__sentence">
-            <span className="ac-hintline">
-              {t(`routines.report.${r.report}`)}
-              <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
-                {t("routines.report.hint")}
-              </InfoHint>
-            </span>
-          </p>
-        </DetailsSection>
-      </div>
+      <DetailsSection title={t("routines.panel.report")}>
+        <p className="routine-details__sentence">
+          <span className="ac-hintline">
+            {t(`routines.report.${r.report}`)}
+            <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
+              {t("routines.report.hint")}
+            </InfoHint>
+          </span>
+        </p>
+      </DetailsSection>
       <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
         {list.length > 0 && (
@@ -1620,9 +1688,8 @@ function RoutineDialog({
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
   const [active, setActive] = useState(routine?.active ?? true);
-  // The two plain questions: when it posts, and what it may do on its own.
+  // When it posts.
   const [report, setReport] = useState<RoutineReport>(routine?.report ?? "when_new");
-  const [access, setAccess] = useState<RoutineAccess>(routine?.access ?? "read");
   const say = useSay();
   const [touched, setTouched] = useState(false);
   // One source of truth for "when": the rule (the picker), with the phrase kept in step.
@@ -1740,7 +1807,6 @@ function RoutineDialog({
     if (triggerChanged) patch.trigger = trigger();
     if (active !== r.active) patch.active = active;
     if (report !== r.report) patch.report = report;
-    if (access !== r.access) patch.access = access;
     return patch;
   };
   // A routine on someone's computer that runs hourly or more often: say how often it wakes that computer.
@@ -1811,7 +1877,6 @@ function RoutineDialog({
           prompt: prompt.trim(),
           target: targetValue(),
           trigger: trigger(),
-          access,
           report,
         },
       },
@@ -2068,26 +2133,7 @@ function RoutineDialog({
               options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
             />
           </div>
-          <div className="routine-kind">
-            <span className="ac-hintline">
-              <span className="ac-field__label">{t("routines.form.access")}</span>
-              <InfoHint name={t("common.about", { label: t("routines.form.access") })}>
-                {t("routines.access.hint")}
-              </InfoHint>
-            </span>
-            <Segmented
-              label={t("routines.form.access")}
-              value={access}
-              onValueChange={setAccess}
-              options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
-            />
-          </div>
-          <RoutineReachWarnings
-            prompt={prompt}
-            access={access}
-            agentId={agentId || null}
-            creatorUserId={routine?.createdByUserId}
-          />
+          <RoutineReachWarnings prompt={prompt} agentId={agentId || null} creatorUserId={routine?.createdByUserId} />
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">
               <Switch id="nr-active" checked={active} onCheckedChange={setActive} />
@@ -2137,7 +2183,7 @@ function runLabel(locale: string, iso: string, timeZone: string) {
     .replace(/\./g, "")
     .replace(/ de /g, " ");
   const time = new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
+    hour: clockHour(locale),
     minute: "2-digit",
     timeZone,
   }).format(d);

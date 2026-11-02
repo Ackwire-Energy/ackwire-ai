@@ -178,7 +178,7 @@ function AgentMachineFolders({ agent, machineId }: { agent: Agent; machineId: st
   const m = machines.data?.find((x) => x.id === machineId);
   if (!m) return null;
   const folders = foldersOfAgent(m.access, agent.id);
-  const g = agentGrammar(t, agent.name);
+  const g = agentGrammar(agent.name);
   return (
     <div className="stack-4" style={{ gap: 6 }} data-agent-folders>
       <span className="ac-hintline">

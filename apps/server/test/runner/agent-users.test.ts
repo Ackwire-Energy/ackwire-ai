@@ -57,7 +57,7 @@ function fakeOs(users: OsUser[] = [{ name: "root", uid: 0, comment: "root" }]) {
     if (file === "usermod") {
       const u = users.find((x) => x.name === name);
       if (!u) return { code: 6, output: `usermod: user '${name}' does not exist` };
-      u.comment = args[1] ?? "";
+      if (args[0] === "--comment") u.comment = args[1] ?? "";
       return { code: 0, output: "" };
     }
     return { code: 0, output: "" };
@@ -187,6 +187,33 @@ test("a useradd that fails keeps the uid listed: the next request makes the user
   expect(os.calls[1]).toStartWith("useradd --uid 21000 ");
 });
 
+test("with a shared folder, each agent's user joins its group and gets ~/shared, made as the agent, once per process", () => {
+  const home = tempDir("agent-users-");
+  dirs.push(home);
+  const os = fakeOs();
+  const shared = { path: "/srv/agentes/shared", group: "agentes-shared" };
+  const users = new AgentUsers({ home, range: RANGE, run: os.run, etc: home, shared });
+  users.ensure(ANA);
+  expect(os.calls.slice(-2)).toEqual([
+    "usermod -aG agentes-shared ag-a1b2c3d4",
+    "/usr/sbin/runuser -u ag-a1b2c3d4 -- ln -s /srv/agentes/shared /home/ag-a1b2c3d4/shared",
+  ]);
+  os.calls.length = 0;
+  users.ensure(ANA);
+  expect(os.calls).toEqual([]);
+
+  // An existing agent joins too, at its first request after the runner starts; a failed usermod is only logged.
+  const lines: string[] = [];
+  const again = new AgentUsers({ home, range: RANGE, run: os.run, etc: home, shared, log: (l) => lines.push(l) });
+  os.failNext("usermod", 6);
+  expect(again.ensure(ANA).user).toBe("ag-a1b2c3d4");
+  expect(os.calls.filter((c) => c.startsWith("usermod") || c.startsWith("/usr/sbin/runuser"))).toEqual([
+    "usermod -aG agentes-shared ag-a1b2c3d4",
+    "/usr/sbin/runuser -u ag-a1b2c3d4 -- ln -s /srv/agentes/shared /home/ag-a1b2c3d4/shared",
+  ]);
+  expect(lines).toEqual([expect.stringContaining("ag-a1b2c3d4 can't use the shared folder: usermod failed (6)")]);
+});
+
 test("no uid left in the range: refused", async () => {
   const home = tempDir("agent-users-");
   dirs.push(home);
@@ -228,11 +255,13 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     USER: "ag-a1b2c3d4",
     LOGNAME: "ag-a1b2c3d4",
     SHELL: "/bin/bash",
-    PATH: "/usr/local/bin:/usr/bin:/bin",
+    // The shared folder's bin/ (ADR 0115) last: a tool an agent put there never stands in for the computer's own.
+    PATH: "/usr/local/bin:/usr/bin:/bin:/home/ag-a1b2c3d4/shared/bin",
+    AGENTES_SHARED_BIN: "/home/ag-a1b2c3d4/shared/bin",
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: "31627",
   };
-  const launcher = systemLauncher(user, true);
+  const launcher = systemLauncher(user, true, false);
   const p = launcher.prefix;
   expect(p.slice(0, 8)).toEqual([
     "/usr/bin/systemd-run",
@@ -294,6 +323,10 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     "mkdir -m 1777 /tmp/.ICE-unix 2>/dev/null || :",
     'exec "$@"',
   ]);
+  // systemd 253 and later: a process the kernel stops for memory takes only itself, not the rest of the scope.
+  const keeps = systemLauncher(user, true, true).prefix;
+  expect(keeps.slice(3, 6)).toEqual(["--collect", "--property=OOMPolicy=continue", "--slice=agents-21003.slice"]);
+  expect(keeps.slice(6)).toEqual(p.slice(5));
   // No systemd as PID 1 (a container): runuser alone.
   expect(systemLauncher(user, false)).toEqual({
     prefix: ["/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"],

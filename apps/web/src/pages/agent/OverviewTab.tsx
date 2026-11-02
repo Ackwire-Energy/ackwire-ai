@@ -66,7 +66,7 @@ export function OverviewTab() {
   const budgetText =
     viewer === "admin" && spent !== undefined && limit !== undefined
       ? t("agentPage.overview.spentOf", {
-          spent: formatUsd(t, locale, spent),
+          spent: formatUsd(locale, spent),
           limit: usd(t, locale, limit),
           month: formatMonth(locale, new Date()),
         })
@@ -321,7 +321,9 @@ export function OverviewTab() {
               <div>
                 <span className="agp-k">{t("audience.section")}</span>
                 <span className="agp-chips">
-                  <Chip icon="message">{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</Chip>
+                  <Chip icon="message">
+                    {audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}
+                  </Chip>
                 </span>
               </div>
             </div>

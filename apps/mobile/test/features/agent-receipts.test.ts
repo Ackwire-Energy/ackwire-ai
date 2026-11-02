@@ -447,22 +447,17 @@ describe("a receipt never adds a line to its row", () => {
   const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
   const num = (text: string, pattern: RegExp) => Number(pattern.exec(text)?.[1]);
 
-  test("the mark stands in room the row already keeps: beside my bubble's last line, at the end of a name line", () => {
+  test("the mark stands in a line the row already keeps: after the time under my turn, at the end of a name line", () => {
     const row = src("features/chat/MessageRow.tsx");
     const marks = src("features/chat/AgentReceipts.tsx");
-    // My row's left padding is the mark's room plus the screen's edge, the same as its right padding.
-    const left = num(row, /me: \{ paddingLeft: (\d+)/);
-    const right = num(row, /me: \{ paddingLeft: \d+, paddingRight: (\d+)/);
-    const room = num(row, /const MARK_ROOM = (\d+);/);
-    expect(left - room).toBe(right);
-    expect(row).toContain("marginLeft: -MARK_ROOM");
-    // Centered on the bubble's last line (24px lines, 10px under them), the mark stays inside a one-line bubble.
-    const mark = num(marks, /mark: \{[^}]*height: (\d+)/);
-    const below = num(row, /meMark: \{[^}]*paddingBottom: (\d+)/);
-    const pad = num(row, /bubble: \{[^}]*paddingVertical: (\d+)/);
-    expect(below + mark / 2).toBe(pad + 24 / 2);
-    expect(below + mark).toBeLessThanOrEqual(pad + 24 + pad);
-    expect(row).toContain("<ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />");
+    // The time's line holds the tallest mark, and the mark sits in it, after the time.
+    expect(num(marks, /mark: \{[^}]*height: (\d+)/)).toBe(num(row, /meTime: \{[^}]*height: (\d+)/));
+    const line = row.slice(row.indexOf("<View style={styles.meTime}>"));
+    expect(line.indexOf("when.time(m.createdAt)")).toBeLessThan(line.indexOf("<ReceiptMark message={m} mine"));
+    expect(line).toContain("<ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />");
+    // The turn's last bubble ends on the cut corner, on the side it stands.
+    expect(row).toContain("solo: { borderBottomRightRadius: BUBBLE_CUT }");
+    expect(row).toContain("end: { borderTopRightRadius: 6, borderBottomRightRadius: BUBBLE_CUT }");
     // Someone else's: absolutely placed in room their name line always keeps, so a mark that comes wraps nothing.
     expect(row).toContain('<View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>');
     expect(row).toMatch(/whoMark: \{ position: "absolute"/);

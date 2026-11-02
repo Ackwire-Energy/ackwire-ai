@@ -1,5 +1,7 @@
+import type { LocaleStrings } from "@agenteschat/i18n/plurals";
+
 /**
- * The app's own strings (pt-BR, the primary locale), under `mobile.*`.
+ * The app's own strings (pt-BR; English, `keys.en.ts`, is the source), under `mobile.*`.
  * They live here until they move into `@agenteschat/i18n` (packages/i18n); `./index.ts` merges them
  * into the shared resources at runtime. `keys.en.ts` must have exactly the same shape (typed below).
  */
@@ -128,9 +130,4 @@ export const mobilePtBR = {
   search: {
     placeholder: "Buscar",
   },
-};
-
-type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
-
-/** Every locale of the app's strings has this shape. */
-export type MobileTranslations = Shape<typeof mobilePtBR>;
+} satisfies LocaleStrings;

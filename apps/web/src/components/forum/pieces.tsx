@@ -26,7 +26,6 @@ import { lookOf } from "@/lib/look";
 
 /** Names, looks and grammar of the people and agents at a table. */
 export function useForumWho() {
-  const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const agentName = (id: string | null | undefined) => (id ? (dir.agentById.get(id)?.name ?? "") : "");
@@ -39,7 +38,7 @@ export function useForumWho() {
   const colorOf = (agentId: string | null | undefined): AgentColor =>
     (agentId ? lookOf(dir.agentById.get(agentId))?.color : undefined) ?? "sky";
   /** "a Ada" / "o Theo" words for a name (people too: "pedido da Marina"). */
-  const g = (name: string) => agentGrammar(t, name);
+  const g = (name: string) => agentGrammar(name);
   return { dir, me: me.user.id, agentName, personName, seatName, look, colorOf, g };
 }
 
@@ -147,7 +146,7 @@ export function TopicTrack({
     const name = it.agentId ? who.agentName(it.agentId) : who.personName(it.userId);
     const g = who.g(name);
     const me = it.userId === who.me;
-    const r = { round: it.round, name, of: g.of };
+    const r = { round: it.round, name, context: g.context };
     switch (it.kind) {
       case "spoke": {
         const s = posts.find((p) => p.id === it.postId)?.stance;
@@ -241,7 +240,11 @@ export function useOrigin() {
           agentId: null,
           short,
           text: requester
-            ? t("forum.origin.issueBy", { number: o.issueNumber ?? "", name: requester, of: who.g(requester).of })
+            ? t("forum.origin.issueBy", {
+                number: o.issueNumber ?? "",
+                name: requester,
+                context: who.g(requester).context,
+              })
             : short,
         };
       }

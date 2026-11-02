@@ -1,4 +1,5 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { agents } from "./agents";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -36,6 +37,15 @@ export const skills = pgTable(
     /** Enabled for agents created later. */
     defaultForNewAgents: boolean().notNull().default(false),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    /** `person` (installed or written by people) or `agent` (promoted from an agent's how-tos, ADR 0120). */
+    origin: text().notNull().default("person"),
+    /** An agent-made skill's agent: the only one that may change it with `update_skill`. */
+    ownerAgentId: uuid().references(() => agents.id, { onDelete: "set null" }),
+    /** A person froze it: agents can't change it and decay leaves it alone. */
+    locked: boolean().notNull().default(false),
+    /** `load_skill` calls, for an agent-made skill's decay. */
+    useCount: integer().notNull().default(0),
+    lastUsedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),

@@ -30,6 +30,7 @@ import type { IconName } from "@/ui";
 // ── Sections ────────────────────────────────────────────────────────────────
 
 export type SettingsSection =
+  | "apps"
   | "general"
   | "members"
   | "audit"
@@ -43,7 +44,7 @@ export type SettingsSection =
   | "usage"
   | "import";
 
-export type SettingsGroup = "org" | "agents" | "costs";
+export type SettingsGroup = "you" | "org" | "agents" | "costs";
 
 export interface SettingsEntry {
   id: SettingsSection;
@@ -57,6 +58,8 @@ export interface SettingsEntry {
 
 /** The web's settings, in its order and groups (`settings.group.*`, `settings.section.*`), with the phone's screens. */
 export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
+  // AI apps (ADR 0119): each person's own connections in this workspace; connecting one happens on the web.
+  { id: "apps", group: "you", icon: "share", href: "/settings/apps", allowed: () => true },
   { id: "general", group: "org", icon: "home", href: "/settings/general", allowed: () => true },
   // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
@@ -77,7 +80,7 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   { id: "import", group: "costs", icon: "archive", href: "/settings/import", allowed: (o) => can(o, "create_agents") },
 ];
 
-export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "agents", "costs"];
+export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["you", "org", "agents", "costs"];
 
 /** The sections this membership opens, in order. */
 export const visibleSections = (org: OrgSummary | null | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(org));
