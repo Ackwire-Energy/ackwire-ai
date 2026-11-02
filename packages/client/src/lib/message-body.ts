@@ -64,7 +64,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
   const own =
-    signedOut && (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor") ? noAi.own : null;
+    signedOut &&
+    (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor" || noAi?.own === "opencode")
+      ? noAi.own
+      : null;
   if (own) {
     const brain = brainName(own);
     return t("chat.body.no_ai_not_signed_in", { brain, defaultValue: body });

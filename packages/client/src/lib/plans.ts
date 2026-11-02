@@ -25,7 +25,7 @@ export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "nee
  */
 export const brainModelChoices = (
   plan: CodingPlan | undefined,
-  models: readonly { value: string; label: string; inPlan?: boolean }[],
+  models: readonly { value: string; label: string; inPlan?: boolean; free?: boolean }[],
 ): BrainModelChoice[] =>
   plan
     ? plan.claudeCode.models.map((m) => ({
@@ -36,7 +36,12 @@ export const brainModelChoices = (
         ...(m.free ? { free: m.free } : {}),
         ...(m.maker ? { maker: m.maker } : {}),
       }))
-    : models.map(({ value, label, inPlan }) => ({ value, label, ...(inPlan ? { inPlan } : {}) }));
+    : models.map(({ value, label, inPlan, free }) => ({
+        value,
+        label,
+        ...(inPlan ? { inPlan } : {}),
+        ...(free ? { free } : {}),
+      }));
 
 /**
  * The choice a stored model shows as: on a plan, the model it runs there (an alias the plan leaves out or another
@@ -69,12 +74,26 @@ export const CURSOR_KEY_PLAN: Pick<CodingPlan, "label" | "name" | "maker" | "sit
 };
 
 /**
- * The key step an account sign-in shows, if any: a coding plan's (its `provider`), or Cursor's API key when chosen
- * under Cursor's sign-in; and the `provider` the sign-in starts with.
+ * An OpenCode account (ADR 0127): its key is its only sign-in, made in OpenCode's console. Without one the agent
+ * still thinks on OpenCode's free tier with the computer's own CLI.
+ */
+export const OPENCODE_KEY_PLAN: Pick<CodingPlan, "label" | "name" | "maker" | "site" | "keyPattern" | "placeholder"> = {
+  label: "OpenCode",
+  name: "OpenCode API key",
+  maker: "OpenCode",
+  site: "https://opencode.ai/console",
+  keyPattern: "^[\\x21-\\x7e]{16,512}$",
+  placeholder: "oc_sk_",
+};
+
+/**
+ * The key step an account sign-in shows, if any: a coding plan's (its `provider`), Cursor's API key when chosen
+ * under Cursor's sign-in, or OpenCode's, its only one; and the `provider` the sign-in starts with.
  */
 export function signInKey(provider: string | undefined, kind: string, cursorKey: boolean) {
   const coding = planOf(provider);
   if (coding) return { plan: coding as typeof CURSOR_KEY_PLAN, provider };
+  if (kind === "opencode") return { plan: OPENCODE_KEY_PLAN, provider: "zen" };
   return kind === "cursor" && cursorKey
     ? { plan: CURSOR_KEY_PLAN, provider: "cursor" }
     : { plan: undefined, provider: undefined };
@@ -101,7 +120,7 @@ export function planReplies(
   }: {
     on: boolean;
     agent: string | null;
-    brain: "claude_code" | "codex" | "cursor";
+    brain: "claude_code" | "codex" | "cursor" | "opencode";
     /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
     plan?: string | null;
     coding?: CodingPlan;

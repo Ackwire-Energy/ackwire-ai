@@ -3979,6 +3979,9 @@
   "noAi.notSignedIn.cursor": {
     "value": "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s page."
   },
+  "noAi.notSignedIn.opencode": {
+    "value": "OpenCode can't think on this computer. Connect an OpenCode key on {{name}}'s page."
+  },
   "noAi.card.connected": {
     "value": "Done: {{name}} has an AI now."
   },
@@ -4018,6 +4021,9 @@
   "connectAi.title.cursor": {
     "value": "Connect your Cursor plan"
   },
+  "connectAi.title.zen": {
+    "value": "Connect OpenCode"
+  },
   "connectAi.title.api_key": {
     "value": "Add an API key"
   },
@@ -4053,6 +4059,12 @@
   },
   "connectAi.plan.cursor.tiers": {
     "value": "Pro, Pro+, Ultra or Teams, or a Cursor API key"
+  },
+  "connectAi.plan.zen.title": {
+    "value": "OpenCode"
+  },
+  "connectAi.plan.zen.tiers": {
+    "value": "Free models, or your OpenCode key"
   },
   "connectAi.plan.zai.tiers": {
     "value": "Lite, Pro or Max"
@@ -4200,6 +4212,9 @@
   },
   "connectAi.otherAccount.cursor": {
     "value": "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again."
+  },
+  "connectAi.otherAccount.opencode": {
+    "value": "OpenCode signed in as {{email}}, not {{account}}. Try again with the right key."
   },
   "connectAi.useAnyway": {
     "value": "Use {{email}}"
@@ -7333,6 +7348,9 @@
   "agentPage.work.brain.add.title.cursor": {
     "value": "Add a Cursor account"
   },
+  "agentPage.work.brain.add.title.opencode": {
+    "value": "Add an OpenCode key"
+  },
   "agentPage.work.brain.add.stepOne.claude_code": {
     "value": "The account with your plan"
   },
@@ -7353,6 +7371,9 @@
   },
   "agentPage.work.brain.add.open.cursor": {
     "value": "Sign in with Cursor"
+  },
+  "agentPage.work.brain.add.opencodeFree": {
+    "value": "No key needed for OpenCode's free models. A key from OpenCode's console adds its paid ones."
   },
   "agentPage.work.brain.add.cursorFinish": {
     "value": "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself."
@@ -7413,6 +7434,9 @@
   },
   "agentPage.work.brain.add.duplicate.cursor": {
     "value": "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again."
+  },
+  "agentPage.work.brain.add.duplicate.opencode": {
+    "value": "That OpenCode key is already connected as {{account}}."
   },
   "agentPage.work.brain.add.startFailed": {
     "value": "No answer from {{computer}}. Try again in a moment."
@@ -15241,6 +15265,9 @@
   "aiAccounts.connect.cursor": {
     "value": "Cursor"
   },
+  "aiAccounts.connect.opencode": {
+    "value": "OpenCode"
+  },
   "aiAccounts.connect.needs.keys": {
     "value": "Update agentes on the computer to use a plan's key"
   },
@@ -15257,6 +15284,9 @@
     "value": "Not ready on {{computer}} yet"
   },
   "aiAccounts.connect.needsCloud.cursor": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.opencode": {
     "value": "Not ready on {{computer}} yet"
   },
   "aiAccounts.connect.needsCloud.online": {
@@ -18412,6 +18442,9 @@
   "brain.line.cursor": {
     "value": "{{model}} on the Cursor plan"
   },
+  "brain.line.zen": {
+    "value": "{{model}} on OpenCode"
+  },
   "brain.line.coding": {
     "value": "{{model}} on {{plan}}"
   },
@@ -18423,6 +18456,9 @@
   },
   "brain.line.cursorOf": {
     "value": "{{model}} on {{owner}}'s Cursor plan"
+  },
+  "brain.line.zenOf": {
+    "value": "{{model}} on {{owner}}'s OpenCode"
   },
   "brain.line.codingOf": {
     "value": "{{model}} on {{owner}}'s {{plan}}"
@@ -18436,6 +18472,9 @@
   "brain.line.cursorAuto": {
     "value": "Cursor plan"
   },
+  "brain.line.zenAuto": {
+    "value": "OpenCode"
+  },
   "brain.line.codingAuto": {
     "value": "{{plan}}"
   },
@@ -18447,6 +18486,9 @@
   },
   "brain.line.cursorAutoOf": {
     "value": "{{owner}}'s Cursor plan"
+  },
+  "brain.line.zenAutoOf": {
+    "value": "{{owner}}'s OpenCode"
   },
   "brain.line.codingAutoOf": {
     "value": "{{owner}}'s {{plan}}"
@@ -18472,6 +18514,9 @@
   "brain.card.cursor": {
     "value": "Cursor"
   },
+  "brain.card.opencode": {
+    "value": "OpenCode"
+  },
   "brain.foot.api": {
     "value": "Through the API"
   },
@@ -18492,6 +18537,9 @@
   },
   "brain.cursorText": {
     "value": "Uses the Cursor plan of whoever connected the computer."
+  },
+  "brain.opencodeText": {
+    "value": "OpenCode's free models, or the OpenCode key of whoever connected the computer."
   },
   "brain.cursorModel.inPlan": {
     "value": "In your Cursor plan"
@@ -18588,6 +18636,9 @@
   },
   "brain.summary.cursor": {
     "value": "Cursor · {{model}}"
+  },
+  "brain.summary.opencode": {
+    "value": "OpenCode · {{model}}"
   },
   "brain.summary.noFallback": {
     "value": "{{brain}}, no API fallback"
@@ -23485,6 +23536,9 @@
   "machines.access.tool.cursor": {
     "value": "Cursor"
   },
+  "machines.access.tool.opencode": {
+    "value": "OpenCode"
+  },
   "machines.access.tool.commands": {
     "value": "Commands"
   },
@@ -23499,6 +23553,9 @@
   },
   "machines.access.toolText.cursor": {
     "value": "Like Claude Code, with a Cursor account. Only in the allowed folders."
+  },
+  "machines.access.toolText.opencode": {
+    "value": "Like Claude Code, with OpenCode's free models or an OpenCode key. Only in the allowed folders."
   },
   "machines.access.toolText.commands": {
     "value": "Runs Terminal commands, like tests and builds."

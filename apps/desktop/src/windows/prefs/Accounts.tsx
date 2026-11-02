@@ -38,9 +38,9 @@ import { useToast } from "../../ui/Toast";
 
 /**
  * What changes between Claude Code and Codex (names stay in the strings; sites are not words). Cursor's accounts
- * (ADR 0114) are added from the web app, not here yet.
+ * (ADR 0114) and OpenCode's keys (ADR 0127) are added from the web app, not here yet.
  */
-type DesktopKind = Exclude<AccountKind, "cursor">;
+type DesktopKind = Exclude<AccountKind, "cursor" | "opencode">;
 const KINDS: Record<
   DesktopKind,
   { title: string; tool: string; product: string; signIn: string; signInLead: string; site: string }
@@ -245,7 +245,7 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
         onOpenChange={(o) => !o && !busy && setRemoving(null)}
         title={t("desktop.prefs.accounts.removeTitle", { account: removing ? accountName(removing) : "" })}
         description={t("desktop.prefs.accounts.removeBody", {
-          site: removing && removing.kind !== "cursor" ? KINDS[removing.kind].site : "",
+          site: removing && removing.kind !== "cursor" && removing.kind !== "opencode" ? KINDS[removing.kind].site : "",
         })}
         closeLabel={t("desktop.common.close")}
         width={440}

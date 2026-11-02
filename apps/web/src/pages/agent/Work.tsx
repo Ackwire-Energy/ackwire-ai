@@ -282,7 +282,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
-    !view || (kind !== "claude_code" && kind !== "codex" && kind !== "cursor")
+    !view || (kind !== "claude_code" && kind !== "codex" && kind !== "cursor" && kind !== "opencode")
       ? null
       : view.account
         ? view.accounts.find((a) => a.id === view.account)?.usage
@@ -740,7 +740,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const moves = home && home.machineId !== work.machineId ? home : null;
   const option = (home?.options ?? view.options).find((o) => o.kind === kind);
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
-  const accountKind = kind === "claude_code" || kind === "codex" || kind === "cursor" ? kind : null;
+  const accountKind =
+    kind === "claude_code" || kind === "codex" || kind === "cursor" || kind === "opencode" ? kind : null;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
   const computerName = view.computer?.name ?? "";
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
@@ -763,11 +764,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     "key",
     "claude",
     "chatgpt",
-    // Cursor (ADR 0114) only where a computer here runs it, or the agent thinks with it: Connect an AI shows it always.
-    ...(savedCard === "cursor" ||
-    [view.options, ...machines.map((m) => m.options)].flat().some((o) => o.kind === "cursor" && o.available)
-      ? (["cursor"] as const)
-      : []),
+    // Cursor (ADR 0114) and OpenCode (ADR 0127) only where a computer here runs them, or the agent thinks with them:
+    // Connect an AI shows them always.
+    ...(["cursor", "zen"] as const).filter(
+      (c) =>
+        savedCard === c ||
+        [view.options, ...machines.map((m) => m.options)].flat().some((o) => o.kind === kindOf(c) && o.available),
+    ),
     ...PLAN_IDS.filter(
       (p) => p === savedCard || allAccounts.some((a) => a.provider === p && (a.mine || a.id === view.account)),
     ),
@@ -1372,7 +1375,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   <ProviderLogo id={planMark(c)} off={off} />
                 ),
               title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
-              tag: c === "chatgpt" || c === "cursor" ? t("brain.testing") : undefined,
+              tag: c === "chatgpt" || c === "cursor" || c === "zen" ? t("brain.testing") : undefined,
               description:
                 c === "key"
                   ? t("agentPage.work.brain.modelText", g)

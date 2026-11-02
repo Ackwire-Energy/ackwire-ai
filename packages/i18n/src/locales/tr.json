@@ -1606,7 +1606,8 @@
     "notSignedIn": {
       "claude_code": "Claude Code bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Claude hesabı bağlayın.",
       "codex": "Codex bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir ChatGPT hesabı bağlayın.",
-      "cursor": "Cursor bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Cursor hesabı bağlayın."
+      "cursor": "Cursor bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Cursor hesabı bağlayın.",
+      "opencode": "OpenCode bu bilgisayarda düşünemiyor. {{name}} sayfasından bir OpenCode anahtarı bağlayın."
     },
     "card": {
       "connected": "Tamam: {{name}} artık bir yapay zekaya sahip.",
@@ -1626,6 +1627,7 @@
       "claude": "Claude planınızı bağlayın",
       "chatgpt": "ChatGPT planınızı bağlayın",
       "cursor": "Cursor planınızı bağlayın",
+      "zen": "OpenCode'u bağlayın",
       "api_key": "API anahtarı ekleyin"
     },
     "titleFor": "{{name}} için bir yapay zeka bağlayın",
@@ -1647,6 +1649,10 @@
       "cursor": {
         "title": "Cursor planınız",
         "tiers": "Pro, Pro+, Ultra veya Teams ya da bir Cursor API anahtarı"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "Ücretsiz modeller veya OpenCode anahtarınız"
       },
       "zai": {
         "tiers": "Lite, Pro veya Max"
@@ -1718,7 +1724,8 @@
     "otherAccount": {
       "claude_code": "Claude'da {{account}} değil, {{email}} ile giriş yapılmış. Claude sayfasında çıkış yapıp tekrar deneyin.",
       "codex": "ChatGPT'de {{account}} değil, {{email}} ile giriş yapılmış. ChatGPT sayfasında çıkış yapıp tekrar deneyin.",
-      "cursor": "Cursor'da {{account}} değil, {{email}} ile giriş yapılmış. Cursor sayfasında çıkış yapıp tekrar deneyin."
+      "cursor": "Cursor'da {{account}} değil, {{email}} ile giriş yapılmış. Cursor sayfasında çıkış yapıp tekrar deneyin.",
+      "opencode": "OpenCode {{account}} değil, {{email}} olarak oturum açtı. Doğru anahtarla tekrar deneyin."
     },
     "useAnyway": "{{email}} kullan",
     "assignFailed": "{{label}} hesabı bağlandı ama {{agent}} bu hesaba geçemedi.",
@@ -2983,7 +2990,8 @@
           "title": {
             "claude_code": "Claude hesabı ekle",
             "codex": "ChatGPT hesabı ekle",
-            "cursor": "Cursor hesabı ekle"
+            "cursor": "Cursor hesabı ekle",
+            "opencode": "OpenCode anahtarı ekleyin"
           },
           "stepOne": {
             "claude_code": "Planınızın olduğu hesap",
@@ -2996,6 +3004,7 @@
             "codex": "ChatGPT ile giriş yap",
             "cursor": "Cursor ile giriş yap"
           },
+          "opencodeFree": "OpenCode'un ücretsiz modelleri anahtar istemez. OpenCode konsolundan bir anahtar ücretli modelleri de ekler.",
           "cursorFinish": "Cursor sayfasında giriş yapın, giriş {{computer}} üzerinde kendiliğinden tamamlanır.",
           "cursorKey": "Bunun yerine Cursor API anahtarı kullan",
           "openAgain": "Yeniden aç",
@@ -3016,7 +3025,8 @@
           "duplicate": {
             "claude_code": "Claude, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Claude sayfasında çıkış yapıp tekrar deneyin.",
             "codex": "ChatGPT, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için ChatGPT sayfasında çıkış yapıp tekrar deneyin.",
-            "cursor": "Cursor, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Cursor sayfasında çıkış yapıp tekrar deneyin."
+            "cursor": "Cursor, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Cursor sayfasında çıkış yapıp tekrar deneyin.",
+            "opencode": "Bu OpenCode anahtarı zaten {{account}} olarak bağlı."
           },
           "startFailed": "{{computer}} yanıt vermedi. Birazdan tekrar deneyin.",
           "sendFailed": "Kod gönderilemedi. Kontrol edip tekrar deneyin.",
@@ -6224,6 +6234,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "Plan anahtarı kullanmak için bilgisayardaki agentes uygulamasını güncelleyin"
       },
@@ -6233,6 +6244,7 @@
         "claude_code": "{{computer}} üzerinde henüz hazır değil",
         "codex": "{{computer}} üzerinde henüz hazır değil",
         "cursor": "{{computer}} üzerinde henüz hazır değil",
+        "opencode": "{{computer}} üzerinde henüz hazır değil",
         "online": "{{computer}} şu anda yanıt vermiyor. İlgileniyoruz."
       }
     },
@@ -7475,18 +7487,22 @@
       "claude": "Claude planında {{model}}",
       "chatgpt": "ChatGPT planında {{model}}",
       "cursor": "Cursor planında {{model}}",
+      "zen": "OpenCode ile {{model}}",
       "coding": "{{plan}} üzerinde {{model}}",
       "claudeOf": "{{owner}} kişisinin Claude planında {{model}}",
       "chatgptOf": "{{owner}} kişisinin ChatGPT planında {{model}}",
       "cursorOf": "{{owner}} kişisinin Cursor planında {{model}}",
+      "zenOf": "{{owner}} adlı kişinin OpenCode'u ile {{model}}",
       "codingOf": "{{owner}} kişisinin {{plan}} planında {{model}}",
       "claudeAuto": "Claude planı",
       "chatgptAuto": "ChatGPT planı",
       "cursorAuto": "Cursor planı",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}} kişisinin Claude planı",
       "chatgptAutoOf": "{{owner}} kişisinin ChatGPT planı",
       "cursorAutoOf": "{{owner}} kişisinin Cursor planı",
+      "zenAutoOf": "{{owner}} adlı kişinin OpenCode'u",
       "codingAutoOf": "{{owner}} kişisinin {{plan}} planı",
       "on": "{{computer}} üzerinde {{line}}"
     },
@@ -7496,7 +7512,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "API üzerinden",
@@ -7507,6 +7524,7 @@
     "claude_codeText": "Bilgisayarı bağlayan kişinin Claude planını kullanır.",
     "codexText": "Bilgisayarı bağlayan kişinin ChatGPT planını kullanır.",
     "cursorText": "Bilgisayarı bağlayan kişinin Cursor planını kullanır.",
+    "opencodeText": "OpenCode'un ücretsiz modelleri veya bilgisayarı bağlayan kişinin OpenCode anahtarı.",
     "cursorModel": {
       "inPlan": "Cursor planınıza dahil",
       "apiPrice": "Cursor tarafından API fiyatlarıyla faturalanır"
@@ -7550,6 +7568,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, API yedeği yok"
     },
     "mission": {
@@ -9629,6 +9648,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "Komutlar",
         "browser": "Tarayıcı"
       },
@@ -9636,6 +9656,7 @@
         "claude": "Dosya yazar ve değiştirir, yalnızca izin verilen klasörlerde.",
         "codex": "Claude Code gibi, bir ChatGPT hesabıyla. Yalnızca izin verilen klasörlerde.",
         "cursor": "Claude Code gibi, bir Cursor hesabıyla. Yalnızca izin verilen klasörlerde.",
+        "opencode": "Claude Code gibi, OpenCode'un ücretsiz modelleri veya bir OpenCode anahtarıyla. Yalnızca izin verilen klasörlerde.",
         "commands": "Test ve derleme gibi Terminal komutları çalıştırır."
       },
       "commandsWarn": "Komutlar yalnızca izin verilen klasörlere değil, bilgisayarın başka yerlerine de erişebilir.",

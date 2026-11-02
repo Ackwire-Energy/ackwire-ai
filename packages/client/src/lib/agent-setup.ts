@@ -126,7 +126,7 @@ function aiLine(t: TFunction, r: AgentSetupResult, o: { now: string; owner?: str
 export type NewAgentStart = (
   | { brain: "model"; model: string; key: string | null; contextTokens: number | null }
   | {
-      brain: "claude_code" | "codex" | "cursor";
+      brain: "claude_code" | "codex" | "cursor" | "opencode";
       machineId: string;
       computer: string;
       account: { id: string; label: string } | null;

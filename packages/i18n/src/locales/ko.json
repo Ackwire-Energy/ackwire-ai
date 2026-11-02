@@ -1550,7 +1550,8 @@
     "notSignedIn": {
       "claude_code": "이 컴퓨터에서 Claude Code에 로그인되어 있지 않아요. {{name}}의 페이지에서 Claude 계정을 연결하세요.",
       "codex": "이 컴퓨터에서 Codex에 로그인되어 있지 않아요. {{name}}의 페이지에서 ChatGPT 계정을 연결하세요.",
-      "cursor": "이 컴퓨터에서 Cursor에 로그인되어 있지 않아요. {{name}}의 페이지에서 Cursor 계정을 연결하세요."
+      "cursor": "이 컴퓨터에서 Cursor에 로그인되어 있지 않아요. {{name}}의 페이지에서 Cursor 계정을 연결하세요.",
+      "opencode": "이 컴퓨터에서 OpenCode가 생각할 수 없어요. {{name}}의 페이지에서 OpenCode 키를 연결하세요."
     },
     "card": {
       "connected": "완료됐어요. 이제 {{name}}에게 AI가 있어요.",
@@ -1570,6 +1571,7 @@
       "claude": "Claude 요금제 연결",
       "chatgpt": "ChatGPT 요금제 연결",
       "cursor": "Cursor 요금제 연결",
+      "zen": "OpenCode 연결",
       "api_key": "API 키 추가"
     },
     "titleFor": "{{name}}의 AI 연결",
@@ -1591,6 +1593,10 @@
       "cursor": {
         "title": "내 Cursor 요금제",
         "tiers": "Pro, Pro+, Ultra 또는 Teams, 또는 Cursor API 키"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "무료 모델, 또는 내 OpenCode 키"
       },
       "zai": {
         "tiers": "Lite, Pro 또는 Max"
@@ -1662,7 +1668,8 @@
     "otherAccount": {
       "claude_code": "Claude에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. Claude 페이지에서 로그아웃하고 다시 시도하세요.",
       "codex": "ChatGPT에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. ChatGPT 페이지에서 로그아웃하고 다시 시도하세요.",
-      "cursor": "Cursor에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. Cursor 페이지에서 로그아웃하고 다시 시도하세요."
+      "cursor": "Cursor에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. Cursor 페이지에서 로그아웃하고 다시 시도하세요.",
+      "opencode": "OpenCode가 {{account}}이 아닌 {{email}}(으)로 로그인했어요. 올바른 키로 다시 시도하세요."
     },
     "useAnyway": "{{email}} 사용",
     "assignFailed": "{{label}} 계정은 연결됐지만 {{agent}}을(를) 이 계정으로 바꾸지 못했어요.",
@@ -2896,7 +2903,8 @@
           "title": {
             "claude_code": "Claude 계정 추가",
             "codex": "ChatGPT 계정 추가",
-            "cursor": "Cursor 계정 추가"
+            "cursor": "Cursor 계정 추가",
+            "opencode": "OpenCode 키 추가"
           },
           "stepOne": {
             "claude_code": "요금제가 있는 계정",
@@ -2909,6 +2917,7 @@
             "codex": "ChatGPT로 로그인",
             "cursor": "Cursor로 로그인"
           },
+          "opencodeFree": "OpenCode의 무료 모델은 키가 필요 없어요. OpenCode 콘솔의 키를 쓰면 유료 모델도 쓸 수 있어요.",
           "cursorFinish": "Cursor 페이지에서 로그인하면 {{computer}}에서 로그인이 자동으로 완료돼요.",
           "cursorKey": "대신 Cursor API 키 사용",
           "openAgain": "다시 열기",
@@ -2929,7 +2938,8 @@
           "duplicate": {
             "claude_code": "Claude가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 Claude 페이지에서 로그아웃하고 다시 시도하세요.",
             "codex": "ChatGPT가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 ChatGPT 페이지에서 로그아웃하고 다시 시도하세요.",
-            "cursor": "Cursor가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 Cursor 페이지에서 로그아웃하고 다시 시도하세요."
+            "cursor": "Cursor가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 Cursor 페이지에서 로그아웃하고 다시 시도하세요.",
+            "opencode": "이 OpenCode 키는 이미 {{account}}(으)로 연결되어 있어요."
           },
           "startFailed": "{{computer}}에서 응답이 없어요. 잠시 후 다시 시도하세요.",
           "sendFailed": "코드를 보내지 못했어요. 확인하고 다시 시도하세요.",
@@ -6000,6 +6010,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "요금제 키를 사용하려면 컴퓨터에서 agentes를 업데이트하세요"
       },
@@ -6009,6 +6020,7 @@
         "claude_code": "{{computer}}에서 아직 준비되지 않았어요",
         "codex": "{{computer}}에서 아직 준비되지 않았어요",
         "cursor": "{{computer}}에서 아직 준비되지 않았어요",
+        "opencode": "{{computer}}에서 아직 준비되지 않았어요",
         "online": "지금 {{computer}}이(가) 응답하지 않아요. 해결 중이에요."
       }
     },
@@ -7211,18 +7223,22 @@
       "claude": "Claude 요금제의 {{model}}",
       "chatgpt": "ChatGPT 요금제의 {{model}}",
       "cursor": "Cursor 요금제의 {{model}}",
+      "zen": "OpenCode의 {{model}}",
       "coding": "{{plan}}의 {{model}}",
       "claudeOf": "{{model}} · {{owner}}님의 Claude 요금제",
       "chatgptOf": "{{owner}}님의 ChatGPT 요금제의 {{model}}",
       "cursorOf": "{{owner}}님의 Cursor 요금제의 {{model}}",
+      "zenOf": "{{owner}}의 OpenCode에서 {{model}}",
       "codingOf": "{{owner}}님의 {{plan}}의 {{model}}",
       "claudeAuto": "Claude 요금제",
       "chatgptAuto": "ChatGPT 요금제",
       "cursorAuto": "Cursor 요금제",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}}님의 Claude 요금제",
       "chatgptAutoOf": "{{owner}}님의 ChatGPT 요금제",
       "cursorAutoOf": "{{owner}}님의 Cursor 요금제",
+      "zenAutoOf": "{{owner}}의 OpenCode",
       "codingAutoOf": "{{owner}}님의 {{plan}}",
       "on": "{{computer}}의 {{line}}"
     },
@@ -7232,7 +7248,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "API 사용",
@@ -7243,6 +7260,7 @@
     "claude_codeText": "컴퓨터를 연결한 사람의 Claude 요금제를 사용해요.",
     "codexText": "컴퓨터를 연결한 사람의 ChatGPT 요금제를 사용해요.",
     "cursorText": "컴퓨터를 연결한 사람의 Cursor 요금제를 사용해요.",
+    "opencodeText": "OpenCode의 무료 모델, 또는 컴퓨터를 연결한 사람의 OpenCode 키를 사용해요.",
     "cursorModel": {
       "inPlan": "내 Cursor 요금제에 포함",
       "apiPrice": "Cursor가 API 가격으로 청구"
@@ -7286,6 +7304,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, API 대체 없음"
     },
     "mission": {
@@ -9320,6 +9339,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "명령",
         "browser": "브라우저"
       },
@@ -9327,6 +9347,7 @@
         "claude": "허용된 폴더에서만 파일을 작성하고 수정해요.",
         "codex": "Claude Code와 같지만 ChatGPT 계정을 사용해요. 허용된 폴더에서만 작동해요.",
         "cursor": "Claude Code와 같지만 Cursor 계정을 사용해요. 허용된 폴더에서만 작동해요.",
+        "opencode": "Claude Code와 같지만 OpenCode의 무료 모델이나 OpenCode 키를 사용해요. 허용된 폴더에서만 작동해요.",
         "commands": "테스트나 빌드 같은 터미널 명령을 실행해요."
       },
       "commandsWarn": "명령은 허용된 폴더뿐 아니라 컴퓨터의 다른 부분에도 접근할 수 있어요.",

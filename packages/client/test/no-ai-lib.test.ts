@@ -23,13 +23,14 @@ import {
   type PlanChoice,
   type PlanGate,
   planGate,
+  planMark,
   planOfAccount,
   planOfKind,
   signInAgainPlan,
   signsInOnce,
   signsInPerAgent,
 } from "../src/lib/no-ai";
-import { LOGIN_PER_AGENT, SHARED_SIGN_INS } from "../src/lib/plans";
+import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
 
 const setup = (patch: Partial<ComputerSetup> = {}) =>
   setupView({
@@ -244,12 +245,13 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(firstAgent([], () => false)).toBeUndefined();
   });
 
-  test("Claude, ChatGPT, Cursor, then the coding plans; ChatGPT signs in through Codex, Cursor through its own CLI", () => {
-    expect(PLAN_CHOICES).toEqual(["claude", "chatgpt", "cursor", "zai", "kimi", "minimax", "opencode"]);
+  test("Claude, ChatGPT, Cursor, OpenCode, then the coding plans; ChatGPT signs in through Codex, Cursor and OpenCode through their own CLIs", () => {
+    expect(PLAN_CHOICES).toEqual(["claude", "chatgpt", "cursor", "zen", "zai", "kimi", "minimax", "opencode"]);
     expect(PLAN_CHOICES.map((c: PlanChoice) => kindOf(c))).toEqual([
       "claude_code",
       "codex",
       "cursor",
+      "opencode",
       "claude_code",
       "claude_code",
       "claude_code",
@@ -261,7 +263,7 @@ describe("the agent a plan starts on, and the order of the plans", () => {
 describe("All agents: one login per agent, the key pasted once", () => {
   test("Claude and the coding plans sign in once per agent; ChatGPT stays one agent per account", () => {
     expect(LOGIN_PER_AGENT).toEqual({ claude_code: true, codex: false, cursor: false, key: true });
-    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(["claude", "zai", "kimi", "minimax", "opencode"]);
+    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(["claude", "zen", "zai", "kimi", "minimax", "opencode"]);
   });
 
   /** Ada and Theo have no AI, Lia is on GLM Coding, Bo on the API key, Cy on Claude, Di on the other computer. */
@@ -476,6 +478,23 @@ describe("Cursor (ADR 0114): a plan of its own, signed in through its CLI", () =
     const t = ((key: string, o?: { brain?: string }) => `${key}:${o?.brain ?? ""}`) as unknown as TFunction;
     expect(serverBody(t, "…", { bodyCode: "no_ai", noAi: { reason: "not_signed_in", own: "cursor" } })).toBe(
       "chat.body.no_ai_not_signed_in:Cursor",
+    );
+  });
+});
+
+describe("OpenCode (ADR 0127): its free tier or its key, through its own CLI", () => {
+  test("its accounts and agents read as OpenCode, its mark is OpenCode's, a key thinks for several agents", () => {
+    expect(planOfKind("opencode")).toBe("zen");
+    expect(planOfAccount({ kind: "opencode", provider: "zen" })).toBe("zen");
+    // OpenCode Go's key on Claude Code stays the coding plan.
+    expect(planOfAccount({ kind: "claude_code", provider: "opencode" })).toBe("opencode");
+    expect(agentAi({ brain: { kind: "opencode", model: null } }, "ready")).toBe("zen");
+    expect(planMark("zen")).toBe("opencode");
+    expect(signsInPerAgent("zen")).toBe(true);
+    expect(signInKey(undefined, "opencode", false)).toEqual({ plan: OPENCODE_KEY_PLAN, provider: "zen" });
+    const t = ((key: string, o?: { brain?: string }) => `${key}:${o?.brain ?? ""}`) as unknown as TFunction;
+    expect(serverBody(t, "…", { bodyCode: "no_ai", noAi: { reason: "not_signed_in", own: "opencode" } })).toBe(
+      "chat.body.no_ai_not_signed_in:OpenCode",
     );
   });
 });

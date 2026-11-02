@@ -1600,6 +1600,10 @@ export const ptBR = {
       cursor: "O Cursor está sem login neste computador. Conecte uma conta do Cursor na página do\u00a0{{name}}.",
       cursor_female:
         "O Cursor está sem login neste computador. Conecte uma conta do Cursor na página da\u00a0{{name}}.",
+      opencode:
+        "O OpenCode não consegue pensar neste computador. Conecte uma chave do OpenCode na página do\u00a0{{name}}.",
+      opencode_female:
+        "O OpenCode não consegue pensar neste computador. Conecte uma chave do OpenCode na página da\u00a0{{name}}.",
     },
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
@@ -1620,6 +1624,7 @@ export const ptBR = {
       claude: "Conectar o seu plano do Claude",
       chatgpt: "Conectar o seu plano do ChatGPT",
       cursor: "Conectar o seu plano do Cursor",
+      zen: "Conectar o OpenCode",
       api_key: "Adicionar uma chave de API",
     },
     titleFor: "Conectar uma IA para o {{name}}",
@@ -1636,6 +1641,7 @@ export const ptBR = {
       claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Ultra, Team ou Enterprise" },
       chatgpt: { title: "Seu plano do ChatGPT", tiers: "Plus, Pro, Business ou Enterprise" },
       cursor: { title: "Seu plano do Cursor", tiers: "Pro, Pro+, Ultra ou Teams, ou uma chave de API do Cursor" },
+      zen: { title: "OpenCode", tiers: "Modelos grátis, ou a sua chave do OpenCode" },
       zai: { tiers: "Lite, Pro ou Max" },
       kimi: { tiers: "Plus, Pro, Max ou Ultra" },
       minimax: { tiers: "Go, Explore ou Build" },
@@ -1701,6 +1707,7 @@ export const ptBR = {
       claude_code: "O Claude entrou como {{email}}, não como {{account}}. Saia na página do Claude e tente de novo.",
       codex: "O ChatGPT entrou como {{email}}, não como {{account}}. Saia na página do ChatGPT e tente de novo.",
       cursor: "O Cursor entrou como {{email}}, não como {{account}}. Saia na página do Cursor e tente de novo.",
+      opencode: "O OpenCode entrou como {{email}}, não como {{account}}. Tente de novo com a chave certa.",
     },
     useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
@@ -2962,6 +2969,7 @@ export const ptBR = {
             claude_code: "Adicionar conta do Claude",
             codex: "Adicionar conta do ChatGPT",
             cursor: "Adicionar conta do Cursor",
+            opencode: "Adicionar chave do OpenCode",
           },
           stepOne: {
             claude_code: "A conta com o seu plano",
@@ -2972,6 +2980,8 @@ export const ptBR = {
           stepOneHint:
             "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT", cursor: "Entrar com Cursor" },
+          opencodeFree:
+            "Os modelos grátis do OpenCode não pedem chave. Uma chave do console do OpenCode libera os pagos.",
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Entre na página do Cursor. O {{computer}} termina sozinho.",
           cursorKey: "Usar uma chave de API do Cursor",
@@ -2998,6 +3008,7 @@ export const ptBR = {
               "O ChatGPT entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do ChatGPT e tente de novo.",
             cursor:
               "O Cursor entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do Cursor e tente de novo.",
+            opencode: "Essa chave do OpenCode já está conectada como {{account}}.",
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
@@ -6131,6 +6142,7 @@ export const ptBR = {
       claude_code: "Claude",
       codex: "ChatGPT",
       cursor: "Cursor",
+      opencode: "OpenCode",
       needs: {
         keys: "Atualize o agentes no computador para usar a chave de um plano",
       },
@@ -6140,6 +6152,7 @@ export const ptBR = {
         claude_code: "Ainda não está pronto no {{computer}}",
         codex: "Ainda não está pronto no {{computer}}",
         cursor: "Ainda não está pronto no {{computer}}",
+        opencode: "Ainda não está pronto no {{computer}}",
         online: "O {{computer}} não está respondendo agora. Já estamos cuidando.",
       },
     },
@@ -7384,18 +7397,22 @@ export const ptBR = {
       claude: "{{model}} pelo plano do Claude",
       chatgpt: "{{model}} pelo plano do ChatGPT",
       cursor: "{{model}} pelo plano do Cursor",
+      zen: "{{model}} pelo OpenCode",
       coding: "{{model}} pelo {{plan}}",
       claudeOf: "{{model}} pelo plano do Claude de {{owner}}",
       chatgptOf: "{{model}} pelo plano do ChatGPT de {{owner}}",
       cursorOf: "{{model}} pelo plano do Cursor de {{owner}}",
+      zenOf: "{{model}} pelo OpenCode de {{owner}}",
       codingOf: "{{model}} pelo {{plan}} de {{owner}}",
       claudeAuto: "Plano do Claude",
       chatgptAuto: "Plano do ChatGPT",
       cursorAuto: "Plano do Cursor",
+      zenAuto: "OpenCode",
       codingAuto: "{{plan}}",
       claudeAutoOf: "Plano do Claude de {{owner}}",
       chatgptAutoOf: "Plano do ChatGPT de {{owner}}",
       cursorAutoOf: "Plano do Cursor de {{owner}}",
+      zenAutoOf: "OpenCode de {{owner}}",
       codingAutoOf: "{{plan}} de {{owner}}",
       on: "{{line}} no {{computer}}",
     },
@@ -7403,7 +7420,7 @@ export const ptBR = {
     modelText: "Um modelo de IA pela API, com uma chave do workspace.",
     countsBudget: "Conta no orçamento do {{name}}.",
     countsBudget_female: "Conta no orçamento da {{name}}.",
-    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor" },
+    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" },
     foot: {
       api: "Pela API",
       noComputer: "Sem computador",
@@ -7413,6 +7430,7 @@ export const ptBR = {
     claude_codeText: "Usa o plano do Claude de quem conectou o computador.",
     codexText: "Usa o plano do ChatGPT de quem conectou o computador.",
     cursorText: "Usa o plano do Cursor de quem conectou o computador.",
+    opencodeText: "Os modelos grátis do OpenCode, ou a chave do OpenCode de quem conectou o computador.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "No seu plano do Cursor", apiPrice: "O Cursor cobra pelo preço da API" },
     testing: "Em teste",
@@ -7458,6 +7476,7 @@ export const ptBR = {
       claude_code: "Claude Code · {{model}}",
       codex: "Codex · {{model}}",
       cursor: "Cursor · {{model}}",
+      opencode: "OpenCode · {{model}}",
       noFallback: "{{brain}}, sem reserva pela API",
     },
     mission: {
@@ -9273,12 +9292,20 @@ export const ptBR = {
       removed: "{{folder}} foi removida.",
       removedAgent: "{{name}} não usa mais {{folder}}.",
       tools: "Ferramentas",
-      tool: { claude: "Claude Code", codex: "Codex", cursor: "Cursor", commands: "Comandos", browser: "Navegador" },
+      tool: {
+        claude: "Claude Code",
+        codex: "Codex",
+        cursor: "Cursor",
+        opencode: "OpenCode",
+        commands: "Comandos",
+        browser: "Navegador",
+      },
       /** Each tool's ⓘ. */
       toolText: {
         claude: "Escreve e muda arquivos, só nas pastas liberadas.",
         codex: "Como o Claude Code, com uma conta do ChatGPT. Só nas pastas liberadas.",
         cursor: "Como o Claude Code, com uma conta do Cursor. Só nas pastas liberadas.",
+        opencode: "Como o Claude Code, com os modelos grátis do OpenCode ou uma chave dele. Só nas pastas liberadas.",
         commands: "Roda comandos do Terminal, como testes e builds.",
       },
       commandsWarn: "Comandos podem chegar a outras partes do computador, não só às pastas liberadas.",

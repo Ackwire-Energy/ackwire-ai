@@ -337,6 +337,7 @@ function AddAccountFlow({
           }
         >
           {provider === "zai" ? <StepText>{t("connectAi.zaiTeam")}</StepText> : null}
+          {kind === "opencode" ? <StepText>{t("agentPage.work.brain.add.opencodeFree")}</StepText> : null}
         </Step>
         <Step n={2} divider title={t("aiAccounts.add.keyTitle")} side={read === "reconnecting" ? waiting : undefined}>
           {busy

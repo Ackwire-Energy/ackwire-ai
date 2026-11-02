@@ -1727,7 +1727,8 @@
     "notSignedIn": {
       "claude_code": "Claude Code nie jest zalogowany na tym komputerze. Podłącz konto Claude na stronie agenta {{name}}.",
       "codex": "Codex nie jest zalogowany na tym komputerze. Podłącz konto ChatGPT na stronie agenta {{name}}.",
-      "cursor": "Cursor nie jest zalogowany na tym komputerze. Podłącz konto Cursor na stronie agenta {{name}}."
+      "cursor": "Cursor nie jest zalogowany na tym komputerze. Podłącz konto Cursor na stronie agenta {{name}}.",
+      "opencode": "OpenCode nie może myśleć na tym komputerze. Połącz klucz OpenCode na stronie agenta {{name}}."
     },
     "card": {
       "connected": "Gotowe: {{name}} ma teraz AI.",
@@ -1747,6 +1748,7 @@
       "claude": "Połącz swój plan Claude",
       "chatgpt": "Połącz swój plan ChatGPT",
       "cursor": "Połącz swój plan Cursor",
+      "zen": "Połącz OpenCode",
       "api_key": "Dodaj klucz API"
     },
     "titleFor": "Połącz AI dla: {{name}}",
@@ -1768,6 +1770,10 @@
       "cursor": {
         "title": "Twój plan Cursor",
         "tiers": "Pro, Pro+, Ultra lub Teams albo klucz API Cursor"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "Darmowe modele albo Twój klucz OpenCode"
       },
       "zai": {
         "tiers": "Lite, Pro lub Max"
@@ -1839,7 +1845,8 @@
     "otherAccount": {
       "claude_code": "Claude jest zalogowany jako {{email}}, a nie {{account}}. Wyloguj się na stronie Claude i spróbuj ponownie.",
       "codex": "ChatGPT jest zalogowany jako {{email}}, a nie {{account}}. Wyloguj się na stronie ChatGPT i spróbuj ponownie.",
-      "cursor": "Cursor jest zalogowany jako {{email}}, a nie {{account}}. Wyloguj się na stronie Cursor i spróbuj ponownie."
+      "cursor": "Cursor jest zalogowany jako {{email}}, a nie {{account}}. Wyloguj się na stronie Cursor i spróbuj ponownie.",
+      "opencode": "OpenCode zalogował się jako {{email}}, a nie {{account}}. Spróbuj ponownie z właściwym kluczem."
     },
     "useAnyway": "Użyj {{email}}",
     "assignFailed": "Konto {{label}} jest połączone, ale nie udało się na nie przełączyć agenta {{agent}}.",
@@ -3196,7 +3203,8 @@
           "title": {
             "claude_code": "Dodaj konto Claude",
             "codex": "Dodaj konto ChatGPT",
-            "cursor": "Dodaj konto Cursor"
+            "cursor": "Dodaj konto Cursor",
+            "opencode": "Dodaj klucz OpenCode"
           },
           "stepOne": {
             "claude_code": "Konto z twoim planem",
@@ -3209,6 +3217,7 @@
             "codex": "Zaloguj się przez ChatGPT",
             "cursor": "Zaloguj się przez Cursor"
           },
+          "opencodeFree": "Darmowe modele OpenCode nie wymagają klucza. Klucz z konsoli OpenCode dodaje modele płatne.",
           "cursorFinish": "Zaloguj się na stronie Cursor, a logowanie na komputerze {{computer}} zakończy się samo.",
           "cursorKey": "Użyj zamiast tego klucza API Cursor",
           "openAgain": "Otwórz ponownie",
@@ -3229,7 +3238,8 @@
           "duplicate": {
             "claude_code": "Claude zalogował się jako {{account}}, a to konto jest już połączone. Aby użyć innego, wyloguj się na stronie Claude i spróbuj ponownie.",
             "codex": "ChatGPT zalogował się jako {{account}}, a to konto jest już połączone. Aby użyć innego, wyloguj się na stronie ChatGPT i spróbuj ponownie.",
-            "cursor": "Cursor zalogował się jako {{account}}, a to konto jest już połączone. Aby użyć innego, wyloguj się na stronie Cursor i spróbuj ponownie."
+            "cursor": "Cursor zalogował się jako {{account}}, a to konto jest już połączone. Aby użyć innego, wyloguj się na stronie Cursor i spróbuj ponownie.",
+            "opencode": "Ten klucz OpenCode jest już połączony jako {{account}}."
           },
           "startFailed": "Brak odpowiedzi od komputera {{computer}}. Spróbuj ponownie za chwilę.",
           "sendFailed": "Nie udało się wysłać kodu. Sprawdź go i spróbuj ponownie.",
@@ -6754,6 +6764,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "Zaktualizuj agentes na komputerze, żeby używać klucza planu"
       },
@@ -6763,6 +6774,7 @@
         "claude_code": "Jeszcze niegotowe na komputerze {{computer}}",
         "codex": "Jeszcze niegotowe na komputerze {{computer}}",
         "cursor": "Jeszcze niegotowe na komputerze {{computer}}",
+        "opencode": "Jeszcze niegotowe na {{computer}}",
         "online": "{{computer}} teraz nie odpowiada. Zajmujemy się tym."
       }
     },
@@ -8104,18 +8116,22 @@
       "claude": "{{model}} w planie Claude",
       "chatgpt": "{{model}} w planie ChatGPT",
       "cursor": "{{model}} w planie Cursor",
+      "zen": "{{model}} przez OpenCode",
       "coding": "{{model}} w {{plan}}",
       "claudeOf": "{{model}} w planie Claude użytkownika {{owner}}",
       "chatgptOf": "{{model}} w planie ChatGPT użytkownika {{owner}}",
       "cursorOf": "{{model}} w planie Cursor użytkownika {{owner}}",
+      "zenOf": "{{model}} przez OpenCode użytkownika {{owner}}",
       "codingOf": "{{model}} w {{plan}} użytkownika {{owner}}",
       "claudeAuto": "Plan Claude",
       "chatgptAuto": "Plan ChatGPT",
       "cursorAuto": "Plan Cursor",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Plan Claude użytkownika {{owner}}",
       "chatgptAutoOf": "Plan ChatGPT użytkownika {{owner}}",
       "cursorAutoOf": "Plan Cursor użytkownika {{owner}}",
+      "zenAutoOf": "OpenCode użytkownika {{owner}}",
       "codingAutoOf": "{{plan}} użytkownika {{owner}}",
       "on": "{{line}} na komputerze {{computer}}"
     },
@@ -8126,7 +8142,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "Przez API",
@@ -8137,6 +8154,7 @@
     "claude_codeText": "Korzysta z planu Claude osoby, która połączyła komputer.",
     "codexText": "Korzysta z planu ChatGPT osoby, która połączyła komputer.",
     "cursorText": "Korzysta z planu Cursor osoby, która połączyła komputer.",
+    "opencodeText": "Darmowe modele OpenCode albo klucz OpenCode osoby, która połączyła komputer.",
     "cursorModel": {
       "inPlan": "W twoim planie Cursor",
       "apiPrice": "Rozliczane przez Cursor po cenach API"
@@ -8180,6 +8198,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, bez zapasowego API"
     },
     "mission": {
@@ -10353,6 +10372,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "Polecenia",
         "browser": "Przeglądarka"
       },
@@ -10360,6 +10380,7 @@
         "claude": "Tworzy i zmienia pliki, tylko w dozwolonych folderach.",
         "codex": "Jak Claude Code, z kontem ChatGPT. Tylko w dozwolonych folderach.",
         "cursor": "Jak Claude Code, z kontem Cursor. Tylko w dozwolonych folderach.",
+        "opencode": "Jak Claude Code, z darmowymi modelami OpenCode albo kluczem OpenCode. Tylko w dozwolonych folderach.",
         "commands": "Uruchamia polecenia w Terminalu, na przykład testy i buildy."
       },
       "commandsWarn": "Polecenia mogą sięgać do innych części komputera, nie tylko do dozwolonych folderów.",
