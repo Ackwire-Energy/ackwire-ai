@@ -163,14 +163,16 @@ const CLOSEST_HANDLES = 3;
  * so the run stops trying it and tells the person; any other gets the closest handles among the agents the
  * person behind the run can talk to (the ones `find_agent` lists).
  */
-export async function noAgentText(ctx: ToolContext, handles: string[]): Promise<string> {
+/** `viaAgent`: the tool asks the agent for the person (ask_agent, tell_agent), so agents that take consultations count. */
+export async function noAgentText(ctx: ToolContext, handles: string[], options: { viaAgent?: boolean } = {}): Promise<string> {
   const person = await personBehindCall(ctx);
   const [archived, team, talks] = await Promise.all([
     loadArchived(ctx.db, ctx.orgId),
     loadTeam(ctx.db, ctx.orgId),
     speakerFor(ctx.db, ctx.orgId, person),
   ]);
-  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, viaAgent(talks))).map((a) => a.handle);
+  const speaker = options.viaAgent ? viaAgent(talks) : talks;
+  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, speaker)).map((a) => a.handle);
   return handles
     .map((h) => {
       if (archived.includes(h)) {

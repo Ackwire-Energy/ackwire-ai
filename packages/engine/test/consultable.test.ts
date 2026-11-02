@@ -10,6 +10,7 @@ import {
   createAgent,
   drainOutbox,
   insertMessage,
+  noAgentText,
   openDm,
   postPersonMessage,
   setAgentAudience,
@@ -209,6 +210,14 @@ describe("other agents can consult it", () => {
     const deciders = await approverIds(f.db, { orgId: f.org.id, ownerUserId: nino.ownerUserId, tool: "merge" });
     expect(deciders).toContain(f.owner.id);
     expect(deciders).not.toContain(lia.id);
+  });
+
+  test("a handle that doesn't exist: only ask_agent and tell_agent suggest the agents it consults for the person", async () => {
+    f = await setup({ askAgent: true });
+    const { lia } = await world();
+    const ctx = await devRunFor(lia.id, "@dev cria um tópico pro nin");
+    expect(await noAgentText(ctx, ["nin"])).not.toContain("@nino");
+    expect(await noAgentText(ctx, ["nin"], { viaAgent: true })).toContain("@nino");
   });
 
   test("the person still can't talk to it directly: no DM, no run from a mention", async () => {

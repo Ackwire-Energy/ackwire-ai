@@ -84,7 +84,7 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pu
     .select()
     .from(agents)
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
-  if (!target) return { refused: refuse(await noAgentText(ctx, [handle])) };
+  if (!target) return { refused: refuse(await noAgentText(ctx, [handle], { viaAgent: true })) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
   const behind = await personBehindCall(ctx);
   const routine = behind ? null : await actingRoutineOfCall(ctx);
