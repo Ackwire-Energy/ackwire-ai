@@ -102,8 +102,7 @@ describe("asking means waiting (§1)", () => {
     expect(endsAsking("Rodei isto:\n```\nwhy?\n```\nTudo certo.")).toBe(false);
   });
 
-  test("the controller ends the turn there: no judgment can push it to go ahead", async () => {
-    let judged = false;
+  test("the controller ends the turn there: a judged promise never pushes it to go ahead", async () => {
     const turn: TurnEnd = {
       state: { count: 0 },
       kind: "conversation",
@@ -116,17 +115,30 @@ describe("asking means waiting (§1)", () => {
       judged: "Dá pra acelerar instalando o hyperfine e rodando nos 40 arquivos. Quer que eu faça?",
       mission: false,
       wakesLater: async () => false,
-      verdict: async () => {
-        judged = true;
-        return "continue";
-      },
+      verdict: async () => "continue",
     };
-    expect(await decideTurnEnd(turn)).toEqual({ outcome: "done", rule: "asked" });
-    expect(judged).toBe(false);
+    expect(await decideTurnEnd(turn)).toMatchObject({ outcome: "done", rule: "asked" });
     // Told to ask, its question still becomes the card.
     expect((await decideTurnEnd({ ...turn, state: { count: 0, askNudged: true, askPending: true } })).rule).not.toBe(
       "asked",
     );
+    // A question that asks for a secret in the chat is still sent to the secure way.
+    const secret = await decideTurnEnd({
+      ...turn,
+      judged: "Me manda o token do Sentry aqui?",
+      verdict: async () => "secret",
+    });
+    expect(secret.rule).toBe("secret");
+    // A question handed by mention to an agent the mention never reached is still handed over.
+    const unreached = await decideTurnEnd({ ...turn, judged: "@bia, pode revisar?", unreached: "Use tell_agent." });
+    expect(unreached.rule).toBe("unreached");
+    // Its means left untried: still nudged to try them.
+    const untried = await decideTurnEnd({
+      ...turn,
+      judged: "Qual é o endereço do servidor?",
+      verdict: async () => "untried",
+    });
+    expect(untried.rule).toBe("untried");
   });
 
   test("a follow-up waits while the agent's question is unanswered", async () => {

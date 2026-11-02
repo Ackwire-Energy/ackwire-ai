@@ -367,10 +367,6 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   if (t.unanswered && canNudge) return { outcome: "continue", rule: "answer", nudge: ANSWER_NUDGE };
   if (t.openRequest && !t.state.requestNudged)
     return { outcome: "continue", rule: "open_request", nudge: t.openRequest };
-  // Asking means waiting (ADR 0131 §1): a reply that ends asking the person something waits for their answer, never
-  // judged into going ahead. One told to ask (`askPending`) still becomes its question card below.
-  if (t.kind === "conversation" && t.judged && !t.state.askPending && endsAsking(t.judged))
-    return { outcome: "done", rule: "asked" };
   if (!t.judged || !t.verdict) return { outcome: "done", rule: t.verdict ? "nothing_to_judge" : "no_judge" };
   if (!canNudge && !t.state.askPending && (t.state.askNudged || t.kind !== "conversation"))
     return { outcome: "done", rule: "cap" };
@@ -393,6 +389,11 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
   if (verdict === "continue" && t.unreached && canNudge)
     return { outcome: "continue", rule: "unreached", verdict, nudge: t.unreached };
+  // Asking means waiting (ADR 0131 §1): a reply that ends asking the person whether to go on waits for their answer,
+  // never pushed into going ahead. A secret asked in the chat and an unkept hand-off keep their rules above; one told
+  // to ask (`askPending`) still becomes its question card below.
+  if (verdict === "continue" && t.kind === "conversation" && !t.state.askPending && endsAsking(t.judged))
+    return { outcome: "done", rule: "asked", verdict };
   if (verdict === "continue") {
     const progressed = t.state.count === 0 || t.executed > (t.state.executedAtNudge ?? 0);
     if (canNudge && progressed)
