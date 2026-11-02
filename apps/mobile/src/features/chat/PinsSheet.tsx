@@ -1,11 +1,13 @@
 import { cachePinned, type MessagePin, usePinMessage, usePins } from "@agenteschat/client";
 import { textOrMedia } from "@agenteschat/client/lib/media";
+import { can } from "@agenteschat/client/lib/permissions";
 import { pinsIn } from "@agenteschat/client/lib/pins";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Card, Count, Icon, IconButton, Row, Text, weights } from "@/ui";
+import { useOrg } from "@/providers/org";
+import { Card, Count, Icon, IconButton, Row, Text, useToast, weights } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { previewOf } from "../shared/logic";
@@ -69,7 +71,10 @@ export function PinsSheet({
   onPick: (pin: MessagePin) => void;
 }) {
   const { t } = useTranslation();
-  const orgId = useOrgId();
+  const { orgId, org } = useOrg();
+  // As on the web: unpinning needs "post" (the server answers 403 otherwise).
+  const mayUnpin = can(org, "post");
+  const toast = useToast();
   const dir = useDirectory();
   const c = useColors();
   const when = useWhen();
@@ -80,7 +85,12 @@ export function PinsSheet({
     cachePinned(qc, orgId, channelId, p.messageId, false);
     pin.mutate(
       { channelId, messageId: p.messageId, pinned: false },
-      { onError: () => cachePinned(qc, orgId, channelId, p.messageId, true) },
+      {
+        onError: () => {
+          cachePinned(qc, orgId, channelId, p.messageId, true);
+          toast({ title: t("mobile.app.failed"), icon: "x" });
+        },
+      },
     );
   };
   return (
@@ -110,7 +120,9 @@ export function PinsSheet({
                     <Text variant="caption" tone="faint">
                       {when.short(p.message.createdAt)}
                     </Text>
-                    <IconButton icon="x" label={t("mobile.pins.unpinOf", { name })} onPress={() => unpin(p)} />
+                    {mayUnpin ? (
+                      <IconButton icon="x" label={t("mobile.pins.unpinOf", { name })} onPress={() => unpin(p)} />
+                    ) : null}
                   </View>
                 }
                 onPress={() => onPick(p)}

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import type { MessagePin } from "@agenteschat/client";
 import { pinsIn } from "@agenteschat/client/lib/pins";
@@ -26,6 +28,12 @@ const pin = (messageId: string, pinnedMinutesAgo: number, threadId: string | nul
 });
 
 describe("Fixadas", () => {
+  test("× (unpin) shows only to who may post, as on the web", () => {
+    const sheet = readFileSync(join(import.meta.dir, "../../src/features/chat/PinsSheet.tsx"), "utf8");
+    expect(sheet).toContain('const mayUnpin = can(org, "post")');
+    expect(sheet).toMatch(/\{mayUnpin \? \(\s*<IconButton icon="x"/);
+  });
+
   test("the latest pin first, one entry per message", () => {
     const list = orderPins([pin("a", 30), pin("b", 5), pin("a", 2), pin("c", 60)]);
     expect(list.map((p) => [p.messageId, p.pinnedAt])).toEqual([
