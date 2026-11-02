@@ -8592,7 +8592,7 @@
     "clearSearch": "Hapus pencarian",
     "noMatch": "Tidak ada hasil untuk “{{q}}”.",
     "noTools": "Server ini tidak menyediakan alat apa pun.",
-    "unreadable": "Tidak bisa membaca alat dari server ini: {{reason}}",
+    "unreadable": "Tidak dapat membaca alat konektor: {{reason}}",
     "refresh": "Cari alat baru",
     "decideTitle": "Butuh keputusanmu · {{count}}",
     "decideHelp": "Namanya tidak menjelaskan fungsinya. Konfirmasi saran atau pilih yang lain.",

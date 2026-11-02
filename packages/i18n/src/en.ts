@@ -8324,7 +8324,7 @@ export const en = {
     clearSearch: "Clear search",
     noMatch: "Nothing found for “{{q}}”.",
     noTools: "The server didn't offer any tools.",
-    unreadable: "Couldn't read this server's tools: {{reason}}",
+    unreadable: "Couldn't read the connector's tools: {{reason}}",
     refresh: "Look for new tools",
     decideTitle: "Need your decision · {{count}}",
     decideHelp: "Their names don't say what they do. Confirm the suggestion or pick another.",

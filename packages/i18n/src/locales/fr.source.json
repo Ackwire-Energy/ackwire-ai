@@ -20813,6 +20813,9 @@
   "connectors.toolChanges.description": {
     "value": "Text"
   },
+  "connectors.toolChanges.input": {
+    "value": "Input"
+  },
   "connectors.toolChanges.field.added": {
     "value": "new"
   },
@@ -20828,14 +20831,11 @@
   "connectors.toolChanges.removed": {
     "value": "Removed"
   },
-  "connectors.toolChanges.acceptOne": {
-    "value": "Accept {{tool}}"
-  },
-  "connectors.toolChanges.input": {
-    "value": "Input"
-  },
   "connectors.toolChanges.accept": {
     "value": "Accept"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.accepted": {
     "value": "{{tool}} updated."
@@ -21570,7 +21570,7 @@
     "value": "The server didn't offer any tools."
   },
   "toolReview.unreadable": {
-    "value": "Couldn't read this server's tools: {{reason}}"
+    "value": "Couldn't read the connector's tools: {{reason}}"
   },
   "toolReview.refresh": {
     "value": "Look for new tools"

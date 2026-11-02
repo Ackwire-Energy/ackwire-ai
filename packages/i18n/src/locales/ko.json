@@ -8518,7 +8518,7 @@
     "clearSearch": "검색어 지우기",
     "noMatch": "“{{q}}”에 대한 결과가 없어요.",
     "noTools": "서버가 제공한 도구가 없어요.",
-    "unreadable": "이 서버의 도구를 읽을 수 없습니다: {{reason}}",
+    "unreadable": "커넥터의 도구를 읽을 수 없습니다: {{reason}}",
     "refresh": "새 도구 찾기",
     "decideTitle": "결정 필요 · {{count}}",
     "decideHelp": "이름만으로는 무엇을 하는지 알 수 없어요. 제안을 확인하거나 다른 것을 고르세요.",

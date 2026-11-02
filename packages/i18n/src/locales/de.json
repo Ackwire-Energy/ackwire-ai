@@ -8868,7 +8868,7 @@
     "clearSearch": "Suche leeren",
     "noMatch": "Nichts gefunden zu „{{q}}“.",
     "noTools": "Der Server hat keine Tools angeboten.",
-    "unreadable": "Die Tools dieses Servers konnten nicht gelesen werden: {{reason}}",
+    "unreadable": "Die Tools des Connectors konnten nicht gelesen werden: {{reason}}",
     "refresh": "Nach neuen Tools suchen",
     "decideTitle": "Brauchen deine Entscheidung · {{count}}",
     "decideHelp": "Ihre Namen verraten nicht, was sie tun. Bestätige den Vorschlag oder wähle etwas anderes.",

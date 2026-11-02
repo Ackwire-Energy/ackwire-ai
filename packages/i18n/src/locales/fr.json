@@ -9248,7 +9248,7 @@
     "clearSearch": "Effacer la recherche",
     "noMatch": "Rien trouvé pour « {{q}} ».",
     "noTools": "Le serveur n'a proposé aucun outil.",
-    "unreadable": "Impossible de lire les outils de ce serveur : {{reason}}",
+    "unreadable": "Impossible de lire les outils du connecteur : {{reason}}",
     "refresh": "Chercher de nouveaux outils",
     "decideTitle": "Votre décision est nécessaire · {{count}}",
     "decideHelp": "Leur nom ne dit pas ce qu'ils font. Confirmez la suggestion ou choisissez-en une autre.",

@@ -8807,7 +8807,7 @@
     "clearSearch": "Aramayı temizle",
     "noMatch": "“{{q}}” için bir şey bulunamadı.",
     "noTools": "Sunucu hiç araç sunmadı.",
-    "unreadable": "Bu sunucunun araçları okunamadı: {{reason}}",
+    "unreadable": "Bağlayıcının araçları okunamadı: {{reason}}",
     "refresh": "Yeni araçları ara",
     "decideTitle": "Kararınız gerekiyor · {{count}}",
     "decideHelp": "Adları ne yaptıklarını söylemiyor. Öneriyi onaylayın ya da başka birini seçin.",
