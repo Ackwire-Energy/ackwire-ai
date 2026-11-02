@@ -529,7 +529,9 @@
     "copied": "コピーしました",
     "retry": "もう一度試す",
     "openTailscale": "Tailscaleを開く",
-    "otherServer": "別のサーバーを使う"
+    "otherServer": "別のサーバーを使う",
+    "stuck": "agentes.chatを開けませんでした。もう一度試すか、今の状態のページを表示してください。",
+    "showAnyway": "このまま表示"
   },
   "menu": {
     "about": "agentes.chatについて",
