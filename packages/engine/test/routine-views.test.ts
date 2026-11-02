@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
+  calendarRange,
   createChannel,
   createRoutine,
   getRoutineView,
@@ -335,6 +336,41 @@ describe("routine views", () => {
       .set({ event: { type: "email.received", summary: "3 emails" } })
       .where(eq(schema.routineRuns.id, held.id));
     expect((await getRoutineView(f.db, f.owner.id, f.org.id, routine.id)).state).toBe("running");
+  });
+
+  test("an agent hidden from a person hides its routines too: Rotinas, Início, one routine, the calendar", async () => {
+    f = await setup();
+    const routine = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
+      name: "Relatório diário de custos",
+      agentId: f.agent.id,
+      prompt: "Resuma os custos.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: daily(),
+    });
+    const outsider = await addMember(f.db, f.org.id, "member", "caio");
+    const insider = await addMember(f.db, f.org.id, "member", "dora");
+    const admin = await addMember(f.db, f.org.id, "admin", "edu");
+    await f.db
+      .update(schema.agents)
+      .set({ audienceMode: "people", audienceUserIds: [insider.id] })
+      .where(eq(schema.agents.id, f.agent.id));
+    const range = (userId: string) =>
+      calendarRange({ db: f.db }, userId, f.org.id, "2099-01-05T00:00:00Z", "2099-01-09T00:00:00Z");
+    const names = async (userId: string) => (await listRoutines(f.db, userId, f.org.id)).map((r) => r.name);
+
+    expect(await names(outsider.id)).toEqual([]);
+    await expect(getRoutineView(f.db, outsider.id, f.org.id, routine.id)).rejects.toThrow("Routine not found");
+    await expect(listRoutineRuns(f.db, outsider.id, f.org.id, routine.id)).rejects.toThrow("Routine not found");
+    expect((await range(outsider.id)).routines).toEqual([]);
+
+    for (const who of [insider.id, admin.id, f.owner.id]) {
+      expect(await names(who)).toEqual(["Relatório diário de custos"]);
+      expect((await range(who)).routines.length).toBe(4);
+    }
+    // Only its owner: the member who was let in no longer sees it either.
+    await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, f.agent.id));
+    expect(await names(insider.id)).toEqual([]);
+    expect(await names(admin.id)).toEqual(["Relatório diário de custos"]);
   });
 
   test("a paused routine shows its reason; resuming clears the reason and the failure streak", async () => {
