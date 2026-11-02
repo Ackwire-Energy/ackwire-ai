@@ -185,7 +185,11 @@ describe("answering and opening", () => {
       actors: [{ type: "agent", id: "ada" }],
       source: { channelId: "d", dmId: "d", messageId: "h", handoffId: "h", agentId: "ada" },
     });
-    expect(openTarget(asked)).toEqual({ to: "/org/$orgId/dm/agent/$agentId", params: { agentId: "ada" } });
+    expect(openTarget(asked)).toEqual({
+      to: "/org/$orgId/dm/agent/$agentId",
+      params: { agentId: "ada" },
+      search: { m: "h" },
+    });
     expect(opensOnComputer(asked)).toBeNull();
     // One whose conversation I can't open names none: it opens on the agent's computer.
     expect(opensOnComputer({ ...asked, source: { handoffId: "h", agentId: "ada" } })).toBe("ada");
