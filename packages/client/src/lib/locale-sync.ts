@@ -9,7 +9,7 @@ export interface LocaleState {
 }
 
 /**
- * Once signed in, the language every device of the person shows (ADR 0121):
+ * Once signed in, the language every device of the person shows (ADR 0122):
  * 1. A pick on this device the server hasn't heard (`pending`) wins and is sent, "auto" included.
  * 2. A language kept on this device while the server has none picked (`localeAuto` not false) is the person's pick
  *    too: one made before the server kept picks, or one whose send failed. It wins and is sent.

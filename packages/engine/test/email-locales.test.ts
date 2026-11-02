@@ -7,7 +7,7 @@ import { EMAIL_SAMPLES } from "./email-samples";
 /** Each sample once (its English variant), in every language of the app. */
 const SAMPLES = Object.entries(EMAIL_SAMPLES).filter(([id]) => !id.includes(".pt-BR"));
 
-describe("every email in every language (ADR 0121)", () => {
+describe("every email in every language (ADR 0122)", () => {
   for (const locale of LOCALE_CODES) {
     test(locale, () => {
       for (const [id, sample] of SAMPLES) {

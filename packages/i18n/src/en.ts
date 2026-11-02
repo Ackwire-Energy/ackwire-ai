@@ -1,7 +1,7 @@
 import type { Widen } from "./widen";
 
 /**
- * English: the source language and every other language's fallback (ADR 0121). A key exists here first; the other
+ * English: the source language and every other language's fallback (ADR 0122). A key exists here first; the other
  * languages are checked against it (`test/locales.test.ts`).
  * Rules (docs/design/design-system/README.md): short sentences, active voice,
  * no exclamation marks, buttons start with a verb, "agentes" in lower case.

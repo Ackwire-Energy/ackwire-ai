@@ -18,7 +18,7 @@ export const users = pgTable("users", {
   locale: text(),
   /**
    * The language follows each device's own ("Automático", the default) until the person picks one; the devices
-   * then show that one everywhere (ADR 0121). Not a Better Auth field.
+   * then show that one everywhere (ADR 0122). Not a Better Auth field.
    */
   localeAuto: boolean().notNull().default(true),
   /**

@@ -299,7 +299,7 @@ describe("creating a workspace while one is held", () => {
   });
 });
 
-describe("the person's language (ADR 0121)", () => {
+describe("the person's language (ADR 0122)", () => {
   test("any language of the app, picked or detected; anything else refused", async () => {
     expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "pt-BR", localeAuto: true });
     await setMyLocale(f.db, f.owner.id, "fr");

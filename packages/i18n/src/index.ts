@@ -1,5 +1,5 @@
 /**
- * @agenteschat/i18n: the UI strings of the web, phone and desktop apps (ADR 0035, ADR 0121).
+ * @agenteschat/i18n: the UI strings of the web, phone and desktop apps (ADR 0035, ADR 0122).
  * English is the source; pt-BR keeps its TypeScript file (its comments are notes for translators); every other
  * language is a JSON file in `locales/`, filled by `bun run i18n:apply`, and falls back to English per key.
  * Apps load one language at a time through `@agenteschat/i18n/load`; this module holds them all (tests, tools).

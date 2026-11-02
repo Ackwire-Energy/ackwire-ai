@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { localeSync } from "../src/lib/locale-sync";
 
-describe("the language once signed in (ADR 0121)", () => {
+describe("the language once signed in (ADR 0122)", () => {
   test("a pick on this device the server hasn't heard wins and is sent", () => {
     expect(
       localeSync({

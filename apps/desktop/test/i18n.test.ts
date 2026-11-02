@@ -30,7 +30,7 @@ function values(tree: object): string[] {
 }
 
 describe("desktop strings", () => {
-  test("every language against English: keys, plural forms, placeholders, tags (ADR 0121)", () => {
+  test("every language against English: keys, plural forms, placeholders, tags (ADR 0122)", () => {
     for (const { code, ready } of LOCALES.filter((l) => l.code !== "en")) {
       const same = (identical.desktop as Record<string, string[]>)[code] ?? [];
       const problems = checkLocale({ source: desktopEn, target: DESKTOP_STRINGS[code], code, ready, identical: same });

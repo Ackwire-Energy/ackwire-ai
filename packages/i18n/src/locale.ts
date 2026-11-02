@@ -1,5 +1,5 @@
 /**
- * The app's languages (ADR 0121). English is the source and the default; every other language falls back to it per
+ * The app's languages (ADR 0122). English is the source and the default; every other language falls back to it per
  * key. `ready` languages are the ones people can pick and the ones picked for them; the server accepts every code.
  * `weekStart` (0 Sunday, 1 Monday, CLDR) is stored because Firefox has no `Intl.Locale.getWeekInfo`. `script` drives
  * the font rules and the typography checks.

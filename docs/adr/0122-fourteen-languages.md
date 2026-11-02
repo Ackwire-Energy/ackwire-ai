@@ -1,4 +1,4 @@
-# 0121. Fourteen languages, English as the source
+# 0122. Fourteen languages, English as the source
 
 - Status: Accepted (foundation built; translations follow, one language at a time)
 - Date: 2026-11-02
@@ -9,7 +9,7 @@
   `components/LanguageSelect.tsx`; `apps/mobile/src/providers/i18n.ts`, `src/i18n/merge.ts`,
   `src/features/i18n/locales.ts`; `apps/desktop/src/i18n/index.ts`; `packages/engine/src/email/words/*`,
   `push/messages/*`, `organizations.ts` (`setMyLocale`, `myLocale`); `apps/server/src/routes/app/account.ts`;
-  `scripts/i18n.ts`; migration `0174_locales.sql`
+  `scripts/i18n.ts`; migration `0175_locales.sql`
 
 ## Context
 

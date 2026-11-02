@@ -7,7 +7,7 @@ import { chooseLocale, createI18n, detectedLocale, readLocaleState, savedLocale 
 
 beforeEach(() => localStorage.clear());
 
-describe("the language to start in (ADR 0121)", () => {
+describe("the language to start in (ADR 0122)", () => {
   test("this browser's pick, else the landing's cookie, else the browser's own, else English", () => {
     expect(savedLocale(["pt-PT"], "agentes_locale=en")).toBe("en");
     expect(savedLocale(["fr-FR"], "")).toBe("en");

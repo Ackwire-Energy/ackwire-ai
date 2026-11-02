@@ -1,5 +1,5 @@
 /**
- * One language's strings checked against English, the source (ADR 0121): the same keys, every plural form the
+ * One language's strings checked against English, the source (ADR 0122): the same keys, every plural form the
  * language needs, the same placeholders and tags, nothing empty, nothing left in English, the glossary's names kept,
  * no semicolons. Shared by every surface's test (`@agenteschat/i18n/testing`) and by `bun run i18n:apply`.
  */

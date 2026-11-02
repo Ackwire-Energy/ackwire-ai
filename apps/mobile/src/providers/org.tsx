@@ -49,7 +49,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const me = useMe();
   const session = useSession();
   const api = useApi();
-  // The person's language here and on the server, matched once their `me` arrives (ADR 0121).
+  // The person's language here and on the server, matched once their `me` arrives (ADR 0122).
   useLocaleSync({
     user: me.data?.user,
     read: readLocaleState,

@@ -463,7 +463,7 @@ export function accountRoutes(deps: AppDeps) {
                 description: "The app's language (`PATCH /me`); null until an app said one.",
               }),
               localeAuto: z.boolean().openapi({
-                description: "The language follows each device's own until the person picks one (ADR 0121).",
+                description: "The language follows each device's own until the person picks one (ADR 0122).",
               }),
               canCreateWorkspace: z.boolean().openapi({
                 description:
@@ -553,7 +553,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Change your app language",
       description:
-        "The language of the apps on every device and of the emails and pushes sent to you (ADR 0121). `auto: true` when a device detected it (Automático: each device follows its own until you pick one), false when you picked it.",
+        "The language of the apps on every device and of the emails and pushes sent to you (ADR 0122). `auto: true` when a device detected it (Automático: each device follows its own until you pick one), false when you picked it.",
       request: {
         body: body(z.object({ locale: z.enum(USER_LOCALES), auto: z.boolean().default(false) })),
       },

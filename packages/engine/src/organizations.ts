@@ -782,7 +782,7 @@ export const USER_LOCALES = LOCALE_CODES;
 export type UserLocale = AppLocale;
 
 /**
- * Saves the person's app language (ADR 0121): `auto` when a device detected it ("Automático"), false when they
+ * Saves the person's app language (ADR 0122): `auto` when a device detected it ("Automático"), false when they
  * picked it, so every device shows that one.
  */
 export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false) {

@@ -4,7 +4,7 @@ import { browser, createTestServer, signUp, type TestServer } from "./harness";
 let t: TestServer;
 afterEach(() => t?.close());
 
-test("the person's language (ADR 0121): PATCH /me saves any language of the app, /me returns it", async () => {
+test("the person's language (ADR 0122): PATCH /me saves any language of the app, /me returns it", async () => {
   t = await createTestServer();
   const ana = browser(t);
   await signUp(ana, "ana@example.com");

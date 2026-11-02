@@ -29,7 +29,7 @@ function leaves(o: object, prefix = ""): string[] {
   );
 }
 
-test("every language against English: keys, plural forms, placeholders, tags (ADR 0121)", () => {
+test("every language against English: keys, plural forms, placeholders, tags (ADR 0122)", () => {
   for (const { code, ready } of LOCALES.filter((l) => l.code !== "en")) {
     const problems = [
       ...checkLocale({ source: mobileEn, target: MOBILE[code], code, ready, identical: same("mobile-base", code) }),

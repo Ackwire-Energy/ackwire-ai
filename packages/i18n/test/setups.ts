@@ -213,7 +213,7 @@ export const ANYWHERE: readonly string[] = [
   "desktop.servers.",
 ];
 
-/** A key's agent-gender variant (`_female`, ADR 0121) goes where its base key goes. */
+/** A key's agent-gender variant (`_female`, ADR 0122) goes where its base key goes. */
 const baseOf = (key: string) => key.replace(/_female(?=(_(zero|one|two|few|many|other))?$)/, "");
 const listed = (key: string, entries: readonly string[]) => {
   const base = baseOf(key);

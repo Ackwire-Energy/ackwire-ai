@@ -47,7 +47,7 @@ describe("no hardcoded UI text", () => {
   });
 });
 
-describe("translated text stays as each language writes it (ADR 0121)", () => {
+describe("translated text stays as each language writes it (ADR 0122)", () => {
   const ROOTS_ALL = [
     ...ROOTS,
     join(REPO, "packages", "client", "src"),

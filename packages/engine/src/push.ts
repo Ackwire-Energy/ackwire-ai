@@ -190,7 +190,7 @@ async function pushTargets(db: Database, userId: string, now: Date) {
     .innerJoin(users, eq(users.id, pushDevices.userId))
     .where(eq(pushDevices.userId, userId))
     .orderBy(asc(pushDevices.createdAt));
-  // The person's language (ADR 0121), else the one the device registered: a change in the app reaches every push.
+  // The person's language (ADR 0122), else the one the device registered: a change in the app reaches every push.
   const phones = rows
     .filter((r) => r.device.platform !== "web")
     .map((r) => ({ ...r.device, locale: r.userLocale ?? r.device.locale }));

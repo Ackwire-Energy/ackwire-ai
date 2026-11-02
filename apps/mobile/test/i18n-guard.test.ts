@@ -17,7 +17,7 @@ const ALLOWED = [
 ];
 const allowed = (s: string) => ALLOWED.some((re) => re.test(s));
 
-test("JSX text and accessibilityLabel / placeholder / title literals go through t() (ADR 0121)", () => {
+test("JSX text and accessibilityLabel / placeholder / title literals go through t() (ADR 0122)", () => {
   const offenders: string[] = [];
   for (const root of ROOTS)
     for (const f of sourceFiles(root, /\.tsx$/)) {

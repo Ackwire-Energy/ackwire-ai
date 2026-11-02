@@ -25,7 +25,7 @@ const KINDS = [
   "something_new",
 ];
 
-test("every push kind in every language: words, within the phone's limits (ADR 0121)", () => {
+test("every push kind in every language: words, within the phone's limits (ADR 0122)", () => {
   for (const locale of LOCALE_CODES)
     for (const kind of KINDS)
       for (const variant of [

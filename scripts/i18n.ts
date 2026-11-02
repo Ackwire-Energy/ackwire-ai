@@ -1,5 +1,5 @@
 /**
- * The translation tools (ADR 0121):
+ * The translation tools (ADR 0122):
  *   bun run i18n:missing <code> [--file app|mobile-base|mobile-features|desktop] [--group <top-level key>]
  *       writes i18n-work/<code>.todo.json: every English string the language has no translation of, or whose English
  *       changed since it was translated (`outdated`: the English then and the translation to redo), with its pt-BR

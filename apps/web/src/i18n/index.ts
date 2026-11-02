@@ -139,7 +139,7 @@ export function chooseLocale(choice: AppLocale | "auto", instance: I18n, signedI
 export const localePatch = (choice: AppLocale | "auto") =>
   choice === "auto" ? { locale: detectedLocale(), auto: true } : { locale: choice, auto: false };
 
-/** The signed-in person's language on this browser and on the server, matched once their `/me` arrives (ADR 0121). */
+/** The signed-in person's language on this browser and on the server, matched once their `/me` arrives (ADR 0122). */
 export function useServerLocale(user: { id: string; locale?: string | null; localeAuto?: boolean } | undefined) {
   const { i18n: instance } = useTranslation();
   const api = useApi();
