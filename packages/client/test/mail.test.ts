@@ -9,7 +9,6 @@ import {
   loginOf,
   mailAccessOf,
   mailErrorOf,
-  millionSendErrorText,
   normalizePolicy,
   notIcloudMail,
   splitAddresses,
@@ -105,20 +104,6 @@ describe("mail API", () => {
     expect(mailErrorOf(new ApiError(500, "internal", "boom"))).toBe("unknown");
     expect(mailErrorOf(new Error("network"))).toBe("unknown");
   });
-
-  test("a MillionSend key that can't reach the inbox, or a connector with no key, says why instead of 'try again'", () => {
-    const t = ((key: string, values?: Record<string, string>) =>
-      values ? `${key}:${JSON.stringify(values)}` : key) as unknown as TFunction;
-    const box = "suporte@acme.com";
-    expect(millionSendErrorText(t, new ApiError(404, "mail.millionsend_inbox_not_found", "no"), box)).toBe(
-      `mail.millionsend.notReached:{"address":"${box}"}`,
-    );
-    expect(millionSendErrorText(t, new ApiError(400, "mail.millionsend_no_connector_key", "no"))).toBe(
-      "mail.millionsend.noConnectorKey",
-    );
-    expect(millionSendErrorText(t, new ApiError(422, "auth", "auth"))).toBe("mail.millionsend.auth");
-    expect(millionSendErrorText(t, new Error("network"))).toBe("mail.error.unknown");
-  });
 });
 
 describe("mail rules", () => {
@@ -143,7 +128,6 @@ describe("mail rules", () => {
     expect(choiceOf({ provider: "gmail", preset: null })).toBe("gmail");
     expect(choiceOf({ provider: "imap", preset: "icloud" })).toBe("icloud");
     expect(choiceOf({ provider: "imap", preset: "locaweb" })).toBe("other");
-    expect(choiceOf({ provider: "millionsend", preset: null })).toBe("millionsend");
   });
 
   test("the iCloud form's hint: a big provider's address, never Apple's own or a custom domain", () => {

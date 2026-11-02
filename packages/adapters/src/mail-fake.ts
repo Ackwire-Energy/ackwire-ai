@@ -19,8 +19,6 @@ import {
   type MailQuery,
   type MailSummary,
   type MailTestError,
-  type MillionSendClient,
-  type MillionSendInbox,
   type OutgoingMail,
 } from "./mail";
 
@@ -403,57 +401,3 @@ export function createFakeComposioClient(
 
 /** A MailAuthError, for fakes told to refuse the credentials. */
 export const fakeMailAuthError = () => new MailAuthError("Invalid credentials (fake)");
-
-/** Fake MillionSend keys: one with full access, one limited to an inbox (it can't create webhooks). */
-export const FAKE_MILLIONSEND_KEY = "ms_fake_full";
-export const FAKE_MILLIONSEND_INBOX_KEY = "ms_fake_inbox";
-
-/**
- * A fake MillionSend: the inboxes every fake key reaches, the webhooks created (with the secret each was given,
- * so a test signs deliveries with it) and those deleted. Any other key is refused.
- */
-export function createFakeMillionSend(
-  inboxes: MillionSendInbox[] = [
-    {
-      id: "7eeb9517-aed7-40d7-ad65-500be42ed147",
-      address: "suporte@acme.agents.millionsend.com",
-      name: "Suporte",
-      kind: "agent",
-      shared: true,
-    },
-  ],
-) {
-  const state = {
-    inboxes,
-    keys: new Map([
-      [FAKE_MILLIONSEND_KEY, { webhooks: true }],
-      [FAKE_MILLIONSEND_INBOX_KEY, { webhooks: false }],
-    ]),
-    webhooks: new Map<string, { apiKey: string; endpoint: string; inboxId: string; secret: string }>(),
-    deletedWebhooks: [] as string[],
-  };
-  let seq = 0;
-  const known = (apiKey: string) => {
-    const key = state.keys.get(apiKey);
-    if (!key) throw new MailAuthError("MillionSend refused the API key");
-    return key;
-  };
-  const client: MillionSendClient = {
-    async listInboxes(apiKey) {
-      known(apiKey);
-      return state.inboxes.map((i) => ({ ...i }));
-    },
-    async createWebhook(apiKey, input) {
-      if (!known(apiKey).webhooks) return null;
-      const id = `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`;
-      state.webhooks.set(id, { apiKey, ...input });
-      return { id };
-    },
-    async deleteWebhook(apiKey, webhookId) {
-      known(apiKey);
-      state.deletedWebhooks.push(webhookId);
-      state.webhooks.delete(webhookId);
-    },
-  };
-  return { client, state };
-}

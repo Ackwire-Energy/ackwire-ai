@@ -76,7 +76,7 @@ export interface WorkerDeps {
   artifacts?: ArtifactDeps;
   /** Approval reminder emails. */
   approvalDigest?: { publicUrl: string; afterHours: number };
-  /** People's mailboxes (ADR 0038): IMAP and MillionSend polling for routines, and Composio account checks. */
+  /** People's mailboxes (ADR 0038): IMAP polling for routines, and Composio account checks. */
   mail?: { deps: MailDeps; pollSeconds: number };
   /** The agent browser's live view (ADR 0040): expired handoffs are told to its viewers. */
   browserLive?: BrowserLive;
@@ -257,7 +257,7 @@ export function startWorkers(deps: WorkerDeps) {
   });
 
   const mail = deps.mail;
-  if (mail?.deps.mail?.imap || mail?.deps.mail?.millionsend) {
+  if (mail?.deps.mail?.imap) {
     every("mailPoll", Math.min(WORKER_INTERVALS_MS.mailPoll, mail.pollSeconds * 1000), async () => {
       const r = await pollMailWatches(mail.deps, { intervalMs: mail.pollSeconds * 1000, concurrency: 5 });
       if (r.fired > 0) {

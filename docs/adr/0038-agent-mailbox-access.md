@@ -122,7 +122,7 @@ KMS is not a prerequisite for email. Gmail and Outlook through Composio store no
 - IMAP host names are resolved and refused when they point to private, loopback or metadata addresses. They are checked once before connecting, not pinned against DNS rebinding.
 - Presets: iCloud, Yahoo, Zoho (and Zoho custom domains), Fastmail, Locaweb, Hostinger, GoDaddy, Titan and IONOS. KingHost and UOL Host are left out because no official settings page was found; those mailboxes use "Outro servidor".
 - Outlook has no brand icon (Simple Icons removed it at Microsoft's request); the card shows a letter tile.
-- A MillionSend inbox is a fourth path (`via = millionsend`), through MillionSend's API with a key of its own: ADR 0102.
+- A MillionSend inbox was a fourth path (`via = millionsend`), ADR 0102, withdrawn on 2026-11-02.
 
 ## Amendment (2026-10-31): connectors through Composio
 

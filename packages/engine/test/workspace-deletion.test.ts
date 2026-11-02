@@ -4,9 +4,6 @@ import {
   type ComposioClient,
   createFakeComposioClient,
   createFakeMailConnector,
-  createFakeMailPoller,
-  createFakeMillionSend,
-  FAKE_MILLIONSEND_KEY,
   MailError,
   orgTopic,
   type ServerFrame,
@@ -28,9 +25,7 @@ import {
   createContextToolSource,
   createInvitation,
   createJobHandlers,
-  createLocalKeyWrapper,
   createMachineHub,
-  createMillionSendAccount,
   createOrganization,
   type DeletionDeps,
   drainOutbox,
@@ -918,34 +913,6 @@ describe("the purge", () => {
     expect(await purgeWorkspace({ db: f.db, mail }, f.org.id)).toBe(true);
     expect(composio.state.deletedAccounts.sort()).toEqual(["ca_1", "ca_2"]);
     expect(composio.state.grantsKept).toEqual(["ca_1"]);
-  });
-
-  test("MillionSend stops posting its inboxes' mail: each webhook is deleted with the inbox's own key", async () => {
-    f = await setup();
-    const fake = createFakeMillionSend();
-    const mail = {
-      composio: null,
-      imap: null,
-      millionsend: {
-        client: fake.client,
-        connector: createFakeMailConnector().connector,
-        poller: createFakeMailPoller().poller,
-      },
-    };
-    const keyWrappers = [createLocalKeyWrapper(SECRET)];
-    const publicUrl = "https://agentes.example.com";
-    const inboxId = fake.state.inboxes[0]?.id ?? "";
-    const r = await createMillionSendAccount({ db: f.db, keyWrappers, mail, publicUrl }, f.owner.id, f.org.id, {
-      apiKey: FAKE_MILLIONSEND_KEY,
-      inboxId,
-    });
-    const [webhookId] = [...fake.state.webhooks.keys()];
-    expect(r.ok && r.instant).toBe(true);
-    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
-    await pastItsDate();
-    const connectors: ConnectorDeps = { db: f.db, keyWrappers, publicUrl };
-    expect(await purgeWorkspace({ db: f.db, mail, connectors }, f.org.id)).toBe(true);
-    expect(fake.state.deletedWebhooks).toEqual([webhookId ?? "none"]);
   });
 
   test("a mailbox's grant stays while a Drive of its Google account outlives the purge; the workspace's own goes first", async () => {

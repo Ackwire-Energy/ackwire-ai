@@ -4,9 +4,6 @@ import {
   MailAuthError,
   type MailPoller,
   type MailSummary,
-  millionSendFolder,
-  readMillionSendWebhook,
-  verifyStandardWebhook,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { countComposio } from "../connector-usage";
@@ -14,15 +11,12 @@ import { markComposioAccountBroken } from "../connectors/composio";
 import { NotFoundError } from "../errors";
 import { cutText } from "../format";
 import { type EventMerge, holdForNextRun, queueEventRun, type RoutineEventPayload } from "../routine-events";
-import { ForbiddenSignatureError } from "../webhooks";
 import {
   accountRef,
   applyComposioStateFor,
-  forgetAtMillionSend,
   type MailDeps,
   mailSlugs,
   markNeedsReconnect,
-  openMillionSendSecret,
   orgMailAccounts,
 } from "./accounts";
 import { agentMailPolicy } from "./policies";
@@ -60,7 +54,7 @@ function mailSummary(address: string, folder: string, readTool: string, messages
   const lines = messages.map((m) => {
     const base = `- ${m.date} · ${m.from} · "${m.subject}" · id ${m.id}`;
     const snippetRoom = room - base.length - 3;
-    // MillionSend's lists carry no text: no snippet, no dangling separator.
+    // A list without text: no snippet, no dangling separator.
     const snippet = snippetRoom > 20 ? oneLine(m.snippet, snippetRoom) : "";
     return snippet ? `${base} · ${snippet}` : cutText(base, Math.max(40, room));
   });
@@ -230,63 +224,14 @@ export async function handleComposioWebhook(
   return { type: event.type, fired: 0 };
 }
 
-// ── MillionSend webhooks ────────────────────────────────────────────────────
-
-/**
- * `POST /api/webhooks/millionsend`: new mail in a MillionSend inbox. Each mailbox has its own webhook and secret,
- * so the inbox the body names only says whose secrets to try: nothing counts until one of them signs it
- * (`ForbiddenSignatureError` otherwise). Then the message goes to the routines watching its folder on each
- * mailbox it signed for, deduplicated against polling by message id. A delivery for a disconnected mailbox (its
- * webhook outlived a delete that failed) deletes that webhook with the mailbox's key and is taken, running
- * nothing: refused, MillionSend would keep mailing the team that its webhook fails.
- */
-export async function handleMillionSendWebhook(
-  deps: Pick<MailDeps, "db" | "keyWrappers" | "mail" | "now">,
-  headers: Headers,
-  rawBody: string,
-): Promise<{ type: string; fired: number }> {
-  const millionsend = deps.mail?.millionsend;
-  if (!millionsend) throw new NotFoundError("MillionSend inboxes are off");
-  const read = readMillionSendWebhook(rawBody);
-  if (!read) throw new ForbiddenSignatureError();
-  const { db } = deps;
-  const candidates = await db
-    .select()
-    .from(mailAccounts)
-    .where(and(eq(mailAccounts.via, "millionsend"), eq(mailAccounts.externalAccountId, read.inboxId)));
-  const at = (deps.now?.() ?? new Date()).getTime();
-  const signed: (typeof candidates)[number][] = [];
-  for (const account of candidates) {
-    const secret = await openMillionSendSecret(deps, account).catch(() => null);
-    if (secret?.webhook && verifyStandardWebhook(secret.webhook.secret, headers, rawBody, at)) signed.push(account);
-  }
-  if (signed.length === 0) throw new ForbiddenSignatureError();
-  for (const account of signed) {
-    if (account.revokedAt) await forgetAtMillionSend(millionsend.client, deps, account).catch(() => {});
-  }
-  if (read.event.type !== "mail.received") return { type: "other", fired: 0 };
-  const message = read.event.message;
-  let fired = 0;
-  for (const account of signed) {
-    if (account.revokedAt || account.status !== "active") continue;
-    const watches = await db.select().from(mailWatches).where(eq(mailWatches.accountId, account.id));
-    for (const w of watches) {
-      if (millionSendFolder(w.folder) !== millionSendFolder(message.folder)) continue;
-      if ((await ingestMail(deps, w.id, [message])).fired) fired++;
-    }
-  }
-  return { type: "mail.received", fired };
-}
-
-// ── Polling (IMAP, MillionSend) ─────────────────────────────────────────────
+// ── Polling (IMAP) ─────────────────────────────────────────────
 
 /** A watch that failed (not the password) waits this many intervals before the next try. */
 const ERROR_BACKOFF_INTERVALS = 5;
 
 /**
- * Worker tick: checks the folders watched by active routines on IMAP and MillionSend mailboxes whose last
- * check is older than `intervalMs` (failed ones back off). MillionSend's webhook wakes routines at once, and
- * this catches what it missed. Watches are claimed with `FOR UPDATE SKIP LOCKED` and stamped before the
+ * Worker tick: checks the folders watched by active routines on IMAP mailboxes whose last
+ * check is older than `intervalMs` (failed ones back off). Watches are claimed with `FOR UPDATE SKIP LOCKED` and stamped before the
  * network call, so replicas never poll the same folder twice. A first check starts from now; a changed IMAP
  * `UIDVALIDITY` starts over from now too (the poller says so).
  */
@@ -296,7 +241,6 @@ export async function pollMailWatches(
 ): Promise<{ checked: number; fired: number; failed: number }> {
   const pollers: Record<string, MailPoller | undefined> = {
     imap: deps.mail?.imap?.poller,
-    millionsend: deps.mail?.millionsend?.poller,
   };
   const vias = Object.keys(pollers).filter((via) => pollers[via]);
   if (vias.length === 0) return { checked: 0, fired: 0, failed: 0 };

@@ -4,7 +4,6 @@ import {
   ForbiddenSignatureError,
   HOOK_LIMIT_PER_IP,
   handleComposioWebhook,
-  handleMillionSendWebhook,
   handleWebhook,
   NotFoundError,
   receiveRoutineHook,
@@ -55,25 +54,6 @@ export function registerWebhookReceiver(api: OpenAPIHono, deps: AppDeps) {
       if (error instanceof ComposioSignatureError) return c.json({ error: "invalid signature" }, 401);
       if (error instanceof NotFoundError) return c.json({ error: "not found" }, 404);
       if (error instanceof SyntaxError) return c.json({ error: "invalid body" }, 400);
-      throw error;
-    }
-  });
-  // MillionSend (ADR 0102): new mail in an inbox connected as a mailbox. One endpoint for the whole server; each
-  // mailbox's webhook is signed with its own secret (Standard Webhooks), tried for the inbox the body names.
-  api.post("/webhooks/millionsend", async (c) => {
-    const raw = await readWebhookText(c.req.raw, 1_000_000);
-    if (raw === null) return c.json({ error: "too large" }, 413);
-    try {
-      const result = await handleMillionSendWebhook(
-        { db: deps.db, keyWrappers: webhookDeps.keyWrappers, mail: deps.adapters.mail },
-        c.req.raw.headers,
-        raw,
-      );
-      if (result.fired > 0) deps.wakeWorkers?.();
-      return c.json({ ok: true, type: result.type, fired: result.fired }, 202);
-    } catch (error) {
-      if (error instanceof ForbiddenSignatureError) return c.json({ error: "invalid signature" }, 401);
-      if (error instanceof NotFoundError) return c.json({ error: "not found" }, 404);
       throw error;
     }
   });

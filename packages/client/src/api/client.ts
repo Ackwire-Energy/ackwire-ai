@@ -138,8 +138,6 @@ import type {
   Memory,
   Message,
   MessagePin,
-  MillionSendInbox,
-  MillionSendKeyInput,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -1332,13 +1330,6 @@ export interface ApiClient {
     accounts(orgId: string): Promise<MailAccount[]>;
     /** Tests the login and both servers first; a `422` carries `MailConnectError` as its code. */
     connectImap(orgId: string, input: MailImapInput): Promise<MailAccount>;
-    /** The inboxes a MillionSend key reaches (the key isn't kept); a `422 auth` when MillionSend refuses it. */
-    millionsendInboxes(orgId: string, input: MillionSendKeyInput): Promise<MillionSendInbox[]>;
-    /** Connects one; `instant`: a webhook brings its new mail at once (else it's checked every few minutes). */
-    connectMillionSend(
-      orgId: string,
-      input: MillionSendKeyInput & { inboxId: string; label?: string },
-    ): Promise<{ account: MailAccount; instant: boolean }>;
     /**
      * Gmail/Outlook: the page to open; the server sends the person back with `?mail=connected|failed`.
      * `desktop`: started in the desktop app's window, which opens the page in the browser and gets the return back.

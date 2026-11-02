@@ -89,7 +89,6 @@ import type {
   Me,
   Message,
   MessageMemory,
-  MillionSendKeyInput,
   MoveAgentsInput,
   NoticeCategory,
   NoticePrefs,
@@ -1633,17 +1632,6 @@ export function useMailAction(orgId: string) {
     connectComposio: useMutation({
       mutationFn: (input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean }) =>
         api.mail.connectComposio(orgId, input),
-    }),
-    millionsendInboxes: useMutation({
-      mutationFn: (input: MillionSendKeyInput) => api.mail.millionsendInboxes(orgId, input),
-      // The form says why (a key MillionSend refused).
-      meta: { silent: true },
-    }),
-    connectMillionSend: useMutation({
-      mutationFn: (input: MillionSendKeyInput & { inboxId: string; label?: string }) =>
-        api.mail.connectMillionSend(orgId, input),
-      onSuccess: done,
-      meta: { silent: true },
     }),
     update: useMutation({
       mutationFn: ({ accountId, ...input }: MailAccountUpdate & { accountId: string }) =>

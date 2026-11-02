@@ -110,7 +110,6 @@ import type {
   Memory,
   Message,
   MessagePin,
-  MillionSendInbox,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -263,11 +262,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       accounts: async (orgId) => (await request<{ accounts: MailAccount[] }>(`${org(orgId)}/mail/accounts`)).accounts,
       connectImap: async (orgId, input) =>
         (await request<{ account: MailAccount }>(`${org(orgId)}/mail/accounts/imap`, { json: input })).account,
-      millionsendInboxes: async (orgId, input) =>
-        (await request<{ inboxes: MillionSendInbox[] }>(`${org(orgId)}/mail/millionsend/inboxes`, { json: input }))
-          .inboxes,
-      connectMillionSend: (orgId, input) =>
-        request<{ account: MailAccount; instant: boolean }>(`${org(orgId)}/mail/accounts/millionsend`, { json: input }),
       connectComposio: (orgId, input) =>
         request<{ accountId: string; redirectUrl: string }>(`${org(orgId)}/mail/accounts/composio`, { json: input }),
       update: async (orgId, accountId, input) =>

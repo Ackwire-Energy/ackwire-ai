@@ -1,7 +1,6 @@
 /**
  * Small, dependency-free helpers to normalise mail coming out of providers
- * (Composio's Gmail and Outlook tool results and trigger payloads, MillionSend's
- * API): JSON fields, HTML to plain text, address lists, dates and base64url bodies.
+ * (Composio's Gmail and Outlook tool results and trigger payloads): JSON fields, HTML to plain text, address lists, dates and base64url bodies.
  */
 import type { MailAddress } from "./mail";
 
@@ -198,18 +197,6 @@ export function parseAddress(value: string): MailAddress | null {
   }
   const bare = /([^\s<>"]+@[^\s<>"]+)/.exec(trimmed);
   return bare?.[1] ? { address: bare[1].toLowerCase() } : null;
-}
-
-/**
- * A mailbox as a From field carries it: the address alone without a name, else `Name <address>`, the name quoted
- * unless it is plain words. MillionSend serializes its inbox senders the same way, and on its shared domain
- * refuses a name that doesn't read back as the inbox's own.
- */
-export function formatMailbox(name: string | null | undefined, address: string): string {
-  const n = name?.trim();
-  if (!n) return address;
-  const phrase = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~\- ]+$/.test(n) ? n : `"${n.replace(/(["\\])/g, "\\$1")}"`;
-  return `${phrase} <${address}>`;
 }
 
 /** An address list header (or an array of strings / Graph recipients) into lowercase addresses. */

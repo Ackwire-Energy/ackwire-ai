@@ -5270,28 +5270,6 @@ export interface MailProviders {
   /** iCloud and any other mailbox (IMAP/SMTP). */
   imap: boolean;
   presets: MailPreset[];
-  /**
-   * MillionSend inboxes, null when off. `connectorKey`: the workspace's MillionSend connector holds a key a person
-   * may choose to reuse; `keysUrl`: where MillionSend Cloud makes keys (null: a self-hosted MillionSend).
-   */
-  millionsend: { connectorKey: boolean; keysUrl: string | null } | null;
-}
-
-/** An inbox a MillionSend key reaches. */
-export interface MillionSendInbox {
-  id: string;
-  address: string;
-  name: string | null;
-  kind: "agent" | "human";
-  shared: boolean;
-  /** Already a mailbox of this workspace. */
-  connected: boolean;
-}
-
-/** A MillionSend key: pasted, or the MillionSend connector's (the person chose it). */
-export interface MillionSendKeyInput {
-  apiKey?: string;
-  useConnector?: boolean;
 }
 
 export type MailLevel = "read" | "read_write";
@@ -5299,8 +5277,8 @@ export type MailLevel = "read" | "read_write";
 /** A mailbox the organization connected (never its password). */
 export interface MailAccount {
   id: string;
-  provider: "gmail" | "outlook" | "imap" | "millionsend";
-  via: "composio" | "imap" | "millionsend";
+  provider: "gmail" | "outlook" | "imap";
+  via: "composio" | "imap";
   address: string;
   label: string;
   status: "pending" | "active" | "needs_reconnect";
@@ -5342,8 +5320,6 @@ export interface MailAccountUpdate {
   label?: string;
   /** A new app password (IMAP): tested first, a `422` carries `MailConnectError`. */
   password?: string;
-  /** A new API key (MillionSend): it must still reach the inbox, a `422` carries `auth`. */
-  apiKey?: string;
   offActions?: MailActionName[];
   askActions?: MailActionName[];
   /** The mailbox's other addresses (replaces the list). */

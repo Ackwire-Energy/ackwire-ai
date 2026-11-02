@@ -410,7 +410,7 @@ export function toolHint(tool: string, activity: Activity, detail?: string | nul
   if (detail?.trim()) return detail.trim() === activity.app ? null : detail.trim();
   if (activity.kind !== "consulting") return null;
   const name = tool.trim().replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
-  // The MillionSend connector shares its service name with MillionSend mailboxes: only `mail_` tools are a mailbox's.
+  // A connector may share its service name with a mailbox (Gmail): only `mail_` tools are a mailbox's.
   if (
     activity.service === "mail" ||
     activity.service === "postgres" ||

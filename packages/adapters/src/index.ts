@@ -30,7 +30,6 @@ export * from "./machine-protocol";
 export * from "./mail";
 export * from "./mail-fake";
 export * from "./mail-presets";
-export * from "./millionsend-mail";
 export * from "./presence";
 export * from "./pubsub";
 export * from "./push";
