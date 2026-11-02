@@ -11663,7 +11663,8 @@ export const ptBR = {
     ask: {
       watching: "Você está só assistindo.",
       title: "Quer assumir o controle?",
-      working: "{{The}} {{name}} pausa enquanto você estiver no controle.",
+      working: "O\u00a0{{name}} pausa enquanto você está no controle.",
+      working_female: "A\u00a0{{name}} pausa enquanto você está no controle.",
     },
     sub: {
       control: "Você no controle · o\u00a0{{name}} espera",

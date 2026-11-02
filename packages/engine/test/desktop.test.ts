@@ -460,7 +460,7 @@ describe("the agents frame (protocol 9)", () => {
           id: f.agent.id,
           handle: "dev",
           name: "Dev",
-          locale: "en",
+          locale: "pt-BR",
           look: { color: "rose", eyes: "happy", accessory: "crown" },
         },
       ],

@@ -9945,6 +9945,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Le réseau change. Les sessions ouvertes de l’ordinateur redémarreront à {{when}}.",
+      "restart": "Les sessions de l’ordinateur redémarrent pour appliquer le réseau. Les nouvelles tâches attendent la fin.",
+      "line": "IP de sortie {{ip}}",
+      "hint": "L’adresse que voient les sites quand les agents naviguent. Elle change quand le réseau de l’ordinateur change."
+    },
     "online": "En ligne",
     "offline": "Hors ligne",
     "execOff": "Commandes désactivées",
@@ -12431,6 +12437,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Vous regardez seulement.",
+      "title": "Prendre le contrôle ?",
+      "working": "{{name}} se met en pause pendant que vous avez le contrôle."
+    },
     "sub": {
       "control": "Vous avez le contrôle · {{name}} attend",
       "control_female": "Vous avez le contrôle · {{name}} attend",

@@ -23108,6 +23108,18 @@
   "errors.handle.takenByAgent": {
     "value": "@{{handle}} belongs to an agent."
   },
+  "machines.egress.draining": {
+    "value": "Network settings are changing. Open computer sessions will restart at {{when}}."
+  },
+  "machines.egress.restart": {
+    "value": "Computer sessions are restarting to apply network settings. New work waits until this finishes."
+  },
+  "machines.egress.line": {
+    "value": "Exit IP {{ip}}"
+  },
+  "machines.egress.hint": {
+    "value": "The address websites see when the agents browse. It updates when the computer’s network changes."
+  },
   "machines.online": {
     "value": "Online"
   },
@@ -28692,6 +28704,15 @@
   },
   "computerSetup.email.short": {
     "value": "We'll email you."
+  },
+  "desktop.ask.watching": {
+    "value": "You're just watching."
+  },
+  "desktop.ask.title": {
+    "value": "Want to take control?"
+  },
+  "desktop.ask.working": {
+    "value": "{{name}} pauses while you’re in control."
   },
   "desktop.sub.control": {
     "value": "You're in control · {{name}} waits"

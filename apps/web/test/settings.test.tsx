@@ -8,6 +8,7 @@ import { setNavigateAway } from "@/lib/navigate";
 import { pick, rowMenu } from "./catalog";
 import { createFakeApi, OPENROUTER_KEY, OPENROUTER_MODELS, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
+import { pick as pickOption } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -686,7 +687,10 @@ describe("Buscar no workspace", () => {
 
 test("changing Settings language saves the account before updating the local language", async () => {
   const { state } = await go(seedState(), "settings/account");
-  await click(screen().getByRole("radio", { name: "English" }));
+  await pickOption(screen().getByRole("combobox", { name: "Idioma" }), "English");
   await settle(6);
-  expect(state.calls.find((call) => call.method === "account.updateMe")?.args[0]).toEqual({ locale: "en" });
+  expect(state.calls.find((call) => call.method === "account.updateMe")?.args[0]).toEqual({
+    locale: "en",
+    auto: false,
+  });
 });
