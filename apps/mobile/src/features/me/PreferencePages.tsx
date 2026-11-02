@@ -307,17 +307,20 @@ export function AppearancePage() {
   );
 }
 
-/** Idioma: Automático (the phone's language) first, then each language by its own name. */
-export function LanguagePage() {
+/**
+ * Idioma: Automático (the phone's language) first, then each language by its own name. Signed out, the pick waits on
+ * the phone for the next sign-in.
+ */
+export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
   const { t } = useTranslation();
   const api = useApi();
   const [choice, setChoice] = useState(() => readLocaleState().stored ?? "auto");
   const pick = (next: AppLocale | "auto") => {
     setChoice(next);
     const code = next === "auto" ? deviceLocale() : next;
-    rememberLocale(next, false);
+    rememberLocale(next, !signedIn);
     setLocale(code);
-    void api.account.updateMe({ locale: code, auto: next === "auto" }).catch(() => {});
+    if (signedIn) void api.account.updateMe({ locale: code, auto: next === "auto" }).catch(() => {});
   };
   return (
     <Page title={t("mobile.me.language")}>
