@@ -60,29 +60,27 @@ export const SAFETY_FINAL =
 export const SAFETY_TAG = "[refused for safety]";
 
 /**
- * Refusal codes (a tool result's `data.code`, bare or as `command.<code>`) that stop data from going out: the
- * gateway's credential check, the command policy's secret, upload, remote-host and inline-code refusals, `remember`'s
- * unasked destination and the outbound checks on web addresses.
+ * Refusal codes (a tool result's `data.code`) that stop data from going out: the gateway's credential check,
+ * `remember`'s unasked destination and the outbound checks on web addresses. A command held for a person's approval
+ * (`command.approval_needed`) is not one: the person may let it run.
  */
 const SAFETY_CODES = new Set([
   "tool.credential",
-  "secret",
-  "never",
-  "upload",
-  "remote",
-  "inline",
   "memory.unasked_destination",
   "outbound.private_text",
   "outbound.credential",
   "outbound.long",
 ]);
 
-const isSafetyCode = (code: unknown) =>
-  typeof code === "string" && (SAFETY_CODES.has(code) || SAFETY_CODES.has(code.replace(/^command\./, "")));
+const isSafetyCode = (code: unknown) => typeof code === "string" && SAFETY_CODES.has(code);
 
-/** A computer brain's own call the command policy refused for one of those reasons (`mission-commands.ts`). */
+/**
+ * A computer brain's own call the command policy refused because it reads secrets or sends data out
+ * (`mission-commands.ts`). Inline code, a remote host or a shell are refused with another way to do it, so they
+ * aren't final.
+ */
 const HARNESS_SAFETY =
-  /→ failed: This command was refused because (?:it touches secrets|it sends data|it connects to another host|it runs code given inline)/;
+  /→ failed: (?:This command was refused because (?:it touches secrets|it sends data)|Agents never read secrets)/;
 
 /** The tried lines as a run reads them: inside the envelope, since their outcomes quote tool results. */
 const triedBlock = (tried: string[]) =>
@@ -187,8 +185,9 @@ export async function continuationVerdict(
           : p("ask") >= 0.45
             ? "ask"
             : "done";
-  // What failed was only refused for safety: no way is left to try, nor more to do, for that data.
-  return (verdict === "untried" || verdict === "continue") && onlySafetyRefusals(input.tried) ? "done" : verdict;
+  // What failed was only refused for safety: no way is left to try for that data. Work it said it will still do
+  // (`continue`) goes on.
+  return verdict === "untried" && onlySafetyRefusals(input.tried) ? "done" : verdict;
 }
 
 /** One tool call as the judge reads it: `name(argument) → outcome`, short. */
