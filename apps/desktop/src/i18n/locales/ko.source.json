@@ -1418,6 +1418,12 @@
   "cover.otherServer": {
     "value": "Use another server"
   },
+  "cover.stuck": {
+    "value": "agentes.chat didn't open. Try again, or see the page as it is."
+  },
+  "cover.showAnyway": {
+    "value": "Show it anyway"
+  },
   "menu.about": {
     "value": "About agentes.chat"
   },

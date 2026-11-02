@@ -529,7 +529,9 @@
     "copied": "복사됨",
     "retry": "다시 시도",
     "openTailscale": "Tailscale 열기",
-    "otherServer": "다른 서버 사용"
+    "otherServer": "다른 서버 사용",
+    "stuck": "agentes.chat이 열리지 않았습니다. 다시 시도하거나 지금 상태의 페이지를 보세요.",
+    "showAnyway": "그대로 보기"
   },
   "menu": {
     "about": "agentes.chat 정보",

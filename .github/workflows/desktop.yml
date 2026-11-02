@@ -3,7 +3,8 @@ name: Desktop
 # The desktop app for macOS, Windows and Linux. Started by hand on main with `release` = fix/feature/major: one
 # job bumps the version (patch/minor/major) in tauri.conf.json, package.json and Cargo.toml, commits and tags
 # `desktop-v<version>` on main; three jobs build it (macOS universal, signed with our Developer ID and
-# notarized; Windows NSIS; Linux AppImage and deb), each with the updater bundle signed with the updater key;
+# notarized when the Apple secrets are set, ad-hoc signed without them; Windows NSIS; Linux AppImage and deb),
+# each with the updater bundle signed with the updater key;
 # one job publishes every file in the GitHub Release (the server reads those names, apps/server
 # routes/desktop.ts):
 #   macOS    agentes_<v>_universal.dmg (+ .sha256), agentes_<v>_universal.app.tar.gz (+ .sig)
@@ -193,23 +194,43 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # Signing and notarization (Developer ID .p12 + App Store Connect API key) and the updater key.
+      # The updater key is always required. Signing and notarization (Developer ID .p12 + App Store Connect API
+      # key) are optional (ADR 0036 §10): with all six Apple secrets the app is signed and notarized; with none,
+      # it is ad-hoc signed and the first open asks for "Open Anyway"; some but not all is a mistake.
       - name: Signing secrets
+        id: signing
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          for name in APPLE_CERTIFICATE APPLE_API_KEY_P8 TAURI_SIGNING_PRIVATE_KEY; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Secret $name is missing"
-              exit 1
-            fi
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY is missing"
+            exit 1
+          fi
+          APPLE=(APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_P8)
+          MISSING=()
+          for name in "${APPLE[@]}"; do
+            if [ -z "${!name}" ]; then MISSING+=("$name"); fi
           done
+          if [ "${#MISSING[@]}" -eq "${#APPLE[@]}" ]; then
+            echo "::warning::No Apple signing secrets: the macOS app is ad-hoc signed, not notarized"
+            echo "apple=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error::Apple signing secrets missing: ${MISSING[*]} (set all six, or none for an ad-hoc build)"
+            exit 1
+          fi
           KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
           printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+          echo "apple=true" >> "$GITHUB_OUTPUT"
 
       # The runner ships inside the app as a Tauri sidecar: `binaries/agentes-runner-<target triple>`.
       # A universal build needs both arch binaries (one per cargo build) and the lipo'd universal one.
@@ -266,11 +287,12 @@ jobs:
           test -s apps/desktop/src-tauri/native/web/index.html
           test -d apps/desktop/src-tauri/native/licenses/npm
 
-      - name: Icons
+      - name: Icons and the .dmg's background
         working-directory: apps/desktop
         run: |
           bun scripts/icons.ts
           bun run tauri icon app-icon.png
+          bun scripts/dmg-art.ts
 
       # The cached target may keep an older build's .app, .dmg and updater bundle (another name, another
       # version): the steps below pick the first one they find, so only this build's may be there.
@@ -279,6 +301,7 @@ jobs:
         run: rm -rf apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle
 
       - name: Build the app (universal, signed, notarized)
+        if: ${{ steps.signing.outputs.apple == 'true' }}
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -293,8 +316,25 @@ jobs:
           tauriScript: bun run tauri
           args: --target universal-apple-darwin --config src-tauri/tauri.native.conf.json
 
+      # No Apple secrets: no APPLE_* variables at all (an empty one still counts as set for the bundler), and
+      # no hardened runtime, which with an ad-hoc signature keeps WebKit's content process from starting.
+      - name: Build the app (universal, ad-hoc signed)
+        if: ${{ steps.signing.outputs.apple != 'true' }}
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: bun run tauri
+          args: >-
+            --target universal-apple-darwin --config src-tauri/tauri.native.conf.json
+            --config src-tauri/tauri.adhoc.conf.json
+
       - name: Check the signature and the notarization
         shell: bash
+        env:
+          APPLE: ${{ steps.signing.outputs.apple }}
         run: |
           APP=$(ls -d apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app | head -1)
           codesign --verify --deep --strict --verbose=2 "$APP"
@@ -307,6 +347,11 @@ jobs:
           test -s "$APP/Contents/Resources/NOTICE"
           test -s "$APP/Contents/Resources/server/native.js"
           test -s "$APP/Contents/Resources/web/index.html"
+          if [ "$APPLE" != "true" ]; then
+            codesign -dv "$APP" 2>&1 | grep -q '^Signature=adhoc$'
+            echo "::notice::Ad-hoc signed: no notarization, the first open asks for Open Anyway"
+            exit 0
+          fi
           # Apple may take a moment to hand out the ticket after accepting the notarization, and the build's
           # own stapling then gives up quietly (0.5.4): staple again for a few minutes before checking. The
           # .dmg and the update keep the app as built; without a ticket, the Mac checks it online.
