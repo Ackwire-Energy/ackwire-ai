@@ -107,6 +107,6 @@ describe("loading", () => {
     expect(Object.keys(resources).sort()).toEqual([...LOCALE_CODES].sort());
     expect(await loadStrings.en()).toBe(en);
     expect((await loadStrings["pt-BR"]()).common).toEqual(resources["pt-BR"].translation.common);
-    expect(await loadStrings.ja()).toEqual({});
+    expect(await loadStrings.ja()).toEqual((await import("../src/locales/ja.json")).default);
   });
 });
