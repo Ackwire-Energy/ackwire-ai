@@ -1,5 +1,5 @@
-import type { AppAccess, AppsList, ConnectedApp, PersonalToken, PersonalTokenInput } from "@agenteschat/client";
-import { ApiError, useAppActions, useApps } from "@agenteschat/client";
+import type { AppAccess, AppsList, ConnectedApp, Me, PersonalToken, PersonalTokenInput } from "@agenteschat/client";
+import { ApiError, keys, useAppActions, useApps } from "@agenteschat/client";
 import {
   APP_CLIENTS,
   type AppClientId,
@@ -13,7 +13,7 @@ import {
   vscodeInstallLink,
 } from "@agenteschat/client/lib/app-clients";
 import { appFacts, appMark, isAppsEmpty, newlyConnected, tokenFacts } from "@agenteschat/client/lib/apps";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, REAUTH_SIGN_IN } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Alert,
@@ -38,12 +38,14 @@ import {
   TabPanel,
   Tabs,
 } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { useSignInAgain } from "@/hooks/useSignInAgain";
 import { useToast } from "@/lib/toast";
 import "./ai-apps.css";
 
@@ -630,6 +632,9 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reauth, setReauth] = useState(false);
+  const qc = useQueryClient();
+  const signInAgain = useSignInAgain(qc.getQueryData<Me | null>(keys.me)?.user.email ?? "");
   if (secret) {
     return (
       <Dialog
@@ -672,14 +677,22 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
           e.preventDefault();
           if (!clean || createToken.isPending) return;
           setError(null);
+          setReauth(false);
           createToken.mutate(
             { name: clean, access, expiresInDays: daysOf(validity) },
             {
               onSuccess: (created) => setSecret(created.secret),
-              onError: (err) =>
+              onError: (err) => {
+                const stale = errorCode(err) === REAUTH_SIGN_IN;
+                setReauth(stale);
                 setError(
-                  err instanceof ApiError && err.code === "token_limit" ? t("apps.tokens.limit") : errorText(t, err),
-                ),
+                  stale
+                    ? t("apps.tokens.reauth")
+                    : err instanceof ApiError && err.code === "token_limit"
+                      ? t("apps.tokens.limit")
+                      : errorText(t, err),
+                );
+              },
             },
           );
         }}
@@ -710,7 +723,11 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
           <Field label={t("apps.tokens.validity")} id="apps-token-validity">
             <Select
               value={validity}
-              onValueChange={(v) => setValidity(v as Validity)}
+              onValueChange={(v) => {
+                setValidity(v as Validity);
+                setReauth(false);
+                setError(null);
+              }}
               options={VALIDITIES.map((v) => ({ value: v, label: t(`apps.tokens.days.${v}`) }))}
             />
           </Field>
@@ -720,9 +737,15 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" loading={createToken.isPending} disabled={!clean}>
-            {t("apps.tokens.create")}
-          </Button>
+          {reauth ? (
+            <Button type="button" variant="primary" onClick={() => void signInAgain()}>
+              {t("proof.signInButton")}
+            </Button>
+          ) : (
+            <Button type="submit" variant="primary" loading={createToken.isPending} disabled={!clean}>
+              {t("apps.tokens.create")}
+            </Button>
+          )}
         </DialogFooter>
       </form>
     </Dialog>

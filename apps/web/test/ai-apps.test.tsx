@@ -362,6 +362,18 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     expect(apps.tokens).toHaveLength(10);
   });
 
+  test("a token the server wants a fresh sign-in for: says so, with Entrar de novo in place of Criar token", async () => {
+    const { apps } = await go();
+    await click(section().getByRole("button", { name: "Criar token" }));
+    await act(async () => fireEvent.change(dialog().getByLabelText("Nome"), { target: { value: "Backup" } }));
+    apps.nextError = new ApiError(403, "reauth.sign_in", "Sign in again");
+    await click(dialog().getByRole("button", { name: "Criar token" }));
+    expect(screen().getByRole("dialog").textContent).toContain("Um token sem validade pede uma entrada recente.");
+    expect(dialog().getByRole("button", { name: "Entrar de novo" })).toBeTruthy();
+    expect(dialog().queryByRole("button", { name: "Criar token" })).toBeNull();
+    expect(apps.tokens).toHaveLength(0);
+  });
+
   test("who manages members: Meus and Todo o workspace, with whose each app is and no creating there", async () => {
     const state = seedState();
     await go(state, (apps) => {

@@ -10,6 +10,7 @@ import {
   TOKEN_EXPIRY_DAYS,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { signedInLately } from "../../auth";
 import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
@@ -214,7 +215,7 @@ export function appRoutes(deps: AppDeps) {
       security,
       summary: "Create a personal token",
       description:
-        "For scripts and apps without OAuth sign-in: `Authorization: Bearer agp_…` on `/mcp`, in this workspace only. `secret` is returned here once. At most 10 live per person and workspace (409 `token_limit`).",
+        "For scripts and apps without OAuth sign-in: `Authorization: Bearer agp_…` on `/mcp`, in this workspace only. `secret` is returned here once. At most 10 live per person and workspace (409 `token_limit`). One with no expiry (`expiresInDays: null`) needs a sign-in in the last 10 minutes (403 `reauth.sign_in`): only a password reset or a revoke would end it, so a session alone can't make one.",
       request: {
         params: OrgParams,
         body: body(
@@ -244,6 +245,11 @@ export function appRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
+      if (
+        c.req.valid("json").expiresInDays === null &&
+        !(await signedInLately(deps.auth, c.req.raw.headers, c.get("user").id))
+      )
+        return apiError(c, 403, "reauth.sign_in", "Sign in again to create a token with no expiry");
       const created = await createPersonalToken(
         db,
         deps.config.PUBLIC_URL,

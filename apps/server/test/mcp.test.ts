@@ -571,6 +571,21 @@ describe("Settings: apps and personal tokens", () => {
     expect(audit).toContain("apps.token_revoked");
   });
 
+  test("a personal token with no expiry takes a sign-in in the last 10 minutes", async () => {
+    const { b, orgId, ownerId } = await setup();
+    const create = (expiresInDays: number | null) =>
+      b(`/api/app/organizations/${orgId}/tokens`, { json: { name: "Backup", access: "write", expiresInDays } });
+    expect((await create(null)).status).toBe(201);
+    await t.db
+      .update(schema.sessions)
+      .set({ createdAt: new Date(Date.now() - 3600_000) })
+      .where(eq(schema.sessions.userId, ownerId));
+    const stale = await create(null);
+    expect(stale.status).toBe(403);
+    expect(((await stale.json()) as { error: { code: string } }).error.code).toBe("reauth.sign_in");
+    expect((await create(30)).status).toBe(201);
+  });
+
   test("an expired personal token is refused and left out of the list", async () => {
     const { b, orgId } = await setup();
     const { token, secret } = (await (

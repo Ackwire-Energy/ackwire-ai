@@ -9009,6 +9009,7 @@ export const ptBR = {
       done: "Já copiei",
       use: "Use no cabeçalho Authorization: Bearer, com o endereço do servidor.",
       limit: "Você chegou a 10 tokens neste workspace. Revogue um para criar outro.",
+      reauth: "Um token sem validade pede uma entrada recente. Entre de novo e crie o token, ou escolha uma validade.",
     },
     dialog: {
       pick: "Qual app você usa?",

@@ -8942,6 +8942,7 @@ export const en: Translations = {
       done: "I've copied it",
       use: "Use it in the Authorization: Bearer header, with the server address.",
       limit: "You have 10 tokens in this workspace. Revoke one to create another.",
+      reauth: "A token with no expiry needs a recent sign-in. Sign in again and create it, or pick an expiry.",
     },
     dialog: {
       pick: "Which app do you use?",
