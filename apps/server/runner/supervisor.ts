@@ -668,7 +668,9 @@ export class Supervisor {
         try {
           w.user = this.withNetwork(w.user);
         } catch {
-          pending.push(w.user.uid);
+          // No process of this worker holds the old network (a held uid is reported by its pins), and its next
+          // start resolves the network again and fails that work with the reason. Waiting here would hold every
+          // agent's new work behind a launch that can't succeed.
         }
         continue;
       }
