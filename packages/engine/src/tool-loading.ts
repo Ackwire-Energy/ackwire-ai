@@ -12,8 +12,7 @@ import type { ToolDefinition } from "./tools/types";
  * wrong guess costs a search, never a capability. The choice is made once per
  * run and kept on the transcript (`toolGroups`), so the tool list, and with
  * it the prompt cache, stays the same for the whole run. Some groups go
- * without asking (`keptToolGroups`): the thread's (its list only grows) and
- * those used in the channel lately.
+ * without asking (`keptToolGroups`): those the previous run here used.
  */
 
 /** A group is loaded up front at this probability or more (a miss costs a search; a load costs every call). */
@@ -161,49 +160,47 @@ export async function recentForJudge(
     .map((r) => `${r.authorType}: ${r.body.replace(/\s+/g, " ")}`);
 }
 
-/** Tools the agent used in the channel this recently load again without asking (ADR 0043: 77/77 with the judge). */
-export const RECENT_USE_MS = 6 * 3600_000;
-
 /**
- * The groups a run keeps without asking the judge (ADR 0043): those the agent's
- * previous run in this thread listed (the thread's tool list only grows, so a
- * computer brain's session and the cache aren't reset by every message), and
- * those of the tools it called in this channel in the last 6 hours.
+ * The groups a run keeps without asking the judge (ADR 0043, token-trim B1): those of the tools the agent's previous
+ * run in this conversation called (the thread; in a channel's or DM's main timeline, its previous run there). Only
+ * what that one run used, so a group comes along for the next message and drops once a run goes without it: a
+ * greeting after computer work no longer carries the computer's tools. A miss costs one `find_tools` search.
  */
 export async function keptToolGroups(
   db: Database,
-  run: { id: string; orgId: string; agentId: string; channelId: string; threadRootId: string },
+  run: {
+    id: string;
+    orgId: string;
+    agentId: string;
+    channelId: string;
+    threadRootId: string;
+    triggerMessageId: string;
+  },
   tools: ToolDefinition[],
 ): Promise<string[]> {
   const r = schema.agentRuns;
   const st = schema.agentRunSteps;
-  const [previous, used] = await Promise.all([
-    db
-      .select({ transcript: r.transcript })
-      .from(r)
-      .where(
-        and(eq(r.orgId, run.orgId), eq(r.agentId, run.agentId), eq(r.threadRootId, run.threadRootId), ne(r.id, run.id)),
-      )
-      .orderBy(desc(r.createdAt))
-      .limit(1),
-    db
-      .selectDistinct({ name: sql<string>`${st.data}->>'name'` })
-      .from(r)
-      .innerJoin(st, eq(st.runId, r.id))
-      .where(
-        and(
-          eq(r.orgId, run.orgId),
-          eq(r.agentId, run.agentId),
-          gt(r.createdAt, new Date(Date.now() - RECENT_USE_MS)),
-          eq(r.channelId, run.channelId),
-          eq(st.kind, "tool_call"),
-        ),
-      )
-      .limit(200),
-  ]);
-  const groups = (previous[0]?.transcript as { toolGroups?: unknown } | null)?.toolGroups;
-  const kept = new Set(Array.isArray(groups) ? groups.filter((g): g is string => typeof g === "string") : []);
+  const flat = run.threadRootId === run.triggerMessageId;
+  const [previous] = await db
+    .select({ id: r.id })
+    .from(r)
+    .where(
+      and(
+        eq(r.orgId, run.orgId),
+        eq(r.agentId, run.agentId),
+        eq(r.channelId, run.channelId),
+        flat ? sql`${r.threadRootId} = ${r.triggerMessageId}` : eq(r.threadRootId, run.threadRootId),
+        ne(r.id, run.id),
+      ),
+    )
+    .orderBy(desc(r.createdAt))
+    .limit(1);
+  if (!previous) return [];
+  const used = await db
+    .selectDistinct({ name: sql<string>`${st.data}->>'name'` })
+    .from(st)
+    .where(and(eq(st.runId, previous.id), eq(st.kind, "tool_call")))
+    .limit(200);
   const names = new Set(used.map((u) => u.name));
-  for (const t of tools) if (names.has(t.name)) kept.add(toolGroupKey(t));
-  return [...kept];
+  return [...new Set(tools.filter((t) => names.has(t.name)).map(toolGroupKey))];
 }

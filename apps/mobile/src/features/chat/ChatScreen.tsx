@@ -1900,7 +1900,7 @@ function Chat({
                       <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
                     )
                   }
-                  onType={() => sendTyping(threadId)}
+                  onType={(text) => sendTyping(threadId, text)}
                   voice={voice}
                 />
               ) : (

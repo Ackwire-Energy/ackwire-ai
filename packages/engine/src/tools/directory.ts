@@ -344,7 +344,8 @@ export function presentTools(
 // ── Tools on demand (ADR 0043) ───────────────────────────────────────────────
 
 /** A tool's group: its scope's prefix (`drive:write` → `drive`), each custom connector on its own; "" = conversation. */
-export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId">) {
+export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId"> & { name?: string }) {
+  if (tool.name && RARE_TOOLS.has(tool.name)) return RARE_GROUP;
   const prefix = tool.scope.split(":")[0] ?? "";
   return prefix.startsWith("custom") ? `custom:${tool.connectionId ?? prefix}` : prefix;
 }
@@ -357,8 +358,27 @@ export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId"
 export const CORE_GROUPS: ReadonlySet<string> = new Set(["", "context", "memory", "skills"]);
 const CORE_TOOLS: ReadonlySet<string> = new Set(["read_wiki_page", "search_wiki"]);
 
+/**
+ * Tools of the core groups that few runs use (token-trim B3): a group of their own, loaded on demand like any other.
+ * Never what the agent reaches for on its own (react, ask_user, request_permission, remember, save_how_to,
+ * update_memory, forget, update_skill, search_context, the web, ask_agent, tell_agent, follow_up,
+ * work_in_background, post_message, send_dm, post_update, show_block, the skill and wiki readers).
+ */
+export const RARE_TOOLS: ReadonlySet<string> = new Set([
+  "propose_instruction_change",
+  "send_sticker",
+  "read_skill_file",
+  "find_agent",
+  "get_my_usage",
+  "set_status",
+  "add_agent_to_channel",
+  "update_thread",
+  "cancel_follow_up",
+]);
+const RARE_GROUP = "more";
+
 export const isCore = (tool: Pick<ToolDefinition, "name" | "scope" | "connectionId">) =>
-  CORE_GROUPS.has(toolGroupKey(tool)) || CORE_TOOLS.has(tool.name);
+  !RARE_TOOLS.has(tool.name) && (CORE_GROUPS.has(toolGroupKey(tool)) || CORE_TOOLS.has(tool.name));
 
 /**
  * A core tool whose definition is the same in every run of the agent (`ToolSpec.stable`, the cached start of the
@@ -369,6 +389,8 @@ export const isStableTool = (tool: Pick<ToolDefinition, "name" | "scope" | "conn
 
 /** How a group is named for the model and the judge ("Browser", "GitHub", a connector's label). */
 const GROUP_LABELS: Record<string, string> = {
+  [RARE_GROUP]:
+    "More of the conversation (stickers, your status, threads, adding agents to channels, the agents' directory, your usage, instruction changes)",
   drive: "Files (Drive)",
   issues: "Issues",
   calendar: "Calendar",

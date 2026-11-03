@@ -350,7 +350,9 @@ test("command line: stream-json both ways, opus falls back to sonnet, strict MCP
   expect(args).not.toContain("--setting-sources");
   const lean = claudeBrainArgs({ ...base, settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS });
   expect(lean.join(" ")).toContain("--setting-sources project");
-  expect(lean.join(" ")).toContain("--tools Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch");
+  // Our web tools instead of Claude Code's (they mark what they read as outside content, ADR 0117).
+  expect(lean.join(" ")).toContain("--tools Bash,Read,Edit,Write,Glob,Grep,ToolSearch");
+  expect(lean.join(" ")).not.toContain("WebFetch");
   expect(lean.slice(-2)).toEqual(["--session-id", SESSION(1)]);
   expect(fallbackModelFor("claude-opus-5-5")).toBe("sonnet");
   expect(fallbackModelFor("sonnet")).toBeUndefined();
@@ -377,7 +379,8 @@ test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no ed
   expect(plan).toContain("--strict-mcp-config");
   expect(at(plan, "--setting-sources")).toBe("");
   expect(at(plan, "--permission-mode")).toBe("default");
-  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep,WebFetch,WebSearch");
+  // ToolSearch loads our tools that aren't always listed (without it Claude Code lists them all).
+  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep,ToolSearch");
   expect(at(plan, "--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
   const work = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", false) });
   expect(at(work, "--permission-mode")).toBe("acceptEdits");
@@ -390,6 +393,9 @@ test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no ed
   const personal = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", true) });
   expect(personal).not.toContain("--strict-mcp-config");
   expect(personal).not.toContain("--setting-sources");
+  // Every tool of Claude Code but its web: ours read it.
+  expect(at(personal, "--disallowedTools")).toBe("WebFetch,WebSearch");
+  expect(work).not.toContain("--disallowedTools");
 });
 
 // ── The manager with a fake Claude Code ──────────────────────────────────────
@@ -755,7 +761,7 @@ test.if(posix)(
     expect(args).toContain("--strict-mcp-config");
     expect(at("--setting-sources")).toBe("");
     expect(at("--permission-mode")).toBe("default");
-    expect(at("--tools")).toBe("Bash,Read,Glob,Grep,WebFetch,WebSearch");
+    expect(at("--tools")).toBe("Bash,Read,Glob,Grep,ToolSearch");
     expect(at("--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
     const settings = JSON.parse(readFileSync(at("--settings") as string, "utf8")) as {
       permissions: { allow: string[]; deny: string[] };
@@ -771,9 +777,11 @@ test.if(posix)(
     expect(settings.permissions.allow.some((r) => r.startsWith("Bash("))).toBe(false);
     // Its MCP process answers the prompts itself, reads only.
     const config = JSON.parse(readFileSync(at("--mcp-config") as string, "utf8")) as {
-      mcpServers: { agentes: { env: Record<string, string> } };
+      mcpServers: { agentes: { env: Record<string, string>; alwaysLoad?: boolean } };
     };
     expect(config.mcpServers.agentes.env.AGENTES_MCP_PROFILE).toBe("plan");
+    // Our tools behind Claude Code's ToolSearch, but those listed always (`ALWAYS_LOADED`, each tool's `_meta`).
+    expect(config.mcpServers.agentes.alwaysLoad).toBeUndefined();
     // A work turn: edits accepted, the same denials, no profile for its prompts.
     const work = setup();
     await work.turn(1, "do");

@@ -32,6 +32,7 @@
     "eval:resilience": "bun --env-file=.env packages/engine/eval/resilience.ts",
     "eval:mentions": "bun --env-file=.env packages/engine/eval/mention-handoff.ts",
     "eval:router": "bun --env-file=.env packages/engine/eval/router.ts",
+    "eval:turns": "bun --env-file=.env packages/engine/eval/turns-real.ts",
     "eval:conversation": "bun --env-file=.env packages/engine/eval/conversation.ts",
     "eval:browser": "bun --env-file=.env packages/engine/eval/browser/ab.ts",
     "eval:browser:micro": "bun --env-file=.env packages/engine/eval/browser/micro.ts",

@@ -21,6 +21,9 @@ export interface PubSub {
 /** Topic of everything happening in one channel. */
 export const channelTopic = (channelId: string) => `channel:${channelId}`;
 
+/** Server-side: every `user.typing`, also published on its channel's topic (an agent's quiet window, ADR 0112). */
+export const typingTopic = "typing";
+
 /** Server-side organization events (membership changes). Never forwarded to clients as is. */
 export const orgTopic = (orgId: string) => `org:${orgId}`;
 

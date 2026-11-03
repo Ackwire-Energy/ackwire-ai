@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import type { ModelRequest } from "@agenteschat/providers";
+import { laidOut, type ModelRequest } from "@agenteschat/providers";
 import { drainOutbox, grantScopes, postPersonMessage } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -23,7 +23,9 @@ const mask = (text: string) =>
     .replace(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun), [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}/g, "<now>");
 
 /** What the model reads from a request: the system text, the messages and the tools, without cache metadata. */
-function words(request: ModelRequest) {
+function words(asked: ModelRequest) {
+  // As the adapters send it: the per-turn notes after the trigger's text (token-trim B8).
+  const request = laidOut(asked);
   const system =
     typeof request.system === "string" ? request.system : request.system.map((b: { text: string }) => b.text);
   const tools = [...(request.tools ?? [])]

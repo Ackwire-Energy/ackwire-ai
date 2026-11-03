@@ -3,6 +3,7 @@ import {
   type DirectoryRole,
   deferrableGroups,
   directoryRole,
+  isCore,
   ON_DEMAND_FIND,
   ON_DEMAND_USE,
   turnMeans,
@@ -101,6 +102,9 @@ export function describeCapabilities(
     const findTool = tools.find((t) => t.name === ON_DEMAND_FIND);
     const onDemand = findTool ? directoryRole(findTool as ToolDefinition) : undefined;
     const groups = new Map<string, string[]>();
+    /** Groups whose every tool is a core one (`isCore`), and the others. */
+    const coreGroups = new Set<string>();
+    const notCore = new Set<string>();
     // A connector's tools carry their own descriptions: here one line per connector, by name only,
     // and a big one (a directory, tools/directory.ts) says how to find its tools instead of listing them.
     const connectors = new Map<string, { label: string; names: string[]; directory: DirectoryRole | null }>();
@@ -120,11 +124,19 @@ export function describeCapabilities(
       // Tools on demand (ADR 0043): their directory gets a line of its own below.
       if (onDemand && (t.name === ON_DEMAND_FIND || t.name === ON_DEMAND_USE)) continue;
       const group = groupOf(t);
+      if (isCore(t as ToolDefinition) && !notCore.has(group)) coreGroups.add(group);
+      else {
+        notCore.add(group);
+        coreGroups.delete(group);
+      }
       const items = groups.get(group) ?? [];
       items.push(`\`${t.name}\``);
       groups.set(group, items);
     }
-    for (const [group, items] of groups) lines.push(`- ${group}: ${items.join(", ")}`);
+    // The core groups by name only: every run lists their tools, each with its own definition (token-trim B4).
+    const core = [...groups.keys()].filter((g) => coreGroups.has(g));
+    if (core.length > 0) lines.push(`- Your tools for: ${core.join(", ")}`);
+    for (const [group, items] of groups) if (!coreGroups.has(group)) lines.push(`- ${group}: ${items.join(", ")}`);
     for (const c of connectors.values()) {
       const d = c.directory;
       lines.push(
@@ -141,13 +153,15 @@ export function describeCapabilities(
     }
     // What the guidance below is about: every tool the run can reach, loaded or on demand.
     const names = new Set([...tools, ...(onDemand?.tools ?? [])].map((t) => t.name));
+    // A section on how to use a group comes with the group itself, not while it is on demand (token-trim B4).
+    const loaded = new Set(tools.map((t) => t.name));
     means = turnMeans(names);
-    if (names.has("create_artifact")) {
+    if (loaded.has("create_artifact")) {
       lines.push(
         '- Requests for a PDF (or Word file): create a document with `create_artifact` (kind `document`); the file\'s card offers "Download PDF".',
       );
     }
-    if (names.has("run_code")) {
+    if (loaded.has("run_code")) {
       lines.push(
         "- If a command fails because of the network (DNS, connection refused), say exactly what the tool says about it; don't blame permissions.",
       );
@@ -158,12 +172,12 @@ export function describeCapabilities(
     if (names.has("desktop_do")) {
       lines.push(DESKTOP_GUIDANCE);
     }
-    if (names.has("schedule_reminder")) {
+    if (loaded.has("schedule_reminder")) {
       lines.push(
         "- You can schedule reminders and routines: `schedule_reminder` (once, in the time zone of whoever asked) and `create_routine` (recurring; with `channel` it posts straight to that channel, not to this conversation). To change a routine that already exists (instructions, time, where it answers), use `list_routines` and `update_routine`, also when the person describes the change as how you handle something a routine does ('quando entrar um erro…'); never say it can't be changed. Confirm the time with the words the tool returns; if the time is ambiguous, ask first with `ask_user`. A routine works while nobody watches, with everything you can use, and speaks only when there is news (`report` when_new); set `report` always when people want a report every time.",
       );
     }
-    if (names.has("schedule_action")) {
+    if (loaded.has("schedule_action")) {
       lines.push(
         "- A connected app's action for later (a post at a set time, a message to send tomorrow): prepare it with `schedule_action`, with its exact tool and full content. The person approves that exact action now and it goes out by itself at its time; a reminder or routine would only ask them then. To change its content or time, call it again with `replaces`. Merge, deploy and rollback can't be approved ahead.",
       );
@@ -176,7 +190,7 @@ export function describeCapabilities(
     if (names.has("update_skill")) {
       lines.push("- If a skill you loaded was wrong or missing a step, fix it with `update_skill` before you answer.");
     }
-    if (names.has("share_artifact")) {
+    if (loaded.has("share_artifact")) {
       lines.push(
         "- A request for a file you already made (here, in a DM or in another channel): find it with `list_artifacts` and bring it with `share_artifact` instead of creating it again.",
       );

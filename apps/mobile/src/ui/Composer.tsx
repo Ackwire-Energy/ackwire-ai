@@ -91,7 +91,7 @@ export interface ComposerProps {
    */
   prefill?: { text: string; at: number } | null;
   /** Each change that leaves text in the field ("está digitando…" for the others; the screen throttles it). */
-  onType?: () => void;
+  onType?: (text: string) => void;
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
   media?: { label: string; onPress: () => void } | null;
   /**
@@ -286,7 +286,7 @@ export function Composer({
             value={text}
             onChangeText={(next) => {
               setText(next);
-              if (next.trim()) onType?.();
+              if (next.trim()) onType?.(next);
             }}
             {...(selection ? { selection } : {})}
             onSelectionChange={(e) => {

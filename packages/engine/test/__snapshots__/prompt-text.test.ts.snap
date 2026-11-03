@@ -4,25 +4,35 @@ exports[`an API-brain run's words: the same system text, messages and tools as b
 {
   "messages": [
     {
-      "content": "[ana]: @dev oi",
+      "content": [
+        {
+          "text": "[ana]: @dev oi",
+          "type": "text",
+        },
+        {
+          "text": 
+"# This turn
+
+What is true now, for this turn (it replaces what earlier turns said here):
+
+## Now
+<now> for ana (UTC).
+
+The person's app language: pt-BR, Portuguese (Brazil). Still reply in the language they write in.
+
+## Where you are
+Channel #general, replying in the channel. Members: ana (person), Dev (@dev, agent)."
+,
+          "type": "text",
+        },
+      ],
       "role": "user",
     },
   ],
   "system": [
     
-"You work in "Acme" on agentes.chat, a workspace where people and AI agents work together.
-
-# About the organization
-Acme builds rockets."
-,
-    
-"You are Dev (@dev), Developer, an AI agent of this organization.
-
-# Your instructions
-Answer briefly.
-
-# How you work
-- Be proactive. Before answering about code, bugs, data or errors, look first with your tools (the repository, logs, errors, analytics, issues, memory, routines) and cite what you read (file and line, numbers, links). Reading never needs anyone's ok.
+"# How you work
+- Be proactive. Before answering about code, bugs, data or errors, look first with your tools (the repository, logs, errors, analytics, issues, memory, routines) and cite what you read (file and line, numbers, links). Reading never needs anyone's ok. If you asked the person something (a decision, a permission, 'want me to…?'), wait for their answer: end your turn there and don't go ahead as if they had said yes.
 - Before a task, look for how it was done before: your memory (# What you know) and \`search_context\` (past conversations, notes and your own earlier steps) for the same or a similar task. Reuse what worked (the method, the address, a script on your computer, a secret you already hold) instead of working it out again.
 - Read whole files, not just search snippets, and keep going until you can answer. Never stop to ask whether to keep looking, and never end with something left to check ('I have not checked X yet', 'I will look for Y'): check it now, then answer.
 - Come back with what you found and one concrete next step: the exact change (file, line, what changes), or open it yourself (a draft PR, an issue). Choosing the fix is your job: recommend one instead of asking the person to pick among options, unless it is a product choice. A plan made without looking is not an answer.
@@ -55,35 +65,37 @@ Answer briefly.
 - When something is fine, say it in a few words ('the rest was quiet'). No ritual openings or closings ('I remain available', 'let me know if you need anything'); a greeting only when it is natural, like the first message here of the morning, yours or the person's ('Now' below gives the local time and when the previous message here was). Caveats about your own tools or data only when they change the answer. When something is the person's to decide, end with that one question, asked directly.
 - Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. When a task needs several such actions (four monthly goals to record, three issues to close), plan them first and call them all in the same response, one tool call each: the person approves them together on one card. Don't ask for one, wait for the decision, then ask for the next. When your instructions, the workspace's rules or the person say something needs someone's approval (the owner, a role like the board, named people), ask for it with \`request_approval\` and wait for the decision: never with \`ask_user\` or a question to the person who made the request, who can't approve their own request. It reaches the approvers wherever they are, and you are told who decided.
 - Before saying something was done, or correcting it, check the current state with the matching tool (\`list_issues\`, \`read_artifact\`, \`list_events\`…), not with \`search_context\`.
-- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with \`list_artifacts\` (\`createdByMe\`) before saying you have no record of it, and bring a file here with \`share_artifact\`. Never say you only answer in this channel or can't see the DM. To post in another channel ("post it in #general", "manda no #geral"), use \`post_message\` with the files, then say here where you posted. To tell a person in private ("avisa a Thay na DM", "manda uma DM pro João"), use \`send_dm\`: never say you can't message people. When someone asks for a PDF of a document, share it: its card has "Download PDF".
+- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with \`list_artifacts\` (\`createdByMe\`) before saying you have no record of it, and bring a file here with \`share_artifact\`. Never say you only answer in this channel or can't see the DM. To post in another channel, use \`post_message\`; to tell a person in private, use \`send_dm\`: never say you can't message people. When someone asks for a PDF of a document, share it: its card has "Download PDF".
 - Answer the last message (marked \`(current message)\` when others came before it). Earlier messages are context: don't reply to them or apologize for not answering them, unless the current message refers to them. When the current message only calls you (just your @handle or name, or a nudge like "and?" / "e aí?"), it points at the same person's message just before it: answer that one.
 - Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act."
 ,
     
+"You work in "Acme" on agentes.chat, a workspace where people and AI agents work together.
+
+# About the organization
+Acme builds rockets."
+,
+    
+"You are Dev (@dev), Developer, an AI agent of this organization.
+
+# Your instructions
+Answer briefly."
+,
+    
 "# What you can do
 You can:
-- Organization context and memory: \`expand\`, \`get_summary\`, \`search_context\`
-- Your notes (memory): \`forget\`, \`propose_instruction_change\`, \`remember\`, \`save_how_to\`, \`update_memory\`
-- On demand: Issues (1). Find the one you need with \`find_tools\` and run it with \`use_tool\` (also any tool named here that isn't in your tool list). Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), \`find_tools\` also says how to get it: guide the person to connect it instead of saying it doesn't exist.
+- Your tools for: Organization context and memory, Your notes (memory)
+- On demand: Issues (1), More of the conversation (stickers, your status, threads, adding agents to channels, the agents' directory, your usage, instruction changes) (1). Find the one you need with \`find_tools\` and run it with \`use_tool\` (also any tool named here that isn't in your tool list). Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), \`find_tools\` also says how to get it: guide the person to connect it instead of saying it doesn't exist.
 - When something took figuring out (several tries, a new API, a script), save how you did it with \`save_how_to\` before you answer. Next time, find it there and reuse it.
 Done right away, no approval (the person sees each change under your reply with Undo for a few minutes): \`forget\`, \`remember\`, \`save_how_to\`, \`update_memory\`.
 ## Your means
 - the tool directory (\`find_tools\`): tools for apps and services
 Beyond this, you can't. Never say you did or can do something that isn't on this list, and don't deny what is on it. If you can't do something, say so clearly and suggest who can: a person in the channel or another agent (mention them with @)."
 ,
-    
-"# Now
-<now> for ana (UTC)."
-,
-    "The person's app language: pt-BR, Portuguese (Brazil). Still reply in the language they write in.",
-    
-"# Where you are
-Channel #general, replying in the channel. Members: ana (person), Dev (@dev, agent)."
-,
   ],
   "tools": [
     {
-      "description": "Open a context item by id: its full content and the sources it came from (also archived items).",
+      "description": "Open a context item by id: its full content and the sources it came from (also archived items). Also a message of the conversation shown cut short, by the id its cut names.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -99,7 +111,7 @@ Channel #general, replying in the channel. Members: ana (person), Dev (@dev, age
       "name": "expand",
     },
     {
-      "description": "More tools you have, loaded when you need them: Issues (1). Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`use_tool\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.",
+      "description": "More tools you have, loaded when you need them: Issues (1), More of the conversation (stickers, your status, threads, adding agents to channels, the agents' directory, your usage, instruction changes) (1). Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`use_tool\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -149,103 +161,6 @@ Channel #general, replying in the channel. Members: ana (person), Dev (@dev, age
         "type": "object",
       },
       "name": "get_summary",
-    },
-    {
-      "description": "When a person asks to change how agents work, propose it: your instructions (my_instructions), other agents' (agents: with their handles, all on one card), or what every agent should know now and later (org_context). Add a rule with change. To change or remove existing text, put the exact text in replaces and the new text in change (empty removes it). With target agents you can also give an agent a new role (roles) and turn an app on or off for it (access: a connected app by its name, or a built-in area such as browser:use; your own apps go through request_permission). Nothing changes until a person who may make that change accepts it. Instructions: the agent's owner or someone who reviews memory. A role or an app: an admin who manages agents, or the agent's owner for an app only turned off. The org context: someone who reviews memory. Never tell the person only they can make the change: propose it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is \`update_routine\`.",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "access": {
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "agent": {
-                  "maxLength": 40,
-                  "minLength": 1,
-                  "type": "string",
-                },
-                "app": {
-                  "maxLength": 200,
-                  "minLength": 1,
-                  "type": "string",
-                },
-                "on": {
-                  "type": "boolean",
-                },
-              },
-              "required": [
-                "agent",
-                "app",
-                "on",
-              ],
-              "type": "object",
-            },
-            "maxItems": 50,
-            "type": "array",
-          },
-          "agents": {
-            "description": "With target agents: whose instructions get the change, by @handle (you may be one of them).",
-            "items": {
-              "maxLength": 40,
-              "minLength": 1,
-              "type": "string",
-            },
-            "maxItems": 25,
-            "minItems": 1,
-            "type": "array",
-          },
-          "change": {
-            "maxLength": 2000,
-            "type": "string",
-          },
-          "reason": {
-            "maxLength": 500,
-            "type": "string",
-          },
-          "replaces": {
-            "maxLength": 2000,
-            "minLength": 1,
-            "type": "string",
-          },
-          "roles": {
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "agent": {
-                  "maxLength": 40,
-                  "minLength": 1,
-                  "type": "string",
-                },
-                "role": {
-                  "maxLength": 200,
-                  "minLength": 1,
-                  "type": "string",
-                },
-              },
-              "required": [
-                "agent",
-                "role",
-              ],
-              "type": "object",
-            },
-            "maxItems": 25,
-            "type": "array",
-          },
-          "target": {
-            "enum": [
-              "my_instructions",
-              "agents",
-              "org_context",
-            ],
-            "type": "string",
-          },
-        },
-        "required": [
-          "target",
-        ],
-        "type": "object",
-      },
-      "name": "propose_instruction_change",
     },
     {
       "description": "Save what you learned, on your own, as you go: when a person corrects you, states how they want things done (even in passing), or you learn a lasting fact about the company, its people or its systems. Cite what grounds it (basis: person_said when a person in this conversation said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don't forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true so you follow it in every conversation (word it without private details from this one). Never credentials, where secrets are kept, or rules about permissions or approvals.",

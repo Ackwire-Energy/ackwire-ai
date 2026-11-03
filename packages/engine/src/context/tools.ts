@@ -27,7 +27,7 @@ import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible }
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
-import { untrustedBlock } from "../untrusted";
+import { neutralizeUntrusted, untrustedBlock } from "../untrusted";
 import { wikiHitsForAgent } from "../wiki";
 import {
   type ConsolidateResult,
@@ -234,7 +234,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     },
     {
       name: "expand",
-      description: "Open a context item by id: its full content and the sources it came from (also archived items).",
+      description:
+        "Open a context item by id: its full content and the sources it came from (also archived items). Also a message of the conversation shown cut short, by the id its cut names.",
       scope: "context:read",
       inputSchema: {
         type: "object",
@@ -247,8 +248,23 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const id = str(input.item_id);
         if (!/^[0-9a-f-]{36}$/i.test(id)) return { content: "Not found.", isError: true };
         const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
-        const person = await personRequester(ctx);
         const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
+        if (!item) {
+          // A long old message the history showed cut short (token-trim B9): whole, where the agent may read.
+          const [message] = await ctx.db
+            .select({ body: messages.body, channelId: messages.channelId, meta: messages.meta })
+            .from(messages)
+            .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, id), isNull(messages.deletedAt)));
+          if (
+            !message ||
+            !allowed.includes(message.channelId) ||
+            (dm && message.channelId === dm.channelId && !(await dm.ofMessages([id])))
+          ) {
+            return { content: "Not found.", isError: true };
+          }
+          return { content: message.meta?.readOutside === true ? neutralizeUntrusted(message.body) : message.body };
+        }
+        const person = await personRequester(ctx);
         if (
           !item?.channelIds.every((c) => allowed.includes(c)) ||
           !personMayRead(item, person, ctx.agentId) ||

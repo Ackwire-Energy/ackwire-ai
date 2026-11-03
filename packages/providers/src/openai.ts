@@ -9,6 +9,7 @@ import type {
 import { MODEL_CATALOG } from "./catalog";
 import {
   type ContentBlock,
+  laidOut,
   type ModelMessage,
   type ModelProvider,
   type ModelRequest,
@@ -52,7 +53,8 @@ export function createOpenAIProvider(
 
   return {
     id: "openai",
-    async stream(request, { apiKey, organization, project, onDelta }): Promise<ModelResult> {
+    async stream(input, { apiKey, organization, project, onDelta }): Promise<ModelResult> {
+      const request = laidOut(input);
       const partial: PartialUsage = {
         inputTokens: null,
         cacheReadTokens: 0,

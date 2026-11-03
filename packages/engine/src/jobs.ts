@@ -18,6 +18,7 @@ import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
 import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
+import { typingLogFor } from "./burst";
 import { crowdedAgents, publishQueueChanged } from "./computer-queue";
 import type { ConnectorDeps } from "./connectors/connections";
 import { startNoteRun } from "./consultations";
@@ -172,6 +173,8 @@ export interface JobDeps extends RunExecutorDeps {
     plans?: { hub: Pick<MachineCaller, "call" | "status">; publicUrl: string };
     /** How long a person's message waits for their next one (`ROUTER_QUIET_MS` on a server); absent: no wait. */
     quietMs?: number;
+    /** The wait ends early when the person isn't typing (token-trim B11). */
+    quietByTyping?: boolean;
   };
 }
 
@@ -229,6 +232,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
     quietMs: router.quietMs,
+    quietByTyping: router.quietByTyping,
     pubsub: deps.pubsub,
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
     ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
@@ -244,6 +248,8 @@ async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
 
 /** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
 export function createJobHandlers(deps: JobDeps): JobHandlers {
+  // Listening from now on, so typing sent while a run reads its context (before its quiet window) counts.
+  if (deps.quietByTyping || deps.router?.quietByTyping) typingLogFor(deps.pubsub);
   const routing = messageRouter(deps);
 
   // An agent's @mention wakes the other agent unless the judge is sure it needs nothing from it.

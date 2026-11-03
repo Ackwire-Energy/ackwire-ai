@@ -3,6 +3,7 @@ import { sseData } from "./sse";
 import {
   type ContentBlock,
   estimateTokens,
+  laidOut,
   type ModelMessage,
   type ModelProvider,
   type ModelRequest,
@@ -96,7 +97,8 @@ export function createGeminiProvider(
   const http = options.fetch ?? fetch;
   return {
     id: "gemini",
-    async stream(request, { apiKey, onDelta }): Promise<ModelResult> {
+    async stream(input, { apiKey, onDelta }): Promise<ModelResult> {
+      const request = laidOut(input);
       const partial: PartialUsage = {
         inputTokens: null,
         cacheReadTokens: 0,

@@ -538,6 +538,42 @@ export const MCP_PROTOCOL_VERSION = "2025-06-18";
 /** Our tools that only read (MCP `readOnlyHint`). */
 const READ_ONLY_TOOLS = new Set(["get_context"]);
 
+/**
+ * Our tools Claude Code always lists (`_meta` "anthropic/alwaysLoad"); the rest wait behind its ToolSearch, named in
+ * its list of deferred tools (token-trim B6). What an agent reaches for on its own, unasked: replying in its forms,
+ * memory and learning in the turn (ADR 0120), skills and the wiki, teammates, following through, long work, the web
+ * (ours replace Claude Code's), and the way to everything else. Mirrors the never-deferred list on `RARE_TOOLS`
+ * (packages/engine/src/tools/directory.ts).
+ */
+export const ALWAYS_LOADED: ReadonlySet<string> = new Set([
+  "react",
+  "ask_user",
+  "ask_choices",
+  "request_approval",
+  "remember",
+  "update_memory",
+  "forget",
+  "save_how_to",
+  "search_context",
+  "load_skill",
+  "update_skill",
+  "read_wiki_page",
+  "search_wiki",
+  "ask_agent",
+  "tell_agent",
+  "follow_up",
+  "work_in_background",
+  "post_update",
+  "post_message",
+  "send_dm",
+  "show_block",
+  "web_search",
+  "web_fetch",
+  "find_tools",
+  "use_tool",
+  PERMISSION_TOOL,
+]);
+
 type JsonRpcId = string | number | null;
 export type ToolCaller = (tool: string, args: Record<string, unknown>) => Promise<IpcReply>;
 /** The run's tools as the bridge knows them now (protocol 8). */
@@ -670,9 +706,11 @@ export async function handleMcpMessage(
         id,
         result: {
           // Read-only tools say so (Codex runs them without an approval even when told to ask).
-          tools: (list ? await list() : MISSION_MCP_TOOLS).map((tool) =>
-            READ_ONLY_TOOLS.has(tool.name) ? { ...tool, annotations: { readOnlyHint: true } } : tool,
-          ),
+          tools: (list ? await list() : MISSION_MCP_TOOLS).map((tool) => ({
+            ...tool,
+            ...(READ_ONLY_TOOLS.has(tool.name) ? { annotations: { readOnlyHint: true } } : {}),
+            ...(ALWAYS_LOADED.has(tool.name) ? { _meta: { "anthropic/alwaysLoad": true } } : {}),
+          })),
         },
       };
     case "tools/call": {

@@ -263,6 +263,8 @@ export const stableFirst = <T extends SystemBlock>(system: T[]): T[] => [
   ...system.filter(isTurnBlock),
 ];
 
+const THIS_TURN_INTRO = "What is true now, for this turn (it replaces what earlier turns said here):";
+
 /** How long the fixed part of "# This turn" may be: the time, where it is, why it was called, a routine's time line. */
 export const THIS_TURN_MAX_CHARS = 2000;
 
@@ -302,13 +304,77 @@ export function thisTurnParts(
         : b.text,
     ),
   );
-  const intro = "What is true now, for this turn (it replaces what earlier turns said here):";
-  const head = ["# This turn", intro, ...parts].join("\n\n");
+  const head = ["# This turn", THIS_TURN_INTRO, ...parts].join("\n\n");
   const clipped =
     head.length > THIS_TURN_MAX_CHARS
       ? `${cutText(head, THIS_TURN_MAX_CHARS).trimEnd()}\n[… cut; look it up with your tools if you need more]`
       : head;
   return { head: clipped, found: found.map((b) => level(b.text)).join("\n\n") };
+}
+
+/**
+ * The model brain's per-turn notes (token-trim B8): the per-turn blocks and what was found for the trigger, as "# This
+ * turn" (as a computer brain reads them, unclipped, with the time the run was built at), to be read after the trigger's
+ * text in its message (`at`, `ModelRequest.notes`, laid out by the adapters) and left out of the system (`after`). The
+ * system then holds only what changes with settings, so the next run reads this run's history from the cache. Without
+ * `at` (a run saved before this), as before.
+ */
+export function turnNotes(
+  blocks: readonly SystemBlock[],
+  at: number | undefined,
+  messages: readonly ModelMessage[] = [],
+): { system: SystemBlock[]; notes?: { at: number; text: string }; messages?: ModelMessage[] } {
+  const system = blocks as readonly ContextBlock[];
+  const notes = system.filter(isComputerTurnBlock);
+  if (at === undefined || notes.length === 0) return { system: [...system] };
+  const level = (text: string) => text.replace(/^# /, "## ");
+  const fixed = notes.filter((b) => !b.found);
+  const ordered = [...fixed.filter((b) => b.now), ...fixed.filter((b) => !b.now), ...notes.filter((b) => b.found)];
+  const current = unmarkCurrent(messages[at]);
+  return {
+    system: system.map((b) => (isComputerTurnBlock(b) ? { ...b, after: true } : b)),
+    notes: {
+      at,
+      text: [
+        "# This turn",
+        THIS_TURN_INTRO,
+        ...(current ? [current.line] : []),
+        ...ordered.map((b) => level(b.text)),
+      ].join("\n\n"),
+    },
+    ...(current ? { messages: messages.map((m, i) => (i === at ? current.message : m)) } : {}),
+  };
+}
+
+const CURRENT_MARK = "(current message) ";
+const CURRENT_LINE_MAX = 300;
+
+/**
+ * The trigger's turn without its `(current message)` mark, and the mark as a line of the notes: the next run reads
+ * that turn unmarked (it is no longer the last), so the cached text must be unmarked already (token-trim B8). Null
+ * when the turn has no mark (it holds only the trigger).
+ */
+function unmarkCurrent(m: ModelMessage | undefined): { message: ModelMessage; line: string } | null {
+  if (m?.role !== "user") return null;
+  const texts =
+    typeof m.content === "string" ? [m.content] : m.content.flatMap((b) => (b.type === "text" ? [b.text] : []));
+  const marked = texts.find((t) => t.includes(CURRENT_MARK));
+  if (marked === undefined) return null;
+  const at = marked.indexOf(CURRENT_MARK);
+  const unmarked = marked.slice(0, at) + marked.slice(at + CURRENT_MARK.length);
+  // Its own part only: up to the next author's part, if one follows.
+  const part = unmarked.slice(at).split(/\n\n(?=\[)/)[0] ?? "";
+  const shown = part.length > CURRENT_LINE_MAX ? `${cutText(part, CURRENT_LINE_MAX).trimEnd()} …` : part;
+  return {
+    message: {
+      role: m.role,
+      content:
+        typeof m.content === "string"
+          ? unmarked
+          : m.content.map((b) => (b.type === "text" && b.text === marked ? { ...b, text: unmarked } : b)),
+    },
+    line: `## The current message\nOf the last messages above, this is the one to answer; the others are context:\n${CURRENT_MARK}${shown}`,
+  };
 }
 
 /**
@@ -375,6 +441,8 @@ export async function buildRunContext(
     skills?: { name: string; description: string }[];
     /** `find_agent` is available: name the other agents in "# Your team". */
     team?: boolean;
+    /** `expand` is available: long old messages come cut short, reopened with it (token-trim B9). */
+    expand?: boolean;
     /** `update_issue` is available: "# Your open tasks" says how to keep them updated. */
     issueTools?: boolean;
     trigger?: Message;
@@ -518,6 +586,11 @@ export async function buildRunContext(
   // thread itself is long, covers the thread, not the range).
   const fetched = before.length;
   before.splice(Math.max(0, options.maxMessages - thread.length - 1));
+  // Older messages were left out: start at an anchor, so the history's start (and its cached prefix) stays the same
+  // for several runs instead of moving by one message every time (token-trim B8).
+  if (!range && fetched >= Math.max(1, options.maxMessages - 1)) {
+    before.splice(before.length - historyStart([...before].reverse().map((m) => m.id)));
+  }
   const rangeCut = range !== null && (before.length < fetched || fetched >= Math.max(1, options.maxMessages - 1));
   const fullHistory: Message[] = background
     ? [trigger]
@@ -723,21 +796,12 @@ export async function buildRunContext(
       };
 
   const capabilities = await options.capabilities;
-  // Most stable first, so prompt-cache prefixes are shared: the org context is
-  // the same for every agent of the organization, the agent block per agent.
+  // Most stable first, so prompt-cache prefixes are shared: the rules are the same for every agent with the same
+  // tools, the organization's block for every agent of the organization (a breakpoint after it, token-trim B5),
+  // the agent's block per agent.
   const system: ContextBlock[] = [
     {
       text: [
-        `You work in "${org.name}" on agentes.chat, a workspace where people and AI agents work together.`,
-        org.context.trim() ? `# About the organization\n${org.context.trim()}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
-    },
-    {
-      text: [
-        `You are ${agent.name} (@${agent.handle})${agent.role ? `, ${agent.role}` : ""}, an AI agent of this organization.`,
-        agent.instructions.trim() ? `# Your instructions\n${agent.instructions.trim()}` : "",
         options.toolsAvailable
           ? `${HOW_YOU_WORK}\n${finishWhatYouStart(Boolean(options.followUp))}${options.work ? `\n${WORK_IN_BACKGROUND_LINE}` : ""}`
           : "",
@@ -777,7 +841,7 @@ export async function buildRunContext(
             ? "- Before saying something was done, or correcting it, check the current state with the matching tool (`list_issues`, `read_artifact`, `list_events`…), not with `search_context`."
             : "",
           options.toolsAvailable
-            ? '- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. To post in another channel ("post it in #general", "manda no #geral"), use `post_message` with the files, then say here where you posted. To tell a person in private ("avisa a Thay na DM", "manda uma DM pro João"), use `send_dm`: never say you can\'t message people. When someone asks for a PDF of a document, share it: its card has "Download PDF".'
+            ? '- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. To post in another channel, use `post_message`; to tell a person in private, use `send_dm`: never say you can\'t message people. When someone asks for a PDF of a document, share it: its card has "Download PDF".'
             : "",
           '- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don\'t reply to them or apologize for not answering them, unless the current message refers to them. When the current message only calls you (just your @handle or name, or a nudge like "and?" / "e aí?"), it points at the same person\'s message just before it: answer that one.',
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
@@ -787,7 +851,23 @@ export async function buildRunContext(
       ]
         .filter(Boolean)
         .join("\n\n"),
+    },
+    {
+      text: [
+        `You work in "${org.name}" on agentes.chat, a workspace where people and AI agents work together.`,
+        org.context.trim() ? `# About the organization\n${org.context.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       cache: true,
+    },
+    {
+      text: [
+        `You are ${agent.name} (@${agent.handle})${agent.role ? `, ${agent.role}` : ""}, an AI agent of this organization.`,
+        agent.instructions.trim() ? `# Your instructions\n${agent.instructions.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
     },
     ...(capabilities ? [{ text: capabilities }] : []),
     ...(team ? [{ text: team }] : []),
@@ -933,22 +1013,25 @@ export async function buildRunContext(
         })
       : []),
   ];
-  // Breakpoints: after the agent's block, and after the last block that changes only with settings (what it can do,
-  // its team, its skills); what follows (recent actions, briefs, the turn) changes from run to run.
-  const settled = system[1 + [capabilities, team, options.skills?.length].filter(Boolean).length];
+  // Breakpoints: after the organization's block (shared by its agents), and after the last block that changes only
+  // with settings (the agent's, what it can do, its team, its skills); what follows changes from run to run.
+  const settled = system[2 + [capabilities, team, options.skills?.length].filter(Boolean).length];
   if (settled) settled.cache = true;
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
 
   return {
     system,
-    messages: toTurns(history, agent.id, names, trigger.id, { canAddAgents: channel.kind === "channel" }),
+    messages: toTurns(history, agent.id, names, trigger.id, {
+      canAddAgents: channel.kind === "channel",
+      cutOld: options.expand === true,
+    }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
     sessionPrompt: [
-      // The organization's context and the agent's block (name, role, instructions, how it works), without the
+      // The rules, the organization's context and the agent's block (name, role, instructions). Without the
       // `ask_choices` line: it is there only when a person is behind the run, so it follows the requester like
       // "# Your team" below.
-      ...system.slice(0, 2).map((b) => b.text.replace(`\n${ASK_CHOICES_LINE}`, "")),
+      ...system.slice(0, 3).map((b) => b.text.replace(`\n${ASK_CHOICES_LINE}`, "")),
       // The roster, not "# Your team": that text follows the requester, so a person and an agent taking turns
       // would start a new session every turn.
       JSON.stringify(
@@ -1779,18 +1862,58 @@ function unreachedLine(meta: Record<string, unknown> | undefined, canAdd: boolea
  * a channel, where the line about an agent its latest mention didn't reach
  * says it can be added.
  */
+/** How many of the oldest messages a cut history may leave out to start at an anchor (`historyStart`). */
+export const HISTORY_ANCHOR_WINDOW = 12;
+const ANCHOR_EVERY = 5;
+
+/**
+ * Where a history cut at its oldest end starts (an index into `ids`, oldest first): the first of the
+ * `HISTORY_ANCHOR_WINDOW` oldest messages whose id marks an anchor (about one in `ANCHOR_EVERY`), else the first.
+ * As messages come and the window slides, it starts at the same message until that one leaves the window.
+ */
+export function historyStart(ids: string[]): number {
+  return Math.max(0, ids.slice(0, HISTORY_ANCHOR_WINDOW).findIndex(isAnchor));
+}
+
+const isAnchor = (id: string) => Number.parseInt(id.replace(/-/g, "").slice(-6), 16) % ANCHOR_EVERY === 0;
+
+/** Messages at the end of the history always read whole. */
+export const KEEP_WHOLE = 8;
+/** An older message longer than this reads as its start (`OLD_MESSAGE_START`) and the id `expand` reopens it by. */
+export const LONG_OLD_MESSAGE = 1500;
+const OLD_MESSAGE_START = 600;
+
+const cutOld = (m: Pick<Message, "id" | "body">) =>
+  m.body.length <= LONG_OLD_MESSAGE
+    ? m.body
+    : `${cutText(m.body, OLD_MESSAGE_START).trimEnd()}\n[… cut: ${m.body.length - OLD_MESSAGE_START} more characters; expand ${m.id} reopens it]`;
+
 export function toTurns(
   history: Message[],
   agentId: string,
   names: Map<string, string>,
   currentId?: string,
-  options: { canAddAgents?: boolean } = {},
+  options: { canAddAgents?: boolean; cutOld?: boolean } = {},
 ): ModelMessage[] {
   const turns: { role: "user" | "assistant"; parts: { id: string; text: string }[] }[] = [];
+  const cutIds = new Set<string>();
   // Only the agent's latest message with text carries the line about a mention that missed: older ones are settled.
   const latestOwn = [...history]
     .reverse()
     .find((m) => m.authorAgentId === agentId && !m.meta?.notice && !taskNotice(m) && m.body.trim())?.id;
+  // Long messages before the last `KEEP_WHOLE` come cut short, with how to reopen them (token-trim B9). The cut ends at
+  // an anchor, so it moves every few messages, not every run: the cached history changes once per move.
+  const end = options.cutOld ? history.length - KEEP_WHOLE : 0;
+  let cutBefore = end;
+  for (let i = end; i > Math.max(0, end - HISTORY_ANCHOR_WINDOW); i--) {
+    if (isAnchor(history[i]?.id ?? "")) {
+      cutBefore = i;
+      break;
+    }
+  }
+  history.forEach((m, i) => {
+    if (i < cutBefore && m.id !== currentId) cutIds.add(m.id);
+  });
   for (const m of history) {
     // A notice is its agent's own (its author): another agent reads a neutral line or nothing (ADR 0053 §9).
     if (m.meta?.notice && m.authorAgentId !== agentId) {
@@ -1833,7 +1956,8 @@ export function toTurns(
           : who;
     // Quote reply, files and a GIF or a sticker (ADR 0091): from the meta written at post time (no query here).
     const media = mediaOf(m.meta);
-    const said = `${quotedLine(m.meta)}${relayed ? neutralizeUntrusted(m.body) : m.body}${attachedLine(m)}`;
+    const text = cutIds.has(m.id) ? cutOld(m) : m.body;
+    const said = `${quotedLine(m.meta)}${relayed ? neutralizeUntrusted(text) : text}${attachedLine(m)}`;
     const body = media && !own ? [said, mediaLine(media, names)].filter(Boolean).join("\n") : said;
     const notes = undoNotes(m.meta);
     // The agent's own sticker or GIF with no text (the silent one after its reply) has no turn of its own: below.
