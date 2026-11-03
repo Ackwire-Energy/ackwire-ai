@@ -83,6 +83,8 @@ import type {
   GifCategory,
   GifKey,
   InviteBatch,
+  IssueActivity,
+  IssueActivityEvent,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -2980,6 +2982,54 @@ export const useIssueActivity = (orgId: string, id: string | undefined) => {
     enabled: Boolean(id),
   });
 };
+
+/**
+ * A live event while a task is open: a comment or an event on it (`issue.comment`) goes into its activity once, and
+ * an event also refreshes the task itself (status, assignee, a linked PR). `false`: not about this task.
+ */
+export function applyIssueActivityEvent(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  issueId: string,
+  event: { type: string },
+): boolean {
+  if (event.type !== "issue.comment" || !("issueId" in event) || !("activity" in event)) return false;
+  const { issueId: id, activity } = event as IssueActivityEvent;
+  if (id !== issueId) return false;
+  qc.setQueryData<IssueActivity[]>(keys.issueActivity(orgId, issueId), (list) =>
+    !list || list.some((a) => a.id === activity.id) ? list : [...list, activity],
+  );
+  if (activity.kind === "event") void qc.invalidateQueries({ queryKey: [...keys.issues(orgId), "one"] });
+  return true;
+}
+
+/**
+ * A task's activity live while it is open: comments and events come on the task's channel, or as org broadcasts
+ * for a task with none. What was missed while the connection was down comes back on reconnect.
+ */
+export function useIssueLive(
+  orgId: string,
+  connection: RealtimeConnection | null,
+  issue: { id: string; channelId: string | null } | undefined,
+) {
+  const qc = useQueryClient();
+  const issueId = issue?.id;
+  const channelId = issue?.channelId ?? null;
+  useEffect(() => {
+    if (!connection || !issueId) return;
+    const take = (event: { type: string }) => void applyIssueActivityEvent(qc, orgId, issueId, event);
+    const offOrg = connection.onUserEvent(take);
+    const offChannel = channelId ? connection.subscribe(channelId, take) : undefined;
+    const offReconnect = connection.onReconnect(() => {
+      void qc.invalidateQueries({ queryKey: keys.issueActivity(orgId, issueId) });
+    });
+    return () => {
+      offOrg();
+      offChannel?.();
+      offReconnect();
+    };
+  }, [connection, orgId, qc, issueId, channelId]);
+}
 
 export function useIssueAction(orgId: string) {
   const api = useApi();

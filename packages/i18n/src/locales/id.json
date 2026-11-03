@@ -7289,9 +7289,73 @@
     "uses": {
       "title": "Agen yang memakai halaman ini",
       "count_other": "kali dipakai dalam 7 hari terakhir",
+      "week_other": "{{count}} kali dirujuk minggu ini",
       "last": "{{name}} memakainya {{when}}",
       "lastIn": "{{name}} memakainya {{when}}, saat menjawab di #{{channel}}",
       "none": "Belum ada agen yang memakainya. Halaman ini masuk ke jawaban saat seseorang bertanya tentang topiknya."
+    },
+    "editedWhen": "mengedit {{when}}",
+    "access": {
+      "label": "Siapa yang melihat: {{who}}",
+      "everyone": "Seluruh ruang kerja",
+      "everyoneHint": "Setiap anggota dan setiap agen dengan akses ke wiki membaca halaman ini.",
+      "peopleAnd": "Semua orang dan {{agents}}",
+      "peopleOnly": "Semua orang, tanpa agen",
+      "ownersOnly": "Hanya pemilik",
+      "withAllAgents": "{{names}} dan semua agen",
+      "more_other": "{{count}} lagi"
+    },
+    "backlinkDm": "Percakapan dengan {{name}}",
+    "backlinkDmSomeone": "seseorang",
+    "draftKept": "Draf disimpan",
+    "draftRecovered": "Draf dipulihkan",
+    "markdown": "Markdown",
+    "markdownHint": "Lihat dan edit teks sebagai Markdown",
+    "props": {
+      "folderHint": "Folder halaman",
+      "noFolder": "Tanpa folder",
+      "searchFolder": "Cari folder",
+      "createFolder": "Buat folder “{{name}}”",
+      "addTag": "Tag",
+      "removeTag": "Hapus #{{tag}}"
+    },
+    "rich": {
+      "placeholder": "Tulis di sini. [[ menautkan halaman lain dan / menampilkan blok.",
+      "hint": "[[ menautkan halaman · / menampilkan blok · {{key}} S menyimpan versi",
+      "blockLabel": "Jenis blok",
+      "strike": "Coret",
+      "linkPage": "Tautkan halaman",
+      "column": "Kolom",
+      "addRow": "Baris",
+      "addColumn": "Kolom",
+      "calloutText": "Tulis sorotan di sini.",
+      "codeText": "kode",
+      "blocks": {
+        "paragraph": "Paragraf",
+        "heading": "Judul",
+        "subheading": "Subjudul",
+        "list": "Daftar",
+        "numbered": "Daftar bernomor",
+        "task": "Tugas",
+        "table": "Tabel",
+        "callout": "Sorotan",
+        "code": "Kode",
+        "quote": "Kutipan",
+        "rule": "Pemisah",
+        "link": "Halaman wiki"
+      }
+    },
+    "ask": {
+      "button": "Minta agen",
+      "title": "Minta agen",
+      "text": "Permintaan masuk ke percakapanmu dengan agen, beserta tautan halaman. Agen mengedit dengan alat wiki, dan versinya tercatat di riwayat sebagai atas permintaanmu.",
+      "agent": "Agen",
+      "what": "Apa yang perlu diubah?",
+      "placeholder": "Mis.: perbarui dengan kenaikan harga 2027",
+      "send": "Kirim ke {{name}}",
+      "sendNone": "Kirim",
+      "sent": "Permintaan terkirim di percakapanmu dengan {{name}}.",
+      "message": "Tentang halaman [[{{title}}]]:"
     },
     "import": {
       "cta": "Impor dari Obsidian",

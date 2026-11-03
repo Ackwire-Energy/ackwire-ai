@@ -200,6 +200,8 @@
       "wiki.form.tags",
       "wiki.import.stat.links",
       "wiki.legend.obsidian",
+      "wiki.markdown",
+      "wiki.props.addTag",
       "wiki.tags",
       "work.duration.hours",
       "work.duration.hoursMinutes",
@@ -366,6 +368,7 @@
       "webPushAsk.minutes",
       "wiki.audienceRoles",
       "wiki.legend.obsidian",
+      "wiki.markdown",
       "work.duration.hours",
       "work.duration.hoursMinutes",
       "work.duration.minutes"
@@ -662,6 +665,7 @@
       "timezone.group.Europe",
       "toolReview.ok",
       "webPushAsk.minutes",
+      "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
       "wiki.editor.code",
@@ -672,7 +676,11 @@
       "wiki.import.stat.notes",
       "wiki.legend.agents",
       "wiki.legend.obsidian",
+      "wiki.markdown",
       "wiki.pageCount",
+      "wiki.props.addTag",
+      "wiki.rich.blocks.code",
+      "wiki.rich.codeText",
       "wiki.savePick",
       "wiki.tags",
       "wiki.tree",
@@ -995,12 +1003,16 @@
       "toolNames.verb.merge",
       "toolNames.verb.upload",
       "toolReview.ok",
+      "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.editor.code",
       "wiki.editor.link",
       "wiki.form.tags",
       "wiki.graph",
       "wiki.legend.obsidian",
+      "wiki.markdown",
+      "wiki.props.addTag",
+      "wiki.rich.blocks.code",
       "wiki.tags"
     ],
     "it": [
@@ -1263,6 +1275,8 @@
       "wiki.home",
       "wiki.import.stat.links",
       "wiki.legend.obsidian",
+      "wiki.markdown",
+      "wiki.props.addTag",
       "work.duration.hours",
       "work.duration.hoursMinutes",
       "work.duration.minutes"
@@ -1699,6 +1713,7 @@
       "toolReview.subjectCount",
       "usageViews.tokens",
       "webPushAsk.minutes",
+      "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.audienceAgents",
       "wiki.editor.code",
@@ -1708,6 +1723,10 @@
       "wiki.import.stat.links",
       "wiki.legend.agents",
       "wiki.legend.obsidian",
+      "wiki.markdown",
+      "wiki.props.addTag",
+      "wiki.rich.blocks.code",
+      "wiki.rich.codeText",
       "wiki.tags",
       "work.duration.minutes"
     ],
@@ -1816,7 +1835,8 @@
       "team.cap.linear",
       "team.cap.sentry",
       "toolReview.ok",
-      "wiki.legend.obsidian"
+      "wiki.legend.obsidian",
+      "wiki.markdown"
     ],
     "ko": [
       "agent.builtinName",
@@ -1920,7 +1940,8 @@
       "storage.onedrive",
       "team.cap.linear",
       "team.cap.sentry",
-      "wiki.legend.obsidian"
+      "wiki.legend.obsidian",
+      "wiki.markdown"
     ],
     "zh-Hans": [
       "agent.builtinName",
@@ -2014,7 +2035,8 @@
       "team.cap.linear",
       "team.cap.sentry",
       "toolNames.order",
-      "wiki.legend.obsidian"
+      "wiki.legend.obsidian",
+      "wiki.markdown"
     ],
     "id": [
       "access.area.browser",
@@ -2213,7 +2235,9 @@
       "toolNames.verb.merge",
       "toolNames.verb.transfer",
       "toolReview.ok",
-      "wiki.legend.obsidian"
+      "wiki.legend.obsidian",
+      "wiki.markdown",
+      "wiki.props.addTag"
     ],
     "tr": [
       "access.area.forum",
@@ -2337,7 +2361,8 @@
       "team.cap.linear",
       "team.cap.sentry",
       "toolNames.order",
-      "wiki.legend.obsidian"
+      "wiki.legend.obsidian",
+      "wiki.markdown"
     ],
     "pl": [
       "access.agentCol",
@@ -2538,11 +2563,14 @@
       "timezone.group.Oceania",
       "toolReview.ok",
       "webPushAsk.minutes",
+      "wiki.ask.agent",
       "wiki.audienceAgentDetail",
       "wiki.editor.link",
       "wiki.import.stat.folders",
       "wiki.import.stat.links",
       "wiki.legend.obsidian",
+      "wiki.markdown",
+      "wiki.props.addTag",
       "work.duration.minutes"
     ],
     "ru": [
@@ -2632,7 +2660,8 @@
       "storage.onedrive",
       "team.cap.linear",
       "team.cap.sentry",
-      "wiki.legend.obsidian"
+      "wiki.legend.obsidian",
+      "wiki.markdown"
     ]
   },
   "mobile-base": {
