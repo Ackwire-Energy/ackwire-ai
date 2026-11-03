@@ -2831,6 +2831,18 @@ export const en = {
     nameLabel: "Name",
     roleLabel: "Role",
     roleHelp: "What it does for the team, e.g. Email and calendar assistant.",
+    /** The name, @ and role on the agent's settings: buttons that open their fields (what screen readers say). */
+    editName: "Edit name: {{name}}",
+    editHandle: "Edit mentions: @{{handle}}",
+    editRole: "Edit role: {{role}}",
+    noRole: "No role",
+    rolePlaceholder: "E.g. Support",
+    /** The list of roles under the role's field. */
+    roleList: "Roles",
+    /** In that list: what the person typed, as a role of its own. */
+    roleUse: "Use “{{role}}”",
+    /** In that list, beside the role the agent has now. */
+    roleCurrent: "current",
     edit: "Edit",
     chat: "Chat",
     moreActions: "More actions",

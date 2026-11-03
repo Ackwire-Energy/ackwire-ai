@@ -5,7 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { click, typeIn } from "./new-agent-flow";
+import { click, press, typeIn } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -31,10 +31,13 @@ test("Editar: a 40-character role saves whole", async () => {
   const api = createFakeApi(state);
   await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=identity`, { api });
   await settle(10);
-  const role = screen().getByLabelText("Cargo") as HTMLInputElement;
+  // The role is a tag: a click turns it into its field.
+  await click(screen().getByRole("button", { name: /^Editar cargo/ }));
+  const role = screen().getByRole("combobox", { name: "Cargo" }) as HTMLInputElement;
   expect(role.maxLength).toBe(200);
   await typeIn(role, LONG_ROLE);
-  await settle(2);
+  await press(role, "Enter");
+  expect(screen().getByRole("button", { name: /^Editar cargo/ }).textContent).toBe(LONG_ROLE);
   await act(async () => fireEvent.click(screen().getByRole("button", { name: /^Salvar/ })));
   await settle(6);
   const saved = state.calls.find((c) => c.method === "agents.update")?.args[2] as Record<string, unknown> | undefined;

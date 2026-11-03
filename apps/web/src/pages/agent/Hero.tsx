@@ -20,6 +20,19 @@ import { WorkCard } from "./Work";
 
 const LIVE = new Set(["running", "queued", "thinking", "waiting_approval"]);
 
+/**
+ * Opens the name's field in Configurações › Identidade e jeito (it edits in place: its button turns into the field,
+ * which takes the focus), trying a few times while the tab shows.
+ */
+function editNameSoon(tries = 5) {
+  setTimeout(() => {
+    const name = document.getElementById("agp-name");
+    if (name instanceof HTMLInputElement) name.focus();
+    else if (name) name.click();
+    else if (tries > 1) editNameSoon(tries - 1);
+  });
+}
+
 /** The agent's live run, if any: "status|channelId|connector" (a string, so the selector is stable). */
 function useLiveRun(agentId: string) {
   const key = useStreams((s) => {
@@ -157,7 +170,7 @@ export function AgentHero({
                   icon="edit"
                   onSelect={() => {
                     goTo("settings", "identity");
-                    setTimeout(() => document.getElementById("agp-name")?.focus());
+                    editNameSoon();
                   }}
                 >
                   {t("agent.editIdentity")}

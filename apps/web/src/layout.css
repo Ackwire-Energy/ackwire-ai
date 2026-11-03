@@ -10413,8 +10413,10 @@ html:not([data-pointer]) .msg-mem:focus-visible {
   }
 }
 
-/* ── The agent's identity, compact: the agent on its color beside name and role;
-   then the colors, and the eyes and what it wears as one sliding row each (Carousel). ── */
+/* ── The agent's identity, compact: the agent on its color beside its card (the name big, then "@handle · role",
+   each edited where it is); then the colors, and the eyes and what it wears as one sliding row each (Carousel). The
+   card is about as tall as the tile, so both start on one top edge: what the card adds under its line (a "before",
+   an error, the group) grows it down without moving the agent. ── */
 .agp-id {
   display: flex;
   align-items: flex-start;
@@ -10424,7 +10426,7 @@ html:not([data-pointer]) .msg-mem:focus-visible {
 .agp-id__look {
   display: grid;
   flex: none;
-  place-items: end center;
+  place-items: center;
   width: 96px;
   height: 96px;
   overflow: hidden;
@@ -10432,12 +10434,280 @@ html:not([data-pointer]) .msg-mem:focus-visible {
   background: linear-gradient(170deg, var(--a), var(--b));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
+/* The body in the middle of its tile, 6px low: a hat reaches up to half a body above it (the engine's ACCESSORY_REACH
+   leaves 9/16), drawn on the canvas that reaches past the body's box (`.ac-avatar__canvas`) and is cut by the tile. */
+.agp-id__look > .ac-avatar {
+  top: 6px;
+}
 .agp-id__fields {
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.agp-id__name {
+  display: flex;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 32px;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+.agp-id__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+}
+.agp-id__handle {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink2);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.agp-id__dot {
+  color: var(--faint);
+}
+.agp-id__fields > .newag__err {
+  margin-top: 0;
+}
+.agp-id__was {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+/* Text that edits where it is (InPlaceText): the value in its row's type, a pencil on hover; a click turns it into
+   its field, the same size and in the same place (the padding sits outside the text, in negative margins). */
+.agp-inplace {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: calc(100% + 16px);
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: text;
+  transition: background 0.15s;
+}
+.agp-inplace:hover {
+  background: var(--sunken);
+}
+html:not([data-pointer]) .agp-inplace:focus-visible {
+  outline: none;
+  background: var(--sunken);
+  box-shadow: var(--focus-ring);
+}
+/* The pencil takes no room until the pointer or the keys are there, so "@ada ·" keeps its spacing. */
+.agp-inplace__pen {
+  display: inline-flex;
+  flex: none;
+  width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  opacity: 0;
+  transition:
+    width 0.15s,
+    margin 0.15s,
+    opacity 0.15s;
+}
+.agp-inplace:hover .agp-inplace__pen,
+html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
+  width: 14px;
+  margin-left: 6px;
+  opacity: 1;
+}
+.agp-inplace__field {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  max-width: calc(100% + 16px);
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--field-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--field-line),
+    var(--field-ring);
+}
+.agp-inplace__field input {
+  min-width: 4ch;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  outline: none;
+  field-sizing: content;
+}
+.agp-inplace__prefix {
+  color: var(--ink-muted);
+}
+
+/* The role as a tag (RoleTag): the role's icon and name, a pencil on hover; the field it turns into keeps its shape,
+   the roles the app knows in a list under it. Who can't change it reads the same tag, still. */
+.agp-roletag {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
   min-width: 0;
+  max-width: 100%;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 9px 9px 9px 3px;
+  background: var(--plate);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
+}
+.agp-roletag > .ac-icon {
+  flex: none;
+  color: var(--ink2);
+}
+.agp-roletag__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agp-roletag[data-empty] .agp-roletag__text {
+  color: var(--ink-muted);
+}
+button.agp-roletag {
+  cursor: pointer;
+}
+button.agp-roletag:hover {
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+html:not([data-pointer]) button.agp-roletag:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Hidden, the pencil gives back the gap before it too. */
+.agp-roletag__pen {
+  display: inline-flex;
+  flex: none;
+  width: 0;
+  margin-left: -6px;
+  overflow: hidden;
+  color: var(--ink-muted);
+  opacity: 0;
+  transition:
+    width 0.15s,
+    margin 0.15s,
+    opacity 0.15s;
+}
+button.agp-roletag:hover .agp-roletag__pen,
+html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
+  width: 14px;
+  margin-left: 0;
+  opacity: 1;
+}
+.agp-roleedit {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  min-width: min(240px, 100%);
+  max-width: 100%;
+}
+.agp-roletag.agp-roletag--edit {
+  width: 100%;
+  background: var(--field-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--field-line),
+    var(--field-ring);
+  cursor: text;
+}
+.agp-roletag--edit input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.agp-roletag--edit input::placeholder {
+  color: var(--faint);
+  font-weight: 500;
+}
+.agp-roles {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: 320px;
+}
+.agp-roles .ac-menu__item {
+  align-items: center;
+}
+/* The highlighted option keeps its weight: the list doesn't change width as the arrows move. */
+.agp-roles .ac-menu__item[aria-selected="true"] {
+  font-weight: inherit;
+}
+.agp-roles__name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agp-roles__hint {
+  flex: none;
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+/* Touch screens have no hover: the pencils show, saying the name, the @ and the role edit where they are. */
+@media (hover: none) {
+  .agp-inplace__pen {
+    width: 14px;
+    margin-left: 6px;
+    opacity: 1;
+  }
+  .agp-roletag__pen {
+    width: 14px;
+    margin-left: 0;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agp-inplace,
+  .agp-inplace__pen,
+  .agp-roletag,
+  .agp-roletag__pen {
+    transition: none;
+  }
 }
 .agp-look {
   display: flex;
@@ -10479,9 +10749,19 @@ html:not([data-pointer]) .msg-mem:focus-visible {
   gap: 8px;
   font-size: 11.5px;
 }
+/* Phones: the tile above its card, both on the left edge; the role's field takes the rest of its line (wrapping
+   under the @ when that is short), its list as wide as it. */
 @media (max-width: 640px) {
   .agp-id {
     flex-direction: column;
+  }
+  .agp-roleedit {
+    flex: 1 1 auto;
+  }
+  .agp-roles {
+    right: 0;
+    width: auto;
+    max-width: none;
   }
 }
 

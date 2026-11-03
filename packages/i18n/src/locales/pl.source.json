@@ -7126,6 +7126,30 @@
   "agent.roleHelp": {
     "value": "What it does for the team, e.g. Email and calendar assistant."
   },
+  "agent.editName": {
+    "value": "Edit name: {{name}}"
+  },
+  "agent.editHandle": {
+    "value": "Edit mentions: @{{handle}}"
+  },
+  "agent.editRole": {
+    "value": "Edit role: {{role}}"
+  },
+  "agent.noRole": {
+    "value": "No role"
+  },
+  "agent.rolePlaceholder": {
+    "value": "E.g. Support"
+  },
+  "agent.roleList": {
+    "value": "Roles"
+  },
+  "agent.roleUse": {
+    "value": "Use “{{role}}”"
+  },
+  "agent.roleCurrent": {
+    "value": "current"
+  },
   "agent.edit": {
     "value": "Edit"
   },
