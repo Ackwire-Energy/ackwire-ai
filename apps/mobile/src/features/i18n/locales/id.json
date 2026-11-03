@@ -1672,6 +1672,21 @@
       "titleSaved": "Judul disimpan"
     },
     "formatAuto": "{{name}} memilih yang terbaik",
+    "newWidget": {
+      "titleHint": "Judul · {{name}} menyarankan satu saat diuji",
+      "alerts": "Peringatan aktif",
+      "realData": "Data sungguhan",
+      "editAsk": "Ubah permintaan",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Bentuk otomatis"
+    },
+    "agentPick": {
+      "search": "Cari agen",
+      "noMatch": "Tidak ada agen dengan nama atau peran itu.",
+      "note": "Setiap agen hanya membaca aplikasi yang boleh ia akses.",
+      "reads": "Membaca {{apps}}",
+      "noApps": "Tidak ada aplikasi terhubung"
+    },
     "notice": {
       "widget_alert_other": "{{names}} menandai sebuah widget",
       "widget_failed_other": "{{names}} tidak bisa memperbarui sebuah widget",

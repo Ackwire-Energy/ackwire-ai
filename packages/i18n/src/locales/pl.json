@@ -13945,7 +13945,8 @@
       "canceled": "Widżet „{{title}}” wrócił na miejsce."
     },
     "add": {
-      "label": "Dodaj widżet"
+      "label": "Dodaj widżet",
+      "short": "Widżet"
     },
     "alert": {
       "label": "Daj znać, gdy coś jest nie tak",
@@ -14046,6 +14047,13 @@
       "textManual": "Jego historia aktualizacji zniknie razem z nim.",
       "confirm": "Usuń"
     }
+  },
+  "agentPicker": {
+    "search": "Szukaj agentów",
+    "list": "Agenci",
+    "empty": "Żaden agent nie pasuje do „{{q}}”",
+    "noConnectors": "Brak konektorów",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Dashboardy",
@@ -14199,6 +14207,34 @@
       "testCost": "Ten test kosztował {{cost}}",
       "testFirst": "Najpierw przetestuj, żeby zobaczyć prawdziwy wynik",
       "titleField": "Tytuł",
+      "titlePlaceholder": "Tytuł · {{name}} zaproponuje go przy teście",
+      "cardSubtitle": "Napisz na karcie, co chcesz zobaczyć. Dotknij jej części, aby zmienić, kto zajmuje się widżetem, kiedy się aktualizuje, alert i rozmiar.",
+      "pinTitle": "Przypnij blok z czatu",
+      "pinSubtitle": "Karta pochodzi z czatu. Ty wybierasz tytuł i to, czy jest odtwarzana.",
+      "pickFromChat": "Wybierz blok, który agent już wysłał:",
+      "orPin": "Albo przypnij blok, który już przyszedł na czacie",
+      "repick": "Wybierz inny blok",
+      "formatAuto": "Forma automatyczna",
+      "enterTests": "Enter testuje ponownie",
+      "quoted": "„{{ask}}”",
+      "editAsk": "Zmień prośbę",
+      "editAskOf": "Zmień prośbę: {{ask}}",
+      "testingShort": "Testowanie…",
+      "buildingFoot": "{{name}} buduje…",
+      "failedTitle": "{{name}}: nie udało się zbudować",
+      "staleHint": "Przetestuj ponownie, aby zobaczyć, jak wygląda.",
+      "whoButton": "Kto się nim zajmuje: {{name}}",
+      "whoHint": "Ten, kto się nim zajmuje, buduje widżet z tego, co czyta przez swoje konektory.",
+      "alert": "Alert",
+      "alertOn": "Alert włączony",
+      "alertDone": "Gotowe",
+      "manual": "Tylko gdy poproszę",
+      "manualInline": "tylko gdy poproszę",
+      "noUpdate": "Nie aktualizuj",
+      "noUpdateInline": "nie aktualizuje się",
+      "inRoutines": "rutyna jest widoczna w Rutynach",
+      "pinAsIs": "Zostaje bez zmian, bez rutyny",
+      "pinRedoes": "{{name}} odtwarza go {{schedule}} za pomocą rutyny",
       "formatHints": {
         "auto": "{{name}} wybiera formę, która pokaże to najlepiej",
         "kpi": "Jedna duża liczba i jej zmiana",

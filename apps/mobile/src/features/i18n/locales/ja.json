@@ -1672,6 +1672,21 @@
       "titleSaved": "タイトルを保存しました"
     },
     "formatAuto": "{{name}}が最適なものを選びます",
+    "newWidget": {
+      "titleHint": "タイトル · テスト時に{{name}}が提案します",
+      "alerts": "アラートあり",
+      "realData": "実データ",
+      "editAsk": "依頼を変更",
+      "asked": "「{{ask}}」",
+      "autoFormat": "自動の形式"
+    },
+    "agentPick": {
+      "search": "エージェントを検索",
+      "noMatch": "その名前や役割のエージェントはいません。",
+      "note": "各エージェントは、アクセス権のあるアプリだけを読み取ります。",
+      "reads": "{{apps}}を読みます",
+      "noApps": "接続されたアプリなし"
+    },
     "notice": {
       "widget_alert_other": "{{names}}がウィジェットでアラートを出しました",
       "widget_failed_other": "{{names}}がウィジェットを更新できませんでした",

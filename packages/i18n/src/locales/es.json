@@ -13500,7 +13500,8 @@
       "canceled": "“{{title}}” volvió a su lugar."
     },
     "add": {
-      "label": "Agregar widget"
+      "label": "Agregar widget",
+      "short": "Widget"
     },
     "alert": {
       "label": "Avísame cuando algo ande mal",
@@ -13601,6 +13602,13 @@
       "textManual": "Su historial de actualizaciones se va con él.",
       "confirm": "Quitar"
     }
+  },
+  "agentPicker": {
+    "search": "Buscar agentes",
+    "list": "Agentes",
+    "empty": "Ningún agente coincide con “{{q}}”",
+    "noConnectors": "Sin conectores",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Paneles",
@@ -13750,6 +13758,34 @@
       "testCost": "Esta prueba costó {{cost}}",
       "testFirst": "Pruébalo antes para ver el resultado real",
       "titleField": "Título",
+      "titlePlaceholder": "Título · {{name}} sugiere uno al probar",
+      "cardSubtitle": "Escribe en la tarjeta lo que quieres ver. Toca sus partes para cambiar quién lo cuida, cuándo se actualiza, la alerta y el tamaño.",
+      "pinTitle": "Fijar un bloque del chat",
+      "pinSubtitle": "La tarjeta viene del chat. Tú eliges el título y si se rehace.",
+      "pickFromChat": "Elige un bloque que un agente ya envió:",
+      "orPin": "O fija un bloque que ya llegó en el chat",
+      "repick": "Elegir otro bloque",
+      "formatAuto": "Formato automático",
+      "enterTests": "Enter vuelve a probar",
+      "quoted": "“{{ask}}”",
+      "editAsk": "Cambiar el pedido",
+      "editAskOf": "Cambiar el pedido: {{ask}}",
+      "testingShort": "Probando…",
+      "buildingFoot": "{{name}} armando…",
+      "failedTitle": "{{name}} no pudo armarlo",
+      "staleHint": "Prueba de nuevo para ver cómo queda.",
+      "whoButton": "Quién lo cuida: {{name}}",
+      "whoHint": "Quien lo cuida arma el widget con lo que lee por sus conectores.",
+      "alert": "Alerta",
+      "alertOn": "Avisa",
+      "alertDone": "Listo",
+      "manual": "Solo cuando lo pida",
+      "manualInline": "solo cuando lo pida",
+      "noUpdate": "No actualizar",
+      "noUpdateInline": "no se actualiza",
+      "inRoutines": "la rutina aparece en Rutinas",
+      "pinAsIs": "Queda como está, sin rutina",
+      "pinRedoes": "{{name}} lo rehace {{schedule}} con una rutina",
       "formatHints": {
         "auto": "{{name}} elige el que mejor lo muestra",
         "kpi": "Un número grande y cómo cambió",

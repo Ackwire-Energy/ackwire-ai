@@ -12619,7 +12619,8 @@
       "canceled": "「{{title}}」は元の場所に戻りました。"
     },
     "add": {
-      "label": "ウィジェットを追加"
+      "label": "ウィジェットを追加",
+      "short": "ウィジェット"
     },
     "alert": {
       "label": "何かおかしいときに知らせる",
@@ -12720,6 +12721,13 @@
       "textManual": "更新履歴も消えます。",
       "confirm": "削除"
     }
+  },
+  "agentPicker": {
+    "search": "エージェントを検索",
+    "list": "エージェント",
+    "empty": "「{{q}}」に一致するエージェントはいません",
+    "noConnectors": "コネクタなし",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "ダッシュボード",
@@ -12861,6 +12869,34 @@
       "testCost": "このテストの費用は{{cost}}です",
       "testFirst": "先にテストして実際の結果を確認してください",
       "titleField": "タイトル",
+      "titlePlaceholder": "タイトル · テスト時に{{name}}が提案します",
+      "cardSubtitle": "見たい内容をカードに書いてください。カードの各部分をタップすると、担当、更新のタイミング、アラート、サイズを変更できます。",
+      "pinTitle": "チャットのブロックを固定",
+      "pinSubtitle": "カードはチャットから作られます。タイトルと、作り直すかどうかを選べます。",
+      "pickFromChat": "エージェントがすでに送ったブロックを選んでください：",
+      "orPin": "またはチャットに届いたブロックを固定",
+      "repick": "別のブロックを選ぶ",
+      "formatAuto": "自動の形式",
+      "enterTests": "Enterで再テスト",
+      "quoted": "「{{ask}}」",
+      "editAsk": "依頼を変更",
+      "editAskOf": "依頼を変更：{{ask}}",
+      "testingShort": "テスト中…",
+      "buildingFoot": "{{name}}が作成中…",
+      "failedTitle": "{{name}}は作成できませんでした",
+      "staleHint": "もう一度テストして仕上がりを確認してください。",
+      "whoButton": "担当：{{name}}",
+      "whoHint": "担当のエージェントは、コネクタで読み取った内容からウィジェットを作ります。",
+      "alert": "アラート",
+      "alertOn": "アラートあり",
+      "alertDone": "完了",
+      "manual": "依頼したときだけ",
+      "manualInline": "依頼したときだけ",
+      "noUpdate": "更新しない",
+      "noUpdateInline": "更新しない",
+      "inRoutines": "ルーティンは「ルーティン」に表示されます",
+      "pinAsIs": "そのまま、ルーティンなし",
+      "pinRedoes": "{{name}}がルーティンで{{schedule}}作り直します",
       "formatHints": {
         "auto": "{{name}}がいちばん分かりやすい形式を選びます",
         "kpi": "大きな数字1つとその変化",

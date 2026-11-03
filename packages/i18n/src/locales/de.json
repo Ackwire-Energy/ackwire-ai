@@ -13057,7 +13057,8 @@
       "canceled": "„{{title}}“ ist wieder an seinem Platz."
     },
     "add": {
-      "label": "Widget hinzufügen"
+      "label": "Widget hinzufügen",
+      "short": "Widget"
     },
     "alert": {
       "label": "Sag mir Bescheid, wenn etwas nicht stimmt",
@@ -13158,6 +13159,13 @@
       "textManual": "Sein Aktualisierungsverlauf verschwindet mit ihm.",
       "confirm": "Entfernen"
     }
+  },
+  "agentPicker": {
+    "search": "Agenten suchen",
+    "list": "Agenten",
+    "empty": "Kein Agent passt zu „{{q}}“",
+    "noConnectors": "Keine Konnektoren",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Dashboards",
@@ -13303,6 +13311,34 @@
       "testCost": "Dieser Test hat {{cost}} gekostet",
       "testFirst": "Teste es zuerst, um das echte Ergebnis zu sehen",
       "titleField": "Titel",
+      "titlePlaceholder": "Titel · {{name}} schlägt beim Testen einen vor",
+      "cardSubtitle": "Schreib auf die Karte, was du sehen willst. Tippe auf ihre Teile, um zu ändern, wer sich darum kümmert, wann es aktualisiert wird, den Alarm und die Größe.",
+      "pinTitle": "Einen Block aus dem Chat anheften",
+      "pinSubtitle": "Die Karte kommt aus dem Chat. Du wählst den Titel und ob sie neu erstellt wird.",
+      "pickFromChat": "Wähle einen Block, den ein Agent schon geschickt hat:",
+      "orPin": "Oder hefte einen Block an, der schon im Chat kam",
+      "repick": "Anderen Block wählen",
+      "formatAuto": "Automatische Darstellung",
+      "enterTests": "Enter testet erneut",
+      "quoted": "„{{ask}}“",
+      "editAsk": "Anfrage ändern",
+      "editAskOf": "Anfrage ändern: {{ask}}",
+      "testingShort": "Wird getestet…",
+      "buildingFoot": "{{name}} baut es…",
+      "failedTitle": "{{name}} konnte es nicht bauen",
+      "staleHint": "Teste noch einmal, um zu sehen, wie es aussieht.",
+      "whoButton": "Wer sich darum kümmert: {{name}}",
+      "whoHint": "Wer sich darum kümmert, baut das Widget aus dem, was er über seine Konnektoren liest.",
+      "alert": "Alarm",
+      "alertOn": "Alarm an",
+      "alertDone": "Fertig",
+      "manual": "Nur wenn ich frage",
+      "manualInline": "nur wenn ich frage",
+      "noUpdate": "Nicht aktualisieren",
+      "noUpdateInline": "wird nicht aktualisiert",
+      "inRoutines": "die Routine erscheint unter Routinen",
+      "pinAsIs": "Bleibt, wie es ist, ohne Routine",
+      "pinRedoes": "{{name}} erstellt es {{schedule}} mit einer Routine neu",
       "formatHints": {
         "auto": "{{name}} wählt die Darstellung, die es am besten zeigt",
         "kpi": "Eine große Zahl und wie sie sich verändert hat",

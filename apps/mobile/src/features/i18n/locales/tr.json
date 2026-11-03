@@ -1754,6 +1754,21 @@
       "titleSaved": "Başlık kaydedildi"
     },
     "formatAuto": "En iyisini {{name}} seçer",
+    "newWidget": {
+      "titleHint": "Başlık · {{name}} testte bir tane önerir",
+      "alerts": "Uyarı açık",
+      "realData": "Gerçek veriler",
+      "editAsk": "İsteği değiştir",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Otomatik biçim"
+    },
+    "agentPick": {
+      "search": "Ajan ara",
+      "noMatch": "Bu ad veya rolde ajan yok.",
+      "note": "Her ajan yalnızca erişim verilen uygulamaları okur.",
+      "reads": "{{apps}} okur",
+      "noApps": "Bağlı uygulama yok"
+    },
     "notice": {
       "widget_alert_one": "{{names}} bir widget için uyardı",
       "widget_alert_other": "{{names}} bir widget için uyardı",

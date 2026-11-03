@@ -13644,7 +13644,8 @@
       "canceled": "« {{title}} » est revenu à sa place."
     },
     "add": {
-      "label": "Ajouter un widget"
+      "label": "Ajouter un widget",
+      "short": "Widget"
     },
     "alert": {
       "label": "Me prévenir quand quelque chose cloche",
@@ -13740,11 +13741,18 @@
       "board": "« {{title}} » a quitté le tableau de bord et la routine de {{name}} s'est arrêtée"
     },
     "removeConfirm": {
-      "title": "Retirer « {{title}} » ?",
+      "title": "Retirer « {{title}} » ?",
       "textRoutine": "La routine de {{name}} qui le met à jour s'arrête, et son historique de mises à jour part avec lui.",
       "textManual": "Son historique de mises à jour part avec lui.",
       "confirm": "Retirer"
     }
+  },
+  "agentPicker": {
+    "search": "Rechercher des agents",
+    "list": "Agents",
+    "empty": "Aucun agent ne correspond à « {{q}} »",
+    "noConnectors": "Aucun connecteur",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Tableaux de bord",
@@ -13828,7 +13836,7 @@
       "title": "Tableau de bord vide",
       "text": "Ajoutez des widgets : demandez à un agent ou épinglez un bloc du chat."
     },
-    "onlyHome": "Créez un tableau de bord pour l'espace de travail ou certains rôles avec « Nouveau tableau de bord ».",
+    "onlyHome": "Créez un tableau de bord pour l'espace de travail ou certains rôles avec « Nouveau tableau de bord ».",
     "create": {
       "title": "Nouveau tableau de bord",
       "subtitle": "Des widgets réunis sur une page, pour vous ou pour l'équipe.",
@@ -13894,6 +13902,34 @@
       "testCost": "Ce test a coûté {{cost}}",
       "testFirst": "Testez d'abord pour voir le vrai résultat",
       "titleField": "Titre",
+      "titlePlaceholder": "Titre · {{name}} en propose un au test",
+      "cardSubtitle": "Écrivez sur la carte ce que vous voulez voir. Touchez ses parties pour changer qui s'en occupe, quand il se met à jour, l'alerte et la taille.",
+      "pinTitle": "Épingler un bloc du chat",
+      "pinSubtitle": "La carte vient du chat. Vous choisissez son titre et s'il est refait.",
+      "pickFromChat": "Choisissez un bloc qu'un agent a déjà envoyé :",
+      "orPin": "Ou épinglez un bloc déjà arrivé dans le chat",
+      "repick": "Choisir un autre bloc",
+      "formatAuto": "Affichage automatique",
+      "enterTests": "Entrée relance le test",
+      "quoted": "« {{ask}} »",
+      "editAsk": "Modifier la demande",
+      "editAskOf": "Modifier la demande : {{ask}}",
+      "testingShort": "Test en cours…",
+      "buildingFoot": "{{name}} le construit…",
+      "failedTitle": "{{name}} n'a pas pu le construire",
+      "staleHint": "Testez à nouveau pour voir le résultat.",
+      "whoButton": "Qui s'en occupe : {{name}}",
+      "whoHint": "Celui qui s'en occupe construit le widget avec ce qu'il lit via ses connecteurs.",
+      "alert": "Alerte",
+      "alertOn": "Alerte activée",
+      "alertDone": "Terminé",
+      "manual": "Seulement quand je le demande",
+      "manualInline": "seulement quand je le demande",
+      "noUpdate": "Ne pas mettre à jour",
+      "noUpdateInline": "ne se met pas à jour",
+      "inRoutines": "la routine apparaît dans Routines",
+      "pinAsIs": "Reste tel quel, sans routine",
+      "pinRedoes": "{{name}} le refait {{schedule}} avec une routine",
       "formatHints": {
         "auto": "{{name}} choisit celui qui le montre le mieux",
         "kpi": "Un grand nombre et son évolution",

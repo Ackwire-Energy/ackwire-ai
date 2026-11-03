@@ -4258,6 +4258,39 @@
   "dashboards.formatAuto": {
     "value": "{{name}} picks the best one"
   },
+  "dashboards.newWidget.titleHint": {
+    "value": "Title · {{name}} suggests one when testing"
+  },
+  "dashboards.newWidget.alerts": {
+    "value": "Alerts"
+  },
+  "dashboards.newWidget.realData": {
+    "value": "Real data"
+  },
+  "dashboards.newWidget.editAsk": {
+    "value": "Change the ask"
+  },
+  "dashboards.newWidget.asked": {
+    "value": "“{{ask}}”"
+  },
+  "dashboards.newWidget.autoFormat": {
+    "value": "Auto format"
+  },
+  "dashboards.agentPick.search": {
+    "value": "Search agents"
+  },
+  "dashboards.agentPick.noMatch": {
+    "value": "No agent with that name or role."
+  },
+  "dashboards.agentPick.note": {
+    "value": "Each agent reads only the apps it was given access to."
+  },
+  "dashboards.agentPick.reads": {
+    "value": "Reads {{apps}}"
+  },
+  "dashboards.agentPick.noApps": {
+    "value": "No connected apps"
+  },
   "dashboards.notice.widget_alert": {
     "value": {
       "one": "{{names}} flagged a widget",

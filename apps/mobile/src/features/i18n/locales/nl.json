@@ -1754,6 +1754,21 @@
       "titleSaved": "Titel opgeslagen"
     },
     "formatAuto": "{{name}} kiest de beste",
+    "newWidget": {
+      "titleHint": "Titel · {{name}} stelt er een voor bij het testen",
+      "alerts": "Melding aan",
+      "realData": "Echte gegevens",
+      "editAsk": "Vraag wijzigen",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Automatische vorm"
+    },
+    "agentPick": {
+      "search": "Agents zoeken",
+      "noMatch": "Geen agent met die naam of rol.",
+      "note": "Elke agent leest alleen de apps waar hij toegang toe heeft.",
+      "reads": "Leest {{apps}}",
+      "noApps": "Geen gekoppelde apps"
+    },
     "notice": {
       "widget_alert_one": "{{names}} heeft een widget gemarkeerd",
       "widget_alert_other": "{{names}} hebben een widget gemarkeerd",

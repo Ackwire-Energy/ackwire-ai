@@ -12811,7 +12811,8 @@
       "canceled": "“{{title}}”回到了原位。"
     },
     "add": {
-      "label": "添加小组件"
+      "label": "添加小组件",
+      "short": "小组件"
     },
     "alert": {
       "label": "有异常时通知我",
@@ -12912,6 +12913,13 @@
       "textManual": "更新历史也会一起移除。",
       "confirm": "移除"
     }
+  },
+  "agentPicker": {
+    "search": "搜索智能体",
+    "list": "智能体",
+    "empty": "没有与“{{q}}”匹配的智能体",
+    "noConnectors": "无连接器",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "仪表盘",
@@ -13053,6 +13061,34 @@
       "testCost": "这次测试花费 {{cost}}",
       "testFirst": "先测试一下，看看真实结果",
       "titleField": "标题",
+      "titlePlaceholder": "标题 · {{name}} 会在测试时建议一个",
+      "cardSubtitle": "在卡片上写下你想看的内容。点按卡片的各个部分，可以更改由谁负责、何时更新、提醒和大小。",
+      "pinTitle": "固定聊天中的区块",
+      "pinSubtitle": "卡片来自聊天。由你选择标题，以及是否重新制作。",
+      "pickFromChat": "选择一个智能体已发送的区块：",
+      "orPin": "或固定一个已在聊天中出现的区块",
+      "repick": "选择其他区块",
+      "formatAuto": "自动形式",
+      "enterTests": "按 Enter 重新测试",
+      "quoted": "“{{ask}}”",
+      "editAsk": "修改需求",
+      "editAskOf": "修改需求：{{ask}}",
+      "testingShort": "测试中…",
+      "buildingFoot": "{{name}} 正在制作…",
+      "failedTitle": "{{name}} 未能制作成功",
+      "staleHint": "再测试一次，看看效果。",
+      "whoButton": "由谁负责：{{name}}",
+      "whoHint": "负责的智能体会根据它通过连接器读取的内容制作小组件。",
+      "alert": "提醒",
+      "alertOn": "提醒已开",
+      "alertDone": "完成",
+      "manual": "仅在我要求时",
+      "manualInline": "仅在我要求时",
+      "noUpdate": "不更新",
+      "noUpdateInline": "不更新",
+      "inRoutines": "例行工作显示在“例行工作”中",
+      "pinAsIs": "保持原样，不建例行工作",
+      "pinRedoes": "{{name}} 通过例行工作{{schedule}}重新制作",
       "formatHints": {
         "auto": "{{name}} 选择最能展示它的形式",
         "kpi": "一个醒目的数字及其变化",

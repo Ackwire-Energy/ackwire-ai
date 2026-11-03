@@ -1836,6 +1836,21 @@
       "titleSaved": "Titolo salvato"
     },
     "formatAuto": "{{name}} sceglie il migliore",
+    "newWidget": {
+      "titleHint": "Titolo · {{name}} ne suggerisce uno nel test",
+      "alerts": "Avvisa",
+      "realData": "Dati reali",
+      "editAsk": "Cambia la richiesta",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Formato automatico"
+    },
+    "agentPick": {
+      "search": "Cerca agenti",
+      "noMatch": "Nessun agente con questo nome o ruolo.",
+      "note": "Ogni agente legge solo le app a cui ha accesso.",
+      "reads": "Legge {{apps}}",
+      "noApps": "Nessuna app collegata"
+    },
     "notice": {
       "widget_alert_one": "{{names}} ha segnalato un widget",
       "widget_alert_many": "{{names}} hanno segnalato un widget",

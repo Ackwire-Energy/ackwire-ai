@@ -1672,6 +1672,21 @@
       "titleSaved": "标题已保存"
     },
     "formatAuto": "{{name}} 会选最合适的",
+    "newWidget": {
+      "titleHint": "标题 · {{name}} 会在测试时建议一个",
+      "alerts": "提醒已开",
+      "realData": "真实数据",
+      "editAsk": "修改需求",
+      "asked": "“{{ask}}”",
+      "autoFormat": "自动形式"
+    },
+    "agentPick": {
+      "search": "搜索智能体",
+      "noMatch": "没有这个名称或角色的智能体。",
+      "note": "每个智能体只读取它有权访问的应用。",
+      "reads": "读取 {{apps}}",
+      "noApps": "没有已连接的应用"
+    },
     "notice": {
       "widget_alert_other": "{{names}} 对一个小组件发出了提醒",
       "widget_failed_other": "{{names}} 未能更新一个小组件",

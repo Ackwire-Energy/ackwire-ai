@@ -13644,7 +13644,8 @@
       "canceled": "“{{title}}” è tornato al suo posto."
     },
     "add": {
-      "label": "Aggiungi widget"
+      "label": "Aggiungi widget",
+      "short": "Widget"
     },
     "alert": {
       "label": "Avvisami quando qualcosa non va",
@@ -13745,6 +13746,13 @@
       "textManual": "La sua cronologia degli aggiornamenti se ne va con lui.",
       "confirm": "Rimuovi"
     }
+  },
+  "agentPicker": {
+    "search": "Cerca agenti",
+    "list": "Agenti",
+    "empty": "Nessun agente corrisponde a “{{q}}”",
+    "noConnectors": "Nessun connettore",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Dashboard",
@@ -13894,6 +13902,34 @@
       "testCost": "Questa prova è costata {{cost}}",
       "testFirst": "Provalo prima per vedere il risultato reale",
       "titleField": "Titolo",
+      "titlePlaceholder": "Titolo · {{name}} ne suggerisce uno nel test",
+      "cardSubtitle": "Scrivi sulla scheda cosa vuoi vedere. Tocca le sue parti per cambiare chi se ne occupa, quando si aggiorna, l'avviso e la dimensione.",
+      "pinTitle": "Fissa un blocco dalla chat",
+      "pinSubtitle": "La scheda arriva dalla chat. Scegli tu il titolo e se viene rifatta.",
+      "pickFromChat": "Scegli un blocco che un agente ha già inviato:",
+      "orPin": "Oppure fissa un blocco già arrivato nella chat",
+      "repick": "Scegli un altro blocco",
+      "formatAuto": "Formato automatico",
+      "enterTests": "Invio prova di nuovo",
+      "quoted": "“{{ask}}”",
+      "editAsk": "Cambia la richiesta",
+      "editAskOf": "Cambia la richiesta: {{ask}}",
+      "testingShort": "Prova in corso…",
+      "buildingFoot": "{{name}} lo sta costruendo…",
+      "failedTitle": "{{name}} non è riuscito a costruirlo",
+      "staleHint": "Prova di nuovo per vedere come viene.",
+      "whoButton": "Chi se ne occupa: {{name}}",
+      "whoHint": "Chi se ne occupa costruisce il widget con ciò che legge dai suoi connettori.",
+      "alert": "Avviso",
+      "alertOn": "Avvisa",
+      "alertDone": "Fatto",
+      "manual": "Solo quando lo chiedo",
+      "manualInline": "solo quando lo chiedo",
+      "noUpdate": "Non aggiornare",
+      "noUpdateInline": "non si aggiorna",
+      "inRoutines": "la routine compare in Routine",
+      "pinAsIs": "Resta così com'è, senza routine",
+      "pinRedoes": "{{name}} lo rifà {{schedule}} con una routine",
       "formatHints": {
         "auto": "{{name}} sceglie quello che lo mostra meglio",
         "kpi": "Un numero grande e come è cambiato",

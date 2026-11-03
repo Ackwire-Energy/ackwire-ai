@@ -12989,7 +12989,8 @@
       "canceled": "“{{title}}” yerine döndü."
     },
     "add": {
-      "label": "Widget ekle"
+      "label": "Widget ekle",
+      "short": "Widget"
     },
     "alert": {
       "label": "Bir şeyler ters gidince bana haber ver",
@@ -13090,6 +13091,13 @@
       "textManual": "Güncelleme geçmişi de onunla birlikte gider.",
       "confirm": "Kaldır"
     }
+  },
+  "agentPicker": {
+    "search": "Ajan ara",
+    "list": "Ajanlar",
+    "empty": "“{{q}}” ile eşleşen ajan yok",
+    "noConnectors": "Bağlayıcı yok",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Panolar",
@@ -13235,6 +13243,34 @@
       "testCost": "Bu testin maliyeti: {{cost}}",
       "testFirst": "Gerçek sonucu görmek için önce test edin",
       "titleField": "Başlık",
+      "titlePlaceholder": "Başlık · {{name}} testte bir tane önerir",
+      "cardSubtitle": "Görmek istediğinizi karta yazın. Kimin ilgileneceğini, ne zaman güncelleneceğini, uyarıyı ve boyutu değiştirmek için parçalarına dokunun.",
+      "pinTitle": "Sohbetten bir blok sabitle",
+      "pinSubtitle": "Kart sohbetten gelir. Başlığını ve yeniden yapılıp yapılmayacağını siz seçersiniz.",
+      "pickFromChat": "Bir ajanın zaten gönderdiği bir blok seçin:",
+      "orPin": "Ya da sohbete zaten gelmiş bir bloğu sabitleyin",
+      "repick": "Başka blok seç",
+      "formatAuto": "Otomatik biçim",
+      "enterTests": "Enter yeniden test eder",
+      "quoted": "“{{ask}}”",
+      "editAsk": "İsteği değiştir",
+      "editAskOf": "İsteği değiştir: {{ask}}",
+      "testingShort": "Test ediliyor…",
+      "buildingFoot": "{{name}} hazırlıyor…",
+      "failedTitle": "{{name}} hazırlayamadı",
+      "staleHint": "Nasıl göründüğünü görmek için yeniden test edin.",
+      "whoButton": "Kim ilgilenecek: {{name}}",
+      "whoHint": "İlgilenen ajan, widget'ı bağlayıcıları üzerinden okuduklarıyla hazırlar.",
+      "alert": "Uyarı",
+      "alertOn": "Uyarı açık",
+      "alertDone": "Bitti",
+      "manual": "Yalnızca ben istediğimde",
+      "manualInline": "yalnızca ben istediğimde",
+      "noUpdate": "Güncellenmesin",
+      "noUpdateInline": "güncellenmez",
+      "inRoutines": "rutin Rutinler'de görünür",
+      "pinAsIs": "Olduğu gibi kalır, rutin yok",
+      "pinRedoes": "{{name}} bir rutinle {{schedule}} yeniden yapar",
       "formatHints": {
         "auto": "En iyi gösteren biçimi {{name}} seçer",
         "kpi": "Büyük bir sayı ve nasıl değiştiği",

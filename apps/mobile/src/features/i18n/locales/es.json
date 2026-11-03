@@ -1836,6 +1836,21 @@
       "titleSaved": "Título guardado"
     },
     "formatAuto": "{{name}} elige el mejor",
+    "newWidget": {
+      "titleHint": "Título · {{name}} sugiere uno al probar",
+      "alerts": "Avisa",
+      "realData": "Datos reales",
+      "editAsk": "Cambiar el pedido",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Formato automático"
+    },
+    "agentPick": {
+      "search": "Buscar agentes",
+      "noMatch": "Ningún agente con ese nombre o rol.",
+      "note": "Cada agente lee solo las apps a las que tiene acceso.",
+      "reads": "Lee {{apps}}",
+      "noApps": "Ninguna app conectada"
+    },
     "notice": {
       "widget_alert_one": "{{names}} marcó un widget",
       "widget_alert_many": "{{names}} marcaron un widget",

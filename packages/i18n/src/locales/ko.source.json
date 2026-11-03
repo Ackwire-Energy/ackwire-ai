@@ -31145,6 +31145,9 @@
   "widgets.add.label": {
     "value": "Add widget"
   },
+  "widgets.add.short": {
+    "value": "Widget"
+  },
   "widgets.alert.label": {
     "value": "Tell me when something is off"
   },
@@ -31381,6 +31384,21 @@
   },
   "widgets.removeConfirm.confirm": {
     "value": "Remove"
+  },
+  "agentPicker.search": {
+    "value": "Search agents"
+  },
+  "agentPicker.list": {
+    "value": "Agents"
+  },
+  "agentPicker.empty": {
+    "value": "No agent matches “{{q}}”"
+  },
+  "agentPicker.noConnectors": {
+    "value": "No connectors"
+  },
+  "agentPicker.more": {
+    "value": "+{{count}}"
   },
   "dashboards.title": {
     "value": "Dashboards"
@@ -31747,6 +31765,90 @@
   },
   "dashboards.newWidget.titleField": {
     "value": "Title"
+  },
+  "dashboards.newWidget.titlePlaceholder": {
+    "value": "Title · {{name}} suggests one on the test"
+  },
+  "dashboards.newWidget.cardSubtitle": {
+    "value": "Write on the card what you want to see. Its parts change who looks after it, when it updates, the alert and its size."
+  },
+  "dashboards.newWidget.pinTitle": {
+    "value": "Pin a block from the chat"
+  },
+  "dashboards.newWidget.pinSubtitle": {
+    "value": "The card comes from the chat; you choose its title and whether it is redone."
+  },
+  "dashboards.newWidget.pickFromChat": {
+    "value": "Choose a block an agent already sent:"
+  },
+  "dashboards.newWidget.orPin": {
+    "value": "Or pin a block that already came in the chat"
+  },
+  "dashboards.newWidget.repick": {
+    "value": "Choose another block"
+  },
+  "dashboards.newWidget.formatAuto": {
+    "value": "Automatic format"
+  },
+  "dashboards.newWidget.enterTests": {
+    "value": "Enter tests again"
+  },
+  "dashboards.newWidget.quoted": {
+    "value": "“{{ask}}”"
+  },
+  "dashboards.newWidget.editAsk": {
+    "value": "Change the ask"
+  },
+  "dashboards.newWidget.editAskOf": {
+    "value": "Change the ask: {{ask}}"
+  },
+  "dashboards.newWidget.testingShort": {
+    "value": "Testing…"
+  },
+  "dashboards.newWidget.buildingFoot": {
+    "value": "{{name}} building…"
+  },
+  "dashboards.newWidget.failedTitle": {
+    "value": "{{name}} couldn't build it"
+  },
+  "dashboards.newWidget.staleHint": {
+    "value": "Test again to see how it looks."
+  },
+  "dashboards.newWidget.whoButton": {
+    "value": "Who looks after it: {{name}}"
+  },
+  "dashboards.newWidget.whoHint": {
+    "value": "Whoever looks after it builds the widget from what it reads through its connectors."
+  },
+  "dashboards.newWidget.alert": {
+    "value": "Alert"
+  },
+  "dashboards.newWidget.alertOn": {
+    "value": "Alerts"
+  },
+  "dashboards.newWidget.alertDone": {
+    "value": "Done"
+  },
+  "dashboards.newWidget.manual": {
+    "value": "Only when I ask"
+  },
+  "dashboards.newWidget.manualInline": {
+    "value": "only when I ask"
+  },
+  "dashboards.newWidget.noUpdate": {
+    "value": "Don't update"
+  },
+  "dashboards.newWidget.noUpdateInline": {
+    "value": "doesn't update"
+  },
+  "dashboards.newWidget.inRoutines": {
+    "value": "the routine shows in Routines"
+  },
+  "dashboards.newWidget.pinAsIs": {
+    "value": "Stays as it is, no routine"
+  },
+  "dashboards.newWidget.pinRedoes": {
+    "value": "{{name}} redoes it {{schedule}} with a routine"
   },
   "dashboards.newWidget.formatHints.auto": {
     "value": "{{name}} picks the one that shows it best"

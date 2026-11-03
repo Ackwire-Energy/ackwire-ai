@@ -12610,7 +12610,8 @@
       "canceled": "“{{title}}”이(가) 제자리로 돌아갔어요."
     },
     "add": {
-      "label": "위젯 추가"
+      "label": "위젯 추가",
+      "short": "위젯"
     },
     "alert": {
       "label": "뭔가 이상하면 알려 주세요",
@@ -12711,6 +12712,13 @@
       "textManual": "업데이트 기록도 함께 사라져요.",
       "confirm": "제거"
     }
+  },
+  "agentPicker": {
+    "search": "에이전트 검색",
+    "list": "에이전트",
+    "empty": "“{{q}}”와(과) 일치하는 에이전트가 없어요",
+    "noConnectors": "커넥터 없음",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "대시보드",
@@ -12852,6 +12860,34 @@
       "testCost": "이번 테스트 비용: {{cost}}",
       "testFirst": "먼저 테스트해서 실제 결과를 확인하세요",
       "titleField": "제목",
+      "titlePlaceholder": "제목 · 테스트할 때 {{name}}이(가) 제안해요",
+      "cardSubtitle": "보고 싶은 내용을 카드에 적으세요. 카드의 각 부분을 탭하면 맡을 에이전트, 업데이트 시점, 알림, 크기를 바꿀 수 있어요.",
+      "pinTitle": "채팅의 블록 고정",
+      "pinSubtitle": "카드는 채팅에서 가져와요. 제목과 다시 만들지 여부는 직접 정해요.",
+      "pickFromChat": "에이전트가 이미 보낸 블록을 고르세요:",
+      "orPin": "또는 채팅에 이미 온 블록을 고정하세요",
+      "repick": "다른 블록 고르기",
+      "formatAuto": "자동 형식",
+      "enterTests": "Enter로 다시 테스트",
+      "quoted": "“{{ask}}”",
+      "editAsk": "요청 바꾸기",
+      "editAskOf": "요청 바꾸기: {{ask}}",
+      "testingShort": "테스트 중…",
+      "buildingFoot": "{{name}}이(가) 만드는 중…",
+      "failedTitle": "{{name}}이(가) 만들지 못했어요",
+      "staleHint": "다시 테스트해서 어떻게 보이는지 확인하세요.",
+      "whoButton": "맡을 에이전트: {{name}}",
+      "whoHint": "맡은 에이전트가 커넥터로 읽은 내용으로 위젯을 만들어요.",
+      "alert": "알림",
+      "alertOn": "알림 켜짐",
+      "alertDone": "완료",
+      "manual": "요청할 때만",
+      "manualInline": "요청할 때만",
+      "noUpdate": "업데이트 안 함",
+      "noUpdateInline": "업데이트 안 함",
+      "inRoutines": "루틴은 루틴 메뉴에 표시돼요",
+      "pinAsIs": "그대로 두기, 루틴 없음",
+      "pinRedoes": "{{name}}이(가) 루틴으로 {{schedule}} 다시 만들어요",
       "formatHints": {
         "auto": "{{name}}이(가) 가장 잘 보여 주는 형식을 골라요",
         "kpi": "큰 숫자 하나와 그 변화",

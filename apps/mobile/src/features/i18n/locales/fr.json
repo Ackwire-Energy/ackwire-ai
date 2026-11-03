@@ -1836,6 +1836,21 @@
       "titleSaved": "Titre enregistré"
     },
     "formatAuto": "{{name}} choisit le meilleur",
+    "newWidget": {
+      "titleHint": "Titre · {{name}} en propose un au test",
+      "alerts": "Alerte activée",
+      "realData": "Vraies données",
+      "editAsk": "Modifier la demande",
+      "asked": "« {{ask}} »",
+      "autoFormat": "Affichage automatique"
+    },
+    "agentPick": {
+      "search": "Rechercher des agents",
+      "noMatch": "Aucun agent avec ce nom ou ce rôle.",
+      "note": "Chaque agent ne lit que les apps auxquelles il a accès.",
+      "reads": "Lit {{apps}}",
+      "noApps": "Aucune app connectée"
+    },
     "notice": {
       "widget_alert_one": "{{names}} a signalé un widget",
       "widget_alert_many": "{{names}} ont signalé un widget",

@@ -12735,7 +12735,8 @@
       "canceled": "“{{title}}” kembali ke tempatnya."
     },
     "add": {
-      "label": "Tambah widget"
+      "label": "Tambah widget",
+      "short": "Widget"
     },
     "alert": {
       "label": "Beri tahu saya kalau ada yang tidak beres",
@@ -12836,6 +12837,13 @@
       "textManual": "Riwayat pembaruannya ikut hilang.",
       "confirm": "Hapus"
     }
+  },
+  "agentPicker": {
+    "search": "Cari agen",
+    "list": "Agen",
+    "empty": "Tidak ada agen yang cocok dengan “{{q}}”",
+    "noConnectors": "Tanpa konektor",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Dasbor",
@@ -12977,6 +12985,34 @@
       "testCost": "Uji ini memakan biaya {{cost}}",
       "testFirst": "Uji dulu untuk melihat hasil sungguhannya",
       "titleField": "Judul",
+      "titlePlaceholder": "Judul · {{name}} menyarankan satu saat diuji",
+      "cardSubtitle": "Tulis di kartu apa yang ingin kamu lihat. Ketuk bagian-bagiannya untuk mengubah siapa yang mengurus, kapan diperbarui, peringatan, dan ukurannya.",
+      "pinTitle": "Sematkan blok dari chat",
+      "pinSubtitle": "Kartunya berasal dari chat. Kamu memilih judulnya dan apakah dibuat ulang.",
+      "pickFromChat": "Pilih blok yang sudah dikirim agen:",
+      "orPin": "Atau sematkan blok yang sudah ada di chat",
+      "repick": "Pilih blok lain",
+      "formatAuto": "Bentuk otomatis",
+      "enterTests": "Enter menguji lagi",
+      "quoted": "“{{ask}}”",
+      "editAsk": "Ubah permintaan",
+      "editAskOf": "Ubah permintaan: {{ask}}",
+      "testingShort": "Menguji…",
+      "buildingFoot": "{{name}} sedang membuat…",
+      "failedTitle": "{{name}} tidak bisa membuatnya",
+      "staleHint": "Uji lagi untuk melihat hasilnya.",
+      "whoButton": "Siapa yang mengurus: {{name}}",
+      "whoHint": "Yang mengurus membuat widget dari apa yang dibacanya lewat konektornya.",
+      "alert": "Peringatan",
+      "alertOn": "Peringatan aktif",
+      "alertDone": "Selesai",
+      "manual": "Hanya saat saya minta",
+      "manualInline": "hanya saat saya minta",
+      "noUpdate": "Jangan perbarui",
+      "noUpdateInline": "tidak diperbarui",
+      "inRoutines": "rutinitas muncul di Rutinitas",
+      "pinAsIs": "Tetap seperti adanya, tanpa rutinitas",
+      "pinRedoes": "{{name}} membuatnya ulang {{schedule}} dengan rutinitas",
       "formatHints": {
         "auto": "{{name}} memilih yang paling jelas menampilkannya",
         "kpi": "Satu angka besar dan perubahannya",

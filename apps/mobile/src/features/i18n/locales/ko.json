@@ -1672,6 +1672,21 @@
       "titleSaved": "제목을 저장했어요"
     },
     "formatAuto": "{{name}}이(가) 가장 좋은 걸 골라요",
+    "newWidget": {
+      "titleHint": "제목 · 테스트할 때 {{name}}이(가) 제안해요",
+      "alerts": "알림 켜짐",
+      "realData": "실제 데이터",
+      "editAsk": "요청 바꾸기",
+      "asked": "“{{ask}}”",
+      "autoFormat": "자동 형식"
+    },
+    "agentPick": {
+      "search": "에이전트 검색",
+      "noMatch": "그 이름이나 역할의 에이전트가 없어요.",
+      "note": "각 에이전트는 접근 권한이 있는 앱만 읽어요.",
+      "reads": "{{apps}}을(를) 읽어요",
+      "noApps": "연결된 앱 없음"
+    },
     "notice": {
       "widget_alert_other": "{{names}}이(가) 위젯에 알림을 보냈어요",
       "widget_failed_other": "{{names}}이(가) 위젯을 업데이트하지 못했어요",

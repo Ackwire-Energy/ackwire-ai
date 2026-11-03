@@ -1754,6 +1754,21 @@
       "titleSaved": "Titel gespeichert"
     },
     "formatAuto": "{{name}} wählt die beste aus",
+    "newWidget": {
+      "titleHint": "Titel · {{name}} schlägt beim Testen einen vor",
+      "alerts": "Alarm an",
+      "realData": "Echte Daten",
+      "editAsk": "Anfrage ändern",
+      "asked": "„{{ask}}“",
+      "autoFormat": "Automatische Darstellung"
+    },
+    "agentPick": {
+      "search": "Agenten suchen",
+      "noMatch": "Kein Agent mit diesem Namen oder dieser Rolle.",
+      "note": "Jeder Agent liest nur die Apps, auf die er Zugriff hat.",
+      "reads": "Liest {{apps}}",
+      "noApps": "Keine verbundenen Apps"
+    },
     "notice": {
       "widget_alert_one": "{{names}} hat ein Widget markiert",
       "widget_alert_other": "{{names}} haben ein Widget markiert",

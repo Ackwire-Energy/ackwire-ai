@@ -13250,7 +13250,8 @@
       "canceled": "“{{title}}” staat weer op zijn plek."
     },
     "add": {
-      "label": "Widget toevoegen"
+      "label": "Widget toevoegen",
+      "short": "Widget"
     },
     "alert": {
       "label": "Laat het me weten als er iets mis is",
@@ -13351,6 +13352,13 @@
       "textManual": "Zijn updategeschiedenis gaat mee.",
       "confirm": "Verwijderen"
     }
+  },
+  "agentPicker": {
+    "search": "Agents zoeken",
+    "list": "Agents",
+    "empty": "Geen agent past bij “{{q}}”",
+    "noConnectors": "Geen connectors",
+    "more": "+{{count}}"
   },
   "dashboards": {
     "title": "Dashboards",
@@ -13496,6 +13504,34 @@
       "testCost": "Deze test kostte {{cost}}",
       "testFirst": "Test hem eerst om het echte resultaat te zien",
       "titleField": "Titel",
+      "titlePlaceholder": "Titel · {{name}} stelt er een voor bij het testen",
+      "cardSubtitle": "Schrijf op de kaart wat je wilt zien. Tik op de onderdelen om te wijzigen wie ervoor zorgt, wanneer hij bijwerkt, de melding en de grootte.",
+      "pinTitle": "Een blok uit de chat vastzetten",
+      "pinSubtitle": "De kaart komt uit de chat. Jij kiest de titel en of hij opnieuw gemaakt wordt.",
+      "pickFromChat": "Kies een blok dat een agent al heeft gestuurd:",
+      "orPin": "Of zet een blok vast dat al in de chat kwam",
+      "repick": "Ander blok kiezen",
+      "formatAuto": "Automatische vorm",
+      "enterTests": "Enter test opnieuw",
+      "quoted": "“{{ask}}”",
+      "editAsk": "Vraag wijzigen",
+      "editAskOf": "Vraag wijzigen: {{ask}}",
+      "testingShort": "Testen…",
+      "buildingFoot": "{{name}} bouwt hem…",
+      "failedTitle": "{{name}} kon hem niet bouwen",
+      "staleHint": "Test opnieuw om te zien hoe het eruitziet.",
+      "whoButton": "Wie ervoor zorgt: {{name}}",
+      "whoHint": "Wie ervoor zorgt, bouwt de widget met wat hij via zijn connectors leest.",
+      "alert": "Melding",
+      "alertOn": "Melding aan",
+      "alertDone": "Klaar",
+      "manual": "Alleen als ik het vraag",
+      "manualInline": "alleen als ik het vraag",
+      "noUpdate": "Niet bijwerken",
+      "noUpdateInline": "werkt niet bij",
+      "inRoutines": "de routine staat in Routines",
+      "pinAsIs": "Blijft zoals hij is, zonder routine",
+      "pinRedoes": "{{name}} maakt hem {{schedule}} opnieuw met een routine",
       "formatHints": {
         "auto": "{{name}} kiest de vorm die het het best laat zien",
         "kpi": "Eén groot getal en hoe het veranderde",

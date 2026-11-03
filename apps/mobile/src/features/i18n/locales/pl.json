@@ -1918,6 +1918,21 @@
       "titleSaved": "Zapisano tytuł"
     },
     "formatAuto": "{{name}} wybiera najlepszą",
+    "newWidget": {
+      "titleHint": "Tytuł · {{name}} zaproponuje go przy teście",
+      "alerts": "Alert włączony",
+      "realData": "Prawdziwe dane",
+      "editAsk": "Zmień prośbę",
+      "asked": "„{{ask}}”",
+      "autoFormat": "Forma automatyczna"
+    },
+    "agentPick": {
+      "search": "Szukaj agentów",
+      "noMatch": "Brak agenta o tej nazwie lub roli.",
+      "note": "Każdy agent czyta tylko aplikacje, do których ma dostęp.",
+      "reads": "Czyta: {{apps}}",
+      "noApps": "Brak połączonych aplikacji"
+    },
     "notice": {
       "widget_alert_one": "{{names}} zgłasza alert widżetu",
       "widget_alert_few": "{{names}} zgłaszają alert widżetu",
