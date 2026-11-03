@@ -187,7 +187,7 @@ test("headless as before: its own window size, none of the headed flags", () => 
   expect(args.at(-1)).toBe("about:blank");
 });
 
-test("the profile: Chrome's own frame, whenever its window manager came up, and no sign-in to Chrome itself; its other settings stay", () => {
+test("the profile: Chrome's own frame, whenever its window manager came up, no sign-in to Chrome itself and no footer under the start page; its other settings stay", () => {
   const profile = tempDir("profile-");
   dirs.push(profile);
   const prefs = path.join(profile, "Default", "Preferences");
@@ -195,6 +195,7 @@ test("the profile: Chrome's own frame, whenever its window manager came up, and 
   expect(JSON.parse(readFileSync(prefs, "utf8"))).toEqual({
     browser: { custom_chrome_frame: true },
     signin: { allowed_on_next_startup: false },
+    NewTabPage: { FooterVisible: false },
   });
   // A profile Chrome already ran with its sign-in allowed: Chrome sets `signin.allowed` from the next-startup switch
   // as it starts.
@@ -203,6 +204,7 @@ test("the profile: Chrome's own frame, whenever its window manager came up, and 
     JSON.stringify({
       browser: { window_placement: { maximized: true } },
       signin: { allowed: true, allowed_on_next_startup: true },
+      NewTabPage: { FooterVisible: true, PrevNavigationTime: "1" },
       intl: { a: 1 },
     }),
   );
@@ -210,6 +212,7 @@ test("the profile: Chrome's own frame, whenever its window manager came up, and 
   expect(JSON.parse(readFileSync(prefs, "utf8"))).toEqual({
     browser: { window_placement: { maximized: true }, custom_chrome_frame: true },
     signin: { allowed: true, allowed_on_next_startup: false },
+    NewTabPage: { FooterVisible: false, PrevNavigationTime: "1" },
     intl: { a: 1 },
   });
   // Not JSON: Chrome's own business.
