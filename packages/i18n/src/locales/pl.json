@@ -13936,7 +13936,13 @@
       "size": "Rozmiar",
       "remove": "Usuń",
       "drag": "Przeciągnij, aby przenieść",
-      "fixed": "Stały"
+      "fixed": "Stały",
+      "role": "przesuwalny widżet",
+      "help": "Spacja lub Enter podnosi kartę, strzałki ją przesuwają, Spacja lub Enter ją upuszcza, a Esc anuluje. Same strzałki przesuwają ją o jedno miejsce.",
+      "picked": "Podnosisz „{{title}}”. Strzałki przesuwają, Spacja upuszcza, Esc anuluje.",
+      "moved": "„{{title}}”: pozycja {{position}} z {{total}}.",
+      "dropped": "Upuszczono „{{title}}” na pozycji {{position}} z {{total}}.",
+      "canceled": "Widżet „{{title}}” wrócił na miejsce."
     },
     "add": {
       "tile": "Widżet",
@@ -13979,7 +13985,9 @@
       "askTo": "do: {{name}}",
       "send": "Wyślij",
       "sent": "{{name}} tworzy widżet od nowa.",
-      "updated": "Zaktualizowano"
+      "updated": "Zaktualizowano",
+      "rename": "Zmień nazwę",
+      "titleLabel": "Tytuł widżetu"
     },
     "notice": {
       "alert": "<b>{{name}}</b> zgłasza alert: „{{title}}”",
@@ -14027,6 +14035,7 @@
       "open": "Otwórz"
     },
     "home": "Mój Start",
+    "untitled": "Nowy widżet",
     "updatedAgo": "zaktualizowano {{when}}",
     "removed": {
       "home": "Usunięto „{{title}}” ze Startu, a rutyna agenta {{name}} się zatrzymała",
@@ -14136,9 +14145,7 @@
       "what": "Co chcesz śledzić?",
       "whatPlaceholder": "Np.: dzisiejsza sprzedaż w porównaniu z wczorajszą",
       "who": "Kto się nim zajmuje",
-      "reads": "{{role}} · czyta: {{sources}}",
       "format": "Forma",
-      "autoHint": "{{name}} wybiera formę, która najlepiej pokazuje to, o co prosisz.",
       "updates": "Aktualizacja",
       "destination": "Dodaj do",
       "create": "Utwórz widżet",
@@ -14175,7 +14182,26 @@
         "noRedo": "Nie aktualizuje się sam",
         "noRedoHint": "O aktualizację możesz poprosić w menu"
       },
-      "created": "Dodano widżet: {{where}}"
+      "created": "Dodano widżet: {{where}}",
+      "test": "Testuj",
+      "testAgain": "Testuj ponownie",
+      "testing": "{{name}} buduje go na prawdziwych danych…",
+      "tested": "Prawdziwe dane · {{when}}",
+      "stale": "Zmieniono od testu",
+      "testFailed": "Nie udało się: {{reason}}",
+      "tryAgain": "Spróbuj ponownie",
+      "testCost": "Ten test kosztował {{cost}}",
+      "testFirst": "Najpierw przetestuj, żeby zobaczyć prawdziwy wynik",
+      "titleField": "Tytuł",
+      "formatHints": {
+        "auto": "{{name}} wybiera formę, która pokaże to najlepiej",
+        "kpi": "Jedna duża liczba i jej zmiana",
+        "goal": "Postęp w drodze do celu",
+        "bars": "Kilka wartości obok siebie",
+        "line": "Jak to zmieniało się w czasie",
+        "list": "Krótka lista pozycji",
+        "text": "Kilka zdań podsumowania"
+      }
     },
     "pinTop": "Przypnij na górze",
     "unpin": "Odepnij",
@@ -14207,7 +14233,8 @@
       "agentArchived": "Ten agent został zarchiwizowany.",
       "blockNotFound": "Tego wykresu nie ma już w wiadomości.",
       "notAgentMessage": "Przypiąć można tylko wykres agenta.",
-      "promptRequired": "Napisz, co ma pokazywać widżet."
+      "promptRequired": "Napisz, co ma pokazywać widżet.",
+      "notTested": "Najpierw przetestuj: widżet powstaje, gdy test się uda."
     }
   }
 }

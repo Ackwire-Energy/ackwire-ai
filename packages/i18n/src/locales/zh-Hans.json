@@ -12802,7 +12802,13 @@
       "size": "大小",
       "remove": "移除",
       "drag": "拖动以移动",
-      "fixed": "固定"
+      "fixed": "固定",
+      "role": "可移动的小组件",
+      "help": "按空格或 Enter 拿起卡片，用方向键移动，再按空格或 Enter 放下，按 Esc 取消。只按方向键会一次移动一格。",
+      "picked": "你拿起了“{{title}}”。方向键移动，空格放下，Esc 取消。",
+      "moved": "“{{title}}”：第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把“{{title}}”放到了第 {{position}} 个，共 {{total}} 个。",
+      "canceled": "“{{title}}”回到了原位。"
     },
     "add": {
       "tile": "小组件",
@@ -12845,7 +12851,9 @@
       "askTo": "发给 {{name}}",
       "send": "发送",
       "sent": "{{name}} 正在重做小组件。",
-      "updated": "已更新"
+      "updated": "已更新",
+      "rename": "重命名",
+      "titleLabel": "小组件标题"
     },
     "notice": {
       "alert": "<b>{{name}}</b> 对“{{title}}”发出了提醒",
@@ -12893,6 +12901,7 @@
       "open": "打开"
     },
     "home": "我的首页",
+    "untitled": "新小组件",
     "updatedAgo": "{{when}}更新",
     "removed": {
       "home": "“{{title}}”已移出首页，{{name}} 的例行工作已停止",
@@ -12993,9 +13002,7 @@
       "what": "你想跟踪什么？",
       "whatPlaceholder": "例如：今天的销售额与昨天对比",
       "who": "由谁负责",
-      "reads": "{{role}} · 读取 {{sources}}",
       "format": "形式",
-      "autoHint": "{{name}} 会选择最能展示你要求内容的形式。",
       "updates": "更新",
       "destination": "添加到",
       "create": "创建小组件",
@@ -13032,7 +13039,26 @@
         "noRedo": "不会自动更新",
         "noRedoHint": "你可以在菜单中要求更新"
       },
-      "created": "小组件已添加到 {{where}}"
+      "created": "小组件已添加到 {{where}}",
+      "test": "测试",
+      "testAgain": "再测试一次",
+      "testing": "{{name}} 正在用真实数据制作…",
+      "tested": "真实数据 · {{when}}",
+      "stale": "测试后有改动",
+      "testFailed": "没有成功：{{reason}}",
+      "tryAgain": "重试",
+      "testCost": "这次测试花费 {{cost}}",
+      "testFirst": "先测试一下，看看真实结果",
+      "titleField": "标题",
+      "formatHints": {
+        "auto": "{{name}} 选择最能展示它的形式",
+        "kpi": "一个醒目的数字及其变化",
+        "goal": "距离目标的进度",
+        "bars": "几个数值并排对比",
+        "line": "随时间的变化",
+        "list": "一份简短的条目列表",
+        "text": "几句话概括"
+      }
     },
     "pinTop": "置顶",
     "unpin": "取消置顶",
@@ -13064,7 +13090,8 @@
       "agentArchived": "这个智能体已归档。",
       "blockNotFound": "那个图表已不在消息中。",
       "notAgentMessage": "只能固定智能体的图表。",
-      "promptRequired": "说说小组件应该显示什么。"
+      "promptRequired": "说说小组件应该显示什么。",
+      "notTested": "请先测试：测试成功后才会创建小组件。"
     }
   }
 }

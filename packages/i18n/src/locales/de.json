@@ -13048,7 +13048,13 @@
       "size": "Größe",
       "remove": "Entfernen",
       "drag": "Zum Verschieben ziehen",
-      "fixed": "Fest"
+      "fixed": "Fest",
+      "role": "verschiebbares Widget",
+      "help": "Leertaste oder Enter nimmt die Karte auf, die Pfeiltasten verschieben sie, Leertaste oder Enter legt sie ab und Esc bricht ab. Die Pfeiltasten allein verschieben sie um einen Platz.",
+      "picked": "Du hast „{{title}}“ aufgenommen. Die Pfeiltasten verschieben es, Leertaste legt es ab, Esc bricht ab.",
+      "moved": "„{{title}}“: Position {{position}} von {{total}}.",
+      "dropped": "Du hast „{{title}}“ auf Position {{position}} von {{total}} abgelegt.",
+      "canceled": "„{{title}}“ ist wieder an seinem Platz."
     },
     "add": {
       "tile": "Widget",
@@ -13091,7 +13097,9 @@
       "askTo": "an {{name}}",
       "send": "Senden",
       "sent": "{{name}} baut das Widget neu.",
-      "updated": "Aktualisiert"
+      "updated": "Aktualisiert",
+      "rename": "Umbenennen",
+      "titleLabel": "Titel des Widgets"
     },
     "notice": {
       "alert": "<b>{{name}}</b> hat „{{title}}“ markiert",
@@ -13139,6 +13147,7 @@
       "open": "Öffnen"
     },
     "home": "Mein Start",
+    "untitled": "Neues Widget",
     "updatedAgo": "aktualisiert {{when}}",
     "removed": {
       "home": "„{{title}}“ ist nicht mehr auf Start und die Routine von {{name}} wurde gestoppt",
@@ -13242,9 +13251,7 @@
       "what": "Was möchtest du verfolgen?",
       "whatPlaceholder": "Z. B.: die Verkäufe von heute im Vergleich zu gestern",
       "who": "Wer sich darum kümmert",
-      "reads": "{{role}} · liest {{sources}}",
       "format": "Darstellung",
-      "autoHint": "{{name}} wählt die Darstellung, die am besten zeigt, worum du gebeten hast.",
       "updates": "Aktualisierung",
       "destination": "Hinzufügen zu",
       "create": "Widget erstellen",
@@ -13281,7 +13288,26 @@
         "noRedo": "Aktualisiert sich nicht von selbst",
         "noRedoHint": "Du kannst im Menü eine Aktualisierung anfordern"
       },
-      "created": "Widget zu {{where}} hinzugefügt"
+      "created": "Widget zu {{where}} hinzugefügt",
+      "test": "Testen",
+      "testAgain": "Erneut testen",
+      "testing": "{{name}} baut es mit echten Daten…",
+      "tested": "Echte Daten · {{when}}",
+      "stale": "Seit dem Test geändert",
+      "testFailed": "Hat nicht geklappt: {{reason}}",
+      "tryAgain": "Erneut versuchen",
+      "testCost": "Dieser Test hat {{cost}} gekostet",
+      "testFirst": "Teste es zuerst, um das echte Ergebnis zu sehen",
+      "titleField": "Titel",
+      "formatHints": {
+        "auto": "{{name}} wählt die Darstellung, die es am besten zeigt",
+        "kpi": "Eine große Zahl und wie sie sich verändert hat",
+        "goal": "Der Fortschritt zu einem Ziel",
+        "bars": "Ein paar Werte nebeneinander",
+        "line": "Wie es sich im Lauf der Zeit verändert hat",
+        "list": "Eine kurze Liste von Einträgen",
+        "text": "Ein paar Sätze, die es zusammenfassen"
+      }
     },
     "pinTop": "Oben anheften",
     "unpin": "Lösen",
@@ -13313,7 +13339,8 @@
       "agentArchived": "Dieser Agent wurde archiviert.",
       "blockNotFound": "Dieses Diagramm ist nicht mehr in der Nachricht.",
       "notAgentMessage": "Nur das Diagramm eines Agenten kann angeheftet werden.",
-      "promptRequired": "Sag, was das Widget zeigen soll."
+      "promptRequired": "Sag, was das Widget zeigen soll.",
+      "notTested": "Teste es zuerst: Das Widget wird erstellt, sobald sein Test klappt."
     }
   }
 }

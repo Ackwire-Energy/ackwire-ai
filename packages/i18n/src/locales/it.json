@@ -13635,7 +13635,13 @@
       "size": "Dimensione",
       "remove": "Rimuovi",
       "drag": "Trascina per spostare",
-      "fixed": "Fisso"
+      "fixed": "Fisso",
+      "role": "widget spostabile",
+      "help": "Spazio o Invio prende la scheda, le frecce la spostano, Spazio o Invio la rilascia ed Esc annulla. Le frecce da sole la spostano di un posto.",
+      "picked": "Hai preso “{{title}}”. Le frecce lo spostano, Spazio lo rilascia, Esc annulla.",
+      "moved": "“{{title}}”: posizione {{position}} di {{total}}.",
+      "dropped": "Hai rilasciato “{{title}}” in posizione {{position}} di {{total}}.",
+      "canceled": "“{{title}}” è tornato al suo posto."
     },
     "add": {
       "tile": "Widget",
@@ -13678,7 +13684,9 @@
       "askTo": "a {{name}}",
       "send": "Invia",
       "sent": "{{name}} sta rifacendo il widget.",
-      "updated": "Aggiornato"
+      "updated": "Aggiornato",
+      "rename": "Rinomina",
+      "titleLabel": "Titolo del widget"
     },
     "notice": {
       "alert": "<b>{{name}}</b> ha segnalato “{{title}}”",
@@ -13726,6 +13734,7 @@
       "open": "Apri"
     },
     "home": "La mia Home",
+    "untitled": "Nuovo widget",
     "updatedAgo": "aggiornato {{when}}",
     "removed": {
       "home": "“{{title}}” è uscito dalla Home e la routine di {{name}} si è fermata",
@@ -13832,9 +13841,7 @@
       "what": "Cosa vuoi seguire?",
       "whatPlaceholder": "Es.: le vendite di oggi rispetto a ieri",
       "who": "Chi se ne occupa",
-      "reads": "{{role}} · legge {{sources}}",
       "format": "Formato",
-      "autoHint": "{{name}} sceglie il formato che mostra meglio quello che hai chiesto.",
       "updates": "Aggiornamento",
       "destination": "Aggiungi a",
       "create": "Crea widget",
@@ -13871,7 +13878,26 @@
         "noRedo": "Non si aggiorna da solo",
         "noRedoHint": "Puoi chiedere un aggiornamento dal menu"
       },
-      "created": "Widget aggiunto a {{where}}"
+      "created": "Widget aggiunto a {{where}}",
+      "test": "Prova",
+      "testAgain": "Rifai la prova",
+      "testing": "{{name}} lo sta costruendo con i dati reali…",
+      "tested": "Dati reali · {{when}}",
+      "stale": "Cambiato dopo la prova",
+      "testFailed": "Non ha funzionato: {{reason}}",
+      "tryAgain": "Prova di nuovo",
+      "testCost": "Questa prova è costata {{cost}}",
+      "testFirst": "Provalo prima per vedere il risultato reale",
+      "titleField": "Titolo",
+      "formatHints": {
+        "auto": "{{name}} sceglie quello che lo mostra meglio",
+        "kpi": "Un numero grande e come è cambiato",
+        "goal": "I progressi verso un obiettivo",
+        "bars": "Alcuni valori uno accanto all'altro",
+        "line": "Come è cambiato nel tempo",
+        "list": "Un breve elenco di voci",
+        "text": "Qualche frase che lo riassume"
+      }
     },
     "pinTop": "Fissa in alto",
     "unpin": "Rimuovi dai fissati",
@@ -13903,7 +13929,8 @@
       "agentArchived": "Questo agente è stato archiviato.",
       "blockNotFound": "Quel grafico non è più nel messaggio.",
       "notAgentMessage": "Si può fissare solo il grafico di un agente.",
-      "promptRequired": "Di' cosa deve mostrare il widget."
+      "promptRequired": "Di' cosa deve mostrare il widget.",
+      "notTested": "Provalo prima: il widget viene creato quando la prova va a buon fine."
     }
   }
 }

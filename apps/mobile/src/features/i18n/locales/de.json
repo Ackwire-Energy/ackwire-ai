@@ -1723,7 +1723,8 @@
       "which": "Welches Diagramm"
     },
     "organize": {
-      "hint": "Verschiebe die Widgets und wähle die Größe von jedem. Fertig speichert die Reihenfolge.",
+      "hint": "Halte ein Widget gedrückt und zieh es an seinen neuen Platz, oder nutze die Pfeile, und wähle die Größe von jedem. Fertig speichert die Reihenfolge.",
+      "holdHint": "Gedrückt halten und ziehen, um es zu verschieben.",
       "up": "Nach oben",
       "down": "Nach unten",
       "position": "{{at}} von {{count}}",
@@ -1748,8 +1749,12 @@
       "removeText": "Seine Routine stoppt, und was es zeigt, verschwindet mit ihm.",
       "removed": "Widget entfernt. Seine Routine wurde gestoppt.",
       "routine": "Seine Routine",
-      "onBoard": "Wo es ist"
+      "onBoard": "Wo es ist",
+      "title": "Titel",
+      "titlePlaceholder": "Ein kurzer Name für das Widget",
+      "titleSaved": "Titel gespeichert"
     },
+    "formatAuto": "{{name}} wählt die beste aus",
     "notice": {
       "widget_alert_one": "{{names}} hat ein Widget markiert",
       "widget_alert_other": "{{names}} haben ein Widget markiert",

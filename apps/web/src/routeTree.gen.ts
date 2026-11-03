@@ -251,11 +251,12 @@ const OrgOrgIdDashboardsIndexRoute = OrgOrgIdDashboardsIndexRouteImport.update({
   path: '/dashboards/',
   getParentRoute: () => OrgOrgIdRoute,
 } as any)
-const OrgOrgIdDashboardsDashboardIdRoute = OrgOrgIdDashboardsDashboardIdRouteImport.update({
-  id: '/dashboards/$dashboardId',
-  path: '/dashboards/$dashboardId',
-  getParentRoute: () => OrgOrgIdRoute,
-} as any)
+const OrgOrgIdDashboardsDashboardIdRoute =
+  OrgOrgIdDashboardsDashboardIdRouteImport.update({
+    id: '/dashboards/$dashboardId',
+    path: '/dashboards/$dashboardId',
+    getParentRoute: () => OrgOrgIdRoute,
+  } as any)
 const OrgOrgIdForumTopicIdRoute = OrgOrgIdForumTopicIdRouteImport.update({
   id: '/forum_/$topicId',
   path: '/forum/$topicId',

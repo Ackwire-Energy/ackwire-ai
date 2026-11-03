@@ -1723,7 +1723,8 @@
       "which": "Welke grafiek"
     },
     "organize": {
-      "hint": "Verplaats de widgets en kies voor elk de grootte. Klaar bewaart de volgorde.",
+      "hint": "Houd een widget vast en sleep hem naar zijn nieuwe plek, of gebruik de pijltjes, en kies voor elk de grootte. Klaar bewaart de volgorde.",
+      "holdHint": "Vasthouden en slepen om hem te verplaatsen.",
       "up": "Omhoog",
       "down": "Omlaag",
       "position": "{{at}} van {{count}}",
@@ -1748,8 +1749,12 @@
       "removeText": "Zijn routine stopt, en wat hij toont, gaat mee.",
       "removed": "Widget verwijderd. Zijn routine is gestopt.",
       "routine": "Zijn routine",
-      "onBoard": "Waar hij staat"
+      "onBoard": "Waar hij staat",
+      "title": "Titel",
+      "titlePlaceholder": "Een korte naam voor de widget",
+      "titleSaved": "Titel opgeslagen"
     },
+    "formatAuto": "{{name}} kiest de beste",
     "notice": {
       "widget_alert_one": "{{names}} heeft een widget gemarkeerd",
       "widget_alert_other": "{{names}} hebben een widget gemarkeerd",

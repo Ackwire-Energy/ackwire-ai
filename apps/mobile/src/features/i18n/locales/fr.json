@@ -1805,7 +1805,8 @@
       "which": "Quel graphique"
     },
     "organize": {
-      "hint": "Déplacez les widgets et choisissez la taille de chacun. Terminé enregistre l'ordre.",
+      "hint": "Maintenez un widget appuyé et faites-le glisser à sa nouvelle place, ou utilisez les flèches, et choisissez la taille de chacun. Terminé enregistre l'ordre.",
+      "holdHint": "Maintenez appuyé et faites glisser pour le déplacer.",
       "up": "Monter",
       "down": "Descendre",
       "position": "{{at}} sur {{count}}",
@@ -1830,8 +1831,12 @@
       "removeText": "Sa routine s'arrête, et ce qu'il affiche part avec lui.",
       "removed": "Widget retiré. Sa routine s'est arrêtée.",
       "routine": "Sa routine",
-      "onBoard": "Où il se trouve"
+      "onBoard": "Où il se trouve",
+      "title": "Titre",
+      "titlePlaceholder": "Un nom court pour le widget",
+      "titleSaved": "Titre enregistré"
     },
+    "formatAuto": "{{name}} choisit le meilleur",
     "notice": {
       "widget_alert_one": "{{names}} a signalé un widget",
       "widget_alert_many": "{{names}} ont signalé un widget",

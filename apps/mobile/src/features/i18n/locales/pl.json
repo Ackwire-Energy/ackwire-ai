@@ -1887,7 +1887,8 @@
       "which": "Który wykres"
     },
     "organize": {
-      "hint": "Przesuwaj widżety i wybierz rozmiar każdego z nich. Gotowe zapisuje kolejność.",
+      "hint": "Przytrzymaj widżet i przeciągnij go na nowe miejsce albo użyj strzałek, i wybierz rozmiar każdego z nich. Gotowe zapisuje kolejność.",
+      "holdHint": "Przytrzymaj i przeciągnij, żeby go przenieść.",
       "up": "Przenieś wyżej",
       "down": "Przenieś niżej",
       "position": "{{at}} z {{count}}",
@@ -1912,8 +1913,12 @@
       "removeText": "Jego rutyna się zatrzyma, a to, co pokazuje, zniknie razem z nim.",
       "removed": "Usunięto widżet. Jego rutyna się zatrzymała.",
       "routine": "Jego rutyna",
-      "onBoard": "Gdzie jest"
+      "onBoard": "Gdzie jest",
+      "title": "Tytuł",
+      "titlePlaceholder": "Krótka nazwa widżetu",
+      "titleSaved": "Zapisano tytuł"
     },
+    "formatAuto": "{{name}} wybiera najlepszą",
     "notice": {
       "widget_alert_one": "{{names}} zgłasza alert widżetu",
       "widget_alert_few": "{{names}} zgłaszają alert widżetu",

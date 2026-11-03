@@ -1805,7 +1805,8 @@
       "which": "Quale grafico"
     },
     "organize": {
-      "hint": "Sposta i widget e scegli la dimensione di ciascuno. Fatto salva l'ordine.",
+      "hint": "Tieni premuto un widget e trascinalo nel nuovo posto, o usa le frecce, e scegli la dimensione di ciascuno. Fatto salva l'ordine.",
+      "holdHint": "Tieni premuto e trascina per spostarlo.",
       "up": "Sposta su",
       "down": "Sposta giù",
       "position": "{{at}} di {{count}}",
@@ -1830,8 +1831,12 @@
       "removeText": "La sua routine si ferma, e quello che mostra se ne va con lui.",
       "removed": "Widget rimosso. La sua routine si è fermata.",
       "routine": "La sua routine",
-      "onBoard": "Dove si trova"
+      "onBoard": "Dove si trova",
+      "title": "Titolo",
+      "titlePlaceholder": "Un nome breve per il widget",
+      "titleSaved": "Titolo salvato"
     },
+    "formatAuto": "{{name}} sceglie il migliore",
     "notice": {
       "widget_alert_one": "{{names}} ha segnalato un widget",
       "widget_alert_many": "{{names}} hanno segnalato un widget",

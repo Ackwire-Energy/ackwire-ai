@@ -4187,7 +4187,10 @@
     "value": "Which chart"
   },
   "dashboards.organize.hint": {
-    "value": "Move the widgets and pick each one's size. Done saves the order."
+    "value": "Hold a widget and drag it to its new place, or use the arrows, and pick each one's size. Done saves the order."
+  },
+  "dashboards.organize.holdHint": {
+    "value": "Hold and drag to move it."
   },
   "dashboards.organize.up": {
     "value": "Move up"
@@ -4245,6 +4248,18 @@
   },
   "dashboards.widget.onBoard": {
     "value": "Where it is"
+  },
+  "dashboards.widget.title": {
+    "value": "Title"
+  },
+  "dashboards.widget.titlePlaceholder": {
+    "value": "A short name for the widget"
+  },
+  "dashboards.widget.titleSaved": {
+    "value": "Title saved"
+  },
+  "dashboards.formatAuto": {
+    "value": "{{name}} picks the best one"
   },
   "dashboards.notice.widget_alert": {
     "value": {

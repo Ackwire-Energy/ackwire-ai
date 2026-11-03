@@ -12601,7 +12601,13 @@
       "size": "크기",
       "remove": "제거",
       "drag": "끌어서 이동",
-      "fixed": "고정됨"
+      "fixed": "고정됨",
+      "role": "옮길 수 있는 위젯",
+      "help": "스페이스나 Enter로 카드를 집고, 화살표로 옮기고, 스페이스나 Enter로 놓고, Esc로 취소해요. 화살표만 누르면 한 칸씩 옮겨져요.",
+      "picked": "“{{title}}”을(를) 집었어요. 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
+      "moved": "“{{title}}”: {{total}}개 중 {{position}}번째예요.",
+      "dropped": "“{{title}}”을(를) {{total}}개 중 {{position}}번째에 놓았어요.",
+      "canceled": "“{{title}}”이(가) 제자리로 돌아갔어요."
     },
     "add": {
       "tile": "위젯",
@@ -12644,7 +12650,9 @@
       "askTo": "받는 사람: {{name}}",
       "send": "보내기",
       "sent": "{{name}}이(가) 위젯을 다시 만들고 있어요.",
-      "updated": "업데이트됨"
+      "updated": "업데이트됨",
+      "rename": "이름 변경",
+      "titleLabel": "위젯 제목"
     },
     "notice": {
       "alert": "<b>{{name}}</b>이(가) “{{title}}”에 알림을 보냈어요",
@@ -12692,6 +12700,7 @@
       "open": "열기"
     },
     "home": "내 홈",
+    "untitled": "새 위젯",
     "updatedAgo": "{{when}} 업데이트",
     "removed": {
       "home": "“{{title}}”이(가) 홈에서 빠지고 {{name}}의 루틴이 멈췄어요",
@@ -12792,9 +12801,7 @@
       "what": "무엇을 지켜보고 싶나요?",
       "whatPlaceholder": "예: 오늘 매출을 어제와 비교해서",
       "who": "맡을 에이전트",
-      "reads": "{{role}} · {{sources}} 읽기",
       "format": "형식",
-      "autoHint": "{{name}}이(가) 요청한 내용을 가장 잘 보여 주는 형식을 골라요.",
       "updates": "업데이트",
       "destination": "추가할 곳",
       "create": "위젯 만들기",
@@ -12831,7 +12838,26 @@
         "noRedo": "스스로 업데이트하지 않아요",
         "noRedoHint": "메뉴에서 업데이트를 요청할 수 있어요"
       },
-      "created": "위젯을 {{where}}에 추가했어요"
+      "created": "위젯을 {{where}}에 추가했어요",
+      "test": "테스트",
+      "testAgain": "다시 테스트",
+      "testing": "{{name}}이(가) 실제 데이터로 만들고 있어요…",
+      "tested": "실제 데이터 · {{when}}",
+      "stale": "테스트 후에 바뀌었어요",
+      "testFailed": "잘 안 됐어요: {{reason}}",
+      "tryAgain": "다시 시도",
+      "testCost": "이번 테스트 비용: {{cost}}",
+      "testFirst": "먼저 테스트해서 실제 결과를 확인하세요",
+      "titleField": "제목",
+      "formatHints": {
+        "auto": "{{name}}이(가) 가장 잘 보여 주는 형식을 골라요",
+        "kpi": "큰 숫자 하나와 그 변화",
+        "goal": "목표까지의 진행 상황",
+        "bars": "몇 가지 값을 나란히",
+        "line": "시간에 따라 어떻게 바뀌었는지",
+        "list": "짧은 항목 목록",
+        "text": "요약하는 몇 문장"
+      }
     },
     "pinTop": "맨 위에 고정",
     "unpin": "고정 해제",
@@ -12863,7 +12889,8 @@
       "agentArchived": "이 에이전트는 보관되었어요.",
       "blockNotFound": "그 차트가 더 이상 메시지에 없어요.",
       "notAgentMessage": "에이전트의 차트만 고정할 수 있어요.",
-      "promptRequired": "위젯에 무엇을 보여 줄지 말해 주세요."
+      "promptRequired": "위젯에 무엇을 보여 줄지 말해 주세요.",
+      "notTested": "먼저 테스트하세요. 테스트가 성공하면 위젯이 만들어져요."
     }
   }
 }

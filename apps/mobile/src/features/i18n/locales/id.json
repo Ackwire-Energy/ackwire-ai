@@ -1641,7 +1641,8 @@
       "which": "Grafik yang mana"
     },
     "organize": {
-      "hint": "Pindahkan widget dan pilih ukuran masing-masing. Selesai menyimpan urutannya.",
+      "hint": "Tahan widget lalu seret ke tempat barunya, atau pakai tanda panah, dan pilih ukuran masing-masing. Selesai menyimpan urutannya.",
+      "holdHint": "Tahan dan seret untuk memindahkannya.",
       "up": "Pindah ke atas",
       "down": "Pindah ke bawah",
       "position": "{{at}} dari {{count}}",
@@ -1666,8 +1667,12 @@
       "removeText": "Rutinitasnya berhenti, dan yang ditampilkannya ikut hilang.",
       "removed": "Widget dihapus. Rutinitasnya berhenti.",
       "routine": "Rutinitasnya",
-      "onBoard": "Lokasinya"
+      "onBoard": "Lokasinya",
+      "title": "Judul",
+      "titlePlaceholder": "Nama singkat untuk widget",
+      "titleSaved": "Judul disimpan"
     },
+    "formatAuto": "{{name}} memilih yang terbaik",
     "notice": {
       "widget_alert_other": "{{names}} menandai sebuah widget",
       "widget_failed_other": "{{names}} tidak bisa memperbarui sebuah widget",

@@ -13241,7 +13241,13 @@
       "size": "Grootte",
       "remove": "Verwijderen",
       "drag": "Sleep om te verplaatsen",
-      "fixed": "Vast"
+      "fixed": "Vast",
+      "role": "verplaatsbare widget",
+      "help": "Spatie of Enter pakt de kaart op, de pijltjes verplaatsen hem, Spatie of Enter zet hem neer en Esc annuleert. Alleen de pijltjes verplaatsen hem één plek.",
+      "picked": "Je hebt “{{title}}” opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "“{{title}}”: positie {{position}} van {{total}}.",
+      "dropped": "Je hebt “{{title}}” neergezet op positie {{position}} van {{total}}.",
+      "canceled": "“{{title}}” staat weer op zijn plek."
     },
     "add": {
       "tile": "Widget",
@@ -13284,7 +13290,9 @@
       "askTo": "aan {{name}}",
       "send": "Versturen",
       "sent": "{{name}} maakt de widget opnieuw.",
-      "updated": "Bijgewerkt"
+      "updated": "Bijgewerkt",
+      "rename": "Hernoemen",
+      "titleLabel": "Titel van de widget"
     },
     "notice": {
       "alert": "<b>{{name}}</b> heeft “{{title}}” gemarkeerd",
@@ -13332,6 +13340,7 @@
       "open": "Openen"
     },
     "home": "Mijn start",
+    "untitled": "Nieuwe widget",
     "updatedAgo": "bijgewerkt {{when}}",
     "removed": {
       "home": "“{{title}}” staat niet meer op Start en de routine van {{name}} is gestopt",
@@ -13435,9 +13444,7 @@
       "what": "Wat wil je volgen?",
       "whatPlaceholder": "Bijv.: de verkoop van vandaag vergeleken met gisteren",
       "who": "Wie ervoor zorgt",
-      "reads": "{{role}} · leest {{sources}}",
       "format": "Vorm",
-      "autoHint": "{{name}} kiest de vorm die het best laat zien wat je vroeg.",
       "updates": "Bijwerken",
       "destination": "Toevoegen aan",
       "create": "Widget maken",
@@ -13474,7 +13481,26 @@
         "noRedo": "Werkt niet vanzelf bij",
         "noRedoHint": "Je kunt in het menu om een update vragen"
       },
-      "created": "Widget toegevoegd aan {{where}}"
+      "created": "Widget toegevoegd aan {{where}}",
+      "test": "Testen",
+      "testAgain": "Opnieuw testen",
+      "testing": "{{name}} bouwt hem met echte gegevens…",
+      "tested": "Echte gegevens · {{when}}",
+      "stale": "Gewijzigd sinds de test",
+      "testFailed": "Het is niet gelukt: {{reason}}",
+      "tryAgain": "Opnieuw proberen",
+      "testCost": "Deze test kostte {{cost}}",
+      "testFirst": "Test hem eerst om het echte resultaat te zien",
+      "titleField": "Titel",
+      "formatHints": {
+        "auto": "{{name}} kiest de vorm die het het best laat zien",
+        "kpi": "Eén groot getal en hoe het veranderde",
+        "goal": "De voortgang naar een doel",
+        "bars": "Een paar waarden naast elkaar",
+        "line": "Hoe het veranderde in de tijd",
+        "list": "Een korte lijst met items",
+        "text": "Een paar zinnen die het samenvatten"
+      }
     },
     "pinTop": "Bovenaan vastzetten",
     "unpin": "Losmaken",
@@ -13506,7 +13532,8 @@
       "agentArchived": "Deze agent is gearchiveerd.",
       "blockNotFound": "Die grafiek staat niet meer in het bericht.",
       "notAgentMessage": "Alleen de grafiek van een agent kan worden vastgezet.",
-      "promptRequired": "Zeg wat de widget moet tonen."
+      "promptRequired": "Zeg wat de widget moet tonen.",
+      "notTested": "Test hem eerst: de widget wordt gemaakt zodra de test lukt."
     }
   }
 }

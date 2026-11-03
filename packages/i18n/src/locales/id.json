@@ -12726,7 +12726,13 @@
       "size": "Ukuran",
       "remove": "Hapus",
       "drag": "Seret untuk memindahkan",
-      "fixed": "Tetap"
+      "fixed": "Tetap",
+      "role": "widget yang bisa dipindah",
+      "help": "Spasi atau Enter mengambil kartu, tombol panah memindahkannya, Spasi atau Enter menjatuhkannya, dan Esc membatalkan. Tombol panah saja memindahkannya satu tempat.",
+      "picked": "Kamu mengambil “{{title}}”. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
+      "moved": "“{{title}}”: posisi {{position}} dari {{total}}.",
+      "dropped": "Kamu menjatuhkan “{{title}}” di posisi {{position}} dari {{total}}.",
+      "canceled": "“{{title}}” kembali ke tempatnya."
     },
     "add": {
       "tile": "Widget",
@@ -12769,7 +12775,9 @@
       "askTo": "ke {{name}}",
       "send": "Kirim",
       "sent": "{{name}} sedang membuat ulang widget-nya.",
-      "updated": "Diperbarui"
+      "updated": "Diperbarui",
+      "rename": "Ganti nama",
+      "titleLabel": "Judul widget"
     },
     "notice": {
       "alert": "<b>{{name}}</b> menandai “{{title}}”",
@@ -12817,6 +12825,7 @@
       "open": "Buka"
     },
     "home": "Berandaku",
+    "untitled": "Widget baru",
     "updatedAgo": "diperbarui {{when}}",
     "removed": {
       "home": "“{{title}}” keluar dari Beranda dan rutinitas {{name}} berhenti",
@@ -12917,9 +12926,7 @@
       "what": "Apa yang ingin kamu pantau?",
       "whatPlaceholder": "Mis.: penjualan hari ini dibanding kemarin",
       "who": "Siapa yang mengurus",
-      "reads": "{{role}} · membaca {{sources}}",
       "format": "Bentuk",
-      "autoHint": "{{name}} memilih bentuk yang paling jelas menunjukkan permintaanmu.",
       "updates": "Pembaruan",
       "destination": "Tambahkan ke",
       "create": "Buat widget",
@@ -12956,7 +12963,26 @@
         "noRedo": "Tidak diperbarui sendiri",
         "noRedoHint": "Kamu bisa meminta pembaruan di menu"
       },
-      "created": "Widget ditambahkan ke {{where}}"
+      "created": "Widget ditambahkan ke {{where}}",
+      "test": "Uji",
+      "testAgain": "Uji lagi",
+      "testing": "{{name}} sedang membuatnya dengan data sungguhan…",
+      "tested": "Data sungguhan · {{when}}",
+      "stale": "Berubah sejak diuji",
+      "testFailed": "Tidak berhasil: {{reason}}",
+      "tryAgain": "Coba lagi",
+      "testCost": "Uji ini memakan biaya {{cost}}",
+      "testFirst": "Uji dulu untuk melihat hasil sungguhannya",
+      "titleField": "Judul",
+      "formatHints": {
+        "auto": "{{name}} memilih yang paling jelas menampilkannya",
+        "kpi": "Satu angka besar dan perubahannya",
+        "goal": "Kemajuan menuju target",
+        "bars": "Beberapa nilai berdampingan",
+        "line": "Perubahannya dari waktu ke waktu",
+        "list": "Daftar singkat berisi beberapa item",
+        "text": "Beberapa kalimat yang merangkumnya"
+      }
     },
     "pinTop": "Sematkan di atas",
     "unpin": "Lepas sematan",
@@ -12988,7 +13014,8 @@
       "agentArchived": "Agen ini sudah diarsipkan.",
       "blockNotFound": "Grafik itu sudah tidak ada di pesan.",
       "notAgentMessage": "Hanya grafik dari agen yang bisa disematkan.",
-      "promptRequired": "Sebutkan apa yang harus ditampilkan widget."
+      "promptRequired": "Sebutkan apa yang harus ditampilkan widget.",
+      "notTested": "Uji dulu: widget dibuat setelah ujinya berhasil."
     }
   }
 }

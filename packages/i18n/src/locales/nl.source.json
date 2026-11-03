@@ -31124,6 +31124,24 @@
   "widgets.organize.fixed": {
     "value": "Fixed"
   },
+  "widgets.organize.role": {
+    "value": "movable widget"
+  },
+  "widgets.organize.help": {
+    "value": "Space or Enter picks the card up, the arrows move it, Space or Enter drops it and Esc cancels. The arrows alone move it one place."
+  },
+  "widgets.organize.picked": {
+    "value": "You picked up “{{title}}”. The arrows move it, Space drops it, Esc cancels."
+  },
+  "widgets.organize.moved": {
+    "value": "“{{title}}”: position {{position}} of {{total}}."
+  },
+  "widgets.organize.dropped": {
+    "value": "You dropped “{{title}}” at position {{position}} of {{total}}."
+  },
+  "widgets.organize.canceled": {
+    "value": "“{{title}}” went back to its place."
+  },
   "widgets.add.tile": {
     "value": "Widget"
   },
@@ -31228,6 +31246,12 @@
   },
   "widgets.panel.updated": {
     "value": "Updated"
+  },
+  "widgets.panel.rename": {
+    "value": "Rename"
+  },
+  "widgets.panel.titleLabel": {
+    "value": "Widget title"
   },
   "widgets.notice.alert": {
     "value": "<b>{{name}}</b> flagged “{{title}}”"
@@ -31336,6 +31360,9 @@
   },
   "widgets.home": {
     "value": "My Home"
+  },
+  "widgets.untitled": {
+    "value": "New widget"
   },
   "widgets.updatedAgo": {
     "value": "updated {{when}}"
@@ -31583,14 +31610,8 @@
   "dashboards.newWidget.who": {
     "value": "Who looks after it"
   },
-  "dashboards.newWidget.reads": {
-    "value": "{{role}} · reads {{sources}}"
-  },
   "dashboards.newWidget.format": {
     "value": "Format"
-  },
-  "dashboards.newWidget.autoHint": {
-    "value": "{{name}} picks the format that best shows what you asked."
   },
   "dashboards.newWidget.updates": {
     "value": "Updates"
@@ -31691,6 +31712,57 @@
   "dashboards.newWidget.created": {
     "value": "Widget added to {{where}}"
   },
+  "dashboards.newWidget.test": {
+    "value": "Test"
+  },
+  "dashboards.newWidget.testAgain": {
+    "value": "Test again"
+  },
+  "dashboards.newWidget.testing": {
+    "value": "{{name}} is building it with real data…"
+  },
+  "dashboards.newWidget.tested": {
+    "value": "Real data · {{when}}"
+  },
+  "dashboards.newWidget.stale": {
+    "value": "Changed since the test"
+  },
+  "dashboards.newWidget.testFailed": {
+    "value": "It didn't work: {{reason}}"
+  },
+  "dashboards.newWidget.tryAgain": {
+    "value": "Try again"
+  },
+  "dashboards.newWidget.testCost": {
+    "value": "This test cost {{cost}}"
+  },
+  "dashboards.newWidget.testFirst": {
+    "value": "Test it first to see the real result"
+  },
+  "dashboards.newWidget.titleField": {
+    "value": "Title"
+  },
+  "dashboards.newWidget.formatHints.auto": {
+    "value": "{{name}} picks the one that shows it best"
+  },
+  "dashboards.newWidget.formatHints.kpi": {
+    "value": "One big number and how it moved"
+  },
+  "dashboards.newWidget.formatHints.goal": {
+    "value": "Progress toward a target"
+  },
+  "dashboards.newWidget.formatHints.bars": {
+    "value": "A few values side by side"
+  },
+  "dashboards.newWidget.formatHints.line": {
+    "value": "How it changed over time"
+  },
+  "dashboards.newWidget.formatHints.list": {
+    "value": "A short list of items"
+  },
+  "dashboards.newWidget.formatHints.text": {
+    "value": "A few sentences that sum it up"
+  },
   "dashboards.pinTop": {
     "value": "Pin to the top"
   },
@@ -31774,6 +31846,9 @@
   },
   "dashboards.errors.promptRequired": {
     "value": "Say what the widget should show."
+  },
+  "dashboards.errors.notTested": {
+    "value": "Test it first: the widget is created once its test works."
   },
   "agent.editName": {
     "value": "Edit name: {{name}}"

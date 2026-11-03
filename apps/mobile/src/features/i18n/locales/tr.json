@@ -1723,7 +1723,8 @@
       "which": "Hangi grafik"
     },
     "organize": {
-      "hint": "Widget'ları taşıyın ve her birinin boyutunu seçin. Bitti sırayı kaydeder.",
+      "hint": "Bir widget'a basılı tutup yeni yerine sürükleyin ya da okları kullanın ve her birinin boyutunu seçin. Bitti sırayı kaydeder.",
+      "holdHint": "Taşımak için basılı tutup sürükleyin.",
       "up": "Yukarı taşı",
       "down": "Aşağı taşı",
       "position": "{{at}}/{{count}}",
@@ -1748,8 +1749,12 @@
       "removeText": "Rutini durur ve gösterdikleri de onunla birlikte gider.",
       "removed": "Widget kaldırıldı. Rutini durdu.",
       "routine": "Rutini",
-      "onBoard": "Bulunduğu yer"
+      "onBoard": "Bulunduğu yer",
+      "title": "Başlık",
+      "titlePlaceholder": "Widget için kısa bir ad",
+      "titleSaved": "Başlık kaydedildi"
     },
+    "formatAuto": "En iyisini {{name}} seçer",
     "notice": {
       "widget_alert_one": "{{names}} bir widget için uyardı",
       "widget_alert_other": "{{names}} bir widget için uyardı",

@@ -13635,7 +13635,13 @@
       "size": "Taille",
       "remove": "Retirer",
       "drag": "Faites glisser pour déplacer",
-      "fixed": "Fixe"
+      "fixed": "Fixe",
+      "role": "widget déplaçable",
+      "help": "Espace ou Entrée prend la carte, les flèches la déplacent, Espace ou Entrée la dépose et Échap annule. Les flèches seules la déplacent d'une place.",
+      "picked": "Vous avez pris « {{title}} ». Les flèches le déplacent, Espace le dépose, Échap annule.",
+      "moved": "« {{title}} » : position {{position}} sur {{total}}.",
+      "dropped": "Vous avez déposé « {{title}} » en position {{position}} sur {{total}}.",
+      "canceled": "« {{title}} » est revenu à sa place."
     },
     "add": {
       "tile": "Widget",
@@ -13678,7 +13684,9 @@
       "askTo": "à {{name}}",
       "send": "Envoyer",
       "sent": "{{name}} refait le widget.",
-      "updated": "Mis à jour"
+      "updated": "Mis à jour",
+      "rename": "Renommer",
+      "titleLabel": "Titre du widget"
     },
     "notice": {
       "alert": "<b>{{name}}</b> a signalé « {{title}} »",
@@ -13726,6 +13734,7 @@
       "open": "Ouvrir"
     },
     "home": "Mon accueil",
+    "untitled": "Nouveau widget",
     "updatedAgo": "mis à jour {{when}}",
     "removed": {
       "home": "« {{title}} » a quitté l'Accueil et la routine de {{name}} s'est arrêtée",
@@ -13832,9 +13841,7 @@
       "what": "Que voulez-vous suivre ?",
       "whatPlaceholder": "Ex. : les ventes du jour comparées à celles d'hier",
       "who": "Qui s'en occupe",
-      "reads": "{{role}} · lit {{sources}}",
       "format": "Type d'affichage",
-      "autoHint": "{{name}} choisit le format qui montre le mieux ce que vous avez demandé.",
       "updates": "Mise à jour",
       "destination": "Ajouter à",
       "create": "Créer le widget",
@@ -13871,7 +13878,26 @@
         "noRedo": "Ne se met pas à jour tout seul",
         "noRedoHint": "Vous pouvez demander une mise à jour dans le menu"
       },
-      "created": "Widget ajouté à {{where}}"
+      "created": "Widget ajouté à {{where}}",
+      "test": "Tester",
+      "testAgain": "Tester à nouveau",
+      "testing": "{{name}} le construit avec les vraies données…",
+      "tested": "Vraies données · {{when}}",
+      "stale": "Modifié depuis le test",
+      "testFailed": "Ça n'a pas marché : {{reason}}",
+      "tryAgain": "Essayer à nouveau",
+      "testCost": "Ce test a coûté {{cost}}",
+      "testFirst": "Testez d'abord pour voir le vrai résultat",
+      "titleField": "Titre",
+      "formatHints": {
+        "auto": "{{name}} choisit celui qui le montre le mieux",
+        "kpi": "Un grand nombre et son évolution",
+        "goal": "La progression vers un objectif",
+        "bars": "Quelques valeurs côte à côte",
+        "line": "Son évolution dans le temps",
+        "list": "Une courte liste d'éléments",
+        "text": "Quelques phrases qui résument"
+      }
     },
     "pinTop": "Épingler en haut",
     "unpin": "Désépingler",
@@ -13903,7 +13929,8 @@
       "agentArchived": "Cet agent a été archivé.",
       "blockNotFound": "Ce graphique n'est plus dans le message.",
       "notAgentMessage": "Seul le graphique d'un agent peut être épinglé.",
-      "promptRequired": "Dites ce que le widget doit afficher."
+      "promptRequired": "Dites ce que le widget doit afficher.",
+      "notTested": "Testez d'abord : le widget est créé une fois le test réussi."
     }
   }
 }

@@ -1641,7 +1641,8 @@
       "which": "어떤 차트"
     },
     "organize": {
-      "hint": "위젯을 옮기고 각각의 크기를 고르세요. 완료를 누르면 순서가 저장돼요.",
+      "hint": "위젯을 길게 눌러 새 위치로 끌거나 화살표를 사용하고, 각각의 크기를 고르세요. 완료를 누르면 순서가 저장돼요.",
+      "holdHint": "길게 눌러 끌면 옮길 수 있어요.",
       "up": "위로 이동",
       "down": "아래로 이동",
       "position": "{{count}}개 중 {{at}}번째",
@@ -1666,8 +1667,12 @@
       "removeText": "루틴이 멈추고, 보여 주던 내용도 함께 사라져요.",
       "removed": "위젯을 제거했어요. 루틴이 멈췄어요.",
       "routine": "루틴",
-      "onBoard": "위치"
+      "onBoard": "위치",
+      "title": "제목",
+      "titlePlaceholder": "위젯의 짧은 이름",
+      "titleSaved": "제목을 저장했어요"
     },
+    "formatAuto": "{{name}}이(가) 가장 좋은 걸 골라요",
     "notice": {
       "widget_alert_other": "{{names}}이(가) 위젯에 알림을 보냈어요",
       "widget_failed_other": "{{names}}이(가) 위젯을 업데이트하지 못했어요",

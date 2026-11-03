@@ -1641,7 +1641,8 @@
       "which": "哪个图表"
     },
     "organize": {
-      "hint": "移动小组件并为每个选择大小。点“完成”保存顺序。",
+      "hint": "按住小组件拖到新位置，或使用箭头，并为每个选择大小。点“完成”保存顺序。",
+      "holdHint": "按住并拖动即可移动。",
       "up": "上移",
       "down": "下移",
       "position": "第 {{at}} 个，共 {{count}} 个",
@@ -1666,8 +1667,12 @@
       "removeText": "它的例行工作会停止，显示的内容也会一起移除。",
       "removed": "小组件已移除。它的例行工作已停止。",
       "routine": "它的例行工作",
-      "onBoard": "所在位置"
+      "onBoard": "所在位置",
+      "title": "标题",
+      "titlePlaceholder": "小组件的简短名称",
+      "titleSaved": "标题已保存"
     },
+    "formatAuto": "{{name}} 会选最合适的",
     "notice": {
       "widget_alert_other": "{{names}} 对一个小组件发出了提醒",
       "widget_failed_other": "{{names}} 未能更新一个小组件",

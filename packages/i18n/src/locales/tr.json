@@ -12980,7 +12980,13 @@
       "size": "Boyut",
       "remove": "Kaldır",
       "drag": "Taşımak için sürükleyin",
-      "fixed": "Sabit"
+      "fixed": "Sabit",
+      "role": "taşınabilir widget",
+      "help": "Boşluk veya Enter kartı alır, ok tuşları taşır, Boşluk veya Enter bırakır ve Esc iptal eder. Yalnızca ok tuşları onu bir sıra taşır.",
+      "picked": "“{{title}}” widget'ını aldınız. Ok tuşları taşır, Boşluk bırakır, Esc iptal eder.",
+      "moved": "“{{title}}”: {{total}} içinde {{position}}. sıra.",
+      "dropped": "“{{title}}” bırakıldı: {{total}} içinde {{position}}. sıra.",
+      "canceled": "“{{title}}” yerine döndü."
     },
     "add": {
       "tile": "Widget",
@@ -13023,7 +13029,9 @@
       "askTo": "alıcı: {{name}}",
       "send": "Gönder",
       "sent": "{{name}} widget'ı yeniden yapıyor.",
-      "updated": "Güncellendi"
+      "updated": "Güncellendi",
+      "rename": "Yeniden adlandır",
+      "titleLabel": "Widget başlığı"
     },
     "notice": {
       "alert": "<b>{{name}}</b> “{{title}}” için uyardı",
@@ -13071,6 +13079,7 @@
       "open": "Aç"
     },
     "home": "Ana sayfam",
+    "untitled": "Yeni widget",
     "updatedAgo": "{{when}} güncellendi",
     "removed": {
       "home": "“{{title}}” ana sayfadan çıktı ve {{name}} rutini durdu",
@@ -13174,9 +13183,7 @@
       "what": "Neyi takip etmek istiyorsunuz?",
       "whatPlaceholder": "Örn.: bugünkü satışların dünle karşılaştırması",
       "who": "Kim ilgilenecek",
-      "reads": "{{role}} · {{sources}} okur",
       "format": "Biçim",
-      "autoHint": "{{name}}, istediğinizi en iyi gösteren biçimi seçer.",
       "updates": "Güncelleme",
       "destination": "Eklenecek yer",
       "create": "Widget oluştur",
@@ -13213,7 +13220,26 @@
         "noRedo": "Kendi kendine güncellenmez",
         "noRedoHint": "Menüden güncelleme isteyebilirsiniz"
       },
-      "created": "Widget şuraya eklendi: {{where}}"
+      "created": "Widget şuraya eklendi: {{where}}",
+      "test": "Test et",
+      "testAgain": "Yeniden test et",
+      "testing": "{{name}} gerçek verilerle hazırlıyor…",
+      "tested": "Gerçek veriler · {{when}}",
+      "stale": "Testten sonra değişti",
+      "testFailed": "Olmadı: {{reason}}",
+      "tryAgain": "Tekrar dene",
+      "testCost": "Bu testin maliyeti: {{cost}}",
+      "testFirst": "Gerçek sonucu görmek için önce test edin",
+      "titleField": "Başlık",
+      "formatHints": {
+        "auto": "En iyi gösteren biçimi {{name}} seçer",
+        "kpi": "Büyük bir sayı ve nasıl değiştiği",
+        "goal": "Bir hedefe doğru ilerleme",
+        "bars": "Yan yana birkaç değer",
+        "line": "Zaman içinde nasıl değiştiği",
+        "list": "Kısa bir öğe listesi",
+        "text": "Özetleyen birkaç cümle"
+      }
     },
     "pinTop": "En üste sabitle",
     "unpin": "Sabitlemeyi kaldır",
@@ -13245,7 +13271,8 @@
       "agentArchived": "Bu ajan arşivlendi.",
       "blockNotFound": "O grafik artık mesajda yok.",
       "notAgentMessage": "Yalnızca bir ajanın grafiği sabitlenebilir.",
-      "promptRequired": "Widget'ın ne göstermesi gerektiğini yazın."
+      "promptRequired": "Widget'ın ne göstermesi gerektiğini yazın.",
+      "notTested": "Önce test edin: widget, testi başarılı olunca oluşturulur."
     }
   }
 }
