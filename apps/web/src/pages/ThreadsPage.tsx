@@ -33,6 +33,7 @@ import { MissionStatusChip, missionSummaryStatusKey } from "@/components/mission
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
+import { SelectionBar } from "@/components/SelectionBar";
 import { ThreadStatusChip, useThreadControls } from "@/components/threads/ThreadBits";
 import { useOpenParam } from "@/lib/open-param";
 import { THREAD_TABS, type ThreadsTab } from "./thread-tabs";
@@ -315,7 +316,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           </Button>
         )}
         {selected.length > 0 && (
-          <div className="drive-selbar threads-selbar" role="toolbar" aria-label={t("threads.selection")}>
+          <SelectionBar label={t("threads.selection")}>
             <span className="drive-selbar__count">{t("threads.selected", { count: selected.length })}</span>
             {tab === "archived" ? (
               <Button size="sm" variant="ghost" icon="unarchive" onClick={() => bulk("unarchive")}>
@@ -343,7 +344,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
               title={t("threads.clearSelection")}
               onClick={() => setPicked(new Set())}
             />
-          </div>
+          </SelectionBar>
         )}
       </div>
       {open && (
