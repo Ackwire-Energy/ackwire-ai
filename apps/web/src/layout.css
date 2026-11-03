@@ -7871,6 +7871,11 @@ html:not([data-pointer]) .onb__step:focus-visible {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
+/* "Sem responsável" among the people of a picker: as big as their faces. */
+.ac-menu--select .ac-menu__leading > .newag__ib {
+  width: 32px;
+  height: 32px;
+}
 /* The role step: "Do zero" first (its Cargo field right under it, one card's gap apart), then the groups of presets
    under small headings. */
 .newag__role-groups {
