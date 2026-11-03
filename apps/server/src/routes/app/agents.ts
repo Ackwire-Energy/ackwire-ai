@@ -480,9 +480,9 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agent-status",
       tags,
       security,
-      summary: "Each agent's presence (online, busy, away, offline) and what it says it is doing",
+      summary: "Each agent's presence (online, busy, away, out of office, offline) and what it says it is doing",
       description:
-        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
+        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `out` (out of office, §12) while its plan is at its limit with no model to fall back on or its monthly budget is spent, with an `out_of_plan`/`out_of_budget` line whose `until` says when it is back, and the router leaves it out of messages nobody mentioned it in; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -490,7 +490,7 @@ export function agentRoutes(deps: AppDeps) {
             agents: z.array(
               z.object({
                 agentId: z.uuid(),
-                presence: z.enum(["online", "busy", "away", "offline"]),
+                presence: z.enum(["online", "busy", "away", "out", "offline"]),
                 status: z
                   .object({
                     by: z.enum(["self", "auto", "wait"]).openapi({
@@ -518,6 +518,8 @@ export function agentRoutes(deps: AppDeps) {
                         "queued_computer",
                         "waiting_plan",
                         "waiting_budget",
+                        "out_of_plan",
+                        "out_of_budget",
                         "provider_down",
                         "work",
                       ])
@@ -545,7 +547,15 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      return c.json({ agents: await agentStatuses(db, c.get("user").id, orgId) }, 200);
+      const gateway = deps.extras?.context?.gateway;
+      // A plan at its limit still answers through a model with a key (ADR 0032 §5): not out of office then.
+      const hasModel = gateway
+        ? (agent: Parameters<typeof gateway.hasModelCredential>[0]) => gateway.hasModelCredential(agent)
+        : undefined;
+      return c.json(
+        { agents: await agentStatuses(db, c.get("user").id, orgId, new Date(), hasModel ? { hasModel } : {}) },
+        200,
+      );
     },
   );
 

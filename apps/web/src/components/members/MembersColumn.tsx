@@ -274,7 +274,9 @@ function PersonRow({ member: m, you }: { member: Member; you: boolean }) {
           {line ? (
             <StatusLine emoji={line.emoji} text={line.text} className="members-side__line" />
           ) : (
-            (presence === "away" || presence === "busy") && <span className="members-side__line">{word}</span>
+            (presence === "away" || presence === "busy" || presence === "out") && (
+              <span className="members-side__line">{word}</span>
+            )
           )}
         </span>
       </span>
@@ -294,11 +296,11 @@ function AgentRow({
   busy: boolean;
   autoReply: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const state = useStreams((s) => agentStateIn(s, agent.id, channelId));
   const shown = useAgentPresence(agent.id);
   const word = shown ? t(`presence.${shown.presence}`) : null;
-  const line = agentLine(t, shown?.line ?? null);
+  const line = agentLine(t, shown?.line ?? null, i18n.language);
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
   const text = line?.text ?? doing ?? agent.role ?? word;
   const shows = useId();

@@ -1809,9 +1809,9 @@ export interface Person {
 }
 
 /** A person as others see them (ADR 0084). */
-export type MemberPresence = "online" | "away" | "busy" | "hidden" | "offline";
+export type MemberPresence = "online" | "away" | "busy" | "out" | "hidden" | "offline";
 /** What a person picks: `auto` = online while connected, `away`, `busy`, or `hidden` (offline to everyone else). */
-export type Availability = "auto" | "away" | "busy" | "hidden";
+export type Availability = "auto" | "away" | "busy" | "out" | "hidden";
 
 export interface MemberStatus {
   text: string;
@@ -1826,8 +1826,11 @@ export interface StatusInput {
   status?: { text: string; emoji?: string | null; until?: string | null } | null;
 }
 
-/** An agent's presence, from its work (ADR 0084); an agent with no AI is drawn `offline` by the apps. */
-export type AgentPresence = "online" | "busy" | "away" | "offline";
+/**
+ * An agent's presence, from its work (ADR 0084); an agent with no AI is drawn `offline` by the apps. `out`: out of
+ * office (§12), its plan at its limit or its monthly budget spent until `status.until`.
+ */
+export type AgentPresence = "online" | "busy" | "away" | "out" | "offline";
 
 /** What an agent's line says when the server picked it (ADR 0084 §8); worded by the app (`presence.agent.*`). */
 export type AgentStatusKind =
@@ -1850,6 +1853,10 @@ export type AgentStatusKind =
   | "queued_computer"
   | "waiting_plan"
   | "waiting_budget"
+  /** Out of office (§12): its plan hit its limit; `until` when it is back. */
+  | "out_of_plan"
+  /** Out of office (§12): its monthly budget is spent; `until` the next month. */
+  | "out_of_budget"
   | "provider_down"
   /** Background work (ADR 0121): `subject` its title where everyone may read it, `count` how many. */
   | "work";

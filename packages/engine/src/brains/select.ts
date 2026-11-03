@@ -148,6 +148,20 @@ function planLimitNow(key: string, usage: PlanUsage | null | undefined, now: num
 }
 
 /**
+ * Whether this sign-in's plan is at its limit now (an agent out of office, ADR 0084 §12), and until when (null:
+ * unknown): this process's cache, else the stored reading.
+ */
+export function planLimitOf(
+  machineId: string,
+  kind: BrainKind,
+  accountId: string | undefined,
+  usage: PlanUsage | null | undefined,
+  now = Date.now(),
+): { until: number | null } | null {
+  return planLimitNow(limitKey(machineId, kind, accountId), usage, now);
+}
+
+/**
  * What the runner last said about the plan this run would think with: the account's usage, or the computer's own
  * sign-in's (`executors.ownUsage`). Read from the database, so every replica sees the same limit.
  */

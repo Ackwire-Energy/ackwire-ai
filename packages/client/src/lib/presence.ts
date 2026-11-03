@@ -10,6 +10,7 @@ import type {
 } from "../api/types";
 import { clockHour } from "./format";
 import { workStatusText } from "./long-work";
+import { usageWhen } from "./plan-usage";
 
 /**
  * Presence and written status (ADR 0084), platform-neutral: what you pick, the suggestions, when a status
@@ -17,7 +18,7 @@ import { workStatusText } from "./long-work";
  */
 
 /** What a person picks, in the order the apps list them. */
-export const AVAILABILITIES: readonly Availability[] = ["auto", "away", "busy", "hidden"];
+export const AVAILABILITIES: readonly Availability[] = ["auto", "away", "busy", "out", "hidden"];
 
 /** How you appear for what you picked (to yourself: hidden stays hidden). */
 export const presenceOfAvailability = (a: Availability): MemberPresence => (a === "auto" ? "online" : a);
@@ -34,7 +35,7 @@ export const STATUS_SUGGESTIONS = [
   { key: "lunch", emoji: "🍽️", until: "m30", availability: "away" },
   { key: "focus", emoji: "🎧", until: "h2", availability: "busy" },
   { key: "sick", emoji: "🤒", until: "today", availability: "away" },
-  { key: "vacation", emoji: "🏖️", until: "week", availability: "away" },
+  { key: "vacation", emoji: "🏖️", until: "week", availability: "out" },
 ] as const satisfies readonly { key: string; emoji: string; until: UntilChoice; availability: Availability }[];
 
 /** When a status picked with `choice` at `now` clears (ISO), or null; "today"/"week" end at local midnight. */
@@ -108,14 +109,29 @@ export const AGENT_KIND_EMOJI: Record<AgentStatusKind, string> = {
   waiting_plan: "⏳",
   waiting_budget: "⏳",
   provider_down: "⚠️",
+  out_of_plan: "🪫",
+  out_of_budget: "🪫",
   work: "🛠️",
 };
 
-/** An agent's line in words (its own, or the server's kind worded in the app's language), with its emoji. */
-export function agentStatusText(t: TFunction, line: AgentStatusLine): { emoji: string; text: string } | null {
+/**
+ * An agent's line in words (its own, or the server's kind worded in the app's language), with its emoji. Out of
+ * office (§12) says when it is back ("Sem limite do plano · volta às 15:00"), in `locale`.
+ */
+export function agentStatusText(
+  t: TFunction,
+  line: AgentStatusLine,
+  locale?: string,
+  now = new Date(),
+): { emoji: string; text: string } | null {
   if (line.text) return { emoji: line.emoji ?? AGENT_KIND_EMOJI.task, text: line.text };
   if (!line.kind) return null;
   if (line.kind === "work") return { emoji: line.emoji ?? AGENT_KIND_EMOJI.work, text: workStatusText(t, line) };
+  if (line.kind === "out_of_plan" || line.kind === "out_of_budget") {
+    const what = t(`presence.agent.${line.kind}`);
+    const back = line.until ? t("presence.agent.backAt", { when: usageWhen(t, locale, line.until, now) }) : null;
+    return { emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind], text: back ? `${what} · ${back}` : what };
+  }
   return {
     emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind],
     text: t(`presence.agent.${line.kind}`, { subject: line.subject ?? "" }),

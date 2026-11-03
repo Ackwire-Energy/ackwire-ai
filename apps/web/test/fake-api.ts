@@ -1120,12 +1120,18 @@ function presenceOf(state: FakeState, userId: string): Pick<Person, "online" | "
       ? self
         ? "hidden"
         : "offline"
-      : !state.online.has(userId)
-        ? "offline"
-        : chosen.availability === "auto"
-          ? "online"
-          : chosen.availability;
-  return { online: presence !== "offline" && presence !== "hidden", presence, status: chosen.status };
+      : chosen.availability === "out"
+        ? "out"
+        : !state.online.has(userId)
+          ? "offline"
+          : chosen.availability === "auto"
+            ? "online"
+            : chosen.availability;
+  return {
+    online: presence !== "offline" && presence !== "hidden" && presence !== "out",
+    presence,
+    status: chosen.status,
+  };
 }
 
 export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {

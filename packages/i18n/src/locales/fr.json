@@ -2288,12 +2288,14 @@
     "busy": "Occupé",
     "hidden": "Invisible",
     "offline": "Hors ligne",
+    "out": "Absent du bureau",
     "lower": {
       "online": "en ligne",
       "away": "absent",
       "busy": "occupé",
       "hidden": "invisible",
-      "offline": "hors ligne"
+      "offline": "hors ligne",
+      "out": "absent du bureau"
     },
     "setStatus": "Définir un statut",
     "seen": "vu {{when}}",
@@ -2316,6 +2318,7 @@
       "auto": "En ligne tant qu'agentes.chat est ouvert.",
       "away": "Parti un moment : les autres savent que les réponses peuvent tarder.",
       "busy": "Tout le monde voit qu'il vaut mieux ne pas vous déranger pour l'instant.",
+      "out": "Loin du travail (vacances, jour de congé) : tout le monde le voit jusqu’à ce que ton statut disparaisse.",
       "hidden": "Vous apparaissez hors ligne pour tous, et pouvez tout utiliser quand même."
     },
     "suggest": {
@@ -2355,6 +2358,9 @@
       "waiting_plan": "En attente du renouvellement de l'abonnement",
       "waiting_budget": "En attente du renouvellement du budget",
       "provider_down": "Le fournisseur d'IA est en panne · nouvel essai automatique",
+      "out_of_plan": "Limite du forfait atteinte",
+      "out_of_budget": "Budget du mois épuisé",
+      "backAt": "de retour {{when}}",
       "work": "En arrière-plan : {{subject}}"
     },
     "agentWhy": {
@@ -2363,6 +2369,7 @@
       "away": "Inactif depuis {{when}}",
       "awayNever": "N'a pas encore travaillé",
       "offline": "En pause",
+      "out": "Plus de limite pour l’instant · répond après le renouvellement",
       "noAi": "Aucune IA connectée"
     },
     "bySelf": "Écrit par {{name}} · s'efface une fois terminé",

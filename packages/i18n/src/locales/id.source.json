@@ -31267,5 +31267,26 @@
   },
   "routines.panel.reportHint.when_new": {
     "value": "Quiet when there's nothing new"
+  },
+  "presence.out": {
+    "value": "Out of office"
+  },
+  "presence.lower.out": {
+    "value": "out of office"
+  },
+  "presence.agent.out_of_plan": {
+    "value": "Out of plan limit"
+  },
+  "presence.agent.out_of_budget": {
+    "value": "Monthly budget spent"
+  },
+  "presence.agent.backAt": {
+    "value": "back {{when}}"
+  },
+  "presence.agentWhy.out": {
+    "value": "Out of limit for now · answers after the reset"
+  },
+  "presence.help.out": {
+    "value": "Away from work (vacation, a day off): everyone sees it until your status clears."
   }
 }
