@@ -118,6 +118,9 @@ describe("skill notices", () => {
       "skills.notice.failed",
       "skills.notice.edited",
     ]);
+    // Waiting only because it would replace the agents' change (no script in it).
+    const replaces = { ...notice("waiting"), latest: { statusTo: "waiting", reason: "edited" } } as AppNotification;
+    expect(workspaceHeadline(replaces)).toBe("skills.notice.waitingEdited");
     expect(openTarget(notice("edited"))).toEqual({
       to: "/org/$orgId/settings/$section",
       params: { section: "skills" },

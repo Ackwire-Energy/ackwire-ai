@@ -58,8 +58,20 @@ export const skills = pgTable(
     /**
      * An update from its link that adds or changes what runs (scripts, other executables), waiting for a person who
      * manages skills: what it held (`hash`) and those files. `dismissed`: said no to; the same content isn't raised again.
+     * `edited`: it waits (also) because it would replace what agents changed (`editedSinceSource`).
      */
-    pendingUpdate: jsonb().$type<{ hash: string; scripts: string[]; at: string; dismissed?: boolean }>(),
+    pendingUpdate: jsonb().$type<{
+      hash: string;
+      scripts: string[];
+      at: string;
+      dismissed?: boolean;
+      edited?: boolean;
+    }>(),
+    /**
+     * Changed by an agent (or an accepted proposal) since its link last wrote it: the next update from its link waits
+     * for a person (`pendingUpdate.edited`), since it would replace that change. A save of the whole skill clears it.
+     */
+    editedSinceSource: boolean().notNull().default(false),
     /** The last refusal of an update from its link (its code), so a failure is reported once, not every day. */
     updateError: text(),
     /**

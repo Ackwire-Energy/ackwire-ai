@@ -206,7 +206,9 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "skill_update") {
     const to = n.latest.statusTo;
     return to === "waiting"
-      ? ("skills.notice.waiting" as const)
+      ? n.latest.reason === "edited" && !n.latest.title
+        ? ("skills.notice.waitingEdited" as const)
+        : ("skills.notice.waiting" as const)
       : to === "failed"
         ? ("skills.notice.failed" as const)
         : to === "edited"

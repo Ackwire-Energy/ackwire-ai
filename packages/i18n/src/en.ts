@@ -6291,6 +6291,8 @@ export const en = {
     pending: {
       title: "The update from its link changes files that run: {{files}}",
       lead: "Apply it only if you trust these files. Agents run them on their computers.",
+      edited: "The update from its link would replace what agents changed in it",
+      editedLead: "Apply it to take its link's version. You can undo it after.",
       apply: "Apply update",
       dismiss: "Don't apply",
       applied: "{{name}} updated from its link.",
@@ -6309,6 +6311,7 @@ export const en = {
     notice: {
       updated: "{{name}} was updated from its link",
       waiting: "An update of {{name}} changes its scripts",
+      waitingEdited: "An update of {{name}} would replace what agents changed",
       failed: "{{name}} couldn't update from its link",
       edited: "Agents improved {{name}}",
     },

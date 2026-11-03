@@ -339,7 +339,11 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
       {pending ? (
         <>
           <View style={styles.note}>
-            <Note icon="shield">{t("skills.pending.title", { files: pending.scripts.join(", ") })}</Note>
+            <Note icon="shield">
+              {pending.scripts.length > 0
+                ? t("skills.pending.title", { files: pending.scripts.join(", ") })
+                : t("skills.pending.edited")}
+            </Note>
           </View>
           <GroupedList>
             <GroupedRow
@@ -375,7 +379,12 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
               }
             />
           </GroupedList>
-          <GroupedFooter>{t("skills.pending.lead")}</GroupedFooter>
+          <GroupedFooter>
+            {[
+              ...(pending.scripts.length > 0 ? [t("skills.pending.lead")] : []),
+              ...(pending.edited ? [t("skills.pending.editedLead")] : []),
+            ].join(" ")}
+          </GroupedFooter>
         </>
       ) : null}
       {s.updateError ? (

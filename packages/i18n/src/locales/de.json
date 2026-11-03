@@ -6581,6 +6581,8 @@
     "pending": {
       "title": "Das Update über seinen Link ändert Dateien, die ausgeführt werden: {{files}}",
       "lead": "Wende es nur an, wenn du diesen Dateien vertraust. Agenten führen sie auf ihren Computern aus.",
+      "edited": "Das Update über seinen Link würde ersetzen, was Agenten daran geändert haben",
+      "editedLead": "Wende es an, um die Version des Links zu übernehmen. Du kannst es danach rückgängig machen.",
       "apply": "Update anwenden",
       "dismiss": "Nicht anwenden",
       "applied": "{{name}} über seinen Link aktualisiert.",
@@ -6598,6 +6600,7 @@
     "notice": {
       "updated": "{{name}} wurde über seinen Link aktualisiert",
       "waiting": "Ein Update von {{name}} ändert seine Skripte",
+      "waitingEdited": "Ein Update von {{name}} würde ersetzen, was Agenten geändert haben",
       "failed": "{{name}} konnte sich nicht über seinen Link aktualisieren",
       "edited": "Agenten haben {{name}} verbessert"
     },

@@ -188,8 +188,11 @@ function keptBinaries(files: { path: string; size: number }[]) {
   return kept;
 }
 
+/** A path in a skill's folder as written, with `/` separators and no leading `./` or `/`. */
+export const cleanSkillPath = (path: string) => path.replace(/\\/g, "/").replace(/^\.?\/+/, "");
+
 function safePath(path: string) {
-  const clean = path.replace(/\\/g, "/").replace(/^\.?\/+/, "");
+  const clean = cleanSkillPath(path);
   if (!clean || clean.split("/").some((p) => p === ".." || p === "") || clean.startsWith("/")) {
     throw new ValidationError(`Invalid path in the skill: ${path}`);
   }
@@ -255,7 +258,8 @@ export interface SkillView {
   /** When its link was last read to update it. */
   checkedAt: string | null;
   /** An update from its link that changes what runs, waiting for a person who manages skills (`dismissed`: refused). */
-  pendingUpdate: { scripts: string[]; at: string; dismissed: boolean } | null;
+  /** `edited`: it would replace what agents changed since its link last wrote it. */
+  pendingUpdate: { scripts: string[]; at: string; dismissed: boolean; edited: boolean } | null;
   /** Why its last update from its link failed (a code the app translates), until one works. */
   updateError: string | null;
   /**
@@ -292,7 +296,12 @@ const view = (s: SkillRow): SkillView => ({
   autoUpdate: s.autoUpdate,
   checkedAt: s.checkedAt?.toISOString() ?? null,
   pendingUpdate: s.pendingUpdate
-    ? { scripts: s.pendingUpdate.scripts, at: s.pendingUpdate.at, dismissed: s.pendingUpdate.dismissed === true }
+    ? {
+        scripts: s.pendingUpdate.scripts,
+        at: s.pendingUpdate.at,
+        dismissed: s.pendingUpdate.dismissed === true,
+        edited: s.pendingUpdate.edited === true,
+      }
     : null,
   updateError: s.updateError,
   lastUpdate:
@@ -450,6 +459,7 @@ export async function saveSkill(
         version: sql`${skills.version} + 1`,
         ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
         deletedAt: null,
+        editedSinceSource: false,
         updatedAt: new Date(),
       })
       .where(eq(skills.id, existing.id))

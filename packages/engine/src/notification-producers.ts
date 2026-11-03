@@ -1159,7 +1159,8 @@ export const resolveToolChanged = (deps: NotificationDeps, orgId: string, connec
 const skillWaitingGroup = (skillId: string) => `skill_update:waiting:${skillId}:`;
 
 /**
- * An update of a skill from its link: applied (`updated`), waiting because it changes what runs (`waiting`, the files),
+ * An update of a skill from its link: applied (`updated`), waiting because it changes what runs (`waiting`, the files)
+ * or would replace what agents changed (`latest.reason` `edited`),
  * or refused (`failed`, its code). Who hears it: `to` an update, who manages skills a waiting one, both a refusal
  * (`to` may have lost the right or left the workspace, which only who manages skills can fix). `edited`: an agent
  * changed a skill a person made ("Agentes melhoram as skills sozinhos"), told to `to` (its author) in one row per
@@ -1170,7 +1171,7 @@ export async function notifySkillUpdate(
   skill: { id: string; orgId: string; name: string },
   what:
     | { state: "updated"; version: number }
-    | { state: "waiting"; hash: string; scripts: string[] }
+    | { state: "waiting"; hash: string; scripts: string[]; edited?: boolean }
     | { state: "failed"; reason: string }
     | { state: "edited"; agentId: string; version: number },
   to: string | null,
@@ -1196,6 +1197,7 @@ export async function notifySkillUpdate(
     latest: {
       statusTo: what.state,
       ...(what.state === "waiting" ? { title: what.scripts.join(", ") } : {}),
+      ...(what.state === "waiting" && what.edited ? { reason: "edited" } : {}),
       ...(what.state === "failed" ? { reason: what.reason } : {}),
     },
   });

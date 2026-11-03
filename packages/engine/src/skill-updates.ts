@@ -32,13 +32,14 @@ export type SkillSnapshot = NonNullable<SkillRow["lastUpdate"]>["from"];
 
 /**
  * An update from a skill's link: nothing new (`unchanged`); applied, a new version (`updated`, `before` what it
- * replaced); or waiting for a person who manages skills because it adds or changes what runs (`waiting`, those files;
- * `fresh`: this content wasn't waiting already).
+ * replaced); or waiting for a person who manages skills because it adds or changes what runs (`waiting`, those files)
+ * or would replace what agents changed since its link last wrote it (`edited`); `fresh`: this content wasn't waiting
+ * already.
  */
 export type SkillSourceUpdate =
   | { status: "unchanged"; skill: SkillDetail }
   | { status: "updated"; skill: SkillDetail; before: SkillSnapshot }
-  | { status: "waiting"; skill: SkillDetail; scripts: string[]; fresh: boolean };
+  | { status: "waiting"; skill: SkillDetail; scripts: string[]; edited: boolean; fresh: boolean };
 
 const snapshot = (s: SkillRow): SkillSnapshot => ({
   version: s.version,
@@ -92,8 +93,9 @@ async function changedRunnables(deps: SkillDeps, s: SkillRow, files: SkillFileIn
 /**
  * Reads the skill's link and updates it from it, with `reimportSkill`'s read (who manages skills, `manage_agents`):
  * the same content again changes nothing; new text and files that don't run apply at once as a new version, which
- * `undoSkillUpdate` takes back; an update adding or changing a script or another file that runs waits for a person
- * (`pendingUpdate`), unless `approved` is that content's hash (`approveSkillUpdate`).
+ * `undoSkillUpdate` takes back; an update adding or changing a script or another file that runs, or one that would
+ * replace what agents changed since (`editedSinceSource`), waits for a person (`pendingUpdate`), unless `approved` is
+ * that content's hash (`approveSkillUpdate`). While its link holds the same, the agents' changes stay.
  */
 export async function updateSkillFromSource(
   deps: SkillDeps,
@@ -120,11 +122,14 @@ export async function updateSkillFromSource(
     return { status: "unchanged", skill: await mark({ sourceHash: hash, pendingUpdate: null }) };
   }
   const scripts = await changedRunnables(deps, s, incoming.files);
-  if (scripts.length > 0 && options.approved !== hash) {
+  const edited = s.editedSinceSource;
+  if ((scripts.length > 0 || edited) && options.approved !== hash) {
     const fresh = s.pendingUpdate?.hash !== hash;
-    const skill = await mark(fresh ? { pendingUpdate: { hash, scripts, at: checkedAt.toISOString() } } : {});
-    if (fresh) await notifySkillUpdate(deps, s, { state: "waiting", hash, scripts }, null).catch(() => {});
-    return { status: "waiting", skill, scripts, fresh };
+    const skill = await mark(
+      fresh ? { pendingUpdate: { hash, scripts, at: checkedAt.toISOString(), ...(edited ? { edited } : {}) } } : {},
+    );
+    if (fresh) await notifySkillUpdate(deps, s, { state: "waiting", hash, scripts, edited }, null).catch(() => {});
+    return { status: "waiting", skill, scripts, edited, fresh };
   }
   const before = snapshot(s);
   const saved = await saveSkill(deps, actorId, orgId, incoming);

@@ -711,9 +711,14 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
         <div className="waitcard">
           <span className="waitcard__top ac-iconline">
             <Icon name="alert" size={16} />
-            <span>{t("skills.pending.title", { files: pending.scripts.join(", ") })}</span>
+            <span>
+              {pending.scripts.length > 0
+                ? t("skills.pending.title", { files: pending.scripts.join(", ") })
+                : t("skills.pending.edited")}
+            </span>
           </span>
-          <p>{t("skills.pending.lead")}</p>
+          {pending.scripts.length > 0 && <p>{t("skills.pending.lead")}</p>}
+          {pending.edited && <p>{t("skills.pending.editedLead")}</p>}
           <span className="waitcard__acts">
             <Button
               size="sm"

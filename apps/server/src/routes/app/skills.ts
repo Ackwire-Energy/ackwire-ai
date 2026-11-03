@@ -68,11 +68,11 @@ const Skill = z
     autoUpdate: z.boolean().openapi({ description: "Read from its link every day and updated from it." }),
     checkedAt: z.string().nullable().openapi({ description: "When its link was last read to update it." }),
     pendingUpdate: z
-      .object({ scripts: z.array(z.string()), at: z.string(), dismissed: z.boolean() })
+      .object({ scripts: z.array(z.string()), at: z.string(), dismissed: z.boolean(), edited: z.boolean() })
       .nullable()
       .openapi({
         description:
-          "An update from its link that adds or changes files that run (`scripts`), waiting for who manages skills; `dismissed`: refused.",
+          "An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or it would replace what agents changed since (`edited`); `dismissed`: refused.",
       }),
     updateError: z
       .string()

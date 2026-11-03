@@ -6861,6 +6861,8 @@
     "pending": {
       "title": "La mise à jour depuis son lien modifie des fichiers qui s'exécutent : {{files}}",
       "lead": "Appliquez-la seulement si vous faites confiance à ces fichiers. Les agents les exécutent sur leurs ordinateurs.",
+      "edited": "La mise à jour depuis son lien remplacerait ce que les agents y ont changé",
+      "editedLead": "Applique-la pour prendre la version du lien. Tu pourras l'annuler ensuite.",
       "apply": "Appliquer la mise à jour",
       "dismiss": "Ne pas appliquer",
       "applied": "{{name}} mise à jour depuis son lien.",
@@ -6878,6 +6880,7 @@
     "notice": {
       "updated": "{{name}} a été mise à jour depuis son lien",
       "waiting": "Une mise à jour de {{name}} modifie ses scripts",
+      "waitingEdited": "Une mise à jour de {{name}} remplacerait ce que les agents ont changé",
       "failed": "{{name}} n'a pas pu se mettre à jour depuis son lien",
       "edited": "Des agents ont amélioré {{name}}"
     },

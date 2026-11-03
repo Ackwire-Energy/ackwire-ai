@@ -38,7 +38,7 @@ import { enqueue } from "../outbox";
 import { maySql } from "../permissions";
 import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
-import { pinBlobs, skillFolderFiles, writeSkillBody, writeSkillChange } from "../skills";
+import { pinBlobs, runsCode, skillFolderFiles, writeSkillBody, writeSkillChange } from "../skills";
 import { ALL_TOOLS } from "../tools/scopes";
 import {
   type ContextItem,
@@ -253,6 +253,9 @@ async function mayDecide(db: Database, actorId: string, p: Proposal) {
     return ownerDecides(p) && !!p.agentId && (await getAgent(db, p.orgId, p.agentId))?.ownerUserId === actorId;
   }
   if (p.target === "org_context") return can(membership, "configure");
+  // A file that runs on agents' computers is a skill change of its own: who manages skills, as an update from its
+  // link that changes one (`approveSkillUpdate`).
+  if (p.target === "skill" && p.skillPath && runsCode(p.skillPath)) return can(membership, "manage_agents");
   if (can(membership, "review_memory")) return true;
   if (p.target === "agent_instructions" && p.agentId) {
     const agent = await getAgent(db, p.orgId, p.agentId);
@@ -445,6 +448,7 @@ async function appliedToSkill(deps: { db: Database; blobs?: BlobStoreResolver },
   const { db } = deps;
   const id = proposalSkillId(p);
   if (!id) return false;
+  const edited = () => db.update(schema.skills).set({ editedSinceSource: true }).where(eq(schema.skills.id, id));
   const [skill] = await db
     .select()
     .from(schema.skills)
@@ -454,6 +458,7 @@ async function appliedToSkill(deps: { db: Database; blobs?: BlobStoreResolver },
   if (!p.skillPath) {
     if (sha256(skill.body) !== p.baseHash) return false;
     await writeSkillBody(db, skill, p.proposedText);
+    await edited();
     return true;
   }
   if (!deps.blobs) throw new ValidationError("Skill files can't be changed on this server (no storage)");
@@ -465,6 +470,7 @@ async function appliedToSkill(deps: { db: Database; blobs?: BlobStoreResolver },
     body: skill.body,
     files: [{ path, data: new TextEncoder().encode(p.proposedText) }],
   });
+  await edited();
   return true;
 }
 

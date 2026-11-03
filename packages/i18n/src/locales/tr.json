@@ -6528,6 +6528,8 @@
     "pending": {
       "title": "Bağlantısından gelen güncelleme çalışan dosyaları değiştiriyor: {{files}}",
       "lead": "Yalnızca bu dosyalara güveniyorsanız uygulayın. Ajanlar bunları kendi bilgisayarlarında çalıştırır.",
+      "edited": "Bağlantısından gelen güncelleme, ajanların değiştirdiklerinin yerine geçer",
+      "editedLead": "Bağlantıdaki sürümü almak için uygula. Sonra geri alabilirsin.",
       "apply": "Güncellemeyi uygula",
       "dismiss": "Uygulama",
       "applied": "{{name}} bağlantısından güncellendi.",
@@ -6545,6 +6547,7 @@
     "notice": {
       "updated": "{{name}} bağlantısından güncellendi",
       "waiting": "{{name}} güncellemesi betiklerini değiştiriyor",
+      "waitingEdited": "{{name}} güncellemesi, ajanların değiştirdiklerinin yerine geçer",
       "failed": "{{name}} bağlantısından güncellenemedi",
       "edited": "Ajanlar {{name}} becerisini geliştirdi"
     },

@@ -16019,6 +16019,12 @@
   "skills.pending.lead": {
     "value": "Apply it only if you trust these files. Agents run them on their computers."
   },
+  "skills.pending.edited": {
+    "value": "The update from its link would replace what agents changed in it"
+  },
+  "skills.pending.editedLead": {
+    "value": "Apply it to take its link's version. You can undo it after."
+  },
   "skills.pending.apply": {
     "value": "Apply update"
   },
@@ -16057,6 +16063,9 @@
   },
   "skills.notice.waiting": {
     "value": "An update of {{name}} changes its scripts"
+  },
+  "skills.notice.waitingEdited": {
+    "value": "An update of {{name}} would replace what agents changed"
   },
   "skills.notice.failed": {
     "value": "{{name}} couldn't update from its link"

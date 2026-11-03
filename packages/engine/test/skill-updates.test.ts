@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   actionsFor,
+  addRunStep,
   approveSkillUpdate,
   createSkillToolSource,
   createToolGateway,
@@ -238,6 +239,46 @@ describe("edge cases of updating from a link", () => {
     expect(await enqueueSkillUpdates(f.db, new Date("2026-11-04T10:00:00Z"))).toBe(0);
     expect(await runSkillUpdates(deps, f.org.id)).toEqual({ updated: 0, waiting: 0, failed: 0 });
     expect((await getSkill(f.db, f.owner.id, f.org.id, skill.id)).body).toBe("# mine");
+  });
+});
+
+describe("an agent's change and its link's next update", () => {
+  test("an update that would replace what agents changed waits for a person; the same link keeps their change", async () => {
+    f = await setup();
+    const admin = await addMember(f.db, f.org.id, "admin");
+    const { gh, deps, skill } = await install(f, { "deploy/SKILL.md": skillMd("# v1"), "deploy/notes.md": "a" });
+    await setSkillAutoUpdate(f.db, f.owner.id, f.org.id, skill.id, true);
+    await f.db.insert(schema.agentSkills).values({ orgId: f.org.id, agentId: f.agent.id, skillId: skill.id });
+    const ctx = await runFor(f, f.owner.id);
+    const run = { id: ctx.runId as string, orgId: f.org.id };
+    await addRunStep(f.db, run, "tool_call", { toolUseId: "tu_load", name: "load_skill", input: { name: "deploy" } });
+    await addRunStep(f.db, run, "tool_result", { toolUseId: "tu_load", name: "load_skill", content: "ok" });
+    expect((await call(deps, ctx, "update_skill", { name: "deploy", body: "# v1\nWarm the cache." })).content).toBe(
+      "Updated deploy (v2).",
+    );
+
+    // Its link the same: the agent's change stays.
+    expect(await runSkillUpdates(deps, f.org.id)).toEqual({ updated: 0, waiting: 0, failed: 0 });
+    expect((await getSkill(f.db, f.owner.id, f.org.id, skill.id)).body).toBe("# v1\nWarm the cache.");
+
+    // Its link changed: the update waits, told to who manages skills as replacing the agents' change.
+    gh.state.files = { "deploy/SKILL.md": skillMd("# v2"), "deploy/notes.md": "a" };
+    expect(await runSkillUpdates(deps, f.org.id)).toEqual({ updated: 0, waiting: 1, failed: 0 });
+    expect(await getSkill(f.db, f.owner.id, f.org.id, skill.id)).toMatchObject({
+      version: 2,
+      body: "# v1\nWarm the cache.",
+      pendingUpdate: { scripts: [], edited: true, dismissed: false },
+    });
+    expect((await inbox(f, admin.id)).map((n) => n.latest)).toMatchObject([{ statusTo: "waiting", reason: "edited" }]);
+
+    // Applied by a person: the link's version, with Desfazer back to the agent's.
+    expect((await approveSkillUpdate(deps, f.owner.id, f.org.id, skill.id)).status).toBe("updated");
+    const updated = await getSkill(f.db, f.owner.id, f.org.id, skill.id);
+    expect([updated.body, updated.pendingUpdate]).toEqual(["# v2", null]);
+    gh.state.files = { "deploy/SKILL.md": skillMd("# v3"), "deploy/notes.md": "a" };
+    expect(await runSkillUpdates(deps, f.org.id)).toMatchObject({ updated: 1 });
+    const back = await undoSkillUpdate(deps, f.owner.id, f.org.id, skill.id);
+    expect(back.body).toBe("# v2");
   });
 });
 

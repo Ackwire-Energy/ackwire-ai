@@ -3,6 +3,7 @@ import { and, eq, schema } from "@agenteschat/db";
 import {
   actionsFor,
   addRunStep,
+  createRole,
   decideProposal,
   ForbiddenError,
   getSkill,
@@ -10,8 +11,10 @@ import {
   insertMessage,
   linkRunActions,
   listNotifications,
+  SKILL_CHANGE_LIMITS,
   type SkillDetail,
   saveSkill,
+  setMemberRoles,
   setSkillAgentsImprove,
   setSkillSettings,
   skillFolderFiles,
@@ -222,8 +225,16 @@ describe("agents improve skills by themselves (ADR 0120, ADR 0020)", () => {
       "pending",
     ]);
 
-    // A member can't apply it; who manages agents can, and the script is the new one in a new version.
+    // A member can't apply it, nor someone who only reviews memory; who manages agents can.
     const member = await addMember(f.db, f.org.id, "member");
+    await expect(decideProposal(f.db, member.id, f.org.id, p?.id ?? "", "accept")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    const reviewers = await createRole(f.db, f.owner.id, f.org.id, {
+      name: "Revisores",
+      permissions: ["review_memory"],
+    });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, member.id, [reviewers.id]);
     await expect(decideProposal(f.db, member.id, f.org.id, p?.id ?? "", "accept")).rejects.toBeInstanceOf(
       ForbiddenError,
     );
@@ -287,6 +298,29 @@ describe("agents improve skills by themselves (ADR 0120, ADR 0020)", () => {
       ).filter((a) => a.kind === "skill.updated"),
     ).toEqual([]);
     expect((await proposals()).map((p) => p.skillPath)).toEqual(["references/guide.md"]);
+  });
+
+  test("no loop of fixes: a few changes per run, then refused; a path read as ./x is the same file", async () => {
+    f = await setup({ skillTools: true });
+    const { skill } = await personSkill(f);
+    const run = await personRun(f);
+    await step(run, "load_skill", { name: "deploy" }, "loaded");
+    await step(run, "read_skill_file", { name: "deploy", path: "./references/guide.md" }, "Old guide.");
+    const outs: string[] = [];
+    for (let i = 1; i <= SKILL_CHANGE_LIMITS.perRun + 1; i++)
+      outs.push(
+        (
+          await invoke(run, "update_skill", {
+            name: "deploy",
+            files: [{ path: "references/guide.md", content: `v${i}` }],
+          })
+        ).content,
+      );
+    expect(outs.slice(0, -1)).toEqual(["Updated deploy (v2).", "Updated deploy (v3).", "Updated deploy (v4)."]);
+    expect(outs.at(-1)).toContain("already changed 3 times in this turn");
+    expect((await getSkill(f.db, f.owner.id, f.org.id, skill.id)).version).toBe(4);
+    const [row] = await f.db.select().from(schema.skills).where(eq(schema.skills.id, skill.id));
+    expect(row?.editedSinceSource).toBe(true);
   });
 
   test("the skill's text only: a binary that doesn't run and SKILL.md itself are refused as files", async () => {

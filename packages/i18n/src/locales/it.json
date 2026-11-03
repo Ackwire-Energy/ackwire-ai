@@ -6874,6 +6874,8 @@
     "pending": {
       "title": "L'aggiornamento dal suo link cambia file che vengono eseguiti: {{files}}",
       "lead": "Applicalo solo se ti fidi di questi file. Gli agenti li eseguono sui loro computer.",
+      "edited": "L'aggiornamento dal suo link sostituirebbe ciò che gli agenti vi hanno cambiato",
+      "editedLead": "Applicalo per prendere la versione del link. Puoi annullarlo dopo.",
       "apply": "Applica aggiornamento",
       "dismiss": "Non applicare",
       "applied": "{{name}} aggiornata dal suo link.",
@@ -6891,6 +6893,7 @@
     "notice": {
       "updated": "{{name}} è stata aggiornata dal suo link",
       "waiting": "Un aggiornamento di {{name}} cambia i suoi script",
+      "waitingEdited": "Un aggiornamento di {{name}} sostituirebbe ciò che gli agenti hanno cambiato",
       "failed": "{{name}} non è riuscita ad aggiornarsi dal suo link",
       "edited": "Gli agenti hanno migliorato {{name}}"
     },

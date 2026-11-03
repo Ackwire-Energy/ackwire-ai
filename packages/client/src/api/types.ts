@@ -3409,8 +3409,11 @@ export interface Skill {
   autoUpdate?: boolean;
   /** When its link was last read to update it. */
   checkedAt?: string | null;
-  /** An update from its link that adds or changes files that run, waiting for who manages skills. */
-  pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean } | null;
+  /**
+   * An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or would
+   * replace what agents changed since (`edited`, left out by older servers).
+   */
+  pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean; edited?: boolean } | null;
   /** Why its last update from its link failed: a code (`skill.no_skill_md`, `skill.connection_gone`…). */
   updateError?: string | null;
   /** Its last update from its link, or an agent's last change to it (`agentId`), while Desfazer can take it back. */

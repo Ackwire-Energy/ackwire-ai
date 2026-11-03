@@ -6436,6 +6436,8 @@ export const ptBR = {
     pending: {
       title: "A atualização do link muda arquivos que rodam: {{files}}",
       lead: "Aplique só se confiar nesses arquivos. Os agentes rodam eles nos computadores deles.",
+      edited: "A atualização do link substituiria o que os agentes mudaram nela",
+      editedLead: "Aplique para ficar com a versão do link. Dá para desfazer depois.",
       apply: "Aplicar atualização",
       dismiss: "Não aplicar",
       applied: "{{name}} atualizada do link.",
@@ -6453,6 +6455,7 @@ export const ptBR = {
     notice: {
       updated: "{{name}} foi atualizada do link",
       waiting: "Uma atualização de {{name}} muda os scripts dela",
+      waitingEdited: "Uma atualização de {{name}} substituiria o que os agentes mudaram",
       failed: "{{name}} não conseguiu se atualizar do link",
       edited: "Agentes melhoraram {{name}}",
     },

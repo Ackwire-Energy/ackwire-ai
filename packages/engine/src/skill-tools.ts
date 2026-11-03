@@ -414,9 +414,11 @@ export function createSkillToolSource(
               if (r.status === "unchanged") lines.push(`${row.name}: already what its link holds (v${row.version}).`);
               else if (r.status === "waiting") {
                 waiting.push(row.id);
-                lines.push(
-                  `${row.name}: the update adds or changes ${r.scripts.join(", ")}, so it waits for approval.`,
-                );
+                const why = [
+                  ...(r.scripts.length ? [`adds or changes ${r.scripts.join(", ")}`] : []),
+                  ...(r.edited ? ["would replace what agents changed in it"] : []),
+                ].join(" and ");
+                lines.push(`${row.name}: the update ${why}, so it waits for approval.`);
               } else {
                 lines.push(`${row.name}: updated to v${r.skill.version}.`);
                 if (ctx.runId) {

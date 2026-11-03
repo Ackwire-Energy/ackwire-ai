@@ -6808,6 +6808,8 @@
     "pending": {
       "title": "La actualización de su enlace cambia archivos que se ejecutan: {{files}}",
       "lead": "Aplícala solo si confías en estos archivos. Los agentes los ejecutan en sus computadoras.",
+      "edited": "La actualización desde su enlace reemplazaría lo que los agentes cambiaron en ella",
+      "editedLead": "Aplícala para quedarte con la versión del enlace. Puedes deshacerla después.",
       "apply": "Aplicar actualización",
       "dismiss": "No aplicar",
       "applied": "{{name}} actualizada desde su enlace.",
@@ -6825,6 +6827,7 @@
     "notice": {
       "updated": "{{name}} se actualizó desde su enlace",
       "waiting": "Una actualización de {{name}} cambia sus scripts",
+      "waitingEdited": "Una actualización de {{name}} reemplazaría lo que los agentes cambiaron",
       "failed": "{{name}} no se pudo actualizar desde su enlace",
       "edited": "Los agentes mejoraron {{name}}"
     },

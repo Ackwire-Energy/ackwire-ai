@@ -6631,6 +6631,8 @@
     "pending": {
       "title": "De update vanaf de link wijzigt bestanden die worden uitgevoerd: {{files}}",
       "lead": "Pas het alleen toe als je deze bestanden vertrouwt. Agents voeren ze uit op hun computers.",
+      "edited": "De update via de link zou vervangen wat agents eraan hebben veranderd",
+      "editedLead": "Pas hem toe om de versie van de link te nemen. Je kunt het daarna ongedaan maken.",
       "apply": "Update toepassen",
       "dismiss": "Niet toepassen",
       "applied": "{{name}} bijgewerkt vanaf de link.",
@@ -6648,6 +6650,7 @@
     "notice": {
       "updated": "{{name}} is bijgewerkt vanaf de link",
       "waiting": "Een update van {{name}} wijzigt de scripts",
+      "waitingEdited": "Een update van {{name}} zou vervangen wat agents hebben veranderd",
       "failed": "{{name}} kon niet bijwerken vanaf de link",
       "edited": "Agents hebben {{name}} verbeterd"
     },

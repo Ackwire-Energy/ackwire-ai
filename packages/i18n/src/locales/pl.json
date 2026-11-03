@@ -7070,6 +7070,8 @@
     "pending": {
       "title": "Aktualizacja z linku zmienia uruchamiane pliki: {{files}}",
       "lead": "Zastosuj ją tylko wtedy, gdy ufasz tym plikom. Agenci uruchamiają je na swoich komputerach.",
+      "edited": "Aktualizacja z linku zastąpiłaby to, co agenci w niej zmienili",
+      "editedLead": "Zastosuj ją, aby przyjąć wersję z linku. Możesz to potem cofnąć.",
       "apply": "Zastosuj aktualizację",
       "dismiss": "Nie stosuj",
       "applied": "{{name}}: zaktualizowano z linku.",
@@ -7087,6 +7089,7 @@
     "notice": {
       "updated": "{{name}}: zaktualizowano z linku",
       "waiting": "Aktualizacja {{name}} zmienia jej skrypty",
+      "waitingEdited": "Aktualizacja {{name}} zastąpiłaby to, co zmienili agenci",
       "failed": "{{name}}: nie udało się zaktualizować z linku",
       "edited": "Agenci ulepszyli {{name}}"
     },

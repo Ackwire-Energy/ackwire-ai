@@ -1,5 +1,5 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, inArray, isNull, lt, or, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, gt, inArray, isNull, lt, or, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAgentActions } from "../agent-actions";
 import { runCalls } from "../continuation";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
@@ -12,6 +12,7 @@ import {
   agentSkillByName,
   agentsImproveSkill,
   classifyFile,
+  cleanSkillPath,
   pinBlobs,
   requireAgentSkillChange,
   runsCode,
@@ -61,6 +62,48 @@ export interface SkillChange {
   why?: "outside" | "person" | "locked";
 }
 
+/**
+ * How often agents may change one skill: changes applied in one run and in a day (all agents), and its changes
+ * waiting as proposals. Past them the change is refused, so a loop of fixes can't churn a skill or its reviewers.
+ */
+export const SKILL_CHANGE_LIMITS = { perRun: 3, perDay: 20, waiting: 10 };
+
+async function assertSkillChangeRoom(db: Database, ctx: RunCtx, skillId: string) {
+  const [applied] = await db
+    .select({
+      run: sql<number>`count(*) filter (where ${agentActions.runId} = ${ctx.runId})::int`,
+      day: sql<number>`count(*)::int`,
+    })
+    .from(agentActions)
+    .where(
+      and(
+        eq(agentActions.orgId, ctx.orgId),
+        eq(agentActions.kind, "skill.updated"),
+        eq(agentActions.targetId, skillId),
+        gt(agentActions.createdAt, new Date(Date.now() - 24 * 3600_000)),
+      ),
+    );
+  const [waiting] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.contextProposals)
+    .where(
+      and(
+        eq(schema.contextProposals.orgId, ctx.orgId),
+        eq(schema.contextProposals.target, "skill"),
+        eq(schema.contextProposals.status, "pending"),
+        sql`${schema.contextProposals.access}->0->>'id' = ${skillId}`,
+      ),
+    );
+  if ((applied?.run ?? 0) >= SKILL_CHANGE_LIMITS.perRun)
+    throw new ValidationError(
+      `This skill already changed ${SKILL_CHANGE_LIMITS.perRun} times in this turn: put everything in one last change next time.`,
+    );
+  if ((applied?.day ?? 0) >= SKILL_CHANGE_LIMITS.perDay)
+    throw new ValidationError("This skill changed too many times today: leave it as it is until tomorrow.");
+  if ((waiting?.n ?? 0) >= SKILL_CHANGE_LIMITS.waiting)
+    throw new ValidationError("Too many changes to this skill already wait for a person: leave it until they decide.");
+}
+
 const snapshotOf = (s: SkillRow) => ({
   version: s.version,
   body: s.body,
@@ -78,7 +121,11 @@ async function readsInRun(ctx: RunCtx & { db: Database }, name: string) {
       .toLowerCase() === name;
   return {
     loaded: calls.some((c) => c.name === "load_skill" && named(c)),
-    read: new Set(calls.filter((c) => c.name === "read_skill_file" && named(c)).map((c) => String(of(c)?.path ?? ""))),
+    read: new Set(
+      calls
+        .filter((c) => c.name === "read_skill_file" && named(c))
+        .map((c) => cleanSkillPath(String(of(c)?.path ?? "").trim())),
+    ),
   };
 }
 
@@ -102,7 +149,7 @@ export async function changeSkillAsAgent(
 ): Promise<SkillChange> {
   const name = slug.trim().toLowerCase();
   const { body: rawBody, files = [] } = typeof change === "string" ? { body: change } : change;
-  const edits = files.map((e) => ({ ...e, path: e.path.trim().replace(/^\.?\/+/, "") }));
+  const edits = files.map((e) => ({ ...e, path: cleanSkillPath(e.path.trim()) }));
   const text = rawBody?.trim();
   if (text === "" || (text === undefined && edits.length === 0))
     throw new ValidationError("Give the skill's new body or the files to change.");
@@ -152,6 +199,7 @@ export async function changeSkillAsAgent(
   const bodyChanged = text !== undefined && text !== skill.body;
   if (!bodyChanged && textFiles.length === 0 && scripts.length === 0)
     return { action: "unchanged", proposalIds: [], scripts: [] };
+  await assertSkillChangeRoom(ctx.db, ctx, skill.id);
 
   const why =
     trust === "low"
@@ -192,7 +240,10 @@ export async function changeSkillAsAgent(
       ]);
       const [marked] = await db
         .update(skills)
-        .set({ lastUpdate: { from: before, version: row.version, at: new Date().toISOString(), agentId: ctx.agentId } })
+        .set({
+          lastUpdate: { from: before, version: row.version, at: new Date().toISOString(), agentId: ctx.agentId },
+          editedSinceSource: true,
+        })
         .where(eq(skills.id, skill.id))
         .returning();
       return marked ?? row;
