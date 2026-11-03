@@ -405,11 +405,9 @@ describe("the invite dialog", () => {
     await settle(6);
     await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
-    await click(
-      within(screen().getByRole("dialog", { name: "#eng" })).getByRole("button", {
-        name: "Adicionar pessoa ou agente",
-      }),
-    );
+    const details = screen().getByRole("dialog", { name: "#eng" });
+    await click(within(details).getByRole("button", { name: "Membros" }));
+    await click(within(details).getByRole("button", { name: "Adicionar pessoa ou agente" }));
     const add = screen().getByRole("dialog", { name: "Adicionar a #eng" });
     expect(add.textContent).not.toContain("Ninguém");
     expect(add.textContent).not.toContain("“”");
@@ -419,7 +417,12 @@ describe("the invite dialog", () => {
     await click(within(add).getByRole("button", { name: "Convidar pessoas" }));
     await settle(2);
     expect(screen().queryByRole("dialog", { name: "Adicionar a #eng" })).toBeNull();
-    expect(dialog().querySelector(".invite-more__sum")?.textContent).toBe("· #eng");
+    // The invite dialog opens for that channel: it comes checked on the channels step.
+    await type(within(dialog()).getByLabelText("E-mails"), "nova@estudio.com");
+    await press("Continuar");
+    await press("Continuar");
+    await settle(4);
+    expect(box("#eng").getAttribute("aria-checked")).toBe("true");
   });
 });
 
