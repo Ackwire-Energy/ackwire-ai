@@ -278,6 +278,60 @@ describe("Issue detail", () => {
     expect(aside.textContent).toContain("agendamento");
   });
 
+  test("title, description and criteria are edited where they are; leaving the field saves (Salvo)", async () => {
+    const { api } = await go("issues/131");
+    await click(screen().getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }));
+    const title = screen().getByRole("textbox", { name: "Título" });
+    await type(title, "Confirmação por WhatsApp e SMS");
+    await act(async () => fireEvent.blur(title));
+    await settle(4);
+    expect((await api.issues.get(ORG_ID, 131)).title).toBe("Confirmação por WhatsApp e SMS");
+    expect(screen().getByRole("heading", { level: 1, name: "Confirmação por WhatsApp e SMS" })).toBeTruthy();
+    expect(screen().getByText("Salvo")).toBeTruthy();
+
+    await click(screen().getByRole("button", { name: "Editar a descrição" }));
+    const description = screen().getByRole("textbox", { name: "Descrição" });
+    await type(description, "Mandar a confirmação 24 h antes da consulta.");
+    await act(async () => fireEvent.blur(description));
+    await settle(4);
+    expect((await api.issues.get(ORG_ID, 131)).description).toBe("Mandar a confirmação 24 h antes da consulta.");
+
+    const criteria = () => screen().getByRole("region", { name: "Critérios de aceite" });
+    await click(
+      within(criteria()).getByRole("button", { name: 'Editar o critério "Paciente sem WhatsApp recebe SMS"' }),
+    );
+    const row = within(criteria()).getByRole("textbox", { name: "Critérios de aceite" });
+    await type(row, "Paciente sem WhatsApp recebe um SMS");
+    await act(async () => fireEvent.blur(row));
+    await settle(4);
+    const add = within(criteria()).getByRole("textbox", { name: "Adicionar critério" });
+    await type(add, "Funciona no fim de semana");
+    await key(add, "Enter");
+    await settle(4);
+    const saved = await api.issues.get(ORG_ID, 131);
+    expect(saved.criteria).toHaveLength(5);
+    expect(saved.criteria.map((c) => c.text)).toContain("Paciente sem WhatsApp recebe um SMS");
+    expect(saved.criteria.at(-1)?.text).toBe("Funciona no fim de semana");
+    expect(criteria().textContent).toContain("0 de 5");
+  });
+
+  test("in the dialog: the task's page at full height; Esc in the title being edited saves it and stays", async () => {
+    const { api } = await go("issues?open=131");
+    const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
+    expect(dialog.className).toContain("ac-details--fill");
+    expect(
+      within(dialog).getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }),
+    ).toBeTruthy();
+    expect(within(dialog).getByText(/^Criada por João/)).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Editar o título" }));
+    const title = within(dialog).getByRole("textbox", { name: "Título" });
+    await type(title, "Confirmação por WhatsApp");
+    await act(async () => fireEvent.keyDown(title, { key: "Escape" }));
+    await settle(4);
+    expect(screen().getByRole("dialog")).toBeTruthy();
+    expect((await api.issues.get(ORG_ID, 131)).title).toBe("Confirmação por WhatsApp");
+  });
+
   test("Pedir à Ada: assigns the agent, moves to Em andamento and logs it", async () => {
     await go("issues/131");
     const ask = screen().getByRole("region", { name: "Pedir a um agente" });

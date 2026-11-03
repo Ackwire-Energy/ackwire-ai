@@ -4402,6 +4402,13 @@
     "criteria": "受け入れ条件",
     "criteriaCount": "{{done}}/{{total}}",
     "noCriteria": "受け入れ条件はまだありません。",
+    "edit": {
+      "title": "タイトルを編集",
+      "description": "説明を編集",
+      "criterion": "条件「{{text}}」を編集",
+      "criterionShort": "条件を編集",
+      "hint": "フィールドを離れるか Esc を押すと保存されます。"
+    },
     "askTitle": "このタスクを{{name}}に頼む",
     "askText": "{{name}}は必要な情報を読み、ここに計画をコメントしてから実行します。公開など重要な操作は、あなたの承認を求めます。",
     "askText_female": "{{name}}は必要な情報を読み、ここに計画をコメントしてから実行します。公開など重要な操作は、あなたの承認を求めます。",
@@ -4454,6 +4461,7 @@
       "created": "タスクを作成しました",
       "renamed": "タスクの名前を変更しました",
       "description_changed": "説明を編集しました",
+      "criteria_changed": "受け入れ条件を編集しました",
       "status_changed": "ステータスを{{status}}に変更しました",
       "priority_changed": "優先度を{{priority}}に変更しました",
       "assigned": "タスクを割り当てました",

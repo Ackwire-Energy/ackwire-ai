@@ -4704,6 +4704,13 @@
     "criteria": "Criterios de aceptación",
     "criteriaCount": "{{done}} de {{total}}",
     "noCriteria": "Todavía no hay criterios de aceptación.",
+    "edit": {
+      "title": "Editar el título",
+      "description": "Editar la descripción",
+      "criterion": "Editar el criterio \"{{text}}\"",
+      "criterionShort": "Editar el criterio",
+      "hint": "Se guarda cuando sales del campo o pulsas Esc."
+    },
     "askTitle": "Pídele a {{name}} que haga esta tarea",
     "askTitle_female": "Pídele a {{name}} que haga esta tarea",
     "askText": "{{name}} lee lo que necesita, comenta el plan aquí y lo hace. Todo lo sensible, como publicar, pide tu aprobación.",
@@ -4759,6 +4766,7 @@
       "created": "creó la tarea",
       "renamed": "renombró la tarea",
       "description_changed": "editó la descripción",
+      "criteria_changed": "editó los criterios de aceptación",
       "status_changed": "cambió el estado a {{status}}",
       "priority_changed": "cambió la prioridad a {{priority}}",
       "assigned": "asignó la tarea",

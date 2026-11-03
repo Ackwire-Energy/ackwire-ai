@@ -4436,6 +4436,13 @@
     "criteria": "Kriteria penerimaan",
     "criteriaCount": "{{done}} dari {{total}}",
     "noCriteria": "Belum ada kriteria penerimaan.",
+    "edit": {
+      "title": "Edit judul",
+      "description": "Edit deskripsi",
+      "criterion": "Edit kriteria \"{{text}}\"",
+      "criterionShort": "Edit kriteria",
+      "hint": "Tersimpan saat kamu keluar dari kolom atau menekan Esc."
+    },
     "askTitle": "Minta {{name}} mengerjakan tugas ini",
     "askTitle_female": "Minta {{name}} mengerjakan tugas ini",
     "askText": "{{name}} membaca apa yang dibutuhkannya, menulis rencananya di sini, lalu mengerjakannya. Apa pun yang sensitif, seperti publikasi, akan meminta persetujuanmu.",
@@ -4491,6 +4498,7 @@
       "created": "membuat tugas",
       "renamed": "mengganti nama tugas",
       "description_changed": "mengedit deskripsi",
+      "criteria_changed": "mengedit kriteria penerimaan",
       "status_changed": "mengubah status menjadi {{status}}",
       "priority_changed": "mengubah prioritas menjadi {{priority}}",
       "assigned": "menugaskan tugas",
