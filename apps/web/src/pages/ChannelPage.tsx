@@ -1051,6 +1051,8 @@ function ChannelView({
   const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
+  // Where the last glide down was headed (its end then): the end moving past it is what the glide missed.
+  const glideEnd = useRef(0);
   // The last wheel/touch/key/pointer on the list: scroll events without one are layout, not the person.
   const lastGesture = useRef(0);
   const markGesture = () => {
@@ -1198,6 +1200,7 @@ function ChannelView({
     }
     if (smooth && !reducedMotionRef.current && typeof el.scrollTo === "function") {
       autoScrollUntil.current = Date.now() + 600;
+      glideEnd.current = el.scrollHeight - el.clientHeight;
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     } else el.scrollTop = el.scrollHeight;
     clearUnseen();
@@ -1214,6 +1217,8 @@ function ChannelView({
     // What grew during a glide down (the activity bar opening as the message goes out, the first words) is
     // followed once the glide ends: the glide stops at the end it was given. It glides on to the new end, never
     // jumps there; what grows during that second glide (words streaming in) is caught up at once after it.
+    // Only when the end did move: new rows report their first size during every glide, and a second glide for
+    // nothing would hold what grows in its 600ms (the first words of a reply) for one jump at its end.
     let later: ReturnType<typeof setTimeout> | undefined;
     // When the glide this observer started itself ends.
     let ownGlide = 0;
@@ -1222,7 +1227,11 @@ function ChannelView({
       const wait = autoScrollUntil.current - Date.now();
       clearTimeout(later);
       if (wait > 0) later = setTimeout(() => pin(true), wait);
-      else if (afterGlide && autoScrollUntil.current !== ownGlide) {
+      else if (
+        afterGlide &&
+        autoScrollUntil.current !== ownGlide &&
+        el.scrollHeight - el.clientHeight > glideEnd.current + 1
+      ) {
         followRef.current(true);
         ownGlide = autoScrollUntil.current;
       } else followRef.current();
@@ -1253,6 +1262,7 @@ function ChannelView({
     if (el) {
       if (smooth && !reducedMotion && typeof el.scrollTo === "function") {
         autoScrollUntil.current = Date.now() + 600;
+        glideEnd.current = el.scrollHeight - el.clientHeight;
         el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
       } else el.scrollTop = el.scrollHeight;
     }
