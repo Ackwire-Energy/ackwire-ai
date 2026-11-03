@@ -193,38 +193,63 @@ export function createSkillToolSource(
     {
       name: "update_skill",
       description:
-        "Fix one of your skills you loaded in this turn when it was wrong or missing a step: the full new body (Markdown, steps first, then pitfalls). Your own skills change at once (with Undo); a skill a person made becomes a proposal they accept. Never credentials.",
+        "Fix a skill you loaded this turn: `body` its new body, `files` whole text files to change or add (read them first). Files that run wait for a person. No credentials.",
       scope: "skills:read",
       inputSchema: {
         type: "object",
         properties: {
           name: { type: "string", minLength: 1, maxLength: 64 },
-          body: { type: "string", minLength: 10, maxLength: 50_000 },
+          body: { type: "string", maxLength: 50_000 },
+          files: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                path: { type: "string", minLength: 1, maxLength: 300 },
+                content: { type: "string", maxLength: 200_000 },
+              },
+              required: ["path", "content"],
+              additionalProperties: false,
+            },
+          },
         },
-        required: ["name", "body"],
+        required: ["name"],
         additionalProperties: false,
       },
       describe: (input) => ({ title: `Fix the skill ${str(input.name)}` }),
       async execute(input, ctx) {
         try {
+          const files = Array.isArray(input.files)
+            ? (input.files as { path?: unknown; content?: unknown }[]).map((f) => ({
+                path: str(f.path),
+                content: str(f.content),
+              }))
+            : [];
+          if (files.length > 10) return { content: "At most 10 files at a time.", isError: true };
           const change = await changeSkillAsAgent(
-            { db: ctx.db, pubsub: deps.pubsub, judge: deps.judge },
+            { db: ctx.db, pubsub: deps.pubsub, judge: deps.judge, blobs: deps.blobs },
             ctx,
             str(input.name),
-            str(input.body),
+            { body: typeof input.body === "string" ? input.body : undefined, files },
             (await learnTrust(ctx)).trust,
           );
+          const waits = change.scripts.length
+            ? ` ${change.scripts.join(", ")} run${change.scripts.length === 1 ? "s" : ""} as code, so that change waits for a person who manages agents (a proposal).`
+            : "";
           if (change.action === "updated")
-            return { content: `Updated ${change.skill.name} (v${change.skill.version}).` };
-          if (change.action === "proposed" && change.outside)
-            return {
-              content: `This turn read outside content (the web, mail or a connected app), so the fix is proposal ${change.proposalId}: someone who manages agents accepts it. Use your fix in this turn.`,
-            };
-          if (change.action === "proposed")
-            return {
-              content: `A person made this skill, so the fix is proposal ${change.proposalId}: someone who manages agents accepts it. Use your fix in this turn.`,
-            };
-          return { content: "Nothing changed: the body is the same." };
+            return { content: `Updated ${change.skill?.name} (v${change.skill?.version}).${waits}` };
+          if (change.action === "unchanged") return { content: "Nothing changed: it is the same." };
+          const why =
+            change.why === "outside"
+              ? "This turn read outside content (the web, mail or a connected app), so the change is a proposal"
+              : change.why === "person"
+                ? "Agents don't change this skill by themselves here, so the change is a proposal"
+                : change.why === "locked"
+                  ? "A person locked this skill, so the change is a proposal"
+                  : "The change is a proposal";
+          return {
+            content: `${why} (${change.proposalIds.join(", ")}): someone who manages agents accepts it.${waits} Use your fix in this turn.`,
+          };
         } catch (error) {
           return failed(error);
         }

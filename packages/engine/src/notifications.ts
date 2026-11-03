@@ -147,7 +147,8 @@ export const NOTIFICATION_KINDS = [
    * An update of a skill from its link (`skill-updates.ts`), `source.skillId` and its name in `source.label`;
    * `latest.statusTo`: `updated` (who turned "Atualizar sozinha" on), `waiting` (it changes what runs: who manages
    * skills, waiting, the files in `latest.title`, resolved once applied or refused) or `failed` (once per reason, its
-   * code in `latest.reason`). Inbox only.
+   * code in `latest.reason`) or `edited` (an agent changed a skill a person made: its author, the agents as actors,
+   * one row while unread). Inbox only.
    */
   "skill_update",
 ] as const;
@@ -291,6 +292,9 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   // One per approval card: requests joining it update it, read or not (`notifyApproval`).
   "approval",
   "app_created",
+  // An agent's changes to a skill gather in one row while unread (`notifySkillUpdate` `edited`); its other notices
+  // have a key of their own each.
+  "skill_update",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];

@@ -389,6 +389,8 @@ export const RARE_TOOLS: ReadonlySet<string> = new Set([
   "add_agent_to_channel",
   "update_thread",
   "cancel_follow_up",
+  "offer_install_skill",
+  "update_skill_from_source",
 ]);
 const RARE_GROUP = "more";
 

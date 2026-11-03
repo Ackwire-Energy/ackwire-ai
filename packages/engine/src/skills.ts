@@ -258,8 +258,13 @@ export interface SkillView {
   pendingUpdate: { scripts: string[]; at: string; dismissed: boolean } | null;
   /** Why its last update from its link failed (a code the app translates), until one works. */
   updateError: string | null;
-  /** Its last update from its link, while it can be undone (the skill is still at the version it made). */
-  lastUpdate: { fromVersion: number; at: string } | null;
+  /**
+   * Its last update from its link, or an agent's last change to it (`agentId`), while it can be undone (the skill is
+   * still at the version it made).
+   */
+  lastUpdate: { fromVersion: number; at: string; agentId: string | null } | null;
+  /** "Agentes melhoram as skills sozinhos" set for this skill; null: the workspace's setting. */
+  agentsImprove: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -292,8 +297,9 @@ const view = (s: SkillRow): SkillView => ({
   updateError: s.updateError,
   lastUpdate:
     s.lastUpdate && s.lastUpdate.version === s.version
-      ? { fromVersion: s.lastUpdate.from.version, at: s.lastUpdate.at }
+      ? { fromVersion: s.lastUpdate.from.version, at: s.lastUpdate.at, agentId: s.lastUpdate.agentId ?? null }
       : null,
+  agentsImprove: s.agentsImprove,
   createdAt: s.createdAt.toISOString(),
   updatedAt: s.updatedAt.toISOString(),
 });
@@ -1159,6 +1165,108 @@ export async function writeSkillVersion(
     select org_id, skill_id, ${row.version}, path, size, mime, status, storage_config_id, blob_key
     from skill_files where skill_id = ${s.id}::uuid and version = ${filesOf}`);
   return row;
+}
+
+/**
+ * A new version with this body and these files changed or added (the others carried over): an agent's fix to a skill
+ * (`update_skill`) or an accepted proposal for one of its files. Refused as an upload is past the limits.
+ */
+export async function writeSkillChange(
+  deps: { db: Database; blobs?: BlobStoreResolver },
+  s: SkillRow,
+  change: { body: string; files: SkillFileInput[] },
+): Promise<SkillRow> {
+  if (change.files.length === 0) return writeSkillVersion(deps.db, s, { body: change.body });
+  if (!deps.blobs) throw new ValidationError("Skill files can't be changed on this server (no storage)");
+  const skillDeps = { db: deps.db, blobs: deps.blobs };
+  const planned = await planFiles(skillDeps, s.orgId, change.files);
+  const changed = new Set(planned.files.map((f) => f.path));
+  assertSkillSize([
+    ...(await skillFilesOf(deps.db, s)).filter((f) => !changed.has(f.path)),
+    ...planned.files.map((f) => ({ path: f.path, size: f.size })),
+  ]);
+  const row = await writeSkillVersion(deps.db, s, { body: change.body });
+  await deps.db
+    .delete(skillFiles)
+    .where(
+      and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, row.version), inArray(skillFiles.path, [...changed])),
+    );
+  await storeFiles(skillDeps, row, row.version, planned);
+  return row;
+}
+
+/**
+ * The resolver with the workspace's current storage read now, for a transaction that stores or reads skill files:
+ * the resolver's own queries run outside it, which a single-connection database (PGlite) would wait on forever.
+ */
+export async function pinBlobs(blobs: BlobStoreResolver, orgId: string): Promise<BlobStoreResolver> {
+  const location = await blobs.forOrg(orgId);
+  return {
+    forOrg: async () => location,
+    forConfig: (o, id) => (id === location.storageConfigId ? Promise.resolve(location.store) : blobs.forConfig(o, id)),
+  };
+}
+
+/** Whether agents change this person-made skill at once ("Agentes melhoram as skills sozinhos"): its own, else the workspace's. */
+export async function agentsImproveSkill(db: Database, s: Pick<SkillRow, "orgId" | "agentsImprove">) {
+  if (s.agentsImprove !== null) return s.agentsImprove;
+  const [row] = await db
+    .select({ on: schema.organizationSettings.agentsImproveSkills })
+    .from(schema.organizationSettings)
+    .where(eq(schema.organizationSettings.orgId, s.orgId));
+  return row?.on ?? true;
+}
+
+/** The workspace's "Agentes melhoram as skills sozinhos" (on by default). */
+export async function getSkillSettings(db: Database, actorId: string, orgId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  return { agentsImprove: await agentsImproveSkill(db, { orgId, agentsImprove: null }) };
+}
+
+/** Who manages agents turns "Agentes melhoram as skills sozinhos" on or off for the workspace. */
+export async function setSkillSettings(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  input: { agentsImprove: boolean },
+) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  await db
+    .insert(schema.organizationSettings)
+    .values({ orgId, agentsImproveSkills: input.agentsImprove })
+    .onConflictDoUpdate({
+      target: schema.organizationSettings.orgId,
+      set: { agentsImproveSkills: input.agentsImprove, updatedAt: new Date() },
+    });
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: input.agentsImprove ? "skills.agents_improve_on" : "skills.agents_improve_off",
+    target: { type: "organization", id: orgId },
+    details: {},
+  });
+  return { agentsImprove: input.agentsImprove };
+}
+
+/** The same for one skill (who manages agents); null follows the workspace again. */
+export async function setSkillAgentsImprove(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  id: string,
+  on: boolean | null,
+) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const s = await loadSkill(db, orgId, id);
+  const [row] = await db.update(skills).set({ agentsImprove: on }).where(eq(skills.id, s.id)).returning();
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "skill.agents_improve",
+    target: { type: "skill", id: s.id },
+    details: { name: s.name, on },
+  });
+  return skillDetail(db, row ?? s);
 }
 
 /** Who may lock or undo an agent-made skill: who manages agents, or the owner of the agent that made it. */

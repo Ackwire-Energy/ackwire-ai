@@ -1161,7 +1161,9 @@ const skillWaitingGroup = (skillId: string) => `skill_update:waiting:${skillId}:
 /**
  * An update of a skill from its link: applied (`updated`), waiting because it changes what runs (`waiting`, the files),
  * or refused (`failed`, its code). Who hears it: `to` an update, who manages skills a waiting one, both a refusal
- * (`to` may have lost the right or left the workspace, which only who manages skills can fix).
+ * (`to` may have lost the right or left the workspace, which only who manages skills can fix). `edited`: an agent
+ * changed a skill a person made ("Agentes melhoram as skills sozinhos"), told to `to` (its author) in one row per
+ * skill that gathers the agents' changes while unread.
  */
 export async function notifySkillUpdate(
   deps: NotificationDeps,
@@ -1169,17 +1171,22 @@ export async function notifySkillUpdate(
   what:
     | { state: "updated"; version: number }
     | { state: "waiting"; hash: string; scripts: string[] }
-    | { state: "failed"; reason: string },
+    | { state: "failed"; reason: string }
+    | { state: "edited"; agentId: string; version: number },
   to: string | null,
 ) {
   const key =
     what.state === "waiting"
       ? `${skillWaitingGroup(skill.id)}${what.hash}`
-      : `skill_update:${what.state}:${skill.id}:${what.state === "updated" ? what.version : what.reason}:${Date.now()}`;
+      : what.state === "edited"
+        ? `skill_update:edited:${skill.id}`
+        : `skill_update:${what.state}:${skill.id}:${what.state === "updated" ? what.version : what.reason}:${Date.now()}`;
+  if (what.state === "edited" && !to) return;
   await notify(deps, {
     orgId: skill.orgId,
+    ...(what.state === "edited" ? { actor: { type: "agent" as const, id: what.agentId } } : {}),
     userIds:
-      to && what.state === "updated"
+      to && (what.state === "updated" || what.state === "edited")
         ? [to]
         : [...(await adminsOf(deps, skill.orgId, "manage_agents")), ...(to && what.state === "failed" ? [to] : [])],
     kind: "skill_update",

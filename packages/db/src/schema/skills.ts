@@ -43,6 +43,8 @@ export const skills = pgTable(
     ownerAgentId: uuid().references(() => agents.id, { onDelete: "set null" }),
     /** A person froze it: agents can't change it and decay leaves it alone. */
     locked: boolean().notNull().default(false),
+    /** "Agentes melhoram as skills sozinhos" for this skill; null: the workspace's setting. */
+    agentsImprove: boolean(),
     /** `load_skill` calls, for an agent-made skill's decay. */
     useCount: integer().notNull().default(0),
     lastUsedAt: timestamp({ withTimezone: true }),
@@ -60,11 +62,15 @@ export const skills = pgTable(
     pendingUpdate: jsonb().$type<{ hash: string; scripts: string[]; at: string; dismissed?: boolean }>(),
     /** The last refusal of an update from its link (its code), so a failure is reported once, not every day. */
     updateError: text(),
-    /** The last update from its link, to undo it: the version before (its text) and the version it made. */
+    /**
+     * The last update from its link, or an agent's last change to it (`agentId`), to undo it: the version before (its
+     * text) and the version it made.
+     */
     lastUpdate: jsonb().$type<{
       from: { version: number; body: string; description: string; metadata: Record<string, unknown> };
       version: number;
       at: string;
+      agentId?: string;
     }>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

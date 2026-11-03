@@ -202,3 +202,31 @@ test("updating from its link: text applies and is undone, a new script waits for
     autoUpdate: true,
   });
 });
+
+test("Agentes melhoram as skills sozinhos: on by default, who manages agents turns it off, a skill's own switch wins", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const member = await joinByInvitation(t, owner, orgId, "member@example.com");
+  const settings = `/api/app/organizations/${orgId}/skill-settings`;
+
+  expect(await (await member(settings)).json()).toEqual({ agentsImprove: true });
+  expect((await member(settings, { method: "PUT", json: { agentsImprove: false } })).status).toBe(403);
+  const off = await owner(settings, { method: "PUT", json: { agentsImprove: false } });
+  expect([off.status, await off.json()]).toEqual([200, { agentsImprove: false }]);
+  expect(await (await member(settings)).json()).toEqual({ agentsImprove: false });
+
+  const created = await owner(`/api/app/organizations/${orgId}/skills`, {
+    json: { name: "deploy", description: "Deploys.", body: "# deploy" },
+  });
+  const { id, agentsImprove } = (await created.json()) as { id: string; agentsImprove: boolean | null };
+  expect(agentsImprove).toBeNull();
+  const patch = (b: typeof owner, json: unknown) =>
+    b(`/api/app/organizations/${orgId}/skills/${id}`, { method: "PATCH", json });
+  expect((await patch(member, { agentsImprove: true })).status).toBe(403);
+  const on = await patch(owner, { agentsImprove: true });
+  expect(((await on.json()) as { agentsImprove: boolean; version: number }).agentsImprove).toBe(true);
+  const back = await patch(owner, { agentsImprove: null });
+  expect(await back.json()).toMatchObject({ agentsImprove: null, version: 1 });
+});

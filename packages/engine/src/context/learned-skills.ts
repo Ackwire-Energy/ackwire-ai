@@ -1,18 +1,27 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, isNull, lt, or, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAgentActions } from "../agent-actions";
 import { runCalls } from "../continuation";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import type { Judge } from "../judge";
+import { notifySkillUpdate } from "../notification-producers";
 import { requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
+import { restoreSkillSnapshot, type SkillSnapshot } from "../skill-updates";
 import {
   agentSkillByName,
+  agentsImproveSkill,
+  classifyFile,
+  pinBlobs,
   requireAgentSkillChange,
+  runsCode,
   SKILL_NAME,
   type SkillRow,
+  skillFilesOf,
+  skillFolderFiles,
   validateSkill,
   writeSkillBody,
+  writeSkillChange,
 } from "../skills";
 import type { ToolContext } from "../tools/types";
 import {
@@ -32,74 +41,182 @@ const { skills, agentSkills, contextItems, contextUsage, outcomes, agentRuns, ag
 /** A run's context for receipts: the run, where it ran and what started it. */
 type RunCtx = Pick<ToolContext, "orgId" | "agentId" | "runId" | "channelId" | "triggerMessageId">;
 
-export type SkillChange =
-  | { action: "updated"; skill: SkillRow }
-  /** `outside`: its own skill, but the run read outside content, so a person decides. */
-  | { action: "proposed"; proposalId: string; outside?: true }
-  | { action: "unchanged" };
+/** A text file of a skill an agent writes whole (`update_skill`): its path in the skill's folder and its new text. */
+export interface SkillFileEdit {
+  path: string;
+  content: string;
+}
 
 /**
- * An agent changes a skill it loaded in this run (ADR 0120): its own agent-made, unlocked skill gets a new version
- * with a `skill.updated` receipt (Undo); a skill a person made or installed gets a proposal a person accepts.
- * Read before write: only a skill this run loaded with `load_skill`. Credentials and permission rules never go in.
- * `trust` is the run's (`learnTrust`): after outside content (the web, mail, a connected app) even its own skill only
- * gets a proposal, since skills load as trusted instructions and can be shared with other agents.
+ * What became of an agent's change to a skill: applied as a new version (`updated`), all of it waiting as proposals
+ * (`proposed`), or the same as it is (`unchanged`). `proposalIds` are the parts that wait, `scripts` the files among
+ * them that run (always a person's call). `why` the rest waits: the run read outside content, a person made the skill
+ * and agents don't change it there, or it is locked.
+ */
+export interface SkillChange {
+  action: "updated" | "proposed" | "unchanged";
+  skill?: SkillRow;
+  proposalIds: string[];
+  scripts: string[];
+  why?: "outside" | "person" | "locked";
+}
+
+const snapshotOf = (s: SkillRow) => ({
+  version: s.version,
+  body: s.body,
+  description: s.description,
+  metadata: s.metadata,
+});
+
+/** The calls of this run that read the skill (`load_skill`) or one of its files (`read_skill_file`). */
+async function readsInRun(ctx: RunCtx & { db: Database }, name: string) {
+  const calls = (await runCalls(ctx.db, { id: ctx.runId, orgId: ctx.orgId })).filter((c) => !c.result?.isError);
+  const of = (c: { input: unknown }) => c.input as { name?: unknown; path?: unknown } | null;
+  const named = (c: { input: unknown }) =>
+    String(of(c)?.name ?? "")
+      .trim()
+      .toLowerCase() === name;
+  return {
+    loaded: calls.some((c) => c.name === "load_skill" && named(c)),
+    read: new Set(calls.filter((c) => c.name === "read_skill_file" && named(c)).map((c) => String(of(c)?.path ?? ""))),
+  };
+}
+
+/**
+ * An agent changes a skill it loaded in this run (ADR 0120): its body and its text files (references, templates,
+ * data), each existing file read first with `read_skill_file`. Read before write: only a skill this run loaded with
+ * `load_skill`. Credentials and permission rules never go in.
+ * Applied at once as a new version, with a `skill.updated` receipt (Desfazer): its own agent-made, unlocked skill,
+ * and a skill a person made while "Agentes melhoram as skills sozinhos" is on for it (`agentsImproveSkill`), its
+ * author told. Otherwise each part becomes a proposal a person who manages agents accepts. A file that runs (a
+ * script, an executable: `runsCode`) is always a proposal, whatever the setting.
+ * `trust` is the run's (`learnTrust`): after outside content (the web, mail, a connected app) nothing applies at
+ * once, since skills load as trusted instructions and can be shared with other agents.
  */
 export async function changeSkillAsAgent(
-  deps: { db: Database; pubsub?: PubSub; judge?: Judge },
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge; blobs?: BlobStoreResolver },
   ctx: RunCtx & { db: Database },
   slug: string,
-  body: string,
+  change: string | { body?: string; files?: SkillFileEdit[] },
   trust: "high" | "low",
 ): Promise<SkillChange> {
   const name = slug.trim().toLowerCase();
-  const text = body.trim();
-  if (!text) throw new ValidationError("The skill's new body is empty.");
-  if (looksLikeSecret(text)) throw new ValidationError("This looks like a credential, so it can't go in a skill.");
-  const loaded = (await runCalls(ctx.db, { id: ctx.runId, orgId: ctx.orgId })).some(
-    (c) =>
-      c.name === "load_skill" &&
-      !c.result?.isError &&
-      String((c.input as { name?: unknown } | null)?.name ?? "")
-        .trim()
-        .toLowerCase() === name,
-  );
-  if (!loaded) throw new ValidationError(`Load the skill ${name} with load_skill first, then change it.`);
+  const { body: rawBody, files = [] } = typeof change === "string" ? { body: change } : change;
+  const edits = files.map((e) => ({ ...e, path: e.path.trim().replace(/^\.?\/+/, "") }));
+  const text = rawBody?.trim();
+  if (text === "" || (text === undefined && edits.length === 0))
+    throw new ValidationError("Give the skill's new body or the files to change.");
+  for (const t of [text ?? "", ...edits.map((e) => e.content)])
+    if (looksLikeSecret(t)) throw new ValidationError("This looks like a credential, so it can't go in a skill.");
+  const reads = await readsInRun(ctx, name);
+  if (!reads.loaded) throw new ValidationError(`Load the skill ${name} with load_skill first, then change it.`);
   const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, name);
   if (!skill) throw new NotFoundError(`No skill named ${name} is enabled for you.`);
-  if (await changesPermissions(deps.judge, ctx.orgId, text))
-    throw new ValidationError("A skill can't change permissions or approvals.");
   const own = skill.origin === "agent";
   if (own) {
     if (skill.ownerAgentId !== ctx.agentId) throw new ForbiddenError("That skill belongs to another agent.");
     if (skill.locked) throw new ForbiddenError("A person locked this skill, so it can't be changed.");
-    if (skill.body === text) return { action: "unchanged" };
   }
-  if (own && trust === "high") {
-    const next = await ctx.db.transaction(async (tx) => {
+  const existing = new Map((await skillFilesOf(ctx.db, skill)).map((f) => [f.path, f]));
+  const kept =
+    edits.length > 0 && deps.blobs
+      ? new Map(
+          (
+            await skillFolderFiles(
+              { db: ctx.db, blobs: deps.blobs },
+              skill,
+              edits.map((e) => e.path),
+            )
+          ).map((f) => [f.path, new TextDecoder().decode(f.data)]),
+        )
+      : new Map<string, string>();
+  const textFiles: SkillFileEdit[] = [];
+  const scripts: SkillFileEdit[] = [];
+  for (const e of edits) {
+    const { path } = e;
+    if (!path || path.split("/").some((p) => p === ".." || p === "" || p.startsWith(".")) || /^skill\.md$/i.test(path))
+      throw new ValidationError(`Invalid file path ${e.path}: a file in the skill's folder (the body is \`body\`).`);
+    const runs = runsCode(path);
+    if (!runs && classifyFile(path).kind !== "text")
+      throw new ValidationError(`${path} isn't a text file: only text files of a skill can be written.`);
+    const was = existing.get(path);
+    if (was && !runs && !reads.read.has(path))
+      throw new ValidationError(`Read ${path} with read_skill_file first, then change it.`);
+    if (was && was.status === "ignored") throw new ValidationError(`${path} wasn't kept, so it can't be changed.`);
+    if (kept.get(path) === e.content) continue;
+    (runs ? scripts : textFiles).push({ path, content: e.content });
+  }
+  for (const t of [text ?? "", ...textFiles.map((f) => f.content)])
+    if (await changesPermissions(deps.judge, ctx.orgId, t))
+      throw new ValidationError("A skill can't change permissions or approvals.");
+  const bodyChanged = text !== undefined && text !== skill.body;
+  if (!bodyChanged && textFiles.length === 0 && scripts.length === 0)
+    return { action: "unchanged", proposalIds: [], scripts: [] };
+
+  const why =
+    trust === "low"
+      ? "outside"
+      : own
+        ? undefined
+        : skill.locked
+          ? "locked"
+          : (await agentsImproveSkill(ctx.db, skill))
+            ? undefined
+            : "person";
+  const proposalIds: string[] = [];
+  const propose = async (body: string, file?: { path: string; text: string }) => {
+    const p = await proposeSkillChange(
+      { db: ctx.db, pubsub: deps.pubsub },
+      { orgId: ctx.orgId, agentId: ctx.agentId, skill, body, file },
+    );
+    if (p) proposalIds.push(p.id);
+  };
+  let next: SkillRow | undefined;
+  if (!why && (bodyChanged || textFiles.length > 0)) {
+    const blobs = deps.blobs && textFiles.length > 0 ? await pinBlobs(deps.blobs, ctx.orgId) : deps.blobs;
+    next = await ctx.db.transaction(async (tx) => {
       const db = tx as unknown as Database;
-      const row = await writeSkillBody(db, skill, text);
+      const row = await writeSkillChange({ db, blobs }, skill, {
+        body: bodyChanged ? (text as string) : skill.body,
+        files: textFiles.map((f) => ({ path: f.path, data: new TextEncoder().encode(f.content) })),
+      });
+      const before = snapshotOf(skill);
       await recordAgentActions(db, ctx, [
         {
           kind: "skill.updated",
           target: { type: "skill", id: skill.id, title: skill.name },
-          params: { name: skill.name },
-          before: { body: skill.body },
-          after: { body: text },
+          params: { name: skill.name, ...(textFiles.length ? { files: textFiles.map((f) => f.path) } : {}) },
+          before,
+          after: snapshotOf(row),
         },
       ]);
-      return row;
+      const [marked] = await db
+        .update(skills)
+        .set({ lastUpdate: { from: before, version: row.version, at: new Date().toISOString(), agentId: ctx.agentId } })
+        .where(eq(skills.id, skill.id))
+        .returning();
+      return marked ?? row;
     });
-    return { action: "updated", skill: next };
+    if (!own && deps.pubsub)
+      await notifySkillUpdate(
+        { db: ctx.db, pubsub: deps.pubsub },
+        skill,
+        { state: "edited", agentId: ctx.agentId, version: next.version },
+        skill.createdByUserId,
+      ).catch(() => {});
+  } else {
+    if (bodyChanged) await propose(text as string);
+    for (const f of textFiles) await propose(f.content, { path: f.path, text: kept.get(f.path) ?? "" });
   }
-  const proposal = await proposeSkillChange(
-    { db: ctx.db, pubsub: deps.pubsub },
-    { orgId: ctx.orgId, agentId: ctx.agentId, skill, body: text },
-  );
-  if (!proposal) return { action: "unchanged" };
-  return own
-    ? { action: "proposed", proposalId: proposal.id, outside: true }
-    : { action: "proposed", proposalId: proposal.id };
+  for (const f of scripts) await propose(f.content, { path: f.path, text: kept.get(f.path) ?? "" });
+  if (next) return { action: "updated", skill: next, proposalIds, scripts: scripts.map((f) => f.path) };
+  if (proposalIds.length === 0) return { action: "unchanged", proposalIds, scripts: [] };
+  return {
+    action: "proposed",
+    proposalIds,
+    scripts: scripts.map((f) => f.path),
+    ...(why ? { why } : {}),
+  };
 }
 
 /**
@@ -131,8 +248,10 @@ export async function revertSkillChange(db: Database, actorId: string, orgId: st
   const after = (last?.after as { body?: unknown } | null)?.body;
   if (!last || typeof before !== "string" || after !== skill.body)
     throw new ValidationError("There is no change of its own to undo.", "skill.nothing_to_undo");
+  const snapshot = last.before as SkillSnapshot;
   await db.transaction(async (tx) => {
-    await writeSkillBody(tx as unknown as Database, skill, before);
+    if (typeof snapshot.version === "number") await restoreSkillSnapshot(tx as unknown as Database, skill, snapshot);
+    else await writeSkillBody(tx as unknown as Database, skill, before);
     await tx
       .update(agentActions)
       .set({ undoneAt: new Date(), undoneByUserId: actorId })
