@@ -1,4 +1,4 @@
-import { and, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
 import { type AiStatusDeps, agentAiStates, orgHasAi } from "./ai-status";
 import { seesAgentDetails } from "./audience";
 import { listChannels } from "./channels";
@@ -6,7 +6,7 @@ import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
 import { agentBudgetsThisMonth } from "./usage";
 
-const { agents, channelMembers, connectorConnections, organizationMembers, users } = schema;
+const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
 
 /** What the person behind the run may do here, as its prompt names it. */
 const POWERS: [RolePermission, string][] = [
@@ -39,7 +39,7 @@ export async function rightHandPrompt(
   const { db } = deps;
   const { orgId, agent, personId } = input;
   const membership = await getMembership(db, personId, orgId);
-  const [person, team, people, channels, budgets, apps] = await Promise.all([
+  const [person, team, people, channels, budgets, apps, workspace, computers] = await Promise.all([
     db.select({ name: users.name }).from(users).where(eq(users.id, personId)),
     db
       .select()
@@ -60,6 +60,13 @@ export async function rightHandPrompt(
       .select({ label: connectorConnections.label })
       .from(connectorConnections)
       .where(and(eq(connectorConnections.orgId, orgId), isNull(connectorConnections.revokedAt))),
+    db.select({ context: organizations.context }).from(organizations).where(eq(organizations.id, orgId)),
+    // A deleted computer keeps its row without a token.
+    db
+      .select({ id: machines.id })
+      .from(machines)
+      .where(and(eq(machines.orgId, orgId), isNotNull(machines.tokenHash)))
+      .limit(1),
   ]);
   const roleNames = membership?.roleIds.length
     ? (
@@ -130,6 +137,12 @@ export async function rightHandPrompt(
     team.length === 0 ? "There is no agent besides you: offer to create the first ones (propose_agent)." : "",
     people.length <= 1 ? "Only one person is here: offer to invite the team (offer_invites)." : "",
     apps.length === 0 ? "No app is connected: offer one the team needs (offer_connect_app)." : "",
+    !workspace[0]?.context.trim()
+      ? "The workspace has no context yet (what the company does, for whom, its house rules), which every agent reads: ask, and say it goes in Settings › Workspace."
+      : "",
+    computers.length === 0
+      ? "No computer is ready for the agents yet, so they can't browse or run code: say where it is set up (Settings › Computers)."
+      : "",
     seen.some((a) => channelsOf(a.id).length === 0)
       ? "An agent is in no channel: offer to add it to one (add_agent_to_channel)."
       : "",

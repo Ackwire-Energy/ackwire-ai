@@ -144,6 +144,35 @@ test("its prompt says what the person may do, and shows only the agents they may
   expect(member).toContain("Never ask for a key, password or token in the chat");
 });
 
+test("its setup checklist names the workspace's context and a computer until they are there", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await rightHandOf(f.org.id);
+  if (!lodi) throw new Error("no right hand");
+  const prompt = () =>
+    rightHandPrompt({ db: f.db }, { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm: true });
+  await f.db.update(schema.organizations).set({ context: "" }).where(eq(schema.organizations.id, f.org.id));
+  const bare = await prompt();
+  expect(bare).toContain("The workspace has no context yet");
+  expect(bare).toContain("No computer is ready for the agents yet");
+  await f.db
+    .update(schema.organizations)
+    .set({ context: "We sell stock software." })
+    .where(eq(schema.organizations.id, f.org.id));
+  const [machine] = await f.db
+    .insert(schema.machines)
+    .values({ orgId: f.org.id, name: "Mac", tokenHash: "hash-of-a-fake-token" })
+    .returning();
+  const set = await prompt();
+  expect(set).not.toContain("The workspace has no context yet");
+  expect(set).not.toContain("No computer is ready");
+  // A deleted computer (its token cleared) is none.
+  await f.db
+    .update(schema.machines)
+    .set({ tokenHash: null })
+    .where(eq(schema.machines.id, machine?.id ?? ""));
+  expect(await prompt()).toContain("No computer is ready for the agents yet");
+});
+
 test("nothing said to it becomes memory", async () => {
   f = await setup({ rightHand: true });
   const [lodi] = await rightHandOf(f.org.id);

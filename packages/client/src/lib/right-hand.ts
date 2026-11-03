@@ -2,3 +2,15 @@ import type { Agent } from "../api/types";
 
 /** The workspace's right hand (ADR 0134): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
+
+/** The workspace's right hand among its agents, when this person may see it. */
+export const rightHandOf = <A extends Pick<Agent, "builtin">>(agents: readonly A[]) => agents.find(isRightHand);
+
+/**
+ * Its name and look before the workspace exists (the onboarding's first question): the server's
+ * `RIGHT_HAND_DEFAULTS` (packages/engine/src/right-hand.ts).
+ */
+export const RIGHT_HAND_DEFAULT = {
+  name: "Lodi",
+  appearance: { color: "teal", eyes: "happy", accessory: "headset" },
+} as const;
