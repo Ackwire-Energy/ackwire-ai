@@ -2318,7 +2318,7 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 }
 
 /* ── Drive: pages/drive.css. The previews (the agent's Arquivos tab), the kind tag and the selection bar
- * (Threads) stay here. ── */
+ * (Threads too) stay here. ── */
 .drive {
   max-width: none;
   display: grid;
@@ -2619,16 +2619,20 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   display: none;
 }
 
-/* Selection: a glass bar that floats at the bottom of the page. */
+/* Selection: a glass bar fixed at the bottom of the work area, centered on it (SelectionBar hangs it from
+ * `.shell__work`, beside the sidebar, so it stays put however short or long the list is). */
 .drive-selbar {
-  position: sticky;
+  position: absolute;
+  left: 0;
+  right: 0;
   bottom: 20px;
   z-index: var(--z-floating);
-  align-self: center;
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: 100%;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin-inline: auto;
   padding: 6px 6px 6px 14px;
   border-radius: 16px;
   background: var(--glass);
@@ -2681,8 +2685,11 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
     display: none;
   }
   .drive-selbar {
-    align-self: stretch;
+    left: 12px;
+    right: 12px;
     bottom: 12px;
+    width: auto;
+    max-width: none;
   }
   .drive-selbar__count {
     margin-right: auto;
