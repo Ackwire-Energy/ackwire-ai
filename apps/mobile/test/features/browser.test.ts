@@ -14,6 +14,7 @@ import {
   browserGranted,
   cardStateOf,
   hostOf,
+  keyPastDraft,
   type PageGap,
   pageNoteOf,
   siteLetter,
@@ -284,6 +285,19 @@ describe("a take over held in the conversation (the card outlives the run's live
     expect(controlledBy(takeover, "u1")).toBe(true);
     expect(controlledBy(takeover, "u2")).toBe(false);
     expect(controlledBy({ ...takeover, status: "pending" }, "u1")).toBe(false);
+  });
+});
+
+describe("the phone keyboard past the typing field", () => {
+  test("Backspace on an empty draft deletes there; with a draft it only edits the draft", () => {
+    expect(keyPastDraft("", "Backspace")).toBe("Backspace");
+    expect(keyPastDraft("a", "Backspace")).toBeNull();
+  });
+
+  test("Return on an empty draft is Enter there; letters never pass", () => {
+    expect(keyPastDraft("", "Enter")).toBe("Enter");
+    expect(keyPastDraft("oi", "Enter")).toBeNull();
+    expect(keyPastDraft("", "a")).toBeNull();
   });
 });
 

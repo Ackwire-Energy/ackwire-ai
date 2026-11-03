@@ -1,6 +1,8 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "@/ui";
+import { withAlpha } from "@/ui/palette";
 import { openPage } from "../ai/parts";
 import { useColors, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
@@ -81,16 +83,29 @@ const COL_MIN = 56;
  * A table (the web's `md__table`): a quiet box with a hairline, the header on a soft band, rows split by
  * hairlines, numbers on the right in tabular figures. Each column is as wide as its widest cell as drawn (measured
  * on an unseen copy that never wraps, since a guess by letters came out narrow and broke words), up to `COL_MAX`;
- * a table wider than the message scrolls sideways inside its box.
+ * a table wider than the message scrolls sideways inside its box, its hidden side fading out at the edge.
+ * `surface`: the color under the table (the fade's), the chat's background unless said.
  */
-export function Table({ header, rows, align }: Pick<TableBlock, "header" | "rows" | "align">) {
+export function Table({
+  header,
+  rows,
+  align,
+  surface,
+}: Pick<TableBlock, "header" | "rows" | "align"> & { surface?: string }) {
   const c = useColors();
   const [drawn, setDrawn] = useState<Record<number, number>>({});
+  const [frame, setFrame] = useState(0);
+  const [x, setX] = useState(0);
   const widths = header.map((h, col) => {
     const natural = drawn[col] ?? Math.max(cellLength(h), ...rows.map((r) => cellLength(r[col] ?? []))) * 8.6 + 24;
     // A pixel more than measured: rounding never wraps a cell that fits.
     return Math.min(COL_MAX, Math.max(COL_MIN, Math.ceil(natural) + 1));
   });
+  // The content's width said outright (not left to layout), so the box always knows it has more to scroll.
+  const total = widths.reduce((sum, w) => sum + w, 0);
+  const fadeTo = surface ?? c.bg;
+  const moreLeft = x > 1;
+  const moreRight = frame > 0 && x + frame < total - 1;
   const words = (inline: Inline[], col: number, head: boolean) => (
     <Text
       variant={head ? "label" : "subhead"}
@@ -134,27 +149,54 @@ export function Table({ header, rows, align }: Pick<TableBlock, "header" | "rows
           ))}
         </ScrollView>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.table, { borderColor: c.line2 ?? c.line }]}
-      >
-        <View>
-          <View style={[styles.tr, { backgroundColor: c.plate }]}>{header.map((h, col) => cell(h, col, true))}</View>
-          {rows.map((r, j) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: the rows of one table, in order
-            <View key={j} style={[styles.tr, { borderTopColor: c.line }, styles.trLine]}>
-              {header.map((_, col) => cell(r[col] ?? [], col, false))}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+      <View style={[styles.table, { borderColor: c.line2 ?? c.line }]}>
+        <ScrollView
+          horizontal
+          directionalLockEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onLayout={(e) => setFrame(e.nativeEvent.layout.width)}
+          onScroll={(e) => setX(e.nativeEvent.contentOffset.x)}
+          contentContainerStyle={{ width: total }}
+        >
+          <View style={{ width: total }}>
+            <View style={[styles.tr, { backgroundColor: c.plate }]}>{header.map((h, col) => cell(h, col, true))}</View>
+            {rows.map((r, j) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: the rows of one table, in order
+              <View key={j} style={[styles.tr, { borderTopColor: c.line }, styles.trLine]}>
+                {header.map((_, col) => cell(r[col] ?? [], col, false))}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+        {moreLeft ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[fadeTo, withAlpha(fadeTo, 0)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.fade, styles.fadeLeft]}
+          />
+        ) : null}
+        {moreRight ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[withAlpha(fadeTo, 0), fadeTo]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.fade, styles.fadeRight]}
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  table: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+  table: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  fade: { position: "absolute", top: 0, bottom: 0, width: 28 },
+  fadeLeft: { left: 0 },
+  fadeRight: { right: 0 },
   measure: { position: "absolute", top: 0, left: 0, right: 0, opacity: 0 },
   tr: { flexDirection: "row" },
   trLine: { borderTopWidth: StyleSheet.hairlineWidth },

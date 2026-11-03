@@ -244,16 +244,16 @@
     "chatSearch": "搜索成员或智能体",
     "people": "成员",
     "nobody": "这里还没有人。",
-    "ask": {
-      "question": "你需要什么？",
-      "placeholder": "例如：周五前审阅定价页的文案",
-      "to": "给",
-      "sendF": "请 {{name}} 处理",
-      "sendM": "请 {{name}} 处理",
-      "more": "或开始新的事",
-      "person": "和成员聊天",
-      "noAgents": "想让智能体帮你做事，先创建你的智能体。"
-    },
+    "search": "成员或智能体",
+    "create": "创建",
+    "agentHint": "名称和职责",
+    "chatShort": "对话",
+    "chatHint": "一位成员或一个智能体",
+    "taskHint": "附负责人和截止日期",
+    "routineHint": "智能体按计划自行完成",
+    "wikiPage": "Wiki 页面",
+    "wikiHint": "供团队和智能体阅读",
+    "inviteHint": "通过邮箱或链接",
     "agent": {
       "question": "它要做什么？"
     }
@@ -1133,7 +1133,8 @@
       "forum": "轮到你了",
       "browser": "浏览器",
       "secret": "密钥",
-      "join": "成员"
+      "join": "成员",
+      "tools": "工具"
     },
     "review": "审阅",
     "answer": "回复",

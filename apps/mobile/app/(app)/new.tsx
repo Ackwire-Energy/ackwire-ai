@@ -1,6 +1,6 @@
-import { NewSheet } from "@/features/new/NewSheet";
+import { NewScreen } from "@/features/new/NewScreen";
 
-/** "Novo", the "+" of the tabs, as a native form sheet (presentation set in `_layout`). */
+/** "New", the "+" of the tabs, pushed over them (presentation set in `_layout`). */
 export default function NewRoute() {
-  return <NewSheet />;
+  return <NewScreen />;
 }

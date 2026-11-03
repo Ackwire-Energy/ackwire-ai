@@ -590,29 +590,35 @@
   "new.nobody": {
     "value": "Nobody here yet."
   },
-  "new.ask.question": {
-    "value": "What do you need?"
+  "new.search": {
+    "value": "Person or agent"
   },
-  "new.ask.placeholder": {
-    "value": "E.g. review the pricing page copy before Friday"
+  "new.create": {
+    "value": "Create"
   },
-  "new.ask.to": {
-    "value": "For"
+  "new.agentHint": {
+    "value": "A name and what it does"
   },
-  "new.ask.sendF": {
-    "value": "Ask {{name}}"
+  "new.chatShort": {
+    "value": "Conversation"
   },
-  "new.ask.sendM": {
-    "value": "Ask {{name}}"
+  "new.chatHint": {
+    "value": "A person or an agent"
   },
-  "new.ask.more": {
-    "value": "Or start something new"
+  "new.taskHint": {
+    "value": "With an assignee and a due date"
   },
-  "new.ask.person": {
-    "value": "Chat with a person"
+  "new.routineHint": {
+    "value": "An agent does it on its own, on schedule"
   },
-  "new.ask.noAgents": {
-    "value": "To ask an agent for something, start by creating yours."
+  "new.wikiPage": {
+    "value": "Wiki page"
+  },
+  "new.wikiHint": {
+    "value": "For the team and the agents to read"
+  },
+  "new.inviteHint": {
+    "value": "By email or link"
   },
   "new.agent.question": {
     "value": "What will it do?"
@@ -2938,6 +2944,9 @@
   },
   "activityNow.kind.join": {
     "value": "Members"
+  },
+  "activityNow.kind.tools": {
+    "value": "Tools"
   },
   "activityNow.review": {
     "value": "Review"
