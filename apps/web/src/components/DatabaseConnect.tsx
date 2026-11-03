@@ -885,7 +885,10 @@ export function DatabaseScopeDialog({
   const whole = (scope ?? (connection?.wholeServer ? "all" : "one")) === "all";
   const nextPrefix = (prefix ?? connection?.databasePrefix ?? "").trim();
   const name = connection?.label ?? "";
-  const using = connection?.agents.length ?? 0;
+  const team = useAgents(org.id).data;
+  // An archived agent keeps its grant but reads nothing; until the team loads, every grant counts so the question
+  // is never skipped.
+  const using = connection?.agents.filter((x) => !team || team.some((a) => a.id === x.agentId)).length ?? 0;
   const close = () => {
     setScope(null);
     setPrefix(null);

@@ -398,6 +398,23 @@ describe("Bancos of a connected database: ask before more databases open", () =>
     expect(screen().queryByRole("dialog")).toBeNull();
   });
 
+  test("an archived agent's grant isn't counted", async () => {
+    const ARCHIVED_ID = "00000000-0000-4000-8000-0000000000a9";
+    const { updates } = await connected({}, [ADA_ID, ARCHIVED_ID]);
+    await pickAll();
+    await save();
+    expect(flow().textContent).toContain("O agente com acesso passa a ler todos os bancos deste servidor.");
+    expect(updates()).toHaveLength(0);
+    cleanup();
+
+    const only = await connected({}, [ARCHIVED_ID]);
+    await pickAll();
+    await save();
+    await settle(4);
+    expect(only.updates()).toHaveLength(1);
+    expect(screen().queryByText("Abrir o servidor inteiro?")).toBeNull();
+  });
+
   test("no question with no agent reading it", async () => {
     const { updates } = await connected({}, []);
     await pickAll();
