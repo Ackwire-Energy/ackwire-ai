@@ -7,6 +7,7 @@ export function Token({
   leading,
   removeLabel,
   onRemove,
+  size,
 }: {
   children: ReactNode;
   /** E.g. a small avatar. */
@@ -14,9 +15,11 @@ export function Token({
   /** "Remover Ada". */
   removeLabel?: string;
   onRemove?: () => void;
+  /** `sm`: inside a field (a search's filters), clear of its edges. */
+  size?: "sm";
 }) {
   return (
-    <span className="ac-token">
+    <span className={size ? `ac-token ac-token--${size}` : "ac-token"}>
       {leading}
       <span className="ac-token__label">{children}</span>
       {onRemove && (

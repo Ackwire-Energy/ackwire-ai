@@ -10,9 +10,10 @@ import { useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 
 /**
  * The channel header's search (Discord's): a field whose mini menu offers the filters and recent searches, Enter
- * shows the results in the panel (`onOpen`). On a phone, an icon that opens the search over the whole screen.
+ * shows the results in the panel (`onOpen`). On a phone, an icon that opens the search over the whole screen. It
+ * starts in the channel it sits in (an `in:` chip the person may remove).
  */
-export function HeaderSearch({ onOpen }: { onOpen: () => void }) {
+export function HeaderSearch({ channelId, onOpen }: { channelId: string; onOpen: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const ws = useHeaderSearch();
@@ -26,6 +27,15 @@ export function HeaderSearch({ onOpen }: { onOpen: () => void }) {
       ws.field.current = null;
     };
   });
+  const place = ws?.placeOf(channelId);
+  // On arriving in a channel, an empty search (or one only scoped to another place) is scoped here; a removed chip
+  // stays removed while the person stays.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs per channel, not on every edit of the search.
+  useEffect(() => {
+    if (!ws || !place || ws.input.trim()) return;
+    const only = ws.chips.length === 1 ? ws.chips[0] : undefined;
+    if (ws.chips.length === 0 || (only?.op === "in" && only.place.id !== place.id)) ws.setChips([{ op: "in", place }]);
+  }, [place?.id]);
   if (!ws) return null;
   const submit = () => {
     if (!ws.chips.length && !ws.input.trim()) return;

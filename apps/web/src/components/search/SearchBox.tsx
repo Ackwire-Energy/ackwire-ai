@@ -46,7 +46,7 @@ function RecentSearch({ text, directory, words }: { text: string; directory: Sea
         const at = label.indexOf(": ");
         const value = at < 0 ? label : label.slice(at + 2).replace(/^#/, "");
         return (
-          <span key={searchChipKey(c)} className="ac-token search-menu__chip">
+          <span key={searchChipKey(c)} className="ac-token ac-token--sm search-menu__chip">
             <span className="ac-token__label">
               {at >= 0 && <b>{label.slice(0, at + 1)}</b>}
               {(c.op === "from" || c.op === "mentions") && (
@@ -320,6 +320,7 @@ export function SearchBox({
           return (
             <Token
               key={searchChipKey(c)}
+              size="sm"
               removeLabel={t("searchPage.removeFilter", { filter: label })}
               onRemove={() => onChipsChange(chips.filter((x) => searchChipKey(x) !== searchChipKey(c)))}
             >
