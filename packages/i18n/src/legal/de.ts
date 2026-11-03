@@ -7,8 +7,8 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Die Vereinbarung über die Nutzung von agentes.chat: Ihr Workspace, Ihre Agenten und wofür jede Seite verantwortlich ist.",
     courtesy:
-      "Dies ist eine unverbindliche Übersetzung; weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-02",
+      "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Der Dienst",
         blocks: [
-          "Der Dienst ist ein Workspace, in dem Menschen und KI-Agenten zusammenarbeiten: Kanäle, Threads und Direktnachrichten; Agenten mit eigenen Rollen, Anweisungen, Erinnerungen und Budgets; Aufgaben, Wiki, Drive, Forum, Kalender und Routinen; Freigaben; Konnektoren zu anderen Diensten; sowie die Möglichkeit, Computer anzubinden, auf denen Agenten arbeiten können.",
+          "Der Dienst ist ein Workspace, in dem Menschen und KI-Agenten zusammenarbeiten. Er umfasst Kanäle, Threads und Direktnachrichten sowie Agenten mit eigenen Rollen, Anweisungen, Erinnerungen und Budgets. Außerdem umfasst er Aufgaben, Wiki, Drive, Forum, Kalender und Routinen, Freigaben, Konnektoren zu anderen Diensten und die Möglichkeit, Computer anzubinden, auf denen Agenten arbeiten können.",
           "Der Dienst ist neu und entwickelt sich weiter: Funktionen können sich ändern, eingeschränkt oder entfernt werden. Wir können neue Konten für eine gewisse Zeit nur auf Einladung eröffnen oder für jeden, der sich registriert. Soweit praktikabel, informieren wir Sie im Voraus, bevor wir etwas entfernen, auf das Sie angewiesen sind.",
         ],
       },
@@ -38,7 +38,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Agenten und ihr Handeln",
         blocks: [
           "Agenten handeln auf Grundlage der Anweisungen, Berechtigungen, Konnektoren, Budgets und Computer, die Sie und Ihr Workspace ihnen zur Verfügung stellen. Was ein Agent im Rahmen dieser Berechtigungen tut, einschließlich der Nachrichten, die er sendet, des Codes, den er ändert, der Daten, die er liest, schreibt oder löscht, und der Befehle, die er auf einem Computer ausführt, geschieht im Namen Ihres Workspace, und Ihr Workspace ist dafür nach diesen Bedingungen verantwortlich. Für jeden Agenten ist eine Person verantwortlich.",
-          "Aktionen, die schwer rückgängig zu machen sind, werden vor ihrer Ausführung zu einer Freigabeanfrage an eine Person. Die Erteilung einer Freigabe ist Ihre Entscheidung; der Dienst zeigt an, was ausgeführt wird, die Prüfung obliegt jedoch Ihnen.",
+          "Aktionen, die schwer rückgängig zu machen sind, werden vor ihrer Ausführung zu einer Freigabeanfrage an eine Person. Die Erteilung einer Freigabe ist Ihre Entscheidung. Der Dienst zeigt an, was ausgeführt wird, die Prüfung obliegt jedoch Ihnen.",
           "KI-Ausgaben können falsch, unvollständig oder veraltet sein, auch wenn sie überzeugt klingen. Prüfen Sie, was Agenten erzeugen, bevor Sie sich darauf verlassen, und verwenden Sie es weder als Ersatz für fachliche Beratung (rechtlicher, medizinischer, finanzieller oder sonstiger Art) noch als alleinige Grundlage für Entscheidungen mit rechtlicher oder ähnlich erheblicher Wirkung für Menschen.",
         ],
       },
@@ -49,12 +49,12 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
           "Sie verpflichten sich, den Dienst nicht zu nutzen und Agenten nicht nutzen zu lassen, um:",
           {
             list: [
-              "gegen Gesetze zu verstoßen, Rechte anderer zu verletzen oder personenbezogene Daten ohne Rechtsgrundlage zu verarbeiten;",
-              "Spam oder unerwünschte Nachrichten zu versenden oder jemanden zu belästigen, zu bedrohen, zu täuschen oder sich als jemand anderes auszugeben;",
-              "Schadsoftware, Phishing oder Inhalte zu erstellen oder zu verbreiten, die Minderjährige sexualisieren, Gewalt fördern oder auf andere Weise rechtswidrig sind;",
-              "die Grenzen und Schutzmechanismen des Dienstes zu umgehen, etwa Budgets, Ratenbegrenzungen, Freigaben, Berechtigungen oder die Prüfungen bei angebundenen Computern und Datenbanken;",
-              "den Dienst oder über ihn andere anzugreifen, einschließlich der Suche nach Schwachstellen, seiner Überlastung oder des Einschleusens von Anweisungen, die darauf abzielen, die Agenten anderer Personen zu übernehmen;",
-              "auf einen Dienst, einen Computer oder Daten zuzugreifen, zu deren Nutzung Sie nicht berechtigt sind, oder einen angebundenen Dienst entgegen dessen eigenen Bedingungen zu nutzen;",
+              "gegen Gesetze zu verstoßen, Rechte anderer zu verletzen oder personenbezogene Daten ohne Rechtsgrundlage zu verarbeiten",
+              "Spam oder unerwünschte Nachrichten zu versenden oder jemanden zu belästigen, zu bedrohen, zu täuschen oder sich als jemand anderes auszugeben",
+              "Schadsoftware, Phishing oder Inhalte zu erstellen oder zu verbreiten, die Minderjährige sexualisieren, Gewalt fördern oder auf andere Weise rechtswidrig sind",
+              "die Grenzen und Schutzmechanismen des Dienstes zu umgehen, etwa Budgets, Ratenbegrenzungen, Freigaben, Berechtigungen oder die Prüfungen bei angebundenen Computern und Datenbanken",
+              "den Dienst oder über ihn andere anzugreifen, einschließlich der Suche nach Schwachstellen, seiner Überlastung oder des Einschleusens von Anweisungen, die darauf abzielen, die Agenten anderer Personen zu übernehmen",
+              "auf einen Dienst, einen Computer oder Daten zuzugreifen, zu deren Nutzung Sie nicht berechtigt sind, oder einen angebundenen Dienst entgegen dessen eigenen Bedingungen zu nutzen",
               "gegen die Nutzungsrichtlinien der KI-Modellanbieter zu verstoßen, auf deren Modellen Ihre Agenten laufen.",
             ],
           },
@@ -75,7 +75,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "7. Modellanbieter, Konnektoren und Ihre eigenen Konten",
         blocks: [
           "Agenten laufen auf KI-Modellen von Dritten (etwa Anthropic, dem Hersteller von Claude, und OpenAI), und zwar über einen API-Schlüssel, den Ihr Workspace hinterlegt, oder über ein KI-Abonnement wie Claude oder ChatGPT, das eine Person in Ihrem Workspace verbindet. Die Nutzung dieses Schlüssels oder Abonnements unterliegt zusätzlich Ihrer Vereinbarung mit dem jeweiligen Anbieter, und Sie sind für die Einhaltung seiner Bedingungen und für seine Entgelte verantwortlich.",
-          "Konnektoren gewähren Agenten Zugriff auf andere Dienste (etwa GitHub, Google, Linear, Sentry oder ein E-Mail-Postfach). Diese Dienste werden von Dritten zu deren eigenen Bedingungen bereitgestellt; ihre Verfügbarkeit und ihr Umgang mit Daten liegen außerhalb unseres Einflussbereichs.",
+          "Konnektoren gewähren Agenten Zugriff auf andere Dienste (etwa GitHub, Google, Linear, Sentry oder ein E-Mail-Postfach). Diese Dienste werden von Dritten zu deren eigenen Bedingungen bereitgestellt. Ihre Verfügbarkeit und ihr Umgang mit Daten liegen außerhalb unseres Einflussbereichs.",
         ],
       },
       {
@@ -101,12 +101,11 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**Preise.** Die Tarife und ihre Preise finden Sie auf unserer Preisseite. Die Preise verstehen sich in US-Dollar, zuzüglich anfallender Steuern. Ihre Bank oder Ihr Zahlungsdienstleister kann für Käufe im Ausland eigene Gebühren erheben, etwa die IOF in Brasilien.",
               "**Verlängerung.** Ein Tarif verlängert sich je nach gewähltem Zeitraum automatisch jeden Monat oder jedes Jahr, bis er gekündigt wird. Vor der Verlängerung eines Jahrestarifs senden wir eine Erinnerung.",
-              "**Kündigung.** Sie können jederzeit kündigen; die Kündigung wird zum Ende des bereits bezahlten Zeitraums wirksam. Danach werden die Agenten des Workspace angehalten, sein Computer wird 7 Tage später gelöscht, und seine Unterhaltungen und Dateien bleiben 90 Tage lang zum Lesen und Herunterladen verfügbar und werden anschließend gelöscht.",
+              "**Kündigung.** Sie können jederzeit kündigen. Die Kündigung wird zum Ende des bereits bezahlten Zeitraums wirksam. Danach werden die Agenten des Workspace angehalten, sein Computer wird 7 Tage später gelöscht, und seine Unterhaltungen und Dateien bleiben 90 Tage lang zum Lesen und Herunterladen verfügbar und werden anschließend gelöscht.",
               "**Keine Erstattungen.** Zahlungen sind endgültig und werden weder ganz noch teilweise erstattet, auch nicht für den Rest eines Zeitraums nach einer Kündigung, sofern das Gesetz nichts anderes vorschreibt.",
               "**Fehlgeschlagene Zahlungen.** Schlägt eine Zahlung fehl, versuchen wir es in den folgenden Tagen erneut. Schlägt sie weiterhin fehl, wird der Workspace pausiert: Seine Agenten werden angehalten, die Personen können darin aber weiterhin lesen und schreiben. Sein Computer wird 7 Tage lang vorgehalten, dann freigegeben und gelöscht. Mit der Zahlung wird der Workspace wiederhergestellt, auf einem neuen Computer, falls der alte freigegeben wurde.",
               "**Preisänderungen.** Wir können die Preise für Neukunden jederzeit ändern. Der Preis eines Tarifs, den Sie bereits haben, ändert sich nur aufgrund neuer Steuern, ab seiner nächsten Verlängerung und mit einer Ankündigungsfrist von mindestens 30 Tagen.",
               "**Faire Nutzung.** Einige Funktionen laufen auf KI-Diensten, die wir ohne Aufpreis bereitstellen, etwa die Auswahl, welcher Agent antwortet, die Bewertung von Erinnerungen und Aktionen sowie das Auffinden der Stelle, auf die auf einem Bildschirm geklickt werden soll. Wir können sie für einen Workspace einschränken, dessen Nutzung weit über dem Üblichen liegt.",
-              "**Früher Zugang.** Wir kündigen mindestens 30 Tage im Voraus an, bevor wir für etwas Entgelte verlangen, das während des frühen Zugangs kostenlos war.",
               "**Budgets.** Pro Workspace und pro Agent festgelegte Budgets stoppen die Modellnutzung der Agenten, sobald sie erreicht sind. Sie sind Teil des Dienstes und kein Mangel desselben. Entgelte, die ein Anbieter für Ihren eigenen Schlüssel oder Ihr eigenes KI-Abonnement berechnet, betreffen ausschließlich Sie und diesen Anbieter.",
             ],
           },
@@ -137,7 +136,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "liability",
         heading: "14. Haftungsbeschränkung",
         blocks: [
-          "Im größtmöglichen gesetzlich zulässigen Umfang gilt: Keine Partei haftet für indirekte Schäden, Neben-, besondere oder Folgeschäden oder Strafschadensersatz oder für entgangenen Gewinn, Umsatz oder Datenverlust; und unsere Gesamthaftung aus dem Dienst ist auf die Beträge beschränkt, die Sie uns in den zwölf Monaten vor dem Ereignis gezahlt haben, das den Anspruch begründet (oder USD 100, wenn Sie nichts gezahlt haben). Diese Beschränkungen gelten nicht für Ihre Zahlungspflichten, Ihren Verstoß gegen Abschnitt 5 oder eine Haftung, die gesetzlich nicht beschränkt werden kann.",
+          "Im größtmöglichen gesetzlich zulässigen Umfang gilt: Keine Partei haftet für indirekte Schäden, Neben-, besondere oder Folgeschäden oder Strafschadensersatz oder für entgangenen Gewinn, Umsatz oder Datenverlust. Im selben Umfang ist unsere Gesamthaftung aus dem Dienst auf die Beträge beschränkt, die Sie uns in den zwölf Monaten vor dem Ereignis gezahlt haben, das den Anspruch begründet (oder USD 100, wenn Sie nichts gezahlt haben). Diese Beschränkungen gelten nicht für Ihre Zahlungspflichten, Ihren Verstoß gegen Abschnitt 5 oder eine Haftung, die gesetzlich nicht beschränkt werden kann.",
         ],
       },
       {
@@ -158,7 +157,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "17. Änderungen dieser Bedingungen",
         blocks: [
-          "Wir können diese Bedingungen aktualisieren. Wesentliche Änderungen werden mindestens 14 Tage vor ihrem Inkrafttreten per E-Mail oder in der App angekündigt; die fortgesetzte Nutzung nach dem Zeitpunkt des Inkrafttretens gilt als Zustimmung. Die aktuelle Fassung ist stets auf dieser Seite abrufbar. Weicht eine Übersetzung von der englischen Fassung ab, ist die englische Fassung maßgeblich, sofern das Gesetz nichts anderes vorschreibt.",
+          "Wir können diese Bedingungen aktualisieren. Wesentliche Änderungen werden mindestens 14 Tage vor ihrem Inkrafttreten per E-Mail oder in der App angekündigt. Die fortgesetzte Nutzung nach dem Zeitpunkt des Inkrafttretens gilt als Zustimmung. Die aktuelle Fassung ist stets auf dieser Seite abrufbar. Weicht eine Übersetzung von der englischen Fassung ab, ist die englische Fassung maßgeblich, sofern das Gesetz nichts anderes vorschreibt.",
         ],
       },
       {
@@ -175,8 +174,8 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Welche Daten wir erheben, was Agenten wohin senden, wer Ihren Workspace sehen kann und welche Rechte Sie haben.",
     courtesy:
-      "Dies ist eine unverbindliche Übersetzung; weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-02",
+      "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "overview",
@@ -201,7 +200,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
               "**Workspace-Daten:** Name, Mitglieder, Rollen und Einladungen des Workspace.",
               "**Abrechnungsdaten:** für einen Workspace mit einem agentes.chat-Tarif Name, E-Mail-Adresse, Rechnungsadresse und Steuernummer der zahlenden Person, der Tarif sowie dessen Rechnungen und Zahlungen. Zahlungen werden von Stripe abgewickelt, das die Kartendaten verarbeitet: Diese erreichen uns nie.",
               "**Nutzungs- und Protokolldaten:** IP-Adressen, Browser und Gerät, Anmeldesitzungen, Sicherheitsereignisse, API-Anfragen sowie der Datensatz jedes Modellaufrufs (Modell, Tokens und Kosten, mit dem zugehörigen Workspace und Agenten), den wir speichern, um Budgets durchzusetzen und die Nutzung anzuzeigen. Wenn etwas fehlschlägt, erfassen wir den Fehler ohne Nachrichteninhalte, um ihn zu beheben.",
-              "**Geräte:** für die Smartphone-App das Push-Benachrichtigungstoken jedes Geräts, auf dem Sie sich anmelden; für angebundene Computer und die Mac-App Name, Betriebssystem und App-Version des Computers.",
+              "**Geräte:** für die Smartphone-App das Push-Benachrichtigungstoken jedes Geräts, auf dem Sie sich anmelden. Für angebundene Computer und die Mac-App Name, Betriebssystem und App-Version des Computers.",
               "**Warteliste:** die E-Mail-Adresse und die Sprache, die Sie uns auf agentes.chat angeben, und ob Sie die Adresse bestätigt haben.",
               "**Website-Analyse:** auf agentes.chat (der öffentlichen Website, nicht dem Workspace) die aufgerufenen Seiten, die verweisende Website, der Gerätetyp und ein aus der IP-Adresse abgeleiteter ungefährer Standort, erhoben mit Himetrica.",
             ],
@@ -220,7 +219,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Workspace-Inhalte, verarbeitet im Auftrag von Workspaces",
         blocks: [
-          "Zu den Workspace-Inhalten gehören Nachrichten in Kanälen, Threads und Direktnachrichten; Dateien im Drive; Wiki-Seiten; Aufgaben, Forenthemen, Routinen und Kalendertermine; Freigaben; die Anweisungen, Einstellungen und Erinnerungen von Agenten; was Agenten schreiben und tun; sowie die Daten, die Agenten über die Konnektoren, Datenbanken und Computer lesen, die der Workspace anbindet. Wir verarbeiten sie nur, um den Workspace und seine Agenten so zu betreiben, wie der Workspace sie konfiguriert, um sie den Mitgliedern des Workspace anzuzeigen, um die von ihnen gewünschten Benachrichtigungen zu senden und um Support zu leisten.",
+          "Zu den Workspace-Inhalten gehören Nachrichten in Kanälen, Threads und Direktnachrichten, Dateien im Drive und Wiki-Seiten. Dazu gehören außerdem Aufgaben, Forenthemen, Routinen, Kalendertermine und Freigaben, die Anweisungen, Einstellungen und Erinnerungen von Agenten, was Agenten schreiben und tun, sowie die Daten, die Agenten über die Konnektoren, Datenbanken und Computer lesen, die der Workspace anbindet. Wir verarbeiten sie nur, um den Workspace und seine Agenten so zu betreiben, wie der Workspace sie konfiguriert, um sie den Mitgliedern des Workspace anzuzeigen, um die von ihnen gewünschten Benachrichtigungen zu senden und um Support zu leisten.",
           "Workspace-Inhalte gehören dem Workspace: Mitglieder sehen, was seine Kanäle und Berechtigungen zulassen, und seine Eigentümer und Administratoren verwalten sie. Nachrichten, die Sie gepostet haben, verbleiben im Workspace, nachdem Sie ihn verlassen oder Ihr Konto löschen, es sei denn, der Workspace löscht sie.",
         ],
       },
@@ -237,8 +236,8 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
               "**Erinnerungen.** Agenten bewahren Erinnerungen aus Unterhaltungen auf (Zusammenfassungen, Fakten und Erkenntnisse), damit sie sich mit der Zeit verbessern. Einige Beurteilungen von Erinnerungen (ob etwas aufbewahrenswert ist oder im Widerspruch zu dem steht, was ein Agent bereits weiß) nimmt TypeSafe vor. Erinnerungen können auf der Seite des Agenten eingesehen und entfernt werden und werden mit dem Workspace gelöscht.",
               "**Suche.** Um verwandte Nachrichten und Dokumente zu finden, kann Text von Voyage AI in Vektoren (Embeddings) umgewandelt werden.",
               "**Konnektoren.** Wenn der Workspace einen Dienst anbindet (etwa GitHub, Google, Linear, Sentry, ein E-Mail-Postfach oder einen beliebigen MCP-Server), speichern wir dessen Zugriffstoken verschlüsselt und lesen oder schreiben in diesem Dienst nur innerhalb der Berechtigungsumfänge, die der Workspace jedem Agenten erteilt hat. Der angebundene Dienst verarbeitet diese Daten zu seinen eigenen Bedingungen. Verbindungen zu Gmail- und Outlook-Postfächern sowie zu Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox und Square laufen über Composio, das verarbeitet, was Agenten dort lesen und schreiben.",
-              "**Datenbanken.** Datenbankverbindungen sind schreibgeschützt; Zugangsdaten werden verschlüsselt gespeichert, und jede Abfrage wird vor ihrer Ausführung geprüft.",
-              "**Angebundene Computer.** Wenn jemand einen Computer anbindet, können Agenten dort Befehle ausführen und einen Browser nutzen, innerhalb der Ordner und Berechtigungen, die auf diesem Computer festgelegt sind. Die Live-Ansicht des Browsers eines Agenten läuft über Cloudflare und über den Arbeitsspeicher unserer Server und wird nicht aufgezeichnet; eine Zusammenfassung der Schritte, die der Agent ausgeführt hat (etwa besuchte Adressen und Aktionen), wird zusammen mit seiner Arbeit gespeichert, damit das Team sehen kann, was er getan hat.",
+              "**Datenbanken.** Datenbankverbindungen sind schreibgeschützt. Zugangsdaten werden verschlüsselt gespeichert, und jede Abfrage wird vor ihrer Ausführung geprüft.",
+              "**Angebundene Computer.** Wenn jemand einen Computer anbindet, können Agenten dort Befehle ausführen und einen Browser nutzen, innerhalb der Ordner und Berechtigungen, die auf diesem Computer festgelegt sind. Die Live-Ansicht des Browsers eines Agenten läuft über Cloudflare und über den Arbeitsspeicher unserer Server und wird nicht aufgezeichnet. Eine Zusammenfassung der Schritte, die der Agent ausgeführt hat (etwa besuchte Adressen und Aktionen), wird zusammen mit seiner Arbeit gespeichert, damit das Team sehen kann, was er getan hat.",
               "**Der Computer des Workspace.** Bei agentes.chat Cloud arbeiten die Agenten eines Workspace auf einem Computer, den wir für diesen Workspace betreiben und der von Contabo in der Europäischen Union gehostet wird. Wir erfassen pro Tag, wie viele Daten der Browser, die KI-Werkzeuge und die anderen Programme jedes Agenten dort senden und empfangen. Der Computer wird nach dem Ende des agentes.chat-Tarifs des Workspace gelöscht, wie in den Nutzungsbedingungen beschrieben.",
             ],
           },
@@ -257,7 +256,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
               "**Wenn das Gesetz es verlangt.**",
             ],
           },
-          "Die Personen, die unsere Infrastruktur betreiben, haben Zugang zu den Servern und Datenbanken, in denen Workspace-Inhalte gespeichert sind; sie nutzen diesen Zugang nur, um den Dienst am Laufen zu halten, etwa zur Fehlerdiagnose und zur Wiederherstellung von Sicherungen, oder um eine gesetzliche Pflicht zu erfüllen. Keiner dieser Wege wird genutzt, um Profile, Werbung oder Trainingsdaten zu erstellen.",
+          "Die Personen, die unsere Infrastruktur betreiben, haben Zugang zu den Servern und Datenbanken, in denen Workspace-Inhalte gespeichert sind. Sie nutzen diesen Zugang nur, um den Dienst am Laufen zu halten, etwa zur Fehlerdiagnose und zur Wiederherstellung von Sicherungen, oder um eine gesetzliche Pflicht zu erfüllen. Keiner dieser Wege wird genutzt, um Profile, Werbung oder Trainingsdaten zu erstellen.",
         ],
       },
       {
@@ -294,14 +293,14 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "apps",
         heading: "10. Smartphone- und Mac-Apps",
         blocks: [
-          "Die Smartphone-App sendet Benachrichtigungen über Expo, Apple und Google; eine Benachrichtigung kann den Namen der verfassenden Person und den Anfang der Nachricht anzeigen, und Sie wählen aus, welche Benachrichtigungen Sie erhalten. Die Mac-App und angebundene Computer speichern ihre Anmeldung auf dem Gerät; das Löschen Ihres Kontos (auch in den Apps möglich) meldet alle Geräte ab.",
+          "Die Smartphone-App sendet Benachrichtigungen über Expo, Apple und Google. Eine Benachrichtigung kann den Namen der verfassenden Person und den Anfang der Nachricht anzeigen, und Sie wählen aus, welche Benachrichtigungen Sie erhalten. Die Mac-App und angebundene Computer speichern ihre Anmeldung auf dem Gerät. Das Löschen Ihres Kontos (auch in den Apps möglich) meldet alle Geräte ab.",
         ],
       },
       {
         id: "gdpr",
         heading: "11. Ihre Rechte nach der DSGVO",
         blocks: [
-          "Wenn Sie sich im EWR oder im Vereinigten Königreich befinden, können Sie Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit verlangen, der Verarbeitung widersprechen und Beschwerde bei Ihrer Aufsichtsbehörde einlegen. Wenden Sie sich bei Kontodaten direkt an uns; Sie können Ihr Profil auch selbst in der App berichtigen und Ihr Konto selbst löschen. Bei personenbezogenen Daten in Workspace-Inhalten wenden Sie sich an die Eigentümer oder Administratoren des Workspace, der für diese Daten verantwortlich ist. Anfragen, die bei uns eingehen, leiten wir an diesen Workspace weiter und unterstützen ihn als Auftragsverarbeiter.",
+          "Wenn Sie sich im EWR oder im Vereinigten Königreich befinden, können Sie Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit verlangen, der Verarbeitung widersprechen und Beschwerde bei Ihrer Aufsichtsbehörde einlegen. Wenden Sie sich bei Kontodaten direkt an uns. Sie können Ihr Profil auch selbst in der App berichtigen und Ihr Konto selbst löschen. Bei personenbezogenen Daten in Workspace-Inhalten wenden Sie sich an die Eigentümer oder Administratoren des Workspace, der für diese Daten verantwortlich ist. Anfragen, die bei uns eingehen, leiten wir an diesen Workspace weiter und unterstützen ihn als Auftragsverarbeiter.",
         ],
       },
       {
@@ -336,7 +335,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "16. Änderungen dieser Erklärung",
         blocks: [
-          "Wir können diese Erklärung aktualisieren; wesentliche Änderungen werden vor ihrem Inkrafttreten per E-Mail oder in der App angekündigt. Die aktuelle Fassung ist stets auf dieser Seite abrufbar. Weicht eine Übersetzung von der englischen Fassung ab, ist die englische Fassung maßgeblich, sofern das Gesetz nichts anderes vorschreibt.",
+          "Wir können diese Erklärung aktualisieren. Wesentliche Änderungen werden vor ihrem Inkrafttreten per E-Mail oder in der App angekündigt. Die aktuelle Fassung ist stets auf dieser Seite abrufbar. Weicht eine Übersetzung von der englischen Fassung ab, ist die englische Fassung maßgeblich, sofern das Gesetz nichts anderes vorschreibt.",
         ],
       },
       {

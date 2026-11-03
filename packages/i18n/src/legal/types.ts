@@ -1,7 +1,7 @@
 /**
  * A legal page (Terms of Use, Privacy Policy) as data, so the app and the
  * landing page render the same text: the app at `/terms` and `/privacy`, the
- * landing at `/en/terms`, `/pt/termos`… (its `src/i18n/legal` is a copy of
+ * landing at `/terms`, `/pt/termos`… (its `src/i18n/legal` is a copy of
  * this folder). Inline text may carry `**bold**`; email addresses and
  * `https://` links become links when rendered (`legalInline`).
  */
