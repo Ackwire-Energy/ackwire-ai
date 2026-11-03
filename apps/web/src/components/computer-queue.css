@@ -26,10 +26,10 @@ html:not([data-pointer]) .cq-link:focus-visible {
 .cq {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 .cq__group + .cq__group {
-  padding-top: 12px;
+  padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 .cq__title {
@@ -37,8 +37,9 @@ html:not([data-pointer]) .cq-link:focus-visible {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 4px 12px;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   font-size: 12px;
+  line-height: 16px;
   font-weight: 600;
   color: var(--ink-muted);
 }
@@ -50,59 +51,77 @@ html:not([data-pointer]) .cq-link:focus-visible {
 .cq__rule {
   margin: 0;
   font-size: 13px;
+  line-height: 18px;
   color: var(--ink-muted);
 }
+/* The rows' 8px padding bleeds past the group's edge: faces line up with the group title. */
 .cq__rows {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 0;
+  margin: 0 -8px;
   padding: 0;
   list-style: none;
 }
-/* Number, face, words, time; the face sits on the words' first line. */
+/* Face, then two lines: who and when, then what and where. The face sits on the first line. */
 .cq__row {
   display: grid;
-  grid-template-columns: 18px auto 1fr auto;
+  grid-template-columns: 20px 1fr;
   align-items: start;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 10px;
+  padding: 8px;
   border-radius: 8px;
-  font-size: 13.5px;
-  line-height: 20px;
 }
 .cq__row > .ac-avatar {
-  margin-top: 1px;
+  margin: 1px;
 }
 .cq__row[data-mine] {
   background: var(--agent-soft);
 }
-.cq__n {
-  font-family: var(--font-mono);
-  font-size: 11px;
+.cq__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+.cq__l1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: stretch;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+.cq__l1 b {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cq__nth {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--faint);
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.cq__text {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.cq__text b {
-  font-weight: 600;
-}
-.cq__text > span {
-  color: var(--ink-muted);
-}
-.cq__text > .cq-first {
-  margin-left: 6px;
-  vertical-align: 1px;
-}
 .cq__time {
+  margin-left: auto;
+  padding-left: 8px;
   font-size: 12px;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.cq__l2 {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+.cq__row[data-mine] .cq__l2 {
+  color: var(--ink2);
+}
+.cq__text > .cq-first {
+  margin-top: 4px;
 }
 
 /* The waiting agent's turn after the message it answers, where "thinking" shows otherwise. */

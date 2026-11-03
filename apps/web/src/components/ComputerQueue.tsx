@@ -6,6 +6,7 @@ import {
   fanOutOf,
   fanOutText,
   fanShows,
+  nthText,
   type QueueNames,
   type QueuePlace,
   queueAllStartedText,
@@ -154,7 +155,7 @@ export function QueueDialog({
 }
 
 function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typeof useQueueNames>; now: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const view = queueView(queue, names.viewerId);
   const allStarted = queueAllStartedText(t, view, now);
   const agentName = (id: string) => names.agent(id) ?? t("channel.unknownAgent");
@@ -168,11 +169,13 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
         <ol className="cq__rows">
           {view.working.map((w) => (
             <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-              <span className="cq__n" />
               <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="thinking" />
               <span className="cq__text">
-                <b>{agentName(w.agentId)}</b>{" "}
-                <span>
+                <span className="cq__l1">
+                  <b>{agentName(w.agentId)}</b>
+                  <span className="cq__time">{queueLeftText(t, w, now)}</span>
+                </span>
+                <span className="cq__l2">
                   {[
                     queuePurposeText(t, w.purpose, names),
                     queueWhereText(t, names.place(w.where)),
@@ -180,7 +183,6 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
                   ].join(" · ")}
                 </span>
               </span>
-              <span className="cq__time">{queueLeftText(t, w, now)}</span>
             </li>
           ))}
         </ol>
@@ -194,16 +196,18 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
           <ol className="cq__rows">
             {view.waiting.map((w) => (
               <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-                <span className="cq__n">{w.position}</span>
                 <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="idle" />
                 <span className="cq__text">
-                  <b>{agentName(w.agentId)}</b>{" "}
-                  <span>
+                  <span className="cq__l1">
+                    <b>{agentName(w.agentId)}</b>
+                    <span className="cq__nth">{nthText(t, i18n.language, w.position)}</span>
+                    <span className="cq__time">{queueStartText(t, w, names.agent, now)}</span>
+                  </span>
+                  <span className="cq__l2">
                     {[queuePurposeText(t, w.purpose, names), queueWhereText(t, names.place(w.where))].join(" · ")}
                   </span>
                   {w.mine && w.people && <Chip className="cq-first">{t("queue.youFirst")}</Chip>}
                 </span>
-                <span className="cq__time">{queueStartText(t, w, names.agent, now)}</span>
               </li>
             ))}
           </ol>
