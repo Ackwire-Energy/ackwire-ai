@@ -35,6 +35,8 @@ export interface AuthClient {
     },
     humanCheck?: string,
   ): Promise<AuthResult>;
+  /** The signed-in person's name (the account's, shown in every workspace). */
+  updateName(name: string): Promise<AuthResult>;
   /** A new link confirming the signed-in person's own address (`email`). */
   sendVerificationEmail(email: string): Promise<AuthResult>;
   /**

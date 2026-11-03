@@ -1,7 +1,7 @@
 import { type InvitationPreview, useAuthConfig } from "@agenteschat/client";
 import { INVITATION_MAIL_HEADER, INVITATION_MAIL_PARAM, INVITATION_TOKEN_HEADER } from "@agenteschat/client/lib/guards";
 import { humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
-import { passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import { nameIsPassword, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, View } from "react-native";
@@ -14,7 +14,7 @@ import { AuthField } from "@/ui/auth/AuthField";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
-import { LAST_EMAIL, Quiet } from "./AuthFlow";
+import { LAST_EMAIL, NameHint, Quiet } from "./AuthFlow";
 import { rememberConfirmationSent } from "./confirmation";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, refusalOf, refusalText, signUpClosed } from "./human-check";
@@ -215,7 +215,11 @@ export function EmailSteps({
   const submit = () => {
     if (!ready || pending) return;
     if (step === "name") go("newPassword");
-    else if (step === "newPassword") void signUp();
+    else if (step === "newPassword" && nameIsPassword(name, password)) {
+      setPassword("");
+      go("name");
+      setError(t("auth.flow.nameIsPassword"));
+    } else if (step === "newPassword") void signUp();
     else if (step === "password") void signIn();
     else if (step === "forgot") void sendReset();
   };
@@ -285,7 +289,7 @@ export function EmailSteps({
             onSubmitEditing={submit}
             autoFocus
           />
-          <ErrorLine error={error} />
+          {error ? <ErrorLine error={error} /> : <NameHint name={name} />}
           <Button variant="primary" wide label={t("auth.flow.continue")} disabled={!ready} onPress={submit} />
           {apple.length > 0 ? (
             <View onTouchStart={startProvider}>

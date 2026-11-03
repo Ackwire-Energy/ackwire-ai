@@ -73,6 +73,7 @@ export function createBetterAuthClient(origin = window.location.origin, language
           },
         }),
       ),
+    updateName: (name) => toResult(client.updateUser({ name })),
     sendVerificationEmail: (email) => toResult(client.sendVerificationEmail({ email })),
     signInSocial: (provider, callbackURL, earlyAccess, errorCallbackURL = "/login") =>
       toResult(
