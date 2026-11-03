@@ -6800,6 +6800,11 @@
     "lastUpdate": "Actualizada desde su enlace {{when}}",
     "undoUpdate": "Deshacer actualización",
     "undone": "{{name}} volvió a la versión {{version}}.",
+    "agentsImprove": "Los agentes mejoran las habilidades solos",
+    "agentsImproveHelp": "Cuando un agente ve que una habilidad está mal o le falta un paso, la corrige al momento: una versión nueva que puedes deshacer, y quien hizo la habilidad se entera. Los cambios en scripts esperan a alguien que gestione habilidades.",
+    "agentsImproveThis": "Los agentes mejoran esta habilidad solos",
+    "agentChange": "{{agent}} la cambió {{when}}",
+    "undoAgentChange": "Deshacer cambio",
     "pending": {
       "title": "La actualización de su enlace cambia archivos que se ejecutan: {{files}}",
       "lead": "Aplícala solo si confías en estos archivos. Los agentes los ejecutan en sus computadoras.",
@@ -6820,7 +6825,8 @@
     "notice": {
       "updated": "{{name}} se actualizó desde su enlace",
       "waiting": "Una actualización de {{name}} cambia sus scripts",
-      "failed": "{{name}} no se pudo actualizar desde su enlace"
+      "failed": "{{name}} no se pudo actualizar desde su enlace",
+      "edited": "Los agentes mejoraron {{name}}"
     },
     "remove": "Quitar",
     "removeTitle": "¿Quitar {{name}}?",

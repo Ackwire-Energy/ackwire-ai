@@ -6286,6 +6286,11 @@
     "lastUpdate": "{{when}} 링크에서 업데이트됨",
     "undoUpdate": "업데이트 실행 취소",
     "undone": "{{name}}을(를) 버전 {{version}}(으)로 되돌렸어요.",
+    "agentsImprove": "에이전트가 스킬을 스스로 개선해요",
+    "agentsImproveHelp": "에이전트가 스킬이 틀렸거나 단계가 빠진 걸 발견하면 바로 고쳐요. 새 버전은 실행 취소할 수 있고, 스킬을 만든 사람에게 알려요. 스크립트 변경은 스킬을 관리하는 사람을 기다려요.",
+    "agentsImproveThis": "에이전트가 이 스킬을 스스로 개선해요",
+    "agentChange": "{{agent}}이(가) {{when}} 변경함",
+    "undoAgentChange": "변경 실행 취소",
     "pending": {
       "title": "링크에서 받은 업데이트가 실행되는 파일을 바꿔요: {{files}}",
       "lead": "이 파일들을 믿을 수 있을 때만 적용하세요. 에이전트가 자기 컴퓨터에서 이 파일들을 실행해요.",
@@ -6306,7 +6311,8 @@
     "notice": {
       "updated": "{{name}}이(가) 링크에서 업데이트됐어요",
       "waiting": "{{name}} 업데이트가 스크립트를 바꿔요",
-      "failed": "{{name}}을(를) 링크에서 업데이트하지 못했어요"
+      "failed": "{{name}}을(를) 링크에서 업데이트하지 못했어요",
+      "edited": "에이전트가 {{name}}을(를) 개선했어요"
     },
     "remove": "삭제",
     "removeTitle": "{{name}}을(를) 삭제할까요?",

@@ -6623,6 +6623,11 @@
     "lastUpdate": "Bijgewerkt vanaf de link {{when}}",
     "undoUpdate": "Update ongedaan maken",
     "undone": "{{name}} is terug naar versie {{version}}.",
+    "agentsImprove": "Agents verbeteren skills zelf",
+    "agentsImproveHelp": "Vindt een agent een skill fout of mist er een stap, dan verbetert hij die meteen: een nieuwe versie die je ongedaan kunt maken, en wie de skill maakte hoort het. Wijzigingen in scripts wachten op iemand die skills beheert.",
+    "agentsImproveThis": "Agents verbeteren deze skill zelf",
+    "agentChange": "{{agent}} heeft hem gewijzigd {{when}}",
+    "undoAgentChange": "Wijziging ongedaan maken",
     "pending": {
       "title": "De update vanaf de link wijzigt bestanden die worden uitgevoerd: {{files}}",
       "lead": "Pas het alleen toe als je deze bestanden vertrouwt. Agents voeren ze uit op hun computers.",
@@ -6643,7 +6648,8 @@
     "notice": {
       "updated": "{{name}} is bijgewerkt vanaf de link",
       "waiting": "Een update van {{name}} wijzigt de scripts",
-      "failed": "{{name}} kon niet bijwerken vanaf de link"
+      "failed": "{{name}} kon niet bijwerken vanaf de link",
+      "edited": "Agents hebben {{name}} verbeterd"
     },
     "remove": "Verwijderen",
     "removeTitle": "{{name}} verwijderen?",

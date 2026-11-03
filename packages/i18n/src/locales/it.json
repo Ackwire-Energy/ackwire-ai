@@ -6866,6 +6866,11 @@
     "lastUpdate": "Aggiornata dal suo link {{when}}",
     "undoUpdate": "Annulla aggiornamento",
     "undone": "{{name}} è tornata alla versione {{version}}.",
+    "agentsImprove": "Gli agenti migliorano le skill da soli",
+    "agentsImproveHelp": "Quando un agente trova una skill sbagliata o a cui manca un passo, la corregge subito: una nuova versione che puoi annullare, e chi ha creato la skill viene avvisato. Le modifiche agli script aspettano chi gestisce le skill.",
+    "agentsImproveThis": "Gli agenti migliorano questa skill da soli",
+    "agentChange": "{{agent}} l'ha modificata {{when}}",
+    "undoAgentChange": "Annulla modifica",
     "pending": {
       "title": "L'aggiornamento dal suo link cambia file che vengono eseguiti: {{files}}",
       "lead": "Applicalo solo se ti fidi di questi file. Gli agenti li eseguono sui loro computer.",
@@ -6886,7 +6891,8 @@
     "notice": {
       "updated": "{{name}} è stata aggiornata dal suo link",
       "waiting": "Un aggiornamento di {{name}} cambia i suoi script",
-      "failed": "{{name}} non è riuscita ad aggiornarsi dal suo link"
+      "failed": "{{name}} non è riuscita ad aggiornarsi dal suo link",
+      "edited": "Gli agenti hanno migliorato {{name}}"
     },
     "remove": "Rimuovi",
     "removeTitle": "Rimuovere {{name}}?",

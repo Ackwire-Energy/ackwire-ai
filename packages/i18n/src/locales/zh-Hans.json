@@ -6342,6 +6342,11 @@
     "lastUpdate": "{{when}}从链接更新",
     "undoUpdate": "撤销更新",
     "undone": "{{name}} 已回到版本 {{version}}。",
+    "agentsImprove": "智能体自行改进技能",
+    "agentsImproveHelp": "智能体发现技能有误或缺少步骤时，会立即修正：生成一个可撤销的新版本，并通知技能的创建者。脚本的改动要等管理技能的人处理。",
+    "agentsImproveThis": "智能体自行改进此技能",
+    "agentChange": "{{agent}} {{when}}修改了它",
+    "undoAgentChange": "撤销修改",
     "pending": {
       "title": "来自链接的更新会修改会运行的文件：{{files}}",
       "lead": "只有在你信任这些文件时才应用。智能体会在它们的电脑上运行这些文件。",
@@ -6362,7 +6367,8 @@
     "notice": {
       "updated": "{{name}} 已从链接更新",
       "waiting": "{{name}} 的一个更新会修改它的脚本",
-      "failed": "{{name}} 无法从链接更新"
+      "failed": "{{name}} 无法从链接更新",
+      "edited": "智能体改进了 {{name}}"
     },
     "remove": "移除",
     "removeTitle": "移除 {{name}}？",

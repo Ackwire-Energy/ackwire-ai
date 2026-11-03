@@ -6427,6 +6427,12 @@ export const ptBR = {
     lastUpdate: "Atualizada do link {{when}}",
     undoUpdate: "Desfazer atualização",
     undone: "{{name}} voltou para a versão {{version}}.",
+    agentsImprove: "Agentes melhoram as skills sozinhos",
+    agentsImproveHelp:
+      "Quando um agente acha uma skill errada ou faltando um passo, ele corrige na hora: uma versão nova que dá para desfazer, e quem fez a skill fica sabendo. Mudanças em scripts esperam alguém que gerencia skills.",
+    agentsImproveThis: "Agentes melhoram esta skill sozinhos",
+    agentChange: "{{agent}} mudou {{when}}",
+    undoAgentChange: "Desfazer mudança",
     pending: {
       title: "A atualização do link muda arquivos que rodam: {{files}}",
       lead: "Aplique só se confiar nesses arquivos. Os agentes rodam eles nos computadores deles.",
@@ -6448,6 +6454,7 @@ export const ptBR = {
       updated: "{{name}} foi atualizada do link",
       waiting: "Uma atualização de {{name}} muda os scripts dela",
       failed: "{{name}} não conseguiu se atualizar do link",
+      edited: "Agentes melhoraram {{name}}",
     },
     remove: "Remover",
     removeTitle: "Remover {{name}}?",

@@ -3413,8 +3413,10 @@ export interface Skill {
   pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean } | null;
   /** Why its last update from its link failed: a code (`skill.no_skill_md`, `skill.connection_gone`…). */
   updateError?: string | null;
-  /** Its last update from its link, while Desfazer can take it back. */
-  lastUpdate?: { fromVersion: number; at: string } | null;
+  /** Its last update from its link, or an agent's last change to it (`agentId`), while Desfazer can take it back. */
+  lastUpdate?: { fromVersion: number; at: string; agentId?: string | null } | null;
+  /** "Agentes melhoram as skills sozinhos" set for this skill; null: the workspace's setting. */
+  agentsImprove?: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3493,6 +3495,13 @@ export interface SkillPatch {
   locked?: boolean;
   /** Update it from its link every day, with the rights of whoever turns it on. */
   autoUpdate?: boolean;
+  /** Agents improve it by themselves; null follows the workspace. */
+  agentsImprove?: boolean | null;
+}
+
+/** The workspace's skill settings: "Agentes melhoram as skills sozinhos" (on by default). */
+export interface SkillSettings {
+  agentsImprove: boolean;
 }
 
 /** A skill an agent made from its own how-tos (ADR 0120), archived ones too. */

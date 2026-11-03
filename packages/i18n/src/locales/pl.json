@@ -7062,6 +7062,11 @@
     "lastUpdate": "Zaktualizowano z linku {{when}}",
     "undoUpdate": "Cofnij aktualizację",
     "undone": "{{name}}: przywrócono wersję {{version}}.",
+    "agentsImprove": "Agenci sami ulepszają umiejętności",
+    "agentsImproveHelp": "Gdy agent zauważy, że umiejętność jest błędna albo brakuje w niej kroku, od razu ją poprawia: nowa wersja, którą możesz cofnąć, a osoba, która ją utworzyła, dostaje informację. Zmiany w skryptach czekają na osobę, która zarządza umiejętnościami.",
+    "agentsImproveThis": "Agenci sami ulepszają tę umiejętność",
+    "agentChange": "{{agent}}: zmiana {{when}}",
+    "undoAgentChange": "Cofnij zmianę",
     "pending": {
       "title": "Aktualizacja z linku zmienia uruchamiane pliki: {{files}}",
       "lead": "Zastosuj ją tylko wtedy, gdy ufasz tym plikom. Agenci uruchamiają je na swoich komputerach.",
@@ -7082,7 +7087,8 @@
     "notice": {
       "updated": "{{name}}: zaktualizowano z linku",
       "waiting": "Aktualizacja {{name}} zmienia jej skrypty",
-      "failed": "{{name}}: nie udało się zaktualizować z linku"
+      "failed": "{{name}}: nie udało się zaktualizować z linku",
+      "edited": "Agenci ulepszyli {{name}}"
     },
     "remove": "Usuń",
     "removeTitle": "Usunąć {{name}}?",

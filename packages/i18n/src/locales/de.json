@@ -6573,6 +6573,11 @@
     "lastUpdate": "Über seinen Link aktualisiert {{when}}",
     "undoUpdate": "Update rückgängig machen",
     "undone": "{{name}} ist zurück auf Version {{version}}.",
+    "agentsImprove": "Agenten verbessern Skills selbst",
+    "agentsImproveHelp": "Findet ein Agent einen Skill falsch oder ohne einen Schritt, korrigiert er ihn sofort: eine neue Version, die du rückgängig machen kannst, und wer den Skill erstellt hat, erfährt es. Änderungen an Skripten warten auf jemanden, der Skills verwaltet.",
+    "agentsImproveThis": "Agenten verbessern diesen Skill selbst",
+    "agentChange": "{{agent}} hat ihn geändert {{when}}",
+    "undoAgentChange": "Änderung rückgängig machen",
     "pending": {
       "title": "Das Update über seinen Link ändert Dateien, die ausgeführt werden: {{files}}",
       "lead": "Wende es nur an, wenn du diesen Dateien vertraust. Agenten führen sie auf ihren Computern aus.",
@@ -6593,7 +6598,8 @@
     "notice": {
       "updated": "{{name}} wurde über seinen Link aktualisiert",
       "waiting": "Ein Update von {{name}} ändert seine Skripte",
-      "failed": "{{name}} konnte sich nicht über seinen Link aktualisieren"
+      "failed": "{{name}} konnte sich nicht über seinen Link aktualisieren",
+      "edited": "Agenten haben {{name}} verbessert"
     },
     "remove": "Entfernen",
     "removeTitle": "{{name}} entfernen?",

@@ -15998,6 +15998,21 @@
   "skills.undone": {
     "value": "{{name}} is back to version {{version}}."
   },
+  "skills.agentsImprove": {
+    "value": "Agents improve skills by themselves"
+  },
+  "skills.agentsImproveHelp": {
+    "value": "When an agent finds a skill wrong or missing a step, it fixes it right away: a new version you can undo, and whoever made the skill is told. Changes to scripts wait for someone who manages skills."
+  },
+  "skills.agentsImproveThis": {
+    "value": "Agents improve this skill by themselves"
+  },
+  "skills.agentChange": {
+    "value": "{{agent}} changed it {{when}}"
+  },
+  "skills.undoAgentChange": {
+    "value": "Undo change"
+  },
   "skills.pending.title": {
     "value": "The update from its link changes files that run: {{files}}"
   },
@@ -16045,6 +16060,9 @@
   },
   "skills.notice.failed": {
     "value": "{{name}} couldn't update from its link"
+  },
+  "skills.notice.edited": {
+    "value": "Agents improved {{name}}"
   },
   "skills.remove": {
     "value": "Remove"

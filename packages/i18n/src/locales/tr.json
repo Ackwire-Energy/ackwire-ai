@@ -6520,6 +6520,11 @@
     "lastUpdate": "{{when}} bağlantısından güncellendi",
     "undoUpdate": "Güncellemeyi geri al",
     "undone": "{{name}} {{version}} sürümüne döndü.",
+    "agentsImprove": "Ajanlar becerileri kendileri geliştirir",
+    "agentsImproveHelp": "Bir ajan bir becerinin yanlış olduğunu ya da bir adımının eksik olduğunu görünce hemen düzeltir: geri alabileceğiniz yeni bir sürüm olur ve beceriyi oluşturan kişiye haber verilir. Betik değişiklikleri becerileri yöneten birini bekler.",
+    "agentsImproveThis": "Ajanlar bu beceriyi kendileri geliştirir",
+    "agentChange": "{{agent}} {{when}} değiştirdi",
+    "undoAgentChange": "Değişikliği geri al",
     "pending": {
       "title": "Bağlantısından gelen güncelleme çalışan dosyaları değiştiriyor: {{files}}",
       "lead": "Yalnızca bu dosyalara güveniyorsanız uygulayın. Ajanlar bunları kendi bilgisayarlarında çalıştırır.",
@@ -6540,7 +6545,8 @@
     "notice": {
       "updated": "{{name}} bağlantısından güncellendi",
       "waiting": "{{name}} güncellemesi betiklerini değiştiriyor",
-      "failed": "{{name}} bağlantısından güncellenemedi"
+      "failed": "{{name}} bağlantısından güncellenemedi",
+      "edited": "Ajanlar {{name}} becerisini geliştirdi"
     },
     "remove": "Kaldır",
     "removeTitle": "{{name}} kaldırılsın mı?",

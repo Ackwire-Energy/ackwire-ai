@@ -6342,6 +6342,11 @@
     "lastUpdate": "Diperbarui dari tautannya {{when}}",
     "undoUpdate": "Urungkan pembaruan",
     "undone": "{{name}} kembali ke versi {{version}}.",
+    "agentsImprove": "Agen memperbaiki skill sendiri",
+    "agentsImproveHelp": "Saat agen menemukan skill yang salah atau kurang satu langkah, agen langsung memperbaikinya: versi baru yang bisa kamu urungkan, dan pembuat skill diberi tahu. Perubahan skrip menunggu orang yang mengelola skill.",
+    "agentsImproveThis": "Agen memperbaiki skill ini sendiri",
+    "agentChange": "{{agent}} mengubahnya {{when}}",
+    "undoAgentChange": "Urungkan perubahan",
     "pending": {
       "title": "Pembaruan dari tautannya mengubah file yang dijalankan: {{files}}",
       "lead": "Terapkan hanya jika kamu memercayai file ini. Agen menjalankannya di komputer mereka.",
@@ -6362,7 +6367,8 @@
     "notice": {
       "updated": "{{name}} diperbarui dari tautannya",
       "waiting": "Pembaruan {{name}} mengubah skripnya",
-      "failed": "{{name}} tidak bisa diperbarui dari tautannya"
+      "failed": "{{name}} tidak bisa diperbarui dari tautannya",
+      "edited": "Agen memperbaiki {{name}}"
     },
     "remove": "Hapus",
     "removeTitle": "Hapus {{name}}?",

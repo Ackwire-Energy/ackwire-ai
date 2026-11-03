@@ -6282,6 +6282,12 @@ export const en = {
     lastUpdate: "Updated from its link {{when}}",
     undoUpdate: "Undo update",
     undone: "{{name}} is back to version {{version}}.",
+    agentsImprove: "Agents improve skills by themselves",
+    agentsImproveHelp:
+      "When an agent finds a skill wrong or missing a step, it fixes it right away: a new version you can undo, and whoever made the skill is told. Changes to scripts wait for someone who manages skills.",
+    agentsImproveThis: "Agents improve this skill by themselves",
+    agentChange: "{{agent}} changed it {{when}}",
+    undoAgentChange: "Undo change",
     pending: {
       title: "The update from its link changes files that run: {{files}}",
       lead: "Apply it only if you trust these files. Agents run them on their computers.",
@@ -6304,6 +6310,7 @@ export const en = {
       updated: "{{name}} was updated from its link",
       waiting: "An update of {{name}} changes its scripts",
       failed: "{{name}} couldn't update from its link",
+      edited: "Agents improved {{name}}",
     },
     remove: "Remove",
     removeTitle: "Remove {{name}}?",

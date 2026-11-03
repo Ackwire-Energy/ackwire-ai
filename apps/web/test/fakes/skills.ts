@@ -31,6 +31,8 @@ export function createFakeSkills(
   github: () => "none" | "refused" | "ok" = () => "none",
 ): ApiClient["skills"] {
   const assigned = new Map<string, Set<string>>();
+  /** "Agentes melhoram as skills sozinhos" per workspace (on unless saved off). */
+  const settingsOf = new Map<string, boolean>();
   const store = perOrg(async (orgId) => {
     const list: SkillDetail[] = [];
     if (!ctx.seed) return list;
@@ -74,6 +76,8 @@ export function createFakeSkills(
       sourceUrl: null,
       defaultForNewAgents: false,
       body: "# Atendimento\n\nSeja breve e cordial.",
+      // An agent improved it by itself (Agentes melhoram as skills sozinhos): Desfazer in its sheet.
+      lastUpdate: { fromVersion: 1, at: now, agentId: agents[0]?.id ?? null },
       files: [
         { path: "SKILL.md", size: 50, mime: "text/markdown", status: "stored" },
         { path: "respostas.txt", size: 20, mime: "text/plain", status: "stored" },
@@ -227,6 +231,12 @@ export function createFakeSkills(
       const i = list.findIndex((x) => x.id === id);
       if (i >= 0) list.splice(i, 1);
       for (const set of assigned.values()) set.delete(id);
+    },
+    settings: async (orgId) => ({ agentsImprove: settingsOf.get(orgId) ?? true }),
+    saveSettings: async (orgId, input) => {
+      log("skills.saveSettings", orgId, input);
+      settingsOf.set(orgId, input.agentsImprove);
+      return { agentsImprove: input.agentsImprove };
     },
     forAgent,
     setForAgent: async (orgId, agentId, skills) => {

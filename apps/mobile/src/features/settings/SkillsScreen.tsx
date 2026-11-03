@@ -9,10 +9,12 @@ import type {
 } from "@agenteschat/client";
 import {
   keys,
+  useAgents,
   useCatalog,
   useGitHubRepos,
   useSkill,
   useSkillAction,
+  useSkillSettings,
   useSkills,
   useSkillUsage,
 } from "@agenteschat/client";
@@ -80,6 +82,8 @@ export function SkillsScreen() {
   const skills = useSkills(orgId, admin);
   const list = skills.data ?? [];
   const usage = useSkillUsage(orgId, admin && list.length > 0);
+  const settings = useSkillSettings(orgId, admin);
+  const action = useSkillAction(orgId);
   const [q, setQ] = useState("");
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   const shown = searchSkills(list, q);
@@ -105,6 +109,23 @@ export function SkillsScreen() {
               onPress={() => router.push("/settings/skills/new")}
             />
           </GroupedList>
+          {settings.data ? (
+            <>
+              <Gap />
+              <GroupedList>
+                <GroupedRow
+                  label={t("skills.agentsImprove")}
+                  labelLines={2}
+                  toggle={settings.data.agentsImprove}
+                  disabled={action.isPending}
+                  onPress={() =>
+                    action.mutate({ type: "settings", settings: { agentsImprove: !settings.data?.agentsImprove } })
+                  }
+                />
+              </GroupedList>
+              <GroupedFooter>{t("skills.agentsImproveHelp")}</GroupedFooter>
+            </>
+          ) : null}
           {list.length > SKILLS_INLINE ? (
             <View style={styles.search}>
               <SearchField
@@ -247,6 +268,7 @@ export function SkillScreen({ id }: { id: string }) {
             </View>
           ) : null}
           {admin ? <SourceUpdate skill={s} /> : null}
+          {admin ? <AgentImprove skill={s} /> : null}
           <Gap />
           <GroupedList>
             <View style={styles.page}>
@@ -369,7 +391,7 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           disabled={action.isPending}
           onPress={() => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: !s.autoUpdate } })}
         />
-        {s.lastUpdate ? (
+        {s.lastUpdate && !s.lastUpdate.agentId ? (
           <GroupedRow
             icon="undo"
             label={t("skills.undoUpdate")}
@@ -387,6 +409,59 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
         ) : null}
       </GroupedList>
       <GroupedFooter>{t("skills.autoUpdateHelp")}</GroupedFooter>
+    </>
+  );
+}
+
+/**
+ * A person's skill as agents improve it, as the web's sheet: its own "Agentes melhoram esta skill sozinhos" (the
+ * workspace's until set), and the last change an agent made, with Desfazer while it is still the skill's version.
+ */
+function AgentImprove({ skill: s }: { skill: SkillDetail }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const { orgId } = useOrg();
+  const action = useSkillAction(orgId);
+  const settings = useSkillSettings(orgId);
+  const agents = useAgents(orgId);
+  if (s.origin === "agent") return null;
+  const change = s.lastUpdate?.agentId ? s.lastUpdate : null;
+  const agent = change ? agents.data?.find((a) => a.id === change.agentId) : undefined;
+  const on = s.agentsImprove ?? settings.data?.agentsImprove ?? true;
+  return (
+    <>
+      <Gap />
+      <GroupedList>
+        <GroupedRow
+          label={t("skills.agentsImproveThis")}
+          labelLines={2}
+          toggle={on}
+          disabled={action.isPending}
+          onPress={() => action.mutate({ type: "update", id: s.id, patch: { agentsImprove: !on } })}
+        />
+        {change ? (
+          <GroupedRow
+            icon="undo"
+            label={t("skills.undoAgentChange")}
+            sub={t("skills.agentChange", {
+              agent: agent?.name ?? t("channel.unknownAgent"),
+              when: relativeTime(t, i18n.language, change.at),
+            })}
+            disabled={action.isPending}
+            onPress={() =>
+              action.mutate(
+                { type: "undoUpdate", id: s.id },
+                {
+                  onSuccess: () => {
+                    successHaptic();
+                    toast({ title: t("skills.undone", { name: s.name, version: change.fromVersion }), icon: "check" });
+                  },
+                },
+              )
+            }
+          />
+        ) : null}
+      </GroupedList>
     </>
   );
 }

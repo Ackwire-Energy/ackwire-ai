@@ -6853,6 +6853,11 @@
     "lastUpdate": "Mise à jour depuis son lien {{when}}",
     "undoUpdate": "Annuler la mise à jour",
     "undone": "{{name}} est revenue à la version {{version}}.",
+    "agentsImprove": "Les agents améliorent les compétences eux-mêmes",
+    "agentsImproveHelp": "Quand un agent trouve une compétence fausse ou incomplète, il la corrige tout de suite : une nouvelle version que vous pouvez annuler, et la personne qui l'a créée est prévenue. Les changements de scripts attendent une personne qui gère les compétences.",
+    "agentsImproveThis": "Les agents améliorent cette compétence eux-mêmes",
+    "agentChange": "{{agent}} l'a modifiée {{when}}",
+    "undoAgentChange": "Annuler la modification",
     "pending": {
       "title": "La mise à jour depuis son lien modifie des fichiers qui s'exécutent : {{files}}",
       "lead": "Appliquez-la seulement si vous faites confiance à ces fichiers. Les agents les exécutent sur leurs ordinateurs.",
@@ -6873,7 +6878,8 @@
     "notice": {
       "updated": "{{name}} a été mise à jour depuis son lien",
       "waiting": "Une mise à jour de {{name}} modifie ses scripts",
-      "failed": "{{name}} n'a pas pu se mettre à jour depuis son lien"
+      "failed": "{{name}} n'a pas pu se mettre à jour depuis son lien",
+      "edited": "Des agents ont amélioré {{name}}"
     },
     "remove": "Retirer",
     "removeTitle": "Retirer {{name}} ?",

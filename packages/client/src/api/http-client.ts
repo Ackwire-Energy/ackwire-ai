@@ -175,6 +175,7 @@ import type {
   Skill,
   SkillDetail,
   SkillPick,
+  SkillSettings,
   SkillSourceUpdate,
   SpeechKey,
   StartChoice,
@@ -1020,6 +1021,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       dismissUpdate: (orgId, id) =>
         request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/dismiss`, { json: {} }),
       undoUpdate: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/undo`, { json: {} }),
+      settings: (orgId) => request<SkillSettings>(`${org(orgId)}/skill-settings`),
+      saveSettings: (orgId, input) =>
+        request<SkillSettings>(`${org(orgId)}/skill-settings`, { method: "PUT", json: input }),
     },
     access: {
       get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),

@@ -233,6 +233,7 @@ import type {
   SkillInput,
   SkillPatch,
   SkillPick,
+  SkillSettings,
   SkillSourceUpdate,
   SpeechKey,
   SpeechKeyInput,
@@ -871,6 +872,9 @@ export interface ApiClient {
     undoUpdate?(orgId: string, id: string): Promise<SkillDetail>;
     /** Bring back a skill archived for disuse. */
     restore?(orgId: string, id: string): Promise<SkillDetail>;
+    /** The workspace's skill settings (older servers: absent). */
+    settings?(orgId: string): Promise<SkillSettings>;
+    saveSettings?(orgId: string, input: SkillSettings): Promise<SkillSettings>;
   };
   access: {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
