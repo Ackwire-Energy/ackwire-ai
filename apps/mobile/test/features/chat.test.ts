@@ -498,7 +498,14 @@ describe("working line", () => {
     // Its row on screen: the line has nothing of its own to say about it, and its stop is on the row.
     const alone = workingEntries([ada], [], name);
     expect(awayRun(alone, [ada], () => true)).toBeUndefined();
-    expect(lineStops(alone, [ada], () => true, () => true)).toEqual([]);
+    expect(
+      lineStops(
+        alone,
+        [ada],
+        () => true,
+        () => true,
+      ),
+    ).toEqual([]);
     // Two agents out of view: the line can't say whose time or stop.
     const both = workingEntries([ada, atlas], [], name);
     expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();

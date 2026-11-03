@@ -655,7 +655,11 @@ export function AskBar({
   const inView = useRowsInView(sight);
   const rowInView = (r: LiveRun) => inView.has(r.runId);
   const stops = lineStops(
-    entriesOffScreen(workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""), runs, rowInView),
+    entriesOffScreen(
+      workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""),
+      runs,
+      rowInView,
+    ),
     runs,
     canStop,
     rowInView,
