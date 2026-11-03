@@ -2,6 +2,7 @@ import {
   archiveChannel,
   channelMembersDetail,
   createChannelCategory,
+  deleteChannel,
   deleteChannelCategory,
   listChannelCategories,
   listPins,
@@ -150,6 +151,36 @@ export function channelRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
       await archiveChannel(db, c.get("user").id, orgId, channelId, opts);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/channels/{channelId}/delete",
+      tags,
+      security,
+      summary: "Delete a channel for good (owners and admins; never #general)",
+      description:
+        "Archived and marked deleted at once, its name freed and its routines removed; its messages, threads, files and the agents' memory of it are purged right after.",
+      request: {
+        params: ChannelParams,
+        body: body(
+          z.object({ name: z.string().max(81).openapi({ description: "The channel's name, typed to confirm." }) }),
+        ),
+      },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      await deleteChannel(
+        { db, pubsub: adapters.pubsub, hub: deps.extras?.sandbox?.machines?.hub ?? null, mail: adapters.mail },
+        c.get("user").id,
+        orgId,
+        channelId,
+        c.req.valid("json").name,
+      );
       return c.body(null, 204);
     },
   );

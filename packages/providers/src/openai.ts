@@ -134,7 +134,18 @@ function toInput(messages: ModelMessage[]): ResponseInputItem[] {
         items.push({
           type: "function_call_output",
           call_id: b.toolUseId,
-          output: b.isError ? `ERROR: ${b.content}` : b.content,
+          output: b.images?.length
+            ? [
+                { type: "input_text", text: b.isError ? `ERROR: ${b.content}` : b.content },
+                ...b.images.map((i) => ({
+                  type: "input_image" as const,
+                  image_url: `data:${i.mediaType};base64,${i.data}`,
+                  detail: "auto" as const,
+                })),
+              ]
+            : b.isError
+              ? `ERROR: ${b.content}`
+              : b.content,
         });
       else if (b.type === "opaque" && b.provider === "openai") items.push(b.data as unknown as ResponseInputItem);
       // Opaque blocks of another provider (e.g. Anthropic thinking) can't be replayed here.

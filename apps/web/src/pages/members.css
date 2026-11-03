@@ -109,20 +109,33 @@
   gap: 6px;
   min-width: 0;
 }
-/* A person: the name beside the face, when they were last here and their menu on the right, their roles under the
-   name, on its edge. */
+/* A person: the name beside the face, when they were last here on the right, their roles under the name, on its edge. */
 .ac-list__row.members-person {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 6px var(--space-3);
+}
+.members-person__name {
+  align-self: flex-start;
+  font-weight: 600;
+  text-align: start;
+}
+/* @handle, then the email, on one line that wraps between them. */
+.members-person__ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  overflow-wrap: anywhere;
+}
+/* When they were last here, and the DM button right beside it at the row's top right. */
+.members-person__end {
+  display: flex;
+  align-items: center;
+  align-self: start;
+  gap: var(--space-1);
 }
 .members-person__seen {
   white-space: nowrap;
-}
-/* Placed by hand: auto-placed after the roles it would land on a line of its own, under the face. */
-.members-person__more {
-  grid-row: 1;
-  grid-column: 4;
 }
 .members-person > .members-roles {
   grid-column: 2 / -1;

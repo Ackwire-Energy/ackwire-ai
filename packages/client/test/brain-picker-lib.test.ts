@@ -8,6 +8,7 @@ import {
   brainPickText,
   brainPickValue,
   needsOwnSignIn,
+  newPlanAccountOption,
   pickGroups,
 } from "../src/lib/brain-picker";
 import { brainModelChoices, CODING_PLANS } from "../src/lib/plans";
@@ -92,6 +93,23 @@ describe("Quem pensa as one list (the new agent's step)", () => {
     const gpt = options.find((o) => o.value === "gpt-6.1-sol");
     expect(gpt?.disabled).toBe(true);
     expect(gpt?.description).toStartWith("newAgent.modelNeedsKey");
+  });
+
+  test("Claude's plan ready here: Claude's models read as the plan's, none says it needs a Claude API key", () => {
+    const options = build([], []);
+    expect(options.some((o) => o.value === "claude-sonnet-5-5")).toBe(false);
+    const plan = options.filter((o) => o.value.startsWith("claude@m1/"));
+    expect(plan.map((o) => o.label)).toEqual(["brain.auto.label", "Opus", "Sonnet", "Haiku"]);
+    expect(plan.every((o) => !o.disabled)).toBe(true);
+    // ChatGPT's plan isn't ready there: its models still say what they need.
+    expect(options.find((o) => o.value === "gpt-6.1-sol")?.description).toStartWith("newAgent.modelNeedsKey");
+    const noComputer = brainPickOptions(t, "pt-BR", {
+      api: modelChoices(MODELS, [], false),
+      machines: [],
+      accounts: [],
+      ownerIsMe: true,
+    });
+    expect(noComputer.find((o) => o.value === "claude-sonnet-5-5")?.disabled).toBe(true);
   });
 
   test("a plan offers what the agent's page offers there: Automático and the same models", () => {
@@ -232,4 +250,19 @@ describe("OpenCode (ADR 0132) in Quem pensa", () => {
     expect(rows[1]?.keywords).toContain("free");
     expect(rows[0]?.description).toBe("brain.opencodeText");
   });
+});
+
+test("the plan account just connected: one not among the options when Conectar uma IA opened, else none", () => {
+  const row = (value: string, accountId?: string) =>
+    ({
+      value,
+      disabled: false,
+      pick: { kind: "claude_code", machineId: "m1", model: AUTO, ...(accountId ? { accountId } : {}) },
+    }) as never;
+  const before = [row("auto"), row("claude@m1#old/auto", "old")];
+  expect(newPlanAccountOption(before, new Set(before.map((o: { value: string }) => o.value)))).toBeUndefined();
+  const after = [...before, row("claude@m1#new/auto", "new")];
+  expect(newPlanAccountOption(after, new Set(before.map((o: { value: string }) => o.value)))?.value).toBe(
+    "claude@m1#new/auto",
+  );
 });

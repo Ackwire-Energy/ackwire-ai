@@ -85,20 +85,21 @@ export function roleLine(
   return names.length > 0 ? names.join(" · ") : undefined;
 }
 
-/** A person's line on Membros: their roles ("Membro" with none), then when they were last here. */
+/** A person's line on Membros: their @handle, their roles ("Membro" with none), then when they were last here. */
 export function memberLine(
   t: TFunction,
   locale: string,
-  person: Pick<Person, "role" | "roleIds" | "online" | "lastSeenAt" | "joinedAt">,
+  person: Pick<Person, "role" | "roleIds" | "online" | "lastSeenAt" | "joinedAt"> & { handle?: string },
   roles: readonly OrgRole[],
   now = new Date(),
 ) {
+  const handle = person.handle ? `@${person.handle} · ` : "";
   const seen = person.online
     ? t("members.activeNow")
     : person.lastSeenAt
       ? t("members.seen", { when: relativeTime(t, locale, person.lastSeenAt, now) })
       : t("members.joined", { when: formatShortDate(locale, person.joinedAt) });
-  return `${roleLine(t, person, roles) ?? t("roles.member")} · ${lowerFirst(seen, locale)}`;
+  return `${handle}${roleLine(t, person, roles) ?? t("roles.member")} · ${lowerFirst(seen, locale)}`;
 }
 
 /** The people who may invite here (ADR 0085): the owners, and whoever holds a role that gives it. */

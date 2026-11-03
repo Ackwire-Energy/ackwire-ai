@@ -99,4 +99,19 @@ describe("Select", () => {
       unmount();
     }
   });
+
+  test("people and agents: 32px faces centred on their two lines, every row of that list with more air", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-menu--select .ac-menu__leading > .ac-avatar")).toContain("width: 32px;");
+    const rows = rule(".ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__item");
+    expect(rows).toContain("padding-block: var(--space-2);");
+    expect(rows).toContain("gap: var(--space-3);");
+    // Not on the first line's capitals, as a small mark is: in the middle of the name and its line.
+    expect(
+      rule(
+        ".ac-menu--select .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-avatar)",
+      ),
+    ).toContain("translate: none;");
+  });
 });

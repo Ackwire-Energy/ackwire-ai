@@ -8,6 +8,7 @@ import {
   type BrainTurnRequest,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
+  parseBrainEvent,
   parseExecutors,
   parseRunnerFrame,
   parseServerFrame,
@@ -204,6 +205,43 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
   ]);
   expect(end.final).toEqual({ type: "done", text: "Hello", session: { id: SESSION(1) } });
   expect(p.session).toBe(SESSION(1));
+});
+
+test("parser: a turn's usage says how many API calls it made and the most uncached input one read", () => {
+  const p = new ClaudeStreamParser();
+  p.beginTurn();
+  const call = (id: string, input: number) =>
+    p.push(
+      line({
+        type: "assistant",
+        parent_tool_use_id: null,
+        message: { id, content: [], usage: { input_tokens: input, cache_read_input_tokens: 9000 } },
+      }),
+    );
+  call("m1", 12);
+  call("m2", 3400);
+  // The same message said again for its next block.
+  call("m2", 3400);
+  call("m3", 40);
+  const end = p.push(
+    line({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "ok",
+      num_turns: 3,
+      usage: { input_tokens: 3452, cache_read_input_tokens: 27000, output_tokens: 30 },
+    }),
+  );
+  expect(end.events).toEqual([
+    { type: "usage", input: 30452, output: 30, source: "plan", cacheRead: 27000, calls: 3, maxUncached: 3400 },
+  ]);
+  // It reaches the server as said.
+  expect(parseBrainEvent(end.events[0])).toEqual(end.events[0] as WireBrainEvent);
+  // The next turn counts its own calls.
+  p.beginTurn();
+  const next = p.push(line({ type: "result", subtype: "success", result: "ok", usage: { output_tokens: 1 } }));
+  expect(next.events).toEqual([{ type: "usage", input: 0, output: 1, source: "plan" }]);
 });
 
 test("parser: a streamed message said again in a later assistant event (with its tool call) adds no text", () => {
@@ -652,6 +690,47 @@ test.if(posix)(
     expect(all.map((x) => x.args.at(-2))).toEqual(["--session-id", "--resume", "--resume"]);
     expect(all.map((x) => x.system?.split("\n")[0])).toEqual(["S1", "S2", "S3"]);
     expect(all[2]?.system).toContain("app rules");
+  },
+);
+
+test.if(posix)(
+  "protocol 40: the system text is the agent's in every folder; the conversation and CLAUDE.md open the session once, and again after it compacted",
+  async () => {
+    const { m, home, ws, spawns, turn } = setup({ idleMs: 50 });
+    const folder = await agentWorkspace(ws, AGENT);
+    writeFileSync(path.join(folder, "CLAUDE.md"), "Run the tests with bun test.");
+    const app = path.join(folder, "repos", "acme", "app");
+    mkdirSync(app, { recursive: true });
+    writeFileSync(path.join(app, "CLAUDE.md"), "app rules");
+    const conversation = "# This conversation\n\n## Your team\nOther agents: @ops.";
+    const said = async (n: number, prompt: string, extra: Partial<BrainTurnRequest> = {}) => {
+      const { final } = await turn(n, prompt, { conversation, ...extra });
+      return final.type === "done" ? final.text : "";
+    };
+    const first = await said(1, "first");
+    expect(first).toStartWith(`echo 1: ${conversation}\n\n# Repository instructions`);
+    expect(first).toContain("## CLAUDE.md\nRun the tests with bun test.\n\nfirst");
+    // The same process: the session has it.
+    expect(await said(2, "second")).toBe("echo 2: second");
+    // The CLI compacted its history during this turn: the next turn reads it again, then not.
+    expect(await said(3, "COMPACT")).toBe("echo 3: COMPACT");
+    expect(await said(4, "after")).toContain(`${conversation}\n\n# Repository instructions`);
+    expect(await said(5, "later")).toBe("echo 5: later");
+    // Closed while idle and resumed: no second copy.
+    const proc = m.process(AGENT.id, SESSION(1));
+    await waitFor(() => m.size === 0 && proc?.exited === true, 4000);
+    expect(await said(6, "resumed")).toBe("echo 1: resumed");
+    // Another session, in a checkout: its own instructions in its first message, the same system text.
+    const other = await said(7, "there", { session: { id: SESSION(2), resume: false }, cwd: "repos/acme/app" });
+    expect(other).toContain("## CLAUDE.md\napp rules\n\nthere");
+    const all = spawns();
+    expect(all.map((x) => x.system)).toEqual(["You are dev.", "You are dev.", "You are dev."]);
+    // A resume past the kept first text (it may have held the conversation, from an older server): read again.
+    await waitFor(() => m.size === 0, 4000);
+    const kept = path.join(home, "brains", "sessions");
+    const old = new Date(Date.now() - SESSION_SYSTEM_KEEP_MS - 60_000);
+    for (const f of readdirSync(kept)) utimesSync(path.join(kept, f), old, old);
+    expect(await said(8, "much later")).toStartWith(`echo 1: ${conversation}\n\n`);
   },
 );
 

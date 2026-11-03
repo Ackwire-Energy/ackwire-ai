@@ -12,6 +12,17 @@ export type RunStatus = AgentRun["status"];
 /** For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. */
 export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null)`;
 
+/**
+ * For a select over `agent_runs`: it ended without answering, so its receipt reads "didn't reply": it passed and posted
+ * nothing anywhere (the `passed` step is `silent`, `endQuietly`), or it was canceled before it started.
+ * `agent_runs.id` is spelled out: a one-table select renders columns unqualified, and a bare "id" in the
+ * subquery would be the step's.
+ */
+export const passedSql = sql<boolean>`((${agentRuns.status} = 'done' and ${agentRuns.replyMessageId} is null
+  and exists (select 1 from ${agentRunSteps} where ${agentRunSteps.runId} = agent_runs.id
+  and ${agentRunSteps.kind} = 'context' and ${agentRunSteps.data}->'passed'->>'silent' = 'true'))
+  or (${agentRuns.status} = 'canceled' and ${agentRuns.startedAt} is null))`;
+
 /** For a select over `agent_runs`: waiting for its computer, in line for room (`queued`) or for it to be back (`away`). */
 export const computerWaitSql = sql<"queued" | "away" | null>`(case when ${agentRuns.status} = 'waiting_input'
   and ${agentRuns.waitingMachineId} is not null then (case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'
@@ -56,6 +67,13 @@ export const STUCK_ERROR = "stuck" as const;
 /** A run's error when its server stopped in the middle of a tool call (a deploy, a crash, a reboot). */
 export const INTERRUPTED_BY_RESTART = "Interrupted by a server restart";
 
+/**
+ * A computer brain's generic failure codes (`BrainFailure.code`, from the brains and the runner): worded as the
+ * computer's problem, the code kept only as a detail. The ones that call for a different step (signed out, outdated
+ * program, missing CLI, plan limit) keep their own code.
+ */
+const COMPUTER_ERRORS = new Set(["runner_error", "runner_failed", "claude_failed", "bad_request"]);
+
 /** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
 const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
 
@@ -79,6 +97,8 @@ export function runErrorDetail(error: string | null | undefined): {
     STUCK_ERROR,
   ];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
+  if (error === "timeout") return { errorCode: "run.computer_timeout", errorParams: { code: error } };
+  if (COMPUTER_ERRORS.has(error)) return { errorCode: "run.computer_failed", errorParams: { code: error } };
   if (error.startsWith("provider_error:")) {
     return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };
   }

@@ -167,6 +167,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItem,
   SidebarItems,
   SidebarSection,
   SignInOptions,
@@ -274,6 +275,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "PUT", json: {} }),
       unfollow: (orgId, threadId) =>
         request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "DELETE" }),
+    },
+    reads: {
+      mute: (orgId, channelId, muted) =>
+        request<void>(
+          `${org(orgId)}/channels/${enc(channelId)}/mute`,
+          muted ? { method: "PUT", json: {} } : { method: "DELETE" },
+        ),
+      markThreadRead: (orgId, threadId) => request<void>(`${org(orgId)}/threads/${enc(threadId)}/read`, { json: {} }),
+      unreadThreads: async (orgId) => (await request<{ count: number }>(`${org(orgId)}/unread-threads`)).count,
     },
     working: {
       list: async (orgId) => (await request<{ runs: WorkingRun[] }>(`${org(orgId)}/active-runs`)).runs,
@@ -498,6 +508,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: { order },
           })
         ).order,
+      sidebarToolOrder: async (orgId) =>
+        (await request<{ order: SidebarItem[] }>(`${org(orgId)}/me/sidebar/tools`)).order,
+      setSidebarToolOrder: async (orgId, order) =>
+        (await request<{ order: SidebarItem[] }>(`${org(orgId)}/me/sidebar/tools`, { method: "PUT", json: { order } }))
+          .order,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
@@ -774,6 +789,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
+      deleteChannel: (orgId, channelId, name) =>
+        request<void>(`${org(orgId)}/channels/${enc(channelId)}/delete`, { json: { name } }),
       roster: async (orgId, channelId) =>
         (await request<{ members: RosterMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/roster`)).members,
       members: async (orgId, channelId) =>

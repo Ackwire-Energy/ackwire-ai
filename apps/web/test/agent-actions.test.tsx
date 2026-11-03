@@ -8,7 +8,7 @@ import { AGENT_ACTION_KINDS, ApiError, keys } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { RECEIPT_ICONS } from "@/components/AgentActions";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -98,6 +98,21 @@ describe("receipts under the agent's reply", () => {
     expect(time.textContent).toMatch(/^4:5\d$/);
     // A single receipt has no group header.
     expect(group.querySelector(".ag-rcg__hd")).toBeNull();
+  });
+
+  test("a created routine says what it does on its own, without asking", async () => {
+    await open(
+      withActions([
+        action({
+          kind: "routine.created",
+          target: { type: "routine", id: "rt-1", title: "Resumo da semana" },
+          params: { name: "Resumo da semana", ownActions: ["SLACK_SEND_MESSAGE", "GMAIL_SEND_EMAIL"] },
+        }),
+      ]),
+    );
+    const row = receipts().querySelector(".ag-rc") as HTMLElement;
+    expect(row.textContent).toContain("Criei a rotina Resumo da semana");
+    expect(row.textContent).toContain("Faz sozinha, sem pedir: Enviar mensagem (Slack) e Enviar e-mail (Gmail)");
   });
 
   test("several: 'N mudanças · agora', Desfazer tudo, one row each with its own Desfazer", async () => {
@@ -282,12 +297,13 @@ describe("receipts this build doesn't expect", () => {
       const { socket, state } = await open(
         withActions([action()], (s) => {
           for (const m of s.messages) if (m.id === "m-act") m.body = null as never;
+          seedDm(s, { type: "agent", id: ATLAS_ID });
         }),
       );
       const reports = () => logged.mock.calls.filter((args) => args.some((a) => a instanceof TypeError));
       expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
       expect(document.body.textContent).not.toContain("Criei a tarefa #23");
-      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      expect(screen().getByRole("heading", { name: "eng" })).toBeTruthy();
       const messages = within(screen().getByRole("region", { name: "Mensagens" })).getAllByRole("article");
       expect(messages.some((a) => a.textContent?.includes("o login está devolvendo 401"))).toBe(true);
       const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
@@ -346,23 +362,22 @@ describe("receipts this build doesn't expect", () => {
     }
   });
 
-  test("a sidebar row that throws is one quiet row, still counted by a drag: the other rows and the conversation stay; fixed, it is back", async () => {
+  test("a sidebar row that throws is one quiet row: the other rows and the conversation stay; fixed, it is back", async () => {
     const logged = spyOn(console, "error").mockImplementation(() => {});
     try {
       const { services } = await open(
         withActions([action()], (s) => {
           // An object where the row draws text: React refuses it while drawing Atlas's row.
           for (const a of s.agents) if (a.id === ATLAS_ID) a.role = { unexpected: true } as never;
+          seedDm(s, { type: "agent", id: ATLAS_ID });
+          seedDm(s, { type: "agent", id: ADA_ID });
         }),
       );
       const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
       expect(within(nav).getAllByText("Não pôde ser exibido")).toHaveLength(1);
-      // A drag finds where a row lands among the `[data-agent-row]` rows: Atlas's place is still one.
-      const unshown = within(nav).getByText("Não pôde ser exibido").closest("[data-agent-row]");
-      expect(unshown?.getAttribute("data-agent-row")).toBe(ATLAS_ID);
       expect(within(nav).getAllByText("Ada").length).toBeGreaterThan(0);
       expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
-      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      expect(screen().getByRole("heading", { name: "eng" })).toBeTruthy();
       expect(article().textContent).toContain("Criei a tarefa #23");
       // Atlas comes back fixed: its row is back.
       await act(async () =>

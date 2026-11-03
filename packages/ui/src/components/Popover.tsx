@@ -61,6 +61,7 @@ export function Popover({
           side={side}
           align={align}
           sideOffset={6}
+          collisionPadding={8}
           aria-label={label}
           role="dialog"
           {...hover?.content}

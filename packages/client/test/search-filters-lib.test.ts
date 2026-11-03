@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   formatSearch,
   groupByChannel,
+  groupHitsByPlace,
+  markTerms,
   parseSearch,
   periodOf,
   rememberSearch,
@@ -9,6 +11,7 @@ import {
   type SearchWords,
   searchFilterInput,
   searchSortFor,
+  searchTerms,
   suggestActors,
   typingOperator,
 } from "../src/lib/search-filters";
@@ -125,5 +128,34 @@ describe("search filters", () => {
       ["x", 2],
       ["y", 1],
     ]);
+  });
+
+  test("hits by place: a thread's replies under the thread, the rest under their channel", () => {
+    const hits = [
+      { channelIds: ["x"], messageId: "m1", threadId: null },
+      { channelIds: ["x"], messageId: "m2", threadId: "r1", threadTitle: "Erro no convite" },
+      { channelIds: ["y"], messageId: "m3", threadId: null },
+      // The thread's root is in the channel's timeline.
+      { channelIds: ["x"], messageId: "r1", threadId: "r1", threadTitle: "Erro no convite" },
+      { channelIds: ["x"], messageId: "m4", threadId: "r1", threadTitle: "Erro no convite" },
+    ];
+    expect(groupHitsByPlace(hits).map((g) => [g.key, g.channelId, g.thread?.title ?? null, g.hits.length])).toEqual([
+      ["x", "x", null, 2],
+      ["thread:r1", "x", "Erro no convite", 2],
+      ["y", "y", null, 1],
+    ]);
+  });
+
+  test("markTerms: any case and accents, several words, overlaps merged, nothing found", () => {
+    const marked = (text: string, terms: string[]) =>
+      markTerms(text, terms)
+        .map((s) => (s.mark ? `[${s.text}]` : s.text))
+        .join("");
+    expect(marked("O Convite chegou", ["convite"])).toBe("O [Convite] chegou");
+    expect(marked("Ação e acao", ["acao"])).toBe("[Ação] e [acao]");
+    expect(marked("deploy do convite", searchTerms('"convite"  deploy'))).toBe("[deploy] do [convite]");
+    expect(marked("convites", ["convite", "vites"])).toBe("[convites]");
+    expect(markTerms("nada aqui", ["zebra"])).toEqual([{ text: "nada aqui" }]);
+    expect(markTerms("", ["x"])).toEqual([{ text: "" }]);
   });
 });

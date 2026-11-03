@@ -133,7 +133,8 @@ describe("a receipt never changes a message's height", () => {
     expect(parts("d3").filter((part) => part !== "ac-msg__own-foot")).toEqual(parts("d2"));
     expect(screen().queryByText("Visto")).toBeNull();
     expect(document.querySelector(".channel__seen")).toBeNull();
-    // I write again: the face leaves until João reads it, and a message still sending has no time line.
+    // I write again: the face leaves until João reads it, and a message still sending has its sending state in the
+    // time line's place (the same box, so the row keeps its size when the time comes), and no face's slot yet.
     let release = () => {};
     state.holdPosts = new Promise<void>((r) => {
       release = r;
@@ -147,7 +148,8 @@ describe("a receipt never changes a message's height", () => {
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Mais uma coisa.")) as HTMLElement;
     expect(sending.className).toContain("ac-msg--pending");
-    expect(sending.querySelector(".ac-msg__own-foot")).toBeNull();
+    expect(sending.querySelector(".ac-msg__own-foot > .ac-msg__status")?.textContent).toContain("enviando");
+    expect(sending.querySelector(".ac-msg__own-foot .ac-receipt__seen")).toBeNull();
     await act(async () => release());
     await settle(2);
   });

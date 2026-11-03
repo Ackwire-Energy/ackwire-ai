@@ -25,6 +25,7 @@ import {
   applyReactions,
   applyReceiptEvent,
   applyTyping,
+  applyUnreadEvent,
   applyWorkspaceEvent,
   type BrowserFrame,
   type BrowserInputEvent,
@@ -471,6 +472,8 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
       if (isAgentUnavailable(event)) streams.unavailable(event);
+      // Unread marks: a message where I am, and my reads and mutes from any device.
+      applyUnreadEvent(qc, orgId, event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
       if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
       // The island at the top (ADR 0071 §9): what reaches me while I'm here, and what I settled elsewhere leaves.
@@ -687,7 +690,10 @@ export function applyThreadEvent(
   if (event.change === "deleted") qc.removeQueries({ queryKey: one });
   else if (event.thread) {
     const fresh = event.thread;
-    qc.setQueryData<ThreadInfo>(one, (old) => (old ? { ...fresh, canManage: old.canManage } : undefined));
+    // The event leaves out what is only mine: my `canManage`, following it and its unread for me stay.
+    qc.setQueryData<ThreadInfo>(one, (old) =>
+      old ? { ...fresh, canManage: old.canManage, following: old.following, unread: old.unread } : undefined,
+    );
     if (!qc.getQueryData(one)) void qc.invalidateQueries({ queryKey: one });
   } else void qc.invalidateQueries({ queryKey: one });
   void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });

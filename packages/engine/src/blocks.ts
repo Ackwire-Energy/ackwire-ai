@@ -22,6 +22,7 @@ import { enqueue } from "./outbox";
 import { deliverNoticeToRun } from "./run-resume";
 import { replyThreadOf } from "./runs";
 import type { Talker } from "./talker";
+import { listsEveryTool } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const { agentRuns, agents, artifacts, channelMembers, channels, choiceAnswers, pollVotes, polls, users } = schema;
@@ -379,6 +380,17 @@ export async function answerChoices(
   return { choices, message };
 }
 
+/** Choices need someone to pick: a run a person is behind, where people read (ADR 0124). */
+export async function someoneAnswers(ctx: ToolContext) {
+  if (ctx.background || !ctx.runId) return false;
+  const [channel] = await ctx.db
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.id, ctx.channelId), eq(channels.orgId, ctx.orgId)));
+  if (!channel || isAgentOnlyDm(channel)) return false;
+  return (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).kind === "person";
+}
+
 /**
  * `show_block` and `start_poll`: no scope, like `react` and `ask_user`, because they only speak in the agent's own
  * conversation and touch nothing outside it (ADR 0109). `tools/run-policy.ts` lists them as `HERE`.
@@ -543,19 +555,26 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
     },
   };
 
-  /** Choices need someone to pick: a run a person is behind, where people read (ADR 0124). */
-  const someoneAnswers = async (ctx: ToolContext) => {
-    if (ctx.background || !ctx.runId) return false;
-    const [channel] = await ctx.db
-      .select({ kind: channels.kind, dmKey: channels.dmKey })
-      .from(channels)
-      .where(and(eq(channels.id, ctx.channelId), eq(channels.orgId, ctx.orgId)));
-    if (!channel || isAgentOnlyDm(channel)) return false;
-    return (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).kind === "person";
+  // A run that lists every tool has it whoever is behind the run, and is told why it can't use it when nobody can pick.
+  const choices: ToolDefinition = {
+    ...askChoices,
+    async execute(input, ctx) {
+      if (!(await someoneAnswers(ctx))) {
+        return {
+          content:
+            "Nobody can pick on a card in this run (a routine's work, or a conversation between agents): decide within your permissions and say what you chose, or write the options in your answer.",
+          isError: true,
+        };
+      }
+      return askChoices.execute(input, ctx);
+    },
   };
 
   return {
     name: "blocks",
-    tools: async (ctx) => [showBlock, startPoll, ...((await someoneAnswers(ctx)) ? [askChoices] : [])],
+    tools: async (ctx) =>
+      listsEveryTool(ctx)
+        ? [showBlock, startPoll, choices]
+        : [showBlock, startPoll, ...((await someoneAnswers(ctx)) ? [askChoices] : [])],
   };
 }

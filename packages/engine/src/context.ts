@@ -247,6 +247,26 @@ export interface ContextBlock extends SystemBlock {
   teammates?: { id: string; handle: string }[];
   /** Where the agent's plan stands from 90% (ADR 0118): replaced on every claim of the run. */
   usage?: boolean;
+  /**
+   * Holds for the conversation, not for the agent (who asked, where the thread comes from, its brief): a computer
+   * brain reads it once at the start of its session (`conversationText`), so its system text is the same in every
+   * conversation of the agent and the cached prefix is shared. The model brain reads it where it is.
+   */
+  conversation?: boolean;
+}
+
+export const isConversationBlock = (block: SystemBlock) => (block as ContextBlock).conversation === true;
+
+/**
+ * What a computer brain reads as "# This conversation" at the start of its session (and again after it compacted
+ * its history), one level under it; "" when there is nothing.
+ */
+export function conversationText(system: readonly SystemBlock[]): string {
+  const parts = system
+    .filter((b) => isConversationBlock(b) && !isComputerTurnBlock(b) && b.text.trim())
+    .map((b) => b.text);
+  if (parts.length === 0) return "";
+  return ["# This conversation", ...parts.map((t) => t.replace(/^# /, "## "))].join("\n\n");
 }
 
 export const isTurnBlock = (block: SystemBlock) => (block as ContextBlock).turn === true;
@@ -822,7 +842,6 @@ export async function buildRunContext(
           options.blocks && !options.routine && !run.background
             ? "- Something to use rather than read (a what-if, options to see side by side, a view to filter, a short form): show it yourself with show_block, inside your reply; what the person picks comes back to you. A group deciding together: start_poll. Plain numbers stay a table or a chart, and reports and anything to keep stay files."
             : "",
-          options.choices ? ASK_CHOICES_LINE : "",
           "- To point people to a channel, write its name with # (#engineering): it shows as a link to it.",
           "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Inês, from Braga, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
           CONTINUE_THE_CONVERSATION,
@@ -832,7 +851,7 @@ export async function buildRunContext(
             ? `- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. ${ASK_APPROVALS_TOGETHER} ${REQUEST_APPROVAL_LINE}`
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
-            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait; like an approval, it posts only the text of that same turn. The card shows the question and its choices: don't write them in your text too, and after asking write nothing more. Never ask for something your tools can find, don't ask about simple requests you can just do (an issue to open, a priority to set, work to assign: do it, they can undo), and never ask more than you need."
+            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Ask only when you can't go on without their answer, and make it a question to them, never a status note: an optional offer ('I can also email it if you want') or a note that you need nothing goes in your normal reply; like an approval, it posts only the text of that same turn. The card shows the question and its choices: don't write them in your text too, and after asking write nothing more. Never ask for something your tools can find, don't ask about simple requests you can just do (an issue to open, a priority to set, work to assign: do it, they can undo), and never ask more than you need."
             : "",
           options.react
             ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply: no text at all, not even the emoji again. Never react and also reply with redundant text; if something still needs saying, just reply.'
@@ -870,7 +889,8 @@ export async function buildRunContext(
         .join("\n\n"),
     },
     ...(capabilities ? [{ text: capabilities }] : []),
-    ...(team ? [{ text: team }] : []),
+    // Follows the requester (whose part of the team it names).
+    ...(team ? [{ conversation: true, text: team }] : []),
     ...(options.skills && options.skills.length > 0
       ? [
           {
@@ -882,6 +902,9 @@ export async function buildRunContext(
           },
         ]
       : []),
+    // Only when a person is behind the run: like the team, it follows the requester.
+    // A heading of its own: on its own, the line would read as part of the section before it ("# Your team").
+    ...(options.choices ? [{ conversation: true, text: `# Options to pick from\n${ASK_CHOICES_LINE}` }] : []),
     ...(recentActions.length > 0
       ? [
           {
@@ -911,6 +934,7 @@ export async function buildRunContext(
     ...(range
       ? [
           {
+            conversation: true,
             text: `# Where this thread comes from\nThis thread was started from part of the conversation in ${
               range.channelId === run.channelId
                 ? `#${channel.name}`
@@ -921,8 +945,8 @@ export async function buildRunContext(
           },
         ]
       : []),
-    ...(briefing ? await briefing.then((text) => (text ? [{ text }] : [])) : []),
-    ...(issueBrief ? [{ text: issueBrief }] : []),
+    ...(briefing ? await briefing.then((text) => (text ? [{ conversation: true, text }] : [])) : []),
+    ...(issueBrief ? [{ conversation: true, text: issueBrief }] : []),
     ...(machineAccess
       ? await machineAccess.then((a) =>
           a
@@ -940,7 +964,12 @@ export async function buildRunContext(
       : []),
     ...(await heldSecrets.then((rows) => (rows.length > 0 ? [{ text: heldSecretsText(rows) }] : []))),
     // A routine's background run (ADR 0053 §4): its routine and what people said where it reports.
-    ...(routine ? [{ text: routine.block }, { text: routine.deliverToView }] : []),
+    ...(routine
+      ? [
+          { conversation: true, text: routine.block },
+          { conversation: true, text: routine.deliverToView },
+        ]
+      : []),
     // Per turn from here on: a computer brain reads these in "# This turn" (`thisTurnText`).
     // The local time (the person's, or the routine's zone).
     {
@@ -1031,10 +1060,8 @@ export async function buildRunContext(
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
     sessionPrompt: [
-      // The rules, the organization's context and the agent's block (name, role, instructions). Without the
-      // `ask_choices` line: it is there only when a person is behind the run, so it follows the requester like
-      // "# Your team" below.
-      ...system.slice(0, 3).map((b) => b.text.replace(`\n${ASK_CHOICES_LINE}`, "")),
+      // The rules, the organization's context and the agent's block (name, role, instructions).
+      ...system.slice(0, 3).map((b) => b.text),
       // The roster, not "# Your team": that text follows the requester, so a person and an agent taking turns
       // would start a new session every turn.
       JSON.stringify(

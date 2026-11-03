@@ -332,7 +332,7 @@ describe("the pinned bar under the channel header", () => {
     const message = seedState().messages.find((m) => m.id === messageId) as Message;
     return { messageId, channelId: ENG_ID, threadId: null, pinnedByUserId: "u-joao", pinnedAt, message };
   };
-  const button = () => screen().getByRole("button", { name: /^Mensagens fixadas/ });
+  const button = () => screen().getByRole("button", { name: /^Mensagens fixadas \(/ });
 
   test("the latest pin and the count, the list (face, words, time), a row goes to the message, Desafixar unpins; live", async () => {
     const api = createFakeApi(seedState());
@@ -403,7 +403,7 @@ describe("the pinned bar under the channel header", () => {
     api.pins = { list: async () => [], pin: async () => ({}) as never, unpin: async () => {} };
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
-    expect(screen().queryByRole("button", { name: /^Mensagens fixadas/ })).toBeNull();
+    expect(screen().queryByRole("button", { name: /^Mensagens fixadas \(/ })).toBeNull();
     expect(document.querySelector(".pinbar")).toBeNull();
   });
 });

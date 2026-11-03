@@ -216,7 +216,7 @@ export type WorkerLinkFrame =
   | ({ type: "brain.reclaimed"; reclaimId: string } & BrainReclaimed)
   /** To the worker: Browser was clicked on its agent's desktop (`BrowserManager.show`). */
   | { type: "browser.show"; showId: string; agent: AgentScope }
-  /** From the worker: Chrome for Testing installs first. */
+  /** From the worker: `agent-browser` downloads first. */
   | { type: "browser.showing"; showId: string }
   /** From the worker: the agent's Chrome is on its desktop, or why not. */
   | { type: "browser.shown"; showId: string; error?: { code: MachineErrorCode; message: string } }

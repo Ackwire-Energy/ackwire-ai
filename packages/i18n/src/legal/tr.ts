@@ -7,8 +7,8 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "agentes.chat'in kullanımına ilişkin sözleşme: çalışma alanınız, ajanlarınız ve her bir tarafın neden sorumlu olduğu.",
     courtesy:
-      "Bu metin bir nezaket çevirisidir; İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
-    updated: "2026-11-02",
+      "Bu metin bir nezaket çevirisidir. İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Hizmet",
         blocks: [
-          "Hizmet, insanların ve yapay zekâ ajanlarının birlikte çalıştığı bir çalışma alanıdır: kanallar, ileti dizileri ve doğrudan mesajlar; kendi rolleri, talimatları, hafızaları ve bütçeleri olan ajanlar; görevler, wiki, Drive, forum, takvim ve rutinler; onaylar; diğer hizmetlere bağlayıcılar; ve ajanların üzerinde çalışabileceği bilgisayarları bağlama imkânı.",
+          "Hizmet, insanların ve yapay zekâ ajanlarının birlikte çalıştığı bir çalışma alanıdır. Kanalları, ileti dizilerini ve doğrudan mesajları, ayrıca kendi rolleri, talimatları, hafızaları ve bütçeleri olan ajanları içerir. Bunların yanında görevleri, wiki, Drive, forum, takvim ve rutinleri, onayları, diğer hizmetlere bağlayıcıları ve ajanların üzerinde çalışabileceği bilgisayarları bağlama imkânını da içerir.",
           "Hizmet yenidir ve gelişmeye devam etmektedir: özellikler değişebilir, sınırlandırılabilir veya kaldırılabilir. Yeni hesapları bir süre yalnızca davetle ya da kaydolan herkese açabiliriz. Dayandığınız bir özelliği kaldırmadan önce, makul ölçüde mümkün olduğu hâllerde, sizi önceden bilgilendiririz.",
         ],
       },
@@ -38,7 +38,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Ajanlar ve yaptıkları",
         blocks: [
           "Ajanlar, sizin ve çalışma alanınızın kendilerine verdiği talimatlar, izinler, bağlayıcılar, bütçeler ve bilgisayarlar doğrultusunda hareket eder. Bir ajanın bu izinler dahilinde yaptıkları, gönderdiği mesajlar, değiştirdiği kodlar, okuduğu, yazdığı veya sildiği veriler ve bir bilgisayarda çalıştırdığı komutlar dahil olmak üzere, çalışma alanınız adına yapılmış sayılır ve işbu Koşullar uyarınca bunlardan çalışma alanınız sorumludur. Her ajanın kendisinden sorumlu bir kişisi vardır.",
-          "Geri alınması güç işlemler, gerçekleşmeden önce bir kişiye yöneltilen onay talebine dönüşür. Böyle bir talebi onaylamak sizin kararınızdır; Hizmet ne yapılacağını gösterir, ancak bunu incelemek sizin sorumluluğunuzdadır.",
+          "Geri alınması güç işlemler, gerçekleşmeden önce bir kişiye yöneltilen onay talebine dönüşür. Böyle bir talebi onaylamak sizin kararınızdır. Hizmet ne yapılacağını gösterir, ancak bunu incelemek sizin sorumluluğunuzdadır.",
           "Yapay zekâ çıktıları, kendinden emin bir izlenim verse bile yanlış, eksik veya güncelliğini yitirmiş olabilir. Ajanların ürettiklerine güvenmeden önce bunları inceleyin ve bunları profesyonel danışmanlığın (hukuki, tıbbi, mali veya başka türlü) yerine ya da kişiler üzerinde hukuki veya benzer ölçüde önemli etkiler doğuran kararların tek dayanağı olarak kullanmayın.",
         ],
       },
@@ -49,12 +49,12 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
           "Hizmeti aşağıdaki amaçlarla kullanmamayı ve ajanların bu amaçlarla kullanılmasına izin vermemeyi kabul edersiniz:",
           {
             list: [
-              "hukuka aykırı davranmak, başkalarının haklarını ihlal etmek veya kişisel verileri hukuki bir dayanak olmaksızın işlemek;",
-              "istenmeyen ileti (spam) veya talep edilmemiş mesajlar göndermek ya da herhangi bir kişiyi taciz etmek, tehdit etmek, aldatmak veya onun kimliğine bürünmek;",
-              "kötü amaçlı yazılım, oltalama (phishing) ya da reşit olmayanları cinselleştiren, şiddeti teşvik eden veya başka şekilde hukuka aykırı olan içerik oluşturmak veya yaymak;",
-              "bütçeler, istek sınırları, onaylar, izinler veya bağlı bilgisayarlar ve veritabanları üzerindeki denetimler gibi Hizmetin sınırlarını ve güvenlik önlemlerini aşmak;",
-              "güvenlik açıkları aramak, Hizmeti aşırı yüklemek veya başkalarının ajanlarını ele geçirmeye yönelik talimatlar yerleştirmek dahil olmak üzere, Hizmete veya Hizmet aracılığıyla başkalarına saldırmak;",
-              "kullanmaya yetkili olmadığınız bir hizmete, bilgisayara veya veriye erişmek ya da bağlı bir hizmeti kendi koşullarına aykırı şekilde kullanmak;",
+              "hukuka aykırı davranmak, başkalarının haklarını ihlal etmek veya kişisel verileri hukuki bir dayanak olmaksızın işlemek",
+              "istenmeyen ileti (spam) veya talep edilmemiş mesajlar göndermek ya da herhangi bir kişiyi taciz etmek, tehdit etmek, aldatmak veya onun kimliğine bürünmek",
+              "kötü amaçlı yazılım, oltalama (phishing) ya da reşit olmayanları cinselleştiren, şiddeti teşvik eden veya başka şekilde hukuka aykırı olan içerik oluşturmak veya yaymak",
+              "bütçeler, istek sınırları, onaylar, izinler veya bağlı bilgisayarlar ve veritabanları üzerindeki denetimler gibi Hizmetin sınırlarını ve güvenlik önlemlerini aşmak",
+              "güvenlik açıkları aramak, Hizmeti aşırı yüklemek veya başkalarının ajanlarını ele geçirmeye yönelik talimatlar yerleştirmek dahil olmak üzere, Hizmete veya Hizmet aracılığıyla başkalarına saldırmak",
+              "kullanmaya yetkili olmadığınız bir hizmete, bilgisayara veya veriye erişmek ya da bağlı bir hizmeti kendi koşullarına aykırı şekilde kullanmak",
               "ajanlarınızı çalıştıran yapay zekâ modeli sağlayıcılarının kullanım politikalarını ihlal etmek.",
             ],
           },
@@ -67,15 +67,15 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           '"Çalışma Alanı İçeriği", sizin ve çalışma alanınızdaki diğer kişilerin Hizmete koyduğu her şey ile ajanlarınızın Hizmet içinde ürettiği her şey anlamına gelir. Çalışma Alanı İçeriği, çalışma alanınıza aittir ve sizinle bizim aramızda, ajanların sizin için ürettiği çıktı, onu üreten model sağlayıcısının koşullarına tabi olmak kaydıyla, size aittir. Çıktı, aynı modellerin başkaları için ürettiklerine benzer olabilir.',
           "Hizmeti işletmek için gerekli sınırlı hakları bize tanırsınız: çalışma alanınızı ve ajanlarınızı çalıştırmak, Çalışma Alanı İçeriğini Gizlilik Politikasında açıklandığı şekilde ajanlarınızın kullandığı sağlayıcılara göndermek ve destek sağlamak amacıyla Çalışma Alanı İçeriğini saklamak, işlemek, iletmek ve görüntülemek. Çalışma Alanı İçeriğini satmayız ve makine öğrenimi modellerini eğitmek için kullanmayız.",
-          "Çalışma Alanı İçeriğindeki kişisel verilerin veri sorumlusu çalışma alanınızdır; biz bu verileri, Gizlilik Politikasında ve Veri İşleme Ekinde açıklandığı şekilde, onun talimatları doğrultusunda veri işleyen sıfatıyla işleriz.",
+          "Çalışma Alanı İçeriğindeki kişisel verilerin veri sorumlusu çalışma alanınızdır. Biz bu verileri, Gizlilik Politikasında ve Veri İşleme Ekinde açıklandığı şekilde, onun talimatları doğrultusunda veri işleyen sıfatıyla işleriz.",
         ],
       },
       {
         id: "third-parties",
         heading: "7. Model sağlayıcıları, bağlayıcılar ve kendi hesaplarınız",
         blocks: [
-          "Ajanlar, çalışma alanınızın eklediği bir API anahtarı veya çalışma alanınızdaki birinin bağladığı Claude ya da ChatGPT gibi bir yapay zekâ planı aracılığıyla, üçüncü tarafların (Claude'u geliştiren Anthropic ve OpenAI gibi) yapay zekâ modelleri üzerinde çalışır. Bu anahtarın veya planın kullanımı ayrıca ilgili sağlayıcıyla yaptığınız sözleşmeye tabidir; onun koşullarına uymaktan ve ücretlerinden siz sorumlusunuz.",
-          "Bağlayıcılar, ajanlara başka hizmetlere (GitHub, Google, Linear, Sentry veya bir e-posta gelen kutusu gibi) erişim sağlar. Bu hizmetler üçüncü taraflarca kendi koşulları çerçevesinde sunulur; bunların erişilebilirliği ve verilerle ne yaptıkları bizim kontrolümüz dışındadır.",
+          "Ajanlar, çalışma alanınızın eklediği bir API anahtarı veya çalışma alanınızdaki birinin bağladığı Claude ya da ChatGPT gibi bir yapay zekâ planı aracılığıyla, üçüncü tarafların (Claude'u geliştiren Anthropic ve OpenAI gibi) yapay zekâ modelleri üzerinde çalışır. Bu anahtarın veya planın kullanımı ayrıca ilgili sağlayıcıyla yaptığınız sözleşmeye tabidir. Onun koşullarına uymaktan ve ücretlerinden siz sorumlusunuz.",
+          "Bağlayıcılar, ajanlara başka hizmetlere (GitHub, Google, Linear, Sentry veya bir e-posta gelen kutusu gibi) erişim sağlar. Bu hizmetler üçüncü taraflarca kendi koşulları çerçevesinde sunulur. Bunların erişilebilirliği ve verilerle ne yaptıkları bizim kontrolümüz dışındadır.",
         ],
       },
       {
@@ -101,12 +101,11 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**Fiyatlar.** Planlar ve fiyatları fiyatlandırma sayfamızda yer alır. Fiyatlar ABD doları cinsindendir ve uygulandığı hâllerde vergiler eklenir. Bankanız veya ödeme sağlayıcınız, Brezilya'daki IOF gibi, yurt dışından yapılan alımlar için kendi ücretlerini tahsil edebilir.",
               "**Yenileme.** Bir plan, seçilen döneme bağlı olarak her ay veya her yıl, iptal edilene kadar otomatik olarak yenilenir. Yıllık bir plan yenilenmeden önce bir hatırlatma göndeririz.",
-              "**İptal.** Dilediğiniz zaman iptal edebilirsiniz; iptal, ücreti ödenmiş dönemin sonunda geçerli olur. Bunun ardından çalışma alanının ajanları durur, bilgisayarı 7 gün sonra silinir ve konuşmaları ile dosyaları 90 gün boyunca okunabilir ve indirilebilir durumda kalır; bu sürenin sonunda silinir.",
+              "**İptal.** Dilediğiniz zaman iptal edebilirsiniz. İptal, ücreti ödenmiş dönemin sonunda geçerli olur. Bunun ardından çalışma alanının ajanları durur, bilgisayarı 7 gün sonra silinir ve konuşmaları ile dosyaları 90 gün boyunca okunabilir ve indirilebilir durumda kalır. Bu sürenin sonunda silinir.",
               "**İade yapılmaz.** Kanunun aksini gerektirdiği hâller dışında, bir iptalden sonra kalan dönem için olanlar dahil olmak üzere, ödemeler kesindir ve tamamen veya kısmen iade edilmez.",
-              "**Başarısız ödemeler.** Bir ödeme başarısız olursa, izleyen günlerde yeniden deneriz. Yine başarısız olursa çalışma alanı beklemeye alınır: ajanları durur, kişiler ise çalışma alanında okumaya ve yazmaya devam edebilir. Bilgisayarı 7 gün boyunca saklanır, ardından serbest bırakılır ve silinir. Ödeme yapılması çalışma alanını geri getirir; eski bilgisayar serbest bırakılmışsa yeni bir bilgisayar üzerinde.",
+              "**Başarısız ödemeler.** Bir ödeme başarısız olursa, izleyen günlerde yeniden deneriz. Yine başarısız olursa çalışma alanı beklemeye alınır: ajanları durur, kişiler ise çalışma alanında okumaya ve yazmaya devam edebilir. Bilgisayarı 7 gün boyunca saklanır, ardından serbest bırakılır ve silinir. Ödeme yapılması çalışma alanını geri getirir, eski bilgisayar serbest bırakılmışsa yeni bir bilgisayar üzerinde.",
               "**Fiyat değişiklikleri.** Yeni müşteriler için fiyatları dilediğimiz zaman değiştirebiliriz. Hâlihazırda sahip olduğunuz bir planın fiyatı yalnızca yeni vergiler nedeniyle, bir sonraki yenilemeden itibaren ve en az 30 gün önceden bildirimde bulunularak değişir.",
               "**Adil kullanım.** Bazı özellikler, hangi ajanın yanıt vereceğinin seçilmesi, hafızaların ve işlemlerin değerlendirilmesi ve bir ekranda neye tıklanacağının bulunması gibi, ek ücret almadan sağladığımız yapay zekâ hizmetleri üzerinde çalışır. Kullanımı normalin çok üzerinde olan bir çalışma alanı için bunları sınırlayabiliriz.",
-              "**Erken erişim.** Erken erişim süresince ücretsiz olan bir şey için ücret almaya başlamadan önce en az 30 gün önceden bildirimde bulunuruz.",
               "**Bütçeler.** Çalışma alanı başına ve ajan başına belirlenen bütçelere ulaşıldığında, ajanların model kullanımı durur. Bunlar Hizmetin bir parçasıdır, Hizmetin bir kusuru değildir. Bir sağlayıcının kendi anahtarınız veya yapay zekâ planınız için tahsil ettiği ücretler sizinle o sağlayıcı arasındadır.",
             ],
           },
@@ -123,7 +122,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Süre ve fesih",
         blocks: [
-          "Hizmeti kullanmayı dilediğiniz zaman bırakabilir ve hesabınızı uygulama içinden silebilirsiniz. İşbu Koşulların esaslı ihlali hâlinde, kanunun gerektirdiği hâllerde veya Hizmeti sonlandırmamız durumunda 30 gün önceden bildirimde bulunarak erişiminizi askıya alabilir veya sona erdirebiliriz. Hizmeti sizin ihlaliniz dışındaki nedenlerle sona erdirdiğimizde, Çalışma Alanı İçeriğinizi 30 gün boyunca dışa aktarılabilir hâlde tutarız; ardından Gizlilik Politikasında açıklandığı şekilde sileriz. Niteliği gereği fesihten sonra da geçerliliğini koruyan bölümler (6, 9, 11, 13, 14 ve 15 dahil) geçerliliğini korur.",
+          "Hizmeti kullanmayı dilediğiniz zaman bırakabilir ve hesabınızı uygulama içinden silebilirsiniz. İşbu Koşulların esaslı ihlali hâlinde, kanunun gerektirdiği hâllerde veya Hizmeti sonlandırmamız durumunda 30 gün önceden bildirimde bulunarak erişiminizi askıya alabilir veya sona erdirebiliriz. Hizmeti sizin ihlaliniz dışındaki nedenlerle sona erdirdiğimizde, Çalışma Alanı İçeriğinizi 30 gün boyunca dışa aktarılabilir hâlde tutarız. Ardından Gizlilik Politikasında açıklandığı şekilde sileriz. Niteliği gereği fesihten sonra da geçerliliğini koruyan bölümler (6, 9, 11, 13, 14 ve 15 dahil) geçerliliğini korur.",
         ],
       },
       {
@@ -137,7 +136,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "liability",
         heading: "14. Sorumluluğun sınırlandırılması",
         blocks: [
-          "Kanunun izin verdiği azami ölçüde: taraflardan hiçbiri dolaylı, arızi, özel, netice kabilinden veya cezai tazminatlardan ya da kâr, gelir veya veri kaybından sorumlu değildir; ve Hizmetten kaynaklanan toplam sorumluluğumuz, talebe yol açan olaydan önceki on iki ay içinde bize ödediğiniz tutarlarla (hiçbir ödeme yapmadıysanız 100 ABD doları ile) sınırlıdır. Bu sınırlamalar ödeme yükümlülüklerinize, 5. Bölümü ihlal etmenize veya kanunen sınırlandırılamayan sorumluluğa uygulanmaz.",
+          "Kanunun izin verdiği azami ölçüde: taraflardan hiçbiri dolaylı, arızi, özel, netice kabilinden veya cezai tazminatlardan ya da kâr, gelir veya veri kaybından sorumlu değildir. Aynı ölçüde, Hizmetten kaynaklanan toplam sorumluluğumuz, talebe yol açan olaydan önceki on iki ay içinde bize ödediğiniz tutarlarla (hiçbir ödeme yapmadıysanız 100 ABD doları ile) sınırlıdır. Bu sınırlamalar ödeme yükümlülüklerinize, 5. Bölümü ihlal etmenize veya kanunen sınırlandırılamayan sorumluluğa uygulanmaz.",
         ],
       },
       {
@@ -158,7 +157,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "17. İşbu Koşullardaki değişiklikler",
         blocks: [
-          "İşbu Koşulları güncelleyebiliriz. Esaslı değişiklikler, yürürlüğe girmelerinden en az 14 gün önce e-posta yoluyla veya uygulama içinde duyurulur; yürürlük tarihinden sonra kullanıma devam edilmesi kabul anlamına gelir. Güncel sürüm her zaman bu sayfada yer alır. Bir çeviri ile İngilizce sürüm arasında farklılık olması hâlinde, kanunun aksini gerektirdiği hâller dışında İngilizce sürüm esas alınır.",
+          "İşbu Koşulları güncelleyebiliriz. Esaslı değişiklikler, yürürlüğe girmelerinden en az 14 gün önce e-posta yoluyla veya uygulama içinde duyurulur. Yürürlük tarihinden sonra kullanıma devam edilmesi kabul anlamına gelir. Güncel sürüm her zaman bu sayfada yer alır. Bir çeviri ile İngilizce sürüm arasında farklılık olması hâlinde, kanunun aksini gerektirdiği hâller dışında İngilizce sürüm esas alınır.",
         ],
       },
       {
@@ -175,8 +174,8 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Neleri topladığımız, ajanların neyi nereye gönderdiği, çalışma alanınızı kimlerin görebildiği ve sahip olduğunuz haklar.",
     courtesy:
-      "Bu metin bir nezaket çevirisidir; İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
-    updated: "2026-11-02",
+      "Bu metin bir nezaket çevirisidir. İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "overview",
@@ -186,7 +185,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "Kişilerin bir hesap oluşturmak ve kullanmak için bize verdiği bilgiler olan **hesap verileri** bakımından veri sorumlusu biziz.",
-              "Bir çalışma alanının kişilerinin ve ajanlarının çalışma alanına koyduğu veya orada ürettiği her şey olan **Çalışma Alanı İçeriği** bakımından, çalışma alanının talimatları doğrultusunda hareket eden veri işleyen biziz. Veri sorumlusu çalışma alanıdır; bununla, çalışma alanını oluşturan ya da adına oluşturulan gerçek veya tüzel kişi kastedilir.",
+              "Bir çalışma alanının kişilerinin ve ajanlarının çalışma alanına koyduğu veya orada ürettiği her şey olan **Çalışma Alanı İçeriği** bakımından, çalışma alanının talimatları doğrultusunda hareket eden veri işleyen biziz. Veri sorumlusu çalışma alanıdır. Bununla, çalışma alanını oluşturan ya da adına oluşturulan gerçek veya tüzel kişi kastedilir.",
             ],
           },
         ],
@@ -197,11 +196,11 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Hesap verileri:** ad, e-posta adresi, parola özeti (hash), profil fotoğrafı, dil ve saat dilimi. Google, Apple veya GitHub ile oturum açarsanız, ilgili sağlayıcıdan adınızı, e-posta adresinizi ve hesap tanımlayıcınızı alırız; parolanızı asla almayız.",
+              "**Hesap verileri:** ad, e-posta adresi, parola özeti (hash), profil fotoğrafı, dil ve saat dilimi. Google, Apple veya GitHub ile oturum açarsanız, ilgili sağlayıcıdan adınızı, e-posta adresinizi ve hesap tanımlayıcınızı alırız. Parolanızı asla almayız.",
               "**Çalışma alanı verileri:** çalışma alanının adı, üyeleri, rolleri ve davetleri.",
               "**Faturalandırma verileri:** agentes.chat planı olan bir çalışma alanı için, ödemeyi yapan kişinin adı, e-posta adresi, fatura adresi ve vergi kimlik numarası, plan ve planın faturaları ile ödemeleri. Ödemeler, kart bilgilerini işleyen Stripe tarafından gerçekleştirilir: kart bilgileri bize asla ulaşmaz.",
               "**Kullanım ve kayıt (log) verileri:** IP adresleri, tarayıcı ve cihaz, oturumlar, güvenlik olayları, API istekleri ve bütçeleri uygulamak ve kullanımı göstermek için sakladığımız her model çağrısının kaydı (ait olduğu çalışma alanı ve ajanla birlikte model, token ve maliyet). Bir şey bozulduğunda, düzeltmek amacıyla hatayı mesaj içeriği olmaksızın kaydederiz.",
-              "**Cihazlar:** telefon uygulaması için, oturum açtığınız her cihazın anlık bildirim (push) token'ı; bağlı bilgisayarlar ve Mac uygulaması için bilgisayarın adı, işletim sistemi ve uygulama sürümü.",
+              "**Cihazlar:** telefon uygulaması için, oturum açtığınız her cihazın anlık bildirim (push) token'ı. Bağlı bilgisayarlar ve Mac uygulaması için bilgisayarın adı, işletim sistemi ve uygulama sürümü.",
               "**Bekleme listesi:** agentes.chat üzerinde bize verdiğiniz e-posta adresi ve dil ile bu adresi doğrulayıp doğrulamadığınız.",
               "**Site analitiği:** agentes.chat üzerinde (çalışma alanı değil, herkese açık site), Himetrica ile toplanan, görüntülenen sayfalar, yönlendiren site, cihaz türü ve IP adresinden türetilen yaklaşık konum.",
             ],
@@ -220,8 +219,8 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Çalışma alanları adına işlenen Çalışma Alanı İçeriği",
         blocks: [
-          "Çalışma Alanı İçeriği; kanallardaki, ileti dizilerindeki ve doğrudan mesajlardaki mesajları; Drive'daki dosyaları; wiki sayfalarını; görevleri, forum konularını, rutinleri ve takvim etkinliklerini; onayları; ajanların talimatlarını, ayarlarını ve hafızasını; ajanların yazdıklarını ve yaptıklarını; ve ajanların çalışma alanının bağladığı bağlayıcılar, veritabanları ve bilgisayarlar aracılığıyla okuduğu verileri kapsar. Bunları yalnızca çalışma alanını ve ajanlarını çalışma alanının yapılandırdığı şekilde çalıştırmak, çalışma alanının üyelerine göstermek, talep ettikleri bildirimleri göndermek ve destek sağlamak amacıyla işleriz.",
-          "Çalışma Alanı İçeriği çalışma alanına aittir: üyeler, kanalların ve izinlerin izin verdiği kadarını görür; sahipleri ve yöneticileri ise içeriği yönetir. Paylaştığınız mesajlar, çalışma alanı bunları silmedikçe, çalışma alanından ayrılmanızdan veya hesabınızı silmenizden sonra da çalışma alanında kalır.",
+          "Çalışma Alanı İçeriği, kanallardaki, ileti dizilerindeki ve doğrudan mesajlardaki mesajları, Drive'daki dosyaları ve wiki sayfalarını kapsar. Ayrıca görevleri, forum konularını, rutinleri, takvim etkinliklerini ve onayları, ajanların talimatlarını, ayarlarını ve hafızasını, ajanların yazdıklarını ve yaptıklarını ve ajanların çalışma alanının bağladığı bağlayıcılar, veritabanları ve bilgisayarlar aracılığıyla okuduğu verileri de kapsar. Bunları yalnızca çalışma alanını ve ajanlarını çalışma alanının yapılandırdığı şekilde çalıştırmak, çalışma alanının üyelerine göstermek, talep ettikleri bildirimleri göndermek ve destek sağlamak amacıyla işleriz.",
+          "Çalışma Alanı İçeriği çalışma alanına aittir: üyeler, kanalların ve izinlerin izin verdiği kadarını görür. Sahipleri ve yöneticileri ise içeriği yönetir. Paylaştığınız mesajlar, çalışma alanı bunları silmedikçe, çalışma alanından ayrılmanızdan veya hesabınızı silmenizden sonra da çalışma alanında kalır.",
         ],
       },
       {
@@ -234,11 +233,11 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
               "**Cihazlar ile sunucularımız arasında.** Çalışma Alanı İçeriği dahil olmak üzere, sunucularımız ile bunlara bağlanan tarayıcılar, uygulamalar ve bilgisayarlar arasında gönderilen her şey, Hizmeti saldırılara karşı koruyan Cloudflare üzerinden geçer. Bunu yapabilmek için Cloudflare, bu trafiğin şifresini her cihaza en yakın veri merkezinde çözer ve trafiği bizim adımıza işler.",
               "**Yanıt verme.** Bir ajan çalışırken, ihtiyaç duyduğu bağlamı (çalışma alanının bağlamı, ajanın talimatları, konuşma, ilgili hafıza ve araçlarının sonuçları) o ajan için seçilen model sağlayıcısına gönderir. Çalışma alanının eklediği bir API anahtarı kullanıldığında çağrı, çalışma alanının o sağlayıcıdaki kendi hesabı ve sözleşmesi altında yapılır. Bir ajana Claude veya ChatGPT gibi bir yapay zekâ planı bağlandığında ajan, planı bağlayan kişinin hesabı altında ve sağlayıcının koşullarına tabi olarak çalışır.",
               "**Kimin yanıt vereceğine karar verme.** Bir yönlendirme modeli, hangi ajanın yanıt vermesi gerektiğine (varsa) karar vermek için yeni bir mesajı, çalışma alanının ajanlarının adlarını ve rollerini ve son konuşmaları okur. Bu model TypeSafe'te veya yedek olarak çalışma alanının model sağlayıcısında çalışır. Yönlendirme hiçbir zaman bir ajana herhangi bir izin vermez.",
-              "**Hafıza.** Ajanlar zamanla gelişmek için konuşmalardan hafıza (özetler, olgular ve dersler) tutar. Hafızaya ilişkin bazı değerlendirmeler (bir şeyin saklanmaya değer olup olmadığı veya bir ajanın zaten bildikleriyle çelişip çelişmediği) TypeSafe tarafından yapılır. Hafıza ajanın sayfasında görülebilir ve kaldırılabilir; çalışma alanıyla birlikte silinir.",
+              "**Hafıza.** Ajanlar zamanla gelişmek için konuşmalardan hafıza (özetler, olgular ve dersler) tutar. Hafızaya ilişkin bazı değerlendirmeler (bir şeyin saklanmaya değer olup olmadığı veya bir ajanın zaten bildikleriyle çelişip çelişmediği) TypeSafe tarafından yapılır. Hafıza ajanın sayfasında görülebilir ve kaldırılabilir. Çalışma alanıyla birlikte silinir.",
               "**Arama.** İlgili mesajları ve belgeleri bulmak için metinler Voyage AI tarafından vektörlere (embedding) dönüştürülebilir.",
               "**Bağlayıcılar.** Çalışma alanı bir hizmeti (GitHub, Google, Linear, Sentry, bir e-posta gelen kutusu veya herhangi bir MCP sunucusu gibi) bağladığında, erişim token'larını şifrelenmiş olarak saklarız ve o hizmette yalnızca çalışma alanının her ajana verdiği kapsamlar dahilinde okuma veya yazma yaparız. Bağlı hizmet bu verileri kendi koşulları çerçevesinde işler. Gmail ve Outlook gelen kutularına ve Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox ve Square'e yapılan bağlantılar, ajanların orada okuduklarını ve yazdıklarını işleyen Composio üzerinden gerçekleşir.",
-              "**Veritabanları.** Veritabanı bağlantıları salt okunurdur; kimlik bilgileri şifrelenmiş olarak saklanır ve her sorgu çalıştırılmadan önce denetlenir.",
-              "**Bağlı bilgisayarlar.** Biri bir bilgisayar bağladığında, ajanlar o bilgisayarda belirlenen klasörler ve izinler dahilinde orada komut çalıştırabilir ve bir tarayıcı kullanabilir. Bir ajanın tarayıcısının canlı görüntüsü Cloudflare'den ve sunucularımızın belleğinden geçer ve kaydedilmez; ekibin ajanın ne yaptığını görebilmesi için ajanın attığı adımların bir özeti (ziyaret edilen adresler ve işlemler gibi) ajanın çalışmasıyla birlikte saklanır.",
+              "**Veritabanları.** Veritabanı bağlantıları salt okunurdur. Kimlik bilgileri şifrelenmiş olarak saklanır ve her sorgu çalıştırılmadan önce denetlenir.",
+              "**Bağlı bilgisayarlar.** Biri bir bilgisayar bağladığında, ajanlar o bilgisayarda belirlenen klasörler ve izinler dahilinde orada komut çalıştırabilir ve bir tarayıcı kullanabilir. Bir ajanın tarayıcısının canlı görüntüsü Cloudflare'den ve sunucularımızın belleğinden geçer ve kaydedilmez. Ekibin ajanın ne yaptığını görebilmesi için ajanın attığı adımların bir özeti (ziyaret edilen adresler ve işlemler gibi) ajanın çalışmasıyla birlikte saklanır.",
               "**Çalışma alanının bilgisayarı.** agentes.chat Cloud'da bir çalışma alanının ajanları, o çalışma alanı için işlettiğimiz ve Avrupa Birliği'nde Contabo tarafından barındırılan bir bilgisayar üzerinde çalışır. Her ajanın tarayıcısının, yapay zekâ araçlarının ve diğer programlarının orada gönderdiği ve aldığı veri miktarını günlük olarak ölçeriz. Bilgisayar, Kullanım Koşullarında açıklandığı şekilde, çalışma alanının agentes.chat planı sona erdikten sonra silinir.",
             ],
           },
@@ -257,7 +256,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
               "**Kanunun gerektirdiği hâllerde.**",
             ],
           },
-          "Altyapımızı işleten kişiler, Çalışma Alanı İçeriğini saklayan sunuculara ve veritabanlarına erişebilir; bu erişimi yalnızca Hizmetin çalışmasını sürdürmek, örneğin arızaları teşhis etmek ve yedekleri geri yüklemek için ya da yasal bir yükümlülüğü yerine getirmek için kullanırlar. Bu yolların hiçbiri profil, reklam veya eğitim verisi oluşturmak için kullanılmaz.",
+          "Altyapımızı işleten kişiler, Çalışma Alanı İçeriğini saklayan sunuculara ve veritabanlarına erişebilir. Bu erişimi yalnızca Hizmetin çalışmasını sürdürmek, örneğin arızaları teşhis etmek ve yedekleri geri yüklemek için ya da yasal bir yükümlülüğü yerine getirmek için kullanırlar. Bu yolların hiçbiri profil, reklam veya eğitim verisi oluşturmak için kullanılmaz.",
         ],
       },
       {
@@ -267,7 +266,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "**Hesap verileri:** hesap var olduğu sürece. Hesabınızı uygulama içinden sildiğinizde, kanunen saklamamız gereken kayıtlar hariç, derhâl kaldırılır ve 30 gün içinde yedeklerimizden çıkar. Tek üyesi olduğunuz her çalışma alanı aynı anda kapanır ve içeriği aşağıda açıklandığı şekilde 7 gün sonra silinir. Bulunduğunuz çalışma alanları, her biri var olduğu sürece adınızı ve e-posta adresinizi denetim kayıtlarında tutar.",
-              "**Çalışma Alanı İçeriği:** çalışma alanı var olduğu sürece; çalışma alanı belirli içerikleri sildiğinde ise daha erken. Bir çalışma alanının agentes.chat planı sona erdiğinde, içeriği 90 gün boyunca erişilebilir kalır ve ardından silinir. Bir sahip bir çalışma alanını sildiğinde, çalışma alanı herkes için derhâl kapanır ve içeriği, bir sahip bu süreden önce geri yüklemedikçe 7 gün sonra silinir; bundan sonraki 30 gün içinde de, kanunen veya kötüye kullanım kaydı olarak (aşağıya bakınız) saklamamız gereken içerik hariç, yedeklerimizden çıkar.",
+              "**Çalışma Alanı İçeriği:** çalışma alanı var olduğu sürece, çalışma alanı belirli içerikleri sildiğinde ise daha erken. Bir çalışma alanının agentes.chat planı sona erdiğinde, içeriği 90 gün boyunca erişilebilir kalır ve ardından silinir. Bir sahip bir çalışma alanını sildiğinde, çalışma alanı herkes için derhâl kapanır ve içeriği, bir sahip bu süreden önce geri yüklemedikçe 7 gün sonra silinir. Bundan sonraki 30 gün içinde de, kanunen veya kötüye kullanım kaydı olarak (aşağıya bakınız) saklamamız gereken içerik hariç, yedeklerimizden çıkar.",
               "**Kayıtlar (loglar):** istek ve güvenlik kayıtları 90 güne kadar. Model kullanım kayıtları (token ve maliyet), bütçeler ve kullanım raporları bunlara dayandığından, çalışma alanı var olduğu sürece.",
               "**Faturalandırma verileri:** bir çalışma alanı için ödeme yaptığınız sürece ve bundan sonra vergi ve muhasebe mevzuatının gerektirdiği süre boyunca.",
               "**Bekleme listesi:** davet edilene kadar ve davetten sonraki 12 ay boyunca ya da sizi listeden çıkarmamızı talep edene kadar.",
@@ -287,21 +286,21 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "transfers",
         heading: "9. Uluslararası aktarımlar",
         blocks: [
-          "Uygulamamız ve veritabanı Amerika Birleşik Devletleri'nde çalışır ve bu politikada adı geçen sağlayıcılar verileri Amerika Birleşik Devletleri'nde işler; bunun istisnaları, Contabo'nun Avrupa Birliği'nde barındırdığı çalışma alanı bilgisayarları ile trafiği her cihaza en yakın, Amerika Birleşik Devletleri'nde veya başka bir yerde bulunan veri merkezinde işleyen Cloudflare'dir. GDPR veya UK GDPR'ye tabi kişisel veriler üçüncü bir ülkeye aktarıldığında, Avrupa Komisyonu'nun Standart Sözleşme Hükümlerine ve Birleşik Krallık Ekine dayanırız. LGPD'ye tabi veriler için 33. maddedeki sözleşmesel güvencelere dayanırız.",
+          "Uygulamamız ve veritabanı Amerika Birleşik Devletleri'nde çalışır ve bu politikada adı geçen sağlayıcılar verileri Amerika Birleşik Devletleri'nde işler. Bunun istisnaları, Contabo'nun Avrupa Birliği'nde barındırdığı çalışma alanı bilgisayarları ile trafiği her cihaza en yakın, Amerika Birleşik Devletleri'nde veya başka bir yerde bulunan veri merkezinde işleyen Cloudflare'dir. GDPR veya UK GDPR'ye tabi kişisel veriler üçüncü bir ülkeye aktarıldığında, Avrupa Komisyonu'nun Standart Sözleşme Hükümlerine ve Birleşik Krallık Ekine dayanırız. LGPD'ye tabi veriler için 33. maddedeki sözleşmesel güvencelere dayanırız.",
         ],
       },
       {
         id: "apps",
         heading: "10. Telefon ve Mac uygulamaları",
         blocks: [
-          "Telefon uygulaması bildirimleri Expo, Apple ve Google aracılığıyla gönderir; bir bildirim, yazan kişinin adını ve mesajın başlangıcını gösterebilir ve hangi bildirimleri alacağınızı siz seçersiniz. Mac uygulaması ve bağlı bilgisayarlar oturum bilgilerini cihazda tutar; hesabınızı silmek (uygulamalarda da mümkündür) tüm cihazlardaki oturumları kapatır.",
+          "Telefon uygulaması bildirimleri Expo, Apple ve Google aracılığıyla gönderir. Bir bildirim, yazan kişinin adını ve mesajın başlangıcını gösterebilir ve hangi bildirimleri alacağınızı siz seçersiniz. Mac uygulaması ve bağlı bilgisayarlar oturum bilgilerini cihazda tutar. Hesabınızı silmek (uygulamalarda da mümkündür) tüm cihazlardaki oturumları kapatır.",
         ],
       },
       {
         id: "gdpr",
         heading: "11. GDPR kapsamındaki haklarınız",
         blocks: [
-          "AEA'da veya Birleşik Krallık'ta bulunuyorsanız; erişim, düzeltme, silme, kısıtlama ve taşınabilirlik talep edebilir, işlemeye itiraz edebilir ve denetim makamınıza şikâyette bulunabilirsiniz. Hesap verileri için doğrudan bizimle iletişime geçin; profilinizi düzeltebilir ve hesabınızı uygulama içinden kendiniz de silebilirsiniz. Çalışma Alanı İçeriğindeki kişisel veriler için, bu verilerin sorumlusu olan çalışma alanının sahipleri veya yöneticileriyle iletişime geçin. Bize ulaşan talepleri o çalışma alanına yönlendiririz ve veri işleyen sıfatıyla ona yardımcı oluruz.",
+          "AEA'da veya Birleşik Krallık'ta bulunuyorsanız, erişim, düzeltme, silme, kısıtlama ve taşınabilirlik talep edebilir, işlemeye itiraz edebilir ve denetim makamınıza şikâyette bulunabilirsiniz. Hesap verileri için doğrudan bizimle iletişime geçin. Profilinizi düzeltebilir ve hesabınızı uygulama içinden kendiniz de silebilirsiniz. Çalışma Alanı İçeriğindeki kişisel veriler için, bu verilerin sorumlusu olan çalışma alanının sahipleri veya yöneticileriyle iletişime geçin. Bize ulaşan talepleri o çalışma alanına yönlendiririz ve veri işleyen sıfatıyla ona yardımcı oluruz.",
         ],
       },
       {
@@ -329,14 +328,14 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "children",
         heading: "15. Çocuklar",
         blocks: [
-          "Hizmet yetişkinlere yönelik bir çalışma aracıdır. 18 yaşın altındaki kişilere yönelik değildir ve onların kişisel verilerini bilerek toplamayız. Bir reşit olmayanın bize kişisel veri verdiğini düşünüyorsanız, privacy@agentes.chat adresine yazın; söz konusu verileri sileriz.",
+          "Hizmet yetişkinlere yönelik bir çalışma aracıdır. 18 yaşın altındaki kişilere yönelik değildir ve onların kişisel verilerini bilerek toplamayız. Bir reşit olmayanın bize kişisel veri verdiğini düşünüyorsanız, privacy@agentes.chat adresine yazın. Söz konusu verileri sileriz.",
         ],
       },
       {
         id: "changes",
         heading: "16. Bu politikadaki değişiklikler",
         blocks: [
-          "Bu politikayı güncelleyebiliriz; esaslı değişiklikler yürürlüğe girmeden önce e-posta yoluyla veya uygulama içinde duyurulur. Güncel sürüm her zaman bu sayfada yer alır. Bir çeviri ile İngilizce sürüm arasında farklılık olması hâlinde, kanunun aksini gerektirdiği hâller dışında İngilizce sürüm esas alınır.",
+          "Bu politikayı güncelleyebiliriz. Esaslı değişiklikler yürürlüğe girmeden önce e-posta yoluyla veya uygulama içinde duyurulur. Güncel sürüm her zaman bu sayfada yer alır. Bir çeviri ile İngilizce sürüm arasında farklılık olması hâlinde, kanunun aksini gerektirdiği hâller dışında İngilizce sürüm esas alınır.",
         ],
       },
       {

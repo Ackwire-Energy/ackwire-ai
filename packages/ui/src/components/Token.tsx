@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon } from "../icons/Icon";
 
-/** A picked item (a participant, a member) with a button to remove it. */
+/** A picked item (a participant, a member) with a button to remove it (none without `onRemove`: it stays). */
 export function Token({
   children,
   leading,
@@ -12,16 +12,18 @@ export function Token({
   /** E.g. a small avatar. */
   leading?: ReactNode;
   /** "Remover Ada". */
-  removeLabel: string;
-  onRemove: () => void;
+  removeLabel?: string;
+  onRemove?: () => void;
 }) {
   return (
     <span className="ac-token">
       {leading}
       <span className="ac-token__label">{children}</span>
-      <button type="button" className="ac-token__remove" aria-label={removeLabel} onClick={onRemove}>
-        <Icon name="close" size={14} />
-      </button>
+      {onRemove && (
+        <button type="button" className="ac-token__remove" aria-label={removeLabel} onClick={onRemove}>
+          <Icon name="close" size={14} />
+        </button>
+      )}
     </span>
   );
 }

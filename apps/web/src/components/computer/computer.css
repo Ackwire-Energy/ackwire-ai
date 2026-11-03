@@ -604,9 +604,9 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   /* The controls stand on the name's line, taller than it: the head's top keeps them as far under the sheet's edge as
-     its sides are in (20 px, a phone's 16). */
+     its sides are in. */
   .cmp-dialog:not(.is-screen-only) .ac-dialog__head {
-    padding-top: calc(20px + (var(--cmp-button) - 24px) / 2 + var(--title-cap-mid, var(--cap-mid)));
+    padding-top: calc(var(--dialog-pad) + (var(--cmp-button) - 24px) / 2 + var(--title-cap-mid, var(--cap-mid)));
   }
   .cmp-body > .cmp-prep,
   .cmp-body > .brw-ac.is-surface,
@@ -741,9 +741,6 @@
 @media (max-width: 640px) {
   .cmp-body {
     padding: 16px;
-  }
-  .cmp-dialog:not(.is-screen-only) .ac-dialog__head {
-    padding-top: calc(16px + (var(--cmp-button) - 24px) / 2 + var(--title-cap-mid, var(--cap-mid)));
   }
   .cmp-dialog .ac-dialog__lead {
     display: none;

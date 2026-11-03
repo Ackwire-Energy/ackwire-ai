@@ -902,6 +902,13 @@ export function agentStateOfRun(r: LiveRun): "idle" | "thinking" | "writing" {
   return "idle";
 }
 
+/** Where the agent is working now (a run thinking or writing), or null. */
+export function agentWorkingIn(state: StreamsState, agentId: string): string | null {
+  for (const r of Object.values(state.runs))
+    if (r.agentId === agentId && agentStateOfRun(r) !== "idle") return r.channelId;
+  return null;
+}
+
 /** An agent's state across its live runs (optionally in one channel): writing beats thinking beats idle. */
 export function agentStateIn(
   state: StreamsState,

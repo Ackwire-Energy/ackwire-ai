@@ -241,7 +241,7 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
 
 /**
  * "Agentes": each agent the message reached and where it is with it (an agent's reaction is its answer), who picked
- * them, and the line's action. When no agent will answer, it says so and offers "Chamar um agente": a tap puts its
+ * them, and the line's action. When no agent will answer, or every one it was for passed, it says so and offers "Chamar um agente": a tap puts its
  * @handle in the box. When nothing could pick, why, and how agents are picked.
  */
 function ReceiptsSheet({
@@ -267,7 +267,8 @@ function ReceiptsSheet({
     (reactions ?? []).flatMap((r) => r.agentIds ?? []),
   );
   const view = receiptView(receipt);
-  const nobody = view.status?.kind === "nobody";
+  // Nobody will answer, or every agent it was for ended without answering: a person can call one.
+  const nobody = view.status?.kind === "nobody" || view.status?.kind === "passed";
   const callable = nobody
     ? rows.flatMap(({ agentId }) => {
         const handle = dir.agentById.get(agentId)?.handle;
@@ -300,7 +301,13 @@ function ReceiptsSheet({
           {by.text}
         </Note>
       ) : null}
-      {nobody ? <Note icon="checks">{t(mentionNeeded ? "receipts.mentionNeeded" : "receipts.nobody")}</Note> : null}
+      {nobody ? (
+        <Note icon="checks">
+          {view.status?.kind === "passed"
+            ? t("receipts.passed", { count: rows.length })
+            : t(mentionNeeded ? "receipts.mentionNeeded" : "receipts.nobody")}
+        </Note>
+      ) : null}
       {callable.length > 0 ? (
         <>
           <SectionHeader title={t("channel.callAgent")} />

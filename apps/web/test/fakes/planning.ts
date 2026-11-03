@@ -350,6 +350,7 @@ export function createMockPlanning(
       agentId: agent(3).id,
       prompt: "Resuma o que aconteceu na semana: decisões, issues fechadas e o que ficou pendente.",
       trigger: sched("toda segunda às 9h"),
+      ownActions: ["SLACK_SEND_MESSAGE"],
     });
     const errors = routine({
       name: "Erros do Sentry do dia",

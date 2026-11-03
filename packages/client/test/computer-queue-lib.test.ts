@@ -194,6 +194,18 @@ test("fan-out: each called agent answered, working or its place in line, from re
   expect(fan?.agents.map((a) => fanChipText(en, "en", a))).toEqual(["answered", "working", "2nd", "3rd", "in line"]);
   // One agent called is no fan-out.
   expect(fanOutOf({ routed: true, agents: [["ada", "handled"]], mentioned: ["ada"] })).toBeNull();
+  // One that passed didn't answer: never "answered".
+  const passed = fanOutOf({
+    routed: true,
+    byAgent: true,
+    mentioned: ["ada", "kai"],
+    agents: [
+      ["ada", "passed"],
+      ["kai", "claimed"],
+    ],
+  });
+  expect(passed?.agents.map((a) => fanChipText(en, "en", a))).toEqual(["working", "didn't answer"]);
+  expect(fanOutText(en, passed as never)).toBe("2 agents called · 1 working · 1 didn't answer");
 });
 
 test("the fan-out strip: under an agent's message, once two called agents started, while one works or waits", () => {

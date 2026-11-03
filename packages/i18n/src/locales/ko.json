@@ -121,6 +121,8 @@
     "color": "색상",
     "colorDesc": "역할 표시의 색이에요.",
     "colorOf": "{{color}} 색상",
+    "hoist": "멤버 목록에 따로 표시",
+    "hoistDesc": "이 역할이 있는 사람은 멤버 열에서 별도 그룹으로 표시돼요.",
     "icon": "아이콘",
     "iconDesc": "이름 옆에 표시돼요.",
     "more": "옵션 더 보기",
@@ -1070,9 +1072,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "시스템",
     "markRead": "읽음으로 표시",
+    "muteChannel": "채널 알림 끄기",
+    "unmuteChannel": "채널 알림 켜기",
     "mention": "멘션",
     "copyHandle": "@{{handle}} 복사",
     "handleCopied": "@를 복사했어요.",
+    "copyId": "ID 복사",
+    "idCopied": "ID를 복사했어요.",
     "editAgent": "에이전트 편집",
     "openPage": "전체 페이지 열기",
     "moveUp": "위로 이동",
@@ -1181,9 +1187,8 @@
     "sidebarMenu": {
       "title": "사이드바",
       "newChannel": "새 채널",
-      "newAgentGroup": "새 에이전트 그룹",
       "addToChannels": "새 채널 또는 카테고리",
-      "addToAgents": "에이전트 또는 그룹 만들기",
+      "addToDms": "새 메시지 또는 에이전트",
       "newMessage": "새 메시지",
       "addMembers": "사람 또는 에이전트 추가",
       "channelSettings": "채널 설정",
@@ -1277,6 +1282,9 @@
     "pendingApprovals_other": "대기 중인 승인 {{count}}개",
     "home": "홈",
     "notifications": "알림",
+    "unreadMark": "읽지 않음",
+    "unreadMentions_other": "나를 언급한 메시지 {{count}}개",
+    "unreadThreads_other": "스레드: 읽지 않은 답글이 있는 스레드 {{count}}개",
     "unreadNotifications_other": "읽지 않은 알림 {{count}}개"
   },
   "agentGroups": {
@@ -1309,6 +1317,9 @@
   },
   "team": {
     "title": "팀",
+    "groups": {
+      "title": "에이전트 그룹"
+    },
     "subtitle_other": "에이전트 {{count}}명, 담당자별로 묶었어요.",
     "working_other": "지금 {{count}}명 작업 중.",
     "skyLabel": "담당자별로 묶은 에이전트예요. 에이전트를 탭하면 하는 일을 볼 수 있어요.",
@@ -1384,10 +1395,15 @@
       "button_other": "고정된 메시지({{count}})",
       "label": "#{{channel}}의 고정된 메시지",
       "in": "#{{channel}}에 고정됨",
-      "unpin": "{{name}}의 메시지 고정 해제"
+      "unpin": "{{name}}의 메시지 고정 해제",
+      "empty": "아직 고정된 항목이 없어요"
+    },
+    "header": {
+      "pins": "고정된 메시지",
+      "showMembers": "멤버 보기",
+      "hideMembers": "멤버 숨기기"
     },
     "membersButton_other": "채널 멤버({{count}})",
-    "membersPeople": "사람",
     "membersAgents": "에이전트",
     "you": "나",
     "agentState": {
@@ -1397,7 +1413,6 @@
     },
     "autoReplyChip": "멘션 없이 답해요",
     "coordinatorChip": "팀을 조율해요",
-    "seeDetails": "채널 세부 정보 보기",
     "more": "메시지 작업 더 보기",
     "copyLink": "링크 복사",
     "linkCopied": "링크를 복사했어요.",
@@ -1419,7 +1434,6 @@
     "messages": "메시지",
     "members": "멤버: {{names}}",
     "details": "채널 세부 정보",
-    "agentsAnswer_other": "{{names}}이(가) 여기서 답해요",
     "composerLabel": "#{{channel}}에 메시지 보내기",
     "composerDm": "{{name}}에게 메시지 보내기",
     "composerPlaceholder": "#{{channel}}에 메시지 보내기 · @로 에이전트 부르기",
@@ -1452,6 +1466,13 @@
     "generalName": "#general은 이름을 바꿀 수 없어요.",
     "archive": "채널 보관",
     "archived": "#{{channel}}을(를) 보관했어요. 대화는 유지돼요.",
+    "delete": "채널 삭제",
+    "deleteTitle": "#{{channel}} 채널을 영구 삭제할까요?",
+    "deleteGoes": "지금 사라지는 것: 메시지, 스레드, 파일, 고정 항목, 에이전트가 이 채널에서 기억한 내용, 여기에 게시하는 루틴.",
+    "deleteIssues": "채널 멤버만 볼 수 있었기 때문에 작업도 함께 삭제됩니다.",
+    "deleteOrArchive": "대화를 남기려면 삭제 대신 채널을 보관하세요.",
+    "deleteTypeName": "확인하려면 {{channel}} 입력",
+    "deleteDone": "#{{channel}} 채널을 삭제했어요.",
     "detailsSub": "{{category}} · {{visibility}}",
     "visibilityPublic": "공개",
     "visibilityPrivate": "비공개",
@@ -1491,6 +1512,7 @@
     "claimed_other": "{{names}}이(가) 답하는 중이에요",
     "waiting_other": "{{names}}이(가) 승인을 기다리고 있어요",
     "handled_other": "{{names}}이(가) 답했어요",
+    "passed_other": "아무도 답하지 않았어요",
     "failed_other": "{{names}}이(가) 답하지 못했어요",
     "asking_other": "{{names}}이(가) 내 답변을 기다리고 있어요",
     "outage_other": "{{names}}: AI 제공업체 장애 · 자동으로 다시 시도해요",
@@ -1510,6 +1532,7 @@
       "handled": "답함",
       "failed": "실패",
       "referenced": "언급만 됨",
+      "passed": "답하지 않음",
       "reacted": "반응함"
     },
     "failedShort": "답하지 못했어요",
@@ -1694,7 +1717,8 @@
     },
     "useAnyway": "{{email}} 사용",
     "assignFailed": "{{label}} 계정은 연결됐지만 {{agent}}을(를) 이 계정으로 바꾸지 못했어요.",
-    "noAgents": "요금제는 소유자의 에이전트만 사용할 수 있는데, 아직 에이전트가 없어요.",
+    "forNewAgents": "{{label}}이(가) 연결됐어요. 앞으로 만드는 에이전트는 이걸로 생각해요.",
+    "forNewAgentsHint": "앞으로 만드는 에이전트는 이걸로 생각해요.",
     "done": "완료",
     "agent": "대상 에이전트",
     "keyLocked": "API 키는 관리자만 추가할 수 있어요.",
@@ -1791,6 +1815,17 @@
     },
     "connect": "연결",
     "connected": "연결됨",
+    "connect_app": {
+      "title": "{{name}} 연결",
+      "mcp": "MCP 서버 추가",
+      "adminOnly": "관리자가 연결해요"
+    },
+    "invite": {
+      "title_other": "{{count}}명 초대",
+      "open": "초대",
+      "done": "초대 보냄",
+      "adminOnly": "초대할 수 있는 사람이 보내요"
+    },
     "agentProposal": {
       "title": "{{agent}}이(가) 새 에이전트를 제안해요",
       "review": "검토",
@@ -1879,6 +1914,7 @@
     "routine": {
       "created": "루틴 <b>{{name}}</b>을(를) 만들었어요 · {{schedule}}",
       "created_bare": "루틴 <b>{{name}}</b>을(를) 만들었어요",
+      "ownActions": "묻지 않고 직접 수행: {{actions}}",
       "updated": "루틴 <b>{{name}}</b>의 {{fields}}을(를) 변경했어요",
       "updated_paused": "루틴 <b>{{name}}</b>을(를) 일시 중지했어요",
       "updated_resumed": "루틴 <b>{{name}}</b>을(를) 재개했어요",
@@ -2070,6 +2106,12 @@
   "profile": {
     "audience": "대화할 수 있는 사람",
     "cardLabel": "프로필",
+    "roles": "역할",
+    "memberSince": "워크스페이스 참여일",
+    "messageTo": "{{name}}에게 보낼 메시지",
+    "audienceEdit": "편집",
+    "nowIn": "지금 #{{channel}}에서",
+    "more": "더 보기",
     "of": "{{name}}의 프로필",
     "presence": "상태",
     "offline": "아직 참여하지 않았어요",
@@ -3364,6 +3406,8 @@
         "org_deleting": "워크스페이스를 삭제하는 중이에요.",
         "agent_paused": "에이전트가 일시 중지됐어요.",
         "computer_busy": "컴퓨터가 다른 작업으로 계속 바빴어요.",
+        "computer_failed": "컴퓨터에 문제가 생겨 멈췄어요.",
+        "computer_timeout": "컴퓨터가 응답하는 데 너무 오래 걸렸어요.",
         "unknown": "실패했어요."
       }
     },
@@ -3724,6 +3768,7 @@
       "handleTaken": "@{{handle}}은(는) 이미 다른 에이전트나 사람이 쓰고 있어요. @{{suggestion}}은(는) 어때요?",
       "modelUnavailable": "워크스페이스에서 사용할 수 있는 모델을 고르세요."
     },
+    "noAi": "워크스페이스에 아직 AI가 없어요. 지금 연결하거나, 에이전트를 만든 뒤에 연결하세요.",
     "instructions": "지침",
     "instructionsPlaceholder": "예: 문서를 바탕으로 #support에서 고객 질문에 답해요. 모르는 것은 팀원을 불러요.",
     "startedFrom": "{{role}} 텍스트에서 시작함",
@@ -3854,6 +3899,13 @@
     "routineNotMade": "루틴을 만들지 못했어요: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} 멤버",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "워크스페이스 소유자",
+      "more": "{{count}}명 더 보기",
+      "find": "사람과 에이전트 찾기"
+    },
     "agentsOnlyYou": "에이전트는 나에게만 답해요.",
     "agentsOnlyYouHint": "요금제를 사용하면 각 에이전트 페이지에서 다른 사람에게도 답하도록 설정할 수 있어요.",
     "filters": "사람 필터",
@@ -3876,7 +3928,6 @@
       "on": "{{date}}"
     },
     "waitingTitle": "내 확인 대기",
-    "more": "{{name}}의 추가 작업",
     "remove": {
       "item": "워크스페이스에서 내보내기",
       "leave": "워크스페이스 나가기",
@@ -4201,7 +4252,7 @@
     },
     "setup_write": {
       "label": "워크스페이스 설정",
-      "description": "사람이 클릭할 수 있는 카드로 AI 연결을 제안하고, 요청한 사람을 위해 채널을 만들어요(실행 취소 가능)."
+      "description": "사람이 클릭할 수 있는 카드로 AI, 앱, MCP 서버 연결이나 사람 초대를 제안하고, 요청한 사람을 위해 채널을 만들어요(실행 취소 가능)."
     },
     "github_git_read": {
       "label": "저장소 클론(git)",
@@ -4672,7 +4723,12 @@
         "forum": "에이전트들이 포럼 주제에서 논의해요",
         "artifact": "Drive의 문서로 저장돼요"
       },
-      "ahead": "나중을 위해 준비됨"
+      "ahead": "나중을 위해 준비됨",
+      "ownActions": "직접 수행하는 작업"
+    },
+    "ownActions": {
+      "hint": "실행할 때마다 연결된 앱에서 이 작업을 묻지 않고 수행해요. 그 밖의 작업은 먼저 사람의 승인을 받고, 병합, 배포, 롤백은 항상 승인을 받아요.",
+      "none": "연결된 앱에서는 작업마다 먼저 사람의 승인을 받아요. 직접 일을 처리하게 하려면 채팅에서 에이전트에게 어떤 작업을 해도 되는지 알려 주세요."
     },
     "ahead": {
       "approved": "승인됨 · {{when}} 실행",
@@ -6060,9 +6116,10 @@
     "bodyHelp": "SKILL.md의 본문이에요.",
     "writeMissing": "이름, 사용 시점, 지침을 입력하세요.",
     "files": "파일",
-    "needsSandbox": "샌드박스 필요",
+    "needsSandbox": "저장되지 않음",
+    "assetLimit": "스킬에는 이미지와 다른 파일을 최대 {{max}}MB까지 저장할 수 있습니다.",
     "runsOnPc": "에이전트의 PC에서 실행",
-    "reinstall": "스크립트를 사용하려면 다시 설치하세요.",
+    "reinstall": "에이전트가 이 파일을 사용할 수 있도록 스킬을 다시 설치하세요.",
     "edit": "편집",
     "save": "저장",
     "saved": "{{name}}을(를) 저장했어요.",
@@ -8168,6 +8225,12 @@
   "connectors": {
     "title": "커넥터",
     "add": "커넥터 추가",
+    "mcp": {
+      "title": "MCP",
+      "add": "MCP 추가",
+      "list": "연결된 MCP 서버",
+      "none": "주소로 연결한 MCP 서버가 여기에 표시돼요."
+    },
     "addTitle": "커넥터 추가",
     "catalogText": "{{org}}에 한 번만 연결하세요. 그다음 에이전트마다 사용할 수 있는 것을 정해요.",
     "catalog": "사용 가능한 커넥터",
@@ -9447,6 +9510,27 @@
       "relevance": "관련도순"
     },
     "searchHere": "이 대화에서 검색",
+    "optionHint": {
+      "from": "이름",
+      "in": "채널",
+      "has": "링크, 파일, 이미지 또는 카드",
+      "mentions": "이름"
+    },
+    "moreFiltersHint": "날짜, 에이전트만, 고정됨",
+    "clearRecentAll": "최근 검색 지우기",
+    "header": {
+      "placeholder": "{{org}} 검색",
+      "clear": "검색 지우기"
+    },
+    "panel": {
+      "label": "검색 결과",
+      "count_other": "결과 {{count}}개",
+      "filters": "필터",
+      "filtersCount_other": "필터 ({{count}})",
+      "jump": "이동",
+      "jumpLabel": "{{name}}님의 메시지로 이동",
+      "threadIn": "#{{channel}}의 스레드"
+    },
     "dm": "{{name}}과(와)의 DM"
   },
   "files": {
@@ -9777,6 +9861,7 @@
       "measuring": "아직 크기를 측정하지 않았어요",
       "diskFullNotice": "{{name}}의 디스크가 거의 가득 찼어요"
     },
+    "chromeMissingNotice": "{{name}}에서 에이전트 브라우저를 쓰려면 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
     "access": {
       "folders": "허용된 폴더",
       "ownFolder": "각 에이전트의 폴더",
@@ -10257,6 +10342,7 @@
         "wiki": "Wiki 페이지",
         "mission": "미션",
         "thread": "스레드",
+        "channel": "채널",
         "forum": "포럼 주제",
         "artifact": "Drive 파일",
         "agent": "에이전트",
@@ -10340,7 +10426,7 @@
       "members": "멤버와 초대",
       "roles": "역할과 권한",
       "access": "에이전트와 접근 권한",
-      "connectors": "커넥터",
+      "connectors": "커넥터와 MCP",
       "skills": "스킬",
       "keys": "AI 계정",
       "storage": "저장 공간",
@@ -10360,7 +10446,7 @@
       "members": "워크스페이스에 있는 사람과 초대예요.",
       "roles": "각 사람이 할 수 있는 일이에요. 역할은 합산돼요.",
       "access": "각 에이전트가 사용할 수 있는 것이에요. 커넥터마다 하나의 수준이 있어요.",
-      "connectors": "워크스페이스 전체에 한 번 연결하는 서비스예요.",
+      "connectors": "워크스페이스 전체에 한 번 연결하는 서비스와 MCP 서버예요.",
       "skills": "에이전트가 필요할 때 여는 Markdown 지침이에요.",
       "keys": "내 요금제와 워크스페이스의 API 키예요.",
       "storage": "워크스페이스의 파일이 저장되는 곳이에요.",
@@ -10890,6 +10976,8 @@
         "readingForum": "포럼을 읽었어요",
         "creatingChannel": "채널을 만들었어요",
         "offeringConnectAi": "AI 연결을 제안했어요",
+        "offeringConnectApp": "앱 연결을 제안했어요",
+        "offeringInvites": "사람 초대를 제안했어요",
         "proposingAgent": "에이전트를 제안했어요",
         "askingAgent": "다른 에이전트에게 물었어요",
         "tellingAgent": "다른 에이전트에게 전했어요",
@@ -10972,6 +11060,8 @@
       "readingForum": "포럼을 읽는 중",
       "creatingChannel": "채널을 만드는 중",
       "offeringConnectAi": "AI 연결을 준비하는 중",
+      "offeringConnectApp": "앱 연결을 준비하는 중",
+      "offeringInvites": "초대를 준비하는 중",
       "proposingAgent": "에이전트를 제안하는 중",
       "askingAgent": "다른 에이전트에게 묻는 중",
       "tellingAgent": "다른 에이전트에게 전하는 중",
@@ -11077,6 +11167,9 @@
       "no_ai_signed_out": "아직 답할 수 없어요: AI가 로그아웃됐어요.",
       "no_ai_not_signed_in": "아직 답할 수 없어요: 제 컴퓨터에서 {{brain}}에 로그인되어 있지 않아요.",
       "action_connect_ai": "AI 연결",
+      "action_connect_app": "{{name}} 연결",
+      "action_add_mcp": "MCP 서버 추가",
+      "action_invite_people": "사람 초대",
       "agent_proposal": "새 에이전트를 제안했어요: {{name}}",
       "approval_request": "승인 요청: {{title}}",
       "secret_request": "{{agent}}이(가) 키를 요청했어요: {{name}}",
@@ -11273,6 +11366,14 @@
     "offer_connect_ai": {
       "label": "AI 연결 제안",
       "description": "요금제나 API 키를 연결하는 대화상자를 여는 버튼이 있는 카드를 게시해요."
+    },
+    "offer_connect_app": {
+      "label": "앱 또는 MCP 연결 제안",
+      "description": "앱이나 MCP 서버를 주소로 연결하는 대화상자를 여는 버튼이 있는 카드를 게시해요."
+    },
+    "offer_invites": {
+      "label": "사람 초대 제안",
+      "description": "주소가 미리 입력된 초대 대화상자를 여는 버튼이 있는 카드를 게시해요."
     },
     "propose_agent": {
       "label": "에이전트 제안",

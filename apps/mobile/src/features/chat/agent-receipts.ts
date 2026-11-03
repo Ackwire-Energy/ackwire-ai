@@ -18,8 +18,8 @@ import type { TFunction } from "i18next";
  * failure, nobody or no AI, and while the author's own plan picks who answers. A receipt never takes a line of its
  * own: it is a mark beside the message (`markOf`): the clock, one tick or two (`receiptTicks`), its words its label,
  * except what asks something of you (send it again, connect an AI) and the AI provider being down, which keep their
- * line under the message, as on the web. "Nobody will answer" is two ticks whose sheet says it, with "Chamar um
- * agente". Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved
+ * line under the message, as on the web. "Nobody will answer" and "No one replied" (every agent it was for passed) are
+ * two ticks whose sheet says it, with "Chamar um agente". Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved
  * by the channel's events).
  */
 
@@ -51,6 +51,7 @@ export type ReceiptWords =
   | "receipts.queued"
   | "receipts.away"
   | "receipts.handled"
+  | "receipts.passed"
   | "receipts.failed"
   | "receipts.nobody"
   | "receipts.platformCap"
@@ -79,7 +80,8 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
   switch (status.kind) {
     case "picked":
     case "claimed":
-    case "handled": {
+    case "handled":
+    case "passed": {
       const label = { key: `receipts.${status.kind}` as const, agents: status.agents };
       return { ...faces(status.agents), mark, words: null, label, action: null, alert: false };
     }
@@ -194,7 +196,7 @@ export function receiptMessageId(messages: readonly Message[], receipts: Receipt
 }
 
 /** Each agent's line in the sheet: its phase, "only mentioned" for one the message just names, "reacted" for one
- * whose reaction was its answer. */
+ * whose reaction was its answer (in any phase). */
 export type ReceiptRowPhase = ReceiptPhase | "referenced" | "reacted";
 
 export function receiptRows(
@@ -205,9 +207,10 @@ export function receiptRows(
   const phases = new Map<string, ReceiptPhase>(receipt?.agents ?? []);
   return view.seen.map((agentId) => {
     const phase = phases.get(agentId) ?? "seen";
-    if (phase !== "seen") return { agentId, phase };
-    if (view.referenced.includes(agentId)) return { agentId, phase: "referenced" };
-    return { agentId, phase: reactedBy.includes(agentId) ? "reacted" : "seen" };
+    // A reaction was its answer, whatever its run's state says.
+    if (reactedBy.includes(agentId)) return { agentId, phase: "reacted" };
+    if (phase === "seen" && view.referenced.includes(agentId)) return { agentId, phase: "referenced" };
+    return { agentId, phase };
   });
 }
 

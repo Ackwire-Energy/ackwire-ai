@@ -40,7 +40,7 @@ import { quietNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun, workKeepsThread } from "./run-scope";
-import { computerWaitSql, NO_AI, outageParkedSql } from "./runs";
+import { computerWaitSql, NO_AI, outageParkedSql, passedSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
@@ -189,6 +189,8 @@ export interface Receipts {
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
     computer?: "queued" | "away";
+    /** It ended without answering: passed and posted nothing, or canceled before it started. */
+    passed?: true;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
   blocked: string[];
@@ -233,6 +235,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     error: schema.agentRuns.error,
     outage: outageParkedSql,
     computer: computerWaitSql,
+    passed: passedSql,
   };
   const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
     db
@@ -299,6 +302,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
         ...(r.outage ? { outage: true as const } : {}),
         ...(r.computer ? { computer: r.computer } : {}),
+        ...(r.passed ? { passed: true as const } : {}),
       })),
       // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
       // or the message only references it.

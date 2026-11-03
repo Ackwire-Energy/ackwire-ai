@@ -1,4 +1,9 @@
-import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserUrl } from "@agenteschat/adapters/machine-protocol";
+import {
+  AGENT_BROWSER_SHA256,
+  AGENT_BROWSER_VERSION,
+  agentBrowserUrl,
+  CHROME_NEEDED,
+} from "@agenteschat/adapters/machine-protocol";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { DEFAULT_AGENT_UID_RANGE, SYSTEM_RUNNER_HOME } from "./config";
 
@@ -67,36 +72,6 @@ export const DESKTOP_CJK_APT_PACKAGES = ["fonts-noto-cjk"] as const;
 export const DESKTOP_DOCK_APT_PACKAGES = ["xfce4-docklike-plugin"] as const;
 
 /**
- * Debian/Ubuntu packages with the shared libraries the agents' Chrome for
- * Testing links (`--system`, with or without `--desktop`): what `ldd chrome`
- * finds missing on a bare Debian 12 or 13, or Ubuntu 22.04 or 24.04. Where
- * apt has a package's `t64` name (Debian 13, Ubuntu 24.04), the script takes it.
- */
-export const BROWSER_APT_PACKAGES = [
-  "libasound2",
-  "libatk-bridge2.0-0",
-  "libatk1.0-0",
-  "libatspi2.0-0",
-  "libcairo2",
-  "libcups2",
-  "libdbus-1-3",
-  "libexpat1",
-  "libgbm1",
-  "libglib2.0-0",
-  "libnspr4",
-  "libnss3",
-  "libpango-1.0-0",
-  "libx11-6",
-  "libxcb1",
-  "libxcomposite1",
-  "libxdamage1",
-  "libxext6",
-  "libxfixes3",
-  "libxkbcommon0",
-  "libxrandr2",
-] as const;
-
-/**
  * What system mode's isolation runs (`--system`): `nft` for the loopback guard, which won't start without it, and
  * `ss` for the bind check.
  */
@@ -105,23 +80,32 @@ export const ISOLATION_APT_PACKAGES = ["nftables", "iproute2"] as const;
 /** System mode: the runner and its Bun (root's, readable by the agents' users), and the command on the PATH. */
 export const SYSTEM_RUNNER_DIR = "/opt/agentes-runner";
 export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
-/**
- * System mode on x86_64: `agent-browser-<version>` and `chrome-<version>/chrome-linux64/chrome` (the layout of
- * `agent-browser install`, whose folder name says Chrome's version), root's, for every agent's user to run.
- */
+/** System mode on x86_64: `agent-browser-<version>`, root's, for every agent's user to run. */
 export const SYSTEM_BROWSER_DIR = `${SYSTEM_RUNNER_DIR}/browser`;
 
+/** Where Google Chrome stable's Linux package (`google-chrome-stable`) installs it. */
+export const GOOGLE_CHROME_LINUX = "/opt/google/chrome/chrome";
+
 /**
- * The Chrome for Testing build `--system` installs for every agent: what `agent-browser install` fetches (Chrome
- * for Testing's Stable channel on the day it is pinned) and the SHA-256 of its `chrome-linux64.zip`. Google
- * publishes only MD5 and CRC32C for these files, so a new pin is that zip downloaded once, its `sha256sum`, and its
- * `openssl md5 -binary | base64` compared with the bucket's `md5Hash`. Null: `--system` installs `agent-browser`
- * alone, and each agent installs Chrome at its browser's first use.
+ * Google's apt repository for Chrome, set up as the `google-chrome-stable` package's own postinst sets it up
+ * (Chrome 156): the same files with the same contents, so the package's setup and its daily check rewrite them as
+ * they are, and apt never sees the repository twice with two keyrings (an error).
  */
-export const TESTING_CHROME: { version: string; sha256: string } | null = {
-  version: "156.0.8078.80",
-  sha256: "b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7",
-};
+export const GOOGLE_APT = {
+  key: "https://dl.google.com/linux/linux_signing_key.pub",
+  /** Google's Linux package signing key (`gpg --show-keys`, checked 2026-11-03): any other key is refused. */
+  fingerprint: "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796",
+  keyring: "/usr/share/keyrings/google-chrome.gpg",
+  sources: "/etc/apt/sources.list.d/google-chrome.sources",
+  uri: "https://dl.google.com/linux/chrome-stable/deb/",
+  /**
+   * A systemd timer (`.timer`, `.service`) upgrading Chrome alone every 6 hours, written only when the installer
+   * installed Chrome: a Debian without unattended upgrades would otherwise never update it.
+   */
+  updates: "/etc/systemd/system/agentes-chrome-update",
+  /** `--desktop`: hides Chrome's own menu entry, so the agents' menus don't offer a second Chrome on the default profile. */
+  desktopEntry: "/usr/local/share/applications/google-chrome.desktop",
+} as const;
 
 /**
  * The installer served at `GET /api/machines/install.sh`:
@@ -144,12 +128,14 @@ export const TESTING_CHROME: { version: string; sha256: string } | null = {
  * runner lacks.
  *
  * `--system` (Linux, root) installs the runner for the whole computer, each
- * agent as its own OS user: `BROWSER_APT_PACKAGES` (without apt it names
+ * agent as its own OS user: `ISOLATION_APT_PACKAGES` (without apt it names
  * them), the pinned Bun and the bundle in
- * `SYSTEM_RUNNER_DIR`, on x86_64 the pinned `agent-browser` and
- * `TESTING_CHROME` in `SYSTEM_BROWSER_DIR` (each checked against its SHA-256,
- * so no agent downloads them at its browser's first use; one that can't be
- * fetched is left to that first use, warned about), the launcher at
+ * `SYSTEM_RUNNER_DIR`, on x86_64 the pinned `agent-browser` in
+ * `SYSTEM_BROWSER_DIR` (checked against its SHA-256, so no agent downloads it
+ * at its browser's first use; one that can't be fetched is left to that first
+ * use, warned about), Google Chrome stable from Google's apt repository
+ * (`GOOGLE_APT`, its key checked against its fingerprint) when the computer
+ * has none, upgraded every 6 hours by a timer of its own, the launcher at
  * `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
@@ -192,7 +178,6 @@ set -eu
 SERVER=${server}
 BUN_VERSION=${shQuote(RUNNER_BUN_VERSION)}
 ISOLATION_PACKAGES=${shQuote(ISOLATION_APT_PACKAGES.join(" "))}
-BROWSER_PACKAGES=${shQuote(BROWSER_APT_PACKAGES.join(" "))}
 DESKTOP_PACKAGES=${shQuote(DESKTOP_APT_PACKAGES.join(" "))}
 LOOK_PACKAGES=${shQuote(DESKTOP_LOOK_APT_PACKAGES.join(" "))}
 CJK_PACKAGES=${shQuote(DESKTOP_CJK_APT_PACKAGES.join(" "))}
@@ -200,8 +185,15 @@ DOCK_PACKAGES=${shQuote(DESKTOP_DOCK_APT_PACKAGES.join(" "))}
 AB_VERSION=${shQuote(AGENT_BROWSER_VERSION)}
 AB_SHA256=${shQuote(AGENT_BROWSER_SHA256["linux-x64"])}
 AB_URL=${shQuote(agentBrowserUrl("linux-x64"))}
-CHROME_VERSION=${shQuote(TESTING_CHROME?.version ?? "")}
-CHROME_SHA256=${shQuote(TESTING_CHROME?.sha256 ?? "")}
+CHROME_EXE=${shQuote(GOOGLE_CHROME_LINUX)}
+CHROME_KEY_URL=${shQuote(GOOGLE_APT.key)}
+CHROME_KEY_FPR=${shQuote(GOOGLE_APT.fingerprint)}
+CHROME_KEYRING=${shQuote(GOOGLE_APT.keyring)}
+CHROME_SOURCES=${shQuote(GOOGLE_APT.sources)}
+CHROME_URI=${shQuote(GOOGLE_APT.uri)}
+CHROME_UPDATES=${shQuote(GOOGLE_APT.updates)}
+CHROME_DESKTOP=${shQuote(GOOGLE_APT.desktopEntry)}
+CHROME_NEEDED=${shQuote(CHROME_NEEDED)}
 
 DIR=""
 NAME=""
@@ -313,15 +305,6 @@ apt_install() {
   export DEBIAN_FRONTEND
   # A fresh server may be updating itself: wait for its lock instead of failing.
   apt-get -qq -o DPkg::Lock::Timeout=600 update || true
-  # Debian 13 and Ubuntu 24.04 renamed some libraries with a t64 suffix, and Ubuntu 24.04's apt
-  # won't pick libasound2t64 for libasound2 itself. One apt-cache call for them all: without its
-  # cache file (as in containers), each call takes seconds.
-  T64=$(printf '%st64\\n' "$@" | xargs apt-cache show 2>/dev/null | sed -n 's/^Package: //p')
-  for PKG in "$@"; do
-    shift
-    if printf '%s\\n' "$T64" | grep -qxF "\${PKG}t64"; then PKG="\${PKG}t64"; fi
-    set -- "$@" "$PKG"
-  done
   apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "$@"
 }
 
@@ -344,11 +327,11 @@ apt_packages() {
   fi
 }
 
-# What keeps the agents apart, the libraries their browser loads, and with --desktop the packages for their screens.
+# What keeps the agents apart, and with --desktop the packages for their screens.
 system_packages() {
-  PACKAGES="$ISOLATION_PACKAGES $BROWSER_PACKAGES" WHAT="the agents' isolation and browser"
+  PACKAGES="$ISOLATION_PACKAGES" WHAT="the agents' isolation"
   if [ "$DESKTOP" -eq 1 ]; then
-    PACKAGES="$PACKAGES $DESKTOP_PACKAGES" WHAT="the agents' isolation, browser and screens"
+    PACKAGES="$PACKAGES $DESKTOP_PACKAGES" WHAT="the agents' isolation and screens"
   fi
   if command -v apt-get >/dev/null 2>&1; then
     t_run "Installing the packages for $WHAT" apt_packages || {
@@ -439,10 +422,9 @@ browser_later() {
   t_warn "$1: each agent installs what's missing at its browser's first use"
 }
 
-# The agents' browser in $BROWSER_DIR, for every agent's user to run and root alone to write: the pinned
-# agent-browser and Chrome for Testing build, each checked against its SHA-256 before it is installed, so no agent
-# downloads them at its browser's first use. What is already there at those checksums is kept. Only on x86_64:
-# Chrome for Testing has no Linux build for arm.
+# The agents' agent-browser in $BROWSER_DIR, for every agent's user to run and root alone to write, checked against
+# its SHA-256 before it is installed, so no agent downloads it at its browser's first use. One already there at that
+# checksum is kept. Only on x86_64, the build pinned here.
 get_browser() {
   case "$(uname -m)" in x86_64 | amd64) ;; *) return 0 ;; esac
   mkdir -p "$BROWSER_DIR"
@@ -464,46 +446,105 @@ get_browser() {
     mv -f "$TMP" "$AB"
   fi
   prune "$BROWSER_DIR" agent-browser "$AB"
-  if [ -z "$CHROME_SHA256" ]; then
-    t_step "agent-browser $AB_VERSION (SHA-256 checked); each agent installs Chrome for Testing at its browser's first use"
-    return 0
-  fi
-  CHROME="$BROWSER_DIR/chrome-$CHROME_VERSION"
-  # Written last, before the folder takes its name: a folder that has it is whole.
-  if [ "$(cat "$CHROME/.sha256" 2>/dev/null || true)" != "$CHROME_SHA256" ]; then
-    # Unzipped by unzip, which keeps the executables' modes (Python's zipfile doesn't).
-    command -v unzip >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && t_run "Installing unzip" apt_install unzip; } || {
-      browser_later "Chrome for Testing needs unzip"
-      return 0
-    }
-    ZIP="$BROWSER_DIR/.chrome-$CHROME_VERSION.zip"
-    STAGE="$BROWSER_DIR/.chrome-$CHROME_VERSION.new"
-    rm -rf "$STAGE"
-    t_run "Downloading Chrome for Testing $CHROME_VERSION" download "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_VERSION/linux64/chrome-linux64.zip" "$ZIP" || {
-      rm -f "$ZIP"
-      browser_later "Downloading Chrome for Testing $CHROME_VERSION failed"
-      return 0
-    }
-    if [ "$(sha256 "$ZIP")" != "$CHROME_SHA256" ]; then
-      rm -f "$ZIP"
-      die "the Chrome for Testing download didn't match its checksum, so it was not installed"
-    fi
-    if ! unzip -q "$ZIP" -d "$STAGE" || [ ! -f "$STAGE/chrome-linux64/chrome" ]; then
-      rm -rf "$ZIP" "$STAGE"
-      browser_later "Unpacking Chrome for Testing failed"
-      return 0
-    fi
-    rm -f "$ZIP"
-    # The same modes under any umask: readable by everyone, written by root alone, nothing set-user or set-group.
-    chmod -R u+rwX,go+rX,go-w,ug-s "$STAGE"
-    printf '%s\\n' "$CHROME_SHA256" > "$STAGE/.sha256"
-    chmod 644 "$STAGE/.sha256"
-    rm -rf "$CHROME"
-    mv "$STAGE" "$CHROME"
-  fi
-  prune "$BROWSER_DIR" chrome "$CHROME"
-  t_step "The agents' browser: agent-browser $AB_VERSION and Chrome for Testing $CHROME_VERSION (SHA-256 checked)"
+  t_step "agent-browser $AB_VERSION (SHA-256 checked)"
 }
+
+# Google's key for its apt repository into $CHROME_KEYRING, refused unless its fingerprint is the one pinned here
+# (BAD_KEY=1): apt then checks every package from that repository against it.
+chrome_key() {
+  command -v gpg >/dev/null 2>&1 || apt_install gpg || return 1
+  KEY_DIR=$(mktemp -d) || return 1
+  download "$CHROME_KEY_URL" "$KEY_DIR/key.asc" || { rm -rf "$KEY_DIR"; return 1; }
+  FPR=$(GNUPGHOME="$KEY_DIR" gpg --batch --show-keys --with-colons "$KEY_DIR/key.asc" 2>/dev/null |
+    sed -n 's/^fpr:*\\([0-9A-F]*\\):.*/\\1/p' | head -n 1)
+  if [ "$FPR" != "$CHROME_KEY_FPR" ]; then
+    rm -rf "$KEY_DIR"
+    BAD_KEY=1
+    return 1
+  fi
+  mkdir -p "$(dirname "$CHROME_KEYRING")"
+  KEY_RC=0
+  GNUPGHOME="$KEY_DIR" gpg --batch --yes --dearmor -o "$CHROME_KEYRING.new" "$KEY_DIR/key.asc" &&
+    chmod 644 "$CHROME_KEYRING.new" && mv -f "$CHROME_KEYRING.new" "$CHROME_KEYRING" || KEY_RC=1
+  rm -rf "$KEY_DIR"
+  return "$KEY_RC"
+}
+
+# Google Chrome stable from Google's apt repository, set up as its own package sets it up, and upgraded every 6 hours by
+# a timer of its own, whether or not this computer updates itself. Its sandbox helper never runs as root for the agents'
+# users: Chrome sandboxes with user namespaces (which --system's Debian has), and dpkg keeps that mode across upgrades.
+# The package makes itself the default web browser: the computer's own choice is put back.
+install_chrome() {
+  chrome_key || return 1
+  SANDBOX="$(dirname "$CHROME_EXE")/chrome-sandbox"
+  dpkg-statoverride --list "$SANDBOX" >/dev/null 2>&1 || dpkg-statoverride --add root root 0755 "$SANDBOX" || return 1
+  ARCH=$(dpkg --print-architecture) || return 1
+  mkdir -p "$(dirname "$CHROME_SOURCES")"
+  printf '%s\\n' '### THIS FILE IS AUTOMATICALLY CONFIGURED ###' '# Changes to this file will not be preserved.' \\
+    '# This file will not be recreated if removed.' 'X-Repolib-Name: Google Chrome' 'Types: deb' "URIs: $CHROME_URI" \\
+    'Suites: stable' 'Components: main' "Architectures: $ARCH" "Signed-By: $CHROME_KEYRING" > "$CHROME_SOURCES"
+  chmod 644 "$CHROME_SOURCES"
+  WWW=$(update-alternatives --query x-www-browser 2>/dev/null | sed -n 's/^Value: //p')
+  GNOME_WWW=$(update-alternatives --query gnome-www-browser 2>/dev/null | sed -n 's/^Value: //p')
+  apt_install google-chrome-stable || return 1
+  if [ -n "$WWW" ]; then update-alternatives --set x-www-browser "$WWW" || true; fi
+  if [ -n "$GNOME_WWW" ]; then update-alternatives --set gnome-www-browser "$GNOME_WWW" || true; fi
+  mkdir -p "$(dirname "$CHROME_UPDATES")"
+  printf '%s\\n' '[Unit]' "Description=Google Chrome's updates for the agents' browsers" 'After=network-online.target' '' \\
+    '[Service]' 'Type=oneshot' 'Environment=DEBIAN_FRONTEND=noninteractive' \\
+    "ExecStart=/bin/sh -c 'apt-get -qq -o DPkg::Lock::Timeout=600 update; apt-get -qq -o DPkg::Lock::Timeout=600 install -y --only-upgrade --no-install-recommends google-chrome-stable'" \\
+    > "$CHROME_UPDATES.service"
+  printf '%s\\n' '[Unit]' "Description=Google Chrome's updates for the agents' browsers" '' '[Timer]' \\
+    'OnCalendar=00/6:00' 'RandomizedDelaySec=1h' 'Persistent=true' '' '[Install]' 'WantedBy=timers.target' \\
+    > "$CHROME_UPDATES.timer"
+  chmod 644 "$CHROME_UPDATES.service" "$CHROME_UPDATES.timer"
+  TIMER="\${CHROME_UPDATES##*/}.timer"
+  systemctl daemon-reload || true
+  systemctl enable --now "$TIMER" 2>/dev/null || systemctl enable "$TIMER" || true
+}
+
+chrome_version() { "$CHROME_EXE" --version 2>/dev/null | sed -n 's/^Google Chrome \\([0-9.]*\\).*/\\1/p'; }
+
+# The agents' browser is the computer's Google Chrome: installed when it has none (with apt), never pinned. A key that
+# isn't Google's stops the install; anything else only says so, and each agent says so when it needs its browser.
+get_chrome() {
+  if [ -x "$CHROME_EXE" ]; then
+    V=$(chrome_version)
+    t_step "Google Chrome\${V:+ $V}, updated by this computer's own updates"
+  elif ! command -v apt-get >/dev/null 2>&1; then
+    t_warn "The agents' browser needs Google Chrome: install it (google.com/chrome) with this computer's package manager"
+    return 0
+  else
+    BAD_KEY=0
+    if ! t_run "Installing Google Chrome from Google's apt repository" install_chrome; then
+      [ "$BAD_KEY" -eq 0 ] || die "Google's apt key didn't match its fingerprint, so Google Chrome was not installed"
+      t_tail "$T_LOG"
+      t_warn "Installing Google Chrome failed: run this installer again. Until then the agents say Chrome isn't installed"
+      return 0
+    fi
+    V=$(chrome_version)
+    t_step "Google Chrome\${V:+ $V}, upgraded every 6 hours"
+  fi
+  if [ "$DESKTOP" -eq 1 ]; then
+    mkdir -p "$(dirname "$CHROME_DESKTOP")"
+    printf '%s\\n' '[Desktop Entry]' 'Type=Application' 'Name=Google Chrome' 'Exec=/usr/bin/google-chrome-stable' \\
+      'NoDisplay=true' > "$CHROME_DESKTOP"
+    chmod 644 "$CHROME_DESKTOP"
+  fi
+}
+
+# Without root nothing installs Chrome: a runner that updates here says what the agents' browser needs (the paths
+# findChrome looks at, but Windows, which has no sh installer).
+chrome_or_warn() {
+  for EXE in "$CHROME_EXE" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
+    if [ -x "$EXE" ]; then return 0; fi
+  done
+  t_warn "$CHROME_NEEDED"
+}
+
+# Chrome for Testing, which runners before Google Chrome used: removed once the runner restarted without it.
+forget_testing_chrome() { rm -rf "$BROWSER_DIR"/chrome-* "$BROWSER_DIR"/.chrome-*; }
 
 # This server's computer replaces the service a connected runner in $RUNNER_HOME runs as (the root unit,
 # or the launchd agent's label), which would leave that connection's server without this computer.
@@ -545,6 +586,7 @@ install_system() {
   chmod 700 "$RUNNER_HOME"
   get_bun
   get_browser
+  get_chrome
   get_runner
   set -- service install --system --no-start
   if [ -n "$UID_RANGE" ]; then set -- "$@" --agent-uid-range "$UID_RANGE"; fi
@@ -560,6 +602,7 @@ install_system() {
     connect
     if [ "$NO_START" -eq 0 ]; then "$LAUNCHER" service install --system || die "starting the service failed"; fi
   fi
+  if [ "$NO_START" -eq 0 ]; then forget_testing_chrome; fi
   finish agentes-runner
 }
 
@@ -616,6 +659,7 @@ install_user() {
   fi
 
   get_runner
+  chrome_or_warn
   if [ -n "$HOST_TOKEN_FILE" ]; then
     chmod 600 "$HOST_TOKEN_FILE"
     set -- service install --host --server "$SERVER" --token-file "$HOST_TOKEN_FILE"

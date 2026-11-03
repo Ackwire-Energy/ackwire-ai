@@ -749,6 +749,7 @@
       "browser_profile_request_other": "{{names}}がブラウザプロフィールの追加を求めています",
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
+      "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
       "app_created_other": "AIアプリがあなたのために作成しました"
     },
     "markRead": "既読にする",
@@ -838,7 +839,7 @@
     "issues": "タスク",
     "issuesWithMe_other": "あなた担当: {{count}}件",
     "drive": "Drive",
-    "connectors": "コネクタ",
+    "connectors": "コネクタとMCP",
     "usage": "使用量",
     "preferences": "環境設定",
     "editProfile": "プロフィールを編集",
@@ -1418,11 +1419,12 @@
     }
   },
   "connectors": {
-    "title": "コネクタ",
+    "title": "コネクタとMCP",
     "search": "サービスを検索",
+    "mcps": "MCP",
+    "mcpsNone": "アドレスで接続したMCPサーバーがここに表示されます。",
+    "addMcp": "MCPを追加",
     "connected": "接続済み",
-    "address": "アドレス",
-    "byAddress": "アドレスで接続",
     "suggested": "{{org}}へのおすすめ",
     "all": "すべて",
     "empty": "エージェントはまだ何も使っていません",

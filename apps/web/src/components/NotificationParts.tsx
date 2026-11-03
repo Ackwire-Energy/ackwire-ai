@@ -91,6 +91,12 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
         <Icon name="drive" size={16} />
       </span>
     );
+  if (n.kind === "computer_no_chrome")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="globe" size={16} />
+      </span>
+    );
   if (n.kind === "app_created")
     return (
       <span className="nt-sys" aria-hidden="true">

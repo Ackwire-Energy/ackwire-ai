@@ -10,6 +10,7 @@ import {
 } from "@agenteschat/client";
 import { fromConnection, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -203,7 +204,6 @@ export function SkillsSection({ install, connected }: { install?: string; connec
             />
           ))}
         </DialogSearchList>
-        <DialogFooter />
       </Dialog>
       <InstallSkillDialog
         open={installing}
@@ -800,7 +800,7 @@ export function SkillSheet({
   );
 }
 
-/** A file of the skill. Scripts run on the agent's PC; old imports kept them as `ignored` (reinstall). */
+/** A file of the skill. Scripts run on the agent's PC. `ignored`: past what a skill keeps, or kept by an older import. */
 function FileEntry({ file }: { file: SkillFile }) {
   const { t } = useTranslation();
   return (
@@ -811,7 +811,9 @@ function FileEntry({ file }: { file: SkillFile }) {
       ) : file.status === "ignored" ? (
         <>
           <Chip icon="block">{t("skills.needsSandbox")}</Chip>
-          <span className="small muted">{t("skills.reinstall")}</span>
+          <span className="small muted">
+            {t("skills.reinstall")} {t("skills.assetLimit", { max: SKILL_ASSET_MB })}
+          </span>
         </>
       ) : (
         <span className="small muted">{file.mime}</span>

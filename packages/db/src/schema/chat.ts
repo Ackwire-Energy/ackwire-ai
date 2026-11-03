@@ -66,6 +66,11 @@ export const channels = pgTable(
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),
+    /**
+     * Deleted by an owner or admin (archived too, so nothing lists it): its contents are purged by the `channel.delete`
+     * job and the row stays as a tombstone, named `deleted-<id>`, for its runs, usage and audit. Never undone.
+     */
+    deletedAt: timestamp({ withTimezone: true }),
     /** Its sidebar category (channels only); null: on top, with no category. */
     categoryId: uuid().references(() => channelCategories.id, { onDelete: "set null" }),
     /** Order inside its category (or among the channels with none), from 0. */
@@ -84,9 +89,33 @@ export const channelReads = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     lastReadAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Muted by this person: never looks unread to them; mentions of them still count. */
+    muted: boolean().notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.channelId, t.userId] }),
+    foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * Where each person stopped reading a thread's replies (the thread list's unread). A followed thread's reply stays
+ * unread until this passes it, whatever the channel's read (`channel_reads`) says. Keyed by the root message (no
+ * foreign key to the partitioned `messages`).
+ */
+export const threadReads = pgTable(
+  "thread_reads",
+  {
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    rootMessageId: uuid().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.rootMessageId, t.userId] }),
     foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
   ],
 );

@@ -1,29 +1,83 @@
-import type { Actor, Agent } from "@agenteschat/client";
-import { useAgentDetail, useModels, usePeople, useRoles, useSettings } from "@agenteschat/client";
-import { audienceNotice, audienceSummary, canTalk, modeOf, seesDetails } from "@agenteschat/client/lib/audience";
-import { brainLine } from "@agenteschat/client/lib/brain";
-import { clockHour, formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
+import type { Actor, Agent, AgentAudience, DmTarget } from "@agenteschat/client";
+import {
+  agentWorkingIn,
+  useAgentDetail,
+  useChannels,
+  useModels,
+  usePeople,
+  useRoles,
+  useSendDm,
+  useSetMemberRoles,
+  useSettings,
+  useUpdateAgent,
+} from "@agenteschat/client";
+import {
+  audienceBlocked,
+  audienceLines,
+  audienceNotice,
+  audienceOf,
+  audiencePatch,
+  canEditAudience,
+  canTalk,
+  modeOf,
+  seesDetails,
+} from "@agenteschat/client/lib/audience";
+import { brainLine, engineOfBrain } from "@agenteschat/client/lib/brain";
+import { errorText } from "@agenteschat/client/lib/errors";
+import {
+  clockHour,
+  firstName,
+  formatMonthYear,
+  formatPercent,
+  formatTime,
+  relativeTime,
+  shortModel,
+  whenAt,
+} from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
-import { Avatar, Button, Meter, PlanMeter, Popover, ProviderLogo, useHoverCard } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import {
+  Avatar,
+  Button,
+  EmojiPickerPopover,
+  Icon,
+  Menu,
+  Meter,
+  PlanMeter,
+  Popover,
+  ProviderLogo,
+  RoleMark,
+  SettingNote,
+  Token,
+  useHoverCard,
+} from "@agenteschat/ui";
+import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { CoordinatorChip } from "@/components/CoordinatorChip";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
+import { useEmojiLabels } from "@/components/Reactions";
+import { RolesPicker } from "@/components/roles/RolesPicker";
+import { colorOf, ProfileSky } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { type MenuEntry, tidy } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
+import { useToast } from "@/lib/toast";
 import { AskAccessButton } from "@/pages/agent/PublicCard";
+import { useStreams } from "@/realtime/context";
 import { useAgentMenu, usePersonMenu } from "./entity-menus";
+import "./profile-card.css";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
@@ -38,14 +92,20 @@ export function ProfileTrigger({
   children,
   className,
   decorative,
+  describedBy,
+  side = "bottom",
 }: {
   actor: Actor;
   /** Accessible name of the button ("Perfil de Ada"). */
   label: string;
+  /** The id of what the button shows, read after its name (a members row: presence, line, chips). */
+  describedBy?: string;
   children: ReactNode;
   className?: string;
   /** A second trigger next to a focusable one (the avatar beside the name): mouse only. */
   decorative?: boolean;
+  /** Where the card opens: the members column opens it to its left. */
+  side?: "bottom" | "left";
 }) {
   const { t } = useTranslation();
   // Hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
@@ -67,8 +127,8 @@ export function ProfileTrigger({
     <Popover
       hover={card}
       label={t("profile.cardLabel")}
-      side="bottom"
-      className="profile-card"
+      side={side}
+      className={`profile-card mcard mcard--${actor.type}`}
       trigger={
         <button
           ref={button}
@@ -76,6 +136,7 @@ export function ProfileTrigger({
           {...menu}
           className={className ? `profile-trigger ${className}` : "profile-trigger"}
           aria-label={label}
+          aria-describedby={describedBy}
           aria-haspopup="dialog"
           tabIndex={decorative ? -1 : undefined}
           aria-hidden={decorative || undefined}
@@ -84,22 +145,141 @@ export function ProfileTrigger({
         </button>
       }
     >
-      {card.open &&
-        (actor.type === "agent" ? (
-          <AgentCard agentId={actor.id} onDone={card.close} />
-        ) : (
-          <PersonCard userId={actor.id} />
-        ))}
+      {card.open && (
+        // A press inside a card the pointer opened keeps it (its menus and pickers open outside it).
+        <div className="mcard__frame" onPointerDownCapture={() => card.open === "hover" && card.onOpenChange(true)}>
+          {actor.type === "agent" ? (
+            <AgentCard agentId={actor.id} onDone={card.close} />
+          ) : (
+            <PersonCard userId={actor.id} onDone={card.close} />
+          )}
+        </div>
+      )}
     </Popover>
   );
 }
 
-function PersonCard({ userId }: { userId: string }) {
+/** Discord's shape: the banner, the ⋯ on it, the big face over its edge, then the body. */
+function CardShell({
+  sky,
+  face,
+  agent,
+  more,
+  onDone,
+  children,
+}: {
+  sky: ReactNode;
+  face: ReactNode;
+  agent?: boolean;
+  /** The ⋯ menu: the same entries as the right click. */
+  more?: MenuEntry[];
+  /** Closes the card (a ⋯ entry ran). */
+  onDone?: () => void;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const entries = tidy((more ?? []).filter((e) => e.kind !== "header"));
+  return (
+    <>
+      <div className="mcard__banner" aria-hidden="true">
+        {sky}
+      </div>
+      {entries.length > 0 && (
+        <div className="mcard__acts">
+          <Menu
+            label={t("profile.more")}
+            side="right"
+            align="start"
+            trigger={
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon="more"
+                className="mcard__more"
+                aria-label={t("profile.more")}
+              />
+            }
+          >
+            <MenuEntries entries={entries} onRun={onDone} />
+          </Menu>
+        </div>
+      )}
+      <div className={agent ? "mcard__face mcard__face--agent" : "mcard__face"}>{face}</div>
+      <div className="profile-card__body">{children}</div>
+    </>
+  );
+}
+
+/** "Mensagem para Caio": Enter opens the DM (made if new) with the text sent. */
+function MessageBox({ target, label, onSent }: { target: DmTarget; label: string; onSent: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const send = useSendDm(org.id);
+  const emojiLabels = useEmojiLabels();
+  const field = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState("");
+  const submit = () => {
+    const body = text.trim();
+    if (!body || send.isPending) return;
+    send.mutate(
+      { ...target, body },
+      {
+        onSuccess: () => {
+          setText("");
+          onSent();
+          void ("agentId" in target
+            ? navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: target.agentId } })
+            : navigate({ to: "/org/$orgId/dm/person/$userId", params: { orgId: org.id, userId: target.userId } }));
+        },
+        onError: (e) => toast.show(errorText(t, e), "error"),
+      },
+    );
+  };
+  return (
+    <div className="ac-input-affix mcard__dm">
+      <input
+        ref={field}
+        value={text}
+        placeholder={label}
+        aria-label={label}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          submit();
+        }}
+      />
+      <EmojiPickerPopover
+        labels={emojiLabels}
+        side="top"
+        align="end"
+        onPick={(emoji) => {
+          setText((v) => v + emoji);
+          field.current?.focus();
+        }}
+        trigger={
+          <button type="button" className="mcard__emoji" aria-label={t("presence.emoji")} title={t("presence.emoji")}>
+            <Icon name="smile" size={18} />
+          </button>
+        }
+      />
+    </div>
+  );
+}
+
+function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const toast = useToast();
   const people = usePeople(org.id);
   const settings = useSettings(org.id);
   const dir = useDirectory(org.id);
+  const roles = useRoles(org.id).data?.roles ?? [];
+  const setRoles = useSetMemberRoles(org.id);
+  const personEntries = usePersonMenu();
   const person = people.data?.find((p) => p.userId === userId);
   // Presence and line as the others see them (ADR 0084): a hidden person reads offline, to themselves hidden.
   const shown = usePersonPresence(userId);
@@ -109,11 +289,15 @@ function PersonCard({ userId }: { userId: string }) {
     : null;
   const member = dir.memberById.get(userId);
   const name = person?.name ?? member?.name ?? t("channel.unknownPerson");
-  const role = person?.role ?? member?.role;
-  // The roles they hold, top first (ADR 0085); the owner and someone with none keep their membership's word.
-  const held = rolesOf({ roleIds: person?.roleIds ?? member?.roleIds }, useRoles(org.id).data?.roles ?? []);
-  const roleLine =
-    role === "owner" || held.length === 0 ? (role ? t(`roles.${role}`) : null) : held.map((r) => r.name).join(", ");
+  const handle = person?.handle ?? member?.handle;
+  const joinedAt = person?.joinedAt ?? member?.joinedAt;
+  const owner = (person?.role ?? member?.role) === "owner";
+  // The roles they hold, top first (ADR 0085); who manages members gives and takes the ones below their own.
+  const roleIds = person?.roleIds ?? member?.roleIds ?? [];
+  const held = rolesOf({ roleIds }, roles);
+  const gives = can(org, "manage_members") && (!owner || org.role === "owner") && roles.some((r) => r.givable);
+  const setTo = (next: string[]) =>
+    setRoles.mutate({ userId, roleIds: next }, { onError: (e) => toast.show(errorText(t, e), "error") });
   // The person's own zone (the API falls back to the workspace's).
   const timezone = person?.timezone ?? member?.timezone ?? settings.data?.timezone;
   let localTime: string | null = null;
@@ -127,20 +311,24 @@ function PersonCard({ userId }: { userId: string }) {
     localTime = null;
   }
   return (
-    <div className="profile-card__body">
-      <div className="profile-card__head">
+    <CardShell
+      sky={<ProfileSky color="sky" person />}
+      face={
         <Avatar
           kind="person"
           size="lg"
           name={name}
-          imageUrl={person?.image ?? member?.image}
+          imageUrl={person?.avatarUrl ?? person?.image ?? member?.avatarUrl ?? member?.image}
           presence={shown?.presence ?? null}
           presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
         />
-        <div className="list-col">
-          <span className="profile-card__name">{name}</span>
-          {roleLine && <span className="small muted">{roleLine}</span>}
-        </div>
+      }
+      more={member ? personEntries(member) : []}
+      onDone={onDone}
+    >
+      <div className="list-col mcard__names">
+        <span className="profile-card__name">{name}</span>
+        {handle && <span className="small muted">@{handle}</span>}
       </div>
       {line && shown?.status && (
         <div className="profile-card__status">
@@ -152,6 +340,52 @@ function PersonCard({ userId }: { userId: string }) {
             <small>{clearsText(t, i18n.language, shown.status.until)}</small>
           </span>
         </div>
+      )}
+      {(owner || held.length > 0 || gives) && (
+        <section className="mcard__section" aria-label={t("profile.roles")}>
+          <span className="mcard__label">{t("profile.roles")}</span>
+          <div className="mcard__roles">
+            {owner && (
+              <span title={t("roles.ownerTitle")}>
+                <Token leading={<RoleMark color="violet" icon="audienceOwner" size={18} />}>{t("roles.owner")}</Token>
+              </span>
+            )}
+            {held.map((r) => (
+              <Token
+                key={r.id}
+                leading={<RoleMark color={r.color} icon={r.icon} size={18} />}
+                {...(gives && r.givable
+                  ? {
+                      removeLabel: t("common.removeName", { name: r.name }),
+                      onRemove: () => setTo(roleIds.filter((id) => id !== r.id)),
+                    }
+                  : {})}
+              >
+                {r.name}
+              </Token>
+            ))}
+            {gives && (
+              <RolesPicker
+                roles={roles}
+                value={roleIds}
+                onChange={setTo}
+                label={t("members.rolesOf", { name })}
+                side="right"
+                align="start"
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon="plus"
+                    className="mcard__add"
+                    aria-label={t("members.rolesOf", { name })}
+                  />
+                }
+              />
+            )}
+          </div>
+        </section>
       )}
       <dl className="profile-card__facts">
         {person && shown && (
@@ -176,17 +410,17 @@ function PersonCard({ userId }: { userId: string }) {
             </dd>
           </>
         )}
+        {joinedAt && (
+          <>
+            <dt>{t("profile.memberSince")}</dt>
+            <dd>{formatMonthYear(i18n.language, joinedAt)}</dd>
+          </>
+        )}
       </dl>
       {userId !== me.user.id && (
-        <div className="profile-card__actions">
-          <Button asChild size="sm" variant="primary">
-            <Link to="/org/$orgId/dm/person/$userId" params={{ orgId: org.id, userId }}>
-              {t("profile.dm")}
-            </Link>
-          </Button>
-        </div>
+        <MessageBox target={{ userId }} label={t("profile.messageTo", { name })} onSent={onDone} />
       )}
-    </div>
+    </CardShell>
   );
 }
 
@@ -195,19 +429,20 @@ function AgentCard({ agentId, onDone }: { agentId: string; onDone: () => void })
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const agent = dir.anyAgent(agentId);
-  if (!agent) return <p className="small muted">{t("channel.unknownAgent")}</p>;
+  if (!agent) return <p className="small muted mcard__unknown">{t("channel.unknownAgent")}</p>;
   // No longer in the team (archived or deleted): who it was, nothing to do with it.
   if (agent.former) {
     return (
-      <div className="profile-card__body">
-        <div className="profile-card__head">
-          <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
-          <div className="list-col">
-            <span className="profile-card__name">{agent.name}</span>
-            <span className="small muted">{t("profile.former")}</span>
-          </div>
+      <CardShell
+        agent
+        sky={<ProfileSky color={colorOf(agent)} />}
+        face={<AgentAvatar agentId={agent.id} size="lg" name={agent.name} />}
+      >
+        <div className="list-col mcard__names">
+          <span className="profile-card__name">{agent.name}</span>
+          <span className="small muted">{t("profile.former")}</span>
         </div>
-      </div>
+      </CardShell>
     );
   }
   return <AgentCardBody agent={agent} onDone={onDone} />;
@@ -218,23 +453,32 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const models = useModels();
-  const openPanel = useOpenAgentPanel();
+  const roles = useRoles(org.id).data?.roles ?? [];
+  const channels = useChannels(org.id).data;
+  const agentEntries = useAgentMenu();
   const seesSpend = can(org, "view_usage") || agent.ownerUserId === me.user.id;
   const details = seesDetails(agent);
+  const g = agentGrammar(agent.name);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
   const model = isAuto(agent.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks =
     agent.brain && agent.brain.kind !== "model"
-      ? brainLine(t, agent.brain, model, { owner: owner?.split(" ")[0], agents: dir.agents })
+      ? brainLine(t, agent.brain, model, { owner: owner ? firstName(owner) : undefined, agents: dir.agents })
       : null;
-  // Its presence from its work and its line (ADR 0084): its own words or what it is doing now.
+  // Its presence from its work and its line (ADR 0084): its own words or what it is doing now, and where.
   const shown = useAgentPresence(agent.id);
   const line = agentLine(t, shown?.line ?? null);
+  const workingIn = useStreams((s) => agentWorkingIn(s, agent.id));
+  const busy = workingIn !== null;
+  const here = workingIn ? channels?.find((c) => c.id === workingIn)?.name : undefined;
+  const lines = audienceLines(agent, roles, dir.members);
   return (
-    <div className="profile-card__body">
-      <div className="profile-card__head">
+    <CardShell
+      agent
+      sky={<ProfileSky color={colorOf(agent)} busy={busy} />}
+      face={
         <AgentAvatar
           agentId={agent.id}
           size="lg"
@@ -242,14 +486,22 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           presence={shown?.presence ?? null}
           presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
         />
-        <div className="list-col">
-          <span className="profile-card__name">{agent.name}</span>
-          <span className="small muted">
-            {agent.role ? t("issues.agentRole", { role: agent.role }) : t("profile.agent")}
-          </span>
-          <NoAiChip agentId={agent.id} />
-          <CoordinatorChip agent={agent} />
-        </div>
+      }
+      more={agentEntries(agent)}
+      onDone={onDone}
+    >
+      <div className="list-col mcard__names">
+        <span className="profile-card__name">{agent.name}</span>
+        <span className="small muted">
+          {[
+            agent.handle ? `@${agent.handle}` : null,
+            agent.role ? t("issues.agentRole", { role: agent.role }) : t("profile.agent"),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+        <NoAiChip agentId={agent.id} />
+        <CoordinatorChip agent={agent} />
       </div>
       {line && shown?.line && (
         <div className="profile-card__status">
@@ -259,10 +511,45 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           <span>
             {line.text}
             <small>
-              {shown.line.by === "self" ? t("presence.bySelf", { name: agent.name }) : t("presence.byAuto")}
+              {here
+                ? t("profile.nowIn", { channel: here })
+                : shown.line.by === "self"
+                  ? t("presence.bySelf", { name: agent.name })
+                  : t("presence.byAuto")}
             </small>
           </span>
         </div>
+      )}
+      {details && (
+        <section className="mcard__section" aria-label={t("profile.audience")}>
+          <div className="mcard__label-row">
+            <span className="mcard__label">{t("profile.audience")}</span>
+            {canEditAudience(org, agent, me.user.id) && <AudienceEdit agent={agent} />}
+          </div>
+          <ul className="mcard__who">
+            {lines.map((l) =>
+              l.kind === "person" ? (
+                <li key={`p-${l.person.userId}`}>
+                  <Avatar size="xs" name={l.person.name} imageUrl={l.person.avatarUrl ?? l.person.image} />
+                  {l.person.name}
+                </li>
+              ) : l.kind === "role" ? (
+                <li key={`r-${l.role.id}`}>
+                  <RoleMark color={l.role.color} icon={l.role.icon} size={18} />
+                  {l.role.name}
+                </li>
+              ) : (
+                <li key="everyone">
+                  {l.role && <RoleMark color={l.role.color} icon={l.role.icon} size={18} />}
+                  {t("audience.summary.everyone")}
+                </li>
+              ),
+            )}
+          </ul>
+          {owner && modeOf(agent) === "people" && (
+            <span className="small muted">{t("audience.ownerAlways", { name: owner })}</span>
+          )}
+        </section>
       )}
       <dl className="profile-card__facts">
         {shown && (
@@ -273,12 +560,6 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         )}
         <dt>{t("profile.owner")}</dt>
         <dd>{owner ?? t("profile.noOwner")}</dd>
-        {modeOf(agent) !== "everyone" && (
-          <>
-            <dt>{t("profile.audience")}</dt>
-            <dd>{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</dd>
-          </>
-        )}
         {details && (
           <>
             <dt>{t("profile.model")}</dt>
@@ -296,40 +577,99 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         )}
       </dl>
       {seesSpend && details && <Spend agent={agent} locale={i18n.language} />}
-      {!canTalk(agent) && (
-        <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</p>
+      {canTalk(agent) ? (
+        <MessageBox target={{ agentId: agent.id }} label={t("home.ask.label", g)} onSent={onDone} />
+      ) : (
+        <>
+          <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</p>
+          <div className="profile-card__actions">
+            <AskAccessButton agent={agent} />
+          </div>
+        </>
       )}
-      <div className="profile-card__actions">
-        {canTalk(agent) || details ? (
-          <Button asChild size="sm" variant="primary">
-            <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-              {t("profile.dm")}
-            </Link>
-          </Button>
-        ) : (
-          <AskAccessButton agent={agent} />
-        )}
-        {/* In a conversation, its page opens in the panel beside it; elsewhere, the page. */}
-        {openPanel ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              onDone();
-              openPanel(agent.id);
-            }}
-          >
-            {t("profile.viewProfile")}
-          </Button>
-        ) : (
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-              {t("profile.viewProfile")}
-            </Link>
-          </Button>
-        )}
+    </CardShell>
+  );
+}
+
+/**
+ * "Editar" beside "Quem pode falar": the agent Settings tab's choice (roles and people), saved the same way. On a
+ * plan only its owner lets more people in (ADR 0059 §5).
+ */
+function AudienceEdit({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const toast = useToast();
+  const update = useUpdateAgent(org.id, agent.id);
+  const g = agentGrammar(agent.name);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<AgentAudience>(() => audienceOf(agent));
+  const [blocked, setBlocked] = useState(false);
+  const valid = audienceValid(draft, agent.ownerUserId);
+  const ownerName = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : undefined;
+  const ownerFirst = ownerName ? firstName(ownerName) : undefined;
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) return;
+        setDraft(audienceOf(agent));
+        setBlocked(false);
+      }}
+      side="right"
+      align="start"
+      label={t("audience.title", g)}
+      className="mcard-audience"
+      trigger={
+        <button type="button" className="mcard__edit">
+          {t("profile.audienceEdit")}
+        </button>
+      }
+    >
+      <span className="mcard-audience__title">{t("audience.title", g)}</span>
+      <AudienceChoice
+        compact
+        value={draft}
+        onChange={(next) => {
+          const stop = audienceBlocked(agent, next, me.user.id);
+          setBlocked(stop);
+          if (!stop) setDraft(next);
+        }}
+        ownerUserId={agent.ownerUserId}
+        agentName={agent.name}
+        idPrefix={`mcard-audience-${agent.id}`}
+        onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
+      />
+      {blocked && (
+        <SettingNote icon="lock" live>
+          {t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })}
+        </SettingNote>
+      )}
+      {!valid && (
+        <span className="small mcard-audience__err" role="alert">
+          {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}
+        </span>
+      )}
+      <div className="mcard-audience__acts">
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!valid || update.isPending}
+          onClick={() =>
+            update.mutate(
+              { audience: audiencePatch(draft) },
+              { onSuccess: () => setOpen(false), onError: (e) => toast.show(errorText(t, e), "error") },
+            )
+          }
+        >
+          {t("common.save")}
+        </Button>
       </div>
-    </div>
+    </Popover>
   );
 }
 

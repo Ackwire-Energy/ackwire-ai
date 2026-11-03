@@ -127,6 +127,8 @@
     "color": "Color",
     "colorDesc": "Pinta la marca del rol.",
     "colorOf": "Color {{color}}",
+    "hoist": "Mostrar aparte en la lista de miembros",
+    "hoistDesc": "Quien tiene este rol aparece en un grupo propio en la columna de miembros.",
     "icon": "Ícono",
     "iconDesc": "Se muestra junto al nombre.",
     "more": "Más opciones",
@@ -1142,9 +1144,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Del sistema",
     "markRead": "Marcar como leído",
+    "muteChannel": "Silenciar canal",
+    "unmuteChannel": "Reactivar canal",
     "mention": "Mencionar",
     "copyHandle": "Copiar @{{handle}}",
     "handleCopied": "@ copiado.",
+    "copyId": "Copiar ID",
+    "idCopied": "ID copiado.",
     "editAgent": "Editar agente",
     "openPage": "Abrir en página completa",
     "moveUp": "Subir",
@@ -1253,9 +1259,8 @@
     "sidebarMenu": {
       "title": "Barra lateral",
       "newChannel": "Nuevo canal",
-      "newAgentGroup": "Nuevo grupo de agentes",
       "addToChannels": "Nuevo canal o categoría",
-      "addToAgents": "Crear agente o grupo",
+      "addToDms": "Nuevo mensaje o agente",
       "newMessage": "Nuevo mensaje",
       "addMembers": "Agregar personas o agentes",
       "channelSettings": "Configuración del canal",
@@ -1357,6 +1362,13 @@
     "pendingApprovals_other": "{{count}} aprobaciones pendientes",
     "home": "Inicio",
     "notifications": "Notificaciones",
+    "unreadMark": "No leído",
+    "unreadMentions_one": "{{count}} mención a ti",
+    "unreadMentions_many": "{{count}} menciones a ti",
+    "unreadMentions_other": "{{count}} menciones a ti",
+    "unreadThreads_one": "Hilos: {{count}} con respuestas sin leer",
+    "unreadThreads_many": "Hilos: {{count}} con respuestas sin leer",
+    "unreadThreads_other": "Hilos: {{count}} con respuestas sin leer",
     "unreadNotifications_one": "{{count}} notificación sin leer",
     "unreadNotifications_many": "{{count}} notificaciones sin leer",
     "unreadNotifications_other": "{{count}} notificaciones sin leer"
@@ -1391,6 +1403,9 @@
   },
   "team": {
     "title": "Equipo",
+    "groups": {
+      "title": "Grupos de agentes"
+    },
     "subtitle_one": "{{count}} agente, agrupado según quién se encarga de él.",
     "subtitle_many": "{{count}} agentes, agrupados según quién se encarga de cada uno.",
     "subtitle_other": "{{count}} agentes, agrupados según quién se encarga de cada uno.",
@@ -1480,12 +1495,17 @@
       "button_other": "Mensajes fijados ({{count}})",
       "label": "Mensajes fijados en #{{channel}}",
       "in": "Fijado en #{{channel}}",
-      "unpin": "Dejar de fijar el mensaje de {{name}}"
+      "unpin": "Dejar de fijar el mensaje de {{name}}",
+      "empty": "Aún no hay nada fijado aquí"
+    },
+    "header": {
+      "pins": "Mensajes fijados",
+      "showMembers": "Mostrar miembros",
+      "hideMembers": "Ocultar miembros"
     },
     "membersButton_one": "Miembros del canal ({{count}})",
     "membersButton_many": "Miembros del canal ({{count}})",
     "membersButton_other": "Miembros del canal ({{count}})",
-    "membersPeople": "Personas",
     "membersAgents": "Agentes",
     "you": "tú",
     "agentState": {
@@ -1495,7 +1515,6 @@
     },
     "autoReplyChip": "responde sin mención",
     "coordinatorChip": "coordina el equipo",
-    "seeDetails": "Ver detalles del canal",
     "more": "Más acciones del mensaje",
     "copyLink": "Copiar enlace",
     "linkCopied": "Enlace copiado.",
@@ -1517,9 +1536,6 @@
     "messages": "Mensajes",
     "members": "Miembros: {{names}}",
     "details": "Detalles del canal",
-    "agentsAnswer_one": "{{names}} responde aquí",
-    "agentsAnswer_many": "{{names}} responden aquí",
-    "agentsAnswer_other": "{{names}} responden aquí",
     "composerLabel": "Mensaje en #{{channel}}",
     "composerDm": "Mensaje para {{name}}",
     "composerPlaceholder": "Mensaje en #{{channel}} · usa @ para llamar a un agente",
@@ -1552,6 +1568,13 @@
     "generalName": "#general mantiene su nombre.",
     "archive": "Archivar canal",
     "archived": "#{{channel}} archivado. La conversación se conserva.",
+    "delete": "Eliminar canal",
+    "deleteTitle": "¿Eliminar #{{channel}} para siempre?",
+    "deleteGoes": "Se va ahora: mensajes, hilos, archivos y fijados, lo que los agentes guardaron del canal y las rutinas que publican en él.",
+    "deleteIssues": "Sus tareas también se van, porque solo los miembros del canal podían verlas.",
+    "deleteOrArchive": "Para conservar la conversación, archiva el canal en lugar de eliminarlo.",
+    "deleteTypeName": "Escribe {{channel}} para confirmar",
+    "deleteDone": "#{{channel}} se eliminó.",
     "detailsSub": "{{category}} · {{visibility}}",
     "visibilityPublic": "Público",
     "visibilityPrivate": "Privado",
@@ -1603,6 +1626,9 @@
     "handled_one": "{{names}} respondió",
     "handled_many": "{{names}} respondieron",
     "handled_other": "{{names}} respondieron",
+    "passed_one": "Nadie respondió",
+    "passed_many": "Nadie respondió",
+    "passed_other": "Nadie respondió",
     "failed_one": "{{names}} no pudo responder",
     "failed_many": "{{names}} no pudieron responder",
     "failed_other": "{{names}} no pudieron responder",
@@ -1630,6 +1656,7 @@
       "handled": "Respondió",
       "failed": "Falló",
       "referenced": "Solo mencionado",
+      "passed": "No respondió",
       "reacted": "Reaccionó"
     },
     "failedShort": "No pudo responder",
@@ -1822,7 +1849,8 @@
     },
     "useAnyway": "Usar {{email}}",
     "assignFailed": "La cuenta de {{label}} está conectada, pero {{agent}} no pudo cambiarse a ella.",
-    "noAgents": "Un plan piensa solo para los agentes de su dueño, y todavía no tienes ninguno.",
+    "forNewAgents": "{{label}} está conectado. Los agentes que crees piensan con él.",
+    "forNewAgentsHint": "Los agentes que crees piensan con él.",
     "done": "Listo",
     "agent": "Para qué agente",
     "keyLocked": "Solo un admin agrega una clave de API.",
@@ -1919,6 +1947,19 @@
     },
     "connect": "Conectar",
     "connected": "Conectado",
+    "connect_app": {
+      "title": "Conectar {{name}}",
+      "mcp": "Agregar un servidor MCP",
+      "adminOnly": "Lo conecta un admin"
+    },
+    "invite": {
+      "title_one": "Invitar a {{count}} persona",
+      "title_many": "Invitar a {{count}} personas",
+      "title_other": "Invitar a {{count}} personas",
+      "open": "Invitar",
+      "done": "Invitación enviada",
+      "adminOnly": "Lo envía quien puede invitar"
+    },
     "agentProposal": {
       "title": "{{agent}} propone un nuevo agente",
       "review": "Revisar",
@@ -2007,6 +2048,7 @@
     "routine": {
       "created": "Creé la rutina <b>{{name}}</b> · {{schedule}}",
       "created_bare": "Creé la rutina <b>{{name}}</b>",
+      "ownActions": "Hace por su cuenta, sin preguntar: {{actions}}",
       "updated": "Cambié {{fields}} de la rutina <b>{{name}}</b>",
       "updated_paused": "Pausé la rutina <b>{{name}}</b>",
       "updated_resumed": "Reanudé la rutina <b>{{name}}</b>",
@@ -2212,6 +2254,12 @@
   "profile": {
     "audience": "Quién puede hablar",
     "cardLabel": "Perfil",
+    "roles": "Roles",
+    "memberSince": "En el espacio de trabajo desde",
+    "messageTo": "Mensaje para {{name}}",
+    "audienceEdit": "Editar",
+    "nowIn": "ahora, en #{{channel}}",
+    "more": "Más",
     "of": "Perfil de {{name}}",
     "presence": "Presencia",
     "offline": "Aún no se ha unido",
@@ -3604,6 +3652,8 @@
         "org_deleting": "El espacio de trabajo se está eliminando.",
         "agent_paused": "El agente está en pausa.",
         "computer_busy": "La computadora siguió ocupada con otras tareas.",
+        "computer_failed": "La computadora tuvo un problema y se detuvo.",
+        "computer_timeout": "La computadora tardó demasiado en responder.",
         "unknown": "Falló."
       }
     },
@@ -3975,6 +4025,7 @@
       "handleTaken": "@{{handle}} ya es de otro agente o persona. ¿Qué tal @{{suggestion}}?",
       "modelUnavailable": "Elige un modelo que el espacio de trabajo pueda usar."
     },
+    "noAi": "El espacio de trabajo todavía no tiene una IA. Conecta una ahora, o crea el agente y conéctala después.",
     "instructions": "Instrucciones",
     "instructionsPlaceholder": "Ej.: Responde las preguntas de los clientes en #soporte según la documentación. Cuando no sabe, llama a alguien del equipo.",
     "startedFrom": "Empezó con el texto de {{role}}",
@@ -4114,6 +4165,13 @@
     "routineNotMade": "La rutina no se creó: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Miembros de #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Propietario del workspace",
+      "more": "Mostrar {{count}} más",
+      "find": "Buscar personas y agentes"
+    },
     "agentsOnlyYou": "Tus agentes solo te responden a ti.",
     "agentsOnlyYouHint": "Con un plan, puedes dejar que cada uno responda a otras personas desde su página.",
     "filters": "Filtrar personas",
@@ -4140,7 +4198,6 @@
       "on": "el {{date}}"
     },
     "waitingTitle": "Te esperan",
-    "more": "Más acciones para {{name}}",
     "remove": {
       "item": "Quitar del espacio de trabajo",
       "leave": "Salir del espacio de trabajo",
@@ -4489,7 +4546,7 @@
     },
     "setup_write": {
       "label": "Configurar el espacio de trabajo",
-      "description": "Ofrecer conectar una IA con una tarjeta en la que una persona hace clic, y crear canales para quien lo pidió, con Deshacer."
+      "description": "Ofrecer conectar una IA, una app o un servidor MCP, o invitar personas, con una tarjeta en la que una persona hace clic, y crear canales para quien lo pidió, con Deshacer."
     },
     "github_git_read": {
       "label": "Clonar repositorios (git)",
@@ -4985,7 +5042,12 @@
         "forum": "Los agentes discuten en un tema del foro",
         "artifact": "Se vuelve un documento en el Drive"
       },
-      "ahead": "Preparado para después"
+      "ahead": "Preparado para después",
+      "ownActions": "Hace por su cuenta"
+    },
+    "ownActions": {
+      "hint": "Cada ejecución hace esto en tus apps conectadas sin preguntar. Cualquier otra acción en ellas pide aprobación antes, y merge, deploy y rollback siempre la piden.",
+      "none": "En las apps conectadas pide aprobación antes de cada acción. Para que haga su trabajo por su cuenta, dile al agente en el chat qué acciones puede hacer."
     },
     "ahead": {
       "approved": "Aprobada · se ejecuta {{when}}",
@@ -6562,9 +6624,10 @@
     "bodyHelp": "El cuerpo de SKILL.md.",
     "writeMissing": "Completa el nombre, cuándo usarla y las instrucciones.",
     "files": "Archivos",
-    "needsSandbox": "necesita un sandbox",
+    "needsSandbox": "no guardado",
+    "assetLimit": "Una habilidad guarda hasta {{max}} MB de imágenes y otros archivos.",
     "runsOnPc": "se ejecuta en la PC del agente",
-    "reinstall": "Reinstálala para usar los scripts.",
+    "reinstall": "Reinstala la habilidad para que los agentes usen este archivo.",
     "edit": "Editar",
     "save": "Guardar",
     "saved": "{{name}} guardada.",
@@ -8826,6 +8889,12 @@
   "connectors": {
     "title": "Conectores",
     "add": "Agregar conector",
+    "mcp": {
+      "title": "MCP",
+      "add": "Agregar MCP",
+      "list": "Servidores MCP conectados",
+      "none": "Aquí aparecen los servidores MCP que conectes por su dirección."
+    },
     "addTitle": "Agregar conector",
     "catalogText": "Conéctalo una vez para {{org}}. Luego elige qué puede usar cada agente.",
     "catalog": "Conectores disponibles",
@@ -10167,6 +10236,31 @@
       "relevance": "Más relevantes"
     },
     "searchHere": "Buscar en esta conversación",
+    "optionHint": {
+      "from": "nombre",
+      "in": "canal",
+      "has": "enlace, archivo, imagen o tarjeta",
+      "mentions": "nombre"
+    },
+    "moreFiltersHint": "fechas, solo agentes, fijados",
+    "clearRecentAll": "Borrar búsquedas recientes",
+    "header": {
+      "placeholder": "Buscar en {{org}}",
+      "clear": "Borrar búsqueda"
+    },
+    "panel": {
+      "label": "Resultados de la búsqueda",
+      "count_one": "{{count}} resultado",
+      "count_many": "{{count}} resultados",
+      "count_other": "{{count}} resultados",
+      "filters": "Filtros",
+      "filtersCount_one": "Filtros ({{count}})",
+      "filtersCount_many": "Filtros ({{count}})",
+      "filtersCount_other": "Filtros ({{count}})",
+      "jump": "Ir",
+      "jumpLabel": "Ir al mensaje de {{name}}",
+      "threadIn": "hilo en #{{channel}}"
+    },
     "dm": "MD con {{name}}"
   },
   "files": {
@@ -10501,6 +10595,7 @@
       "measuring": "Tamaño aún sin medir",
       "diskFullNotice": "El disco de {{name}} está casi lleno"
     },
+    "chromeMissingNotice": "{{name}} necesita Google Chrome para el navegador de los agentes. Descárgalo en google.com/chrome",
     "access": {
       "folders": "Carpetas permitidas",
       "ownFolder": "Carpeta de cada agente",
@@ -11009,6 +11104,7 @@
         "wiki": "una página de la wiki",
         "mission": "una misión",
         "thread": "un hilo",
+        "channel": "un canal",
         "forum": "un tema del foro",
         "artifact": "un archivo del Drive",
         "agent": "un agente",
@@ -11092,7 +11188,7 @@
       "members": "Miembros e invitaciones",
       "roles": "Roles y permisos",
       "access": "Agentes y accesos",
-      "connectors": "Conectores",
+      "connectors": "Conectores y MCP",
       "skills": "Habilidades",
       "keys": "Cuentas de IA",
       "storage": "Almacenamiento",
@@ -11112,7 +11208,7 @@
       "members": "Quién está en el espacio de trabajo, e invitaciones.",
       "roles": "Lo que puede hacer cada persona. Los roles se suman.",
       "access": "Lo que puede usar cada agente: un nivel por conector.",
-      "connectors": "Servicios conectados una sola vez para todo el espacio de trabajo.",
+      "connectors": "Servicios y servidores MCP conectados una sola vez para todo el espacio de trabajo.",
       "skills": "Instrucciones en Markdown que los agentes abren cuando las necesitan.",
       "keys": "Tus planes y las claves de API del espacio de trabajo.",
       "storage": "Dónde viven los archivos del espacio de trabajo.",
@@ -11680,6 +11776,8 @@
         "readingForum": "Leyó el foro",
         "creatingChannel": "Creó un canal",
         "offeringConnectAi": "Ofreció conectar una IA",
+        "offeringConnectApp": "Ofreció conectar una app",
+        "offeringInvites": "Ofreció invitar a personas",
         "proposingAgent": "Propuso un agente",
         "askingAgent": "Le preguntó a otro agente",
         "tellingAgent": "Le avisó a otro agente",
@@ -11762,6 +11860,8 @@
       "readingForum": "leyendo el foro",
       "creatingChannel": "creando un canal",
       "offeringConnectAi": "preparando una IA para conectar",
+      "offeringConnectApp": "preparando una app para conectar",
+      "offeringInvites": "preparando las invitaciones",
       "proposingAgent": "proponiendo un agente",
       "askingAgent": "preguntándole a otro agente",
       "tellingAgent": "avisándole a otro agente",
@@ -11869,6 +11969,9 @@
       "no_ai_signed_out": "Todavía no puedo responder: mi IA tiene la sesión cerrada.",
       "no_ai_not_signed_in": "Todavía no puedo responder: {{brain}} no tiene la sesión iniciada en mi computadora.",
       "action_connect_ai": "Conectar una IA",
+      "action_connect_app": "Conectar {{name}}",
+      "action_add_mcp": "Agregar un servidor MCP",
+      "action_invite_people": "Invitar a personas",
       "agent_proposal": "Propuso un nuevo agente: {{name}}",
       "approval_request": "Solicitud de aprobación: {{title}}",
       "secret_request": "{{agent}} pidió una clave: {{name}}",
@@ -12071,6 +12174,14 @@
     "offer_connect_ai": {
       "label": "Ofrecer conectar una IA",
       "description": "Publica una tarjeta cuyo botón abre el diálogo para conectar un plan o una clave de API."
+    },
+    "offer_connect_app": {
+      "label": "Ofrecer conectar una app o un MCP",
+      "description": "Publica una tarjeta cuyo botón abre el diálogo para conectar una app o un servidor MCP por su dirección."
+    },
+    "offer_invites": {
+      "label": "Ofrecer invitar personas",
+      "description": "Publica una tarjeta cuyo botón abre el diálogo de invitación con las direcciones ya completadas."
     },
     "propose_agent": {
       "label": "Proponer un agente",

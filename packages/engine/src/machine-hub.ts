@@ -4,6 +4,7 @@ import {
   BROWSER_PROTOCOL,
   type BrowserHandoffInfo,
   brainTopic,
+  type ErrorReporter,
   HEARTBEAT_MS,
   HELLO_TIMEOUT_MS,
   type MachineErrorCode,
@@ -54,6 +55,7 @@ import {
   MACHINE_CONTROL_TOPIC,
   MachineDroppedError,
   MachineOfflineError,
+  type MachineRow,
   machineAgents,
   machineOnline,
   machineOwnerTimezone,
@@ -61,7 +63,12 @@ import {
   publishMachineStatus,
   publishMachineUpdated,
 } from "./machines";
-import { DISK_REARM_USE, DISK_WARN_USE, notifyComputerDiskFull } from "./notification-producers";
+import {
+  DISK_REARM_USE,
+  DISK_WARN_USE,
+  notifyComputerDiskFull,
+  notifyComputerNoChrome,
+} from "./notification-producers";
 import { enqueue } from "./outbox";
 import { assertCanWork, standingRefusal } from "./standing";
 
@@ -255,6 +262,8 @@ export interface MachineHubDeps {
   rpcLivenessMs?: number;
   /** The server sends email: the workspace's own computer, ready after a long wait, is emailed to its owners. */
   readyEmail?: Omit<ReadyEmailDeps, "machines"> | null;
+  /** Error reports (ADR 0104): a Cloud computer without Google Chrome goes there. */
+  errors?: ErrorReporter;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
@@ -491,6 +500,30 @@ export function createMachineHub(deps: MachineHubDeps) {
     }
   }
 
+  /**
+   * ADR 0133: the computer's runner drives its own Google Chrome now and found none (one that updated itself, say),
+   * so its agents' browsers fail until someone installs it. The Cloud's computers are ours to fix: an error report.
+   * Elsewhere, with the browser on, the person who can install it hears it once. The agent also says so when it
+   * tries.
+   */
+  async function chromeWentMissing(
+    machine: Pick<MachineRow, "id" | "orgId" | "name" | "kind" | "pairedByUserId">,
+    frame: Extract<RunnerFrame, { type: "hello" }>,
+  ) {
+    if (machine.kind === "managed") {
+      deps.errors?.capture(new Error("Google Chrome failed an agent's browser (missing)"), {
+        org_id: machine.orgId,
+        machine_id: machine.id,
+        os: frame.os,
+        browser_failure: "missing",
+        reason: "The computer's runner found no Google Chrome when it connected.",
+      });
+      return;
+    }
+    if (frame.access?.tools.browser !== true) return;
+    await notifyComputerNoChrome({ db, pubsub }, machine, new Date());
+  }
+
   async function accept(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "hello" }>) {
     if (conn.machineId || conn.authing) return;
     conn.authing = true;
@@ -605,6 +638,11 @@ export function createMachineHub(deps: MachineHubDeps) {
     await onManagedMachineHello({ db, pubsub, readyEmail }, machine).catch((error) =>
       deps.log?.warn("managed machine hello failed", { machineId: machine.id, error: String(error) }),
     );
+    if (frame.browser?.chromeMissing && !machine.executors?.browser?.chromeMissing) {
+      await chromeWentMissing(machine, frame).catch((error) =>
+        deps.log?.warn("missing Chrome notice failed", { machineId: machine.id, error: String(error) }),
+      );
+    }
     // Protocol 9: the agents that use this computer, for the desktop app.
     if (frame.protocol >= PAUSE_PROTOCOL) await sendAgents(conn);
     if (frame.protocol >= BROWSER_PROTOCOL) browserHooks.connected?.(machine.id);

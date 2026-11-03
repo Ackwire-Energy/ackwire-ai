@@ -101,6 +101,18 @@ export const extraIcons = {
     ["circle", { cx: "13", cy: "6", r: "2" }],
     ["circle", { cx: "7", cy: "14", r: "2" }],
   ],
+  /** A channel's settings (the header and the open channel's row, like Discord's): a cog with its hole. */
+  cog: [
+    [
+      "path",
+      {
+        d: "M15.26 8.39L17.31 8.84L17.31 11.16L15.26 11.61L14.86 12.58L15.99 14.35L14.35 15.99L12.58 14.86L11.61 15.26L11.16 17.31L8.84 17.31L8.39 15.26L7.42 14.86L5.65 15.99L4.01 14.35L5.14 12.58L4.74 11.61L2.69 11.16L2.69 8.84L4.74 8.39L5.14 7.42L4.01 5.65L5.65 4.01L7.42 5.14L8.39 4.74L8.84 2.69L11.16 2.69L11.61 4.74L12.58 5.14L14.35 4.01L15.99 5.65L14.86 7.42z",
+      },
+    ],
+    ["circle", { cx: "10", cy: "10", r: "2.4" }],
+  ],
+  /** The workspace's owner beside their name (the members column). */
+  crown: [["path", { d: "M4.5 14.5h11M4.8 12.5 3.6 6.4l3.7 2.8L10 4.8l2.7 4.4 3.7-2.8-1.2 6.1z" }]],
   /** Memory: fact. */
   info: [
     ["circle", { cx: "10", cy: "10", r: "7" }],

@@ -5,13 +5,13 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * The sidebar's parts (Canais, Agentes, Mensagens diretas): small-capitals titles set apart by space, one + each
- * (Canais: Novo canal, Nova categoria; Agentes: Criar agente, Novo grupo; Mensagens diretas: Nova mensagem), the
- * sidebar's own menu on a right click in its empty space, and the buttons over a row's end on hover or focus.
+ * The sidebar's parts (Canais, Mensagens diretas): small-capitals titles set apart by space, one + each (Canais:
+ * Novo canal, Nova categoria; Mensagens diretas: Nova mensagem, Criar agente), the sidebar's own menu on a right
+ * click in its empty space, and the buttons over a row's end on hover or focus.
  */
 
 afterEach(() => {
@@ -29,6 +29,13 @@ const asMember = (state: State = seedState()) => {
 const withCategory = (state: State = seedState()) => {
   state.channelCategories = [{ id: ENGINEERING, name: "Engenharia", position: 0 }];
   for (const c of state.channels) if (c.id === ENG_ID) c.categoryId = ENGINEERING;
+  return state;
+};
+/** DMs with Ada (an hour ago), João (now, 2 unread) and Atlas (none yet: no message, so not listed). */
+const withDms = (state: State = seedState()) => {
+  seedDm(state, { type: "agent", id: ADA_ID }, { ago: 60 });
+  seedDm(state, { type: "person", id: "u-joao" }, { ago: 1, unread: 2 });
+  state.dms.push({ channelId: "dm-atlas", with: { type: "agent", id: ATLAS_ID, name: "Atlas", handle: "atlas" } });
   return state;
 };
 const go = async (state: State = seedState(), path = `c/${GENERAL_ID}`) => {
@@ -88,7 +95,7 @@ describe("the parts' headers", () => {
     const titles = [...nav().querySelectorAll(".sidebar__section--part .sidebar__section-toggle")].map(
       (b) => b.textContent,
     );
-    expect(titles).toEqual(["Canais", "Agentes", "Mensagens diretas"]);
+    expect(titles).toEqual(["Canais", "Mensagens diretas"]);
     const canais = head("Canais").closest(".sidebar__section") as HTMLElement;
     expect(within(canais).getByRole("link", { name: /general/ })).toBeTruthy();
     expect(canais.nextElementSibling?.querySelector(".sidebar__section-toggle")?.textContent).toBe("Engenharia");
@@ -96,14 +103,28 @@ describe("the parts' headers", () => {
     expect(within(nav()).queryByRole("button", { name: "Nova categoria" })).toBeNull();
   });
 
-  test("agents sit flat under Agentes with no group; a group's header comes with the first group", async () => {
-    await go();
-    expect(nav().querySelectorAll(".sidebar__section-toggle").length).toBe(3);
-    cleanup();
+  test("Mensagens diretas lists the conversations that have a message, people and agents together, latest first", async () => {
+    await go(withDms());
+    const dms = head("Mensagens diretas").closest(".sidebar__section") as HTMLElement;
+    const names = [...dms.querySelectorAll("a.sidebar__item .sidebar__item-label")].map((l) => l.textContent);
+    expect(names).toEqual(["João", "Ada"]);
+    // A DM's unread count is the red one, as on Discord.
+    const joao = within(dms).getByRole("link", { name: /João/ });
+    expect(joao.getAttribute("data-unread")).toBe("true");
+    expect(within(joao).getByRole("img", { name: "2 mensagens não lidas" }).textContent).toBe("2");
+    // Closed, the part keeps its unread total on its header.
+    await click(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
+    expect(within(head("Mensagens diretas")).getByRole("img", { name: "2 mensagens não lidas" })).toBeTruthy();
+  });
+
+  test("no conversation yet: the header alone, and no agent group shows in the sidebar", async () => {
     const state = seedState();
     state.agentGroups = [{ id: "00000000-0000-4000-8000-0000000000e1", name: "Integrations", agentIds: [ADA_ID] }];
     await go(state);
-    expect(within(nav()).getByRole("button", { name: "Integrations" })).toBeTruthy();
+    const dms = head("Mensagens diretas").closest(".sidebar__section") as HTMLElement;
+    expect(dms.querySelectorAll("a.sidebar__item").length).toBe(0);
+    expect(within(nav()).queryByRole("button", { name: "Integrations" })).toBeNull();
+    expect(within(nav()).queryByRole("button", { name: "Agentes" })).toBeNull();
   });
 
   test("closed, Canais hides its categories too, but the open channel", async () => {
@@ -114,22 +135,15 @@ describe("the parts' headers", () => {
     expect(shown(nav().querySelector('a.sidebar__item[title="#general"]') as Element)).toBe(false);
   });
 
-  test("the footer has no Criar agente row: Agentes' + has it (always shown on touch screens)", async () => {
+  test("the footer has no Criar agente row: Mensagens diretas' + has it (always shown on touch screens)", async () => {
     await go();
     expect(nav().querySelector(".sidebar__create")).toBeNull();
-  });
-
-  test("with no agents there's no Agentes header, so the footer's Criar agente row comes back", async () => {
+    cleanup();
     const state = seedState();
     state.agents = [];
     await go(state);
-    expect(within(nav()).queryByRole("button", { name: "Agentes" })).toBeNull();
-    expect(within(nav()).getByRole("link", { name: "Criar agente" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/agents/new`,
-    );
-    cleanup();
-    await go(asMember(Object.assign(seedState(), { agents: [] })));
     expect(nav().querySelector(".sidebar__create")).toBeNull();
+    expect(labels(await openPlus("Nova mensagem ou agente"))).toContain("Criar agente");
   });
 });
 
@@ -153,28 +167,28 @@ describe("one + per part", () => {
     expect(labels(await openPlus("Novo canal ou categoria"))).toEqual(["Novo canal"]);
   });
 
-  test("Agentes: Equipe beside it, Criar agente opens the flow, Novo grupo its dialog", async () => {
+  test("Mensagens diretas: Equipe beside it, Nova mensagem opens Ir para…, Criar agente the flow", async () => {
     const { router } = await go();
-    expect(within(head("Agentes")).getByRole("link", { name: "Equipe" })).toBeTruthy();
-    let menu = await openPlus("Criar agente ou grupo");
-    expect(labels(menu)).toEqual(["Criar agente", "Novo grupo"]);
-    await click(within(menu).getByRole("menuitem", { name: "Novo grupo" }));
-    expect(screen().getByRole("dialog", { name: "Novo grupo" })).toBeTruthy();
+    expect(within(head("Mensagens diretas")).getByRole("link", { name: "Equipe" })).toBeTruthy();
+    let menu = await openPlus("Nova mensagem ou agente");
+    expect(labels(menu)).toEqual(["Nova mensagem", "Criar agente"]);
+    let asked = 0;
+    const count = () => asked++;
+    window.addEventListener("agentes:palette", count);
+    await click(within(menu).getByRole("menuitem", { name: "Nova mensagem" }));
+    window.removeEventListener("agentes:palette", count);
+    expect(asked).toBe(1);
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(2);
-    menu = await openPlus("Criar agente ou grupo");
+    menu = await openPlus("Nova mensagem ou agente");
     await click(within(menu).getByRole("menuitem", { name: "Criar agente" }));
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/new`);
   });
 
-  test("a member who may neither create agents nor arrange them has no + on Agentes", async () => {
+  test("a member who may not create agents: the + is Nova mensagem alone, opening Ir para…", async () => {
     await go(asMember());
-    expect(within(head("Agentes")).queryByRole("button", { name: "Criar agente ou grupo" })).toBeNull();
-    expect(within(head("Agentes")).getByRole("link", { name: "Equipe" })).toBeTruthy();
-  });
-
-  test("Mensagens diretas: Nova mensagem opens Ir para…", async () => {
-    await go();
+    expect(within(head("Mensagens diretas")).queryByRole("button", { name: "Nova mensagem ou agente" })).toBeNull();
+    expect(within(head("Mensagens diretas")).getByRole("link", { name: "Equipe" })).toBeTruthy();
     let asked = 0;
     const count = () => asked++;
     window.addEventListener("agentes:palette", count);
@@ -194,7 +208,6 @@ describe("the sidebar's own menu, on its empty space", () => {
       "Novo canal",
       "Nova categoria",
       "Criar agente",
-      "Novo grupo de agentes",
       "Equipe",
       "Restaurar ordem padrão",
     ]);
@@ -218,7 +231,7 @@ describe("the sidebar's own menu, on its empty space", () => {
 
   test("rows and headers keep their own menus, and a tool's link keeps the browser's", async () => {
     await go();
-    await rightClick(head("Agentes"));
+    await rightClick(head("Mensagens diretas"));
     expect(labels(appMenu())).toContain("Mover para cima");
     expect(labels(appMenu())).not.toContain("Personalizar a barra lateral");
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
@@ -286,9 +299,12 @@ describe("a row's buttons on hover or focus", () => {
     expect(stops.every((el) => el.tabIndex === 0)).toBe(true);
   });
 
-  test("a member who didn't make the channel gets none, and keeps its unread count", async () => {
+  test("a member who didn't make the channel gets none, and keeps its unread marks", async () => {
     const state = asMember();
-    for (const c of state.channels) c.unreadCount = c.id === ENG_ID ? 2 : 0;
+    for (const c of state.channels) {
+      c.unreadCount = c.id === ENG_ID ? 2 : 0;
+      c.mentionCount = c.id === ENG_ID ? 2 : 0;
+    }
     await go(state);
     const link = nav().querySelector('a.sidebar__item[title="#eng"]') as HTMLElement;
     expect(link.parentElement?.classList.contains("sidebar__row")).toBe(false);
@@ -297,7 +313,7 @@ describe("a row's buttons on hover or focus", () => {
   });
 
   test("an agent: its settings for its owner and the admins, in the panel and never the full page", async () => {
-    const { router } = await go();
+    const { router } = await go(withDms());
     const ada = within(nav()).getByRole("link", { name: /^Ada/ }).parentElement as HTMLElement;
     await click(within(ada).getByRole("button", { name: "Configurações de Ada" }));
     await settle(4);
@@ -306,14 +322,67 @@ describe("a row's buttons on hover or focus", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
     cleanup();
     // With no conversation on screen: beside the agent's own.
-    const away = await go(undefined, "threads");
+    const away = await go(withDms(), "threads");
     const row = within(nav()).getByRole("link", { name: /^Ada/ }).parentElement as HTMLElement;
     await click(within(row).getByRole("button", { name: "Configurações de Ada" }));
     await settle(8);
     expect(away.router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     expect(document.querySelector("aside.thread-panel--wide")).not.toBeNull();
     cleanup();
-    await go(asMember());
+    await go(asMember(withDms()));
+    expect(within(nav()).getByRole("link", { name: /^Ada/ })).toBeTruthy();
     expect(within(nav()).queryByRole("button", { name: "Configurações de Ada" })).toBeNull();
+  });
+});
+
+describe("unread marks, Discord's way", () => {
+  const RANDOM = "00000000-0000-4000-8000-0000000000c9";
+  const withRandom = (state: State = seedState()) => {
+    state.channels.push({
+      id: RANDOM,
+      name: "random",
+      topic: "",
+      visibility: "public",
+      isMember: true,
+      createdAt: new Date().toISOString(),
+    });
+    return state;
+  };
+
+  test("something new lights the row with no number, only a mention of me gets the red count, muted never lights", async () => {
+    const state = withRandom();
+    for (const c of state.channels) {
+      if (c.id === ENG_ID) Object.assign(c, { unreadCount: 4, mentionCount: 0 });
+      if (c.id === RANDOM) Object.assign(c, { unreadCount: 3, mentionCount: 2 });
+    }
+    await go(state);
+    const link = (name: string) => nav().querySelector(`a.sidebar__item[title="#${name}"]`) as HTMLElement;
+    expect(link("eng").dataset.kind).toBe("channel");
+    expect(link("eng").dataset.unread).toBe("true");
+    expect(link("eng").querySelector(".sidebar__unread")).toBeNull();
+    // No number, so screen readers hear it.
+    expect(link("eng").querySelector(".ac-visually-hidden")?.textContent).toBe("Não lida");
+    const count = link("random").querySelector(".sidebar__unread") as HTMLElement;
+    expect(count.textContent).toBe("2");
+    expect(count.getAttribute("aria-label")).toBe("2 menções a você");
+    expect(link("general").dataset.unread).toBe("false");
+    cleanup();
+
+    // Muted: it rests gray whatever comes, but a mention of me still shows.
+    const muted = withRandom();
+    for (const c of muted.channels)
+      if (c.id === RANDOM) Object.assign(c, { unreadCount: 3, mentionCount: 1, muted: true });
+    await go(muted);
+    expect(link("random").dataset.unread).toBe("false");
+    expect(link("random").dataset.muted).toBe("true");
+    expect(link("random").querySelector(".sidebar__unread")?.textContent).toBe("1");
+  });
+
+  test("the open channel keeps its own buttons, the cog for its settings", async () => {
+    await go();
+    const row = channelRow("general");
+    expect((row.querySelector("a.sidebar__item") as HTMLElement).dataset.status).toBe("active");
+    const cog = within(row).getByRole("button", { name: "Configurações do canal" });
+    expect(cog.querySelector("svg path")?.getAttribute("d")).toStartWith("M15.26 8.39");
   });
 });

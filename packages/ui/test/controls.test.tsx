@@ -5,7 +5,19 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Checkbox, CheckboxPill, Chip, Field, Input, Radio, RadioCard, RadioGroup, TabPanel, Tabs } from "../src";
+import {
+  Checkbox,
+  CheckboxPill,
+  Chip,
+  Field,
+  Input,
+  PickerHeading,
+  Radio,
+  RadioCard,
+  RadioGroup,
+  TabPanel,
+  Tabs,
+} from "../src";
 
 const body = () => within(document.body);
 
@@ -206,5 +218,17 @@ describe("Tabs", () => {
     });
     expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
     expect(body().getByRole("tabpanel").textContent).toBe("Lista decidida");
+  });
+});
+
+describe("PickerHeading", () => {
+  test("a section's label over its description, with a real gap between them", async () => {
+    render(<PickerHeading label="Papéis" description="Quem tem o papel pode falar." />);
+    const head = document.querySelector(".ac-picker-head");
+    expect([...(head?.children ?? [])].map((c) => c.textContent)).toEqual(["Papéis", "Quem tem o papel pode falar."]);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-picker-head")).toContain("flex-direction: column;");
+    expect(rule(".ac-picker-head")).toContain("gap: var(--space-1);");
   });
 });

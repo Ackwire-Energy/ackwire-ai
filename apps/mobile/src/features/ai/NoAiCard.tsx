@@ -19,7 +19,16 @@ type Answer = "pending" | "answering" | "still_missing";
  * (one other agents use), Claude's hint.
  */
 export const openConnectAi = (
-  request: { from?: string; intent?: string; provider?: string; agentId?: string; plan?: string; email?: string } = {},
+  request: {
+    from?: string;
+    intent?: string;
+    provider?: string;
+    agentId?: string;
+    plan?: string;
+    email?: string;
+    /** "1": from the create-agent step, for the agent being made (a plan signs in for the agents I create). */
+    forNew?: string;
+  } = {},
 ) => {
   const query = Object.entries(request)
     .filter(([, v]) => Boolean(v))

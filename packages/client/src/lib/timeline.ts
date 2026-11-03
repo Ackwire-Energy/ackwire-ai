@@ -6,8 +6,18 @@ import { quoteExcerpt } from "./reply";
 import { isRoutineCall, routineReplyOf } from "./routines";
 import { voiceOf } from "./voice";
 
-const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
-  a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1;
+type Timed = { createdAt: string; id: string; local?: Message["local"] };
+
+/**
+ * A message on its way (`local: "pending"`) was sent just now: after everything the server has, whatever the two
+ * clocks say. By time alone, my first of two quick messages, once the server has it (its clock, later than mine),
+ * would move under the second still on its way, and back when that one lands.
+ */
+const sending = (m: Timed) => (m.local === "pending" ? 1 : 0);
+
+const byTime = (a: Timed, b: Timed) =>
+  sending(a) - sending(b) ||
+  (a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1);
 
 /** Adds (or replaces) a message in a list, keeping it ordered and without duplicates. */
 export function upsertMessage(list: Message[] | undefined, message: Message): Message[] {
@@ -106,7 +116,12 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
       id: a.id,
       item: { kind: "approval" as const, key: a.id, approval: a },
     })),
-  ].sort((a, b) => (a.at === b.at ? a.id.localeCompare(b.id) : a.at < b.at ? -1 : 1));
+  ].sort((a, b) =>
+    byTime(
+      { createdAt: a.at, id: a.id, local: a.item.kind === "message" ? a.item.message.local : undefined },
+      { createdAt: b.at, id: b.id, local: b.item.kind === "message" ? b.item.message.local : undefined },
+    ),
+  );
 
   const out: TimelineItem[] = [];
   let lastDay = "";

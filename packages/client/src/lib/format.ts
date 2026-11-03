@@ -77,6 +77,10 @@ export const formatShortDate = (locale: string, iso: string, year = false) =>
 export const formatMonth = (locale: string, date: Date) =>
   new Intl.DateTimeFormat(locale, { month: "long" }).format(date);
 
+/** "março de 2026" */
+export const formatMonthYear = (locale: string, iso: string) =>
+  new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(new Date(iso));
+
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
 /** Calendar distance in days (0 = today, 1 = yesterday). */

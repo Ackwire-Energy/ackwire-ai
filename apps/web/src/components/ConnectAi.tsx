@@ -20,8 +20,10 @@ import {
   defaultChoice,
   defaultTarget,
   type ExistingSignIn,
+  freePlanAccount,
   gateDims,
   type PlanChoice,
+  type PlanGate,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -39,6 +41,8 @@ import {
   type KeyDraft,
   KeyPanel,
   PlanPanel,
+  PlanWithoutAgent,
+  useGatesWithoutAgent,
   usePlanGates,
 } from "@/components/ai/ConnectAiSteps";
 import { useOrg } from "@/components/org-context";
@@ -75,6 +79,12 @@ export interface ConnectAiRequest {
   auto?: boolean;
   /** Opened because the workspace's computer just got ready (its email, its notification): a plan's panel says so. */
   ready?: boolean;
+  /**
+   * Opened from the create-agent step for an agent of the person's own still being made: a plan signs in for the
+   * agents they create (as with no agent yet), never for one they have, and a computer opens in a new tab (the draft
+   * stays).
+   */
+  forNewAgent?: boolean;
 }
 
 /** How "Responder agora" went for a message, in this tab. */
@@ -170,7 +180,7 @@ function ConnectAiDialog({
   const named = request.agentIds?.length ? request.agentIds : null;
   const only = named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
   const one = only ? dir.agentById.get(only) : undefined;
-  const pool = one ? [one.id] : named;
+  const pool = request.forNewAgent ? [] : one ? [one.id] : named;
   const agents = (pool ? mine.filter((a) => pool.includes(a.id)) : mine).map((a) => ({
     id: a.id,
     name: a.name,
@@ -215,6 +225,11 @@ function ConnectAiDialog({
   const forAgent = forId ? { id: forId, name: dir.agentById.get(forId)?.name ?? "" } : undefined;
   const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined));
   const credentials = useCredentials(org.id, mayUseKeys && forId !== undefined);
+  // No agent of theirs yet, and it isn't opened for someone else's: a plan signs in for the agents they create.
+  const bare = agents.length === 0 && !theirs && !named;
+  const bareGates = useGatesWithoutAgent(org.id, bare);
+  const gateOf = (c: PlanChoice): PlanGate =>
+    agents.length > 0 ? gates.gateOf(c) : bare ? bareGates.at(c).gate : { state: "loading" };
   const [used, setUsed] = useState<ExistingUsed | null>(null);
   const [login, setLogin] = useState<ExistingSignIn | null>(null);
   const [picked, setPicked] = useState<AiChoice | null>(null);
@@ -223,9 +238,10 @@ function ConnectAiDialog({
     request.plan ??
     defaultChoice({
       intent: request.intent,
-      ownsAgents: agents.length > 0,
+      // With no agent in the workspace, a plan helps as much as a key: Claude first, as everywhere.
+      ownsAgents: agents.length > 0 || dir.agents.length === 0 || request.forNewAgent === true,
       mayAddKey,
-      claudeGate: agents.length > 0 ? gates.gateOf("claude") : { state: "loading" },
+      claudeGate: gateOf("claude"),
       // Signing in on Claude's panel would move a Codex agent onto Claude Code: one agent opens on its own plan.
       plan: agentPlan(one),
     });
@@ -241,6 +257,8 @@ function ConnectAiDialog({
   const done = () => {
     setConnected(true);
     void qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) });
+    // What "Quem pensa" lists (a new agent's step, an agent's page): the plan's models there are ready now.
+    void qc.invalidateQueries({ queryKey: keys.brainMachines(org.id) });
     onConnected();
   };
   const saveKey = () => {
@@ -262,11 +280,20 @@ function ConnectAiDialog({
     ? owner
       ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
       : t("noAi.lockedAdmins")
-    : agents.length > 0
-      ? undefined
-      : named
-        ? t("noAi.lockedAdmins")
-        : t("connectAi.noAgents");
+    : named && agents.length === 0
+      ? t("noAi.lockedAdmins")
+      : undefined;
+  const toComputers = () => {
+    if (request.forNewAgent) {
+      window.open(`/org/${org.id}/settings/computers`, "_blank", "noopener");
+      return;
+    }
+    onClose();
+    void navigate({
+      to: "/org/$orgId/settings/$section",
+      params: { orgId: org.id, section: "computers" },
+    });
+  };
   return (
     <Dialog
       open
@@ -323,7 +350,7 @@ function ConnectAiDialog({
               if (next !== "key" && Object.keys(linked).length > 0)
                 setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
-            dims={(c) => agents.length > 0 && gateDims(gates.gateOf(c))}
+            dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
             panel={
               choice === "key" ? (
                 <KeyPanel
@@ -333,6 +360,19 @@ function ConnectAiDialog({
                   saved={keySaved}
                   saving={add.isPending}
                   onSave={saveKey}
+                />
+              ) : bare ? (
+                <PlanWithoutAgent
+                  key={choice}
+                  choice={choice}
+                  gates={bareGates}
+                  mayAddKey={mayAddKey}
+                  onKey={() => setPicked("key")}
+                  onComputer={toComputers}
+                  onDone={() => {
+                    void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });
+                    done();
+                  }}
                 />
               ) : (
                 <PlanPanel
@@ -357,13 +397,7 @@ function ConnectAiDialog({
                     setPicked("key");
                     setLogin(null);
                   }}
-                  onComputer={() => {
-                    onClose();
-                    void navigate({
-                      to: "/org/$orgId/settings/$section",
-                      params: { orgId: org.id, section: "computers" },
-                    });
-                  }}
+                  onComputer={toComputers}
                   onDone={(ids) => {
                     // The panel stays on whom it was for, saying it's done.
                     setPickedTarget(target);
@@ -376,7 +410,7 @@ function ConnectAiDialog({
           />
         )}
       </DialogBody>
-      {connected && (
+      {(connected || (bare && choice !== "key" && freePlanAccount(bareGates.accounts, choice))) && (
         <DialogFooter>
           <Button variant="primary" onClick={onClose}>
             {t("connectAi.done")}

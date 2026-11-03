@@ -334,6 +334,77 @@ export function groupByChannel<H extends { channelIds: string[] }>(hits: readonl
   return [...groups];
 }
 
+/** Message hits by where they were said: a thread's replies under the thread, the rest under their channel. */
+export function groupHitsByPlace<
+  H extends { channelIds: string[]; messageId?: string | null; threadId?: string | null; threadTitle?: string | null },
+>(hits: readonly H[]): { key: string; channelId: string; thread: { id: string; title: string } | null; hits: H[] }[] {
+  const groups = new Map<
+    string,
+    { key: string; channelId: string; thread: { id: string; title: string } | null; hits: H[] }
+  >();
+  for (const h of hits) {
+    const channelId = h.channelIds[0] ?? "";
+    const threadId = h.threadId && h.threadId !== h.messageId ? h.threadId : null;
+    const key = threadId ? `thread:${threadId}` : channelId;
+    const group = groups.get(key) ?? {
+      key,
+      channelId,
+      thread: threadId ? { id: threadId, title: h.threadTitle ?? "" } : null,
+      hits: [],
+    };
+    group.hits.push(h);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/** The words of a search, unquoted, for `markTerms`. */
+export const searchTerms = (text: string) =>
+  text
+    .split(/\s+/)
+    .map((w) => w.replace(/"/g, ""))
+    .filter(Boolean);
+
+/**
+ * `text` cut where it holds one of `terms` (any case, any accents), the found parts `mark`ed: "o Convite" with
+ * ["convite"] → [{ text: "o " }, { text: "Convite", mark: true }].
+ */
+export function markTerms(text: string, terms: readonly string[]): { text: string; mark?: boolean }[] {
+  // The folded text, and where each of its units came from in `text` (folding can change a character's length).
+  let folded = "";
+  const from: number[] = [];
+  for (let i = 0; i < text.length; ) {
+    const ch = String.fromCodePoint(text.codePointAt(i) ?? 0);
+    const f = norm(ch);
+    for (let k = 0; k < f.length; k++) from.push(i);
+    folded += f;
+    i += ch.length;
+  }
+  from.push(text.length);
+  const ranges: [number, number][] = [];
+  for (const term of terms.map(norm).filter(Boolean)) {
+    for (let at = folded.indexOf(term); at >= 0; at = folded.indexOf(term, at + term.length)) {
+      ranges.push([from[at] ?? 0, from[at + term.length] ?? text.length]);
+    }
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const r of ranges) {
+    const last = merged.at(-1);
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  const out: { text: string; mark?: boolean }[] = [];
+  let pos = 0;
+  for (const [start, end] of merged) {
+    if (start > pos) out.push({ text: text.slice(pos, start) });
+    out.push({ text: text.slice(start, end), mark: true });
+    pos = end;
+  }
+  if (pos < text.length || out.length === 0) out.push({ text: text.slice(pos) });
+  return out;
+}
+
 /** This language's search words (the box reads them besides English's). */
 export function searchWords(t: TFunction): SearchWords {
   return {

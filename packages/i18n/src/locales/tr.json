@@ -124,6 +124,8 @@
     "color": "Renk",
     "colorDesc": "Rolün işaretini boyar.",
     "colorOf": "{{color}} renk",
+    "hoist": "Üye listesinde ayrı göster",
+    "hoistDesc": "Bu role sahip kişiler üye sütununda kendi grubunda görünür.",
     "icon": "Simge",
     "iconDesc": "Adın yanında gösterilir.",
     "more": "Diğer seçenekler",
@@ -1106,9 +1108,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Sistem",
     "markRead": "Okundu olarak işaretle",
+    "muteChannel": "Kanalı sessize al",
+    "unmuteChannel": "Kanalın sesini aç",
     "mention": "Bahset",
     "copyHandle": "@{{handle}} kopyala",
     "handleCopied": "@ kopyalandı.",
+    "copyId": "ID’yi kopyala",
+    "idCopied": "ID kopyalandı.",
     "editAgent": "Ajanı düzenle",
     "openPage": "Tam sayfa aç",
     "moveUp": "Yukarı taşı",
@@ -1217,9 +1223,8 @@
     "sidebarMenu": {
       "title": "Kenar çubuğu",
       "newChannel": "Yeni kanal",
-      "newAgentGroup": "Yeni ajan grubu",
       "addToChannels": "Yeni kanal veya kategori",
-      "addToAgents": "Ajan veya grup oluştur",
+      "addToDms": "Yeni mesaj veya ajan",
       "newMessage": "Yeni mesaj",
       "addMembers": "Kişi veya ajan ekle",
       "channelSettings": "Kanal ayarları",
@@ -1317,6 +1322,11 @@
     "pendingApprovals_other": "{{count}} bekleyen onay",
     "home": "Ana sayfa",
     "notifications": "Bildirimler",
+    "unreadMark": "Okunmadı",
+    "unreadMentions_one": "Sizden {{count}} bahsetme",
+    "unreadMentions_other": "Sizden {{count}} bahsetme",
+    "unreadThreads_one": "Konular: okunmamış yanıtı olan {{count}} konu",
+    "unreadThreads_other": "Konular: okunmamış yanıtı olan {{count}} konu",
     "unreadNotifications_one": "{{count}} okunmamış bildirim",
     "unreadNotifications_other": "{{count}} okunmamış bildirim"
   },
@@ -1350,6 +1360,9 @@
   },
   "team": {
     "title": "Ekip",
+    "groups": {
+      "title": "Ajan grupları"
+    },
     "subtitle_one": "{{count}} ajan, onunla kimin ilgilendiğine göre gruplandı.",
     "subtitle_other": "{{count}} ajan, her biriyle kimin ilgilendiğine göre gruplandı.",
     "working_one": "Şu anda {{count}} tanesi çalışıyor.",
@@ -1432,11 +1445,16 @@
       "button_other": "Sabitlenen mesajlar ({{count}})",
       "label": "#{{channel}} kanalında sabitlenen mesajlar",
       "in": "#{{channel}} kanalında sabitlendi",
-      "unpin": "{{name}} mesajının sabitlemesini kaldır"
+      "unpin": "{{name}} mesajının sabitlemesini kaldır",
+      "empty": "Burada henüz sabitlenen bir şey yok"
+    },
+    "header": {
+      "pins": "Sabitlenen mesajlar",
+      "showMembers": "Üyeleri göster",
+      "hideMembers": "Üyeleri gizle"
     },
     "membersButton_one": "Kanal üyeleri ({{count}})",
     "membersButton_other": "Kanal üyeleri ({{count}})",
-    "membersPeople": "Kişiler",
     "membersAgents": "Ajanlar",
     "you": "siz",
     "agentState": {
@@ -1446,7 +1464,6 @@
     },
     "autoReplyChip": "bahsetme olmadan yanıt verir",
     "coordinatorChip": "ekibi koordine eder",
-    "seeDetails": "Kanal ayrıntılarını gör",
     "more": "Diğer mesaj işlemleri",
     "copyLink": "Bağlantıyı kopyala",
     "linkCopied": "Bağlantı kopyalandı.",
@@ -1468,8 +1485,6 @@
     "messages": "Mesajlar",
     "members": "Üyeler: {{names}}",
     "details": "Kanal ayrıntıları",
-    "agentsAnswer_one": "{{names}} burada yanıt verir",
-    "agentsAnswer_other": "{{names}} burada yanıt verir",
     "composerLabel": "#{{channel}} kanalına mesaj",
     "composerDm": "{{name}} kişisine mesaj",
     "composerPlaceholder": "#{{channel}} kanalına mesaj · bir ajana seslenmek için @ kullanın",
@@ -1502,6 +1517,13 @@
     "generalName": "#general adını korur.",
     "archive": "Kanalı arşivle",
     "archived": "#{{channel}} arşivlendi. Sohbet korunur.",
+    "delete": "Kanalı sil",
+    "deleteTitle": "#{{channel}} kalıcı olarak silinsin mi?",
+    "deleteGoes": "Hemen gider: mesajlar, ileti dizileri, dosyalar ve sabitlenenler, ajanların bu kanaldan hatırladıkları ve buraya gönderi yapan rutinler.",
+    "deleteIssues": "Görevleri de silinir, çünkü onları yalnızca kanalın üyeleri görebiliyordu.",
+    "deleteOrArchive": "Konuşmayı saklamak için kanalı silmek yerine arşivle.",
+    "deleteTypeName": "Onaylamak için {{channel}} yaz",
+    "deleteDone": "#{{channel}} silindi.",
     "detailsSub": "{{category}} · {{visibility}}",
     "visibilityPublic": "Herkese açık",
     "visibilityPrivate": "Özel",
@@ -1547,6 +1569,8 @@
     "waiting_other": "{{names}} onay bekliyor",
     "handled_one": "{{names}} yanıtladı",
     "handled_other": "{{names}} yanıtladı",
+    "passed_one": "Kimse yanıtlamadı",
+    "passed_other": "Kimse yanıtlamadı",
     "failed_one": "{{names}} yanıtlayamadı",
     "failed_other": "{{names}} yanıtlayamadı",
     "asking_one": "{{names}} yanıtınızı bekliyor",
@@ -1571,6 +1595,7 @@
       "handled": "Yanıtladı",
       "failed": "Başarısız oldu",
       "referenced": "Yalnızca bahsedildi",
+      "passed": "Yanıtlamadı",
       "reacted": "Tepki verdi"
     },
     "failedShort": "Yanıtlayamadı",
@@ -1752,7 +1777,8 @@
     },
     "useAnyway": "{{email}} kullan",
     "assignFailed": "{{label}} hesabı bağlandı ama {{agent}} bu hesaba geçemedi.",
-    "noAgents": "Bir plan yalnızca sahibinin ajanları için düşünür ve henüz hiç ajanınız yok.",
+    "forNewAgents": "{{label}} bağlandı. Oluşturduğunuz ajanlar onunla düşünür.",
+    "forNewAgentsHint": "Oluşturduğunuz ajanlar onunla düşünür.",
     "done": "Tamam",
     "agent": "Hangi ajan için",
     "keyLocked": "API anahtarını yalnızca bir yönetici ekler.",
@@ -1849,6 +1875,18 @@
     },
     "connect": "Bağla",
     "connected": "Bağlandı",
+    "connect_app": {
+      "title": "{{name}} bağla",
+      "mcp": "Bir MCP sunucusu ekle",
+      "adminOnly": "Bir yönetici bağlar"
+    },
+    "invite": {
+      "title_one": "{{count}} kişiyi davet et",
+      "title_other": "{{count}} kişiyi davet et",
+      "open": "Davet et",
+      "done": "Davet gönderildi",
+      "adminOnly": "Davet etme yetkisi olan biri gönderir"
+    },
     "agentProposal": {
       "title": "{{agent}} yeni bir ajan öneriyor",
       "review": "İncele",
@@ -1935,6 +1973,7 @@
     "routine": {
       "created": "<b>{{name}}</b> rutinini oluşturdum · {{schedule}}",
       "created_bare": "<b>{{name}}</b> rutinini oluşturdum",
+      "ownActions": "Sormadan kendisi yapar: {{actions}}",
       "updated": "<b>{{name}}</b> rutininde {{fields}} değiştirdim",
       "updated_paused": "<b>{{name}}</b> rutinini duraklattım",
       "updated_resumed": "<b>{{name}}</b> rutinini sürdürdüm",
@@ -2133,6 +2172,12 @@
   "profile": {
     "audience": "Kimler konuşabilir",
     "cardLabel": "Profil",
+    "roles": "Roller",
+    "memberSince": "Çalışma alanında şu tarihten beri",
+    "messageTo": "{{name}} için mesaj",
+    "audienceEdit": "Düzenle",
+    "nowIn": "şu an #{{channel}} kanalında",
+    "more": "Daha fazla",
     "of": "{{name}} profili",
     "presence": "Durum",
     "offline": "Henüz katılmadı",
@@ -3474,6 +3519,8 @@
         "org_deleting": "Çalışma alanı siliniyor.",
         "agent_paused": "Ajan duraklatıldı.",
         "computer_busy": "Bilgisayar başka görevlerle meşgul kaldı.",
+        "computer_failed": "Bilgisayar bir sorunla karşılaştı ve durdu.",
+        "computer_timeout": "Bilgisayarın yanıt vermesi çok uzun sürdü.",
         "unknown": "Başarısız oldu."
       }
     },
@@ -3832,6 +3879,7 @@
       "handleTaken": "@{{handle}} zaten başka bir ajana veya kişiye ait. @{{suggestion}} nasıl?",
       "modelUnavailable": "Çalışma alanının kullanabileceği bir model seçin."
     },
+    "noAi": "Çalışma alanının henüz bir yapay zekası yok. Şimdi bir tane bağlayın ya da ajanı oluşturup sonra bağlayın.",
     "instructions": "Talimatlar",
     "instructionsPlaceholder": "Örn. #destek kanalında müşteri sorularını belgelere dayanarak yanıtlar. Bilmediğinde ekipten birini çağırır.",
     "startedFrom": "{{role}} metninden başlatıldı",
@@ -3967,6 +4015,13 @@
     "routineNotMade": "Rutin oluşturulmadı: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} üyeleri",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Çalışma alanının sahibi",
+      "more": "{{count}} tane daha göster",
+      "find": "Kişi ve ajan ara"
+    },
     "agentsOnlyYou": "Ajanlarınız yalnızca size yanıt veriyor.",
     "agentsOnlyYouHint": "Bir planla, her birinin sayfasından diğer kişilere de yanıt vermesine izin verebilirsiniz.",
     "filters": "Kişileri filtrele",
@@ -3991,7 +4046,6 @@
       "on": "{{date}} tarihinde"
     },
     "waitingTitle": "Sizi bekliyor",
-    "more": "{{name}} için diğer işlemler",
     "remove": {
       "item": "Çalışma alanından çıkar",
       "leave": "Çalışma alanından ayrıl",
@@ -4328,7 +4382,7 @@
     },
     "setup_write": {
       "label": "Çalışma alanını kurma",
-      "description": "Bir kişinin tıklayacağı bir kartla yapay zeka bağlamayı önerme ve isteyen kişi için Geri al seçeneğiyle kanal oluşturma."
+      "description": "Bir kişinin tıklayacağı bir kartla yapay zeka, uygulama veya MCP sunucusu bağlamayı ya da kişileri davet etmeyi önerme ve isteyen kişi için Geri al seçeneğiyle kanal oluşturma."
     },
     "github_git_read": {
       "label": "Depo klonlama (git)",
@@ -4804,7 +4858,12 @@
         "forum": "Ajanlar bir forum konusunda tartışır",
         "artifact": "Drive'da bir belgeye dönüşür"
       },
-      "ahead": "Sonrası için hazırlandı"
+      "ahead": "Sonrası için hazırlandı",
+      "ownActions": "Kendisi yapar"
+    },
+    "ownActions": {
+      "hint": "Her çalıştırma bunları bağlı uygulamalarında sormadan yapar. Oradaki diğer her işlem önce bir kişinin onayını ister, merge, deploy ve rollback ise her zaman onay ister.",
+      "none": "Bağlı uygulamalarda her işlemden önce bir kişinin onayını ister. İşini kendisi yapması için sohbette ajana hangi işlemleri yapabileceğini söyle."
     },
     "ahead": {
       "approved": "Onaylandı · {{when}} çalışır",
@@ -6288,9 +6347,10 @@
     "bodyHelp": "SKILL.md dosyasının gövdesi.",
     "writeMissing": "Adı, ne zaman kullanılacağını ve talimatları doldurun.",
     "files": "Dosyalar",
-    "needsSandbox": "sandbox gerekir",
+    "needsSandbox": "saklanmadı",
+    "assetLimit": "Bir beceri en fazla {{max}} MB görsel ve başka dosya saklar.",
     "runsOnPc": "ajanın bilgisayarında çalışır",
-    "reinstall": "Betikleri kullanmak için yeniden yükleyin.",
+    "reinstall": "Ajanların bu dosyayı kullanabilmesi için beceriyi yeniden yükleyin.",
     "edit": "Düzenle",
     "save": "Kaydet",
     "saved": "{{name}} kaydedildi.",
@@ -8460,6 +8520,12 @@
   "connectors": {
     "title": "Bağlayıcılar",
     "add": "Bağlayıcı ekle",
+    "mcp": {
+      "title": "MCP'ler",
+      "add": "MCP ekle",
+      "list": "Bağlı MCP sunucuları",
+      "none": "Adresiyle bağladığınız MCP sunucuları burada görünür."
+    },
     "addTitle": "Bağlayıcı ekle",
     "catalogText": "{{org}} için bir kez bağlayın. Sonra her ajanın neyi kullanabileceğini seçin.",
     "catalog": "Kullanılabilir bağlayıcılar",
@@ -9770,6 +9836,29 @@
       "relevance": "En alakalı"
     },
     "searchHere": "Bu konuşmada ara",
+    "optionHint": {
+      "from": "ad",
+      "in": "kanal",
+      "has": "bağlantı, dosya, görsel veya kart",
+      "mentions": "ad"
+    },
+    "moreFiltersHint": "tarihler, yalnızca ajanlar, sabitlenenler",
+    "clearRecentAll": "Son aramaları temizle",
+    "header": {
+      "placeholder": "{{org}} içinde ara",
+      "clear": "Aramayı temizle"
+    },
+    "panel": {
+      "label": "Arama sonuçları",
+      "count_one": "{{count}} sonuç",
+      "count_other": "{{count}} sonuç",
+      "filters": "Filtreler",
+      "filtersCount_one": "Filtreler ({{count}})",
+      "filtersCount_other": "Filtreler ({{count}})",
+      "jump": "Git",
+      "jumpLabel": "{{name}} adlı kişinin mesajına git",
+      "threadIn": "#{{channel}} kanalındaki ileti dizisi"
+    },
     "dm": "{{name}} ile DM"
   },
   "files": {
@@ -10103,6 +10192,7 @@
       "measuring": "Boyut henüz ölçülmedi",
       "diskFullNotice": "{{name}} diski neredeyse dolu"
     },
+    "chromeMissingNotice": "{{name}}, ajanların tarayıcısı için Google Chrome'a ihtiyaç duyuyor. google.com/chrome adresinden indirin",
     "access": {
       "folders": "İzin verilen klasörler",
       "ownFolder": "Her ajanın klasörü",
@@ -10597,6 +10687,7 @@
         "wiki": "bir wiki sayfası",
         "mission": "bir misyon",
         "thread": "bir ileti dizisi",
+        "channel": "bir kanal",
         "forum": "bir forum konusu",
         "artifact": "bir Drive dosyası",
         "agent": "bir ajan",
@@ -10680,7 +10771,7 @@
       "members": "Üyeler ve davetler",
       "roles": "Roller ve izinler",
       "access": "Ajanlar ve erişim",
-      "connectors": "Bağlayıcılar",
+      "connectors": "Bağlayıcılar ve MCP'ler",
       "skills": "Beceriler",
       "keys": "Yapay zeka hesapları",
       "storage": "Depolama",
@@ -10700,7 +10791,7 @@
       "members": "Çalışma alanında kimler var ve davetler.",
       "roles": "Her kişinin neler yapabileceği. Roller toplanır.",
       "access": "Her ajanın neleri kullanabileceği: bağlayıcı başına bir düzey.",
-      "connectors": "Tüm çalışma alanı için bir kez bağlanan hizmetler.",
+      "connectors": "Tüm çalışma alanı için bir kez bağlanan hizmetler ve MCP sunucuları.",
       "skills": "Ajanların ihtiyaç duyduklarında açtıkları Markdown talimatları.",
       "keys": "Planlarınız ve çalışma alanının API anahtarları.",
       "storage": "Çalışma alanının dosyalarının durduğu yer.",
@@ -11243,6 +11334,8 @@
         "readingForum": "Forumu okudu",
         "creatingChannel": "Bir kanal oluşturdu",
         "offeringConnectAi": "Bir yapay zeka bağlamayı önerdi",
+        "offeringConnectApp": "Bir uygulama bağlamayı önerdi",
+        "offeringInvites": "Kişileri davet etmeyi önerdi",
         "proposingAgent": "Bir ajan önerdi",
         "askingAgent": "Başka bir ajana sordu",
         "tellingAgent": "Başka bir ajana iletti",
@@ -11325,6 +11418,8 @@
       "readingForum": "forumu okuyor",
       "creatingChannel": "kanal oluşturuyor",
       "offeringConnectAi": "yapay zeka bağlantısını hazırlıyor",
+      "offeringConnectApp": "uygulama bağlantısını hazırlıyor",
+      "offeringInvites": "davetleri hazırlıyor",
       "proposingAgent": "ajan öneriyor",
       "askingAgent": "başka bir ajana soruyor",
       "tellingAgent": "başka bir ajana iletiyor",
@@ -11431,6 +11526,9 @@
       "no_ai_signed_out": "Henüz yanıt veremiyorum: yapay zekamın oturumu kapalı.",
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
       "action_connect_ai": "Yapay zeka bağla",
+      "action_connect_app": "{{name}} bağla",
+      "action_add_mcp": "Bir MCP sunucusu ekle",
+      "action_invite_people": "Kişileri davet et",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "approval_request": "Onay isteği: {{title}}",
       "secret_request": "{{agent}} bir anahtar istedi: {{name}}",
@@ -11630,6 +11728,14 @@
     "offer_connect_ai": {
       "label": "Yapay zeka bağlamayı öner",
       "description": "Düğmesi plan veya API anahtarı bağlama penceresini açan bir kart paylaşır."
+    },
+    "offer_connect_app": {
+      "label": "Uygulama veya MCP bağlamayı öner",
+      "description": "Düğmesi bir uygulamayı veya MCP sunucusunu adresiyle bağlama penceresini açan bir kart paylaşır."
+    },
+    "offer_invites": {
+      "label": "Kişileri davet etmeyi öner",
+      "description": "Düğmesi adresleri doldurulmuş davet penceresini açan bir kart paylaşır."
     },
     "propose_agent": {
       "label": "Ajan öner",

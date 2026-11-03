@@ -97,7 +97,7 @@ describe("Configurações → Skills", () => {
     ]);
   });
 
-  test("detail: rendered body, files (scripts need a sandbox), remove names the agents", async () => {
+  test("detail: rendered body, files (scripts run on the PC, files not kept say why), remove names the agents", async () => {
     const { state, section } = await settings();
     await click(within(section()).getByRole("button", { name: "Revisão de PR" }));
     await settle(4);
@@ -106,15 +106,15 @@ describe("Configurações → Skills", () => {
     expect(within(sheet).getAllByRole("heading", { name: "Revisão de PR" }).length).toBeGreaterThanOrEqual(2);
     expect(sheet.querySelector("pre.code-card__code code")?.textContent).toBe("bun test");
     const files = within(sheet).getByRole("navigation", { name: "Arquivos" });
-    // Scripts run on the agent's PC; old imports kept them as ignored.
+    // Scripts run on the agent's PC; a file an older import only listed says how to get it.
     const script = within(files).getByText("scripts/lint.sh").closest(".skill-file") as HTMLElement;
     expect(script.textContent).toContain("roda no PC do agente");
     const old = within(files).getByText("scripts/old.py").closest(".skill-file") as HTMLElement;
-    expect(old.textContent).toContain("precisa de sandbox");
-    expect(old.textContent).toContain("Reinstale para usar os scripts.");
+    expect(old.textContent).toContain("não guardado");
+    expect(old.textContent).toContain("Reinstale a skill");
     const text = within(files).getByText("checklist.md").closest(".skill-file") as HTMLElement;
     expect(text.textContent).toContain("text/markdown");
-    expect(text.textContent).not.toContain("precisa de sandbox");
+    expect(text.textContent).not.toContain("não guardado");
     await click(within(sheet).getByRole("button", { name: "Remover" }));
     const confirm = screen().getByRole("dialog", { name: "Remover Revisão de PR?" });
     expect(confirm.textContent).toContain("Ada usa esta skill e deixa de ter acesso a ela.");

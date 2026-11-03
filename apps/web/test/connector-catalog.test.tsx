@@ -779,7 +779,8 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await api.customConnectors.refresh(ORG_ID, res.server.id);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
-    const section = () => screen().getByRole("region", { name: "Conectores" });
+    // A server the catalog doesn't list is an MCP: its own section, under the connectors.
+    const section = () => screen().getByRole("region", { name: "MCPs" });
     expect(section().textContent).toContain("1 ferramenta nova para revisar");
     await click(within(section()).getByRole("button", { name: "Revisar Suporte" }));
     const review = screen().getByRole("dialog", { name: REVIEW });
@@ -797,7 +798,27 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await click(within(confirm).getByRole("button", { name: "Desconectar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "customConnectors.disconnect")?.args).toEqual([ORG_ID, res.server.id]);
-    expect(section().textContent).toContain("Nenhum conector ainda.");
+    expect(section().textContent).toContain("Os servidores MCP que você conectar pelo endereço aparecem aqui.");
+  });
+
+  test("MCPs: a section of its own with Adicionar MCP, which opens connecting by address; the catalog's stay above", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    expect(document.querySelector(".settings__body > .page__header h2")?.textContent).toBe("Conectores e MCPs");
+    const mcps = () => screen().getByRole("region", { name: "MCPs" });
+    expect(mcps().textContent).toContain("Os servidores MCP que você conectar pelo endereço aparecem aqui.");
+    await click(within(mcps()).getByRole("button", { name: "Adicionar MCP" }));
+    const flow = screen().getByRole("dialog", { name: "Conectar servidor MCP" });
+    await type(within(flow).getByLabelText("Endereço do servidor MCP"), "https://oauth.suporte.example.com");
+    await type(within(flow).getByLabelText("Nome"), "Suporte");
+    await click(within(flow).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    await click(within(screen().getByRole("dialog", { name: REVIEW })).getByRole("button", { name: "Cancelar" }));
+    await settle(4);
+    expect(mcps().textContent).toContain("Suporte");
+    expect(screen().getByRole("region", { name: "Conectores" }).textContent).not.toContain("Suporte");
   });
 });
 

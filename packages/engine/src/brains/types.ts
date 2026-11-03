@@ -66,6 +66,12 @@ export interface BrainTurn {
   threadRootId: string | null;
   /** The engine-built context (context.ts): system text + conversation, same for every brain. */
   system: string;
+  /**
+   * Computer brains: what holds for this conversation only ("# This conversation", `conversationText`), left out of
+   * `system` so that is the same in every conversation of the agent. Read once per session (`systemWithConversation`
+   * where a brain takes none apart).
+   */
+  conversation?: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   /** Tools this run may use (from the Tool Gateway, scopes applied). */
   tools: BrainTool[];
@@ -140,6 +146,9 @@ export type BrainEvent =
       model?: string;
       cacheRead?: number;
       cacheWrite?: number;
+      /** Claude Code: the API calls the turn made, and the most uncached input one of them read. */
+      calls?: number;
+      maxUncached?: number;
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }

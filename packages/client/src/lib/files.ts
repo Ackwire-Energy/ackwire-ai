@@ -1,6 +1,8 @@
 /** Same limit as the server (`ARTIFACT_LIMITS.fileBytes`): 50 MB per file version. */
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / 1024 / 1024;
+/** Same limit as the server (`SKILL_LIMITS.assetBytes`): the images and other files a skill keeps, in MB. */
+export const SKILL_ASSET_MB = 20;
 
 /** Previews bigger than this are download-only (the bytes load into memory). */
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;

@@ -7,6 +7,7 @@ import type {
   BrainUnavailable,
   ConnectIntent,
   Edition,
+  Machine,
   MachineAccount,
   MachineAccountKind,
 } from "../api/types";
@@ -180,6 +181,77 @@ export function planGate({
   if (!brain.canManageAccounts) return { state: "locked", who: "computer" };
   return { state: "ready" };
 }
+
+/**
+ * `planGate` for a person who owns no agent yet: a plan signs in on a computer they may add accounts to, and the
+ * account then thinks for the agents they create there. Read off the computers' `/ai-accounts` rows (no agent, no
+ * brain view) and `machines` (who connected each, its switches); `computer`: where it signs in, or the computer the
+ * gate is about.
+ */
+export function planGateWithoutAgent({
+  choice,
+  edition,
+  setup,
+  computers,
+  machines,
+}: {
+  choice: PlanChoice;
+  edition: Edition | null;
+  setup: SetupView | null;
+  computers: readonly AiComputer[] | undefined;
+  machines?: readonly Pick<Machine, "id" | "pairedBy" | "execAllowed" | "access">[] | undefined;
+}): { gate: PlanGate; computer?: AiComputer } {
+  if (edition === "cloud" && setupPending(setup)) return { gate: { state: "preparing", view: setup } };
+  if (!computers || !edition) return { gate: { state: "loading" } };
+  const kind = kindOf(choice);
+  const machineOf = (c: AiComputer) => machines?.find((m) => m.id === c.machineId);
+  const fits = (c: AiComputer) => c.online && c.brains[kind] === true && (!isPlanId(choice) || c.keys);
+  const addable = computers.filter((c) => c.canAdd);
+  const computer = addable.find(fits) ?? addable.find((c) => c.online) ?? addable[0];
+  if (!computer) {
+    // `canAdd` is also false on a runner too old for accounts: one they connected, or nobody did, is that.
+    const old = computers.find((c) => c.mine || machineOf(c)?.pairedBy === null);
+    if (old) return { gate: { state: "unsupported", reason: "runner_old" }, computer: old };
+    const first = computers[0];
+    if (!first) return { gate: edition === "cloud" ? { state: "preparing", view: null } : { state: "missing" } };
+    return { gate: { state: "locked", who: "computer" }, computer: first };
+  }
+  if (!computer.online) return { gate: { state: "offline" }, computer };
+  if (computer.brains[kind] !== true)
+    return { gate: { state: "unsupported", reason: brainOffReason(machineOf(computer), kind) }, computer };
+  if (isPlanId(choice) && !computer.keys) return { gate: { state: "unsupported", reason: "keys" }, computer };
+  return { gate: { state: "ready" }, computer };
+}
+
+/** Why a CLI can't think on a computer, as far as its row says (the server's `brainOptions`): else not installed. */
+function brainOffReason(
+  m: Pick<Machine, "execAllowed" | "access"> | undefined,
+  kind: MachineAccountKind,
+): BrainUnavailable {
+  if (m && !m.execAllowed) return "exec_off";
+  const tools = m?.access?.tools;
+  const on = !tools
+    ? undefined
+    : kind === "cursor"
+      ? (tools.cursor ?? tools.codex)
+      : tools[kind === "codex" ? "codex" : "claude"];
+  return on === false ? "tool_off" : "not_installed";
+}
+
+/**
+ * The person's account of this plan that can think for one more agent (signed in, and free or made for all of their
+ * agents), as "Quem pensa" offers it: what a plan connected with no agent yet left them.
+ */
+export const freePlanAccount = <
+  A extends Pick<MachineAccount, "kind" | "provider" | "mine" | "status" | "shared" | "usedBy">,
+>(
+  accounts: readonly A[] | undefined,
+  choice: PlanChoice,
+) =>
+  accounts?.find(
+    (a) =>
+      a.mine && a.status === "active" && (a.shared === true || a.usedBy.length === 0) && planOfAccount(a) === choice,
+  );
 
 /**
  * The computer's own sign-in can think for the agent with this plan (`ownSignInReady`): Claude's or ChatGPT's, never

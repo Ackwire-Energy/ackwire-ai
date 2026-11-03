@@ -248,9 +248,9 @@ const connectorDeps = (): ConnectorDeps => ({
   publicUrl: "https://chat.example.com",
 });
 const TO_GET =
-  "Connectors you don't have yet. If the person wants one, say how to get it, never that it doesn't exist.";
+  "Connectors you don't have yet. If the person wants one, offer it with offer_connect_app (a card that opens the app's own connect dialog) or say how to get it, never that it doesn't exist.";
 const SENTRY = "- Sentry: Sentry errors, issues and releases.";
-const CONNECT_SENTRY = `${SENTRY} Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Sentry (in Portuguese, Configurações › Conectores › Adicionar conector › Sentry).`;
+const CONNECT_SENTRY = `${SENTRY} Not connected in this workspace: an admin connects it in Settings › Connectors and MCPs › Add connector › Sentry (in Portuguese, Configurações › Conectores e MCPs › Adicionar conector › Sentry).`;
 
 test("a search for an app the workspace hasn't connected says it exists and how an admin connects it, after any other match", async () => {
   f = await setup({ artifactTools: true, catalog: { oauthApps: {} } });
@@ -265,7 +265,7 @@ test("a search for an app the workspace hasn't connected says it exists and how 
     `\n\n${TO_GET}\n- Google Drive: Google Drive files and folders: search, read, create and share. Not available on this installation: whoever runs the installation has to turn it on first.`,
   );
   expect(await findTools(ctx, "set up github")).toContain(
-    "- GitHub: Repositories, pull requests, issues and Actions. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › GitHub",
+    "- GitHub: Repositories, pull requests, issues and Actions. Not connected in this workspace: an admin connects it in Settings › Connectors and MCPs › Add connector › GitHub",
   );
   expect(await findTools(ctx, "create an issue")).not.toContain(TO_GET);
 });
@@ -333,10 +333,10 @@ test("an app this installation can't connect says whoever runs it turns it on; o
     `No other tool matches "gmail". Try other words (Issues).\n\n${TO_GET}\n- Gmail: Read, organize and answer Gmail email. Not available on this installation: whoever runs the installation has to turn it on first.`,
   );
   expect(await findTools(ctx, "icloud")).toEndWith(
-    "\n- iCloud: iCloud email, custom domains included. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › iCloud (in Portuguese, Configurações › Conectores › Adicionar conector › iCloud).",
+    "\n- iCloud: iCloud email, custom domains included. Not connected in this workspace: an admin connects it in Settings › Connectors and MCPs › Add connector › iCloud (in Portuguese, Configurações › Conectores e MCPs › Adicionar conector › iCloud).",
   );
   expect(await findTools(ctx, "send an e-mail")).toContain(
-    "\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Email",
+    "\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. Not connected in this workspace: an admin connects it in Settings › Connectors and MCPs › Add connector › Email",
   );
 });
 
@@ -344,7 +344,7 @@ test("an app whose maker hasn't approved agentes.chat says so, and how an admin 
   f = await setup({ issueTools: true, catalog: { oauthApps: {} } });
   const ctx = await nothingLoaded();
   expect(await findTools(ctx, "figma")).toEndWith(
-    `\n\n${TO_GET}\n- Figma: Figma designs, components and variables. Not open to agentes.chat yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors › Add connector › Another service (in Portuguese, Configurações › Conectores › Adicionar conector › Outro serviço).`,
+    `\n\n${TO_GET}\n- Figma: Figma designs, components and variables. Not open to agentes.chat yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors and MCPs › Add MCP (in Portuguese, Configurações › Conectores e MCPs › Adicionar MCP).`,
   );
 });
 
@@ -362,7 +362,7 @@ test("a mailbox that needs reconnecting says an admin reconnects it, never to co
   });
   const ctx = await nothingLoaded();
   const RECONNECT =
-    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors (in Portuguese, Configurações › Conectores › Reconectar).";
+    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors and MCPs (in Portuguese, Configurações › Conectores e MCPs › Reconectar).";
   const text = await findTools(ctx, "icloud");
   expect(text).toEndWith(`\n- iCloud: iCloud email, custom domains included. ${RECONNECT}`);
   for (const detail of ["ana@icloud.example.com", "Caixa da Ana"]) expect(text).not.toContain(detail);

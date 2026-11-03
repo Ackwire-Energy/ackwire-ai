@@ -21,7 +21,12 @@ import {
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
-import { type BrainPickOption, brainPickOptions } from "@agenteschat/client/lib/brain-picker";
+import {
+  type BrainPickOption,
+  brainPickOptions,
+  newPlanAccountOption,
+  planAccountOption,
+} from "@agenteschat/client/lib/brain-picker";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { defaultPolicy, toMailLevel } from "@agenteschat/client/lib/mail";
@@ -192,8 +197,15 @@ function NewAgentForm({
   });
   const [picked, setPicked] = useState<BrainPickOption | null>(null);
   const [picking, setPicking] = useState(false);
-  const thinks = picked
-    ? pickedAi(picked.pick, aiAccounts.data?.computers)
+  // "Conectar uma IA" from this step (the same sheet as Settings, for the agents I create): a plan account that wasn't
+  // among the choices when it opened is what the agent thinks with, over a pick made before; nothing new keeps the pick.
+  const [optionsBefore, setOptionsBefore] = useState<ReadonlySet<string> | null>(null);
+  const ownPlan = planAccountOption(brainOptions);
+  const connectedHere = optionsBefore ? newPlanAccountOption(brainOptions, optionsBefore) : undefined;
+  // No last setup to start from: a plan account of mine that can think for it (one connected before I had an agent).
+  const chosen = connectedHere ?? picked ?? (proposed || start ? null : (ownPlan ?? null));
+  const thinks = chosen
+    ? pickedAi(chosen.pick, aiAccounts.data?.computers)
     : newAgentAi(start && useLast ? start : null);
   const startText = start
     ? newAgentStartText(t, i18n.language, start, {
@@ -392,10 +404,10 @@ function NewAgentForm({
         return;
       }
       // It exists either way (Criar again would only find its @ taken): on to its conversation, where Connect opens
-      // when it has nothing to think with yet.
+      // when it has nothing to think with yet (ADR 0061 §6).
       void openDm({ agentId: agent.id }).then(() => {
-        if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
         if (thinks.connect) openConnectAi({ agentId: agent.id, plan: thinks.connect });
+        else if (ai?.kind === "none" || (!thinks.plan && usable.size === 0)) openConnectAi({ agentId: agent.id });
       });
     } catch (e) {
       failed(e);
@@ -635,8 +647,8 @@ function NewAgentForm({
             <Row
               title={t("brain.title")}
               subtitle={
-                picked
-                  ? picked.title
+                chosen
+                  ? chosen.title
                   : start && useLast
                     ? t("newAgent.lastSetup", { setup: startText })
                     : t("brain.auto.label")
@@ -673,12 +685,25 @@ function NewAgentForm({
           open={picking}
           onClose={() => setPicking(false)}
           options={brainOptions}
-          value={picked?.value ?? (start && useLast ? undefined : AUTO)}
+          value={chosen?.value ?? (start && useLast ? undefined : AUTO)}
           onPick={(o) => {
             setPicked(o);
             setUseLast(false);
+            setOptionsBefore(null);
           }}
         />
+        {proposed ? null : (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            label={t("aiAccounts.page.connect")}
+            onPress={() => {
+              setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
+              openConnectAi({ forNew: "1" });
+            }}
+          />
+        )}
 
         <View style={styles.section}>
           {managesAgents ? (

@@ -15,7 +15,7 @@ import {
 } from "@agenteschat/client";
 import { type Level, levelsOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
-import { audienceOf, seesDetails } from "@agenteschat/client/lib/audience";
+import { audienceOf, audiencePatch, seesDetails } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -437,12 +437,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     if (fields.has("budget")) put("budget", "monthlyBudgetUsd", budgetValue(draft.budget) ?? null);
     if (fields.has("owner")) put("owner", "ownerUserId", draft.owner === NO_OWNER ? null : draft.owner);
     if (fields.has("audience")) {
-      put("audience", "audience", {
-        mode: draft.audience.mode,
-        userIds: draft.audience.mode === "people" ? draft.audience.userIds : [],
-        roleIds: draft.audience.mode === "people" ? (draft.audience.roleIds ?? []) : [],
-        consultable: draft.audience.consultable ?? true,
-      });
+      put("audience", "audience", audiencePatch(draft.audience));
     }
     if (fields.has("look")) put("look", "appearance", normalizeAppearance(draft.look));
     if (fields.has("coordinator")) put("coordinator", "coordinator", draft.coordinator);

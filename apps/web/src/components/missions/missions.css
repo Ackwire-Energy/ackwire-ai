@@ -874,7 +874,7 @@ a.mi-pr:hover {
 .mi-evt {
   flex-wrap: wrap;
   gap: 4px 8px;
-  margin: 4px 12px 4px var(--thread-indent, 56px);
+  margin: 4px 12px 4px var(--thread-indent, 64px);
   font-size: 12.5px;
   line-height: 18px;
   color: var(--faint);
@@ -931,7 +931,7 @@ a.mi-pr:hover {
 
 /* ── Ephemeral cards (`/summary`, `/plan`): only you see them ─────────────── */
 .mi-ephemeral {
-  margin: 8px 12px 4px var(--thread-indent, 56px);
+  margin: 8px 12px 4px var(--thread-indent, 64px);
   max-width: 640px;
 }
 .mi-ephemeral__head {
@@ -1603,7 +1603,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 
 /* A mission's card in place of its thread's start marker (threads proposed before the link card). */
 .mi-linkrow {
-  margin: 6px 12px 6px var(--thread-indent, 56px);
+  margin: 6px 12px 6px var(--thread-indent, 64px);
 }
 
 /* ── Delivery card: the mission's end (like an approval) ─────────────────── */

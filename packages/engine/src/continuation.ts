@@ -106,7 +106,7 @@ export function findableNudge(means: string[], tried: string[]) {
 
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */
 export const ASK_NUDGE =
-  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few (a key or a password through request_secret). Do not end with a list of what's missing.";
+  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few (a key or a password through request_secret). Do not end with a list of what's missing. If you need nothing from them to finish, just give your answer, with no question.";
 
 /**
  * What a run reads, once, when its reply asks a person for a secret in the chat (ADR 0109 addendum): its reply is not
@@ -177,7 +177,7 @@ export async function continuationVerdict(
               "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
             continue:
               "It said it will do more itself (next, later, after a build), or stopped midway, and nothing it set up brings it back. A reply that asks the person whether to do something ('want me to…?', 'quer que eu faça?') is not this: it waits for their answer. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
-            ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
+            ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question. Not when it says it needs nothing from them, or what's missing only blocks optional extra work the request doesn't need: that is done.",
             secret:
               "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
           },

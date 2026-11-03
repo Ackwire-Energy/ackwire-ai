@@ -8,7 +8,7 @@
   --presence-ring: var(--side);
 }
 .sidebar__item[data-status="active"] {
-  --presence-ring: var(--side-active);
+  --presence-ring: var(--side-chosen);
 }
 .ac-msg {
   --presence-ring: var(--pane);
@@ -59,11 +59,6 @@
 /* A sidebar row: someone offline is quieter. */
 .sidebar__item[data-presence="offline"] .sidebar__item-label {
   color: var(--muted);
-}
-
-/* The members popover: the line in place of the meta. */
-.members-pop__meta.status-line {
-  display: flex;
 }
 
 /* The profile card: the line in a well, who wrote it or when it clears under it. */

@@ -19,6 +19,7 @@ import {
   type StopReason,
   stableToolsFirst,
   type ToolSpec,
+  withoutImages,
 } from "./types";
 
 /** The tool a compatible endpoint gives structured output through: its input is the reply. */
@@ -137,7 +138,13 @@ export function createAnthropicProvider(
           model: request.model,
           max_tokens: request.maxTokens,
           system: toSystem(request, compat ? undefined : room(request)),
-          messages: toMessageParams(request.messages, id, withThinking, cacheControl(request)),
+          // Another company's endpoint (DeepSeek, Kimi, Z.ai, MiniMax) isn't trusted to take images.
+          messages: toMessageParams(
+            compat ? withoutImages(request.messages) : request.messages,
+            id,
+            withThinking,
+            cacheControl(request),
+          ),
           ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
           ...(tools.length > 0 ? { tools } : {}),
           ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
@@ -391,7 +398,19 @@ function toBlockParam(
         {
           type: "tool_result",
           tool_use_id: block.toolUseId,
-          content: block.content,
+          content: block.images?.length
+            ? [
+                { type: "text", text: block.content },
+                ...block.images.map((i) => ({
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: i.mediaType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                    data: i.data,
+                  },
+                })),
+              ]
+            : block.content,
           ...(block.isError ? { is_error: true } : {}),
         },
       ];

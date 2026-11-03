@@ -249,6 +249,18 @@ describe("short follow-ups without a mention", () => {
       false,
     );
   });
+
+  test("a short follow-up reads the same in Portuguese, English, Japanese and German, spaces or not", () => {
+    expect(["e agora?", "and now?", "で、今は？", "und jetzt?"].map(isShortFollowUp)).toEqual([true, true, true, true]);
+    expect(
+      [
+        "preciso que alguém revise todo o fluxo de pagamento antes da release",
+        "someone needs to review the whole payment flow before the release",
+        "決済フローの全体をリリース前に誰かにレビューしてもらう必要があります",
+        "jemand muss vor dem Release den ganzen Zahlungsablauf prüfen",
+      ].map(isShortFollowUp),
+    ).toEqual([false, false, false, false]);
+  });
 });
 
 test("an agent knows what the other agents here can do and points to them", async () => {

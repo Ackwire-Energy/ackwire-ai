@@ -13,6 +13,7 @@ import {
   type IconName,
   InfoHint,
   OptionList,
+  PickerHeading,
   RadioCard,
   RadioGroup,
   RoleMark,
@@ -224,8 +225,7 @@ export function AudienceChoice({
               <>
                 {roleRows.length > 0 && (
                   <>
-                    <span className="ac-field__label">{t("audience.roles")}</span>
-                    <span className="small muted">{t("audience.rolesHint")}</span>
+                    <PickerHeading label={t("audience.roles")} description={t("audience.rolesHint")} />
                     <RoleChecklist
                       roles={roleRows}
                       picked={pickedRoles}
@@ -236,7 +236,7 @@ export function AudienceChoice({
                 )}
                 {rows.length > 0 && (
                   <>
-                    {roleRows.length > 0 && <span className="ac-field__label">{t("audience.people")}</span>}
+                    {roleRows.length > 0 && <PickerHeading label={t("audience.people")} />}
                     {rows.map((m) => {
                       const id = `${idPrefix}-p-${m.userId.replace(/[^a-zA-Z0-9]/g, "-")}`;
                       return (

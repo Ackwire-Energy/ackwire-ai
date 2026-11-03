@@ -488,6 +488,10 @@ html:not([data-pointer]) .roles-template:focus-visible {
     flex-direction: column;
     align-items: stretch;
   }
+  .roles-look__row--switch {
+    flex-direction: row;
+    align-items: center;
+  }
   .roles-icons {
     grid-template-columns: repeat(6, 32px);
   }

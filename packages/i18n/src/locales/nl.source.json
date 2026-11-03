@@ -335,6 +335,12 @@
   "rolesPage.colorOf": {
     "value": "{{color}} color"
   },
+  "rolesPage.hoist": {
+    "value": "Show apart in the members list"
+  },
+  "rolesPage.hoistDesc": {
+    "value": "People with this role get a group of their own in the members column."
+  },
   "rolesPage.icon": {
     "value": "Icon"
   },
@@ -2729,6 +2735,12 @@
   "contextMenu.markRead": {
     "value": "Mark as read"
   },
+  "contextMenu.muteChannel": {
+    "value": "Mute channel"
+  },
+  "contextMenu.unmuteChannel": {
+    "value": "Unmute channel"
+  },
   "contextMenu.mention": {
     "value": "Mention"
   },
@@ -2737,6 +2749,12 @@
   },
   "contextMenu.handleCopied": {
     "value": "@ copied."
+  },
+  "contextMenu.copyId": {
+    "value": "Copy ID"
+  },
+  "contextMenu.idCopied": {
+    "value": "ID copied."
   },
   "contextMenu.editAgent": {
     "value": "Edit agent"
@@ -2945,14 +2963,11 @@
   "shell.sidebarMenu.newChannel": {
     "value": "New channel"
   },
-  "shell.sidebarMenu.newAgentGroup": {
-    "value": "New agent group"
-  },
   "shell.sidebarMenu.addToChannels": {
     "value": "New channel or category"
   },
-  "shell.sidebarMenu.addToAgents": {
-    "value": "Create agent or group"
+  "shell.sidebarMenu.addToDms": {
+    "value": "New message or agent"
   },
   "shell.sidebarMenu.newMessage": {
     "value": "New message"
@@ -3236,6 +3251,21 @@
   "shell.notifications": {
     "value": "Notifications"
   },
+  "shell.unreadMark": {
+    "value": "Unread"
+  },
+  "shell.unreadMentions": {
+    "value": {
+      "one": "{{count}} mention of you",
+      "other": "{{count}} mentions of you"
+    }
+  },
+  "shell.unreadThreads": {
+    "value": {
+      "one": "Threads: {{count}} with unread replies",
+      "other": "Threads: {{count}} with unread replies"
+    }
+  },
   "shell.unreadNotifications": {
     "value": {
       "one": "{{count}} unread notification",
@@ -3316,6 +3346,9 @@
   },
   "team.title": {
     "value": "Team"
+  },
+  "team.groups.title": {
+    "value": "Agent groups"
   },
   "team.subtitle": {
     "value": {
@@ -3523,14 +3556,23 @@
   "channel.pins.unpin": {
     "value": "Unpin {{name}}'s message"
   },
+  "channel.pins.empty": {
+    "value": "Nothing pinned here yet"
+  },
+  "channel.header.pins": {
+    "value": "Pinned messages"
+  },
+  "channel.header.showMembers": {
+    "value": "Show members"
+  },
+  "channel.header.hideMembers": {
+    "value": "Hide members"
+  },
   "channel.membersButton": {
     "value": {
       "one": "Channel members ({{count}})",
       "other": "Channel members ({{count}})"
     }
-  },
-  "channel.membersPeople": {
-    "value": "People"
   },
   "channel.membersAgents": {
     "value": "Agents"
@@ -3552,9 +3594,6 @@
   },
   "channel.coordinatorChip": {
     "value": "coordinates the team"
-  },
-  "channel.seeDetails": {
-    "value": "See channel details"
   },
   "channel.more": {
     "value": "More message actions"
@@ -3618,12 +3657,6 @@
   },
   "channel.details": {
     "value": "Channel details"
-  },
-  "channel.agentsAnswer": {
-    "value": {
-      "one": "{{names}} answers here",
-      "other": "{{names}} answer here"
-    }
   },
   "channel.composerLabel": {
     "value": "Message #{{channel}}"
@@ -3720,6 +3753,27 @@
   },
   "channel.archived": {
     "value": "#{{channel}} archived. The conversation is kept."
+  },
+  "channel.delete": {
+    "value": "Delete channel"
+  },
+  "channel.deleteTitle": {
+    "value": "Delete #{{channel}} for good?"
+  },
+  "channel.deleteGoes": {
+    "value": "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it."
+  },
+  "channel.deleteIssues": {
+    "value": "Its tasks go too, as only the channel's members could see them."
+  },
+  "channel.deleteOrArchive": {
+    "value": "To keep the conversation, archive the channel instead."
+  },
+  "channel.deleteTypeName": {
+    "value": "Type {{channel}} to confirm"
+  },
+  "channel.deleteDone": {
+    "value": "#{{channel}} was deleted."
   },
   "channel.detailsSub": {
     "value": "{{category}} · {{visibility}}"
@@ -3844,6 +3898,12 @@
       "other": "{{names}} answered"
     }
   },
+  "receipts.passed": {
+    "value": {
+      "one": "No one replied",
+      "other": "No one replied"
+    }
+  },
   "receipts.failed": {
     "value": {
       "one": "{{names}} couldn't answer",
@@ -3912,6 +3972,9 @@
   },
   "receipts.status.referenced": {
     "value": "Only mentioned"
+  },
+  "receipts.status.passed": {
+    "value": "Didn't reply"
   },
   "receipts.status.reacted": {
     "value": "Reacted"
@@ -4285,8 +4348,11 @@
   "connectAi.assignFailed": {
     "value": "The {{label}} account is connected, but {{agent}} couldn't switch to it."
   },
-  "connectAi.noAgents": {
-    "value": "A plan thinks only for its owner's agents, and you have none yet."
+  "connectAi.forNewAgents": {
+    "value": "{{label}} is connected. The agents you create think with it."
+  },
+  "connectAi.forNewAgentsHint": {
+    "value": "The agents you create think with it."
   },
   "connectAi.done": {
     "value": "Done"
@@ -4516,6 +4582,30 @@
   "actionCard.connected": {
     "value": "Connected"
   },
+  "actionCard.connect_app.title": {
+    "value": "Connect {{name}}"
+  },
+  "actionCard.connect_app.mcp": {
+    "value": "Add an MCP server"
+  },
+  "actionCard.connect_app.adminOnly": {
+    "value": "An admin connects it"
+  },
+  "actionCard.invite.title": {
+    "value": {
+      "one": "Invite {{count}} person",
+      "other": "Invite {{count}} people"
+    }
+  },
+  "actionCard.invite.open": {
+    "value": "Invite"
+  },
+  "actionCard.invite.done": {
+    "value": "Invited"
+  },
+  "actionCard.invite.adminOnly": {
+    "value": "Someone who may invite sends it"
+  },
   "actionCard.agentProposal.title": {
     "value": "{{agent}} proposes a new agent"
   },
@@ -4708,6 +4798,9 @@
   },
   "agentActions.routine.created_bare": {
     "value": "Created the routine <b>{{name}}</b>"
+  },
+  "agentActions.routine.ownActions": {
+    "value": "Does on its own, without asking: {{actions}}"
   },
   "agentActions.routine.updated": {
     "value": "Changed {{fields}} of the routine <b>{{name}}</b>"
@@ -5217,6 +5310,24 @@
   },
   "profile.cardLabel": {
     "value": "Profile"
+  },
+  "profile.roles": {
+    "value": "Roles"
+  },
+  "profile.memberSince": {
+    "value": "Member since"
+  },
+  "profile.messageTo": {
+    "value": "Message {{name}}"
+  },
+  "profile.audienceEdit": {
+    "value": "Edit"
+  },
+  "profile.nowIn": {
+    "value": "now, in #{{channel}}"
+  },
+  "profile.more": {
+    "value": "More"
   },
   "profile.of": {
     "value": "Profile of {{name}}"
@@ -8599,6 +8710,12 @@
   "agentPage.activity.errors.computer_busy": {
     "value": "The computer stayed busy with other tasks."
   },
+  "agentPage.activity.errors.computer_failed": {
+    "value": "The computer ran into a problem and stopped."
+  },
+  "agentPage.activity.errors.computer_timeout": {
+    "value": "The computer took too long to answer."
+  },
   "agentPage.activity.errors.unknown": {
     "value": "Failed."
   },
@@ -9416,6 +9533,9 @@
   "newAgent.errors.modelUnavailable": {
     "value": "Pick a model the workspace can use."
   },
+  "newAgent.noAi": {
+    "value": "This workspace has no AI yet. Connect one now, or create the agent and connect one after."
+  },
   "newAgent.instructions": {
     "value": "Instructions"
   },
@@ -9765,6 +9885,21 @@
   "newAgent.routineNotMade": {
     "value": "The routine wasn't created: {{reason}}"
   },
+  "members.column.label": {
+    "value": "Members of #{{channel}}"
+  },
+  "members.column.group": {
+    "value": "{{name}} — {{count}}"
+  },
+  "members.column.ownerTitle": {
+    "value": "Workspace owner"
+  },
+  "members.column.more": {
+    "value": "Show {{count}} more"
+  },
+  "members.column.find": {
+    "value": "Find people and agents"
+  },
   "members.agentsOnlyYou": {
     "value": "Your agents answer only you."
   },
@@ -9830,9 +9965,6 @@
   },
   "members.waitingTitle": {
     "value": "Waiting for you"
-  },
-  "members.more": {
-    "value": "More actions for {{name}}"
   },
   "members.remove.item": {
     "value": "Remove from workspace"
@@ -10571,7 +10703,7 @@
     "value": "Set up the workspace"
   },
   "scopes.setup_write.description": {
-    "value": "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo."
+    "value": "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo."
   },
   "scopes.github_git_read.label": {
     "value": "Clone repositories (git)"
@@ -11039,6 +11171,42 @@
   "issues.form.agentStarts": {
     "value": "{{name}} starts as soon as the task is created. Anything sensitive asks for your approval."
   },
+  "issues.form.agentStartsAll": {
+    "value": "{{name}} starts as soon as the task is created, with the description, the criteria and the attachments. Anything sensitive asks for your approval."
+  },
+  "issues.form.titleShort": {
+    "value": "Task title"
+  },
+  "issues.form.quickPlaceholder": {
+    "value": "Describe what's needed. Paste screenshots, drop files. Lines starting with “-” become acceptance criteria."
+  },
+  "issues.form.pasteHint": {
+    "value": "Paste a screenshot with {{keys}} or drop files here."
+  },
+  "issues.form.expand": {
+    "value": "Open the full form"
+  },
+  "issues.form.collapse": {
+    "value": "Back to the quick form"
+  },
+  "issues.form.another": {
+    "value": "Create another"
+  },
+  "issues.form.addCriterion": {
+    "value": "Add a criterion"
+  },
+  "issues.form.removeCriterion": {
+    "value": "Remove the criterion"
+  },
+  "issues.form.drop": {
+    "value": "Drop to attach to the task"
+  },
+  "issues.form.dropText": {
+    "value": "Photos, videos, PDFs, spreadsheets… up to {{max}} MB each."
+  },
+  "issues.form.createHint": {
+    "value": "{{keys}} creates the task"
+  },
   "issues.back": {
     "value": "Tasks"
   },
@@ -11115,6 +11283,12 @@
   "issues.noActivity": {
     "value": "Nothing yet."
   },
+  "issues.discussion": {
+    "value": "Discussion"
+  },
+  "issues.noComments": {
+    "value": "No comments yet."
+  },
   "issues.comment": {
     "value": "Comment on the task"
   },
@@ -11159,6 +11333,48 @@
   },
   "issues.labels": {
     "value": "Labels"
+  },
+  "issues.tabs.label": {
+    "value": "Task sections"
+  },
+  "issues.tabs.details": {
+    "value": "Details"
+  },
+  "issues.tabs.files": {
+    "value": "Attachments"
+  },
+  "issues.tabs.history": {
+    "value": "History"
+  },
+  "issues.files.title": {
+    "value": "Attachments"
+  },
+  "issues.files.add": {
+    "value": "Add files"
+  },
+  "issues.files.addHint": {
+    "value": "or drop them here"
+  },
+  "issues.files.grid": {
+    "value": "Grid"
+  },
+  "issues.files.empty": {
+    "value": "No attachments yet. Drop files here or paste a screenshot."
+  },
+  "issues.files.fromCreation": {
+    "value": "At creation · {{when}}"
+  },
+  "issues.files.fromComment": {
+    "value": "{{name}}'s comment · {{when}}"
+  },
+  "issues.files.linked": {
+    "value": "Linked by {{name}}"
+  },
+  "issues.history.commented": {
+    "value": "commented"
+  },
+  "issues.history.commentedFiles": {
+    "value": "commented with attachments"
   },
   "issues.event.work_update": {
     "value": "{{text}}"
@@ -11703,6 +11919,15 @@
   "routines.panel.ahead": {
     "value": "Prepared for later"
   },
+  "routines.panel.ownActions": {
+    "value": "Does on its own"
+  },
+  "routines.ownActions.hint": {
+    "value": "Every run does these in your connected apps without asking. Any other action there asks a person first, and merge, deploy and rollback always ask."
+  },
+  "routines.ownActions.none": {
+    "value": "In connected apps it asks a person before each action. To let it do its job on its own, tell the agent in the chat which actions it may do."
+  },
   "routines.ahead.approved": {
     "value": "Approved · runs {{when}}"
   },
@@ -11837,6 +12062,9 @@
   },
   "routines.form.kind.webhook": {
     "value": "Webhook"
+  },
+  "routines.form.kind.connector": {
+    "value": "MillionSend email"
   },
   "routines.form.frequency": {
     "value": "Frequency"
@@ -15366,13 +15594,16 @@
     "value": "Files"
   },
   "skills.needsSandbox": {
-    "value": "needs a sandbox"
+    "value": "not kept"
+  },
+  "skills.assetLimit": {
+    "value": "A skill keeps up to {{max}} MB of images and other files."
   },
   "skills.runsOnPc": {
     "value": "runs on the agent's PC"
   },
   "skills.reinstall": {
-    "value": "Reinstall to use the scripts."
+    "value": "Reinstall the skill so agents can use this file."
   },
   "skills.edit": {
     "value": "Edit"
@@ -20837,6 +21068,18 @@
   "connectors.add": {
     "value": "Add connector"
   },
+  "connectors.mcp.title": {
+    "value": "MCPs"
+  },
+  "connectors.mcp.add": {
+    "value": "Add MCP"
+  },
+  "connectors.mcp.list": {
+    "value": "Connected MCP servers"
+  },
+  "connectors.mcp.none": {
+    "value": "MCP servers you connect by their address show up here."
+  },
   "connectors.addTitle": {
     "value": "Add connector"
   },
@@ -23594,6 +23837,15 @@
   "mail.routine.whenFolder": {
     "value": "When an email arrives at {{address}} ({{folder}})"
   },
+  "mail.routine.whenMillionSend": {
+    "value": "When an email arrives in MillionSend"
+  },
+  "mail.routine.inboxAddress": {
+    "value": "Inbox address"
+  },
+  "mail.routine.inboxAddressHelp": {
+    "value": "Empty = any MillionSend inbox."
+  },
   "mail.routine.unknownMailbox": {
     "value": "a mailbox"
   },
@@ -23797,6 +24049,57 @@
   },
   "searchPage.searchHere": {
     "value": "Search in this conversation"
+  },
+  "searchPage.optionHint.from": {
+    "value": "name"
+  },
+  "searchPage.optionHint.in": {
+    "value": "channel"
+  },
+  "searchPage.optionHint.has": {
+    "value": "link, file, image or card"
+  },
+  "searchPage.optionHint.mentions": {
+    "value": "name"
+  },
+  "searchPage.moreFiltersHint": {
+    "value": "dates, agents only, pinned"
+  },
+  "searchPage.clearRecentAll": {
+    "value": "Clear recent searches"
+  },
+  "searchPage.header.placeholder": {
+    "value": "Search {{org}}"
+  },
+  "searchPage.header.clear": {
+    "value": "Clear search"
+  },
+  "searchPage.panel.label": {
+    "value": "Search results"
+  },
+  "searchPage.panel.count": {
+    "value": {
+      "one": "{{count}} result",
+      "other": "{{count}} results"
+    }
+  },
+  "searchPage.panel.filters": {
+    "value": "Filters"
+  },
+  "searchPage.panel.filtersCount": {
+    "value": {
+      "one": "Filters ({{count}})",
+      "other": "Filters ({{count}})"
+    }
+  },
+  "searchPage.panel.jump": {
+    "value": "Jump"
+  },
+  "searchPage.panel.jumpLabel": {
+    "value": "Jump to {{name}}'s message"
+  },
+  "searchPage.panel.threadIn": {
+    "value": "thread in #{{channel}}"
   },
   "searchPage.dm": {
     "value": "DM with {{name}}"
@@ -24594,6 +24897,9 @@
   },
   "machines.shared.diskFullNotice": {
     "value": "The disk of {{name}} is almost full"
+  },
+  "machines.chromeMissingNotice": {
+    "value": "{{name}} needs Google Chrome for the agents' browser. Get it at google.com/chrome"
   },
   "machines.access.folders": {
     "value": "Allowed folders"
@@ -25801,6 +26107,9 @@
   "audit.change.area.thread": {
     "value": "a thread"
   },
+  "audit.change.area.channel": {
+    "value": "a channel"
+  },
   "audit.change.area.forum": {
     "value": "a forum topic"
   },
@@ -26018,7 +26327,7 @@
     "value": "Agents and access"
   },
   "settings.section.connectors": {
-    "value": "Connectors"
+    "value": "Connectors and MCPs"
   },
   "settings.section.skills": {
     "value": "Skills"
@@ -26072,7 +26381,7 @@
     "value": "What each agent can use: one level per connector."
   },
   "settings.sectionText.connectors": {
-    "value": "Services connected once for the whole workspace."
+    "value": "Services and MCP servers connected once for the whole workspace."
   },
   "settings.sectionText.skills": {
     "value": "Markdown instructions agents open when they need them."
@@ -27447,6 +27756,12 @@
   "chat.work.step.offeringConnectAi": {
     "value": "Offered to connect an AI"
   },
+  "chat.work.step.offeringConnectApp": {
+    "value": "Offered to connect an app"
+  },
+  "chat.work.step.offeringInvites": {
+    "value": "Offered to invite people"
+  },
   "chat.work.step.proposingAgent": {
     "value": "Proposed an agent"
   },
@@ -27683,6 +27998,12 @@
   },
   "chat.activity.offeringConnectAi": {
     "value": "getting an AI ready to connect"
+  },
+  "chat.activity.offeringConnectApp": {
+    "value": "getting an app ready to connect"
+  },
+  "chat.activity.offeringInvites": {
+    "value": "getting invitations ready"
   },
   "chat.activity.proposingAgent": {
     "value": "proposing an agent"
@@ -27977,6 +28298,15 @@
   },
   "chat.body.action_connect_ai": {
     "value": "Connect an AI"
+  },
+  "chat.body.action_connect_app": {
+    "value": "Connect {{name}}"
+  },
+  "chat.body.action_add_mcp": {
+    "value": "Add an MCP server"
+  },
+  "chat.body.action_invite_people": {
+    "value": "Invite people"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
@@ -28310,6 +28640,18 @@
   },
   "builtinTools.offer_connect_ai.description": {
     "value": "Posts a card whose button opens the dialog to connect a plan or an API key."
+  },
+  "builtinTools.offer_connect_app.label": {
+    "value": "Offer to connect an app or MCP"
+  },
+  "builtinTools.offer_connect_app.description": {
+    "value": "Posts a card whose button opens the dialog to connect an app or an MCP server by its address."
+  },
+  "builtinTools.offer_invites.label": {
+    "value": "Offer to invite people"
+  },
+  "builtinTools.offer_invites.description": {
+    "value": "Posts a card whose button opens the invite dialog with the addresses filled in."
   },
   "builtinTools.propose_agent.label": {
     "value": "Propose an agent"
@@ -30290,18 +30632,6 @@
   "agentComputer.phone.chooseOnWeb": {
     "value": "Choose it on agentes.chat, in Settings › Computers."
   },
-  "routines.form.kind.connector": {
-    "value": "MillionSend email"
-  },
-  "mail.routine.whenMillionSend": {
-    "value": "When an email arrives in MillionSend"
-  },
-  "mail.routine.inboxAddress": {
-    "value": "Inbox address"
-  },
-  "mail.routine.inboxAddressHelp": {
-    "value": "Empty = any MillionSend inbox."
-  },
   "taskManager.title": {
     "value": "Task manager"
   },
@@ -30619,89 +30949,5 @@
   },
   "taskManager.agentPanel.none": {
     "value": "{{name}} is free now."
-  },
-  "app.issues.form.agentStartsAll": {
-    "value": "{{name}} starts as soon as the task is created, with the description, the criteria and the attachments. Anything sensitive asks for your approval."
-  },
-  "app.issues.form.titleShort": {
-    "value": "Task title"
-  },
-  "app.issues.form.quickPlaceholder": {
-    "value": "Describe what's needed. Paste screenshots, drop files. Lines starting with “-” become acceptance criteria."
-  },
-  "app.issues.form.pasteHint": {
-    "value": "Paste a screenshot with {{keys}} or drop files here."
-  },
-  "app.issues.form.expand": {
-    "value": "Open the full form"
-  },
-  "app.issues.form.collapse": {
-    "value": "Back to the quick form"
-  },
-  "app.issues.form.another": {
-    "value": "Create another"
-  },
-  "app.issues.form.addCriterion": {
-    "value": "Add a criterion"
-  },
-  "app.issues.form.removeCriterion": {
-    "value": "Remove the criterion"
-  },
-  "app.issues.form.drop": {
-    "value": "Drop to attach to the task"
-  },
-  "app.issues.form.dropText": {
-    "value": "Photos, videos, PDFs, spreadsheets… up to {{max}} MB each."
-  },
-  "app.issues.form.createHint": {
-    "value": "{{keys}} creates the task"
-  },
-  "app.issues.discussion": {
-    "value": "Discussion"
-  },
-  "app.issues.noComments": {
-    "value": "No comments yet."
-  },
-  "app.issues.tabs.label": {
-    "value": "Task sections"
-  },
-  "app.issues.tabs.details": {
-    "value": "Details"
-  },
-  "app.issues.tabs.files": {
-    "value": "Attachments"
-  },
-  "app.issues.tabs.history": {
-    "value": "History"
-  },
-  "app.issues.files.title": {
-    "value": "Attachments"
-  },
-  "app.issues.files.add": {
-    "value": "Add files"
-  },
-  "app.issues.files.addHint": {
-    "value": "or drop them here"
-  },
-  "app.issues.files.grid": {
-    "value": "Grid"
-  },
-  "app.issues.files.empty": {
-    "value": "No attachments yet. Drop files here or paste a screenshot."
-  },
-  "app.issues.files.fromCreation": {
-    "value": "At creation · {{when}}"
-  },
-  "app.issues.files.fromComment": {
-    "value": "{{name}}'s comment · {{when}}"
-  },
-  "app.issues.files.linked": {
-    "value": "Linked by {{name}}"
-  },
-  "app.issues.history.commented": {
-    "value": "commented"
-  },
-  "app.issues.history.commentedFiles": {
-    "value": "commented with attachments"
   }
 }

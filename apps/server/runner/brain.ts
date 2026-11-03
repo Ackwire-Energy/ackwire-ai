@@ -292,6 +292,8 @@ function taskOf(ev: Record<string, unknown>): ParsedTask | undefined {
  */
 export class ClaudeStreamParser {
   session?: string;
+  /** The CLI compacted the conversation (`compact_boundary`) since the last turn that read "# This conversation". */
+  compacted = false;
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
@@ -305,8 +307,11 @@ export class ClaudeStreamParser {
   private worked = false;
   private resetsAt?: string;
   private authFailed = false;
+  /** Uncached input of each API call of the turn, by message id (Claude Code repeats a message per content block). */
+  private uncached = new Map<string, number>();
 
   beginTurn() {
+    this.uncached.clear();
     this.tools.clear();
     this.sawDelta = false;
     this.streamedMessage = null;
@@ -338,6 +343,7 @@ export class ClaudeStreamParser {
         if (ev.subtype === "api_retry" && ev.error === "rate_limit") this.limited = true;
         // Claude Code says `init` as each turn starts (also one it starts by itself).
         if (ev.subtype === "init") return { events: [], turnStart: true };
+        if (ev.subtype === "compact_boundary" && main) this.compacted = true;
         const task = taskOf(ev);
         return task ? { events: [], task } : { events: [] };
       }
@@ -363,6 +369,8 @@ export class ClaudeStreamParser {
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
         const messageId = isObj(ev.message) ? str(ev.message.id) : "";
+        if (messageId && isObj(ev.message) && isObj(ev.message.usage))
+          this.uncached.set(messageId, num(ev.message.usage.input_tokens));
         const streamed = this.sawDelta || (messageId !== "" && messageId === this.streamedMessage);
         const events: WireBrainEvent[] = [];
         // A turn's first reply names the messages that started it (a steered one the CLI read after a result).
@@ -440,6 +448,10 @@ export class ClaudeStreamParser {
     const input = num(usage.input_tokens) + cacheRead + cacheWrite;
     const output = num(usage.output_tokens);
     const models = isObj(ev.modelUsage) ? Object.keys(ev.modelUsage) : [];
+    // `usage` adds up every API call of the turn: how many there were, and the largest uncached one, tell more calls
+    // from bigger ones.
+    const calls = num(ev.num_turns);
+    const maxUncached = Math.max(0, ...this.uncached.values());
     if (input > 0 || output > 0) {
       events.push({
         type: "usage",
@@ -449,6 +461,8 @@ export class ClaudeStreamParser {
         ...(models[0] ? { model: models[0] } : {}),
         ...(cacheRead > 0 ? { cacheRead } : {}),
         ...(cacheWrite > 0 ? { cacheWrite } : {}),
+        ...(calls > 0 ? { calls } : {}),
+        ...(maxUncached > 0 ? { maxUncached } : {}),
       });
     }
     this.tools.clear();
@@ -503,6 +517,22 @@ export class ClaudeStreamParser {
       },
     };
   }
+}
+
+/**
+ * A turn's message (protocol 40): a new session's first one, and the first after the CLI compacted its history, open
+ * with the request's `conversation` and the checkout's instructions; a resumed session already has them. Without
+ * `conversation` (an older server) both are in the system text, and the message is the request's own.
+ */
+export function turnPrompt(
+  live: { opening: boolean; withRepo: boolean; cwd: string; proc: { parser: ClaudeStreamParser } },
+  req: Pick<BrainTurnRequest, "prompt" | "conversation">,
+): string {
+  if (typeof req.conversation !== "string" || !(live.opening || live.proc.parser.compacted)) return req.prompt;
+  live.opening = false;
+  live.proc.parser.compacted = false;
+  const head = [req.conversation.trim(), live.withRepo ? repoInstructions(live.cwd).trim() : ""].filter(Boolean);
+  return head.length ? `${head.join("\n\n")}\n\n${req.prompt}` : req.prompt;
 }
 
 // ── Command line ─────────────────────────────────────────────────────────────
@@ -1164,6 +1194,11 @@ interface Live {
   ranKey: string;
   /** Where its session's first system text is kept (`sessionSystem`). */
   keptSystem: string;
+  cwd: string;
+  /** Claude Code loads no settings files: the checkout's CLAUDE.md and AGENTS.md come from us (`repoInstructions`). */
+  withRepo: boolean;
+  /** A new session: its next turn opens with "# This conversation" (protocol 40, `turnPrompt`). */
+  opening: boolean;
   busy: boolean;
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
@@ -1514,7 +1549,7 @@ export class BrainManager {
     // Usage goes to the account the turn thinks with, or to the computer's own sign-in.
     const usageKey = ctx.accountHome && typeof req.account === "string" ? req.account : OWN_USAGE_ID.claude_code;
     try {
-      const out = await runTurnOnProcess(live.proc, req.prompt, {
+      const out = await runTurnOnProcess(live.proc, turnPrompt(live, req), {
         emit: ctx.emit,
         signal: ctx.signal,
         deltaMs: this.opts.deltaMs,
@@ -1613,11 +1648,13 @@ export class BrainManager {
     const ranKey = ranKeyOf(req, session);
     const withRepo = launch.settingSources === "";
     const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
-    writeFileSync(
-      systemFile,
-      this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system)),
-      { mode: 0o600 },
+    // Protocol 40: what holds for the conversation, and the checkout's instructions, open the session's first message
+    // instead (`turnPrompt`), so this text is the same in every session of the agent.
+    const apart = typeof req.conversation === "string";
+    const started = this.sessionSystem(keptSystem, resume, () =>
+      withRepo && !apart ? system + repoInstructions(cwd) : system,
     );
+    writeFileSync(systemFile, started.text, { mode: 0o600 });
     let mcpConfigFile: string | undefined;
     const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
@@ -1719,6 +1756,10 @@ export class BrainManager {
       sig,
       ranKey,
       keptSystem,
+      cwd,
+      withRepo,
+      // A resume whose first text is gone may have begun with the conversation in it (an older server): read it again.
+      opening: !resume || !started.kept,
       busy: false,
       lastUsed: Date.now(),
       idleTimer: null,
@@ -1753,7 +1794,7 @@ export class BrainManager {
    * prompt from it, so a resume with other bytes would write the whole cached prefix again instead of reading it.
    * Kept per agent, account, session and folder; dropped `SESSION_SYSTEM_KEEP_MS` after its last use (the cache is gone).
    */
-  private sessionSystem(file: string, resume: boolean, fresh: () => string): string {
+  private sessionSystem(file: string, resume: boolean, fresh: () => string): { text: string; kept: boolean } {
     const dir = path.dirname(file);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const now = Date.now();
@@ -1772,14 +1813,14 @@ export class BrainManager {
       try {
         const kept = readFileSync(file, "utf8");
         utimesSync(file, now / 1000, now / 1000);
-        return kept;
+        return { text: kept, kept: true };
       } catch {
         // not kept (a new runner, or past the cache): this text becomes the session's
       }
     }
     const text = fresh();
     writeFileSync(file, text, { mode: 0o600 });
-    return text;
+    return { text, kept: false };
   }
 
   private armIdle(live: Live) {

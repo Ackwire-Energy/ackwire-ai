@@ -56,7 +56,18 @@ describe("Anthropic adapter (scripted transport)", () => {
               { type: "tool_use", id: "toolu_0", name: "search_context", input: { query: "x" } },
             ],
           },
-          { role: "user", content: [{ type: "tool_result", toolUseId: "toolu_0", content: "nothing", isError: true }] },
+          {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                toolUseId: "toolu_0",
+                content: "nothing",
+                isError: true,
+                images: [{ mediaType: "image/png", data: "UE5H" }],
+              },
+            ],
+          },
         ],
         maxTokens: 1000,
         tools: [
@@ -89,7 +100,17 @@ describe("Anthropic adapter (scripted transport)", () => {
     });
     expect((body.messages as Record<string, unknown>[])[2]).toEqual({
       role: "user",
-      content: [{ type: "tool_result", tool_use_id: "toolu_0", content: "nothing", is_error: true }],
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: "toolu_0",
+          content: [
+            { type: "text", text: "nothing" },
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "UE5H" } },
+          ],
+          is_error: true,
+        },
+      ],
     });
 
     expect(deltas).toEqual(["Let me check."]);
@@ -544,7 +565,21 @@ describe("prompt cache: a stable prefix whatever tools load", () => {
         {
           model: "deepseek-v4-pro",
           system: [{ text: "agent", cache: true }],
-          messages: [{ role: "user", content: "oi" }],
+          messages: [
+            { role: "user", content: "oi" },
+            { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "read_skill_file", input: {} }] },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "tool_result",
+                  toolUseId: "t1",
+                  content: "a/b.png",
+                  images: [{ mediaType: "image/png", data: "UE5H" }],
+                },
+              ],
+            },
+          ],
           maxTokens: 10,
           cacheTtl: "1h",
           tools: [tool("z"), tool("b", true)],
@@ -558,5 +593,8 @@ describe("prompt cache: a stable prefix whatever tools load", () => {
       ["z", undefined],
     ]);
     expect(body.system).toEqual([{ type: "text", text: "agent", cache_control: { type: "ephemeral" } }]);
+    // A tool result's image goes as a note: these endpoints aren't trusted to take images.
+    expect(JSON.stringify(body.messages)).not.toContain('"image"');
+    expect(JSON.stringify(body.messages)).toContain("The image is not shown");
   });
 });

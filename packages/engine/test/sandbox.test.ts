@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { MAX_INLINE_FILE_BYTES } from "@agenteschat/adapters";
 import { DELETE_BRANCHES_POINTER } from "@agenteschat/adapters/command-policy";
 import { eq, schema } from "@agenteschat/db";
 import {
@@ -305,23 +306,65 @@ describe("Drive and skills", () => {
     f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
     const { runner } = await connectedComputer(f);
     const md = "---\nname: graficos\ndescription: Faz gráficos.\n---\nRode scripts/plot.py.";
-    const zip = await zipOf({ "SKILL.md": md, "scripts/plot.py": "print('plot')", "ref.md": "# ref" });
+    const zip = await zipOf({
+      "SKILL.md": md,
+      "scripts/plot.py": "print('plot')",
+      "ref.md": "# ref",
+      "logo.png": PNG,
+      "manual.pdf": new Uint8Array(MAX_INLINE_FILE_BYTES + 1),
+    });
     const skill = await importSkillZip({ db: f.db, blobs: f.artifactDeps.blobs }, f.owner.id, f.org.id, zip);
     await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
     const ctx = await runCtx();
     expect((await call(ctx, "read_skill_file", { name: "graficos", path: "scripts/plot.py" })).isError).toBe(true);
+    // Too large for one write to the computer: said, not hidden.
+    expect((await call(ctx, "read_skill_file", { name: "graficos", path: "manual.pdf" })).content).toContain(
+      "Not saved on your computer: .skills/graficos/manual.pdf is too large to copy",
+    );
     const out = await call(ctx, "run_skill_script", {
       skill: "graficos",
       path: "scripts/plot.py",
       args: ["--n", "it's"],
     });
     expect(out).toMatchObject({ isError: false });
-    expect([...runner.files.keys()].sort()).toEqual([".skills/graficos/ref.md", ".skills/graficos/scripts/plot.py"]);
+    expect(out.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
+    expect([...runner.files.keys()].sort()).toEqual([
+      ".skills/graficos/logo.png",
+      ".skills/graficos/ref.md",
+      ".skills/graficos/scripts/plot.py",
+    ]);
     // On a connected computer a safe path goes unquoted; the arguments are always quoted.
     expect(runner.sent.find((s) => s.type === "request" && s.op === "exec")).toMatchObject({
       command: "python3 .skills/graficos/scripts/plot.py '--n' 'it'\\''s'",
     });
     expect((await call(ctx, "run_skill_script", { skill: "graficos", path: "ref.md" })).isError).toBe(true);
+  });
+});
+
+describe("skill files on the computer", () => {
+  test("a computer brain's image and any brain's PDF are saved in .skills/{name}/ for the computer's own tools", async () => {
+    f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const { paired, runner } = await connectedComputer(f);
+    const md = "---\nname: graficos\ndescription: Faz gráficos.\n---\nVeja references/diagram.png.";
+    const zip = await zipOf({ "SKILL.md": md, "references/diagram.png": PNG, "references/manual.pdf": "%PDF" });
+    const skill = await importSkillZip({ db: f.db, blobs: f.artifactDeps.blobs }, f.owner.id, f.org.id, zip);
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    const ctx = await runCtx();
+
+    const bridged = { ...ctx, bridge: { machineId: paired.machineId } };
+    const image = await call(bridged, "read_skill_file", { name: "graficos", path: "references/diagram.png" });
+    expect(image).toMatchObject({ data: { path: ".skills/graficos/references/diagram.png" } });
+    expect(image.images).toBeUndefined();
+    expect(image.content).toContain("open it there with your own tools, which show images");
+    expect(runner.files.get(".skills/graficos/references/diagram.png")).toEqual(PNG);
+
+    // A model brain sees the image itself, and gets the PDF on its computer.
+    expect((await call(ctx, "read_skill_file", { name: "graficos", path: "references/diagram.png" })).images).toEqual([
+      { mediaType: "image/png", data: Buffer.from(PNG).toString("base64") },
+    ]);
+    const pdf = await call(ctx, "read_skill_file", { name: "graficos", path: "references/manual.pdf" });
+    expect(pdf.content).toContain("saved to .skills/graficos/references/manual.pdf in your folder");
+    expect(new TextDecoder().decode(runner.files.get(".skills/graficos/references/manual.pdf"))).toBe("%PDF");
   });
 });
 
@@ -422,14 +465,16 @@ describe("the agent's computer API", () => {
 });
 
 /** A minimal zip (stored entries). */
-async function zipOf(files: Record<string, string>) {
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+async function zipOf(files: Record<string, string | Uint8Array>) {
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
   let offset = 0;
   for (const [path, text] of Object.entries(files)) {
     const name = enc.encode(path);
-    const data = enc.encode(text);
+    const data = typeof text === "string" ? enc.encode(text) : text;
     const local = new Uint8Array(30 + name.length + data.length);
     const lv = new DataView(local.buffer);
     lv.setUint32(0, 0x04034b50, true);

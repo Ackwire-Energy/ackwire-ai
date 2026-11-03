@@ -206,6 +206,8 @@ export interface FanOut {
 
 const FAN_STATE: Partial<Record<ReceiptPhase, FanState>> = {
   handled: "answered",
+  // Ended without answering: its chip reads "didn't answer", like a failure's.
+  passed: "failed",
   failed: "failed",
   no_ai: "failed",
   claimed: "working",

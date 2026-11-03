@@ -533,7 +533,7 @@ describe("what a workspace's files take", () => {
         bytes: bytes(5000),
       });
       const old = await upload(deps, f.org.id, "antigo.zip", 7000);
-      // A skill's picture is only listed: nothing of it is stored.
+      // A skill's picture is stored too, for its agents to see.
       await skill(deps, f.org.id, [
         ["modelo.md", 400],
         ["exemplo.png", 900],
@@ -542,12 +542,12 @@ describe("what a workspace's files take", () => {
       await upload(deps, other.id, "deles.pdf", 11_000);
       await deleteArtifact(deps, f.owner.id, f.org.id, old.id);
 
-      expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 8400, ownBucketBytes: 0 });
+      expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 9300, ownBucketBytes: 0 });
       expect(await storedBytes(f.db, other.id)).toEqual({ platformBytes: 11_000, ownBucketBytes: 0 });
       // The folder holds as much, and the file in the trash until it goes for good.
-      expect(await folderBytes(join(dir, "orgs", f.org.id))).toBe(8400 + 7000);
+      expect(await folderBytes(join(dir, "orgs", f.org.id))).toBe(9300 + 7000);
       await restoreArtifact(deps, f.owner.id, f.org.id, old.id);
-      expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 15_400, ownBucketBytes: 0 });
+      expect(await storedBytes(f.db, f.org.id)).toEqual({ platformBytes: 16_300, ownBucketBytes: 0 });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
