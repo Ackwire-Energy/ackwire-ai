@@ -1682,7 +1682,8 @@
     },
     "useAnyway": "Pakai {{email}}",
     "assignFailed": "Akun {{label}} sudah terhubung, tapi {{agent}} tidak bisa beralih ke akun itu.",
-    "noAgents": "Paket hanya berpikir untuk agen milik pemiliknya, dan kamu belum punya agen.",
+    "forNewAgents": "{{label}} sudah terhubung. Agen yang kamu buat berpikir dengannya.",
+    "forNewAgentsHint": "Agen yang kamu buat berpikir dengannya.",
     "done": "Selesai",
     "agent": "Untuk agen mana",
     "keyLocked": "Hanya Admin yang bisa menambahkan kunci API.",
@@ -3649,6 +3650,7 @@
       "handleTaken": "@{{handle}} sudah dipakai agen atau orang lain. Bagaimana kalau @{{suggestion}}?",
       "modelUnavailable": "Pilih model yang bisa dipakai ruang kerja."
     },
+    "noAi": "Ruang kerja ini belum punya AI. Hubungkan satu sekarang, atau buat agennya lalu hubungkan nanti.",
     "instructions": "Instruksi",
     "instructionsPlaceholder": "Misalnya, menjawab pertanyaan pelanggan di #support berdasarkan dokumentasi. Saat tidak tahu, memanggil seseorang di tim.",
     "startedFrom": "Dimulai dari teks {{role}}",

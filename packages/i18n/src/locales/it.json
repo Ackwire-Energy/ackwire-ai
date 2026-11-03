@@ -1800,7 +1800,8 @@
     },
     "useAnyway": "Usa {{email}}",
     "assignFailed": "L'account {{label}} è collegato, ma {{agent}} non è riuscito a passarci.",
-    "noAgents": "Un piano ragiona solo per gli agenti del suo titolare, e tu non ne hai ancora.",
+    "forNewAgents": "{{label}} è collegato. Gli agenti che crei ragionano con lui.",
+    "forNewAgentsHint": "Gli agenti che crei ragionano con lui.",
     "done": "Fatto",
     "agent": "Per quale agente",
     "keyLocked": "Solo un admin aggiunge una chiave API.",
@@ -3919,6 +3920,7 @@
       "handleTaken": "@{{handle}} appartiene già a un altro agente o a una persona. Che ne dici di @{{suggestion}}?",
       "modelUnavailable": "Scegli un modello che lo spazio di lavoro può usare."
     },
+    "noAi": "Lo spazio di lavoro non ha ancora un'IA. Collegane una ora, oppure crea l'agente e collegala dopo.",
     "instructions": "Istruzioni",
     "instructionsPlaceholder": "Es. Risponde alle domande dei clienti in #supporto basandosi sulla documentazione. Quando non sa, chiama qualcuno del team.",
     "startedFrom": "Partito dal testo di {{role}}",

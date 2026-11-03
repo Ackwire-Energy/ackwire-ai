@@ -174,6 +174,42 @@ export function planGate({
 }
 
 /**
+ * `planGate` for a person who owns no agent yet: a plan signs in on a computer they may add accounts to, and the
+ * account then thinks for the agents they create there. Read off the computers' `/ai-accounts` rows (no agent, no
+ * brain view); `computer`: where it signs in, or the computer the gate is about.
+ */
+export function planGateWithoutAgent({
+  choice,
+  edition,
+  setup,
+  computers,
+}: {
+  choice: PlanChoice;
+  edition: Edition | null;
+  setup: SetupView | null;
+  computers: readonly AiComputer[] | undefined;
+}): { gate: PlanGate; computer?: AiComputer } {
+  if (edition === "cloud" && setupPending(setup)) return { gate: { state: "preparing", view: setup } };
+  if (!computers || !edition) return { gate: { state: "loading" } };
+  const kind = kindOf(choice);
+  const fits = (c: AiComputer) => c.online && c.brains[kind] === true && (!isPlanId(choice) || c.keys);
+  const addable = computers.filter((c) => c.canAdd);
+  const computer = addable.find(fits) ?? addable.find((c) => c.online) ?? addable[0];
+  if (!computer) {
+    const first = computers[0];
+    if (!first) return { gate: edition === "cloud" ? { state: "preparing", view: null } : { state: "missing" } };
+    // Theirs, on a runner too old for accounts; else only whoever connected it signs a plan in there.
+    return first.mine
+      ? { gate: { state: "unsupported", reason: "runner_old" }, computer: first }
+      : { gate: { state: "locked", who: "computer" }, computer: first };
+  }
+  if (!computer.online) return { gate: { state: "offline" }, computer };
+  if (computer.brains[kind] !== true) return { gate: { state: "unsupported", reason: "not_installed" }, computer };
+  if (isPlanId(choice) && !computer.keys) return { gate: { state: "unsupported", reason: "keys" }, computer };
+  return { gate: { state: "ready" }, computer };
+}
+
+/**
  * The computer's own sign-in can think for the agent with this plan (`ownSignInReady`): Claude's or ChatGPT's, never
  * a coding plan's, which signs in with its key.
  */

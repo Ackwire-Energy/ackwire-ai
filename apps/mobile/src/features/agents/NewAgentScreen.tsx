@@ -392,10 +392,10 @@ function NewAgentForm({
         return;
       }
       // It exists either way (Criar again would only find its @ taken): on to its conversation, where Connect opens
-      // when it has nothing to think with yet.
+      // when it has nothing to think with yet (ADR 0061 §6).
       void openDm({ agentId: agent.id }).then(() => {
-        if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
         if (thinks.connect) openConnectAi({ agentId: agent.id, plan: thinks.connect });
+        else if (ai?.kind === "none" || (!thinks.plan && usable.size === 0)) openConnectAi({ agentId: agent.id });
       });
     } catch (e) {
       failed(e);

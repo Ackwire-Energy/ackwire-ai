@@ -1799,7 +1799,8 @@
     },
     "useAnyway": "Usar {{email}}",
     "assignFailed": "La cuenta de {{label}} está conectada, pero {{agent}} no pudo cambiarse a ella.",
-    "noAgents": "Un plan piensa solo para los agentes de su dueño, y todavía no tienes ninguno.",
+    "forNewAgents": "{{label}} está conectado. Los agentes que crees piensan con él.",
+    "forNewAgentsHint": "Los agentes que crees piensan con él.",
     "done": "Listo",
     "agent": "Para qué agente",
     "keyLocked": "Solo un admin agrega una clave de API.",
@@ -3867,6 +3868,7 @@
       "handleTaken": "@{{handle}} ya es de otro agente o persona. ¿Qué tal @{{suggestion}}?",
       "modelUnavailable": "Elige un modelo que el espacio de trabajo pueda usar."
     },
+    "noAi": "El espacio de trabajo todavía no tiene una IA. Conecta una ahora, o crea el agente y conéctala después.",
     "instructions": "Instrucciones",
     "instructionsPlaceholder": "Ej.: Responde las preguntas de los clientes en #soporte según la documentación. Cuando no sabe, llama a alguien del equipo.",
     "startedFrom": "Empezó con el texto de {{role}}",

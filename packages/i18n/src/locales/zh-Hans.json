@@ -1677,7 +1677,8 @@
     },
     "useAnyway": "使用 {{email}}",
     "assignFailed": "{{label}} 账号已连接，但 {{agent}} 无法切换到它。",
-    "noAgents": "套餐只为其所有者的智能体思考，而你还没有智能体。",
+    "forNewAgents": "{{label}} 已连接。你创建的智能体会用它思考。",
+    "forNewAgentsHint": "你创建的智能体会用它思考。",
     "done": "完成",
     "agent": "用于哪个智能体",
     "keyLocked": "只有管理员可以添加 API 密钥。",
@@ -3671,6 +3672,7 @@
       "handleTaken": "@{{handle}} 已被其他智能体或成员使用。试试 @{{suggestion}}？",
       "modelUnavailable": "请选择工作区可以使用的模型。"
     },
+    "noAi": "工作区还没有 AI。现在连接一个，或者先创建智能体，之后再连接。",
     "instructions": "指令",
     "instructionsPlaceholder": "例如：根据文档在 #support 回答客户问题。不知道时，找团队里的人。",
     "startedFrom": "基于{{role}}的文本",

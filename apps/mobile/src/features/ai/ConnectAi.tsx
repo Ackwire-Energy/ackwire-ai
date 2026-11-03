@@ -101,16 +101,17 @@ export function ConnectAiSheet() {
   };
   // Opened for one agent: its name in the title.
   const one = named?.length === 1 ? dir.agentById.get(named[0] ?? "") : undefined;
-  // No agent of theirs among those: who connects a plan instead.
+  // No agent of theirs yet, and it isn't opened for someone else's: a plan signs in for the agents they create.
+  const bare = !named && agents.length === 0;
+  const [accountAdded, setAccountAdded] = useState(false);
+  // Someone else's agent: who connects a plan instead.
   const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;
   const locked =
-    agents.length > 0
+    agents.length > 0 || bare
       ? undefined
-      : !named
-        ? t("connectAi.noAgents")
-        : one && owner
-          ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
-          : t("noAi.lockedAdmins");
+      : one && owner
+        ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
+        : t("noAi.lockedAdmins");
   const close = () => {
     if (router.canGoBack()) router.back();
   };
@@ -128,6 +129,12 @@ export function ConnectAiSheet() {
           {...(params.agentId ? { startAgentId: params.agentId } : {})}
           {...(params.email ? { email: params.email } : {})}
           locked={locked}
+          bare={bare}
+          onAccount={() => {
+            setAccountAdded(true);
+            void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
+            answer();
+          }}
           {...(one && one.ownerUserId !== meId && mayAddKey ? { theirs: { id: one.id, name: one.name } } : {})}
           justReady={params.ready === "1"}
           mayAddKey={mayAddKey}
@@ -147,7 +154,7 @@ export function ConnectAiSheet() {
           }}
         />
       )}
-      {keySaved || linked.length > 0 ? (
+      {keySaved || linked.length > 0 || accountAdded ? (
         <View style={styles.done}>
           <Button variant="primary" wide label={t("connectAi.done")} onPress={close} />
         </View>

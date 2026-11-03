@@ -23,6 +23,7 @@ import {
   type PlanChoice,
   type PlanGate,
   planGate,
+  planGateWithoutAgent,
   planOfAccount,
   planOfKind,
   signInAgainPlan,
@@ -184,6 +185,47 @@ describe("planGate: what a plan's panel can do now", () => {
     expect(ownSignInFor("claude", brain({ ownSignIn: false }), signedIn)).toBe(false);
     expect(ownSignInFor("chatgpt", brain({ ownSignIn: false }), codex)).toBe(false);
     expect(ownSignInFor("claude", undefined, signedIn)).toBe(false);
+  });
+});
+
+describe("planGateWithoutAgent: a plan connected before its owner has any agent", () => {
+  const SERVER: AiComputer = { ...MAC, machineId: "m2", name: "Servidor", mine: false };
+  const at = (patch: Partial<Parameters<typeof planGateWithoutAgent>[0]> = {}) =>
+    planGateWithoutAgent({ choice: "claude", edition: "selfhost", setup: null, computers: [MAC], ...patch });
+
+  test("ready on a computer they may add accounts to, with no agent at all", () => {
+    expect(at()).toEqual({ gate: { state: "ready" }, computer: MAC });
+    // The first one that runs the plan, online, among those they may add to.
+    const off = { ...MAC, online: false };
+    const noCodex = { ...SERVER, brains: { claude_code: true, codex: false } };
+    expect(at({ choice: "chatgpt", computers: [off, noCodex, SERVER] }).computer).toBe(SERVER);
+    expect(at({ computers: [{ ...MAC, canAdd: false }, SERVER] }).computer).toBe(SERVER);
+  });
+
+  test("the Cloud's computer on its way waits in place; loading until the computers and the edition are known", () => {
+    const view = setup();
+    expect(at({ edition: "cloud", setup: view, computers: undefined })).toEqual({ gate: { state: "preparing", view } });
+    expect(at({ edition: "cloud", computers: [] })).toEqual({ gate: { state: "preparing", view: null } });
+    expect(at({ computers: undefined }).gate).toEqual({ state: "loading" });
+    expect(at({ edition: null }).gate).toEqual({ state: "loading" });
+  });
+
+  test("never a dead end: no computer offers connecting one, and the reasons are the panel's own", () => {
+    expect(at({ computers: [] }).gate).toEqual({ state: "missing" });
+    expect(at({ computers: [{ ...MAC, online: false }] }).gate).toEqual({ state: "offline" });
+    expect(
+      at({ choice: "chatgpt", computers: [{ ...MAC, brains: { claude_code: true, codex: false } }] }).gate,
+    ).toEqual({ state: "unsupported", reason: "not_installed" });
+    expect(at({ choice: "zai", computers: [{ ...MAC, keys: false }] }).gate).toEqual({
+      state: "unsupported",
+      reason: "keys",
+    });
+    // Someone else's computer: only they sign a plan in there. Theirs on a runner without accounts: too old.
+    expect(at({ computers: [{ ...SERVER, mine: false, canAdd: false }] }).gate).toEqual({
+      state: "locked",
+      who: "computer",
+    });
+    expect(at({ computers: [{ ...MAC, canAdd: false }] }).gate).toEqual({ state: "unsupported", reason: "runner_old" });
   });
 });
 

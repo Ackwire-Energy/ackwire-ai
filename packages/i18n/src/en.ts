@@ -1687,7 +1687,9 @@ export const en = {
     },
     useAnyway: "Use {{email}}",
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
-    noAgents: "A plan thinks only for its owner's agents, and you have none yet.",
+    /** A plan connected by someone who owns no agent yet: it thinks for the agents they create. */
+    forNewAgents: "{{label}} is connected. The agents you create think with it.",
+    forNewAgentsHint: "The agents you create think with it.",
     done: "Done",
     agent: "For which agent",
     keyLocked: "Only an admin adds an API key.",
@@ -3637,6 +3639,8 @@ export const en = {
       handleTaken: "@{{handle}} already belongs to another agent or person. How about @{{suggestion}}?",
       modelUnavailable: "Pick a model the workspace can use.",
     },
+    /** The model step with nothing to think with yet: the agent is created all the same. */
+    noAi: "This workspace has no AI yet. Connect one now, or create the agent and connect one after.",
     instructions: "Instructions",
     instructionsPlaceholder:
       "E.g. Answers customer questions in #support based on the docs. When it doesn't know, calls someone on the team.",
