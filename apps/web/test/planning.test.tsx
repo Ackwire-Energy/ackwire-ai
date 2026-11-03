@@ -181,7 +181,10 @@ describe("Issues (board and list)", () => {
     await click(screen().getByRole("button", { name: "Nova tarefa" }));
     const dialog = screen().getByRole("dialog", { name: "Nova tarefa" });
     await type(within(dialog).getByLabelText("Título"), "Exportar agenda");
-    await type(within(dialog).getByLabelText("Descrição e critérios de aceite"), "Pedido de clientes.\n- Botão na agenda");
+    await type(
+      within(dialog).getByLabelText("Descrição e critérios de aceite"),
+      "Pedido de clientes.\n- Botão na agenda",
+    );
     await click(within(dialog).getByRole("button", { name: "Abrir o formulário completo" }));
     const field = (label: string, tag: string) =>
       within(dialog)

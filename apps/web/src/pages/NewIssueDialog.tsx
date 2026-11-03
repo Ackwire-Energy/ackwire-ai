@@ -81,6 +81,7 @@ export function NewIssueDialog({
   const titleRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLInputElement>(null);
   // The org's Drive: the task has no channel yet.
   const files = useComposerFiles(null, () => textRef.current?.focus());
   const drop = useFileDrop(files.onFiles, open);
@@ -179,7 +180,10 @@ export function NewIssueDialog({
   const agentNote = agent && (
     <p className="issue-agent-note">
       <Icon name="shield" size={14} />
-      {t(files.items.length > 0 || wide ? "issues.form.agentStartsAll" : "issues.form.agentStarts", agentGrammar(agent.name))}
+      {t(
+        files.items.length > 0 || wide ? "issues.form.agentStartsAll" : "issues.form.agentStarts",
+        agentGrammar(agent.name),
+      )}
     </p>
   );
   const priorityLabel = (p: IssuePriority) => t(`issues.priority.${p}`);
@@ -301,6 +305,12 @@ export function NewIssueDialog({
                       <input
                         value={c}
                         onChange={(e) => setCriteria((all) => all.map((x, j) => (j === i ? e.target.value : x)))}
+                        // Enter goes to the new-criterion line; only ⌘↵ or the button creates the task.
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" || e.metaKey || e.ctrlKey) return;
+                          e.preventDefault();
+                          addRef.current?.focus();
+                        }}
                         aria-label={t("issues.criteria")}
                       />
                       <Button
@@ -318,9 +328,11 @@ export function NewIssueDialog({
                     <input
                       value={draftCriterion}
                       onChange={(e) => setDraftCriterion(e.target.value)}
+                      ref={addRef}
                       onKeyDown={(e) => {
-                        if (e.key !== "Enter" || e.metaKey || e.ctrlKey || !draftCriterion.trim()) return;
+                        if (e.key !== "Enter" || e.metaKey || e.ctrlKey) return;
                         e.preventDefault();
+                        if (!draftCriterion.trim()) return;
                         setCriteria((all) => [...all, draftCriterion.trim()]);
                         setDraftCriterion("");
                       }}
@@ -453,7 +465,11 @@ export function NewIssueDialog({
                 <Menu
                   label={t("issues.column")}
                   trigger={
-                    <Button size="sm" icon="stageTodo" aria-label={`${t("issues.column")}: ${columnTitle(chosenColumn)}`}>
+                    <Button
+                      size="sm"
+                      icon="stageTodo"
+                      aria-label={`${t("issues.column")}: ${columnTitle(chosenColumn)}`}
+                    >
                       {columnTitle(chosenColumn)}
                     </Button>
                   }
@@ -484,7 +500,14 @@ export function NewIssueDialog({
               {t("issues.form.cancel")}
             </Button>
           ) : (
-            <Button type="button" variant="ghost" iconOnly icon="attach" aria-label={t("channel.attach")} onClick={pick} />
+            <Button
+              type="button"
+              variant="ghost"
+              iconOnly
+              icon="attach"
+              aria-label={t("channel.attach")}
+              onClick={pick}
+            />
           )}
           {createButton}
         </DialogFooter>

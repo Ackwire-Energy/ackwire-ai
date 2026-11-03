@@ -584,26 +584,26 @@ function Discussion({ issue, activity, loaded }: { issue: Issue; activity: Issue
       />
       {loaded && comments.length === 0 && <p className="small muted">{t("issues.noComments")}</p>}
       {comments.map((a) => (
-      <Message
-        key={a.id}
-        agent={a.author.type === "agent"}
-        avatar={<ActorAvatar actor={a.author} name={actors.name(a.author)} />}
-        author={actors.name(a.author)}
-        time={<time dateTime={a.createdAt}>{whenAt(t, i18n.language, a.createdAt)}</time>}
-      >
-        {a.text && (
-          <MessageText>
-            <Markdown source={a.text} variant="message" wikiLink={wikiLink} />
-          </MessageText>
-        )}
-        {a.attachments && a.attachments.length > 0 && (
-          <div className="artifact-cards">
-            {a.attachments.map((f) => (
-              <ArtifactCard key={f.id} artifact={{ id: f.id }} />
-            ))}
-          </div>
-        )}
-      </Message>
+        <Message
+          key={a.id}
+          agent={a.author.type === "agent"}
+          avatar={<ActorAvatar actor={a.author} name={actors.name(a.author)} />}
+          author={actors.name(a.author)}
+          time={<time dateTime={a.createdAt}>{whenAt(t, i18n.language, a.createdAt)}</time>}
+        >
+          {a.text && (
+            <MessageText>
+              <Markdown source={a.text} variant="message" wikiLink={wikiLink} />
+            </MessageText>
+          )}
+          {a.attachments && a.attachments.length > 0 && (
+            <div className="artifact-cards">
+              {a.attachments.map((f) => (
+                <ArtifactCard key={f.id} artifact={{ id: f.id }} />
+              ))}
+            </div>
+          )}
+        </Message>
       ))}
     </DetailsSection>
   );
@@ -619,40 +619,40 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
       {loaded && activity.length === 0 && <p className="small muted">{t("issues.noActivity")}</p>}
       {activity.map((a) =>
         a.kind === "event" ? (
-      <div key={a.id} className="issue-event small muted">
-        <Icon
-          name={a.event === "agent_asked" ? "agent" : a.textCode?.startsWith("forum_") ? "message" : "waiting"}
-          size={16}
-        />
-        <span>
-          <b className="issue-event__who">{actors.name(a.author)}</b> {issueEventText(t, a)}
-          {a.auto && (
-            <Chip icon="repeat" className="issue-event__auto" title={t("issues.autoHint")}>
-              {t("issues.auto")}
-            </Chip>
-          )}{" "}
-          · {whenAt(t, i18n.language, a.createdAt)}
-          {/* Asked an agent to implement it: the work conversation is in the asker's DM (only they open it). */}
-          {a.event === "agent_asked" && a.textParams?.threadId && a.author.id === me.user.id && (
-            <>
-              {" · "}
-              <Link
-                to="/org/$orgId/threads/$threadId"
-                params={{ orgId: org.id, threadId: a.textParams.threadId }}
-                className="ac-link"
-              >
-                {t("issues.openConversation")}
-              </Link>
-            </>
-          )}
-        </span>
-      </div>
+          <div key={a.id} className="issue-event small muted">
+            <Icon
+              name={a.event === "agent_asked" ? "agent" : a.textCode?.startsWith("forum_") ? "message" : "waiting"}
+              size={16}
+            />
+            <span>
+              <b className="issue-event__who">{actors.name(a.author)}</b> {issueEventText(t, a)}
+              {a.auto && (
+                <Chip icon="repeat" className="issue-event__auto" title={t("issues.autoHint")}>
+                  {t("issues.auto")}
+                </Chip>
+              )}{" "}
+              · {whenAt(t, i18n.language, a.createdAt)}
+              {/* Asked an agent to implement it: the work conversation is in the asker's DM (only they open it). */}
+              {a.event === "agent_asked" && a.textParams?.threadId && a.author.id === me.user.id && (
+                <>
+                  {" · "}
+                  <Link
+                    to="/org/$orgId/threads/$threadId"
+                    params={{ orgId: org.id, threadId: a.textParams.threadId }}
+                    className="ac-link"
+                  >
+                    {t("issues.openConversation")}
+                  </Link>
+                </>
+              )}
+            </span>
+          </div>
         ) : (
           <div key={a.id} className="issue-event small muted">
             <Icon name="message" size={16} />
             <span>
               <b className="issue-event__who">{actors.name(a.author)}</b>{" "}
-              {t(a.attachments?.length ? "issues.event.commentedFiles" : "issues.event.commented")} ·{" "}
+              {t(a.attachments?.length ? "issues.history.commentedFiles" : "issues.history.commented")} ·{" "}
               {whenAt(t, i18n.language, a.createdAt)}
             </span>
           </div>
