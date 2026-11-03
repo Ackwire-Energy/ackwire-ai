@@ -4519,6 +4519,9 @@ function ChannelDetails({
       isEmpty={roster.isSuccess && shown.length === 0 && Boolean(needle)}
       emptyText={t("channel.detailsEmpty", { q })}
     >
+      <p className="member-caption">
+        {t(channel.visibility === "public" ? "channelMembers.captionOpen" : "channelMembers.caption")}
+      </p>
       {agents.length > 0 && group(t("channelMembers.agents"), agentCount)}
       {agents.map((r) => (
         <div key={r.key} className="member-row">

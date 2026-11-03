@@ -5377,6 +5377,9 @@
   "channelMembers.caption": {
     "value": "Who can see this channel"
   },
+  "channelMembers.captionOpen": {
+    "value": "Open to the whole workspace"
+  },
   "channelMembers.addRow": {
     "value": "Add people or agents"
   },

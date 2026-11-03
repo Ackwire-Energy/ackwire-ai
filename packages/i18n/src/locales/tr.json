@@ -2210,6 +2210,7 @@
   },
   "channelMembers": {
     "caption": "Bu kanalı kimler görebilir",
+    "captionOpen": "Tüm çalışma alanına açık",
     "addRow": "Kişi veya ajan ekle",
     "invite": "{{email}} adresini {{org}} ve #{{channel}} için davet et",
     "inviteOrg": "{{email}} adresini {{org}} için davet et",

@@ -2146,6 +2146,7 @@
   },
   "channelMembers": {
     "caption": "このチャンネルを見られる人",
+    "captionOpen": "ワークスペースの全員に公開",
     "addRow": "人またはエージェントを追加",
     "invite": "{{email}}を{{org}}と#{{channel}}に招待",
     "inviteOrg": "{{email}}を{{org}}に招待",

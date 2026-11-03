@@ -2224,6 +2224,7 @@
   },
   "channelMembers": {
     "caption": "Wie dit kanaal kan zien",
+    "captionOpen": "Open voor de hele werkruimte",
     "addRow": "Mensen of agents toevoegen",
     "invite": "{{email}} uitnodigen voor {{org}} en #{{channel}}",
     "inviteOrg": "{{email}} uitnodigen voor {{org}}",

@@ -104,4 +104,23 @@ describe("channel permissions (ADR 0134)", () => {
     await go();
     expect(screen().getAllByText("Quem pode ver este canal").length).toBeGreaterThan(0);
   });
+
+  test("Membros says who the list is by access: open to the workspace when public, who can see it otherwise", async () => {
+    await go();
+    let dialog = await openSettings();
+    await click(within(dialog).getByRole("button", { name: "Membros" }));
+    await settle(3);
+    expect(within(dialog).getByText("Aberto para todo o workspace")).toBeTruthy();
+    expect(within(dialog).queryByText("Quem pode ver este canal")).toBeNull();
+    cleanup();
+    await go((state) => {
+      const eng = state.channels.find((c) => c.id === ENG_ID);
+      if (eng) eng.visibility = "private";
+    });
+    dialog = await openSettings();
+    await click(within(dialog).getByRole("button", { name: "Membros" }));
+    await settle(3);
+    expect(within(dialog).getByText("Quem pode ver este canal")).toBeTruthy();
+    expect(within(dialog).queryByText("Aberto para todo o workspace")).toBeNull();
+  });
 });

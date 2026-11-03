@@ -2184,6 +2184,8 @@ export const en = {
   channelMembers: {
     /** A small line on top of the members column and sheet: what the list is. */
     caption: "Who can see this channel",
+    /** The same line in the channel settings' members, for a public channel: no list limits who sees it. */
+    captionOpen: "Open to the whole workspace",
     addRow: "Add people or agents",
     /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Invite {{email}} to {{org}} and #{{channel}}",

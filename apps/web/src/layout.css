@@ -1250,8 +1250,15 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   gap: 8px;
   margin: 12px 0 2px;
 }
-.member-group:first-child {
+.member-group:first-child,
+.member-caption + .member-group {
   margin-top: 0;
+}
+.member-caption {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
 }
 .member-group__count {
   font-size: 12px;

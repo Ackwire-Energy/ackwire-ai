@@ -2157,6 +2157,7 @@
   },
   "channelMembers": {
     "caption": "Siapa yang bisa melihat kanal ini",
+    "captionOpen": "Terbuka untuk seluruh ruang kerja",
     "addRow": "Tambah orang atau agen",
     "invite": "Undang {{email}} ke {{org}} dan #{{channel}}",
     "inviteOrg": "Undang {{email}} ke {{org}}",

@@ -2293,6 +2293,7 @@
   },
   "channelMembers": {
     "caption": "Chi può vedere questo canale",
+    "captionOpen": "Aperto a tutto lo spazio di lavoro",
     "addRow": "Aggiungi persone o agenti",
     "invite": "Invita {{email}} in {{org}} e in #{{channel}}",
     "inviteOrg": "Invita {{email}} in {{org}}",

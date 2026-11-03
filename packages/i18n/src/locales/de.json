@@ -2222,6 +2222,7 @@
   },
   "channelMembers": {
     "caption": "Wer diesen Kanal sehen kann",
+    "captionOpen": "Offen für den ganzen Workspace",
     "addRow": "Person oder Agent hinzufügen",
     "invite": "{{email}} zu {{org}} und #{{channel}} einladen",
     "inviteOrg": "{{email}} zu {{org}} einladen",

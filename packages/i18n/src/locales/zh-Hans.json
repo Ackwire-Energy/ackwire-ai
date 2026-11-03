@@ -2148,6 +2148,7 @@
   },
   "channelMembers": {
     "caption": "谁能看到这个频道",
+    "captionOpen": "对整个工作区开放",
     "addRow": "添加成员或智能体",
     "invite": "邀请 {{email}} 加入 {{org}} 和 #{{channel}}",
     "inviteOrg": "邀请 {{email}} 加入 {{org}}",

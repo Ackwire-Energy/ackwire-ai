@@ -2144,6 +2144,7 @@
   },
   "channelMembers": {
     "caption": "이 채널을 볼 수 있는 사람",
+    "captionOpen": "워크스페이스 전체에 공개",
     "addRow": "사람 또는 에이전트 추가",
     "invite": "{{email}}을(를) {{org}}와 #{{channel}}에 초대",
     "inviteOrg": "{{email}}을(를) {{org}}에 초대",

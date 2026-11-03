@@ -2213,6 +2213,8 @@ export const ptBR = {
   channelMembers: {
     /** A small line on top of the members column and sheet: what the list is. */
     caption: "Quem pode ver este canal",
+    /** The same line in the channel settings' members, for a public channel: no list limits who sees it. */
+    captionOpen: "Aberto para todo o workspace",
     addRow: "Adicionar pessoa ou agente",
     /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Convidar {{email}} para a {{org}} e para #{{channel}}",
