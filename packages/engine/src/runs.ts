@@ -12,6 +12,17 @@ export type RunStatus = AgentRun["status"];
 /** For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. */
 export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null)`;
 
+/**
+ * For a select over `agent_runs`: it ended without answering, so its receipt reads "didn't reply": it passed and posted
+ * nothing anywhere (the `passed` step is `silent`, `endQuietly`), or it was canceled before it started.
+ * `agent_runs.id` is spelled out: a one-table select renders columns unqualified, and a bare "id" in the
+ * subquery would be the step's.
+ */
+export const passedSql = sql<boolean>`((${agentRuns.status} = 'done' and ${agentRuns.replyMessageId} is null
+  and exists (select 1 from ${agentRunSteps} where ${agentRunSteps.runId} = agent_runs.id
+  and ${agentRunSteps.kind} = 'context' and ${agentRunSteps.data}->'passed'->>'silent' = 'true'))
+  or (${agentRuns.status} = 'canceled' and ${agentRuns.startedAt} is null))`;
+
 /** For a select over `agent_runs`: waiting for its computer, in line for room (`queued`) or for it to be back (`away`). */
 export const computerWaitSql = sql<"queued" | "away" | null>`(case when ${agentRuns.status} = 'waiting_input'
   and ${agentRuns.waitingMachineId} is not null then (case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'

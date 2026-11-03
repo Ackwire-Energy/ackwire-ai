@@ -424,6 +424,8 @@ export type ChannelEvent =
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: passed and posted nothing, or canceled before it ran. */
+      passed?: true;
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {

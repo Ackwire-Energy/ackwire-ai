@@ -458,6 +458,9 @@ const MessageBase = z.object({
             description:
               "`waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`).",
           }),
+          passed: z.literal(true).optional().openapi({
+            description: "It ended without answering: passed and posted nothing, or canceled before it started.",
+          }),
         }),
       ),
       blocked: z

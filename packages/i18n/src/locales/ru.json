@@ -1643,6 +1643,10 @@
     "handled_few": "{{names}} ответили",
     "handled_many": "{{names}} ответили",
     "handled_other": "{{names}} ответили",
+    "passed_one": "Никто не ответил",
+    "passed_few": "Никто не ответил",
+    "passed_many": "Никто не ответил",
+    "passed_other": "Никто не ответил",
     "failed_one": "{{names}} не смог ответить",
     "failed_few": "{{names}} не смогли ответить",
     "failed_many": "{{names}} не смогли ответить",
@@ -1677,6 +1681,7 @@
       "handled": "Ответил",
       "failed": "Ошибка",
       "referenced": "Только упомянут",
+      "passed": "Не ответил(а)",
       "reacted": "Отреагировал(а)"
     },
     "failedShort": "Не смог ответить",

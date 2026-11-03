@@ -1587,6 +1587,9 @@
     "handled_one": "{{names}} respondió",
     "handled_many": "{{names}} respondieron",
     "handled_other": "{{names}} respondieron",
+    "passed_one": "Nadie respondió",
+    "passed_many": "Nadie respondió",
+    "passed_other": "Nadie respondió",
     "failed_one": "{{names}} no pudo responder",
     "failed_many": "{{names}} no pudieron responder",
     "failed_other": "{{names}} no pudieron responder",
@@ -1614,6 +1617,7 @@
       "handled": "Respondió",
       "failed": "Falló",
       "referenced": "Solo mencionado",
+      "passed": "No respondió",
       "reacted": "Reaccionó"
     },
     "failedShort": "No pudo responder",

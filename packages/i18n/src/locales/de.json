@@ -1531,6 +1531,8 @@
     "waiting_other": "{{names}} warten auf Freigabe",
     "handled_one": "{{names}} hat geantwortet",
     "handled_other": "{{names}} haben geantwortet",
+    "passed_one": "Niemand hat geantwortet",
+    "passed_other": "Niemand hat geantwortet",
     "failed_one": "{{names}} konnte nicht antworten",
     "failed_other": "{{names}} konnten nicht antworten",
     "asking_one": "{{names}} wartet auf deine Antwort",
@@ -1555,6 +1557,7 @@
       "handled": "Beantwortet",
       "failed": "Fehlgeschlagen",
       "referenced": "Nur erwähnt",
+      "passed": "Nicht geantwortet",
       "reacted": "Hat reagiert"
     },
     "failedShort": "Konnte nicht antworten",

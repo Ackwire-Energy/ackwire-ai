@@ -1534,6 +1534,8 @@
     "waiting_other": "{{names}} wachten op goedkeuring",
     "handled_one": "{{names}} heeft geantwoord",
     "handled_other": "{{names}} hebben geantwoord",
+    "passed_one": "Niemand heeft geantwoord",
+    "passed_other": "Niemand heeft geantwoord",
     "failed_one": "{{names}} kon niet antwoorden",
     "failed_other": "{{names}} konden niet antwoorden",
     "asking_one": "{{names}} wacht op jouw antwoord",
@@ -1558,6 +1560,7 @@
       "handled": "Beantwoord",
       "failed": "Mislukt",
       "referenced": "Alleen genoemd",
+      "passed": "Niet geantwoord",
       "reacted": "Reageerde"
     },
     "failedShort": "Kon niet antwoorden",

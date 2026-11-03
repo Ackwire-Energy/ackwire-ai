@@ -978,6 +978,7 @@ async function executeRunInner(
     error?: string,
     outage?: true,
     computer?: "queued" | "away",
+    passed?: true,
   ) => {
     for (const id of withReceipts.splice(0)) {
       await publishMessageActions({ db, pubsub: deps.pubsub }, run.orgId, id).catch(() => {});
@@ -1025,6 +1026,7 @@ async function executeRunInner(
       ...(error === NO_AI ? { reason: NO_AI } : {}),
       ...(outage ? { outage } : {}),
       ...(computer ? { computer } : {}),
+      ...(passed ? { passed } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
     // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
@@ -2197,13 +2199,17 @@ async function executeRunInner(
     }
     await deferred;
     t.postedUpTo = t.messages.length;
-    await addRunStep(db, run, "context", { passed: { how, ...(reason ? { reason } : {}) } });
+    // `silent`: it said nothing anywhere, so its receipt reads "didn't reply" (`receiptsFor`), not "replied".
+    const silent = t.postedCount === 0;
+    await addRunStep(db, run, "context", {
+      passed: { how, ...(reason ? { reason } : {}), ...(silent ? { silent } : {}) },
+    });
     const done = await transitionRun(db, run.id, "running", "done", { error: null, transcript: storedTranscript(t) });
     if (!done) throw new PermanentJobError("run changed state while executing");
     // Said nothing at all: the apps drop its "thinking" and show nobody is answering.
-    if (t.postedCount === 0) await publishChannelEvent(deps.pubsub, { type: "agent.passed", ...where });
+    if (silent) await publishChannelEvent(deps.pubsub, { type: "agent.passed", ...where });
     await publishChannelEvent(deps.pubsub, event("done"));
-    await finished("done");
+    await finished("done", undefined, undefined, undefined, silent || undefined);
     await redispatchPending("done");
     return true;
   };

@@ -1590,6 +1590,9 @@
     "handled_one": "{{names}} ha risposto",
     "handled_many": "{{names}} hanno risposto",
     "handled_other": "{{names}} hanno risposto",
+    "passed_one": "Nessuno ha risposto",
+    "passed_many": "Nessuno ha risposto",
+    "passed_other": "Nessuno ha risposto",
     "failed_one": "{{names}} non è riuscito a rispondere",
     "failed_many": "{{names}} non sono riusciti a rispondere",
     "failed_other": "{{names}} non sono riusciti a rispondere",
@@ -1617,6 +1620,7 @@
       "handled": "Ha risposto",
       "failed": "Non riuscito",
       "referenced": "Solo menzionato",
+      "passed": "Non ha risposto",
       "reacted": "Ha reagito"
     },
     "failedShort": "Non ha potuto rispondere",

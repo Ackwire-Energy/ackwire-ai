@@ -1505,6 +1505,9 @@ export const ptBR = {
     waiting_other: "{{names}} estão esperando aprovação",
     handled_one: "{{names}} respondeu",
     handled_other: "{{names}} responderam",
+    /** Every agent it was for ended without answering. */
+    passed_one: "Ninguém respondeu",
+    passed_other: "Ninguém respondeu",
     failed_one: "{{names}} não conseguiu responder",
     failed_other: "{{names}} não conseguiram responder",
     asking_one: "{{names}} está esperando sua resposta",
@@ -1530,6 +1533,7 @@ export const ptBR = {
       handled: "Respondeu",
       failed: "Falhou",
       referenced: "Só mencionado",
+      passed: "Não respondeu",
       reacted: "Reagiu",
     },
     failedShort: "Não conseguiu responder",

@@ -917,6 +917,8 @@ export interface MessageReceipts {
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
     computer?: "queued" | "away";
+    /** It ended without answering: passed and posted nothing, or canceled before it started. */
+    passed?: true;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
@@ -1300,13 +1302,15 @@ export type ChannelEvent =
       messageId: string;
       agentId: string;
       runId?: string;
-      status?: "done" | "failed" | "waiting_approval" | "waiting_input";
+      status?: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: passed and posted nothing, or canceled before it started. */
+      passed?: true;
     }
   /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
   | {

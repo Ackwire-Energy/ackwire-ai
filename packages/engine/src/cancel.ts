@@ -365,6 +365,7 @@ export async function stopRun(
       agentId: run.agentId,
       runId: run.id,
       status: "canceled",
+      ...(run.startedAt ? {} : { passed: true as const }),
     });
     // A forum turn that never ran: the topic moves on.
     if (channelKind === "forum") {

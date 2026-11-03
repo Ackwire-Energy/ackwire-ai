@@ -113,6 +113,93 @@ describe("receipts", () => {
     expect(receiptView(s.m1).status?.kind).toBe("handled");
   });
 
+  test("routed to one agent that passed: 'Ninguém respondeu', never 'Respondeu', live and after a reload", () => {
+    const routedTo = (agents: string[]) =>
+      step(seedReceipt({}, person()), {
+        type: "message.routed",
+        messageId: "m1",
+        seenBy: agents,
+        pickedBy: agents,
+        runs: agents.map((agentId, i) => ({ agentId, runId: `r${i}` })),
+      });
+    // The executor's order when it passes (`endQuietly`).
+    let s = routedTo(["ada"]);
+    s = step(s, { type: "agent.run", threadId: "m1", runId: "r0", agentId: "ada", status: "running" });
+    s = step(s, { type: "agent.passed", threadId: "m1", runId: "r0", agentId: "ada" });
+    s = step(s, { type: "agent.run", threadId: "m1", runId: "r0", agentId: "ada", status: "done" });
+    s = step(s, { type: "run.finished", threadId: "m1", runId: "r0", agentId: "ada", status: "done" });
+    s = step(s, {
+      type: "message.handled",
+      messageId: "m1",
+      agentId: "ada",
+      runId: "r0",
+      status: "done",
+      passed: true,
+    });
+    expect(s.m1?.agents).toEqual([["ada", "passed"]]);
+    expect(receiptView(s.m1)).toMatchObject({ status: { kind: "passed", agents: ["ada"] }, done: true });
+    expect(receiptTicks(s.m1)).toBe("checks");
+    // After a reload: the list says it passed.
+    const listed = seedReceipt({}, {
+      ...person(),
+      receipts: {
+        seenBy: ["ada"],
+        pickedBy: ["ada"],
+        handled: [{ agentId: "ada", runId: "r0", status: "done", passed: true }],
+      },
+    } as Message);
+    expect(receiptView(listed.m1).status).toEqual({ kind: "passed", agents: ["ada"] });
+    expect(receiptTicks(listed.m1)).toBe("checks");
+    // One answer is the answer, whoever else passed.
+    let two = routedTo(["ada", "atlas"]);
+    two = step(two, {
+      type: "message.handled",
+      messageId: "m1",
+      agentId: "ada",
+      runId: "r0",
+      status: "done",
+      passed: true,
+    });
+    two = step(two, { type: "message.handled", messageId: "m1", agentId: "atlas", runId: "r1", status: "done" });
+    expect(receiptView(two.m1).status).toEqual({ kind: "handled", agents: ["atlas"] });
+    expect(two.m1?.agents).toEqual([
+      ["ada", "passed"],
+      ["atlas", "handled"],
+    ]);
+  });
+
+  test("a run canceled before it ran didn't reply; one canceled at work did", () => {
+    let s = seedReceipt({}, person(["ada"]));
+    s = step(s, {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: ["ada"],
+      pickedBy: ["ada"],
+      runs: [{ agentId: "ada", runId: "r" }],
+    });
+    // cancel.ts, for a run nobody was executing.
+    s = step(s, {
+      type: "message.handled",
+      messageId: "m1",
+      agentId: "ada",
+      runId: "r",
+      status: "canceled",
+      passed: true,
+    });
+    expect(receiptView(s.m1).status).toEqual({ kind: "passed", agents: ["ada"] });
+    const listed = (passed: boolean) =>
+      seedReceipt({}, {
+        ...person(["ada"]),
+        receipts: {
+          seenBy: ["ada"],
+          pickedBy: ["ada"],
+          handled: [{ agentId: "ada", runId: "r", status: "canceled", ...(passed ? { passed: true } : {}) }],
+        },
+      } as Message);
+    expect(receiptView(listed(true).m1).status?.kind).toBe("passed");
+    expect(receiptView(listed(false).m1).status?.kind).toBe("handled");
+  });
+
   test("an agent's message that mentions agents: whom it handed off to, the one only mentioned, never 'nobody'", () => {
     const byTheo = {
       id: "m1",

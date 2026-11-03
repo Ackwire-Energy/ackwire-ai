@@ -1478,6 +1478,7 @@
     "claimed_other": "{{names}} 正在回答",
     "waiting_other": "{{names}} 正在等待审批",
     "handled_other": "{{names}} 已回答",
+    "passed_other": "没有人回答",
     "failed_other": "{{names}} 无法回答",
     "asking_other": "{{names}} 正在等你回答",
     "outage_other": "{{names}}：AI 服务商出现故障 · 会自动重试",
@@ -1497,6 +1498,7 @@
       "handled": "已回答",
       "failed": "失败",
       "referenced": "仅被提及",
+      "passed": "未回答",
       "reacted": "已回应"
     },
     "failedShort": "无法回答",

@@ -3802,6 +3802,12 @@
       "other": "{{names}} answered"
     }
   },
+  "receipts.passed": {
+    "value": {
+      "one": "No one replied",
+      "other": "No one replied"
+    }
+  },
   "receipts.failed": {
     "value": {
       "one": "{{names}} couldn't answer",
@@ -3870,6 +3876,9 @@
   },
   "receipts.status.referenced": {
     "value": "Only mentioned"
+  },
+  "receipts.status.passed": {
+    "value": "Didn't reply"
   },
   "receipts.status.reacted": {
     "value": "Reacted"
