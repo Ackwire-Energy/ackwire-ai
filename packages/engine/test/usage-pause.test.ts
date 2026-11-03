@@ -1350,6 +1350,14 @@ test("Responder mesmo assim: one run that reads the catch-up and can't pass; who
     mayAnswer: false,
     continuedRunId: runId,
   });
+  // Closed six days before it was overruled: the week still counts from the overrule.
+  const day = 24 * 3600_000;
+  await f.db
+    .update(schema.agentRuns)
+    .set({ finishedAt: new Date(Date.now() - 6 * day) })
+    .where(eq(schema.agentRuns.id, closed?.id ?? ""));
+  expect(await overruledHere(f.db, another, Date.now() + 6 * day)).toBe(true);
+  expect(await overruledHere(f.db, another, Date.now() + 8 * day)).toBe(false);
 });
 
 test("still open: the agent runs, told whose ask the check judged open", async () => {
@@ -1540,6 +1548,29 @@ test("two skips on one line make one owner notice counting both; one in a conver
   const owner = await noticesOf(f, "catch_up_closed");
   expect(owner.map((n) => [n.userId, n.count])).toEqual([[f.owner.id, 2]]);
   expect(await noticesOf(f, "catch_up_closed_asker")).toHaveLength(3);
+});
+
+test("the owner who asked hears it once, as who asked, not again in the owner's count", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }), judge: checks("solved", "nina") });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const nina = await addMember(f.db, f.org.id, "member", "nina");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: nina.id });
+  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev o deploy saiu?" });
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage(deps, nina.id, f.org.id, f.general.id, { body: "Saiu às 14h." });
+  await drainOutbox(f.db, handlers);
+  await pausedLongAgo(f);
+  clearPlanLimits();
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  expect(seen).toHaveLength(1);
+  expect((await noticesOf(f, "catch_up_closed_asker")).map((n) => n.userId)).toEqual([f.owner.id]);
+  expect(await noticesOf(f, "catch_up_closed")).toHaveLength(0);
 });
 
 test("who asked withdrawing it closes it with no notice to them", async () => {

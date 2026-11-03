@@ -1568,6 +1568,7 @@ async function executeRunInner(
               agentId: agent.id,
               agentName: agent.name,
               waitKey: waitedKey,
+              askers: closed.askers,
               ...at,
             }).catch(() => {});
           // Who asked hears it when someone else was credited: a wrong skip reaches who would miss the answer.

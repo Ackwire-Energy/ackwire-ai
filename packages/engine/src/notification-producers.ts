@@ -922,11 +922,13 @@ export async function notifyCatchUpClosed(
     channelId: string;
     threadId: string | null;
     messageId: string;
+    /** Who asked in it: an owner among them hears it as the asker, or withdrew it themselves. */
+    askers?: string[];
   },
 ) {
   const owner = await agentOwner(deps, input.agentId);
-  if (!owner || !(await readableChannelIds(deps.db, input.orgId, owner, [input.channelId])).has(input.channelId))
-    return;
+  if (!owner || input.askers?.includes(owner)) return;
+  if (!(await readableChannelIds(deps.db, input.orgId, owner, [input.channelId])).has(input.channelId)) return;
   await notify(deps, {
     orgId: input.orgId,
     userIds: [owner],

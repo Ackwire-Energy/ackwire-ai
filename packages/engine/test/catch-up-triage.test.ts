@@ -135,10 +135,14 @@ test("a close needs a source code checks", () => {
   expect(triageQuestions(s).who_a1).toMatchObject({ type: "choice" });
   expect(Object.keys((triageQuestions(s).who_a1 as { criteria: object }).criteria)).not.toContain("GitHub");
   expect(catchUpDecision({ status_a1: solved, who_a1: who("m3") }, s, 0.8).outcome).toBe("unsure");
-  // Not needed: only the asker withdraws.
+  // Not needed: only the asker withdraws, by something they did after asking.
   const gone = status({ not_needed: 0.95 });
   expect(catchUpDecision({ status_a1: gone, who_a1: who("p3") }, s, 0.8).outcome).toBe("unsure");
-  expect(catchUpDecision({ status_a1: gone, who_a1: who("p1") }, s, 0.8)).toMatchObject({
+  expect(catchUpDecision({ status_a1: gone, who_a1: who("p1") }, s, 0.8).outcome).toBe("unsure");
+  const deixa = snapshot({
+    posts: [...s.posts, { id: "m4", key: "p1", kind: "person", from: "Ana", text: "deixa", at: at(9500_000) }],
+  });
+  expect(catchUpDecision({ status_a1: gone, who_a1: who("p1") }, deixa, 0.8)).toMatchObject({
     outcome: "closed",
     askers: [{ reason: "withdrawn" }],
   });
@@ -154,8 +158,11 @@ test("a close needs a source code checks", () => {
   // Moved to done by Carla: she is a source for solved.
   const done = snapshot({ task: { title: "Deploy", status: "done", changedAt: at(60_000), changedBy: "p5" } });
   expect(catchUpDecision({ status_a1: solved, who_a1: who("p5") }, done, 0.8).outcome).toBe("closed");
-  // The asker's own ✅ or thanks.
-  expect(catchUpDecision({ status_a1: solved, who_a1: who("p1") }, s, 0.8).outcome).toBe("closed");
+  // The asker's own ✅ or thanks, not their ask alone.
+  expect(catchUpDecision({ status_a1: solved, who_a1: who("p1") }, s, 0.8).outcome).toBe("unsure");
+  const tick = snapshot({ reactions: [{ on: "a1", reaction: "✅", key: "p1", at: at(60_000) }] });
+  expect(catchUpDecision({ status_a1: solved, who_a1: who("p1") }, tick, 0.8).outcome).toBe("closed");
+  expect(catchUpDecision({ status_a1: solved, who_a1: who("p1") }, deixa, 0.8).outcome).toBe("closed");
 });
 
 test("the gates: when no call is made", () => {
@@ -202,6 +209,12 @@ test("the gates: when no call is made", () => {
   });
   expect(gate({ prior: { ...prior, seenThrough: 0, calls: TRIAGE_MAX_CALLS } })).toMatchObject({ reuse: {} });
   expect(gate({ prior: { ...prior, seenThrough: 0 } })).toBeNull();
+  // Failed calls count toward the cap too.
+  const failed = { at: now - 2 * TRIAGE_REFRESH_MS, outcome: "judge_error" as const, calls: 1 };
+  expect(gate({ prior: failed })).toBeNull();
+  expect(gate({ prior: { ...failed, calls: TRIAGE_MAX_CALLS } })).toEqual({
+    reuse: { ...failed, calls: TRIAGE_MAX_CALLS },
+  });
 });
 
 test("the brief lists reactions and the task moved since the pause", () => {

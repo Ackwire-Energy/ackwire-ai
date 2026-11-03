@@ -20,6 +20,7 @@ test("a judge fooled on every must-run case still can't close where code checks 
   });
   expect(held.map((c) => c.id).sort()).toEqual(
     [
+      "app-injection",
       "someone-else-withdraws-en",
       "task-in-review",
       "third-party-not-needed",

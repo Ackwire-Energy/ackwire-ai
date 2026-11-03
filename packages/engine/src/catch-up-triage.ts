@@ -213,13 +213,16 @@ export async function triageSnapshot(
     run.issueId ? taskOf(db, run.orgId, run.issueId) : Promise.resolve(null),
   ]);
   const people = new Map<string, Participant>();
-  const keyOf = (kind: "person" | "agent", id: string, name: string) => {
+  /** When each participant last acted, to offer the most recent ones as `who`. */
+  const lastAt = new Map<string, number>();
+  const keyOf = (kind: "person" | "agent", id: string, name: string, at = 0) => {
     const k = `${kind}:${id}`;
     let p = people.get(k);
     if (!p) {
       p = { key: `p${people.size + 1}`, kind, id, name };
       people.set(k, p);
     }
+    lastAt.set(p.key, Math.max(lastAt.get(p.key) ?? 0, at));
     return p.key;
   };
   asked.sort((a, b) => a.at.getTime() - b.at.getTime());
@@ -243,20 +246,20 @@ export async function triageSnapshot(
   const posts = posted.map((m): TriageSnapshot["posts"][number] => {
     const kind = m.via || (!m.userId && !m.agentId) ? ("app" as const) : m.userId ? ("person" as const) : "agent";
     const from = m.person ?? m.agent ?? "App";
-    const key = kind === "app" ? null : keyOf(kind, (m.userId ?? m.agentId) as string, from);
+    const key = kind === "app" ? null : keyOf(kind, (m.userId ?? m.agentId) as string, from, m.at.getTime());
     return { id: m.id, key, kind, from, text: m.body, at: m.at };
   });
   const reactions = reacted.flatMap((r) => {
     const on = askers.find((a) => asked.some((m) => m.id === r.messageId && m.userId === a.userId));
     if (!on) return [];
     const key = r.userId
-      ? keyOf("person", r.userId, r.person ?? "Someone")
-      : keyOf("agent", r.agentId as string, r.agent ?? "Agent");
+      ? keyOf("person", r.userId, r.person ?? "Someone", r.at.getTime())
+      : keyOf("agent", r.agentId as string, r.agent ?? "Agent", r.at.getTime());
     return [{ on: on.key, reaction: r.reaction, key, at: r.at }];
   });
   const taskBy =
     task?.changedBy && (task.changedBy.type === "person" || task.changedBy.type === "agent")
-      ? keyOf(task.changedBy.type, task.changedBy.id, task.changedBy.name)
+      ? keyOf(task.changedBy.type, task.changedBy.id, task.changedBy.name, task.changedAt?.getTime() ?? 0)
       : null;
   const latest = Math.max(
     0,
@@ -273,8 +276,14 @@ export async function triageSnapshot(
     posts,
     reactions,
     task: task ? { title: task.title, status: task.status, changedAt: task.changedAt, changedBy: taskBy } : null,
-    // Askers first (they may close their own ask), then the most recent others.
-    participants: [...people.values()].slice(0, askers.length + MAX_PARTICIPANTS),
+    // Askers first (they may close their own ask), then the most recent others: who answered last is likeliest the one.
+    participants: [
+      ...[...people.values()].filter((p) => p.kind === "person" && askers.some((a) => a.userId === p.id)),
+      ...[...people.values()]
+        .filter((p) => !(p.kind === "person" && askers.some((a) => a.userId === p.id)))
+        .sort((a, b) => (lastAt.get(b.key) ?? 0) - (lastAt.get(a.key) ?? 0))
+        .slice(0, MAX_PARTICIPANTS),
+    ],
     latest,
   };
 }
@@ -332,9 +341,11 @@ export function triageGate(input: {
   if (input.owed || input.mission || input.overruled || input.noJev) return { skip: "skipped_rule" };
   if (s.notPeople || s.askers.length === 0 || s.askers.length > TRIAGE_MAX_ASKERS) return { skip: "skipped_rule" };
   if (!triageHasNews(s)) return { skip: "skipped_quiet" };
+  // The cap counts every call, failed ones too: a Jev outage across hourly probes doesn't call on and on.
+  if (prior && prior.calls >= TRIAGE_MAX_CALLS) return { reuse: prior };
   if (prior && (prior.outcome === "run" || prior.outcome === "unsure")) {
     const fresh = s.latest <= (prior.seenThrough ?? 0) || now - prior.at < TRIAGE_REFRESH_MS;
-    if (fresh || prior.calls >= TRIAGE_MAX_CALLS) return { reuse: prior };
+    if (fresh) return { reuse: prior };
   }
   return null;
 }
@@ -475,7 +486,14 @@ export function catchUpDecision(answers: Record<string, JudgeAnswer>, s: TriageS
     const [who, sure] = top(answers[`who_${a.key}`]);
     const out: TriageAskerVerdict = { key: a.key, userId: a.userId, name: a.name, p };
     if (!who || who === "nobody" || sure < WHO_AT) return out;
-    const self = s.participants.find((x) => x.key === who && x.kind === "person" && x.id === a.userId);
+    // The asker closes their own ask only by something they did after asking it (a post, a reaction, an edit, a later
+    // ask): their one ask alone never reads as "done".
+    const self =
+      s.participants.find((x) => x.key === who && x.kind === "person" && x.id === a.userId) &&
+      (posters.has(who) ||
+        a.asks.length > 1 ||
+        a.asks.some((x) => x.editedSincePause) ||
+        s.reactions.some((r) => r.key === who && r.at.getTime() > s.since));
     // Each reason on its own: a split between solved and withdrawn is doubt, never added up.
     if (p.solved >= bar && (self || posters.has(who) || (changed?.status === "done" && changed.changedBy === who)))
       return { ...out, reason: "solved", who };
@@ -597,7 +615,8 @@ export async function overruledHere(
         eq(agentRuns.agentId, run.agentId),
         eq(agentRuns.channelId, run.channelId),
         ne(agentRuns.id, run.id),
-        gt(agentRuns.finishedAt, new Date(now - OVERRULE_HOLD_MS)),
+        // Overruled up to `ANSWER_ANYWAY_MS` after its close, and held `OVERRULE_HOLD_MS` from then.
+        gt(agentRuns.finishedAt, new Date(now - OVERRULE_HOLD_MS - ANSWER_ANYWAY_MS)),
         // The same conversation: its thread, or the main timeline.
         threadId
           ? eq(agentRuns.threadRootId, threadId)
