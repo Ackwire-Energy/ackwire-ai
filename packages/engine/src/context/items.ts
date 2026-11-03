@@ -142,6 +142,17 @@ export const learnedQuietly = (i: Pick<ContextItem, "kind" | "agentId" | "scopeT
 export const receiptLine = (
   i: Pick<ContextItem, "title" | "content" | "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">,
 ) => (learnedQuietly(i) ? "" : i.title.trim() || (i.createdByKind === "person" ? i.content : ""));
+/**
+ * The receipt line for a write, "" for none. A quiet write that replaces or disputes what a person said, or what a
+ * person wrote (an app's import has no human evidence), still gets one: a person's memory never changes unseen.
+ */
+export function savedReceiptLine(res: Pick<ConsolidateResult, "action" | "item" | "previous">) {
+  if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return "";
+  const p = res.previous;
+  if (!learnedQuietly(res.item) || !p || (p.createdByKind !== "person" && learnedQuietly(p)))
+    return receiptLine(res.item);
+  return res.item.title.trim() || p.title.trim() || p.content;
+}
 export const howToSql = () =>
   sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
 

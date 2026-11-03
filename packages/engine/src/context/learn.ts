@@ -17,7 +17,7 @@ import {
   howToSubject,
   looksLikeSecret,
   type NewContextItem,
-  receiptLine,
+  savedReceiptLine,
 } from "./items";
 import { changeSkillAsAgent } from "./learned-skills";
 import { type ContextDeps, isTrustedMessage, judgeOf, memoryJudging, resolveSummaryModel } from "./summaries";
@@ -525,17 +525,15 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
     try {
       const res = await consolidateItem(db, base, judging);
       out.saved.push({ id: res.item.id, action: res.action, trust: res.item.trust, scopeType: res.item.scopeType });
-      // Only what a person told it gets one plain line in the chat (`learnedQuietly`).
-      if (
-        (res.action === "created" || res.action === "superseded" || res.action === "disputed") &&
-        receiptLine(res.item)
-      )
+      // Only what a person told it, or what changes a person's memory, gets one plain line in the chat.
+      const line = savedReceiptLine(res);
+      if (line)
         await recordAgentActions(db, ctx, [
           {
             kind: "memory.saved",
             target: { type: "memory", id: res.item.id },
             params: {
-              text: cutText(receiptLine(res.item), 500),
+              text: cutText(line, 500),
               ...(res.previous && res.action === "superseded"
                 ? { previousText: cutText(res.previous.title || res.previous.content, 500) }
                 : {}),

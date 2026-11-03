@@ -39,7 +39,7 @@ import {
   howToSubject,
   isHowTo,
   learnedQuietly,
-  receiptLine,
+  savedReceiptLine,
   supersede,
 } from "./items";
 import { kindFamily, overlap } from "./judgments";
@@ -676,11 +676,10 @@ const KEY_DESCRIPTION =
 
 /**
  * A new memory, or a new version of one: a receipt with Undo, its line the plain summary (the title). The same thing
- * again (merged) has nothing to undo; what the agent learned quietly has none (`learnedQuietly`), it lives in the Memory tab.
+ * again (merged) has nothing to undo; what the agent learned quietly has none (`savedReceiptLine`), it lives in the Memory tab.
  */
 async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
-  if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return;
-  const line = receiptLine(res.item);
+  const line = savedReceiptLine(res);
   if (!line) return;
   const replaced = res.action === "superseded" ? res.previous : undefined;
   await recordAgentActions(ctx.db, ctx, [

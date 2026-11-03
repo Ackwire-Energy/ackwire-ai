@@ -1074,6 +1074,48 @@ describe("quiet learning (ADR 0120 addendum)", () => {
     expect((await receipts()).length).toBe(1);
   });
 
+  test("a finding that disputes or replaces a person's memory still leaves a receipt", async () => {
+    f = await setup();
+    const { run } = await personRun();
+    const person = (title: string, content: string, extra: Partial<typeof schema.contextItems.$inferInsert>) =>
+      f.db
+        .insert(schema.contextItems)
+        .values({
+          orgId: f.org.id,
+          kind: "fact",
+          scopeType: "agent",
+          scopeId: f.agent.id,
+          agentId: f.agent.id,
+          subjectKey: title.split(" ").sort().join(" "),
+          title,
+          content,
+          channelIds: [f.general.id],
+          ...extra,
+        })
+        .returning();
+    // Written by a person through a connected app: no human evidence, still a person's.
+    const [wrote] = await person("deploy day", "We deploy on Tuesdays.", {
+      createdByKind: "person",
+      evidence: [{ type: "app", ref: "app:1", at: new Date().toISOString() }],
+    });
+    // The learning job's item from a person's words.
+    const [told] = await person("office hours", "Office hours end at 18:00.", {
+      createdByKind: "agent",
+      createdById: f.agent.id,
+      evidence: [{ type: "human", ref: "m1", at: new Date().toISOString() }],
+    });
+    const found = (key: string, title: string, content: string) =>
+      invoke(run, "remember", { kind: "fact", key, title, content, basis: "found" });
+    await found("deploy day", "Publicamos às sextas", "Deploys happen on Fridays.");
+    await found("office hours", "O escritório fecha às 19h", "The office closes at 7pm on weekdays.");
+    const rows = (await receipts()).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    expect(rows.map((r) => [r.kind, r.params.text, r.before])).toEqual([
+      ["memory.saved", "Publicamos às sextas", null],
+      ["memory.saved", "O escritório fecha às 19h", { itemId: told?.id }],
+    ]);
+    expect((await items()).find((i) => i.id === wrote?.id)?.disputed).toBe(true);
+  });
+
   test("a how-to's identity is its key, not its plain title: same title for two things keeps both, two languages one", async () => {
     f = await setup();
     const { run } = await personRun();
