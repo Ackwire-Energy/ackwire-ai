@@ -352,6 +352,10 @@ export const Channel = z
     mentionCount: z.number().int().optional().openapi({
       description: "Channel list only: of `unreadCount`, the messages that mention you (counted even while muted).",
     }),
+    can: z.object({ post: z.boolean(), callAgents: z.boolean(), manage: z.boolean() }).optional().openapi({
+      description:
+        "Channel list only: what you may do here with its exceptions (ADR 0134): send messages, wake its agents, manage it.",
+    }),
     muted: z.boolean().optional().openapi({
       description: "Channel list only: you muted it, so it never looks unread (`PUT`/`DELETE …/mute`).",
     }),

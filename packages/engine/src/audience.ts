@@ -7,7 +7,7 @@ import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
-import { maySql } from "./permissions";
+import { channelMaySql, maySql } from "./permissions";
 import { dropForeignMailGrants } from "./tools/scopes";
 
 const { agents, users, organizationMembers, orgRoles } = schema;
@@ -231,15 +231,19 @@ export async function agentIdsSeen(db: Database, userId: string, orgId: string) 
 /**
  * The same rule in SQL, for an `agents` row aliased `alias` and a person id expression. An agent with no owner
  * compares to null: `coalesce` makes that a no, so `not allowed` holds for it too (the blocked person's notice).
+ * In a channel (`channelId`), `talk_to_agents` is the person's in that channel, with its exceptions (ADR 0134).
  */
-export function audienceSql(alias: string, userId: SQL): SQL {
+export function audienceSql(alias: string, userId: SQL, options: { channelId?: SQL } = {}): SQL {
   const a = sql.raw(alias);
+  const talks = options.channelId
+    ? channelMaySql(sql`${a}.org_id`, options.channelId, userId, "talk_to_agents")
+    : maySql(sql`${a}.org_id`, userId, "talk_to_agents");
   return sql`coalesce((${userId} is not null and ${a}.owner_user_id = ${userId})
     or ((${a}.audience_mode = 'everyone'
         or (${userId} is not null and ${a}.audience_mode = 'people' and (${userId} = any(${a}.audience_user_ids)
           or exists (select 1 from organization_member_roles amr where amr.org_id = ${a}.org_id
             and amr.user_id = ${userId} and amr.role_id = any(${a}.audience_role_ids)))))
-      and (${userId} is null or ${maySql(sql`${a}.org_id`, userId, "talk_to_agents")})), false)`;
+      and (${userId} is null or ${talks})), false)`;
 }
 
 /** Whom it answers by name: its roles first, then its owner and the people of its audience (only what still exists). */
@@ -301,13 +305,26 @@ export async function notifyBlocked(
   deps: { db: Database; pubsub: PubSub },
   orgId: string,
   userId: string,
-  input: { agentIds: string[]; channelId: string; threadId: string | null; messageId: string },
+  input: {
+    agentIds: string[];
+    channelId: string;
+    threadId: string | null;
+    messageId: string;
+    /** The channel's exceptions took `talk_to_agents` from them (ADR 0134), not the agents' audience. */
+    deniedHere?: boolean;
+  },
 ) {
   const out: { agentId: string; text: string; code: string; params: Record<string, unknown> }[] = [];
   for (const agentId of input.agentIds) {
     const agent = await getAgent(deps.db, orgId, agentId);
     if (!agent) continue;
-    const detail = await audienceDetail(deps.db, agent);
+    const detail = input.deniedHere
+      ? {
+          code: "channel.agents_denied",
+          params: { agentId, agentName: agent.name },
+          english: "You don't call agents in this channel.",
+        }
+      : await audienceDetail(deps.db, agent);
     const text = detail.english;
     out.push({ agentId, text, code: detail.code, params: detail.params });
     await publishUserEvent(deps.pubsub, orgId, userId, {

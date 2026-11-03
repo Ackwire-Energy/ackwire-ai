@@ -510,7 +510,7 @@ export async function eligibleChannelAgents(
         options.autoReplyOnly ? eq(channelMembers.autoReply, true) : undefined,
         // Who can talk to the agent, for the person behind the message.
         options.requesterUserId !== undefined
-          ? audienceSql("agents", sql`${options.requesterUserId}::text`)
+          ? audienceSql("agents", sql`${options.requesterUserId}::text`, { channelId: sql`${channelId}::uuid` })
           : undefined,
       ),
     );
