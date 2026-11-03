@@ -373,6 +373,7 @@ test("a narrow header fits: the waiting count alone beside the computer, the nam
   expect(value(narrow, ".channel__header", "flex-wrap")).toBe("nowrap");
   expect(value(narrow, ".channel__header>.ac-btn", "flex")).toBe("none");
   expect(value(narrow, ".channel__header>.ac-acts", "flex")).toBe("none");
+  expect(value(narrow, ".channel__header>.channel__acts", "column-gap")).toBe("8px");
   expect(value(narrow, ".channel__title", "text-overflow")).toBe("ellipsis");
   expect(value(narrow, ".channel__title", "min-width")).toBe("0");
   expect(value(narrow, ".channel__topic", "text-overflow")).toBe("ellipsis");
