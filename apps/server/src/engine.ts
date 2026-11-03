@@ -96,6 +96,7 @@ import {
   resolveSummaryModel,
   type SandboxDeps,
   type ScheduleReader,
+  type SkillDeps,
   type StorageDeps,
   setWorkOrgCap,
   smallModelFor,
@@ -300,6 +301,15 @@ export function buildEngine(o: EngineOptions) {
     upstream: o.github,
     app: githubApp,
   };
+  // Skills read from their links (installing, updating): private repositories through the workspace's GitHub.
+  const skillDeps: SkillDeps = {
+    db,
+    blobs: artifacts.blobs,
+    fetch: o.http,
+    resolveHost: o.resolveHost,
+    github: { connectors: connectorDeps, app: githubApp },
+    pubsub: adapters.pubsub,
+  };
   // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
   // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
   const browserTools = createBrowserToolSource({
@@ -357,9 +367,7 @@ export function buildEngine(o: EngineOptions) {
       }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({
-        db,
-        blobs: artifacts.blobs,
-        pubsub: adapters.pubsub,
+        ...skillDeps,
         judge: context.judge,
         computer: sandbox,
       }),
@@ -591,6 +599,7 @@ export function buildEngine(o: EngineOptions) {
     storage,
     artifacts,
     sandbox,
+    skills: skillDeps,
     // A workspace's deletion revokes its grants at GitHub and Composio, and leaves a line in the log.
     connectors: connectorDeps,
     mail: adapters.mail,

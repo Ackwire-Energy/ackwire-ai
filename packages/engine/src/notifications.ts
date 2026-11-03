@@ -143,6 +143,13 @@ export const NOTIFICATION_KINDS = [
    * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.
    */
   "app_created",
+  /**
+   * An update of a skill from its link (`skill-updates.ts`), `source.skillId` and its name in `source.label`;
+   * `latest.statusTo`: `updated` (who turned "Atualizar sozinha" on), `waiting` (it changes what runs: who manages
+   * skills, waiting, the files in `latest.title`, resolved once applied or refused) or `failed` (once per reason, its
+   * code in `latest.reason`). Inbox only.
+   */
+  "skill_update",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -177,6 +184,8 @@ export interface NotificationSource {
   userId?: string;
   /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
   agentId?: string;
+  /** A skill of the library (`skill_update`). */
+  skillId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
   label?: string;
 }

@@ -194,6 +194,11 @@ export function describeCapabilities(
     if (names.has("update_skill")) {
       lines.push("- If a skill you loaded was wrong or missing a step, fix it with `update_skill` before you answer.");
     }
+    if (names.has("offer_install_skill")) {
+      lines.push(
+        "- A skill someone asks you to install goes in the workspace's Skills with `offer_install_skill` (a card a person confirms), never in your CLI's own skills folder on your computer (~/.claude/skills, ~/.codex/skills…), where only you would have it. To bring installed skills up to date from their links, `update_skill_from_source`.",
+      );
+    }
     if (loaded.has("share_artifact")) {
       lines.push(
         "- A request for a file you already made (here, in a DM or in another channel): find it with `list_artifacts` and bring it with `share_artifact` instead of creating it again.",

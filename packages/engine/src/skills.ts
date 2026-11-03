@@ -1,4 +1,4 @@
-import type { BlobStoreResolver } from "@agenteschat/adapters";
+import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
@@ -227,6 +227,8 @@ export interface SkillDeps {
   resolveHost?: ResolveHost;
   /** The workspace's GitHub (its connection, the GitHub App), for private repositories. None: public ones only. */
   github?: { connectors: ConnectorDeps; app?: GitHubAppConfig | null };
+  /** Notifications of updates from a skill's link (`skill-updates.ts`). */
+  pubsub?: PubSub;
 }
 
 /** Which of the workspace's GitHub connections read a private repository: the GitHub App, or the GitHub connector. */
@@ -248,6 +250,16 @@ export interface SkillView {
   locked: boolean;
   useCount: number;
   lastUsedAt: string | null;
+  /** "Atualizar sozinha": read from its link every day. */
+  autoUpdate: boolean;
+  /** When its link was last read to update it. */
+  checkedAt: string | null;
+  /** An update from its link that changes what runs, waiting for a person who manages skills (`dismissed`: refused). */
+  pendingUpdate: { scripts: string[]; at: string; dismissed: boolean } | null;
+  /** Why its last update from its link failed (a code the app translates), until one works. */
+  updateError: string | null;
+  /** Its last update from its link, while it can be undone (the skill is still at the version it made). */
+  lastUpdate: { fromVersion: number; at: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -272,6 +284,16 @@ const view = (s: SkillRow): SkillView => ({
   locked: s.locked,
   useCount: s.useCount,
   lastUsedAt: s.lastUsedAt?.toISOString() ?? null,
+  autoUpdate: s.autoUpdate,
+  checkedAt: s.checkedAt?.toISOString() ?? null,
+  pendingUpdate: s.pendingUpdate
+    ? { scripts: s.pendingUpdate.scripts, at: s.pendingUpdate.at, dismissed: s.pendingUpdate.dismissed === true }
+    : null,
+  updateError: s.updateError,
+  lastUpdate:
+    s.lastUpdate && s.lastUpdate.version === s.version
+      ? { fromVersion: s.lastUpdate.from.version, at: s.lastUpdate.at }
+      : null,
   createdAt: s.createdAt.toISOString(),
   updatedAt: s.updatedAt.toISOString(),
 });
@@ -286,7 +308,13 @@ export async function skillFilesOf(db: Database, s: SkillRow) {
   return rows.map((f) => ({ path: f.path, size: f.size, mime: f.mime, status: f.status as SkillFileStatus }));
 }
 
-async function loadSkill(db: Database, orgId: string, id: string) {
+export const skillDetail = async (db: Database, s: SkillRow): Promise<SkillDetail> => ({
+  ...view(s),
+  body: s.body,
+  files: await skillFilesOf(db, s),
+});
+
+export async function loadSkill(db: Database, orgId: string, id: string) {
   const [s] = await db
     .select()
     .from(skills)
@@ -385,6 +413,8 @@ export async function saveSkill(
     source: "upload" | "url" | "manual";
     sourceUrl?: string | null;
     sourceVia?: SkillVia | null;
+    /** What its link held (`skillSourceHash`), read from it. */
+    sourceHash?: string;
     files?: SkillFileInput[];
     defaultForNewAgents?: boolean;
   },
@@ -409,6 +439,7 @@ export async function saveSkill(
         sourceUrl: input.sourceUrl ?? existing.sourceUrl,
         // A link read again says how it was read; an edit or an upload keeps what updating reads through.
         sourceVia: input.source === "url" ? (input.sourceVia ?? null) : existing.sourceVia,
+        ...(input.sourceHash ? { sourceHash: input.sourceHash } : {}),
         // Incremented in SQL (not from the value read above) so two concurrent saves take distinct versions.
         version: sql`${skills.version} + 1`,
         ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
@@ -432,6 +463,7 @@ export async function saveSkill(
         source: input.source,
         sourceUrl: input.sourceUrl ?? null,
         sourceVia: input.sourceVia ?? null,
+        sourceHash: input.sourceHash ?? null,
         defaultForNewAgents: input.defaultForNewAgents ?? false,
         createdByUserId: actorId,
       })
@@ -453,7 +485,7 @@ export async function saveSkill(
       ...(row.sourceVia ? { sourceVia: row.sourceVia } : {}),
     },
   });
-  return { ...view(row), body: row.body, files: await skillFilesOf(deps.db, row) };
+  return skillDetail(deps.db, row);
 }
 
 /** Import from a zip of the skill folder (`SKILL.md` + files). */
@@ -883,13 +915,19 @@ async function readGithubLink(deps: SkillDeps, orgId: string, url: string, throu
   const about = (dir: string) =>
     parseSkillMarkdown(new TextDecoder().decode(inflateZipEntry(repository.zip, skillIn(dir).skillMd)));
   /** The skill at `dir`, ready to save: from the link itself when it points at the skill, else from its folder. */
-  const skillAt = (dir: string) => ({
-    ...repositorySkill(repository.zip, dir, skillIn(dir).files),
-    source: "url" as const,
-    sourceUrl:
-      dir === folder ? url : `https://github.com/${encodePath(repo)}/tree/${encodePath(target.ref)}/${encodePath(dir)}`,
-    sourceVia: repository.via,
-  });
+  const skillAt = (dir: string) => {
+    const skill = repositorySkill(repository.zip, dir, skillIn(dir).files);
+    return {
+      ...skill,
+      sourceHash: skillSourceHash(skill),
+      source: "url" as const,
+      sourceUrl:
+        dir === folder
+          ? url
+          : `https://github.com/${encodePath(repo)}/tree/${encodePath(target.ref)}/${encodePath(dir)}`,
+      sourceVia: repository.via,
+    };
+  };
   return { found, about, skillAt, via: repository.via };
 }
 
@@ -968,6 +1006,49 @@ export async function importPickedSkills(
   const installed: SkillDetail[] = [];
   for (const skill of skills) installed.push(await saveSkill(deps, actorId, orgId, skill));
   return installed;
+}
+
+/**
+ * What a skill's link held, as `sourceHash` keeps it: the same text, metadata and files read again hash the same.
+ */
+export function skillSourceHash(s: ParsedSkill & { files: SkillFileInput[] }) {
+  const hash = new Bun.CryptoHasher("sha256");
+  hash.update(JSON.stringify([s.name, s.description, s.body, s.metadata]));
+  for (const f of [...s.files].sort((a, b) => (a.path < b.path ? -1 : 1))) {
+    hash.update(`\0${f.path}\0${f.data.byteLength}\0${f.skippedSize ?? ""}\0`);
+    hash.update(f.data);
+  }
+  return hash.digest("hex");
+}
+
+/**
+ * A file that runs, or that something could run: a script (`run_skill_script`), or a binary that isn't an image or a
+ * PDF (an executable, an archive, a `.ts` Bun reads as video). An update adding or changing one waits for a person.
+ */
+export function runsCode(path: string) {
+  const { mime, kind } = classifyFile(path);
+  return kind === "script" || (kind === "binary" && !mime.startsWith("image/") && mime !== "application/pdf");
+}
+
+/**
+ * The skill its link holds now, ready to save, read as updating reads it (through the GitHub connection that read it
+ * first). Refused when the link holds several skills now, or another one.
+ */
+export async function readSkillSource(deps: SkillDeps, s: SkillRow) {
+  if (!s.sourceUrl) throw new ValidationError("This skill wasn't imported from a link", "skill.no_link");
+  const link = await readGithubLink(deps, s.orgId, s.sourceUrl, s.sourceVia as SkillVia | null);
+  const [only, ...more] = link.found.keys();
+  if (only === undefined || more.length > 0) {
+    throw new ValidationError(
+      "Its link holds several skills now. Install this one again from its own folder.",
+      "skill.link_holds_several",
+    );
+  }
+  const skill = link.skillAt(only);
+  if (skill.name !== s.name) {
+    throw new ValidationError(`Its link holds the skill ${skill.name} now`, "skill.link_renamed", { name: skill.name });
+  }
+  return skill;
 }
 
 /**
@@ -1056,16 +1137,27 @@ export async function deleteSkill(db: Database, actorId: string, orgId: string, 
  * A skill's body as a new version, its files carried over to it (they are stored per version). For changes that
  * come from use, not from a person's editor: an agent's own skill (`update_skill`), an accepted proposal, an undo.
  */
-export async function writeSkillBody(db: Database, s: SkillRow, body: string): Promise<SkillRow> {
+export const writeSkillBody = (db: Database, s: SkillRow, body: string) => writeSkillVersion(db, s, { body });
+
+/**
+ * A new version with this text and the files of version `filesOf` (default: the current one), stored per version:
+ * an undo of an update from its link brings back the version before with its files.
+ */
+export async function writeSkillVersion(
+  db: Database,
+  s: SkillRow,
+  text: { body: string; description?: string; metadata?: Record<string, unknown> },
+  filesOf = s.version,
+): Promise<SkillRow> {
   const [row] = await db
     .update(skills)
-    .set({ body, version: sql`${skills.version} + 1`, updatedAt: new Date() })
+    .set({ ...text, version: sql`${skills.version} + 1`, updatedAt: new Date() })
     .where(eq(skills.id, s.id))
     .returning();
   if (!row) throw new NotFoundError("Skill not found");
   await db.execute(sql`insert into skill_files (org_id, skill_id, version, path, size, mime, status, storage_config_id, blob_key)
     select org_id, skill_id, ${row.version}, path, size, mime, status, storage_config_id, blob_key
-    from skill_files where skill_id = ${s.id}::uuid and version = ${row.version - 1}`);
+    from skill_files where skill_id = ${s.id}::uuid and version = ${filesOf}`);
   return row;
 }
 
@@ -1330,11 +1422,17 @@ export async function getSkillFile(
  * Every kept file of the skill's version (text, binaries and scripts), with bytes: what `run_skill_script` copies
  * onto the computer.
  */
-export async function skillFolderFiles(deps: SkillDeps, s: SkillRow) {
+export async function skillFolderFiles(deps: SkillDeps, s: SkillRow, paths?: string[]) {
   const rows = await deps.db
     .select()
     .from(skillFiles)
-    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version)));
+    .where(
+      and(
+        eq(skillFiles.skillId, s.id),
+        eq(skillFiles.version, s.version),
+        paths ? inArray(skillFiles.path, paths) : undefined,
+      ),
+    );
   const out: { path: string; status: SkillFileStatus; data: Uint8Array }[] = [];
   for (const f of rows) {
     if (f.status === "ignored" || !f.blobKey) continue;

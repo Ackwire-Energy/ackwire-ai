@@ -11,6 +11,7 @@ import {
   enqueueAutonomyReport,
   enqueueIdleReflections,
   enqueueOverdueDeletions,
+  enqueueSkillUpdates,
   enqueueWaitlistContacts,
   expireApprovals,
   expireBrowserHandoffs,
@@ -128,6 +129,8 @@ export const WORKER_INTERVALS_MS = {
   apps: 3600_000,
   /** Alerts the autonomy brakes held as noise, posted as one digest per agent and conversation (ADR 0131 §5). */
   autonomyDigest: 10 * 60_000,
+  /** Skills that update by themselves: each workspace queued once a day (the date in the job's dedupe key). */
+  skillUpdates: 3600_000,
 };
 
 /**
@@ -184,6 +187,9 @@ export function startWorkers(deps: WorkerDeps) {
   });
 
   every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));
+  every("skillUpdates", WORKER_INTERVALS_MS.skillUpdates, async () => {
+    if ((await enqueueSkillUpdates(db)) > 0) void ticks.get("outbox")?.();
+  });
   every("partitions", WORKER_INTERVALS_MS.partitions, async () => {
     const created = await ensureMessagePartitions(db);
     if (created > 0) log.info("created message partitions", { created });
