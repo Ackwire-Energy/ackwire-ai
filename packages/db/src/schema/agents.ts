@@ -196,8 +196,13 @@ export const agents = pgTable(
     /** Order inside its group. */
     groupPosition: integer().notNull().default(0),
     /**
-     * It coordinates the team (ADR 0093): a person's message that needs an agent and that no other agent took goes
-     * to it. One per workspace among its active agents (the index below).
+     * A built-in agent the product ships (ADR 0134): `right_hand` is the team's right hand, one per workspace (the
+     * index below), never archived, deleted, exported or imported. Null = an agent people made.
+     */
+    builtin: text().$type<"right_hand">(),
+    /**
+     * Retired with ADR 0093 (superseded by ADR 0134): nothing reads or writes it. Kept, with its index, while a
+     * running version still selects it (`check:migrations`); dropped by a migration in a later release.
      */
     coordinator: boolean().notNull().default(false),
     /**
@@ -231,6 +236,7 @@ export const agents = pgTable(
     unique().on(t.orgId, t.handle),
     unique().on(t.orgId, t.id),
     uniqueIndex("agents_one_coordinator").on(t.orgId).where(sql`${t.coordinator} and ${t.archivedAt} is null`),
+    uniqueIndex("agents_one_right_hand").on(t.orgId).where(sql`${t.builtin} = 'right_hand'`),
     // Machines are only soft-deleted (and `deleteMachine` clears this column first).
     foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }),
     // No action (a composite SET NULL would null `org_id` too): code clears it before an account row goes.
