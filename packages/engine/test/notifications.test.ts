@@ -311,7 +311,7 @@ test("Concluídas lists what the person marked done for 30 days, the latest firs
   expect((await inbox(bia.id)).items.map((n) => n.latest.text)).toEqual(["b"]);
 });
 
-test("the backfill puts in Concluídas the mentions, reactions and thread replies closed before done_by_user", async () => {
+test("the backfill puts in Concluídas the kinds only a person closes, done before done_by_user", async () => {
   f = await setup();
   const { bia } = await people();
   const ago = (days: number) => new Date(Date.now() - days * 24 * 3600_000);
@@ -319,6 +319,7 @@ test("the backfill puts in Concluídas the mentions, reactions and thread replie
     ["mention", "mention", ago(2)],
     ["reaction", "reaction", ago(3)],
     ["thread_reply", "thread", ago(1)],
+    ["dm", "dm", ago(4)],
     ["mention", "old", ago(31)],
     ["mention", "open", null],
     // Auto-resolved kinds stay out: the person never marked them done.
@@ -343,7 +344,7 @@ test("the backfill puts in Concluídas the mentions, reactions and thread replie
   await f.db.execute(sql.raw(file));
 
   const done = await listNotifications(deps(), bia.id, f.org.id, { filter: "done" });
-  expect(done.items.map((n) => n.latest.text)).toEqual(["thread", "mention", "reaction"]);
+  expect(done.items.map((n) => n.latest.text)).toEqual(["thread", "mention", "reaction", "dm"]);
   expect((await inbox(bia.id)).items.map((n) => n.latest.text)).toEqual(["open"]);
 });
 
