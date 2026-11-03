@@ -180,6 +180,21 @@ const CASES: Case[] = [
     body: "Walter, PR #12 is open now. I'll ask @ada to review it before it goes to you.",
   },
   {
+    id: "couldnt-report",
+    wakes: false,
+    from: "theo",
+    to: ada,
+    body: "Marina, a @ada não conseguiu abrir o arquivo do relatório, então não vou pedir para ela de novo. Sigo com a planilha.",
+  },
+  {
+    id: "checked-handback",
+    wakes: true,
+    from: "theo",
+    to: ada,
+    body: "@ada revisei os números que você pediu, tudo certo.",
+    answering: { from: "ada", text: "@theo confere os números do resumo antes de eu mandar?" },
+  },
+  {
     id: "as-said",
     wakes: false,
     from: "theo",

@@ -10,8 +10,9 @@ import {
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { formatPercent, formatShortDate, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { noWindowsText, partedUsage } from "@agenteschat/client/lib/plan-usage";
+import { accountShares, noWindowsText, planMeterText, splitUsage } from "@agenteschat/client/lib/plan-usage";
 import { parseAmount } from "@agenteschat/client/lib/text";
+import { gradientOf } from "@agenteschat/ui/agent/engine";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +22,7 @@ import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, Text, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { AccountHead, PlanMeter, UsageCard } from "./parts";
 
@@ -137,55 +139,109 @@ export function UsageScreen() {
   );
 }
 
+/**
+ * A plan account (the web's `AccountBlock`): its bars split by agent in their colours, then one list of its agents,
+ * when it renews and how old the numbers are, and the month's total.
+ */
 function AccountBlock({ account, money }: { account: PlanAccountUsage; money: boolean }) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
-  const nameOf = (a: { agentId: string; name: string }) => dir.agentById.get(a.agentId)?.name ?? a.name;
+  const shares = accountShares(account);
+  const list =
+    shares.shown.length > 0 ? (
+      <AgentShares
+        shares={shares}
+        window={shares.window ? planMeterText(t, i18n.language).window(shares.window) : null}
+      />
+    ) : null;
   return (
     <>
       <AccountHead account={account} />
       {account.usage ? (
-        <PlanMeter
-          usage={partedUsage(account.usage, (parts) =>
-            parts
-              .map((p) => t("usageViews.part", { name: nameOf(p), percent: formatPercent(i18n.language, p.percent) }))
-              .join(" · "),
-          )}
-        />
+        <PlanMeter usage={splitUsage(account.usage, (id) => gradientOf(agentLook(dir.agentById.get(id)).color))}>
+          {list}
+        </PlanMeter>
       ) : (
-        <Text variant="small" tone="muted">
-          {noWindowsText(t, account)}
-        </Text>
+        <>
+          <Text variant="small" tone="muted">
+            {noWindowsText(t, account)}
+          </Text>
+          {list}
+        </>
       )}
       {account.agents.length > 0 ? (
-        <View style={styles.foot}>
-          <View style={styles.legend}>
-            {account.agents.map((a) => (
-              <Pressable
-                key={a.agentId}
-                onPress={() => openAgentUsage(a.agentId)}
-                accessibilityRole="button"
-                style={styles.legendAgent}
-              >
-                <AgentFace agentId={a.agentId} size={18} live={false} />
-                <Text variant="small" tone="ink" style={styles.bold}>
-                  {nameOf(a)}
-                </Text>
-                <Text variant="small" tone="muted">
-                  {a.tokens > 0 ? formatTokensShort(t, i18n.language, a.tokens) : t("usageViews.usesNow")}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text variant="small" tone="muted">
-            {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
-            {money && typeof account.equivalentUsd === "number"
-              ? ` · ${t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}`
-              : ""}
-          </Text>
-        </View>
+        <Text variant="small" tone="muted">
+          {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
+          {money && typeof account.equivalentUsd === "number"
+            ? ` · ${t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}`
+            : ""}
+        </Text>
       ) : null}
     </>
+  );
+}
+
+/** The account's agents, biggest share first; past the first few, one row that opens the rest in place. */
+function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShares>; window: string | null }) {
+  const { t, i18n } = useTranslation();
+  const dir = useDirectory();
+  const c = useColors();
+  const [open, setOpen] = useState(false);
+  const percent = (share: number) => (window ? formatPercent(i18n.language, share) : "");
+  const tokens = (n: number, now = false) =>
+    n > 0 ? formatTokensShort(t, i18n.language, n) : now ? t("usageViews.usesNow") : "";
+  const divided = { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth };
+  return (
+    <View>
+      <View style={styles.share}>
+        <View style={styles.face} />
+        <View style={styles.grow} />
+        <Text variant="caption" tone="faint" style={styles.shareNum}>
+          {window ?? ""}
+        </Text>
+        <Text variant="caption" tone="faint" style={styles.shareTokens}>
+          {t("usageViews.thisMonth")}
+        </Text>
+      </View>
+      {(open ? [...shares.shown, ...shares.rest] : shares.shown).map((a, i) => (
+        <Pressable
+          key={a.agentId}
+          onPress={() => openAgentUsage(a.agentId)}
+          accessibilityRole="button"
+          style={[styles.share, i > 0 && divided]}
+        >
+          <AgentFace agentId={a.agentId} size={18} live={false} />
+          <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
+            {dir.agentById.get(a.agentId)?.name ?? a.name}
+          </Text>
+          <Text variant="small" tone="ink2" style={styles.shareNum}>
+            {percent(a.share)}
+          </Text>
+          <Text variant="small" tone="muted" style={styles.shareTokens}>
+            {tokens(a.tokens, a.now)}
+          </Text>
+        </Pressable>
+      ))}
+      {!open && shares.rest.length > 0 ? (
+        <Pressable
+          onPress={() => setOpen(true)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: false }}
+          style={[styles.share, divided]}
+        >
+          <View style={styles.face} />
+          <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
+            {t("usageViews.moreAgents", { count: shares.rest.length })}
+          </Text>
+          <Text variant="small" tone="ink2" style={styles.shareNum}>
+            {percent(shares.restShare)}
+          </Text>
+          <Text variant="small" tone="muted" style={styles.shareTokens}>
+            {tokens(shares.restTokens)}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -298,9 +354,11 @@ const styles = StyleSheet.create({
   machineName: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 2 },
   block: { gap: 12, paddingVertical: 14 },
   divided: { borderTopWidth: StyleSheet.hairlineWidth },
-  foot: { gap: 8 },
-  legend: { flexDirection: "row", flexWrap: "wrap", gap: 6, columnGap: 14 },
-  legendAgent: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // An account's agents: face, name, share, tokens, the numbers in right-aligned columns that fit 390 pt.
+  share: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 32 },
+  face: { width: 18 },
+  shareNum: { minWidth: 44, textAlign: "right", fontVariant: ["tabular-nums"] },
+  shareTokens: { minWidth: 68, textAlign: "right", fontVariant: ["tabular-nums"] },
   // Narrower than the web's row: the tokens and the budget's share on one line under the name, the spend under it.
   // The face at the top, beside the name (the lines under it run long).
   api: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 10 },

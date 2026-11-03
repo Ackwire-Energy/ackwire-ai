@@ -1,0 +1,176 @@
+/* A shared computer's line: the dialog, the waiting agent's row, the fan-out strip (ComputerQueue.tsx). */
+
+.cq-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--agent);
+  white-space: nowrap;
+  cursor: pointer;
+}
+html:not([data-pointer]) .cq-link:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+
+/* "You go first": the viewer's own request. */
+.cq-first.ac-chip {
+  flex: none;
+  background: var(--agent-soft);
+  color: var(--agent);
+}
+
+.cq {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cq__group + .cq__group {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.cq__title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.cq__all {
+  font-weight: 500;
+  color: var(--faint);
+}
+.cq__empty,
+.cq__rule {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.cq__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Number, face, words, time; the face sits on the words' first line. */
+.cq__row {
+  display: grid;
+  grid-template-columns: 18px auto 1fr auto;
+  align-items: start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 20px;
+}
+.cq__row > .ac-avatar {
+  margin-top: 1px;
+}
+.cq__row[data-mine] {
+  background: var(--agent-soft);
+}
+.cq__n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cq__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cq__text b {
+  font-weight: 600;
+}
+.cq__text > span {
+  color: var(--ink-muted);
+}
+.cq__text > .cq-first {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.cq__time {
+  font-size: 12px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The waiting agent's turn after the message it answers, where "thinking" shows otherwise. */
+.cq-turn__say {
+  margin: 0;
+  color: var(--ink-muted);
+}
+.cq-turn__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.cq-turn__acts:empty {
+  display: none;
+}
+
+/* Under a message that called several agents. */
+.cq-fan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: var(--msg-card-w);
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
+}
+.cq-fan__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.cq-fan__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cq-fan__chip.ac-chip {
+  padding-left: 3px;
+  background: var(--plate);
+  color: var(--ink);
+}
+.cq-fan__chip small {
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+.cq-fan__chip[data-state="answered"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.cq-fan__chip[data-state="answered"] small {
+  color: var(--ok);
+}
+.cq-fan__chip[data-state="working"] small {
+  color: var(--agent);
+}
+
+/* The outage card's pill, on the author line beside the time. */
+.cq-away.ac-chip {
+  flex: none;
+}

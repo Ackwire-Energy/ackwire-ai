@@ -175,7 +175,12 @@ describe("the wiki", () => {
     expect(backlinks.textContent).toContain("Deploy");
     expect(backlinks.textContent).toContain("Leiam o [[Onboarding]] antes de segunda.");
     expect(backlinks.textContent).toContain("#131");
-    const aside = screen().getByRole("complementary", { name: "Sobre a página" });
+    // A mention in a DM says who the conversation is with, never the DM's internal name.
+    expect(backlinks.textContent).toContain("Conversa com Ada");
+    expect(backlinks.textContent).not.toContain("dm-7f3a");
+    // One column: what is around the page comes after its text, no side column.
+    expect(screen().queryByRole("complementary", { name: "Sobre a página" })).toBeNull();
+    const aside = screen().getByRole("region", { name: "Sobre a página" });
     expect(aside.textContent).toContain("por Ada, a pedido de Walter");
     expect(within(aside).getByRole("region", { name: "Agentes que usam esta página" }).textContent).toContain(
       "Nenhum agente consultou ainda",
@@ -190,7 +195,8 @@ describe("the wiki", () => {
     const { router, state } = await go("wiki/onboarding");
     await click(screen().getByRole("button", { name: "Plano de férias" }));
     await settle(4);
-    expect((screen().getByLabelText("Título") as HTMLInputElement).value).toBe("Plano de férias");
+    expect((screen().getByLabelText("Título") as HTMLTextAreaElement).value).toBe("Plano de férias");
+    await click(screen().getByRole("button", { name: "Markdown" }));
     await type(screen().getByRole("combobox", { name: "Texto de Plano de férias" }), "Quem cobre quem.");
     await click(screen().getByRole("button", { name: /^Salvar/ }));
     await settle(6);
@@ -198,9 +204,10 @@ describe("the wiki", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/wiki/plano-de-ferias`);
   });
 
-  test("editing: [[ autocomplete in glass, ⌘S saves with the version", async () => {
+  test("editing Markdown: [[ autocomplete in glass, ⌘S saves with the version", async () => {
     const { state } = await go("wiki/deploy");
     await click(screen().getByRole("button", { name: /^Editar/ }));
+    await click(screen().getByRole("button", { name: "Markdown" }));
     const box = screen().getByRole("combobox", { name: "Texto de Deploy" }) as HTMLTextAreaElement;
     await type(box, `${box.value}\n\nVeja [[Glos`);
     const list = screen().getByRole("listbox", { name: "Páginas" });
@@ -215,9 +222,37 @@ describe("the wiki", () => {
     expect(document.body.textContent).toContain("Página salva.");
   });
 
+  test("one column: the page's actions on its bar, who sees it under the title", async () => {
+    await go("wiki/deploy");
+    const bar = document.querySelector(".wiki-top") as HTMLElement;
+    expect(within(bar).getByRole("button", { name: /^Editar/ })).toBeTruthy();
+    expect(within(bar).getByRole("button", { name: "Mais ações" })).toBeTruthy();
+    expect(screen().getByRole("button", { name: "Quem vê: Todo o workspace" })).toBeTruthy();
+    expect(screen().getByRole("region", { name: "Sobre a página" })).toBeTruthy();
+  });
+
+  test("the visual editor: the page edits as it reads; a changed paragraph saves, the rest as written", async () => {
+    const { state } = await go("wiki/onboarding");
+    await click(screen().getByRole("button", { name: /^Editar/ }));
+    const box = screen().getByRole("textbox", { name: "Texto de Onboarding" });
+    // The title shows above it: the text's own "# Onboarding" stays out of the editor.
+    expect(box.textContent?.startsWith("Passos da primeira semana")).toBe(true);
+    expect(within(box).getByText("Glossário").className).toContain("wiki-link");
+    (box.lastElementChild as HTMLElement).textContent = "Uma issue pequena, com par.";
+    await act(async () => fireEvent.input(box));
+    await click(screen().getByRole("button", { name: /^Salvar/ }));
+    await settle(6);
+    const call = state.calls.find((c) => c.method === "wiki.update");
+    expect(call?.args[2]).toMatchObject({
+      body: "# Onboarding\n\nPassos da primeira semana. Termos em [[Glossário]]; o deploy em [[Deploy]] e o [[Plano de férias]].\n\n## Acessos\n\nPeça ao admin.\n\n## Primeira tarefa\n\nUma issue pequena, com par.",
+      baseVersion: 1,
+    });
+  });
+
   test("version conflict: shows the difference and keeps mine on purpose", async () => {
     const { state, api } = await go("wiki/deploy");
     await click(screen().getByRole("button", { name: /^Editar/ }));
+    await click(screen().getByRole("button", { name: "Markdown" }));
     const box = screen().getByRole("combobox", { name: "Texto de Deploy" }) as HTMLTextAreaElement;
     await type(box, "# Deploy\n\nMinha versão.");
     // Someone else saves first.
@@ -235,7 +270,7 @@ describe("the wiki", () => {
     expect(saves.at(-1)).toMatchObject({ body: "# Deploy\n\nMinha versão.", baseVersion: 2 });
   });
 
-  test("Quem vê: limit a page to a role; the page shows Restrita", async () => {
+  test("Quem vê: limit a page to a role; the line under the title says who sees it", async () => {
     const { state } = await go("wiki/deploy");
     const more = screen().getByRole("button", { name: "Mais ações" });
     more.focus();
@@ -255,7 +290,8 @@ describe("the wiki", () => {
       "deploy",
       { audience: { roleIds: [ADMIN_ROLE_ID], userIds: [] }, agentIds: null, editors: null, agentEditorIds: null },
     ]);
-    expect(screen().getByText("Restrita")).toBeTruthy();
+    // The line under the title says who sees it now.
+    expect(screen().getByRole("button", { name: /^Quem vê: Admin/ })).toBeTruthy();
   });
 
   test("Quem vê: everyone views and one role edits; agents get their own list", async () => {
@@ -320,7 +356,7 @@ describe("the wiki", () => {
     await act(async () => {
       await api.wiki.update(ORG_ID, "deploy", { body: "# Deploy\n\nSó de segunda a quarta.", baseVersion: 1 });
     });
-    await click(screen().getByRole("button", { name: /^v1$/ }));
+    await click(screen().getByRole("button", { name: /^editou/ }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Histórico de Deploy" });
     await click(within(dialog).getByRole("button", { name: /v2/ }));

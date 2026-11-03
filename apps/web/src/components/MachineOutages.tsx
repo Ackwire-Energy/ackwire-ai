@@ -1,5 +1,6 @@
 import type { ComputerBrain, MachineOutage, MachineOutages, OutageTarget } from "@agenteschat/client";
 import { useMachineOutages, useMachines, useMoveAgents } from "@agenteschat/client";
+import { awayText } from "@agenteschat/client/lib/computer-queue";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind } from "@agenteschat/client/lib/machines";
@@ -18,6 +19,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Checkbox,
+  Chip,
   ComputerIcon,
   Dialog,
   DialogBody,
@@ -26,6 +28,7 @@ import {
   OptionList,
   type OptionListItem,
   ProviderLogo,
+  useNow,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -334,32 +337,8 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   // Only where people connect their own computers: a Cloud workspace has one, and nothing while that isn't known.
   const selfHost = useComputerEdition(org.id) === "selfhost";
   const switches = selfHost && can(org, "manage_agents");
-  const outages = useMachineOutages(org.id);
-  const machines = useMachines(org.id);
   const [open, setOpen] = useState(false);
-  const who = notice.agentId ?? agentId;
-  const outage = outageOf(outages.data, who, notice.machineId);
-  const machine = useMemo(
-    () =>
-      (machines.data ?? []).find((m) =>
-        notice.machineId ? m.id === notice.machineId : who ? m.agents.some((a) => a.id === who) : false,
-      ),
-    [machines.data, notice.machineId, who],
-  );
-  const mine = outage?.agents.find((a) => a.agentId === who);
-  const state: "waiting" | "back" | "moved" = outages.data
-    ? mine
-      ? "waiting"
-      : outage
-        ? "moved"
-        : "back"
-    : machine?.online
-      ? "back"
-      : "waiting";
-  // The name it had while offline stays once it is back (the computers list may not have it).
-  const seen = useRef<string | null>(null);
-  if (outage) seen.current = outage.name;
-  const name = outage?.name ?? machine?.name ?? seen.current ?? t("outage.someComputer");
+  const { outages, outage, mine, state, name } = useWaitState(notice, agentId);
   const waiting = mine ? waitingText(t, mine.waiting) : null;
   if (state !== "waiting") {
     return (
@@ -392,5 +371,50 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
         <SwitchComputerDialog open={open} onOpenChange={setOpen} outage={outage} data={outages.data} />
       )}
     </div>
+  );
+}
+
+/** Where the agent's offline note stands: still waiting for its computer, back, or moved to another one. */
+function useWaitState(notice: BrainUnavailable, agentId: string | null) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const outages = useMachineOutages(org.id);
+  const machines = useMachines(org.id);
+  const who = notice.agentId ?? agentId;
+  const outage = outageOf(outages.data, who, notice.machineId);
+  const machine = useMemo(
+    () =>
+      (machines.data ?? []).find((m) =>
+        notice.machineId ? m.id === notice.machineId : who ? m.agents.some((a) => a.id === who) : false,
+      ),
+    [machines.data, notice.machineId, who],
+  );
+  const mine = outage?.agents.find((a) => a.agentId === who);
+  const state: "waiting" | "back" | "moved" = outages.data
+    ? mine
+      ? "waiting"
+      : outage
+        ? "moved"
+        : "back"
+    : machine?.online
+      ? "back"
+      : "waiting";
+  // The name it had while offline stays once it is back (the computers list may not have it).
+  const seen = useRef<string | null>(null);
+  if (outage) seen.current = outage.name;
+  const name = outage?.name ?? machine?.name ?? seen.current ?? t("outage.someComputer");
+  return { outages, outage, mine, state, name };
+}
+
+/** "Away 3 min" on the waiting note's author line, beside its time, while its computer is still gone. */
+export function AwayPill({ notice, agentId }: { notice: BrainUnavailable; agentId: string | null }) {
+  const { t } = useTranslation();
+  const { outage, state } = useWaitState(notice, agentId);
+  const now = useNow(30_000);
+  if (state !== "waiting" || !outage) return null;
+  return (
+    <Chip tone="waiting" className="cq-away">
+      {awayText(t, outage.offlineSince, now)}
+    </Chip>
   );
 }

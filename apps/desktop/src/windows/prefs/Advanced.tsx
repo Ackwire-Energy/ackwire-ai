@@ -13,12 +13,12 @@ import { shortPath } from "../../ui/time";
 export const DEFAULT_LIMITS: Required<Omit<ControlConfigPatch, "name">> = {
   maxConcurrentTasks: 3,
   taskMaxSeconds: 4 * 3600,
-  brainMaxProcesses: 3,
-  brainIdleMinutes: 10,
+  brainMaxProcesses: 1,
+  brainIdleMinutes: 3,
 };
 
 const TASK_MAX = ["3600", "14400", "28800"] as const;
-const IDLE = ["5", "10", "30"] as const;
+const IDLE = ["3", "5", "10", "30"] as const;
 
 export function Advanced() {
   const { t } = useTranslation();

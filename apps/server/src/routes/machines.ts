@@ -3,6 +3,7 @@ import { limitIp } from "@agenteschat/adapters";
 import {
   ARTIFACT_LIMITS,
   authenticateMachine,
+  computerQueue,
   computerSetup,
   confirmDeviceCode,
   currentOrgLogo,
@@ -306,6 +307,55 @@ const OutageTarget = z
   })
   .openapi("OutageTarget");
 
+const QueuePurpose = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("person"), userId: z.string().nullable() }),
+    z.object({ kind: z.literal("agent"), agentId: z.uuid().nullable() }),
+    z.object({ kind: z.literal("routine") }),
+    z.object({ kind: z.literal("work") }),
+  ])
+  .openapi("QueuePurpose", {
+    description:
+      "What the turn is for, never its content: answering a person, asked by another agent, a routine, or long work. Ids are null when the author is gone.",
+  });
+
+const QueueWhere = z.object({ channelId: z.uuid(), threadId: z.uuid().nullable() });
+
+const ComputerQueue = z
+  .object({
+    machineId: z.uuid(),
+    name: z.string(),
+    working: z.array(
+      z.object({
+        runId: z.uuid(),
+        agentId: z.uuid(),
+        purpose: QueuePurpose,
+        where: QueueWhere,
+        startedAt: z.string().openapi({ description: "When this turn asked the computer." }),
+        estimatedEndAt: z.string().nullable().openapi({
+          description:
+            "Start plus the agent's median computer turn (else the workspace's), never sooner than 30 s from now; null with no basis.",
+        }),
+      }),
+    ),
+    waiting: z.array(
+      z.object({
+        runId: z.uuid(),
+        agentId: z.uuid(),
+        purpose: QueuePurpose,
+        where: QueueWhere,
+        people: z.boolean().openapi({ description: "A person waits on it: it goes first." }),
+        position: z.number().int().openapi({ description: "1 = next." }),
+        estimatedStartAt: z.string().nullable(),
+        after: z.array(z.uuid()).openapi({
+          description:
+            "Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line.",
+        }),
+      }),
+    ),
+  })
+  .openapi("ComputerQueue");
+
 const MoveTarget = z.object({ kind: z.literal("machine"), machineId: z.uuid() });
 
 const MoveAgentsResult = z
@@ -603,6 +653,24 @@ export function machineAppRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json(await listMachineOutages(outageDeps(), c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/machines/{machineId}/queue",
+      tags,
+      security,
+      summary: "A computer's line: the turns working on it and the runs waiting for room, in order (every member)",
+      description:
+        "Changes come as the `computer.queue` org event (`{ machineId }`): refetch. Estimates are typical durations, never exact.",
+      request: { params: MachineParams },
+      responses: { 200: json(ComputerQueue), ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId } = c.req.valid("param");
+      return c.json(await computerQueue(db, c.get("user").id, orgId, machineId), 200);
     },
   );
 

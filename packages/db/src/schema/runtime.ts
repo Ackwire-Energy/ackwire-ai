@@ -178,6 +178,8 @@ export const agentRuns = pgTable(
     index().on(t.threadRootId),
     // An agent's recent work across conversations (context: "Seu trabalho recente").
     index().on(t.orgId, t.agentId, t.createdAt),
+    // The operator's work analytics read every workspace's runs in a range of dates.
+    index().on(t.createdAt),
     index().on(t.issueId, t.createdAt),
     // A stretch's runs, counted before an agent starts another (`stretchStop`).
     index().on(t.orgId, t.stretchId).where(sql`${t.stretchId} is not null`),
@@ -262,7 +264,11 @@ export const agentRunSteps = pgTable(
     data: jsonb().$type<Record<string, unknown>>().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.runId, t.seq)],
+  (t) => [
+    unique().on(t.runId, t.seq),
+    // The operator's work analytics look up a run's waits for room among all its steps.
+    index().on(t.runId).where(sql`${t.kind} = 'error' and ${t.data}->>'reason' = 'brain_unavailable'`),
+  ],
 );
 
 export const usageKindEnum = pgEnum("usage_kind", ["agent", "router", "embedding", "summary"]);
@@ -321,6 +327,8 @@ export const usageRecords = pgTable(
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
     index().on(t.orgId, t.agentId, t.createdAt),
     index().on(t.orgId, t.createdAt),
+    // The operator's work analytics read every workspace's usage in a range of dates.
+    index().on(t.createdAt),
   ],
 );
 

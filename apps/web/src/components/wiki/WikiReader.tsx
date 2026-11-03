@@ -1,10 +1,10 @@
 import type { WikiAuthor, WikiPage as WikiPageData, WikiPageSummary, WikiVersion } from "@agenteschat/client";
-import { ApiError, keys, useWikiAction, useWikiHistory, useWikiPage } from "@agenteschat/client";
+import { ApiError, keys, useRoles, useWikiAction, useWikiHistory, useWikiPage } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon } from "@agenteschat/client/lib/files";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { leafTitle, outlineOf } from "@agenteschat/client/lib/wiki";
+import { leafTitle } from "@agenteschat/client/lib/wiki";
 import {
   Avatar,
   Button,
@@ -16,14 +16,14 @@ import {
   diffLines,
   EmptyState,
   Icon,
-  Input,
   Kbd,
   Menu,
   modKey,
+  Popover,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -31,17 +31,21 @@ import { usePreviewUrl } from "@/components/artifacts/FileView";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ErrorState, LoadingList, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { WikiSky } from "@/components/Sky";
 import { WikiEditor } from "@/components/WikiEditor";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
+import { readComposerDraft, writeComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { type EmbedRenderer, Markdown } from "@/lib/markdown";
 import { isAttachmentName } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
+import { retitled } from "@/lib/wiki-rich";
 import { ObsidianMark } from "./ObsidianMark";
+import { WikiAskDialog } from "./WikiAsk";
 import { WikiAudienceDialog } from "./WikiAudience";
+import { WikiFolderPicker, WikiTagsEdit } from "./WikiProps";
+import { WikiRichEditor, type WikiRichEditorHandle } from "./WikiRichEditor";
 
 /** Typing in a field: single-key shortcuts stay off. */
 export const typingIn = (el: Element | null) =>
@@ -162,10 +166,13 @@ function useEmbedRenderer(attachments: Record<string, string> | undefined): Embe
   };
 }
 
-/** Outline that follows the scroll (the heading at the top is current). */
-function Outline({ items }: { items: { level: number; text: string; id: string }[] }) {
+/**
+ * The open page's outline, in the tree under its row: the heading at the top of the reading is current, and a click
+ * scrolls to it below the page's bar.
+ */
+export function PageOutline({ items }: { items: { level: number; text: string; id: string }[] }) {
   const { t } = useTranslation();
-  const [current, setCurrent] = useState<string | null>(null);
+  const [current, setCurrent] = useState<string | null>(items[0]?.id ?? null);
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
     const els = items.map((h) => document.getElementById(h.id)).filter((e): e is HTMLElement => Boolean(e));
@@ -176,150 +183,299 @@ function Outline({ items }: { items: { level: number; text: string; id: string }
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
         if (top) setCurrent(top.target.id);
       },
-      { rootMargin: "0px 0px -70% 0px" },
+      { rootMargin: "-80px 0px -65% 0px" },
     );
     for (const el of els) io.observe(el);
     return () => io.disconnect();
   }, [items]);
   return (
-    <nav className="wiki-aside__block wiki-outline" aria-label={t("wiki.outline")}>
-      <span className="wiki-label">{t("wiki.outline")}</span>
-      <div className="wiki-outline__list">
-        {items.map((h) => (
-          <a
-            key={h.id}
-            href={`#${h.id}`}
-            className="wiki-outline__item"
-            data-level={h.level}
-            aria-current={current === h.id ? "true" : undefined}
-          >
-            {h.text}
-          </a>
-        ))}
-      </div>
+    <nav className="wiki-toc" aria-label={t("wiki.outline")}>
+      {items.map((h) => (
+        <a
+          key={h.id}
+          href={`#${h.id}`}
+          className="wiki-outline__item"
+          data-level={h.level}
+          aria-current={current === h.id ? "true" : undefined}
+          onClick={(e) => {
+            const el = document.getElementById(h.id);
+            if (!el) return;
+            e.preventDefault();
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            setCurrent(h.id);
+          }}
+        >
+          {h.text}
+        </a>
+      ))}
     </nav>
   );
 }
 
-/** "Agentes que usam esta página": who used it in the last 7 days, and the latest use. */
-function AgentUses({ page }: { page: WikiPageData }) {
+/** Who sees the page, in a few words: "Todo o workspace", "Diretoria e Theo", "Diretoria e todos os agentes". */
+function useAccessLabel(p: WikiPageData) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const roles = useRoles(org.id);
+  const dir = useDirectory(org.id);
+  const list = (names: string[]) => {
+    const shown = names.length > 3 ? [...names.slice(0, 2), t("wiki.access.more", { count: names.length - 2 })] : names;
+    return new Intl.ListFormat(i18n.language, { type: "conjunction" }).format(shown);
+  };
+  const known = (names: (string | undefined)[]) => names.filter((n): n is string => Boolean(n));
+  const people = p.audience
+    ? known([
+        ...p.audience.roleIds.map((id) => roles.data?.roles.find((r) => r.id === id)?.name),
+        ...p.audience.userIds.map((id) => dir.memberById.get(id)?.name),
+      ])
+    : null;
+  const agents = p.agentIds ? known(p.agentIds.map((id) => dir.agentById.get(id)?.name)) : null;
+  if (!people && !agents) return { limited: false, label: t("wiki.access.everyone") };
+  if (!people) {
+    return {
+      limited: true,
+      label: agents?.length ? t("wiki.access.peopleAnd", { agents: list(agents) }) : t("wiki.access.peopleOnly"),
+    };
+  }
+  const names = [...people, ...(agents ?? [])];
+  const base = names.length ? list(names) : t("wiki.access.ownersOnly");
+  return { limited: true, label: agents === null ? t("wiki.access.withAllAgents", { names: base }) : base };
+}
+
+/** The agents that used the page this week, one row each, and the last use. */
+function UsesRows({ page }: { page: WikiPageData }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const reads = page.reads;
-  const top = (reads?.agents ?? []).slice(0, 3);
+  const max = reads?.agents[0]?.count ?? 1;
   const last = reads?.last;
   const lastAgent = last ? dir.agentById.get(last.agentId) : undefined;
+  if (!reads || reads.total === 0) return <p className="wiki-about__empty">{t("wiki.uses.none")}</p>;
   return (
-    <section className="wiki-aside__block" aria-label={t("wiki.uses.title")}>
-      <span className="wiki-label">{t("wiki.uses.title")}</span>
-      <div className="wiki-uses">
-        <WikiSky variant="strip" />
-        {top.length > 0 && (
-          <span className="wiki-uses__crew">
-            {top.map((r) => (
-              <AgentAvatar
-                key={r.agentId}
-                agentId={r.agentId}
-                name={dir.agentById.get(r.agentId)?.name ?? ""}
-                size="sm"
-              />
-            ))}
+    <>
+      {reads.agents.slice(0, 5).map((r) => (
+        <div key={r.agentId} className="wiki-use">
+          <AgentAvatar agentId={r.agentId} name={dir.agentById.get(r.agentId)?.name ?? ""} size="xs" />
+          <b>{dir.agentById.get(r.agentId)?.name ?? ""}</b>
+          <span className="wiki-use__bar" aria-hidden="true">
+            <i style={{ width: `${Math.round((r.count / max) * 100)}%` }} />
           </span>
-        )}
-        <div className="wiki-uses__in">
-          {reads && reads.total > 0 ? (
-            <>
-              <p className="wiki-uses__row">
-                <b className="ac-num wiki-uses__big">{reads.total}</b>
-                <span>{t("wiki.uses.count", { count: reads.total })}</span>
-              </p>
-              {last && lastAgent && (
-                <p className="wiki-uses__row">
-                  <AgentAvatar agentId={lastAgent.id} name={lastAgent.name} size="xs" />
-                  <span>
-                    {last.channelName
-                      ? t("wiki.uses.lastIn", {
-                          name: lastAgent.name,
-                          when: relativeTime(t, i18n.language, last.at),
-                          channel: last.channelName,
-                        })
-                      : t("wiki.uses.last", { name: lastAgent.name, when: relativeTime(t, i18n.language, last.at) })}
-                  </span>
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="wiki-uses__row">{t("wiki.uses.none")}</p>
-          )}
+          <span className="wiki-use__n ac-num" title={t("wiki.uses.count", { count: r.count })}>
+            {r.count}
+          </span>
         </div>
-      </div>
-    </section>
+      ))}
+      {last && lastAgent && (
+        <p className="wiki-about__note">
+          {last.channelName
+            ? t("wiki.uses.lastIn", {
+                name: lastAgent.name,
+                when: relativeTime(t, i18n.language, last.at),
+                channel: last.channelName,
+              })
+            : t("wiki.uses.last", { name: lastAgent.name, when: relativeTime(t, i18n.language, last.at) })}
+        </p>
+      )}
+    </>
   );
 }
 
+/**
+ * The line under the title: who wrote it and when (the history), who sees it (the access, for who chooses it), the
+ * agents that use it, the page's state and its tags.
+ */
+function PageMeta({
+  page,
+  chooseAudience,
+  onAudience,
+  onHistory,
+  onTag,
+}: {
+  page: WikiPageData;
+  chooseAudience: boolean;
+  onAudience: () => void;
+  onHistory: () => void;
+  onTag: (tag: string) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const access = useAccessLabel(page);
+  const reads = page.reads;
+  const accessTitle = page.audienceFolder
+    ? t("wiki.audienceFollows", { folder: page.audienceFolder })
+    : access.limited
+      ? t("wiki.restrictedHint")
+      : t("wiki.access.everyoneHint");
+  const accessInner = (
+    <>
+      <Icon name={access.limited ? "eye" : "audienceEveryone"} size={14} />
+      {access.label}
+    </>
+  );
+  return (
+    <div className="wiki-meta">
+      <AuthorLine a={page.updatedBy} />
+      <button
+        type="button"
+        className="wiki-meta__when"
+        title={whenAt(t, i18n.language, page.updatedAt)}
+        onClick={onHistory}
+      >
+        {t("wiki.editedWhen", { when: relativeTime(t, i18n.language, page.updatedAt) })}
+      </button>
+      <span className="wiki-meta__dot" aria-hidden="true" />
+      {chooseAudience ? (
+        <button
+          type="button"
+          className="wiki-chip wiki-chip--line"
+          data-limited={access.limited || undefined}
+          title={accessTitle}
+          aria-label={t("wiki.access.label", { who: access.label })}
+          onClick={onAudience}
+        >
+          {accessInner}
+        </button>
+      ) : (
+        <span className="wiki-chip wiki-chip--line" data-limited={access.limited || undefined} title={accessTitle}>
+          {accessInner}
+        </span>
+      )}
+      {reads && reads.total > 0 && (
+        <Popover
+          label={t("wiki.uses.title")}
+          side="bottom"
+          className="wiki-uses-pop"
+          trigger={
+            <button type="button" className="wiki-chip wiki-chip--line" title={t("wiki.uses.title")}>
+              <span className="wiki-chip__crew">
+                {reads.agents.slice(0, 3).map((r) => (
+                  <AgentAvatar
+                    key={r.agentId}
+                    agentId={r.agentId}
+                    name={dir.agentById.get(r.agentId)?.name ?? ""}
+                    size="xs"
+                  />
+                ))}
+              </span>
+              {t("wiki.uses.week", { count: reads.total })}
+            </button>
+          }
+        >
+          <span className="wiki-label">{t("wiki.uses.title")}</span>
+          <UsesRows page={page} />
+        </Popover>
+      )}
+      {page.canEdit === false && (
+        <Chip icon="eye" title={t("wiki.readOnlyHint")}>
+          {t("wiki.readOnly")}
+        </Chip>
+      )}
+      {page.locked && (
+        <Chip icon="lock" title={t("wiki.lockedHint")}>
+          {t("wiki.locked")}
+        </Chip>
+      )}
+      {page.source?.type === "obsidian" && (
+        <span className="wiki-chip">
+          <ObsidianMark size={14} />
+          {t("wiki.fromObsidian")}
+        </span>
+      )}
+      {page.tags.length > 0 && (
+        <span className="wiki-meta__tags">
+          {page.tags.map((tag) => (
+            <button key={tag} type="button" className="wiki-tagword" onClick={() => onTag(tag)}>
+              #{tag}
+            </button>
+          ))}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Where the page is mentioned: pages, conversations (a DM says who it is with), forum topics and issues. */
 function Backlinks({ page }: { page: WikiPageData }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  if (page.backlinks.length === 0)
+    return <p className="wiki-about__empty">{t("wiki.noBacklinksHint", { title: page.title })}</p>;
   return (
-    <section className="wiki-aside__block" aria-label={t("wiki.backlinks")}>
-      <span className="wiki-label">
-        {t("wiki.backlinks")} <span className="wiki-label__n ac-num">{page.backlinks.length}</span>
-      </span>
-      {page.backlinks.length === 0 ? (
-        <p className="small muted">{t("wiki.noBacklinksHint", { title: page.title })}</p>
-      ) : (
-        <div className="wiki-backlinks">
-          {page.backlinks.map((b) =>
-            b.kind === "page" ? (
-              <Link
-                key={`p:${b.slug}`}
-                to="/org/$orgId/wiki/$slug"
-                params={{ orgId: org.id, slug: b.slug }}
-                className="wiki-backlink"
-              >
+    <div className="wiki-refs">
+      {page.backlinks.map((b) => {
+        if (b.kind === "page")
+          return (
+            <Link
+              key={`p:${b.slug}`}
+              to="/org/$orgId/wiki/$slug"
+              params={{ orgId: org.id, slug: b.slug }}
+              className="wiki-ref ac-iconline"
+            >
+              <Icon name="document" size={16} />
+              <span>
                 <b>{b.title}</b>
-                {b.excerpt && <span>{b.excerpt}</span>}
-              </Link>
-            ) : b.kind === "message" ? (
-              <Link
-                key={`m:${b.messageId}`}
-                to="/org/$orgId/c/$channelId"
-                params={{ orgId: org.id, channelId: b.channelId }}
-                className="wiki-backlink"
-              >
-                <b>
-                  <Icon name="channel" size={14} /> {b.channelName}
-                </b>
-                <span>{b.excerpt}</span>
-              </Link>
-            ) : b.kind === "forum" ? (
-              <Link
-                key={`f:${b.topicId}`}
-                to="/org/$orgId/forum/$topicId"
-                params={{ orgId: org.id, topicId: b.topicId }}
-                className="wiki-backlink"
-              >
-                <b>
-                  <Icon name="message" size={14} /> {b.title}
-                </b>
-              </Link>
-            ) : (
-              <Link
-                key={`i:${b.number}`}
-                to="/org/$orgId/issues/$number"
-                params={{ orgId: org.id, number: String(b.number) }}
-                className="wiki-backlink"
-              >
-                <b>
-                  <Icon name="issues" size={14} /> {`#${b.number} ${b.title}`}
-                </b>
-              </Link>
-            ),
-          )}
-        </div>
-      )}
-    </section>
+                {b.excerpt && <small>{b.excerpt}</small>}
+              </span>
+            </Link>
+          );
+        if (b.kind === "message") {
+          const who =
+            b.dm?.type === "agent"
+              ? dir.agentById.get(b.dm.id)?.name
+              : b.dm?.type === "person"
+                ? dir.memberById.get(b.dm.id)?.name
+                : undefined;
+          return (
+            <Link
+              key={`m:${b.messageId}`}
+              to="/org/$orgId/c/$channelId"
+              params={{ orgId: org.id, channelId: b.channelId }}
+              className="wiki-ref ac-iconline"
+            >
+              {b.dm ? (
+                <AuthorAvatar a={{ type: b.dm.type === "agent" ? "agent" : "person", id: b.dm.id }} />
+              ) : (
+                <Icon name="channel" size={16} />
+              )}
+              <span>
+                <b>{b.dm ? t("wiki.backlinkDm", { name: who ?? t("wiki.backlinkDmSomeone") }) : `#${b.channelName}`}</b>
+                <small>{b.excerpt}</small>
+              </span>
+            </Link>
+          );
+        }
+        if (b.kind === "forum")
+          return (
+            <Link
+              key={`f:${b.topicId}`}
+              to="/org/$orgId/forum/$topicId"
+              params={{ orgId: org.id, topicId: b.topicId }}
+              className="wiki-ref ac-iconline"
+            >
+              <Icon name="message" size={16} />
+              <span>
+                <b>{b.title}</b>
+              </span>
+            </Link>
+          );
+        return (
+          <Link
+            key={`i:${b.number}`}
+            to="/org/$orgId/issues/$number"
+            params={{ orgId: org.id, number: String(b.number) }}
+            className="wiki-ref ac-iconline"
+          >
+            <Icon name="issues" size={16} />
+            <span>
+              <b>{`#${b.number} ${b.title}`}</b>
+            </span>
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
@@ -331,8 +487,7 @@ function ShortHistory({ page, onOpen }: { page: WikiPageData; onOpen: () => void
   const note = useNoteText();
   const versions = (history.data ?? []).slice(0, 3);
   return (
-    <section className="wiki-aside__block" aria-label={t("wiki.history")}>
-      <span className="wiki-label">{t("wiki.history")}</span>
+    <>
       {history.isLoading && <LoadingList count={2} />}
       <div className="wiki-hist">
         {versions.map((v) => {
@@ -353,88 +508,111 @@ function ShortHistory({ page, onOpen }: { page: WikiPageData; onOpen: () => void
         })}
       </div>
       {page.version > 3 && (
-        <Button size="sm" variant="ghost" onClick={onOpen}>
+        <Button size="sm" variant="ghost" className="wiki-about__more" onClick={onOpen}>
           {t("wiki.allVersions", { count: page.version })}
         </Button>
       )}
-    </section>
-  );
-}
-
-type Draft = { title: string; folder: string; tags: string; body: string };
-const tagsOf = (text: string) =>
-  [
-    ...new Set(
-      text
-        .split(/[\s,]+/)
-        .map((x) => x.replace(/^#/, "").trim().toLowerCase())
-        .filter(Boolean),
-    ),
-  ].slice(0, 20);
-
-/** Title, folder and tags while editing (a new page or an existing one). */
-function EditHead({
-  draft,
-  setDraft,
-  folders,
-  autoFocus,
-}: {
-  draft: Draft;
-  setDraft: (d: Draft) => void;
-  folders: string[];
-  autoFocus: boolean;
-}) {
-  const { t } = useTranslation();
-  const listId = useId();
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (autoFocus) ref.current?.focus();
-  }, [autoFocus]);
-  return (
-    <>
-      <input
-        ref={ref}
-        className="wiki-title-input"
-        aria-label={t("wiki.form.title")}
-        placeholder={t("wiki.form.titlePlaceholder")}
-        value={draft.title}
-        onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-      />
-      <div className="wiki-meta wiki-meta--edit">
-        <div className="wiki-meta__field">
-          <Icon name="drive" size={14} />
-          <Input
-            aria-label={t("wiki.form.folder")}
-            list={listId}
-            value={draft.folder}
-            placeholder={t("wiki.form.rootFolder")}
-            onChange={(e) => setDraft({ ...draft, folder: e.target.value })}
-          />
-          <datalist id={listId}>
-            {folders.map((f) => (
-              <option key={f} value={f} />
-            ))}
-          </datalist>
-        </div>
-        <div className="wiki-meta__field">
-          <span className="wiki-meta__hash" aria-hidden="true">
-            #
-          </span>
-          <Input
-            aria-label={t("wiki.form.tags")}
-            value={draft.tags}
-            placeholder={t("wiki.form.tagsPlaceholder")}
-            onChange={(e) => setDraft({ ...draft, tags: e.target.value })}
-          />
-        </div>
-      </div>
     </>
   );
 }
 
+/** "Sobre a página", after the text: the agents that use it, where it is mentioned, its history and authors. */
+function PageAbout({ page, onHistory }: { page: WikiPageData; onHistory: () => void }) {
+  const { t } = useTranslation();
+  const authorLabel = useAuthorLabel();
+  return (
+    <section className="wiki-about" aria-label={t("wiki.aside")}>
+      <section className="wiki-about__block" aria-label={t("wiki.uses.title")}>
+        <span className="wiki-label">{t("wiki.uses.title")}</span>
+        <UsesRows page={page} />
+      </section>
+      <section className="wiki-about__block" aria-label={t("wiki.backlinks")}>
+        <span className="wiki-label">
+          {t("wiki.backlinks")} <span className="wiki-label__n ac-num">{page.backlinks.length}</span>
+        </span>
+        <Backlinks page={page} />
+      </section>
+      <section className="wiki-about__block" aria-label={t("wiki.history")}>
+        <span className="wiki-label">{t("wiki.history")}</span>
+        <ShortHistory page={page} onOpen={onHistory} />
+        <p className="wiki-about__note">{page.authors.map((a) => authorLabel(a)).join(" · ")}</p>
+      </section>
+    </section>
+  );
+}
+
+/** The title while editing: as big as the page's, and it wraps (Enter goes to the text). */
+function TitleField({
+  value,
+  onChange,
+  autoFocus,
+  onEnter,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  autoFocus: boolean;
+  onEnter: () => void;
+}) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLTextAreaElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: grows with the text
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  useEffect(() => {
+    if (autoFocus) ref.current?.focus();
+  }, [autoFocus]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      className="wiki-title-input"
+      aria-label={t("wiki.form.title")}
+      placeholder={t("wiki.form.titlePlaceholder")}
+      value={value}
+      onChange={(e) => onChange(e.target.value.replace(/\n/g, " "))}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onEnter();
+        }
+      }}
+    />
+  );
+}
+
+type Draft = { title: string; folder: string; tags: string[]; body: string };
+type Saved = Draft & { base: number | null };
+
+/** What was left unsaved for a page (or a new one) in this browser, if it still reads. */
+function readSaved(userId: string, key: string): Saved | null {
+  const raw = readComposerDraft(userId, key)?.text;
+  if (!raw) return null;
+  try {
+    const s = JSON.parse(raw) as Partial<Saved>;
+    if (typeof s.title !== "string" || typeof s.body !== "string") return null;
+    return {
+      title: s.title,
+      folder: typeof s.folder === "string" ? s.folder : "",
+      tags: Array.isArray(s.tags) ? s.tags.filter((x): x is string => typeof x === "string") : [],
+      body: s.body,
+      base: typeof s.base === "number" ? s.base : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+const sameDraft = (a: Draft, b: Draft) =>
+  a.title === b.title && a.folder === b.folder && a.body === b.body && a.tags.join(" ") === b.tags.join(" ");
+
 /**
- * One page: reading (title, who wrote it, the text) with the outline, the
- * agents that use it, backlinks and history on the side; editing in place.
+ * One page, in one column: the trail and the page's actions on a bar that stays on top while it scrolls, the title
+ * the full width, who wrote it, who sees it and who uses it under it, the text, then "Sobre a página". Editing
+ * happens in place with the visual editor (Markdown one click away); what isn't saved stays in this browser.
  * Without `slug` it is a new page being written (`initial` title and folder).
  */
 export function WikiReader({
@@ -453,7 +631,7 @@ export function WikiReader({
   onTag: (tag: string) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -461,17 +639,27 @@ export function WikiReader({
   const page = useWikiPage(org.id, slug ?? null);
   const action = useWikiAction(org.id);
   const wikiLink = useWikiLinkRenderer();
-  const authorLabel = useAuthorLabel();
   const isNew = !slug;
-  const [draft, setDraft] = useState<Draft | null>(
-    isNew ? { title: initial?.title ?? "", folder: initial?.folder ?? "", tags: "", body: "" } : null,
-  );
+  const p = page.data;
+  const savedKey = `wiki:${p?.id ?? "new"}`;
+  const [draft, setDraft] = useState<Draft | null>(() => {
+    if (!isNew) return null;
+    const saved = readSaved(me.user.id, "wiki:new");
+    return saved && !initial?.title
+      ? saved
+      : { title: initial?.title ?? "", folder: initial?.folder ?? "", tags: [], body: "" };
+  });
+  const [base, setBase] = useState<number | null>(null);
+  const [recovered, setRecovered] = useState(false);
+  const [mode, setMode] = useState<"visual" | "markdown">("visual");
+  const [editorKey, setEditorKey] = useState(0);
+  const rich = useRef<WikiRichEditorHandle>(null);
   const [conflict, setConflict] = useState<WikiPageData | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [asking, setAsking] = useState<string | null>(null);
   const embed = useEmbedRenderer(page.data?.source?.attachments);
-  const p = page.data;
   const folders = [...new Set(pages.map((x) => x.folder).filter(Boolean))].sort();
   // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
   const writes = can(org, "edit_wiki") && p?.canEdit !== false;
@@ -479,6 +667,16 @@ export function WikiReader({
   // Who sees a page: people who write the wiki and manage roles (the server checks the same).
   const choosesAudience = writes && can(org, "manage_roles");
   const editing = draft !== null;
+  const original = useMemo<Draft | null>(
+    () =>
+      isNew
+        ? { title: initial?.title ?? "", folder: initial?.folder ?? "", tags: [], body: "" }
+        : p
+          ? { title: p.title, folder: p.folder, tags: p.tags, body: p.body }
+          : null,
+    [isNew, initial?.title, initial?.folder, p],
+  );
+  const dirty = Boolean(draft && original && !sameDraft(draft, original));
 
   const startEdit = () => {
     if (!p || !writes) return;
@@ -486,8 +684,38 @@ export function WikiReader({
       toast.show(t("wiki.lockedHint"), "error");
       return;
     }
-    setDraft({ title: p.title, folder: p.folder, tags: p.tags.map((x) => `#${x}`).join(" "), body: p.body });
+    const saved = readSaved(me.user.id, savedKey);
+    const fresh = { title: p.title, folder: p.folder, tags: p.tags, body: p.body };
+    if (saved && !sameDraft(saved, fresh)) {
+      setDraft(saved);
+      setBase(saved.base);
+      setRecovered(true);
+    } else {
+      setDraft(fresh);
+      setBase(p.version);
+      setRecovered(false);
+    }
+    setEditorKey((k) => k + 1);
   };
+  const stopEdit = () => {
+    writeComposerDraft(me.user.id, savedKey, "");
+    setDraft(null);
+    setRecovered(false);
+    setMode("visual");
+  };
+
+  // What isn't saved stays in this browser while it is written (a page left and opened again picks it up).
+  useEffect(() => {
+    if (!draft || !original) return;
+    const id = setTimeout(() => {
+      writeComposerDraft(
+        me.user.id,
+        savedKey,
+        sameDraft(draft, original) ? "" : JSON.stringify({ ...draft, base: base ?? p?.version ?? null }),
+      );
+    }, 400);
+    return () => clearTimeout(id);
+  }, [draft, original, base, me.user.id, savedKey, p?.version]);
 
   // E edits (when not typing).
   useEffect(() => {
@@ -502,21 +730,37 @@ export function WikiReader({
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  /** The text as it is now: the visual editor is read at the moment of saving. */
+  const currentBody = () =>
+    draft && mode === "visual" ? (rich.current?.markdown() ?? draft.body) : (draft?.body ?? "");
+
+  const toggleMode = () => {
+    if (!draft) return;
+    if (mode === "visual") {
+      setDraft({ ...draft, body: currentBody() });
+      setMode("markdown");
+    } else {
+      setMode("visual");
+      setEditorKey((k) => k + 1);
+    }
+  };
+
   const save = async (baseVersion?: number) => {
     if (!draft) return;
     const title = draft.title.trim();
+    const body = p ? retitled(currentBody(), p.title, title) : currentBody();
     if (!title) {
       toast.show(t("wiki.form.required"), "error");
       return;
     }
-    const tags = tagsOf(draft.tags);
+    const tags = draft.tags;
     if (isNew) {
       action.mutate(
-        { type: "create", input: { title, folder: draft.folder.trim(), body: draft.body, tags } },
+        { type: "create", input: { title, folder: draft.folder.trim(), body, tags } },
         {
           onSuccess: (created) => {
             toast.show(t("wiki.created"));
-            setDraft(null);
+            stopEdit();
             void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: created.slug } });
           },
           onError: (e) => toast.show(errorText(t, e, i18n.language), "error"),
@@ -528,25 +772,26 @@ export function WikiReader({
     try {
       let current = p;
       const folder = draft.folder.trim();
-      const changed = draft.body !== p.body || folder !== p.folder || tags.join(" ") !== p.tags.join(" ");
+      const changed = body !== p.body || folder !== p.folder || tags.join(" ") !== p.tags.join(" ");
       if (changed) {
         current = await action.mutateAsync({
           type: "update",
           slug: p.slug,
-          input: { body: draft.body, baseVersion: baseVersion ?? p.version, folder, tags },
+          input: { body, baseVersion: baseVersion ?? base ?? p.version, folder, tags },
         });
       }
       if (title !== p.title) {
         current = await action.mutateAsync({ type: "rename", slug: current.slug, title });
         void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: current.slug } });
       }
-      setDraft(null);
+      stopEdit();
       setConflict(null);
       toast.show(title !== p.title ? t("wiki.renamed") : t("wiki.saved"));
     } catch (e) {
       if (e instanceof ApiError && e.code === "version_conflict") {
         const latest = await api.wiki.get(org.id, p.slug);
         qc.setQueryData(keys.wikiPage(org.id, p.slug), latest);
+        setDraft((d) => (d ? { ...d, body } : d));
         setConflict(latest);
       } else toast.show(errorText(t, e, i18n.language), "error");
     }
@@ -589,7 +834,6 @@ export function WikiReader({
   }
 
   const crumbs = (editing ? draft.folder : (p?.folder ?? "")).split("/").filter(Boolean);
-  const outline = p && !editing ? outlineOf(p.body).filter((h) => !(h.level === 1 && h.text.trim() === p.title)) : [];
   // The page's actions: its "…" and the right click on its title.
   const pageEntries = (p: WikiPageData): MenuEntry[] => [
     {
@@ -655,10 +899,27 @@ export function WikiReader({
   if (editing) {
     actions = (
       <>
+        {(dirty || recovered) && (
+          <span className="wiki-top__status" aria-live="polite">
+            <Icon name="check" size={14} />
+            <span className="wiki-top__status-text">{recovered ? t("wiki.draftRecovered") : t("wiki.draftKept")}</span>
+          </span>
+        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="code"
+          className="wiki-top__md"
+          aria-pressed={mode === "markdown"}
+          title={t("wiki.markdownHint")}
+          onClick={toggleMode}
+        >
+          {t("wiki.markdown")}
+        </Button>
         <Button
           variant="ghost"
           onClick={() => {
-            setDraft(null);
+            stopEdit();
             if (isNew) onDiscard?.();
           }}
         >
@@ -673,21 +934,6 @@ export function WikiReader({
   } else if (p) {
     actions = (
       <>
-        {(p.audience || p.agentIds) && (
-          <Chip icon="eye" title={p.audience ? t("wiki.restrictedHint") : t("wiki.audienceAgentsOnlyHint")}>
-            {p.audienceFolder ? t("wiki.audienceFollows", { folder: p.audienceFolder }) : t("wiki.restricted")}
-          </Chip>
-        )}
-        {p.canEdit === false && (
-          <Chip icon="eye" title={t("wiki.readOnlyHint")}>
-            {t("wiki.readOnly")}
-          </Chip>
-        )}
-        {p.locked && (
-          <Chip icon="lock" title={t("wiki.lockedHint")}>
-            {t("wiki.locked")}
-          </Chip>
-        )}
         {writes && (
           <Button icon="edit" onClick={startEdit}>
             {t("wiki.edit")}
@@ -704,86 +950,94 @@ export function WikiReader({
     );
   }
 
+  const label = t("wiki.editorLabel", { title: draft?.title || t("wiki.newPage") });
+  const suggested = [
+    ...(p?.reads?.agents.map((r) => r.agentId) ?? []),
+    ...(p?.authors.filter((a) => a.type === "agent").map((a) => a.id) ?? []),
+  ];
+
   return (
     <div className="wiki-doc" data-editing={editing || undefined}>
       <article className="wiki-doc__main" aria-labelledby={editing ? undefined : "wiki-title"}>
-        <div className="wiki-crumbs">
-          <Link to="/org/$orgId/wiki" params={{ orgId: org.id }}>
-            {t("wiki.title")}
-          </Link>
-          {crumbs.map((c, i) => (
-            <span key={crumbs.slice(0, i + 1).join("/")}>
-              <span aria-hidden="true">/</span> {c}
-            </span>
-          ))}
-        </div>
-        <header className="wiki-doc__head">
-          <div className="wiki-doc__titles">
-            {editing ? (
-              <EditHead draft={draft} setDraft={setDraft} folders={folders} autoFocus={isNew && !draft.title} />
-            ) : (
-              p && (
-                <h1 id="wiki-title" className="wiki-title" {...entityMenu(() => pageEntries(p))}>
-                  {p.title}
-                </h1>
-              )
-            )}
-          </div>
-          <div className="wiki-doc__actions">{actions}</div>
-        </header>
-        {!editing && p && (
-          <div className="wiki-meta">
-            <AuthorLine a={p.updatedBy} />
-            <span className="wiki-meta__dot" aria-hidden="true" />
-            <span title={whenAt(t, i18n.language, p.updatedAt)}>{relativeTime(t, i18n.language, p.updatedAt)}</span>
-            <span className="wiki-meta__dot" aria-hidden="true" />
-            <button type="button" className="wiki-chip" onClick={() => setHistoryOpen(true)}>
-              <Icon name="clock" size={14} />v{p.version}
-            </button>
-            {p.source?.type === "obsidian" && (
-              <span className="wiki-chip">
-                <ObsidianMark size={14} />
-                {t("wiki.fromObsidian")}
+        <div className="wiki-top">
+          <div className="wiki-crumbs">
+            <Link to="/org/$orgId/wiki" params={{ orgId: org.id }}>
+              {t("wiki.title")}
+            </Link>
+            {crumbs.map((c, i) => (
+              <span key={crumbs.slice(0, i + 1).join("/")}>
+                <span aria-hidden="true">/</span> {c}
               </span>
-            )}
-            {p.tags.map((tag) => (
-              <button key={tag} type="button" className="wiki-chip" aria-label={`#${tag}`} onClick={() => onTag(tag)}>
-                <Icon name="channel" size={14} />
-                {tag}
-              </button>
             ))}
           </div>
-        )}
+          <div className="wiki-top__acts">{actions}</div>
+        </div>
         {editing ? (
-          <WikiEditor
-            value={draft.body}
-            onChange={(body) => setDraft({ ...draft, body })}
-            onSave={() => void save()}
-            pages={pages}
-            label={t("wiki.editorLabel", { title: draft.title || t("wiki.newPage") })}
-            autoFocus={!isNew || Boolean(draft.title)}
-          />
+          <>
+            <TitleField
+              value={draft.title}
+              onChange={(title) => setDraft({ ...draft, title })}
+              autoFocus={isNew && !draft.title}
+              onEnter={() => rich.current?.focus()}
+            />
+            <div className="wiki-props">
+              <WikiFolderPicker
+                value={draft.folder}
+                folders={folders}
+                onChange={(folder) => setDraft({ ...draft, folder })}
+              />
+              <WikiTagsEdit tags={draft.tags} onChange={(tags) => setDraft({ ...draft, tags })} />
+            </div>
+            {mode === "visual" ? (
+              <WikiRichEditor
+                key={editorKey}
+                ref={rich}
+                value={draft.body}
+                title={p?.title}
+                onChange={(body) => setDraft((d) => (d && d.body !== body ? { ...d, body } : d))}
+                onSave={() => void save()}
+                pages={pages}
+                label={label}
+                autoFocus={!isNew || Boolean(draft.title)}
+                onAsk={(quote) => setAsking(quote)}
+              />
+            ) : (
+              <WikiEditor
+                value={draft.body}
+                onChange={(body) => setDraft({ ...draft, body })}
+                onSave={() => void save()}
+                pages={pages}
+                label={label}
+                autoFocus
+              />
+            )}
+            {mode === "visual" && <p className="wiki-hintline small muted">{t("wiki.rich.hint", { key: modKey() })}</p>}
+          </>
         ) : (
           p && (
-            <div className="wiki-page__body wiki-prose">
-              {p.body.trim() ? (
-                <Markdown source={p.body} wikiLink={wikiLink} embed={embed} title={p.title} />
-              ) : (
-                <p className="muted">{t("wiki.emptyPage")}</p>
-              )}
-            </div>
+            <>
+              <h1 id="wiki-title" className="wiki-title" {...entityMenu(() => pageEntries(p))}>
+                {p.title}
+              </h1>
+              <PageMeta
+                page={p}
+                chooseAudience={choosesAudience}
+                onAudience={() => setAudienceOpen(true)}
+                onHistory={() => setHistoryOpen(true)}
+                onTag={onTag}
+              />
+              <div className="wiki-page__body wiki-prose">
+                {p.body.trim() ? (
+                  <Markdown source={p.body} wikiLink={wikiLink} embed={embed} title={p.title} />
+                ) : (
+                  <p className="muted">{t("wiki.emptyPage")}</p>
+                )}
+              </div>
+              <PageAbout page={p} onHistory={() => setHistoryOpen(true)} />
+            </>
           )
         )}
       </article>
-      {!editing && p && (
-        <aside className="wiki-aside" aria-label={t("wiki.aside")}>
-          {outline.length > 0 && <Outline items={outline} />}
-          <AgentUses page={p} />
-          <Backlinks page={p} />
-          <ShortHistory page={p} onOpen={() => setHistoryOpen(true)} />
-          <p className="small muted wiki-aside__authors">{p.authors.map((a) => authorLabel(a)).join(" · ")}</p>
-        </aside>
-      )}
       {conflict && draft && (
         <ConflictDialog
           mine={draft.body}
@@ -791,10 +1045,18 @@ export function WikiReader({
           onKeepMine={() => void save(conflict.version)}
           onKeepTheirs={() => {
             setConflict(null);
-            setDraft(null);
+            stopEdit();
           }}
           onClose={() => setConflict(null)}
           saving={action.isPending}
+        />
+      )}
+      {asking !== null && (
+        <WikiAskDialog
+          title={draft?.title || p?.title || ""}
+          quote={asking}
+          suggested={suggested}
+          onClose={() => setAsking(null)}
         />
       )}
       {p && <HistoryDialog page={p} open={historyOpen} onClose={() => setHistoryOpen(false)} />}

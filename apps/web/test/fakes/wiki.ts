@@ -90,6 +90,17 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
         at: minutesAgo(now, 50),
       });
       onboarding.outside.push({ kind: "issue", number: 131, title: "Atualizar o [[Onboarding]] com o PC dos agentes" });
+      // A DM's name is an internal key: the page says who the conversation is with.
+      if (agents[0])
+        onboarding.outside.push({
+          kind: "message",
+          channelId: channels[0].id,
+          messageId: "m-2",
+          channelName: "dm-7f3a9c2e41b8d06a5c11",
+          dm: { type: "agent", id: agents[0].id },
+          excerpt: "Atualiza o [[Onboarding]] com o novo acesso.",
+          at: minutesAgo(now, 40),
+        });
     }
     return list;
   });

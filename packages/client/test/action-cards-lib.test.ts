@@ -173,7 +173,7 @@ test("a stretch's pause card (ADR 0089): read safely, said with the agents' name
       ? new Intl.ListFormat("pt-BR").format(values?.names as string[])
       : `${key}:${JSON.stringify(values)}`) as unknown as TFunction;
   expect(stretchCardText(t, card, ["Ada", "Theo"])).toBe(
-    'chat.body.stretch_paused_runs:{"agents":"Ada e Theo","count":2,"steps":50}',
+    'chat.body.stretch_paused_runs:{"agents":"Ada e Theo","count":2}',
   );
   const spend = { ...card, reason: "spend" as const, limit: 20, agentIds: ["ada"] };
   expect(stretchCardText(t, spend, ["Ada"])).toBe(

@@ -82,6 +82,8 @@ import type {
   GifCategory,
   GifKey,
   InviteBatch,
+  IssueActivity,
+  IssueActivityEvent,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -2959,6 +2961,54 @@ export const useIssueActivity = (orgId: string, id: string | undefined) => {
   });
 };
 
+/**
+ * A live event while a task is open: a comment or an event on it (`issue.comment`) goes into its activity once, and
+ * an event also refreshes the task itself (status, assignee, a linked PR). `false`: not about this task.
+ */
+export function applyIssueActivityEvent(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  issueId: string,
+  event: { type: string },
+): boolean {
+  if (event.type !== "issue.comment" || !("issueId" in event) || !("activity" in event)) return false;
+  const { issueId: id, activity } = event as IssueActivityEvent;
+  if (id !== issueId) return false;
+  qc.setQueryData<IssueActivity[]>(keys.issueActivity(orgId, issueId), (list) =>
+    !list || list.some((a) => a.id === activity.id) ? list : [...list, activity],
+  );
+  if (activity.kind === "event") void qc.invalidateQueries({ queryKey: [...keys.issues(orgId), "one"] });
+  return true;
+}
+
+/**
+ * A task's activity live while it is open: comments and events come on the task's channel, or as org broadcasts
+ * for a task with none. What was missed while the connection was down comes back on reconnect.
+ */
+export function useIssueLive(
+  orgId: string,
+  connection: RealtimeConnection | null,
+  issue: { id: string; channelId: string | null } | undefined,
+) {
+  const qc = useQueryClient();
+  const issueId = issue?.id;
+  const channelId = issue?.channelId ?? null;
+  useEffect(() => {
+    if (!connection || !issueId) return;
+    const take = (event: { type: string }) => void applyIssueActivityEvent(qc, orgId, issueId, event);
+    const offOrg = connection.onUserEvent(take);
+    const offChannel = channelId ? connection.subscribe(channelId, take) : undefined;
+    const offReconnect = connection.onReconnect(() => {
+      void qc.invalidateQueries({ queryKey: keys.issueActivity(orgId, issueId) });
+    });
+    return () => {
+      offOrg();
+      offChannel?.();
+      offReconnect();
+    };
+  }, [connection, orgId, qc, issueId, channelId]);
+}
+
 export function useIssueAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -3481,6 +3531,22 @@ export const useMachineOutages = (orgId: string, enabled = true) => {
     retry: false,
     refetchInterval: (q) => ((q.state.data?.outages.length ?? 0) > 0 ? 30_000 : false),
     refetchOnWindowFocus: true,
+    meta: { quiet: true },
+  });
+};
+
+/**
+ * A computer's line (who works on it, who waits, estimates). `computer.queue` events refetch it; while anything
+ * waits it also refetches every 30 s, so the estimates keep counting down.
+ */
+export const useMachineQueue = (orgId: string, machineId: string | null | undefined, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.machineQueue(orgId, machineId ?? ""),
+    queryFn: () => api.machines.queue(orgId, machineId ?? ""),
+    enabled: enabled && Boolean(machineId),
+    retry: false,
+    refetchInterval: (q) => ((q.state.data?.waiting.length ?? 0) > 0 ? 30_000 : false),
     meta: { quiet: true },
   });
 };

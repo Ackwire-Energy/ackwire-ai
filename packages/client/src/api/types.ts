@@ -1359,6 +1359,17 @@ export type ChannelEvent =
       file?: string;
     };
 
+/**
+ * Something landed on a task's activity (packages/engine/src/issues.ts): a comment or an event. It comes on the
+ * task's channel, or as an org broadcast (no `channelId`) for a task with none.
+ */
+export type IssueActivityEvent = {
+  type: "issue.comment";
+  channelId?: string;
+  issueId: string;
+  activity: IssueActivity;
+};
+
 /** You followed or unfollowed a thread (on any of your devices). */
 export type ThreadFollowEvent = { type: "thread.follow" } & ThreadFollow;
 
@@ -3627,6 +3638,50 @@ export type OutageTarget = {
   reasonOff: "offline" | "paused" | null;
 };
 
+/** What a turn on a computer is for, never its content. Ids are null when the author is gone. */
+export type QueuePurpose =
+  | { kind: "person"; userId: string | null }
+  | { kind: "agent"; agentId: string | null }
+  | { kind: "routine" }
+  | { kind: "work" };
+
+export interface QueueWhere {
+  channelId: string;
+  threadId: string | null;
+}
+
+export interface QueueWorking {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  startedAt: string;
+  /** An estimate (the agent's typical turn), never exact; null with no basis. */
+  estimatedEndAt: string | null;
+}
+
+export interface QueueWaiting {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  /** A person waits on it: it goes first. */
+  people: boolean;
+  /** 1 = next. */
+  position: number;
+  estimatedStartAt: string | null;
+  /** Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line. */
+  after: string[];
+}
+
+/** `GET …/machines/{machineId}/queue`: a computer's line; `computer.queue` org events say it changed. */
+export interface ComputerQueue {
+  machineId: string;
+  name: string;
+  working: QueueWorking[];
+  waiting: QueueWaiting[];
+}
+
 /** `GET …/machines/outages`. */
 export interface MachineOutages {
   outages: MachineOutage[];
@@ -4253,7 +4308,16 @@ export interface ImportedSource {
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
 export type WikiBacklink =
   | { kind: "page"; slug: string; title: string; excerpt?: string }
-  | { kind: "message"; channelId: string; messageId: string; channelName: string; excerpt: string; at: string }
+  | {
+      kind: "message";
+      channelId: string;
+      messageId: string;
+      channelName: string;
+      /** In a direct conversation: who it is with (a DM's name is an internal key). */
+      dm?: { type: "agent" | "person"; id: string } | null;
+      excerpt: string;
+      at: string;
+    }
   | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
 

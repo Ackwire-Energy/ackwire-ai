@@ -2,6 +2,7 @@ import type { Agent, Channel, Member } from "@agenteschat/client";
 import { Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { ChannelPinsButton } from "@/components/ChannelPins";
+import { QueueButton } from "@/components/ComputerQueue";
 import { useChannelMenu } from "@/components/entity-menus";
 import { NavToggle } from "@/components/NavDrawer";
 import { HeaderSearch } from "@/components/search/HeaderSearch";
@@ -16,6 +17,7 @@ import "./channel-header.css";
 export function ChannelHeader({
   channel,
   isMember,
+  queueMachine,
   people,
   agents,
   onDetails,
@@ -25,6 +27,8 @@ export function ChannelHeader({
 }: {
   channel: Channel;
   isMember: boolean;
+  /** The computer the channel's agents share: who waits in line for it shows first. */
+  queueMachine: string | null;
   people: Member[];
   agents: Agent[];
   /** The cog: the channel's details dialog (description, members, archive…). */
@@ -50,6 +54,7 @@ export function ChannelHeader({
         {channel.topic && <span className="channel__topic">{channel.topic}</span>}
       </div>
       <div className="channel__acts">
+        <QueueButton machineId={queueMachine} />
         {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
         {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
         <button

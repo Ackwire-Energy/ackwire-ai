@@ -1,5 +1,5 @@
 {
-  "id": "06b3873c-a9b9-4512-a278-7b1d21abc001",
+  "id": "2feca91b-becd-454d-aa9e-2f46528a884f",
   "prevId": "b0f8ee1f-9b59-4511-b9ed-e681b76cb972",
   "version": "7",
   "dialect": "postgresql",
@@ -2805,13 +2805,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "muted": {
-          "name": "muted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {},
@@ -3584,87 +3577,6 @@
       "compositePrimaryKeys": {
         "thread_follows_root_message_id_user_id_pk": {
           "name": "thread_follows_root_message_id_user_id_pk",
-          "columns": [
-            "root_message_id",
-            "user_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.thread_reads": {
-      "name": "thread_reads",
-      "schema": "",
-      "columns": {
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "root_message_id": {
-          "name": "root_message_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_read_at": {
-          "name": "last_read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "thread_reads_user_id_users_id_fk": {
-          "name": "thread_reads_user_id_users_id_fk",
-          "tableFrom": "thread_reads",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "thread_reads_org_id_channel_id_channels_org_id_id_fk": {
-          "name": "thread_reads_org_id_channel_id_channels_org_id_id_fk",
-          "tableFrom": "thread_reads",
-          "tableTo": "channels",
-          "columnsFrom": [
-            "org_id",
-            "channel_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "thread_reads_root_message_id_user_id_pk": {
-          "name": "thread_reads_root_message_id_user_id_pk",
           "columns": [
             "root_message_id",
             "user_id"
@@ -12671,7 +12583,24 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "agent_run_steps_run_id_index": {
+          "name": "agent_run_steps_run_id_index",
+          "columns": [
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"agent_run_steps\".\"kind\" = 'error' and \"agent_run_steps\".\"data\"->>'reason' = 'brain_unavailable'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "agent_run_steps_run_id_agent_runs_id_fk": {
           "name": "agent_run_steps_run_id_agent_runs_id_fk",
@@ -12957,6 +12886,21 @@
               "asc": true,
               "nulls": "last"
             },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_runs_created_at_index": {
+          "name": "agent_runs_created_at_index",
+          "columns": [
             {
               "expression": "created_at",
               "isExpression": false,
@@ -15404,6 +15348,21 @@
               "asc": true,
               "nulls": "last"
             },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "usage_records_created_at_index": {
+          "name": "usage_records_created_at_index",
+          "columns": [
             {
               "expression": "created_at",
               "isExpression": false,
