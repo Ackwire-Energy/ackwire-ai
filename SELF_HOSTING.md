@@ -501,8 +501,9 @@ on your tailnet with `tailscale serve` (on this computer:
 the `https://…ts.net` address it prints, then start it again. The desktop app does both with one
 switch.
 
-**From the desktop app** (macOS and Linux). On its first screen, click **Use your own server**, then
-**Run agentes.chat on this Mac** (this computer, on Linux). Your name comes from this computer; type
+**From the desktop app** (macOS, Windows and Linux). On its first screen, click **Use your own server**,
+then **Run agentes.chat on this Mac** (this computer, on Windows and Linux). On Windows the folder is
+`%USERPROFILE%\.agentes`. Your name comes from this computer; type
 your email (your team sees it). **Reach it from your phone and teammates** puts it on your tailnet
 (off; you can turn it on later), and **Send anonymous usage statistics** is on (it writes `TELEMETRY`
 in `~/.agentes/.env`). **Start agentes.chat** then prepares the folder and the database (the first time
@@ -1328,6 +1329,11 @@ natively on this machine for them takes `sudo agentes-runner services allow tcp/
 agentes.chat behind a `tailscale serve`, an nginx or a Caddy outside Docker). The Kotlin compile daemon
 doesn't run there: the computer keeps the default uid range, and Kotlin compiles inside Gradle.
 
+The agent browser opens an offline new tab in its responsible person's language, with no outside request.
+A computer on your server never measures or reports its public address: only a workspace's managed computer
+(`MACHINE_PROVISIONING=external`) does. The system runner's network options for integrators are in
+[ADR 0030](docs/adr/0030-runner-isolation.md#addendum-browser-start-page-and-network-options).
+
 </details>
 
 <details>
@@ -1396,13 +1402,17 @@ computer's backups: they hold sign-ins. The server's database never has them.
 <summary><b>Upgrades</b></summary>
 
 Download the compose file again with each release, since a release can change it, then pull and
-restart:
+restart. Take it from the release's tag (here `v1.2.3`, the newest on the
+[releases page](https://github.com/agentes-chat/agentes-chat/releases)), so it matches the image:
 
 ```sh
-curl -fsSLO https://agentes.chat/install/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/agentes-chat/agentes-chat/v1.2.3/docker-compose.yml
 docker compose pull
 docker compose up -d
 ```
+
+`https://agentes.chat/install/docker-compose.yml`, the one the setup downloads, is the file of the
+build agentes.chat runs, which follows `main` and can be ahead of the latest release.
 
 Keep your settings in `.env` and never edit `docker-compose.yml`, so replacing it loses nothing.
 Anything a variable can't set goes in a `docker-compose.override.yml` beside it, which Compose merges
@@ -1410,10 +1420,9 @@ on its own.
 
 Migrations run when the new version starts, so that is the whole upgrade for a small instance. The
 compose file runs `ghcr.io/agentes-chat/agentes:latest`, the latest release, for amd64 and arm64;
-`:1.2.3` and `:1.2` tags exist alongside it, and `:edge` follows `main`. To hold a version, set
-`AGENTES_IMAGE` in `.env` to a version tag or a digest (`ghcr.io/agentes-chat/agentes@sha256:…`),
-and download that version's compose file (`docker-compose.yml` at the repository's `v1.2.3` tag)
-instead of agentes.chat's latest one. This prints the digest you have:
+`:1.2.3` and `:1.2` tags exist alongside it, and `:edge` is built from every push to `main` that
+passes CI. To hold a version, set `AGENTES_IMAGE` in `.env` to a version tag or a digest
+(`ghcr.io/agentes-chat/agentes@sha256:…`), and keep that version's compose file. This prints the digest you have:
 
 ```sh
 docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/agentes-chat/agentes:latest
@@ -1466,21 +1475,33 @@ back. On Tailscale, run it from another device in your tailnet.
 <details>
 <summary><b>From source</b></summary>
 
-To run your own changes, build the image and point the compose file at it:
+To run your own changes, or before anything is published to GHCR and npm, build the image and the
+setup from a checkout. You need Git, Docker and [Bun](https://bun.sh) (`packageManager` in
+package.json names the version):
 
 ```sh
 git clone https://github.com/agentes-chat/agentes-chat.git
 cd agentes-chat
-docker build -t agentes:local .
-echo AGENTES_IMAGE=agentes:local >> .env
-npx @agenteschat/setup
+bun install
+bun run --filter '@agenteschat/setup' build
+docker build -t ghcr.io/agentes-chat/agentes:latest .
+mkdir -p ~/agentes && cp docker-compose.yml ~/agentes/
+AGENTES_INSTALL_SETUP=$PWD/packages/setup/dist/index.js sh install.sh --dir ~/agentes
 ```
 
-The setup keeps `AGENTES_IMAGE`, so it and every later command run your image. To upgrade,
-`git pull`, build again and `docker compose up -d`. Skip `docker compose pull` with a local image: it
-looks for `agentes:local` in a registry and fails. `docker compose pull postgres` updates the
-database image alone. The build installs every workspace's dependencies and builds the web app, so
-it needs more memory than running the image. The image keeps the checkout's file permissions and
+The image gets the tag the compose file runs, so Compose finds it on this machine and pulls nothing
+for it. The compose file copied from the checkout matches the image you built; the setup keeps a
+compose file it finds and downloads one only when the folder has none. `AGENTES_INSTALL_SETUP` makes
+install.sh run your build of the setup with its pinned Bun instead of the published package. When
+Docker needs root on Linux, run that line as `sudo env AGENTES_INSTALL_SETUP=… sh install.sh …`:
+sudo drops the variable otherwise. For the backup profile, build its image too:
+`docker build -t ghcr.io/agentes-chat/backup:latest deploy/backup`.
+
+To upgrade, `git pull`, build the image again, copy `docker-compose.yml` again, then
+`docker compose up -d` in `~/agentes`. Skip `docker compose pull` with a local image: it replaces it
+with the registry's (or fails while nothing is published). `docker compose pull postgres` updates
+the database image alone. The build installs every workspace's dependencies and builds the web app,
+so it needs more memory than running the image. The image keeps the checkout's file permissions and
 runs as an unprivileged user, so on a host whose umask is stricter than 022, clone and pull under
 `umask 022` (for example `(umask 022 && git pull)`).
 
@@ -1633,72 +1654,3 @@ addresses are refused, so nobody can turn the server against its own network. Re
 through a connected computer instead.
 
 </details>
-
-### Browser start page and observed address
-
-The agent browser opens an offline agentes.chat new tab. Its language follows the agent's responsible person
-(Portuguese or English, with English as the fallback). The clock uses the computer's time zone. No external
-font, image or page request is needed. System installs keep the extension files outside agent-owned homes,
-under `/opt/agentes-runner/browser/start/<uid>`; a regular install uses the runner's own home. Existing profiles
-and sign-ins are kept. A running browser picks up changed names and observed addresses every 30 seconds.
-
-Only a workspace’s managed computer reports its public address in settings and the screen footer. Personal
-and server-hosted computers do not measure or report it. A server-authorized managed system runner
-asks this server's `/api/machines/ip` without credentials every 30 seconds; configure `TRUSTED_PROXIES` for your
-reverse proxy as for other IP-based features. Private LAN and tailnet addresses are hidden, and three failed
-observations clear the display. A country mark appears only when the response includes a recognized country.
-
-A Linux system runner can optionally set `networkLauncher` in its root-owned `config.json` to an absolute
-executable path. The helper receives `<uid> -- <command> [arguments...]`, prepares or enters the network
-context synchronously, then executes the command. Root network diagnostics and the agent's `runuser` launch
-use the same helper. The executable and every parent must be root-owned, with no symlinks or group/other write
-permissions. A failed helper prevents the process from starting. No helper is configured by default. Apply
-changes through the root configuration; an existing process keeps its network context until it ends. The
-host loopback firewall remains active for existing processes. Helpers must preserve access to the runner's
-filesystem sockets and the read-only start-page directory. With this option, Chrome also disables non-proxied
-WebRTC UDP through its launch flag; no managed browser policy is installed.
-
-A deployment whose trusted routing hook redirects foreign traffic through loopback can set the root runner
-config's optional `networkMark` to one unsigned 32-bit packet bit. No exception is installed when it is absent.
-The mark must be distinct from the local-service ownership tag (`0x41000000`). The loopback guard exempts
-marked traffic only when it has no destination NAT and an unmarked FIB address-type lookup says the destination
-is not local. Host-owned public addresses and wildcard listeners therefore keep their normal protection.
-The deployment must filter private destinations before marking packets and prevent agent processes from gaining
-`CAP_NET_ADMIN` or `CAP_NET_RAW` (including through file capabilities). The mark never replaces those filters.
-Changes reconcile the local guard atomically. The shared guard for `managedBy: host` does not use per-runner marks.
-
-When `networkMark` is configured, `systemLauncher` runs `setpriv --no-new-privs --bounding-set=-net_admin,-net_raw` immediately before `runuser`, after the optional network launcher.
-This also covers deployments using marked routing without a namespace launcher. The kernel bind self-check
-uses the same restriction. Existing processes must be drained or restarted before relying on it.
-
-With no-new-privileges enabled, Chrome needs a working user-namespace sandbox; verify it during Linux acceptance.
-
-Without `networkDrainSeconds`, network changes do not reconnect the machine or cancel foreground work. Workers with requests, background tasks,
-secret installs, handoffs, browser streams or desktop leases finish those before they retire. Every launch for
-one UID keeps its previous network while that worker, desktop (including startup) or terminal still exists.
-Linux also retains that context while any other process runs as the UID, including daemonized services.
-Only the launch wrapper's first UID-owned worker is excluded from that process hold; an incomplete process
-scan keeps the transition pending. Once all those scopes drain, the next launch uses the new settings.
-Existing desktops and terminals keep running. The root service atomically writes `network-state.json`
-in its runner home (0600): version 1, PID and Linux `/proc` start ticks, observation time, active
-`networkLauncher`/`networkMark` (null when absent), `pendingUids` for old workers and tracked scopes, and
-`uidNetworks` pins saved before launch (only held or imminent contexts; inactive pins are removed).
-The observation is bounded to 4 MiB; an oversized new launch is refused before creating a process.
-Pins survive a daemon restart while its desktops remain. Existing processes
-without a saved pin are adopted only after proving they share the runner's host namespace; otherwise new work
-waits for those old processes to end. Every directory containing this root observation must be root controlled.
-An integrator must verify process identity, root ownership, the actual firewall rule, and live process namespace
-membership before declaring a migration complete; the file describes launch defaults, not proof that every
-process moved. External routing must preserve already established connections during a change. Keep an installed
-routing mark until connections using it have drained before removing its exception.
-
-
-For a finite transition an administrator may set `networkDrainSeconds` (30–3600). New work waits whenever its
-UID still has the prior network context. Existing sessions get a visible deadline, then the runner closes only
-its own workers, desktops and terminals. The root routing integrator must block stale host-UID egress at that
-deadline and retain the pending status until all old processes are gone; unknown processes require operator
-attention. The persisted `transitions` array in `network-state.json` exposes the per-UID deadline and state.
-Reapplying the same network settings or restarting the daemon does not extend it.
-
-An optional `networkRevision` (default 0) identifies the isolation implementation. Increase it when the
-network helper changes behavior at the same path; existing UID contexts then follow the same bounded drain.

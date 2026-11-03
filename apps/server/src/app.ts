@@ -349,7 +349,7 @@ export function createApp(options: AppOptions) {
       return c.redirect(helpDocsUrl(c.req.param("slug"), locale), 301);
     });
   }
-  // The setup downloads it into a folder that has none: this release's, from any instance.
+  // The setup downloads it into a folder that has none: this build's, from any instance.
   app.get("/install/docker-compose.yml", (c) =>
     c.body(composeFile, 200, { "content-type": "application/yaml; charset=utf-8", "cache-control": "no-store" }),
   );

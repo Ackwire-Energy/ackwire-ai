@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { renderUnicodeCompact } from "uqr";
 
-/** Every instance serves its own compose file there; agentes.chat's is the latest release's. */
+/** Every instance serves its own build's compose file there; agentes.chat's follows main, so it can be ahead of `:latest`. */
 export const COMPOSE_URL = "https://agentes.chat/install/docker-compose.yml";
 /** `INSTALL_DOCS_URL` in @agenteschat/i18n, as text: this MIT package bundles none of the AGPL workspace. */
 export const GUIDE_URL = "https://agentes.chat/docs/install-on-a-server";
