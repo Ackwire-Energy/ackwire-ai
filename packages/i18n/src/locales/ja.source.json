@@ -11126,6 +11126,42 @@
   "issues.form.agentStarts": {
     "value": "{{name}} starts as soon as the task is created. Anything sensitive asks for your approval."
   },
+  "issues.form.agentStartsAll": {
+    "value": "{{name}} starts as soon as the task is created, with the description, the criteria and the attachments. Anything sensitive asks for your approval."
+  },
+  "issues.form.titleShort": {
+    "value": "Task title"
+  },
+  "issues.form.quickPlaceholder": {
+    "value": "Describe what's needed. Paste screenshots, drop files. Lines starting with “-” become acceptance criteria."
+  },
+  "issues.form.pasteHint": {
+    "value": "Paste a screenshot with {{keys}} or drop files here."
+  },
+  "issues.form.expand": {
+    "value": "Open the full form"
+  },
+  "issues.form.collapse": {
+    "value": "Back to the quick form"
+  },
+  "issues.form.another": {
+    "value": "Create another"
+  },
+  "issues.form.addCriterion": {
+    "value": "Add a criterion"
+  },
+  "issues.form.removeCriterion": {
+    "value": "Remove the criterion"
+  },
+  "issues.form.drop": {
+    "value": "Drop to attach to the task"
+  },
+  "issues.form.dropText": {
+    "value": "Photos, videos, PDFs, spreadsheets… up to {{max}} MB each."
+  },
+  "issues.form.createHint": {
+    "value": "{{keys}} creates the task"
+  },
   "issues.back": {
     "value": "Tasks"
   },
@@ -11187,6 +11223,12 @@
   "issues.noActivity": {
     "value": "Nothing yet."
   },
+  "issues.discussion": {
+    "value": "Discussion"
+  },
+  "issues.noComments": {
+    "value": "No comments yet."
+  },
   "issues.comment": {
     "value": "Comment on the task"
   },
@@ -11231,6 +11273,48 @@
   },
   "issues.labels": {
     "value": "Labels"
+  },
+  "issues.tabs.label": {
+    "value": "Task sections"
+  },
+  "issues.tabs.details": {
+    "value": "Details"
+  },
+  "issues.tabs.files": {
+    "value": "Attachments"
+  },
+  "issues.tabs.history": {
+    "value": "History"
+  },
+  "issues.files.title": {
+    "value": "Attachments"
+  },
+  "issues.files.add": {
+    "value": "Add files"
+  },
+  "issues.files.addHint": {
+    "value": "or drop them here"
+  },
+  "issues.files.grid": {
+    "value": "Grid"
+  },
+  "issues.files.empty": {
+    "value": "No attachments yet. Drop files here or paste a screenshot."
+  },
+  "issues.files.fromCreation": {
+    "value": "At creation · {{when}}"
+  },
+  "issues.files.fromComment": {
+    "value": "{{name}}'s comment · {{when}}"
+  },
+  "issues.files.linked": {
+    "value": "Linked by {{name}}"
+  },
+  "issues.history.commented": {
+    "value": "commented"
+  },
+  "issues.history.commentedFiles": {
+    "value": "commented with attachments"
   },
   "issues.event.work_update": {
     "value": "{{text}}"
