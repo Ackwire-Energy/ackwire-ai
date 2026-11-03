@@ -354,7 +354,7 @@ export async function audienceChanged(
   from: AgentAudience,
   to: AgentAudience,
   planFrom = from,
-) {
+): Promise<boolean> {
   const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
   await recordAudit(db, {
     orgId,
@@ -363,7 +363,7 @@ export async function audienceChanged(
     target: { type: "agent", id: after.id },
     details: { from, to, ...(planOwner ? { planOwner } : {}) },
   });
-  await planOpened(db, orgId, actorId, after, planFrom, to);
+  return planOpened(db, orgId, actorId, after, planFrom, to);
 }
 
 /**
@@ -377,15 +377,16 @@ export async function planOpened(
   after: Pick<Agent, "id" | "brain" | "ownerUserId">,
   from: AgentAudience,
   to: AgentAudience,
-) {
+): Promise<boolean> {
   const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
-  if (!planOwner || planOwner === actorId || !widensAudience(from, to, planOwner)) return;
+  if (!planOwner || planOwner === actorId || !widensAudience(from, to, planOwner)) return false;
   await enqueue(db, {
     orgId,
     kind: PLAN_OPENED_JOB,
     payload: { agentId: after.id, actorId, from, to },
     dedupeKey: `plan-opened:${crypto.randomUUID()}`,
   });
+  return true;
 }
 
 /**

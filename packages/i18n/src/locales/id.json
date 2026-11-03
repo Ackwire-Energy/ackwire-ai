@@ -1908,7 +1908,8 @@
     "mailLoss": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi.",
     "mailLoss_female": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi.",
     "planTitle": "Pakai paket {{owner}}?",
-    "planOpen": "Percakapan dengan {{name}} akan memakai paket {{plan}} milik {{owner}} dan batasnya. {{owner}} akan menerima email tentang ini."
+    "planOpen": "Percakapan dengan {{name}} akan memakai paket {{plan}} milik {{owner}} dan batasnya. {{owner}} akan menerima email tentang ini.",
+    "plansTitle": "Pakai paket {{owners}}?"
   },
   "teamChecks": {
     "group": "Yang tidak diulangi agen",

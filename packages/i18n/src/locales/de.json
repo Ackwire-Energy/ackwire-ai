@@ -1966,7 +1966,8 @@
     "mailLoss": "{{name}} hat Zugriff auf das Postfach von {{owners}}. Wenn mehr Leute mit ihm sprechen, könnten sie über ihn an diese E-Mails kommen, daher wird dieser Zugriff entfernt. Wer das Postfach verbunden hat, kann den Zugriff wieder erteilen.",
     "mailLoss_female": "{{name}} hat Zugriff auf das Postfach von {{owners}}. Wenn mehr Leute mit ihr sprechen, könnten sie über sie an diese E-Mails kommen, daher wird dieser Zugriff entfernt. Wer das Postfach verbunden hat, kann den Zugriff wieder erteilen.",
     "planTitle": "Das Abo von {{owner}} nutzen?",
-    "planOpen": "Unterhaltungen mit {{name}} nutzen das {{plan}}-Abo von {{owner}} und seine Limits. {{owner}} bekommt dazu eine E-Mail."
+    "planOpen": "Unterhaltungen mit {{name}} nutzen das {{plan}}-Abo von {{owner}} und seine Limits. {{owner}} bekommt dazu eine E-Mail.",
+    "plansTitle": "Die Abos von {{owners}} nutzen?"
   },
   "teamChecks": {
     "group": "Was der Agent nicht wiederholt hat",

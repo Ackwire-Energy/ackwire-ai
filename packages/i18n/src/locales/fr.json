@@ -2032,7 +2032,8 @@
     "mailLoss": "{{name}} a accès à la boîte mail de {{owners}}. Si plus de personnes lui parlent, elles pourraient atteindre ces e-mails par son intermédiaire, donc cet accès est retiré. La personne qui a connecté la boîte mail peut le redonner.",
     "mailLoss_female": "{{name}} a accès à la boîte mail de {{owners}}. Si plus de personnes lui parlent, elles pourraient atteindre ces e-mails par son intermédiaire, donc cet accès est retiré. La personne qui a connecté la boîte mail peut le redonner.",
     "planTitle": "Utiliser le forfait de {{owner}} ?",
-    "planOpen": "Les conversations avec {{name}} utiliseront le forfait {{plan}} de {{owner}} et ses limites. {{owner}} recevra un e-mail pour le prévenir."
+    "planOpen": "Les conversations avec {{name}} utiliseront le forfait {{plan}} de {{owner}} et ses limites. {{owner}} recevra un e-mail pour le prévenir.",
+    "plansTitle": "Utiliser les forfaits de {{owners}} ?"
   },
   "teamChecks": {
     "group": "Ce que l'agent n'a pas refait",

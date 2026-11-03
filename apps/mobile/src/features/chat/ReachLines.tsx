@@ -18,6 +18,7 @@ import {
 } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -190,20 +191,24 @@ export function useWidenAsk(agent: Agent | undefined) {
         me && opensOthersPlan(agent, next, me)
           ? (dir.memberById.get(agent.ownerUserId ?? "")?.name ?? t("channel.unknownPerson"))
           : null;
-      const question = widenQuestion(t, agent, owner, mailboxes);
-      if (!question) return Promise.resolve(true);
-      return new Promise<boolean>((answer) =>
-        Alert.alert(
-          question.title,
-          question.description,
-          [
-            { text: t("common.cancel"), style: "cancel", onPress: () => answer(false) },
-            { text: t("common.continue"), onPress: () => answer(true) },
-          ],
-          { cancelable: true, onDismiss: () => answer(false) },
-        ),
-      );
+      return confirmQuestion(t, widenQuestion(t, agent, owner, mailboxes));
     };
+}
+
+/** Asks `question` with Cancel and Continue (none: yes at once). */
+export function confirmQuestion(t: TFunction, question: { title: string; description: string } | null) {
+  if (!question) return Promise.resolve(true);
+  return new Promise<boolean>((answer) =>
+    Alert.alert(
+      question.title,
+      question.description,
+      [
+        { text: t("common.cancel"), style: "cancel", onPress: () => answer(false) },
+        { text: t("common.continue"), onPress: () => answer(true) },
+      ],
+      { cancelable: true, onDismiss: () => answer(false) },
+    ),
+  );
 }
 
 const styles = StyleSheet.create({

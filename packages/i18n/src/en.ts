@@ -1919,6 +1919,8 @@ export const en = {
     planTitle: "Use {{owner}}'s plan?",
     planOpen:
       "Conversations with {{name}} will use {{owner}}'s {{plan}} plan and its limits. {{owner}} will get an email about it.",
+    /** "Usar em outros agentes" opening the plans of several people: then one `planOpen` line per owner. */
+    plansTitle: "Use the plans of {{owners}}?",
   },
   teamChecks: {
     group: "What the agent didn't repeat",

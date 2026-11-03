@@ -1949,6 +1949,7 @@ export const ptBR = {
     planTitle: "Usar o plano de {{owner}}?",
     planOpen:
       "As conversas com {{name}} vão usar o plano do {{plan}} de {{owner}} e os limites dele. {{owner}} vai receber um email avisando.",
+    plansTitle: "Usar os planos de {{owners}}?",
   },
   teamChecks: {
     group: "O que o agente não repetiu",

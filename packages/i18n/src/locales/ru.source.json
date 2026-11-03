@@ -4768,6 +4768,9 @@
   "reach.planOpen": {
     "value": "Conversations with {{name}} will use {{owner}}'s {{plan}} plan and its limits. {{owner}} will get an email about it."
   },
+  "reach.plansTitle": {
+    "value": "Use the plans of {{owners}}?"
+  },
   "teamChecks.group": {
     "value": "What the agent didn't repeat"
   },

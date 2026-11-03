@@ -53,7 +53,7 @@ import {
   ownSignInTitle,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
-import { EVERYONE_AUDIENCE } from "@agenteschat/client/lib/audience";
+import { EVERYONE_AUDIENCE, setupPlanOpens, setupPlanQuestion } from "@agenteschat/client/lib/audience";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import {
   type Advanced,
@@ -1053,8 +1053,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     }),
     ...(carried ? [autonomyWords(t, carried)] : []),
   ].join(" · ");
-  const copyTo = async (agentIds: string[]) => {
+  const copyTo = async (agentIds: string[], opens: { agent: string; owner: string }[]) => {
     if (!setup) return;
+    // Letting more people talk to agents on other people's plans asks once, before anything saves.
+    if (!(await asks.confirm(setupPlanQuestion(t, { kind, provider: current?.provider ?? null }, opens)))) return;
     setBusy(true);
     try {
       if (!unchanged) await saveThis();
@@ -1600,7 +1602,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           onWithAutonomy={setWithAutonomy}
           busy={busy}
           onClose={() => setCopying(false)}
-          onUse={(agentIds) => void copyTo(agentIds)}
+          onUse={(agentIds, opens) => void copyTo(agentIds, opens)}
         />
       )}
       {asks.dialog}
@@ -1631,7 +1633,8 @@ function SetupCopyDialog({
   onWithAutonomy: (on: boolean) => void;
   busy: boolean;
   onClose: () => void;
-  onUse: (agentIds: string[]) => void;
+  /** `opens`: the agents picked whose owner's plan it opens to more people (`setupPlanOpens`). */
+  onUse: (agentIds: string[], opens: { agent: string; owner: string }[]) => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -1753,7 +1756,22 @@ function SetupCopyDialog({
         <Button variant="ghost" onClick={onClose}>
           {t("common.cancel")}
         </Button>
-        <Button variant="primary" disabled={chosen.length === 0} loading={busy} onClick={() => onUse(chosen)}>
+        <Button
+          variant="primary"
+          disabled={chosen.length === 0}
+          loading={busy}
+          onClick={() =>
+            onUse(
+              chosen,
+              setupPlanOpens(
+                results,
+                chosen,
+                (id) => byId.get(id),
+                (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
+              ),
+            )
+          }
+        >
           {chosen.length === 0
             ? t("agentPage.work.brain.copy.pick")
             : t("agentPage.work.brain.copy.use", { count: chosen.length })}

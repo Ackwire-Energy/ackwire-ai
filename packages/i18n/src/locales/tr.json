@@ -1954,7 +1954,8 @@
     "mailLoss": "{{name}} bir posta kutusuna erişebiliyor (sahibi: {{owners}}). Onunla daha fazla kişi konuşursa bu e-postalara onun üzerinden ulaşabilirler, bu yüzden bu erişim kaldırılır. Posta kutusunu bağlayan kişi erişimi yeniden verebilir.",
     "mailLoss_female": "{{name}} bir posta kutusuna erişebiliyor (sahibi: {{owners}}). Onunla daha fazla kişi konuşursa bu e-postalara onun üzerinden ulaşabilirler, bu yüzden bu erişim kaldırılır. Posta kutusunu bağlayan kişi erişimi yeniden verebilir.",
     "planTitle": "{{owner}} adlı kişinin planı kullanılsın mı?",
-    "planOpen": "{{name}} ile konuşmalar {{owner}} adlı kişinin {{plan}} planını ve limitlerini kullanacak. {{owner}} bununla ilgili bir e-posta alacak."
+    "planOpen": "{{name}} ile konuşmalar {{owner}} adlı kişinin {{plan}} planını ve limitlerini kullanacak. {{owner}} bununla ilgili bir e-posta alacak.",
+    "plansTitle": "{{owners}} adlı kişilerin planları kullanılsın mı?"
   },
   "teamChecks": {
     "group": "Ajanın tekrarlamadıkları",

@@ -2170,6 +2170,8 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   color: var(--ink-muted);
   font-size: 14px;
   line-height: 20px;
+  /* A question about several people puts each on its own line. */
+  white-space: pre-line;
 }
 .ac-dialog__tools {
   padding: 0 var(--dialog-pad) 8px;

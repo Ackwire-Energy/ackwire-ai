@@ -22,6 +22,7 @@ import {
   normalizeBrainModel,
   setAgentBrain,
 } from "./brain-settings";
+import { planIsOwners } from "./brains/select";
 import type { BrainKind } from "./brains/types";
 import { caches } from "./cache";
 import { ValidationError } from "./errors";
@@ -90,6 +91,11 @@ export interface SetupResult {
   params?: Record<string, string>;
   /** Its Autonomia changes (in a preview, would), whatever its AI does. */
   autonomy?: { from: CommandApproval; to: CommandApproval };
+  /**
+   * It lets more people talk to it on its owner's plan, someone else's (in a preview, would): that owner gets an email
+   * (ADR 0059 §5), so the apps ask first.
+   */
+  opensPlan?: true;
 }
 
 const nullableId = (v: unknown, what: string): string | null => {
@@ -282,21 +288,41 @@ export async function applyAgentSetup(
           results.set(t.id, { agentId: t.id, ...ai });
           continue;
         }
+        let opensPlan = false;
         try {
           await tx.transaction(async (sp) => {
             if (p.status === "applied") {
               if (p.patch) await updateAgent(sp, userId, orgId, t.id, p.patch, { remember: false });
+              let opened = false;
               await setAgentBrain({ db: sp }, userId, orgId, t.id, p.brain, {
                 remember: false,
                 audit: { via: "setup" },
+                onPlanOpened: () => {
+                  opened = true;
+                },
               });
+              // The email goes only where its owner's plan thinks (the job checks again): the question says so too.
+              if (opened) {
+                const [after] = await sp
+                  .select({ machineId: schema.agents.machineId, account: schema.agents.brainAccountId })
+                  .from(schema.agents)
+                  .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.id, t.id)));
+                opensPlan =
+                  !!after?.machineId &&
+                  (await planIsOwners(sp, t, after.machineId, after.account ? { id: after.account } : undefined));
+              }
             }
             if (autonomy) {
               await setAgentMissionApproval({ db: sp }, userId, orgId, t.id, autonomy, { audit: { via: "setup" } });
             }
           });
           applied.push(t.id);
-          results.set(t.id, { agentId: t.id, ...ai, ...(autonomy ? { autonomy: { from, to: autonomy } } : {}) });
+          results.set(t.id, {
+            agentId: t.id,
+            ...ai,
+            ...(autonomy ? { autonomy: { from, to: autonomy } } : {}),
+            ...(opensPlan ? { opensPlan: true as const } : {}),
+          });
           // Not one that kept its own account (even one that already thought so), nor one that took only the Autonomia.
           if (p.status === "applied" ? !p.keeps : p.status === "same" && !p.ownAccount) whole ??= t.id;
         } catch (error) {

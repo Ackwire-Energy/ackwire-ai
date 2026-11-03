@@ -537,7 +537,12 @@ export async function setAgentBrain(
   orgId: string,
   agentId: string,
   input: AgentBrainInput,
-  options: { remember?: boolean; audit?: Record<string, unknown> } = {},
+  options: {
+    remember?: boolean;
+    audit?: Record<string, unknown>;
+    /** Called in its transaction when the save lets more people talk to it on its owner's plan (`planOpened`). */
+    onPlanOpened?: () => void;
+  } = {},
 ): Promise<AgentBrainView> {
   const { agent, admin, membership } = await agentBrainAccess(deps.db, userId, orgId, agentId);
   const from = brainOf(agent.brain);
@@ -673,11 +678,13 @@ export async function setAgentBrain(
       });
     // Onto a plan it answered nobody on it before: one that keeps answering others opens that plan to them.
     const planFrom = changed && isComputerBrain(brain) ? OWNER_ONLY : audienceOf(agent);
+    let opened = false;
     if (row && audience) {
       await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(row), userId);
       const to = { ...audience, consultable: agent.consultable };
-      await audienceChanged(tx, orgId, userId, row, audienceOf(agent), to, planFrom);
-    } else if (row && changed) await planOpened(tx, orgId, userId, row, planFrom, audienceOf(row));
+      opened = await audienceChanged(tx, orgId, userId, row, audienceOf(agent), to, planFrom);
+    } else if (row && changed) opened = await planOpened(tx, orgId, userId, row, planFrom, audienceOf(row));
+    if (opened) options.onPlanOpened?.();
     return { row, released };
   });
   caches.agents.delete(`${orgId}:${agentId}`);

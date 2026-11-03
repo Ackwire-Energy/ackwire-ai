@@ -205,14 +205,16 @@ export function useWidenAsk(agent: Agent) {
     question: { title: string; description: string };
     answer: (yes: boolean) => void;
   } | null>(null);
+  /** Asks `question` (none: yes at once). */
+  const confirm = (question: { title: string; description: string } | null): Promise<boolean> =>
+    question ? new Promise((answer) => setAsking({ question, answer })) : Promise.resolve(true);
   const ask =
     (next: AgentAudience) =>
     (mailboxes: ForeignMailbox[]): Promise<boolean> => {
       const owner = opensOthersPlan(agent, next, me.user.id)
         ? (dir.memberById.get(agent.ownerUserId ?? "")?.name ?? t("channel.unknownPerson"))
         : null;
-      const question = widenQuestion(t, agent, owner, mailboxes);
-      return question ? new Promise((answer) => setAsking({ question, answer })) : Promise.resolve(true);
+      return confirm(widenQuestion(t, agent, owner, mailboxes));
     };
   const answer = (yes: boolean) => {
     asking?.answer(yes);
@@ -241,5 +243,5 @@ export function useWidenAsk(agent: Agent) {
       </Dialog>
     </span>
   );
-  return { ask, dialog };
+  return { ask, confirm, dialog };
 }

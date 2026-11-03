@@ -2028,6 +2028,44 @@ describe("Usar em outros agentes (ADR 0094)", () => {
     });
     expect(document.body.textContent).toContain("1 agente agora pensa com Opus pelo plano do Claude.");
     expect(screen().queryByRole("dialog", { name: "Quem pensa" })).toBeNull();
+    // No agent picked on someone else's plan: nothing asked.
+    expect(screen().queryByRole("dialog", { name: /^Usar o plano/ })).toBeNull();
+  });
+
+  test("an agent picked on someone else's plan: one question naming its owner first; Cancelar saves nothing, Continuar once", async () => {
+    const state = await withOthers();
+    state.setupResults = {
+      ...state.setupResults,
+      [ATLAS_ID]: { status: "applied", opensPlan: true },
+    };
+    const d = await brainDialog();
+    await click(card(d, /^Claude/));
+    await model(d, /^Opus/);
+    await click(within(d).getByRole("button", { name: /^Usar em outros agentes/ }));
+    const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
+    await click(within(c).getByRole("checkbox", { name: /^Atlas/ }));
+    const saves = () => copyCalls(state).filter((x) => !(x as { preview?: boolean }).preview);
+    await click(within(c).getByRole("button", { name: "Usar em 1 agente" }));
+    const q = screen().getByRole("dialog", { name: "Usar o plano de João?" });
+    expect(q.textContent).toContain(
+      "As conversas com Atlas vão usar o plano do Claude de João e os limites dele. João vai receber um email avisando.",
+    );
+    await click(within(q).getByRole("button", { name: "Cancelar" }));
+    await settle(4);
+    expect(screen().queryByRole("dialog", { name: /^Usar o plano/ })).toBeNull();
+    expect(brainCalls(state)).toEqual([]);
+    expect(saves()).toEqual([]);
+    await click(within(c).getByRole("button", { name: "Usar em 1 agente" }));
+    await click(
+      within(screen().getByRole("dialog", { name: "Usar o plano de João?" })).getByRole("button", {
+        name: "Continuar",
+      }),
+    );
+    await settle(6);
+    expect(brainCalls(state)).toHaveLength(1);
+    expect(saves()).toEqual([
+      { setup: expect.objectContaining({ brain: "claude_code", model: "opus" }), agentIds: [ATLAS_ID] },
+    ]);
   });
 
   test("the Autonomia goes too: said with the setup, each agent's change on its line, even where the AI can't", async () => {

@@ -837,6 +837,10 @@ export const AgentSetupResult = z
       ])
       .optional(),
     params: z.record(z.string(), z.string()).optional(),
+    opensPlan: z.literal(true).optional().openapi({
+      description:
+        "It lets more people talk to it on its owner's plan, someone else's (in a preview: would): that owner gets an email, so the apps ask first.",
+    }),
   })
   .openapi("AgentSetupResult");
 

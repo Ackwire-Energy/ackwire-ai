@@ -1,6 +1,14 @@
 import { planOf } from "@agenteschat/providers/plans";
 import type { TFunction } from "i18next";
-import type { Agent, AgentAudience, AudienceMode, ForeignMailbox, OrgRole, OrgSummary } from "../api/types";
+import type {
+  Agent,
+  AgentAudience,
+  AgentSetupResult,
+  AudienceMode,
+  ForeignMailbox,
+  OrgRole,
+  OrgSummary,
+} from "../api/types";
 import { engineOfBrain } from "./brain";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
@@ -157,16 +165,58 @@ export function widenQuestion(
 ): { title: string; description: string } | null {
   const mail = mailboxes.length > 0 ? mailLossText(t, agent, mailboxes) : null;
   if (!planOwner) return mail ? { title: t("reach.mailLossTitle"), description: mail } : null;
-  const kind = agent.brain?.kind && agent.brain.kind !== "model" ? agent.brain.kind : "claude_code";
-  const provider = agent.brain?.provider ?? undefined;
-  // A coding plan's own name, as the email to its owner says it (the engine's `planName`).
-  const coding = planOf(provider);
-  const plan = coding ? (provider === "opencode" ? coding.name : coding.maker) : t(`aiAccounts.connect.${kind}`);
-  const why = t("reach.planOpen", { name: agent.name, owner: planOwner, plan });
+  const why = t("reach.planOpen", { name: agent.name, owner: planOwner, plan: planName(t, agent.brain) });
   return {
     title: t("reach.planTitle", { owner: planOwner }),
     description: mail ? t("common.joinSentences", { a: why, b: mail }) : why,
   };
+}
+
+/** The plan a brain thinks with, as the email to its owner says it (the engine's `planName`): a coding plan's own. */
+function planName(t: TFunction, brain: Pick<NonNullable<Agent["brain"]>, "kind" | "provider"> | null | undefined) {
+  const kind = brain?.kind && brain.kind !== "model" ? brain.kind : "claude_code";
+  const provider = brain?.provider ?? undefined;
+  const coding = planOf(provider);
+  return coding ? (provider === "opencode" ? coding.name : coding.maker) : t(`aiAccounts.connect.${kind}`);
+}
+
+/**
+ * The one question before "Usar em outros agentes" lets more people talk to agents on other people's plans (the
+ * preview's `opensPlan`): whose plans, one line per owner naming their agents; null when it opens none.
+ */
+export function setupPlanQuestion(
+  t: TFunction,
+  brain: Pick<NonNullable<Agent["brain"]>, "kind" | "provider">,
+  opened: readonly { agent: string; owner: string }[],
+): { title: string; description: string } | null {
+  const byOwner = new Map<string, string[]>();
+  for (const o of opened) byOwner.set(o.owner, [...(byOwner.get(o.owner) ?? []), o.agent]);
+  const owners = [...byOwner.keys()];
+  const [only] = owners;
+  if (only === undefined) return null;
+  const plan = planName(t, brain);
+  return {
+    title:
+      owners.length === 1
+        ? t("reach.planTitle", { owner: only })
+        : t("reach.plansTitle", { owners: joinNames(owners, t) }),
+    description: [...byOwner]
+      .map(([owner, agents]) => t("reach.planOpen", { name: joinNames(agents, t), owner, plan }))
+      .join("\n"),
+  };
+}
+
+/** The setup's results that open someone else's plan, among `agentIds`, with each agent's and owner's name. */
+export function setupPlanOpens(
+  results: readonly AgentSetupResult[],
+  agentIds: readonly string[],
+  agentOf: (id: string) => Pick<Agent, "name" | "ownerUserId"> | undefined,
+  ownerName: (userId: string) => string,
+): { agent: string; owner: string }[] {
+  return results.flatMap((r) => {
+    const a = r.opensPlan && agentIds.includes(r.agentId) ? agentOf(r.agentId) : undefined;
+    return a?.ownerUserId ? [{ agent: a.name, owner: ownerName(a.ownerUserId) }] : [];
+  });
 }
 
 /** One line of "Quem pode falar": the whole workspace (its `everyone` role's mark), a role, or a person. */

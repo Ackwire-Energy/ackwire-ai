@@ -9,6 +9,7 @@ import {
   ForbiddenError,
   getNewAgentSetup,
   NEW_AGENT_DEFAULTS,
+  PLAN_OPENED_JOB,
   PROPOSE_AGENT_TOOL,
   releaseAgents,
   type SetupResult,
@@ -273,6 +274,30 @@ describe("Usar em outros agentes", () => {
       { agentId: w.dev, status: "applied" },
       { agentId: w.theo, status: "skipped", reason: "account_single", params: { agent: "Dev" } },
     ]);
+  });
+});
+
+describe("Usar em outros agentes on someone else's plan (ADR 0059 §5)", () => {
+  const planJobs = (w: Awaited<ReturnType<typeof world>>) =>
+    w.fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, PLAN_OPENED_JOB));
+
+  test("an admin letting more people talk to Ana's agent on her plan: the preview says so, and Ana gets an email", async () => {
+    const w = await world();
+    const { fx, deps, caio } = w;
+    const open = { ...ANA_CLAUDE(w.mac), onlyOwner: false };
+    const use = (userId: string, setup: AgentSetupInput, preview?: boolean) =>
+      applyAgentSetup(deps, userId, fx.org.id, { setup, agentIds: [w.theo], ...(preview ? { preview } : {}) });
+    expect(await use(caio.id, open, true)).toEqual([{ agentId: w.theo, status: "applied", opensPlan: true }]);
+    // The MacBook's own sign-in is Ana's plan too: she connected it.
+    expect(await use(caio.id, { ...open, account: null }, true)).toEqual([
+      { agentId: w.theo, status: "applied", opensPlan: true },
+    ]);
+    // Only its owner, or Ana herself: nothing to ask.
+    expect(await use(caio.id, { ...open, onlyOwner: true }, true)).toEqual([{ agentId: w.theo, status: "applied" }]);
+    expect(await use(fx.owner.id, open, true)).toEqual([{ agentId: w.theo, status: "applied" }]);
+    expect(await planJobs(w)).toHaveLength(0);
+    expect(await use(caio.id, open)).toEqual([{ agentId: w.theo, status: "applied", opensPlan: true }]);
+    expect(await planJobs(w)).toHaveLength(1);
   });
 });
 

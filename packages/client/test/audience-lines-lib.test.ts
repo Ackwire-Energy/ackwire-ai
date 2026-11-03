@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { Agent, ForeignMailbox, OrgRole, OrgSummary } from "../src/api/types";
-import { audienceLines, audiencePatch, audienceWithMe, opensOthersPlan, widenQuestion } from "../src/lib/audience";
+import type { Agent, AgentSetupResult, ForeignMailbox, OrgRole, OrgSummary } from "../src/api/types";
+import {
+  audienceLines,
+  audiencePatch,
+  audienceWithMe,
+  opensOthersPlan,
+  setupPlanOpens,
+  setupPlanQuestion,
+  widenQuestion,
+} from "../src/lib/audience";
 import { agentWorkingIn, type StreamsState } from "../src/realtime/streams";
 
 const role = (id: string, position: number, kind: OrgRole["kind"] = "custom") =>
@@ -109,5 +117,53 @@ describe("widenQuestion", () => {
     expect(widenQuestion(t, ada, "Walter", [box])?.description).toMatch(
       /^common\.joinSentences.*reach\.planOpen.*reach\.mailLoss/,
     );
+  });
+});
+
+describe("setupPlanQuestion (Usar em outros agentes)", () => {
+  const t = ((key: string, o?: Record<string, unknown>) =>
+    `${key}${o ? JSON.stringify(o) : ""}`) as unknown as TFunction;
+  const claude = { kind: "claude_code" as const, provider: null };
+  const agents = new Map([
+    ["a-1", { name: "Ada", ownerUserId: "u-joao" }],
+    ["a-2", { name: "Atlas", ownerUserId: "u-joao" }],
+    ["a-3", { name: "Lia", ownerUserId: "u-bia" }],
+    ["a-4", { name: "Theo", ownerUserId: "u-bia" }],
+  ]);
+  const names: Record<string, string> = { "u-joao": "João", "u-bia": "Bia" };
+  const results: AgentSetupResult[] = [
+    { agentId: "a-1", status: "applied", opensPlan: true },
+    { agentId: "a-2", status: "applied", opensPlan: true },
+    { agentId: "a-3", status: "applied", opensPlan: true },
+    { agentId: "a-4", status: "applied" },
+  ];
+  const opens = (ids: string[]) =>
+    setupPlanOpens(
+      results,
+      ids,
+      (id) => agents.get(id),
+      (id) => names[id] ?? "",
+    );
+
+  test("none picked on someone else's plan: nothing to ask", () => {
+    expect(opens(["a-4"])).toEqual([]);
+    expect(setupPlanQuestion(t, claude, opens(["a-4"]))).toBeNull();
+  });
+
+  test("one owner: their plan, their agents in one line", () => {
+    const q = setupPlanQuestion(t, claude, opens(["a-1", "a-2", "a-4"]));
+    expect(q?.title).toBe('reach.planTitle{"owner":"João"}');
+    expect(q?.description).toBe(
+      'reach.planOpen{"name":"format.list{\\"names\\":[\\"Ada\\",\\"Atlas\\"]}","owner":"João","plan":"aiAccounts.connect.claude_code"}',
+    );
+  });
+
+  test("several owners: all of them in the title, one line each", () => {
+    const q = setupPlanQuestion(t, claude, opens(["a-1", "a-3"]));
+    expect(q?.title).toBe('reach.plansTitle{"owners":"format.list{\\"names\\":[\\"João\\",\\"Bia\\"]}"}');
+    const lines = q?.description.split("\n") ?? [];
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('"owner":"João"');
+    expect(lines[1]).toContain('"owner":"Bia"');
   });
 });

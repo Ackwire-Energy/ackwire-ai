@@ -1968,7 +1968,8 @@
     "mailLoss": "{{name}} heeft toegang tot de mailbox van {{owners}}. Als meer mensen met hem praten, kunnen ze via hem bij die e-mails komen, dus deze toegang wordt weggehaald. Wie de mailbox heeft gekoppeld, kan die toegang opnieuw geven.",
     "mailLoss_female": "{{name}} heeft toegang tot de mailbox van {{owners}}. Als meer mensen met haar praten, kunnen ze via haar bij die e-mails komen, dus deze toegang wordt weggehaald. Wie de mailbox heeft gekoppeld, kan die toegang opnieuw geven.",
     "planTitle": "Het abonnement van {{owner}} gebruiken?",
-    "planOpen": "Gesprekken met {{name}} gebruiken het {{plan}}-abonnement van {{owner}} en de limieten ervan. {{owner}} krijgt hierover een e-mail."
+    "planOpen": "Gesprekken met {{name}} gebruiken het {{plan}}-abonnement van {{owner}} en de limieten ervan. {{owner}} krijgt hierover een e-mail.",
+    "plansTitle": "De abonnementen van {{owners}} gebruiken?"
   },
   "teamChecks": {
     "group": "Wat de agent niet herhaalde",

@@ -5052,6 +5052,8 @@ export interface AgentSetupResult {
   params?: Record<string, string>;
   /** Its Autonomia changes, whatever its AI does: wherever the caller may set it by hand, `skipped` agents too. */
   autonomy?: { from: CommandApproval; to: CommandApproval };
+  /** It lets more people talk to it on its owner's plan, someone else's: the apps ask first (`setupPlanQuestion`). */
+  opensPlan?: true;
 }
 
 /** `GET …/agent-setup`: what a new agent starts thinking with (the last setup saved or used on others). */

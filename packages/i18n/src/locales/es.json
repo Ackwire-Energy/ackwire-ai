@@ -2029,7 +2029,8 @@
     "mailLoss": "{{name}} tiene acceso al buzón de {{owners}}. Si más personas hablan con él, podrían llegar a esos correos a través de él, así que se quita ese acceso. Quien conectó el buzón puede darlo de nuevo.",
     "mailLoss_female": "{{name}} tiene acceso al buzón de {{owners}}. Si más personas hablan con ella, podrían llegar a esos correos a través de ella, así que se quita ese acceso. Quien conectó el buzón puede darlo de nuevo.",
     "planTitle": "¿Usar el plan de {{owner}}?",
-    "planOpen": "Las conversaciones con {{name}} usarán el plan de {{plan}} de {{owner}} y sus límites. {{owner}} recibirá un correo avisándole."
+    "planOpen": "Las conversaciones con {{name}} usarán el plan de {{plan}} de {{owner}} y sus límites. {{owner}} recibirá un correo avisándole.",
+    "plansTitle": "¿Usar los planes de {{owners}}?"
   },
   "teamChecks": {
     "group": "Lo que el agente no repitió",
