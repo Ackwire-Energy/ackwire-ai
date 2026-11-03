@@ -3065,6 +3065,7 @@
           "opencodeFree": "OpenCode의 무료 모델은 키가 필요 없어요. OpenCode 콘솔의 키를 쓰면 유료 모델도 쓸 수 있어요.",
           "cursorFinish": "Cursor 페이지에서 로그인하면 {{computer}}에서 로그인이 자동으로 완료돼요.",
           "cursorKey": "대신 Cursor API 키 사용",
+          "copyLink": "링크 복사",
           "openAgain": "다시 열기",
           "stepTwo": "Claude가 보여 주는 코드를 붙여넣으세요",
           "codeLabel": "Claude 코드",

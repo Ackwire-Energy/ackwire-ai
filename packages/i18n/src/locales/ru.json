@@ -3373,6 +3373,7 @@
           "opencodeFree": "Бесплатным моделям OpenCode ключ не нужен. Ключ из консоли OpenCode добавляет платные.",
           "cursorFinish": "Войдите на странице Cursor, и вход завершится на {{computer}} сам.",
           "cursorKey": "Использовать API-ключ Cursor",
+          "copyLink": "Скопировать ссылку",
           "openAgain": "Открыть снова",
           "stepTwo": "Вставьте код, который покажет Claude",
           "codeLabel": "Код Claude",

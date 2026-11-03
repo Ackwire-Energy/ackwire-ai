@@ -3159,6 +3159,8 @@ export const ptBR = {
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Entre na página do Cursor. O {{computer}} termina sozinho.",
           cursorKey: "Usar uma chave de API do Cursor",
+          /** Beside the sign-in button: its link, to open in another browser or profile. */
+          copyLink: "Copiar link",
           openAgain: "Abrir de novo",
           stepTwo: "Cole o código que o Claude mostrar",
           codeLabel: "Código do Claude",

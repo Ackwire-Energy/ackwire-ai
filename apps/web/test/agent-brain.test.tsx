@@ -959,7 +959,49 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     }
   });
 
-  /** Claude's sign-in started from Adicionar conta, its code field showing; the sign-in window is a stand-in. */
+  test("Add account: Copy link begins the sign-in with no window, copies its link and shows the code step", async () => {
+    const { state, api } = await onMac();
+    const opened: string[] = [];
+    const realOpen = window.open;
+    window.open = ((url?: string | URL) => {
+      opened.push(String(url));
+      return null;
+    }) as unknown as typeof window.open;
+    const written: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        readText: async () => "",
+        writeText: async (text: string) => {
+          written.push(text);
+        },
+      },
+    });
+    try {
+      const d = await brainDialog();
+      await pick(d, "Conta", /^Adicionar conta/);
+      await settle(6);
+      const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+      expect(within(block).queryByRole("textbox", { name: "Código do Claude" })).toBeNull();
+      await click(within(block).getByRole("button", { name: "Copiar link" }));
+      await settle(6);
+      expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(1);
+      expect(fakeMachinesOf.get(api)?.lastLogin()?.kind).toBe("claude_code");
+      expect(opened).toEqual([]);
+      expect(written).toEqual(["https://claude.ai/oauth/authorize?code=true&state=st4te"]);
+      expect(within(block).getByRole("button", { name: "Copiado" })).toBeTruthy();
+      expect(within(block).getByRole("textbox", { name: "Código do Claude" })).toBeTruthy();
+      // Copied again, the same sign-in's link: no second one begins.
+      await click(within(block).getByRole("button", { name: "Copiado" }));
+      await settle(4);
+      expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(1);
+      expect(written).toHaveLength(2);
+    } finally {
+      window.open = realOpen;
+    }
+  });
+
+  /** Claude's sign-in started from Add account, its code field showing; the sign-in window is a stand-in. */
   async function codeField() {
     const { state, api } = await onMac();
     const d = await brainDialog();

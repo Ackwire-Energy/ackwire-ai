@@ -3092,6 +3092,7 @@
           "opencodeFree": "OpenCode 的免费模型无需密钥。用 OpenCode 控制台的密钥还能使用付费模型。",
           "cursorFinish": "在 Cursor 的页面上登录后，{{computer}} 上的登录会自动完成。",
           "cursorKey": "改用 Cursor API 密钥",
+          "copyLink": "复制链接",
           "openAgain": "再次打开",
           "stepTwo": "粘贴 Claude 显示的代码",
           "codeLabel": "Claude 授权码",

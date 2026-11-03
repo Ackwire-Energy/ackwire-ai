@@ -3277,6 +3277,7 @@
           "opencodeFree": "Los modelos gratis de OpenCode no necesitan clave. Una clave de la consola de OpenCode suma los de pago.",
           "cursorFinish": "Inicia sesión en la página de Cursor y el inicio de sesión termina solo en {{computer}}.",
           "cursorKey": "Usar una clave de API de Cursor",
+          "copyLink": "Copiar enlace",
           "openAgain": "Abrir de nuevo",
           "stepTwo": "Pega el código que muestra Claude",
           "codeLabel": "Código de Claude",

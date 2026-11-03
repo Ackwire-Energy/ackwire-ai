@@ -3161,6 +3161,7 @@
           "opencodeFree": "OpenCode'un ücretsiz modelleri anahtar istemez. OpenCode konsolundan bir anahtar ücretli modelleri de ekler.",
           "cursorFinish": "Cursor sayfasında giriş yapın, giriş {{computer}} üzerinde kendiliğinden tamamlanır.",
           "cursorKey": "Bunun yerine Cursor API anahtarı kullan",
+          "copyLink": "Bağlantıyı kopyala",
           "openAgain": "Yeniden aç",
           "stepTwo": "Claude'un gösterdiği kodu yapıştırın",
           "codeLabel": "Claude kodu",

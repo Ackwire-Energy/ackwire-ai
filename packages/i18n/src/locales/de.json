@@ -3176,6 +3176,7 @@
           "opencodeFree": "Die kostenlosen Modelle von OpenCode brauchen keinen Schlüssel. Ein Schlüssel aus der OpenCode-Konsole fügt die kostenpflichtigen hinzu.",
           "cursorFinish": "Melde dich auf der Seite von Cursor an, dann schließt sich die Anmeldung auf {{computer}} von selbst ab.",
           "cursorKey": "Stattdessen einen Cursor-API-Schlüssel verwenden",
+          "copyLink": "Link kopieren",
           "openAgain": "Erneut öffnen",
           "stepTwo": "Füge den Code ein, den Claude anzeigt",
           "codeLabel": "Claude-Code",

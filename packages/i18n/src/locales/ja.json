@@ -3067,6 +3067,7 @@
           "opencodeFree": "OpenCodeの無料モデルにキーは不要です。OpenCodeのコンソールのキーで有料モデルも使えます。",
           "cursorFinish": "Cursorのページでログインすると、{{computer}}でのログインは自動で完了します。",
           "cursorKey": "代わりにCursorのAPIキーを使う",
+          "copyLink": "リンクをコピー",
           "openAgain": "もう一度開く",
           "stepTwo": "Claudeに表示されたコードを貼り付けてください",
           "codeLabel": "Claudeのコード",

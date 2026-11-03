@@ -3201,6 +3201,7 @@
           "opencodeFree": "De gratis modellen van OpenCode hebben geen sleutel nodig. Een sleutel uit de OpenCode-console voegt de betaalde toe.",
           "cursorFinish": "Log in op de pagina van Cursor, dan rondt {{computer}} het inloggen vanzelf af.",
           "cursorKey": "Gebruik liever een Cursor-API-sleutel",
+          "copyLink": "Link kopiëren",
           "openAgain": "Opnieuw openen",
           "stepTwo": "Plak de code die Claude toont",
           "codeLabel": "Claude-code",

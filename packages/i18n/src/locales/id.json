@@ -3082,6 +3082,7 @@
           "opencodeFree": "Model gratis OpenCode tidak perlu kunci. Kunci dari konsol OpenCode menambahkan model berbayarnya.",
           "cursorFinish": "Masuk di halaman Cursor, dan proses masuk selesai sendiri di {{computer}}.",
           "cursorKey": "Pakai kunci API Cursor saja",
+          "copyLink": "Salin tautan",
           "openAgain": "Buka lagi",
           "stepTwo": "Tempel kode yang ditampilkan Claude",
           "codeLabel": "Kode Claude",
