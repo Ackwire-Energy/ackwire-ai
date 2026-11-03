@@ -2314,6 +2314,17 @@ export function useArchiveChannel(orgId: string) {
   });
 }
 
+/** "Apagar canal" (owners and admins): `name` as the person typed it. */
+export function useDeleteChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ channelId, name }: { channelId: string; name: string }) =>
+      api.chat.deleteChannel(orgId, channelId, name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
 // ── Direct messages ─────────────────────────────────────────────────────────
 
 export const useDms = (orgId: string) => {

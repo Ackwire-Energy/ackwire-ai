@@ -135,6 +135,7 @@ const AREAS = [
   "wiki",
   "mission",
   "thread",
+  "channel",
   "forum",
   "artifact",
   "agent",

@@ -62,6 +62,10 @@ describe("Auditoria in words (web and phone)", () => {
     expect(auditSubLine(t, row())).toBe("Gmail: Send · audit.behind.person(Bia) · #geral");
     const expired = row({ actor: { type: "system", id: null, name: null }, action: "approval.expired", details: {} });
     expect(auditSentence(t, expired, "en")).toEqual({ name: null, text: "audit.change.approval.expired" });
+    const gone = row({ actor: { type: "person", id: "u1", name: "Bia" }, action: "channel.deleted", details: {} });
+    expect(auditSentence(t, gone, "en").text).toBe(
+      "audit.change.pattern(audit.change.verb.deleted,audit.change.area.channel)",
+    );
   });
 
   test("a waiting call says what became of its approval or of the secret it asked for", () => {

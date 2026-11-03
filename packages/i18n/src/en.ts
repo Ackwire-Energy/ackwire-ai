@@ -1472,6 +1472,14 @@ export const en = {
     generalName: "#general keeps its name.",
     archive: "Archive channel",
     archived: "#{{channel}} archived. The conversation is kept.",
+    /** Delete channel: owners and admins, never #general; its name typed to confirm. */
+    delete: "Delete channel",
+    deleteTitle: "Delete #{{channel}} for good?",
+    deleteGoes:
+      "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it.",
+    deleteOrArchive: "To keep the conversation, archive the channel instead.",
+    deleteTypeName: "Type {{channel}} to confirm",
+    deleteDone: "#{{channel}} was deleted.",
     detailsSub: "{{category}} · {{visibility}}",
     visibilityPublic: "Public",
     visibilityPrivate: "Private",
@@ -10103,6 +10111,7 @@ export const en = {
         wiki: "a wiki page",
         mission: "a mission",
         thread: "a thread",
+        channel: "a channel",
         forum: "a forum topic",
         artifact: "a Drive file",
         agent: "an agent",

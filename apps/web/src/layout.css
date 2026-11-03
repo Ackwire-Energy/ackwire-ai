@@ -10011,7 +10011,7 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-/* Deleting an agent: what goes and what stays, over the name to type. */
+/* Deleting an agent or a channel: what goes and what stays, over the name to type. */
 .agp-delete {
   display: flex;
   flex-direction: column;

@@ -1716,6 +1716,17 @@ export async function deleteAgentRoutines(deps: RoutineDeps, actorId: string, or
   for (const row of rows) await dropRoutine(deps, actorId, row);
 }
 
+/** A deleted channel's routines go with it: those that post there or answer in its conversations. */
+export async function deleteChannelRoutines(deps: RoutineDeps, actorId: string, orgId: string, channelId: string) {
+  const rows = await deps.db
+    .select()
+    .from(routines)
+    .where(
+      and(eq(routines.orgId, orgId), isNull(routines.deletedAt), sql`${routines.target}->>'channelId' = ${channelId}`),
+    );
+  for (const row of rows) await dropRoutine(deps, actorId, row);
+}
+
 async function dropRoutine(deps: RoutineDeps, actorId: string, current: RoutineRow) {
   const orgId = current.orgId;
   await deps.db

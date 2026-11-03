@@ -789,6 +789,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
+      deleteChannel: (orgId, channelId, name) =>
+        request<void>(`${org(orgId)}/channels/${enc(channelId)}/delete`, { json: { name } }),
       roster: async (orgId, channelId) =>
         (await request<{ members: RosterMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/roster`)).members,
       members: async (orgId, channelId) =>

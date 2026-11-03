@@ -254,6 +254,7 @@ import {
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { DatePill, type DatePillHandle } from "@/components/DatePill";
+import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
@@ -4246,6 +4247,9 @@ function ChannelDetails({
       },
     );
   const archiveIt = () => archive.run(channel, () => onOpenChange(false));
+  // Deleting is for owners and admins, never #general; archiving is also for whoever made the channel.
+  const deletable = can(org, "manage_channels") && channel.name !== "general";
+  const [deleting, setDeleting] = useState(false);
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
@@ -4288,7 +4292,7 @@ function ChannelDetails({
   return (
     <>
       <Dialog
-        open={open && !adding && !removing && !goingPublic}
+        open={open && !adding && !removing && !goingPublic && !deleting}
         onOpenChange={(o) => {
           if (!o) {
             saveTopic();
@@ -4502,11 +4506,30 @@ function ChannelDetails({
             >
               {t("channel.archive")}
             </Button>
+            {deletable && (
+              <Button
+                variant="ghost"
+                icon="trash"
+                className="channel-details__archive"
+                onClick={() => {
+                  saveTopic();
+                  saveName();
+                  setDeleting(true);
+                }}
+              >
+                {t("channel.delete")}
+              </Button>
+            )}
           </DialogFooter>
         ) : (
           <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
         )}
       </Dialog>
+      <DeleteChannelDialog
+        channel={open && deleting ? channel : null}
+        onClose={() => setDeleting(false)}
+        onDeleted={() => onOpenChange(false)}
+      />
       <Dialog
         open={open && Boolean(removing)}
         onOpenChange={(o) => !o && setRemoving(null)}

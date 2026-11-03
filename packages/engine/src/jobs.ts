@@ -19,6 +19,7 @@ import { closePoll, POLL_CLOSE_JOB } from "./blocks";
 import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import { typingLogFor } from "./burst";
+import { CHANNEL_DELETE_JOB, purgeChannel } from "./channel-deletion";
 import { crowdedAgents, publishQueueChanged } from "./computer-queue";
 import type { ConnectorDeps } from "./connectors/connections";
 import { startNoteRun } from "./consultations";
@@ -865,6 +866,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     [USER_FILES_PURGE_JOB]: async (job) => {
       if (!deps.storage) throw new PermanentJobError("no storage configured");
       await purgeUserFiles(deps.storage, String(job.payload.userId));
+    },
+    // A deleted channel's contents (`purgeChannel`): a no-op for one that isn't deleted.
+    [CHANNEL_DELETE_JOB]: async (job) => {
+      await purgeChannel({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.channelId));
     },
     // A workspace whose deletion's date came (`purgeWorkspace`): a no-op once restored, kept or gone.
     [ORG_DELETE_JOB]: async (job, ctx) => {

@@ -647,6 +647,8 @@ export interface ApiClient {
     archive(orgId: string, channelId: string): Promise<void>;
     /** "Desfazer" right after archiving. */
     unarchive(orgId: string, channelId: string): Promise<void>;
+    /** Owners and admins, never #general: the channel and what it held go for good. `name`: typed to confirm. */
+    deleteChannel(orgId: string, channelId: string, name: string): Promise<void>;
     /** Members with names; agents carry `autoReply`. */
     roster(orgId: string, channelId: string): Promise<RosterMember[]>;
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;

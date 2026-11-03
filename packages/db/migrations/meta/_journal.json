@@ -1324,6 +1324,13 @@
       "when": 1793706987308,
       "tag": "0190_routine_own_actions",
       "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1793708447561,
+      "tag": "0191_channel_deleted",
+      "breakpoints": true
     }
   ]
 }

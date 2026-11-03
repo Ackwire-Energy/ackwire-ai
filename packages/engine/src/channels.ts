@@ -804,7 +804,9 @@ export async function archiveChannel(
 
 /** Brings an archived channel back as it was (creator or admin): "Refazer" after an agent's channel was undone. */
 export async function unarchiveChannel(db: Database, actorId: string, orgId: string, channelId: string) {
-  await archivableChannel(db, actorId, orgId, channelId);
+  const channel = await archivableChannel(db, actorId, orgId, channelId);
+  // A deleted channel is archived for good: its contents are being purged.
+  if (channel.deletedAt) throw new NotFoundError("Channel not found");
   await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, channelId));
   caches.channels.delete(`${orgId}:${channelId}`);
 }

@@ -66,6 +66,11 @@ export const channels = pgTable(
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),
+    /**
+     * Deleted by an owner or admin (archived too, so nothing lists it): its contents are purged by the `channel.delete`
+     * job and the row stays as a tombstone, named `deleted-<id>`, for its runs, usage and audit. Never undone.
+     */
+    deletedAt: timestamp({ withTimezone: true }),
     /** Its sidebar category (channels only); null: on top, with no category. */
     categoryId: uuid().references(() => channelCategories.id, { onDelete: "set null" }),
     /** Order inside its category (or among the channels with none), from 0. */

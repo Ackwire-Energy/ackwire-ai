@@ -1468,6 +1468,14 @@ export const ptBR = {
     generalName: "O #general mantém o nome.",
     archive: "Arquivar canal",
     archived: "#{{channel}} arquivado. A conversa fica guardada.",
+    // Apagar canal: owners and admins, never #general; its name typed to confirm.
+    delete: "Apagar canal",
+    deleteTitle: "Apagar o #{{channel}} de vez?",
+    deleteGoes:
+      "Sai agora: mensagens, threads, arquivos e fixados, o que os agentes guardaram do canal e as rotinas que postam nele.",
+    deleteOrArchive: "Para guardar a conversa, arquive o canal em vez de apagar.",
+    deleteTypeName: "Digite {{channel}} para confirmar",
+    deleteDone: "#{{channel}} foi apagado.",
     detailsSub: "{{category}} · {{visibility}}",
     visibilityPublic: "Público",
     visibilityPrivate: "Privado",
@@ -10319,6 +10327,7 @@ export const ptBR = {
         wiki: "uma página da wiki",
         mission: "uma missão",
         thread: "uma thread",
+        channel: "um canal",
         forum: "um tópico do fórum",
         artifact: "um arquivo do Drive",
         agent: "um agente",

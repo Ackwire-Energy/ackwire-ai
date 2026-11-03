@@ -3712,6 +3712,24 @@
   "channel.archived": {
     "value": "#{{channel}} archived. The conversation is kept."
   },
+  "channel.delete": {
+    "value": "Delete channel"
+  },
+  "channel.deleteTitle": {
+    "value": "Delete #{{channel}} for good?"
+  },
+  "channel.deleteGoes": {
+    "value": "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it."
+  },
+  "channel.deleteOrArchive": {
+    "value": "To keep the conversation, archive the channel instead."
+  },
+  "channel.deleteTypeName": {
+    "value": "Type {{channel}} to confirm"
+  },
+  "channel.deleteDone": {
+    "value": "#{{channel}} was deleted."
+  },
   "channel.detailsSub": {
     "value": "{{category}} · {{visibility}}"
   },
@@ -11897,6 +11915,9 @@
   },
   "routines.form.kind.webhook": {
     "value": "Webhook"
+  },
+  "routines.form.kind.connector": {
+    "value": "MillionSend email"
   },
   "routines.form.frequency": {
     "value": "Frequency"
@@ -23669,6 +23690,15 @@
   "mail.routine.whenFolder": {
     "value": "When an email arrives at {{address}} ({{folder}})"
   },
+  "mail.routine.whenMillionSend": {
+    "value": "When an email arrives in MillionSend"
+  },
+  "mail.routine.inboxAddress": {
+    "value": "Inbox address"
+  },
+  "mail.routine.inboxAddressHelp": {
+    "value": "Empty = any MillionSend inbox."
+  },
   "mail.routine.unknownMailbox": {
     "value": "a mailbox"
   },
@@ -25929,6 +25959,9 @@
   },
   "audit.change.area.thread": {
     "value": "a thread"
+  },
+  "audit.change.area.channel": {
+    "value": "a channel"
   },
   "audit.change.area.forum": {
     "value": "a forum topic"
@@ -30451,18 +30484,6 @@
   },
   "agentComputer.phone.chooseOnWeb": {
     "value": "Choose it on agentes.chat, in Settings › Computers."
-  },
-  "routines.form.kind.connector": {
-    "value": "MillionSend email"
-  },
-  "mail.routine.whenMillionSend": {
-    "value": "When an email arrives in MillionSend"
-  },
-  "mail.routine.inboxAddress": {
-    "value": "Inbox address"
-  },
-  "mail.routine.inboxAddressHelp": {
-    "value": "Empty = any MillionSend inbox."
   },
   "taskManager.title": {
     "value": "Task manager"
