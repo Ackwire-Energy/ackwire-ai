@@ -126,6 +126,10 @@ describe("a step that needs the person is never a blocker", () => {
     expect(HOW_YOU_WORK).not.toContain("A real blocker is only");
   });
 
+  test("an approval the person gives is no `request_approval`, which asks someone else", () => {
+    expect(HAND_OVER_STEP).toContain("an approval only someone else can give: `request_approval`");
+  });
+
   test("the means name the browser for a service's web version, and the hand-offs the run has", () => {
     const means = turnMeans(new Set(["browser_do", "browser_ask_person", "request_secret"])).join("\n");
     expect(means).toContain("(a service with no connector but a web version)");
@@ -183,6 +187,9 @@ describe("a step that needs the person is never a blocker", () => {
     const criteria = asked[0]?.questions.verdict?.criteria ?? {};
     expect(criteria.done).toContain("is not done while `means` can hand that step to them: that is untried");
     expect(criteria.untried).toContain("a step that needs the person is never a blocker");
+    // Asking first stays right when the way is open, and someone else's account is no consent.
+    expect(criteria.done).toContain("one direct question offering to start a way it names");
+    expect(criteria.done).toContain("someone else's, not the asking person's own, is done");
     expect(criteria.ask).toContain("A way to do the request itself, even worded 'only if you want'");
   });
 

@@ -740,7 +740,7 @@ export const HAND_OVER_TOOLS = [
  * (ADR 0097 addendum). The controller's nudges and the mission prompts say it the same way.
  */
 export const HAND_OVER_STEP =
-  "A step only a person can do (sign in, scan a QR code, type a code sent to them, a captcha, approve, grant a permission, a key, a file or a fact only they have) is never a blocker or a reason to say you can't: do everything up to it, hand it over with its request (on a page or app: `browser_ask_person` or `desktop_ask_person` once at that step; a key: `request_secret`; an approval: `request_approval`; a permission: `request_permission`; else `ask_user`), then go on.";
+  "A step only a person can do (sign in, scan a QR code, type a code sent to them, a captcha, approve, grant a permission, a key, a file or a fact only they have, something done by hand) is never a blocker or a reason to say you can't: do everything up to it, hand it over with its request (on a page or app: `browser_ask_person` or `desktop_ask_person` once at that step; a key: `request_secret`; an approval only someone else can give: `request_approval`; a permission: `request_permission`; else `ask_user`), then go on.";
 
 export function turnMeans(names: ReadonlySet<string>, teammates: string[] = []): string[] {
   const out: string[] = [];
