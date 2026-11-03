@@ -178,6 +178,28 @@ test("a routine on MillionSend's received email: its address registered for that
   ]);
 });
 
+test("a GET-only webhook switched to a connector answers the provider's POSTs again", async () => {
+  f = await setup();
+  const { connection, calls, deps } = await millionSend();
+  const routine = await createRoutine(deps, f.owner.id, f.org.id, {
+    name: "Pedidos",
+    agentId: f.agent.id,
+    prompt: "Responda o pedido novo.",
+    target: { type: "channel", channelId: f.general.id },
+    trigger: { type: "webhook", methods: ["GET"] },
+  });
+  await updateRoutine(deps, f.owner.id, f.org.id, routine.id, {
+    trigger: { type: "connector", connectionId: connection.id, event: "millionsend.email.received" },
+  });
+  const endpoint = String(calls.find((c) => c.name === "create_webhook")?.args.endpoint);
+  const token = endpoint.split("/api/hooks/")[1] ?? "";
+  expect(await post(token, received("ana@cliente.example", "Pedido 7"), "msg_get")).toMatchObject({
+    status: 202,
+    duplicate: false,
+  });
+  expect((await runsOf(routine.id)).length).toBe(1);
+});
+
 test("only an agent the connection's owner let read it may wait on its events", async () => {
   f = await setup();
   const { connection, calls, deps } = await millionSend(false);
