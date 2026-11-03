@@ -50,6 +50,7 @@ afterEach(async () => {
 const NONE: OrgLimits = {
   members: null,
   membersMax: null,
+  payerUserId: null,
   storageBytes: null,
   uploadBytesPerDay: null,
   platformUsdPerMonth: null,
@@ -87,6 +88,7 @@ describe("limits", () => {
     const set = await limit({
       members: 10,
       membersMax: 15,
+      payerUserId: "user_payer",
       storageBytes: 50 * 1024 ** 3,
       uploadBytesPerDay: 1024,
       platformUsdPerMonth: 3.5,
@@ -94,6 +96,7 @@ describe("limits", () => {
     expect(set).toEqual({
       members: 10,
       membersMax: 15,
+      payerUserId: "user_payer",
       storageBytes: 50 * 1024 ** 3,
       uploadBytesPerDay: 1024,
       platformUsdPerMonth: 3.5,
@@ -111,6 +114,7 @@ describe("limits", () => {
     const again = await limit({
       members: 10,
       membersMax: 15,
+      payerUserId: "user_payer",
       storageBytes: 50 * 1024 ** 3,
       uploadBytesPerDay: 1024,
       platformUsdPerMonth: 3.5,

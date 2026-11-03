@@ -68,6 +68,11 @@ export const organizations = pgTable("organizations", {
   limitMembers: integer(),
   /** The most people the workspace's plan takes with seats bought: past `limitMembers` up to it, a seat can be added. */
   limitMembersMax: integer(),
+  /**
+   * Who pays for the plan, the only one the billing service lets add seats or change plans; null: not said. No
+   * foreign key: an id that left the workspace or never was in it just means no one here pays.
+   */
+  payerUserId: text(),
   limitStorageBytes: bigint({ mode: "number" }),
   limitUploadBytesPerDay: bigint({ mode: "number" }),
   limitPlatformNanoUsd: bigint({ mode: "number" }),

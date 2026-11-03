@@ -333,6 +333,13 @@
             "default": null,
             "description": "The most people its plan takes with seats added. Below it, the apps tell whoever manages billing that a full workspace can add a seat; at it, that the plan can change. Null (or left out): not said, and the apps say neither."
           },
+          "payerUserId": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 200,
+            "default": null,
+            "description": "The user id of whoever pays for its plan, the only one who can add seats or change plans. In a full workspace they read that they can add a seat, and anyone else who manages billing reads to ask them, by name while they are in the workspace. Null (or left out): not said, and whoever manages billing reads that they can add a seat."
+          },
           "storageBytes": {
             "type": ["integer", "null"],
             "minimum": 0,

@@ -73,6 +73,19 @@ export function billingRoutes(deps: AppDeps) {
               canAddSeats: z.boolean().openapi({
                 description: "Below `max`: whoever manages billing can add a seat on the billing service.",
               }),
+              payer: z
+                .object({
+                  you: z.boolean().openapi({ description: "The viewer pays for the plan." }),
+                  name: z.string().nullable().openapi({
+                    description:
+                      "To anyone else who manages billing, the payer's name while they are in the workspace.",
+                  }),
+                })
+                .nullable()
+                .openapi({
+                  description:
+                    "Who pays for the plan, the only one who can add seats or change plans; null: the billing service didn't say.",
+                }),
             }),
             storage: z.object({
               usedBytes: z

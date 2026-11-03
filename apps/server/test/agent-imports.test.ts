@@ -458,6 +458,7 @@ describe("an imported agent's own files into the Drive", () => {
     await setOrgLimits((t as TestServer).db, orgId, {
       members: null,
       membersMax: null,
+      payerUserId: null,
       storageBytes: 10,
       uploadBytesPerDay: null,
       platformUsdPerMonth: null,
@@ -468,6 +469,7 @@ describe("an imported agent's own files into the Drive", () => {
     await setOrgLimits((t as TestServer).db, orgId, {
       members: null,
       membersMax: null,
+      payerUserId: null,
       storageBytes: null,
       uploadBytesPerDay: null,
       platformUsdPerMonth: null,

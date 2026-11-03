@@ -241,6 +241,7 @@ test("org detail: owners and admins, and counts of what is in it", async () => {
     limits: {
       members: null,
       membersMax: null,
+      payerUserId: null,
       storageBytes: null,
       uploadBytesPerDay: null,
       platformUsdPerMonth: null,
@@ -661,6 +662,7 @@ test("limits: set them all, read back with what the workspace uses; any standing
   const limits = {
     members: 10,
     membersMax: 15,
+    payerUserId: "user_payer",
     storageBytes: 200 * 1024 ** 3,
     uploadBytesPerDay: 10 * 1024 ** 3,
     platformUsdPerMonth: 10,
@@ -670,6 +672,7 @@ test("limits: set them all, read back with what the workspace uses; any standing
     { ...limits, members: undefined },
     { ...limits, members: 0 },
     { ...limits, membersMax: 0 },
+    { ...limits, payerUserId: "" },
     { ...limits, members: 1.5 },
     { ...limits, storageBytes: -1 },
     { ...limits, platformUsdPerMonth: 100_001 },
@@ -696,12 +699,13 @@ test("limits: set them all, read back with what the workspace uses; any standing
 
   // Limits and standing are apart: a held workspace takes new limits too.
   await body(await put(`/orgs/${orgId}/billing-hold`, { hold: "unpaid" }));
-  // Left out, the plan's top is none.
+  // Left out, the plan's top and who pays are none.
   const none = { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null };
   heard.length = 0;
   expect(await body(await put(`/orgs/${orgId}/limits`, none))).toEqual({
     ...none,
     membersMax: null,
+    payerUserId: null,
     updatedAt: expect.any(String),
   });
   expect(heard).toEqual([{ type: "org.limits", orgId }]);

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { eq, schema } from "@agenteschat/db";
 import { setOrgLimits } from "@agenteschat/engine";
 import { type Browser, browser, createTestServer, joinByInvitation, signUp, type TestServer } from "./harness";
 
@@ -95,14 +96,21 @@ describe("the workspace's limits", () => {
       return res.json();
     };
     expect(await read(member)).toEqual({
-      members: { used: 2, limit: null, max: null, canAddSeats: false },
+      members: { used: 2, limit: null, max: null, canAddSeats: false, payer: null },
       storage: { usedBytes: 0, limitBytes: null, ownStorage: false },
       uploads: { usedBytes24h: 0, limitBytesPerDay: null },
     });
-    const limits = { members: 2, membersMax: 3, storageBytes: 1000, uploadBytesPerDay: 500, platformUsdPerMonth: 3 };
+    const limits = {
+      members: 2,
+      membersMax: 3,
+      payerUserId: null,
+      storageBytes: 1000,
+      uploadBytesPerDay: 500,
+      platformUsdPerMonth: 3,
+    };
     await setOrgLimits(t.db, orgId, limits);
     expect(await read(owner)).toEqual({
-      members: { used: 2, limit: 2, max: 3, canAddSeats: true },
+      members: { used: 2, limit: 2, max: 3, canAddSeats: true, payer: null },
       storage: { usedBytes: 0, limitBytes: 1000, ownStorage: false },
       uploads: { usedBytes24h: 0, limitBytesPerDay: 500 },
     });
@@ -117,5 +125,37 @@ describe("the workspace's limits", () => {
     expect(await invited.json()).toMatchObject({
       error: { code: "org.members_full", params: { members: 2, limit: 2 } },
     });
+  });
+
+  test("who pays: the payer reads it is them, anyone else who manages billing reads their name", async () => {
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    const server = t;
+    const { owner, orgId } = await ownerWithWorkspace(server);
+    const admin = await joinByInvitation(server, owner, orgId, "admin@example.com", { role: "admin" });
+    const member = await joinByInvitation(server, owner, orgId, "member@example.com");
+    const [payer] = await server.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, "owner@example.com"));
+    const seen = async (who: Browser, payerUserId: string | null) => {
+      await setOrgLimits(server.db, orgId, {
+        members: 3,
+        membersMax: 5,
+        payerUserId,
+        storageBytes: null,
+        uploadBytesPerDay: null,
+        platformUsdPerMonth: null,
+      });
+      const res = await who(`/api/app/organizations/${orgId}/limits`);
+      return ((await res.json()) as { members: { payer: unknown } }).members.payer;
+    };
+    const payerId = payer?.id ?? "";
+    expect(await seen(owner, payerId)).toEqual({ you: true, name: null });
+    expect(await seen(admin, payerId)).toEqual({ you: false, name: "owner" });
+    // Who pays is billing's business: a member reads only that it isn't them.
+    expect(await seen(member, payerId)).toEqual({ you: false, name: null });
+    // Someone not in the workspace: no name to say.
+    expect(await seen(admin, "user_gone")).toEqual({ you: false, name: null });
+    expect(await seen(admin, null)).toBeNull();
   });
 });
