@@ -352,7 +352,8 @@ function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: s
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const thread = useThreadMessages(org.id, channelOf(n) ?? undefined, n.source.threadId ?? "");
-  if (thread.isPending) return <LoadingCards count={1} className="nt-reps" />;
+  // The root the channel holds stands in until the replies are read: they are what this shows.
+  if (thread.isPending || thread.isPlaceholderData) return <LoadingCards count={1} className="nt-reps" />;
   // Replies with words or a GIF or a sticker (cards like an approval or a question have none of their own).
   const replies = (thread.data ?? [])
     .filter((m) => m.id !== n.source.threadId && !m.local && (m.body.trim() || messageMediaOf(m.meta)))

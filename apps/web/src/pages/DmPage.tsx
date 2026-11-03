@@ -54,7 +54,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       </main>
     );
   }
-  if (!dm.data || dir.loading) return <ChannelSkeleton />;
+  if (!dm.data || dir.loading) return <ChannelSkeleton dm={kind} />;
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const model = !agent

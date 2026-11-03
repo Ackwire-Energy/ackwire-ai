@@ -46,7 +46,8 @@ export function ThreadPage({
     const timer = setTimeout(() => document.getElementById(`composer-${threadId}`)?.focus(), 80);
     return () => clearTimeout(timer);
   }, [reply, loaded, threadId]);
-  if (info.isPending) return onClose ? <ChannelSkeleton panel /> : <ChannelSkeleton />;
+  // Not in any list this device holds yet (a link, a notification): the thread's own skeleton, once.
+  if (info.isPending) return <ChannelSkeleton thread panel={Boolean(onClose)} />;
   if (!thread) {
     const body =
       info.error instanceof ApiError && (info.error.status === 404 || info.error.status === 403) ? (

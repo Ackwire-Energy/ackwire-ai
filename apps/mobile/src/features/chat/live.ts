@@ -42,6 +42,7 @@ import {
   type StreamsState,
   seedReceipt,
   staleProvisional,
+  startThreadCache,
   stopTyping,
   type TypingState,
   typingThrottle,
@@ -220,8 +221,7 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       if (event.message) cacheMessage(qc, orgId, event.message);
       else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       // A new top-level message may get agent replies in its thread: start that list.
-      if (event.message && !event.message.threadId)
-        qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
+      if (event.message) startThreadCache(qc, orgId, event.message);
       // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it. An agent's
       // sticker or GIF after its reply (ADR 0091) changes none of them.
       if (event.message?.threadId && !isMediaAfterReply(event.message.meta))

@@ -231,6 +231,63 @@ describe("GIFs and stickers in the conversation", () => {
   });
 });
 
+describe("Responder on a media-only message that just arrived", () => {
+  // The live echo starts the message's thread list: it holds the message, so the panel never opens empty.
+  const kinds = [
+    ["a GIF", { media: GIF_MEDIA }, ".ac-gif"],
+    ["a sticker", { media: { kind: "sticker", agentId: ADA_ID, mood: "love" } }, "canvas[role=img]"],
+    ["an image", "image", ".file-thumb"],
+    ["a file", "file", ".file-row"],
+    ["a voice message", { voice: { clipId: "clip-1", durationMs: 4000, peaks: [0.2, 0.6, 0.4] } }, ".ac-voice"],
+  ] as const;
+  for (const [what, meta, selector] of kinds) {
+    test(`${what}: the thread panel shows it as the root`, async () => {
+      const state = seedState();
+      const api = createFakeApi(state);
+      const upload = async (name: string, type: string) =>
+        (await api.artifacts.upload(ORG_ID, new File([new Uint8Array([137, 80, 78, 71])], name, { type }))).id;
+      const realMeta =
+        meta === "image"
+          ? { artifacts: [{ id: await upload("tela.png", "image/png"), version: 1 }] }
+          : meta === "file"
+            ? { artifacts: [{ id: await upload("notas.pdf", "application/pdf"), version: 1 }] }
+            : meta;
+      const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+      await settle(6);
+      const socket = r.sockets.last();
+      await act(async () => socket.open());
+      await settle(2);
+      const message = {
+        id: "m-live",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person" as const, id: "u-joao" },
+        body: "",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        meta: realMeta,
+        createdAt: new Date().toISOString(),
+      };
+      state.messages.push(message);
+      await act(async () =>
+        socket.push({
+          type: "event",
+          channelId: ENG_ID,
+          event: { channelId: ENG_ID, type: "message.created", messageId: message.id, message },
+        }),
+      );
+      await settle(4);
+      await act(async () => fireEvent.mouseEnter(row("m-live")));
+      await click(within(within(row("m-live")).getByRole("toolbar")).getByRole("button", { name: "Responder" }));
+      await settle(8);
+      const panel = screen().getByRole("complementary", { name: "Thread" });
+      const root = panel.querySelector('article[data-message-id="m-live"]');
+      expect(root).toBeTruthy();
+      expect(root?.querySelector(selector)).toBeTruthy();
+    });
+  }
+});
+
 describe("where a message's words would show", () => {
   test("the inbox: a sticker with no words says Figurinha", async () => {
     const state = seedState({

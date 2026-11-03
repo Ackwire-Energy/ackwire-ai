@@ -71,6 +71,7 @@ import {
   type StreamsState,
   seedReceipt,
   staleProvisional,
+  startThreadCache,
   stopTyping,
   type TypingState,
   touchRun,
@@ -833,9 +834,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
         // A new top-level message may get agent replies in its thread: start watching it.
-        if (event.message && !event.message.threadId) {
-          qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
-        }
+        if (event.message) startThreadCache(qc, orgId, event.message);
         // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines. An agent's
         // sticker after its reply (ADR 0091) changes none of them.
         if (event.message?.threadId && !isMediaAfterReply(event.message.meta)) {

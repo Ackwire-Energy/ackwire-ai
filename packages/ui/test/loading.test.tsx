@@ -38,6 +38,30 @@ describe("Skeleton", () => {
     expect(shape.style.width).toBe("120px");
   });
 
+  test("a skeleton taking over from one on screen (the next stage of the same load) shows at once", async () => {
+    const { rerender } = render(
+      <SkeletonGroup key="first" label="Carregando a página">
+        <Skeleton width={120} />
+      </SkeletonGroup>,
+    );
+    await wait(SKELETON_DELAY_MS + 30);
+    rerender(
+      <SkeletonGroup key="next" label="Carregando mensagens">
+        <Skeleton width={120} />
+      </SkeletonGroup>,
+    );
+    expect(body().getByRole("status", { name: "Carregando mensagens" }).hasAttribute("data-visible")).toBe(true);
+    // Long after it went: a new load waits again.
+    cleanup();
+    await wait(400);
+    render(
+      <SkeletonGroup label="Carregando a lista">
+        <Skeleton width={120} />
+      </SkeletonGroup>,
+    );
+    expect(body().getByRole("status", { name: "Carregando a lista" }).hasAttribute("data-visible")).toBe(false);
+  });
+
   test("a conversation looks like messages: avatars (people round, agents square), names, grouped follow-ups", () => {
     render(<SkeletonConversation label="Carregando mensagens" count={6} />);
     const group = body().getByRole("status", { name: "Carregando mensagens" });
