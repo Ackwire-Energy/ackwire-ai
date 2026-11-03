@@ -685,6 +685,8 @@ export interface AgentInput {
   ownerUserId?: string | null;
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
+  /** With `audience`: the mailboxes the person agreed it loses; losing another refuses the save (409). */
+  mailLossSeen?: string[];
   appearance?: AgentLookInput;
   /** Editing only, admins: it coordinates the team (true takes it from whoever had it), ADR 0093. */
   coordinator?: boolean;

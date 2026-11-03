@@ -4,7 +4,7 @@ import { type Agent, getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
@@ -360,6 +360,8 @@ export async function notifyBlocked(
 /**
  * Changes who can talk to the agent: its owner or admins (with no owner,
  * admins only); on a plan, more people only by its owner (`planSharing`).
+ * `mailLossSeen`: the mailboxes the person agreed it loses (`audienceMailLoss`); losing any other refuses the save
+ * (409 `agent.mail_loss_changed`), so a mailbox given after they were asked is never taken unasked.
  * Audited.
  */
 export async function setAgentAudience(
@@ -368,6 +370,7 @@ export async function setAgentAudience(
   orgId: string,
   agentId: string,
   audience: Omit<AgentAudience, "roleIds"> & { roleIds?: string[] },
+  mailLossSeen?: readonly string[],
 ): Promise<Agent> {
   const agent = await audienceEditable(db, actorId, orgId, agentId);
   if (!AUDIENCE_MODES.includes(audience.mode)) throw new ValidationError("Unknown audience mode");
@@ -427,6 +430,12 @@ export async function setAgentAudience(
       .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
       .returning();
     if (updated) {
+      if (mailLossSeen && widensReach(audienceOf(agent), audienceOf(updated), agent.ownerUserId)) {
+        const lost = await foreignMailboxes(tx, orgId, agentId, actorId);
+        if (lost.some((m) => !mailLossSeen.includes(m.accountId))) {
+          throw new ConflictError("It holds a mailbox you weren't asked about", "agent.mail_loss_changed");
+        }
+      }
       await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(updated), actorId);
     }
     return updated;

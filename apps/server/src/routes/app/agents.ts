@@ -815,6 +815,10 @@ export function agentRoutes(deps: AppDeps) {
               deprecated: true,
               description: "Ignored. Older apps send it when an agent on a plan replies to everyone.",
             }),
+            mailLossSeen: z.array(z.uuid()).max(500).optional().openapi({
+              description:
+                "With `audience`: the mailboxes the person agreed it loses (`audience/mail-loss`). If it would lose another (given since), 409 `agent.mail_loss_changed` and nothing is saved: ask again.",
+            }),
           }),
         ),
       },
@@ -828,6 +832,7 @@ export function agentRoutes(deps: AppDeps) {
         appearance,
         coordinator,
         acceptPlanTerms: _,
+        mailLossSeen,
         brakes,
         ...rest
       } = c.req.valid("json");
@@ -849,7 +854,7 @@ export function agentRoutes(deps: AppDeps) {
             { pubsub: adapters.pubsub },
           )
         : null;
-      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
+      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience, mailLossSeen);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
       if (coordinator !== undefined)
         agent = await setCoordinator({ db, pubsub: adapters.pubsub }, actor, orgId, agentId, coordinator);

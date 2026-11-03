@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { and, eq, like, schema } from "@agenteschat/db";
 import {
   audienceMailLoss,
+  ConflictError,
   createRole,
   createRoutine,
   decideApproval,
@@ -174,6 +175,31 @@ test("before widening, the apps can ask which mailboxes would go: whose they are
   expect(await audienceMailLoss(f.db, f.owner.id, f.org.id, f.agent.id, everyone)).toEqual([]);
   // Only who may change the audience asks.
   await expect(audienceMailLoss(f.db, lia.id, f.org.id, f.agent.id, everyone)).rejects.toBeInstanceOf(ForbiddenError);
+});
+
+test("a mailbox given after the person was asked refuses the save, so nothing is taken unasked", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const carla = await addMember(f.db, f.org.id, "member", "carla");
+  await makeAdmin(f.db, f.org.id, carla.id);
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: f.owner.id, audienceMode: "owner" })
+    .where(eq(schema.agents.id, f.agent.id));
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read");
+  const everyone = { mode: "everyone" as const, userIds: [] };
+
+  // Asked when it held nothing, then the owner gave it a mailbox.
+  await expect(setAgentAudience(f.db, carla.id, f.org.id, f.agent.id, everyone, [])).rejects.toBeInstanceOf(
+    ConflictError,
+  );
+  const [kept] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+  expect(kept?.audienceMode).toBe("owner");
+  expect((await mailScopes()).length).toBeGreaterThan(0);
+
+  await setAgentAudience(f.db, carla.id, f.org.id, f.agent.id, everyone, [account.id]);
+  expect(await mailScopes()).toEqual([]);
 });
 
 test("an email in someone's own mailbox: they approve their own; asked by anyone else, only they decide", async () => {

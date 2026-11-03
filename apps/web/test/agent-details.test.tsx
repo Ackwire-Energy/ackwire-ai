@@ -71,7 +71,10 @@ describe("an agent that doesn't answer an admin", () => {
     await act(async () => fireEvent.click(allow));
     await settle(2);
     const update = state.calls.find((c) => c.method === "agents.update");
-    expect(update?.args[2]).toEqual({ audience: { mode: "people", userIds: ["u-walter"], roleIds: ["r-suporte"] } });
+    expect(update?.args[2]).toEqual({
+      audience: { mode: "people", userIds: ["u-walter"], roleIds: ["r-suporte"] },
+      mailLossSeen: [],
+    });
   });
 
   test("letting me in when she holds João's mailbox asks first, naming whose access goes, and Cancel keeps it", async () => {
@@ -97,5 +100,34 @@ describe("an agent that doesn't answer an admin", () => {
     await act(async () => fireEvent.click(within(again).getByRole("button", { name: "Continuar" })));
     await settle(2);
     expect(state.calls.filter((c) => c.method === "agents.update")).toHaveLength(1);
+  });
+
+  test("a mailbox given while I'm asked: the save is refused and I'm asked again, naming both", async () => {
+    const state = keptOut();
+    const box = (id: string, ownerName: string) => ({
+      accountId: id,
+      address: `${id}@acme.com`,
+      ownerUserId: `u-${id}`,
+      ownerName,
+    });
+    state.mailLoss = { [ADA_ID]: [box("joao", "João")] };
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: /Quero falar com/ })));
+    await settle(2);
+    state.mailLoss = { [ADA_ID]: [box("joao", "João"), box("bia", "Bia")] };
+    const ask = screen().getByRole("dialog", { name: "Tirar o acesso à caixa de email?" });
+    await act(async () => fireEvent.click(within(ask).getByRole("button", { name: "Continuar" })));
+    await settle(4);
+    const again = screen().getByRole("dialog", { name: "Tirar o acesso à caixa de email?" });
+    expect(again.textContent).toContain("de João e Bia.");
+    await act(async () => fireEvent.click(within(again).getByRole("button", { name: "Continuar" })));
+    await settle(2);
+    const updates = state.calls.filter((c) => c.method === "agents.update");
+    expect(updates.map((c) => (c.args[2] as { mailLossSeen?: string[] }).mailLossSeen)).toEqual([
+      ["joao"],
+      ["joao", "bia"],
+    ]);
+    expect(state.agents.find((a) => a.id === ADA_ID)?.audience?.userIds).toContain("u-walter");
   });
 });

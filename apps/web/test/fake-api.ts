@@ -1986,9 +1986,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           }
           agent.previousHandles = [...(agent.previousHandles ?? []).filter((h) => h !== input.handle), agent.handle];
         }
+        // As the backend: a mailbox given since the person was asked refuses the save.
+        const { mailLossSeen, ...fields } = input;
+        if (mailLossSeen && (state.mailLoss?.[agentId] ?? []).some((m) => !mailLossSeen.includes(m.accountId))) {
+          throw new ApiError(409, "agent.mail_loss_changed", "It holds a mailbox you weren't asked about");
+        }
         // One agent coordinates the team at a time (ADR 0093).
-        if (input.coordinator) for (const a of state.agents) a.coordinator = false;
-        Object.assign(agent, input);
+        if (fields.coordinator) for (const a of state.agents) a.coordinator = false;
+        Object.assign(agent, fields);
         return { ...agent };
       },
       mailLoss: async (orgId, agentId, audience) => {

@@ -200,6 +200,17 @@ test("before an admin lets more people talk to an agent, the apps learn whose ma
     mailboxes: { accountId: string; level: string }[];
   };
   expect(after.mailboxes.find((x) => x.accountId === account.id)?.level).toBe("read");
+
+  // Saving with what she was asked before the mailbox came: refused, nothing changes; with it, saved.
+  const save = (mailLossSeen: string[]) =>
+    carla(`${org}/agents/${agentId}`, {
+      method: "PATCH",
+      json: { audience: { mode: "everyone", userIds: [] }, mailLossSeen },
+    });
+  const stale = await save([]);
+  expect(stale.status).toBe(409);
+  expect(await stale.json()).toMatchObject({ error: { code: "agent.mail_loss_changed" } });
+  expect((await save([account.id])).status).toBe(200);
 });
 
 /** What the agent page's Email card (MailAccess.tsx) sends: its draft from the GET answer, with the level picked. */
