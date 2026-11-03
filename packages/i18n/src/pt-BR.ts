@@ -1938,6 +1938,7 @@ export const ptBR = {
     routine: {
       created: "Criei a rotina <b>{{name}}</b> · {{schedule}}",
       created_bare: "Criei a rotina <b>{{name}}</b>",
+      ownActions: "Faz sozinha, sem pedir: {{actions}}",
       updated: "Mudei {{fields}} da rotina <b>{{name}}</b>",
       updated_paused: "Pausei a rotina <b>{{name}}</b>",
       updated_resumed: "Retomei a rotina <b>{{name}}</b>",
@@ -4828,6 +4829,11 @@ export const ptBR = {
         artifact: "Vira um documento no Drive",
       },
       ahead: "Preparado para depois",
+      ownActions: "Faz sozinha",
+    },
+    ownActions: {
+      hint: "Cada execução faz isso nos seus apps conectados sem pedir. Qualquer outra ação neles pede aprovação antes, e merge, deploy e rollback sempre pedem.",
+      none: "Nos apps conectados, ela pede aprovação antes de cada ação. Para ela fazer o trabalho sozinha, diga ao agente no chat quais ações pode fazer.",
     },
     /** Actions prepared for its runs (`schedule_action`), on its page. */
     ahead: {

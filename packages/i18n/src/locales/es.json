@@ -2025,6 +2025,7 @@
     "routine": {
       "created": "Creé la rutina <b>{{name}}</b> · {{schedule}}",
       "created_bare": "Creé la rutina <b>{{name}}</b>",
+      "ownActions": "Hace por su cuenta, sin preguntar: {{actions}}",
       "updated": "Cambié {{fields}} de la rutina <b>{{name}}</b>",
       "updated_paused": "Pausé la rutina <b>{{name}}</b>",
       "updated_resumed": "Reanudé la rutina <b>{{name}}</b>",
@@ -5011,7 +5012,12 @@
         "forum": "Los agentes discuten en un tema del foro",
         "artifact": "Se vuelve un documento en el Drive"
       },
-      "ahead": "Preparado para después"
+      "ahead": "Preparado para después",
+      "ownActions": "Hace por su cuenta"
+    },
+    "ownActions": {
+      "hint": "Cada ejecución hace esto en tus apps conectadas sin preguntar. Cualquier otra acción en ellas pide aprobación antes, y merge, deploy y rollback siempre la piden.",
+      "none": "En las apps conectadas pide aprobación antes de cada acción. Para que haga su trabajo por su cuenta, dile al agente en el chat qué acciones puede hacer."
     },
     "ahead": {
       "approved": "Aprobada · se ejecuta {{when}}",

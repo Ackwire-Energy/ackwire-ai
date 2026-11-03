@@ -76,6 +76,12 @@ export const actionErrorKey = (code: string) => `agentActions.errors.${code.repl
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 
+/** A created routine's actions in connected apps it does without asking (its receipt's `ownActions`). */
+export const routineOwnActions = (a: Pick<AgentAction, "kind" | "params">): string[] =>
+  a.kind === "routine.created" && Array.isArray(a.params.ownActions)
+    ? a.params.ownActions.filter((v): v is string => typeof v === "string")
+    : [];
+
 /**
  * The values (and i18next `context`) for `t(actionTextKey(a), …)`: issue
  * number and title, the changed fields in words, the assignee ("você" when it

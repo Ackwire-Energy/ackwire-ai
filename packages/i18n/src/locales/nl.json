@@ -1964,6 +1964,7 @@
     "routine": {
       "created": "Routine <b>{{name}}</b> aangemaakt · {{schedule}}",
       "created_bare": "Routine <b>{{name}}</b> aangemaakt",
+      "ownActions": "Doet zelf, zonder te vragen: {{actions}}",
       "updated": "{{fields}} van routine <b>{{name}}</b> gewijzigd",
       "updated_paused": "Routine <b>{{name}}</b> gepauzeerd",
       "updated_resumed": "Routine <b>{{name}}</b> hervat",
@@ -4918,7 +4919,12 @@
         "forum": "De agents overleggen in een forumonderwerp",
         "artifact": "Wordt een document in de Drive"
       },
-      "ahead": "Klaargezet voor later"
+      "ahead": "Klaargezet voor later",
+      "ownActions": "Doet zelf"
+    },
+    "ownActions": {
+      "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",
+      "none": "In gekoppelde apps vraagt ze voor elke actie eerst een persoon om goedkeuring. Wil je dat ze haar werk zelf doet, vertel de agent in de chat welke acties ze mag doen."
     },
     "ahead": {
       "approved": "Goedgekeurd · draait {{when}}",

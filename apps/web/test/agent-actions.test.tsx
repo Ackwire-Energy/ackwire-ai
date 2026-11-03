@@ -100,6 +100,21 @@ describe("receipts under the agent's reply", () => {
     expect(group.querySelector(".ag-rcg__hd")).toBeNull();
   });
 
+  test("a created routine says what it does on its own, without asking", async () => {
+    await open(
+      withActions([
+        action({
+          kind: "routine.created",
+          target: { type: "routine", id: "rt-1", title: "Resumo da semana" },
+          params: { name: "Resumo da semana", ownActions: ["SLACK_SEND_MESSAGE", "GMAIL_SEND_EMAIL"] },
+        }),
+      ]),
+    );
+    const row = receipts().querySelector(".ag-rc") as HTMLElement;
+    expect(row.textContent).toContain("Criei a rotina Resumo da semana");
+    expect(row.textContent).toContain("Faz sozinha, sem pedir: Enviar mensagem (Slack) e Enviar e-mail (Gmail)");
+  });
+
   test("several: 'N mudanças · agora', Desfazer tudo, one row each with its own Desfazer", async () => {
     await open(withActions([action(), priority(), memory()]));
     const group = receipts();
