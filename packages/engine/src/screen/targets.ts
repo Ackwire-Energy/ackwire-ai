@@ -74,6 +74,8 @@ export interface TargetMemory {
   name: string;
   /** Where it sat (its named containers): it is found again only there ("Delete" in the row for invoice 42). */
   context: string[];
+  /** The judge found it can't be undone: it is never taken from memory. */
+  costly?: boolean;
 }
 
 /** In-process memory of targets per agent and site (LRU). */
@@ -200,11 +202,20 @@ const PICK_MARGIN = 0.2;
  * sure, else the closest ones go back to the agent, which picks by number.
  */
 export const COSTLY_PICK_AT = 0.85;
-const COSTLY =
-  /\b(delete|remove|erase|destroy|trash|discard|don['’]?t save|do not save|close without saving|overwrite|replace|empty|uninstall|format|pay|purchase|buy|place order|checkout|send|transfer|confirm|unsubscribe|close account|cancel (my )?(account|subscription|plan)|excluir|apagar|remover|lixeira|descartar|n[ãa]o salvar|(sair|fechar) sem salvar|sobrescrever|substituir|esvaziar|desinstalar|formatar|pagar|comprar|finalizar|enviar|transferir|confirmar|encerrar|cancelar (a )?(conta|assinatura|plano))\b/i;
-/** A plain "Yes" or "OK" does what its dialog asks ("Delete project Acme?"): costly when the dialog is. */
-const isCostly = (e: ScreenElement) =>
-  COSTLY.test(e.name) || e.context.some((c) => /^(?:alert)?dialog "/.test(c) && COSTLY.test(c));
+/**
+ * Whether acting on the target can't be undone, asked of the judge with the pick: a screen in any language reads
+ * the same. No answer is a yes.
+ */
+const COSTLY: JudgeQuestion = {
+  type: "noul",
+  instructions:
+    "Would acting on `target` pay, delete, send or do something else that can't be undone? A plain Yes or OK in a dialog that asks for such a thing does what the dialog asks.",
+  criteria: {
+    true: "It pays, buys, deletes, discards, empties, overwrites, replaces, sends, transfers, uninstalls, formats, cancels an account or a plan, closes without saving, or confirms one of these.",
+    false: "It can be undone, or only opens, shows, selects or types something.",
+  },
+};
+const costlyOf = (answers: Record<string, JudgeAnswer>) => (answers.costly?.noul ?? 1) >= 0.5;
 /** Below this, nothing on the screen is it. */
 const ABSENT_BELOW = 0.3;
 
@@ -242,7 +253,7 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
   const remembered = input.cache?.get(key);
   const again = remembered ? fromMemory(remembered, o) : null;
   // A costly one (delete, pay) is never taken from memory: its place is kept only in part (row text cut short).
-  if (again && !isCostly(again)) return { found: true, ref: again.ref, element: again, via: "cache", confidence: 1 };
+  if (again && !remembered?.costly) return { found: true, ref: again.ref, element: again, via: "cache", confidence: 1 };
 
   const candidates = candidatesFor(words, input.use, o, MAX_OPTIONS);
   if (candidates.length === 0) return { found: false, reason: "absent", candidates: [] };
@@ -264,6 +275,7 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
         false: "Nothing on the screen is what `target` describes, or it can't be told apart from others.",
       },
     },
+    costly: COSTLY,
   };
   let answers: Record<string, JudgeAnswer>;
   try {
@@ -286,8 +298,8 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
     // No calibrated judge (or it failed): the closest by their words go back, and the agent picks by number.
     return { found: false, reason: "unjudged", candidates: closestByWords(words, candidates) };
   }
-  return decide(answers, candidates, (picked) => {
-    input.cache?.set(key, memoryOf(picked));
+  return decide(answers, candidates, (picked, costly) => {
+    input.cache?.set(key, { ...memoryOf(picked), costly });
   });
 }
 
@@ -314,7 +326,7 @@ function closestByWords(words: string, candidates: ScreenElement[]): ScreenEleme
 function decide(
   answers: Record<string, JudgeAnswer>,
   candidates: ScreenElement[],
-  remember: (e: ScreenElement) => void,
+  remember: (e: ScreenElement, costly: boolean) => void,
 ): TargetResult {
   const which = answers.which;
   const probabilities = which?.probabilities ?? {};
@@ -336,9 +348,9 @@ function decide(
   if (picked && twins.length > 0) {
     return { found: false, reason: "unsure", candidates: [picked, ...twins].slice(0, 3) };
   }
-  const need = picked && isCostly(picked) ? COSTLY_PICK_AT : PICK_AT;
-  if (picked && p >= need && p - next >= PICK_MARGIN && present >= ABSENT_BELOW) {
-    remember(picked);
+  const costly = costlyOf(answers);
+  if (picked && p >= (costly ? COSTLY_PICK_AT : PICK_AT) && p - next >= PICK_MARGIN && present >= ABSENT_BELOW) {
+    remember(picked, costly);
     return { found: true, ref: picked.ref, element: picked, via: "judge", confidence: p };
   }
   const top = ranked.slice(0, 3).map((r) => r.e);
@@ -354,7 +366,7 @@ export type Located =
   | {
       found: false;
       reason: string;
-      /** It is there, but only as a spot on the image, and its words say it can't be undone. */
+      /** It is there, but only as a spot on the image, and the judge found it can't be undone. */
       refused?: true;
     };
 
@@ -449,8 +461,8 @@ async function asCloseUp(image: ScreenImage): Promise<ScreenImage> {
  * element's ref, so the action stays as exact as a ref; else it's a point.
  * With `zoom`, a small first box is boxed again on a close-up of the screen
  * around it, up to twice as large (small desktop targets: menu items, icons,
- * a title bar's buttons), and the close-up's answer is the one taken. Words
- * that can't be undone (delete, discard…) are never taken at a bare point.
+ * a title bar's buttons), and the close-up's answer is the one taken. A target
+ * the judge finds can't be undone (delete, discard…) is never taken at a bare point.
  */
 export async function locateOnImage(input: {
   judge: Judge;
@@ -467,7 +479,7 @@ export async function locateOnImage(input: {
 }): Promise<Located> {
   const words = ON_IMAGE[input.kind ?? "browser"];
   const target = input.target.trim();
-  const boxOn = async (image: ScreenImage, where: string) => {
+  const boxOn = async (image: ScreenImage, where: string, first = false) => {
     const placeholder = `screen_${randomUUID()}`;
     const answers: Record<string, JudgeAnswer> = await input.judge.ask({
       orgId: input.orgId,
@@ -483,14 +495,15 @@ export async function locateOnImage(input: {
           instructions: words.present,
           criteria: { true: "It is visible on the screenshot.", false: words.absent },
         },
+        ...(first ? { costly: COSTLY } : {}),
       },
     });
-    return { box: answers.where?.box, present: answers.present?.noul ?? 0 };
+    return { box: answers.where?.box, present: answers.present?.noul ?? 0, costly: first && costlyOf(answers) };
   };
 
   let first: Awaited<ReturnType<typeof boxOn>>;
   try {
-    first = await boxOn(input.image, words.where);
+    first = await boxOn(input.image, words.where, true);
   } catch (error) {
     return { found: false, reason: error instanceof Error ? error.message : String(error) };
   }
@@ -520,6 +533,6 @@ export async function locateOnImage(input: {
     .filter((m) => x >= m.box.x && x <= m.box.x + m.box.width && y >= m.box.y && y <= m.box.y + m.box.height)
     .sort((a, b) => a.box.width * a.box.height - b.box.width * b.box.height)[0];
   // A spot is only as exact as the box: something that can't be undone is done on an element, or not at all.
-  if (!hit && COSTLY.test(target)) return { found: false, reason: "only a spot on the image", refused: true };
+  if (!hit && first.costly) return { found: false, reason: "only a spot on the image", refused: true };
   return { found: true, x, y, ref: hit?.ref ?? null, confidence: present };
 }

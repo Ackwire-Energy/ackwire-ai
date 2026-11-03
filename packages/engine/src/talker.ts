@@ -42,26 +42,8 @@ export const TALKER_MIN_GAP_MS = 30_000;
 export const TALKER_TIMEOUT_MS = 6_000;
 /** A fast reply is one or two sentences: anything longer is cut. */
 const TALKER_MAX_CHARS = 600;
-/** Only a short message can be a plain "stop" (as in `isStopRequest`). */
-const STOP_MAX_LENGTH = 80;
-
-/**
- * Obvious "stop"s, in the languages people write here: the stop judge
- * cancels the task, so the talker stays out of it. The judge decides the
- * rest; a stop the talker misses is caught again before posting (the run
- * ended).
- */
-const STOP_WORDS =
-  /^(?:para(?:r)?|pare|stop|cancel(?:a|ar|e)?|chega|basta|deixa pra l[aá]|esquece|abort(?:a|ar|e)?|halt|nevermind|never mind|forget it|det[eé]n(?:te)?|alto)[\s.!]*$/i;
-
-export const looksLikeStop = (text: string) => {
-  const t = text.trim();
-  return t.length > 0 && t.length <= STOP_MAX_LENGTH && STOP_WORDS.test(t);
-};
-
 export type TalkerSkip =
   | "background"
-  | "stop"
   | "resolved"
   | "reads_soon"
   | "rate_limited"
@@ -72,10 +54,12 @@ export type TalkerSkip =
 
 /**
  * Whether the conversation layer is worth a model call at all (code decides;
- * cheap and quiet by default). Considered: a run that waits (a question,
+ * cheap and quiet by default). A "stop" is no word list here, so it is the
+ * same in any language: the model passes on it, the stop judge cancels the
+ * task, and a reply that loses that race is never posted (the run ended). Considered: a run that waits (a question,
  * browser help, another agent, its computer), a computer brain mid-turn (it
  * may not read the message for minutes), or a model-brain run quiet for
- * `TALKER_QUIET_MS` (a long tool). Skipped: background work, a "stop", a
+ * `TALKER_QUIET_MS` (a long tool). Skipped: background work, a
  * message that ended the wait, a model-brain run moving along (it reads the
  * message within seconds at its next step), and a second reply within
  * `TALKER_MIN_GAP_MS` or with no new person message since the last one.
@@ -93,7 +77,6 @@ export function talkerPolicy(input: {
 }): TalkerSkip | null {
   const { run, now } = input;
   if (run.background) return "background";
-  if (looksLikeStop(input.message.body)) return "stop";
   if (input.waited?.outcome === "resolved") return "resolved";
   // The message woke the run from its wait: the task itself reads it and answers now.
   if (input.waited?.outcome === "woke") return "reads_soon";

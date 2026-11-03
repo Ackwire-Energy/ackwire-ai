@@ -30,7 +30,7 @@ import { quotedLine } from "./context";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { type DecidedBy, MENTION_NEEDED } from "./events";
-import { cutText } from "./format";
+import { cutText, hasQuestionMark, wordCount } from "./format";
 import type { ModelGateway } from "./gateway";
 import { PLATFORM_CAP } from "./limits";
 import type { MachineCaller } from "./machine-hub";
@@ -122,7 +122,7 @@ export interface RoutingResult {
   reason?: string;
   /**
    * A purely social message (a greeting, goodnight, goodbye, thanks, ok, congratulations) that needs no real answer:
-   * `react` with one fitting `emoji`. Missing when the step doesn't tell; then `socialReaction` stands in.
+   * `react` with one fitting `emoji`. Missing when the step doesn't tell; then `socialReaction` stands in, from emoji only.
    */
   social?: { react: boolean; emoji: string };
   /** Usage record of the call the strategy made, if any. */
@@ -1133,9 +1133,10 @@ export async function routeMessage(
     (otherPerson(lastBefore?.authorUserId) &&
       message.createdAt.getTime() - (lastBefore?.createdAt.getTime() ?? 0) <= PEOPLE_WINDOW_MS);
   const saidText = [...run.map((m) => m.body), message.body].join(" ").trim();
-  // "valeu", "ok", "👍": a few words, no question, little need. No word list, so it holds in any language.
+  // "valeu", "ok", "👍", "ありがとうございます": a few words, no question, little need. No word list, so it holds in
+  // any language.
   const isAck = (needsAgent: number) =>
-    !saidText.includes("?") && saidText.split(/\s+/).filter(Boolean).length <= 4 && needsAgent < DEFAULT_NEED;
+    !hasQuestionMark(saidText) && wordCount(saidText) <= ACK_MAX_WORDS && needsAgent < DEFAULT_NEED;
   const justSpokeId = justSpoke && candidateIds.has(justSpoke) ? justSpoke : null;
   const talkingWith = repliedAgentId ?? lastTalkedTo ?? justSpokeId;
   // The best placed agent: the step's tie-break, else the top score, then whoever spoke here last, then the oldest.
@@ -1182,7 +1183,7 @@ export async function routeMessage(
     const said = [...history, ...(root ? [root] : [])].find(
       (m) => m.authorAgentId === agentId && (m === root || m.threadId === message.threadId),
     );
-    return said?.body.trim().split("\n").at(-1)?.includes("?") ? null : agentId;
+    return hasQuestionMark(said?.body.trim().split("\n").at(-1) ?? "") ? null : agentId;
   };
   // A social message nobody answers (a greeting, goodnight, thanks, an ok) gets one agent's reaction, the emoji the
   // step chose (`social`), else `socialReaction`'s. Who reacts: the agent it speaks to, else the one that just answered
@@ -1414,7 +1415,7 @@ export async function routeMessage(
         // Talking with an agent is no reason on its own: "vou almoçar agora, volto em uma hora" 15 minutes after a
         // talk needs nobody. A question, or some need, is for the agent ("Entenderam?").
         (!peopleTalking &&
-          ((talkingWith !== null && saidText.includes("?")) || needs >= DEFAULT_NEED || (await aloneWithTeam())))) &&
+          ((talkingWith !== null && hasQuestionMark(saidText)) || needs >= DEFAULT_NEED || (await aloneWithTeam())))) &&
       !(await defaultCapReached())
     ) {
       const agentId = talkingWith ?? coordinatorId ?? bestPlaced(scoreOf, decided.best);
@@ -1488,6 +1489,8 @@ export const DEFAULT_STRATEGY = "rule:default";
 
 /** From this need-any-agent score, a person's message the policy gave nobody is for the agents (R5): half the pick bar. */
 export const DEFAULT_NEED = 0.25;
+/** The most words a thanks, an ok or a sign-off has ("ありがとうございます" is five). */
+export const ACK_MAX_WORDS = 5;
 
 /** Another person's message this recent, right before, means people are talking among themselves (R5). */
 export const PEOPLE_WINDOW_MS = 5 * 60_000;
@@ -1596,51 +1599,35 @@ function namesIn(body: string, nameable: Nameable[], authorId: string | null): N
 export function isShortFollowUp(body: string) {
   const text = body.trim();
   if (!text || text.includes("@")) return false;
-  return text.length <= 60 && text.split(/\s+/).length <= 8;
+  return text.length <= 60 && wordCount(text) <= 8;
 }
 
-// `socialReaction`'s words, each with its emoji, in the order they win ("valeu, boa noite" thanks).
-const SOCIAL_WORDS: [emoji: string, words: Set<string>][] = (
+// The reaction each emoji a person sends alone is answered with (`socialReaction`).
+const EMOJI_REACTIONS: [reaction: string, emoji: Set<string>][] = (
   [
-    ["❤️", "amo love amei lindo linda querido querida fofo fofa s2 ❤ 😍 🥰 💜 💙 💚 🧡 💛 🤍 😘"],
-    ["🎉", "parabens congrats congratulations arrasou 🎉 🥳"],
-    [
-      "🙏",
-      "vlw valeu valew obrigado obrigada obg obgd obgda brigado brigada brigadao obrigadao grato grata agradeco thanks thank thx ty tks tnx tysm gracias merci 🙏",
-    ],
-    ["🌙", "noite night nite gn dormir sleep 🌙 😴"],
-    ["☀️", "dia morning gm ☀"],
-    ["👋", "oi ola opa eai eae salve hi hello hey tarde afternoon evening tchau bye flw falou fui ate amanha logo 👋"],
-    [
-      "+1",
-      "ok okk okay blz beleza show top perfeito perfeita perfect great nice cool massa boa fechado certo entendi joia 👍 👌 🙌 💪 tranquilo awesome",
-    ],
+    ["❤️", "❤ 😍 🥰 💜 💙 💚 🧡 💛 🤍 🩷 😘 🫶"],
+    ["🎉", "🎉 🥳 🎊 🏆"],
+    ["🙏", "🙏"],
+    ["🌙", "🌙 😴 💤"],
+    ["☀️", "☀ 🌞 🌅"],
+    ["👋", "👋"],
+    ["+1", "👍 👌 🙌 💪 👏 ✅ 🆗"],
   ] as const
-).map(([emoji, words]) => [emoji, new Set(words.split(" "))]);
-/** Words that go with them without changing them ("vlw pai", "boa noite pessoal", "thank you so much"). */
-const SOCIAL_FILLER = new Set(
-  "pai mae cara mano man bro brother chefe meu minha muito muita mt mto demais mesmo ai ae hein de bola te you u so much a lot very again bom good pessoal gente galera todos todo mundo all everyone guys team to indo vou mais".split(
-    " ",
-  ),
-);
+).map(([reaction, emoji]) => [reaction, new Set(emoji.split(" "))]);
 
 /**
- * The reaction a short social message gets when no step chose one (`RoutingResult.social`): 🙏 thanks, ❤️ affection,
- * 🎉 congratulations, 🌙 good night, ☀️ good morning, 👋 hi or bye, 👍 an ok, in Portuguese or English. Every word one
- * of those or a filler, no question. Anything else: null.
+ * The reaction a social message gets when no step chose one (`RoutingResult.social`), from its emoji alone: a
+ * message of only emoji gets the reaction its first fitting one asks for (🙏, ❤️, 🎉, 🌙, ☀️, 👋, 👍). Words, in
+ * any language, are the router model's to read: without its choice they get none, so "thanks", "ありがとう" and
+ * "danke" are treated the same.
  */
 export function socialReaction(text: string): string | null {
-  if (text.includes("?")) return null;
-  const words = (
-    fold(text)
-      .replace(/<3/g, "❤")
-      .replace(/\uFE0F/g, "")
-      .match(/[\p{L}\p{N}]+|\p{Extended_Pictographic}/gu) ?? []
-  )
-    // "valeuuu", "okkk": a held letter counts once; "kkk" and "haha" are laughter.
-    .map((w) => w.replace(/(\p{L})\1{2,}/gu, "$1"))
-    .filter((w) => !/^(k+|(ha)+|rs+)$/.test(w));
-  if (words.length === 0 || words.length > 8) return null;
-  if (!words.every((w) => SOCIAL_FILLER.has(w) || SOCIAL_WORDS.some(([, set]) => set.has(w)))) return null;
-  return SOCIAL_WORDS.find(([, set]) => words.some((w) => set.has(w)))?.[0] ?? null;
+  const bare = text.replace(/<3/g, "❤").replace(/[\uFE0F\u200D]|\p{Emoji_Modifier}/gu, "");
+  if (hasQuestionMark(bare) || /[\p{L}\p{N}]/u.test(bare.replace(/\p{Extended_Pictographic}/gu, ""))) return null;
+  const emoji = bare.match(/\p{Extended_Pictographic}/gu) ?? [];
+  for (const e of emoji) {
+    const hit = EMOJI_REACTIONS.find(([, set]) => set.has(e));
+    if (hit) return hit[0];
+  }
+  return null;
 }

@@ -2,6 +2,7 @@ import { type Executor, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import { nanoUsdToUsd } from "@agenteschat/providers";
 import { emailLocale, emailsByLocale, queueEmail } from "./email";
 import { enqueue } from "./outbox";
+import { ACK_MAX_WORDS, DEFAULT_NEED } from "./router";
 import { STUCK_ERROR } from "./runs";
 import { openOrg } from "./standing";
 import { REFUSALS } from "./tools/run-policy";
@@ -86,167 +87,22 @@ const TASK_START_SECONDS = 60;
 /** The report goes out this long after the UTC day ends, so its last messages had their whole answer window. */
 const REPORT_DELAY_MS = 3600_000;
 
-/**
- * Words and phrases a message made only of is a thanks, an ok or a sign-off, in the languages people write here;
- * laughter too. Never a yes or a go-ahead ("sim", "pode", "yes", "go", "show"): that asks an agent to act. A word
- * that is only a thanks or a goodbye inside a phrase ("até mais", "see ya", "copy that") is here as the phrase: alone
- * it can be a request ("mais", "copy it", "see all").
- */
-// ponytail: a word list, so a thanks in a language it lacks reads as a request; a judge call per short trigger if it matters.
-const ACK_WORDS = [
-  // pt
-  "ok",
-  "okay",
-  "oks?",
-  "okk+",
-  "blz",
-  "beleza",
-  "valeu",
-  "valew",
-  "vlw",
-  "obrigad[oa]",
-  "obrigad[aã]o",
-  "obg",
-  "obgd",
-  "brigad[oa]",
-  "muito",
-  "muitíssimo",
-  "mto",
-  "mt",
-  "demais",
-  "top",
-  "show de bola",
-  "perfeit[oa]",
-  "[óo]tim[oa]",
-  "massa",
-  "legal",
-  "j[óo]ia",
-  "certo",
-  "certinho",
-  "fechado",
-  "combinado",
-  "entendi",
-  "entendido",
-  "recebido",
-  "anotado",
-  "ciente",
-  "tmj",
-  "tchau",
-  "falou",
-  "flw",
-  "at[ée] (mais|logo|amanh[ãa]|breve)",
-  "at[ée]",
-  "bo[am] (dia|tarde|noite)",
-  "boa",
-  "bom",
-  "abra[çc]os?",
-  "abs",
-  "de nada",
-  "nada",
-  "tudo (bem|certo)",
-  "bem",
-  "grat[oa]",
-  "gratid[ãa]o",
-  "agrade[çc]o",
-  "opa",
-  "kk+",
-  "(ha)+h?",
-  "(he)+",
-  "rs(rs)*",
-  // en
-  "k",
-  "thanks",
-  "thank",
-  "you",
-  "thx",
-  "ty",
-  "tks",
-  "tnx",
-  "cheers",
-  "great",
-  "nice",
-  "cool",
-  "perfect",
-  "awesome",
-  "got (it|you|that)",
-  "noted",
-  "received",
-  "sounds (good|great)",
-  "good",
-  "alright",
-  "all (right|good|set)",
-  "right",
-  "bye",
-  "see (ya|you)",
-  "later",
-  "night",
-  "morning",
-  "have a (good|nice|great) (day|night|weekend|one)",
-  "a",
-  "day",
-  "weekend",
-  "appreciate",
-  "appreciated",
-  "much",
-  "so",
-  "lot",
-  "many",
-  "np",
-  "roger",
-  "copy that",
-  "welcome",
-  "lol",
-  // es, fr, de, it
-  "gracias",
-  "muchas",
-  "vale",
-  "perfecto",
-  "genial",
-  "listo",
-  "adi[óo]s",
-  "hasta (luego|ma[ñn]ana|pronto)",
-  "luego",
-  "chau",
-  "buenas( noches)?",
-  "merci",
-  "beaucoup",
-  "parfait",
-  "danke",
-  "sch[öo]n",
-  "super",
-  "grazie",
-  "perfetto",
-  "ciao",
-  // other scripts
-  "спасибо",
-  "ありがとう(ございます)?",
-  "どうも",
-  "了解",
-  "谢谢",
-  "謝謝",
-  "多谢",
-  "شكرا",
-  "감사합니다",
-  "고마워",
-  "धन्यवाद",
-  "תודה",
-];
-
 /** Runs of punctuation, symbols and emoji (Postgres ARE): what is left of a message without them are its words. */
 const NOT_WORDS =
   "[\\s\\u0021-\\u002f\\u003a-\\u0040\\u005b-\\u0060\\u007b-\\u007e\\u00a1-\\u00bf\\u2010-\\u206f\\u2190-\\u2bff\\u3000-\\u303f\\ufe0f\\uff01-\\uff0f\\U0001f000-\\U0001faff]+";
-/** Whole words and phrases of `ACK_WORDS`, each followed by a space or the end (Postgres ARE). */
-const ACK_PATTERN = `^ *(?:(?:${ACK_WORDS.join("|")})(?: +|$))*$`;
-
 /**
- * SQL: the text in `column` is only a thanks, an ok or a sign-off (or only emoji): at most 80 characters, no "?",
- * and nothing left once its @mentions and the words above are gone.
+ * SQL: the text in `column` is only a thanks, an ok or a sign-off, told the way the router tells it, in any language
+ * (no word list): at most 80 characters with no question mark, and once its @mentions are gone either only emoji and
+ * punctuation, or at most `ACK_MAX_WORDS` words the router heard as needing no agent (`need`, its
+ * `needs_agent_score`, under `DEFAULT_NEED`). A message the router never read counts only when it is emoji. Words
+ * are split at spaces here (a script without them is one word): the router's need tells those apart.
  */
-const isAck = (column: string) => {
-  const text = sql.raw(column);
-  return sql`coalesce(length(${text}) <= 80 and strpos(${text}, '?') = 0 and btrim(${text}) <> ''
-    and regexp_replace(regexp_replace(lower(${text}), '@[a-z0-9_.-]+', ' ', 'g'), ${NOT_WORDS}, ' ', 'g')
-      ~ ${ACK_PATTERN}, false)`;
+const isAck = (column: string, need: string) => {
+  const [text, score] = [sql.raw(column), sql.raw(need)];
+  const words = sql`btrim(regexp_replace(regexp_replace(lower(${text}), '@[a-z0-9_.-]+', ' ', 'g'), ${NOT_WORDS}, ' ', 'g'))`;
+  return sql`coalesce(length(${text}) <= 80 and ${text} !~ '[?？؟]' and btrim(${text}) <> ''
+    and (${words} = '' or (${score} < ${DEFAULT_NEED} and array_length(regexp_split_to_array(${words}, ' +'), 1) <= ${ACK_MAX_WORDS})),
+    false)`;
 };
 
 /**
@@ -318,12 +174,13 @@ export function autonomySql(range: AutonomyRange) {
     ),
     runs as (
       select r.id, r.org_id, r.agent_id, r.trigger_message_id, r.trigger, r.status, r.error, r.background,
-        (r.created_at at time zone 'UTC')::date as day, rm.body as reply_body,
+        (r.created_at at time zone 'UTC')::date as day, rm.body as reply_body, rd.needs_agent_score as reply_need,
         coalesce(rm.meta ? 'stepLimit', false) as reply_limit,
         r.status = 'done' and not f.posted and not r.background as quiet, f.*
       from agent_runs r
       join orgs o on o.id = r.org_id
       left join messages rm on rm.org_id = r.org_id and rm.id = r.reply_message_id
+      left join routing_decisions rd on rd.message_id = r.reply_message_id
       cross join lateral (
         select coalesce(bool_or(s.kind = 'message'), false) as posted,
           coalesce(bool_or(${ACTED}), false) as acted,
@@ -344,11 +201,12 @@ export function autonomySql(range: AutonomyRange) {
     ),
     noise as (
       select r.id, r.org_id, r.day, r.quiet,
-        r.posted and not r.acted and ${isAck("t.body")} as ack,
+        r.posted and not r.acted and ${isAck("t.body", "td.needs_agent_score")} as ack,
         r.status = 'done' and r.trigger = 'mention' and t.author_type = 'agent' and not r.acted
-          and (not r.posted or ${isAck("r.reply_body")}) as idle
+          and (not r.posted or ${isAck("r.reply_body", "r.reply_need")}) as idle
       from runs r
       left join messages t on t.org_id = r.org_id and t.id = r.trigger_message_id
+      left join routing_decisions td on td.message_id = t.id
       where not r.background
     ),
     noise_runs as (select id, org_id, day from noise where quiet or ack or idle),
