@@ -44,7 +44,9 @@ test("a service's × ships in the full ink on its sky, its ink as far from the t
   expect(sideways).toBeTruthy();
   expect(glyph).toContain(`margin-block:${sideways}`);
   const row = await ships("layout.css", "src/styles.css", ".catalog-svc .ac-dialog__acts");
-  expect(row).toEqual(expect.arrayContaining(["top:24px", "right:24px"]));
+  expect(row).toEqual(expect.arrayContaining(["top:var(--dialog-pad)", "right:var(--dialog-pad)"]));
+  // The sheet's own inset, where its icon and words start, under the sky's densest top rows.
+  expect(await ships("layout.css", "src/styles.css", ".ac-dialog.catalog-svc")).toContain("--dialog-pad:24px");
 });
 
 test("a closed browser's sky takes the line's room in the computer window, steps or not, at every width", async () => {
