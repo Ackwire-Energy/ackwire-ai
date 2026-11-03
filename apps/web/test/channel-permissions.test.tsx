@@ -81,6 +81,8 @@ describe("channel permissions (ADR 0134)", () => {
     const inherit = within(post).getByRole("radio", { name: "Padrão" });
     inherit.focus();
     await act(async () => fireEvent.keyDown(inherit, { key: "ArrowRight" }));
+    // The optimistic write reaches React in TanStack's setTimeout(0) notify, which act alone doesn't wait for.
+    await settle(1);
     const allow = within(post).getByRole("radio", { name: "Permitir" });
     expect(allow.getAttribute("aria-checked")).toBe("true");
     expect(document.activeElement).toBe(allow);
