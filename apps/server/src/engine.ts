@@ -306,6 +306,7 @@ export function buildEngine(o: EngineOptions) {
     judge: context.judge,
     vision,
     publicUrl: config.PUBLIC_URL,
+    errors: o.errors,
   });
   // The workspace's cap of live background works (ADR 0121 §7).
   setWorkOrgCap(config.AGENT_WORK_MAX_PER_ORG);

@@ -1,5 +1,6 @@
-let data = {};
 const el = (id) => document.getElementById(id);
+let data = {};
+try { data = JSON.parse(el("data").textContent) || {}; } catch {}
 function draw() {
   const pt = data.locale === "pt-BR";
   const locale = pt ? "pt-BR" : "en";
@@ -23,10 +24,7 @@ function draw() {
   if (flag) el("flag").src = flag;
   el("tip").textContent = pt ? "Digite um endereço na barra acima" : "Type an address in the bar above";
 }
-async function refresh() {
-  try { const response = await fetch("data.json", {cache:"no-store"}); if (response.ok) data = await response.json(); } catch {}
-  draw();
-}
-function tick() { void refresh(); setTimeout(tick, 30000 - Date.now() % 30000); }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) void refresh(); });
+function tick() { draw(); setTimeout(tick, 30000 - Date.now() % 30000); }
+// The runner rewrites this file when the agent's details change (its exit IP): a tab coming back shows them.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) location.reload(); });
 tick();

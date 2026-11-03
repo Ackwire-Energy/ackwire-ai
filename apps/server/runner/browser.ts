@@ -1,11 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { existsSync, lstatSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { isStartPage, START_PAGE_URL } from "@agenteschat/adapters/browser-start";
+import { pathToFileURL } from "node:url";
+import { isStartPage, NEW_TAB_URL, START_FILE } from "@agenteschat/adapters/browser-start";
 import { AGENT_BROWSER_PROFILE } from "@agenteschat/adapters/command-policy";
 import { cgroupCounters } from "@agenteschat/adapters/host-stats";
 import {
@@ -19,6 +20,7 @@ import {
   type BrowserInputEvent,
   type BrowserSetup,
   type BrowserStreamMode,
+  CHROME_FAILURES,
   type MachineReplies,
   type MachineRequest,
   parseBrowserInputEvent,
@@ -32,9 +34,8 @@ import { type CrashedPage, countChromeTraffic, type TrafficCounter } from "./bro
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
-import { SYSTEM_BROWSER_DIR } from "./install-script";
+import { GOOGLE_CHROME_LINUX, SYSTEM_BROWSER_DIR } from "./install-script";
 import { readJson, writeJson } from "./json-file";
-import { acquireLock } from "./lock";
 import { agentFolderName, isInside, ownedSafely } from "./paths";
 import type { Spawn } from "./scope-gate";
 import { prepareStartPage, type StartPageData } from "./start-page";
@@ -53,12 +54,17 @@ import { prepareStartPage, type StartPageData } from "./start-page";
  *   install's (`SYSTEM_BROWSER_DIR`, which `install.sh --system` fills and
  *   only root can change), else a download of the pinned release into
  *   `<runner home>/bin/`, checked against its SHA-256 before it is ever run.
- * - Chrome: always Chrome for Testing, the newest of the shared install's and
- *   the one `agent-browser install` puts in the user's home (run when there is
- *   neither); never the person's own Chrome or Brave: their updater rewrites
- *   the app while we hold it open, and macOS then blames our app ("agentes was
- *   prevented from modifying apps"). A runner outside system mode gets what it
- *   lacks of them as it starts, once the browser is on (`prepareInBackground`).
+ * - Chrome: Google Chrome stable, the computer's own install at its standard
+ *   path (`findChrome`), never a copy of our own: it updates itself the normal
+ *   way (Google's apt repository on Linux, Google's updater on macOS and
+ *   Windows), with no version pinned. Each agent has its own profile, so the
+ *   person's own Chrome profile is never touched, and our Chrome never starts
+ *   Google's updater itself (`--disable-updater-scheduler`: macOS blamed our
+ *   app for it, "agentes was prevented from modifying apps"). A new version on
+ *   disk restarts an agent's Chrome on the same page once it is idle (`sweep`).
+ *   A Chrome that is missing or won't start is told to the agent in plain words
+ *   (`CHROME_FAILURES`), and the server reports it. A runner outside system mode
+ *   gets `agent-browser` as it starts, once the browser is on (`prepareInBackground`).
  * - Ready ahead (`warm`, ADR 0040 §11): the agent's Chrome starts before its
  *   first command, as that command would start it, and each command says what
  *   it waited on before it ran (`setup`).
@@ -135,9 +141,10 @@ export const STREAM_FPS: Record<BrowserStreamMode, number> = { watch: 1, control
 const MAX_OUTPUT_CHARS = 50_000;
 /** Bytes of stdout read from one command (a full-page screenshot as JSON stays well under). */
 const MAX_STDOUT = 8 * 1024 * 1024;
-const INSTALL_TIMEOUT_MS = 10 * 60_000;
-/** How often a runner waiting on another one's Chrome install looks again. */
-const INSTALL_TURN_POLL_MS = 1000;
+/** How often the version of Chrome on disk is read again (it updates itself). */
+const VERSION_CHECK_MS = 5 * 60_000;
+/** A Chrome a newer version waits for on disk restarts once its session had no command for this long. */
+const UPDATE_IDLE_MS = 2 * 60_000;
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 const QUICK_TIMEOUT_MS = 15_000;
 /** One input command on the relay: a click or a key answers in milliseconds. */
@@ -402,58 +409,62 @@ export function isWebPage(url: string): boolean {
   }
 }
 
-/** Where `agent-browser install` puts Chrome for Testing. */
-const testingChromeDir = (home: string) => path.join(home, ".agent-browser", "browsers");
-
-/** Where the executable sits inside one Chrome for Testing folder (the layouts `agent-browser` looks for). */
-function testingChromeBinaries(dir: string, platform: string): string[] {
+/** Where Google Chrome stable installs itself, in the order looked at. */
+export function chromeCandidates(
+  home: string = os.homedir(),
+  platform: string = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
   if (platform === "darwin") {
-    const app = path.join("Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing");
-    return [path.join(dir, app), path.join(dir, "chrome-mac-arm64", app), path.join(dir, "chrome-mac-x64", app)];
+    const app = path.join("Google Chrome.app", "Contents", "MacOS", "Google Chrome");
+    return [path.join("/Applications", app), path.join(home, "Applications", app)];
   }
-  if (platform === "win32") return [path.join(dir, "chrome.exe"), path.join(dir, "chrome-win64", "chrome.exe")];
-  return [path.join(dir, "chrome"), path.join(dir, "chrome-linux64", "chrome")];
+  if (platform === "win32") {
+    return [env.ProgramFiles, env["ProgramFiles(x86)"], env.LOCALAPPDATA]
+      .filter((dir): dir is string => !!dir)
+      .map((dir) => path.win32.join(dir, "Google", "Chrome", "Application", "chrome.exe"));
+  }
+  return [GOOGLE_CHROME_LINUX];
 }
 
-/**
- * The newest Chrome for Testing in the shared install (`shared`) and where
- * `agent-browser install` puts it under the home, by version, as its
- * executable; the shared one when both have that version; null when there is
- * none. The person's own Chrome is never used (see the top of this file).
- */
+/** The computer's Google Chrome, or null when it has none. */
 export function findChrome(
   home: string = os.homedir(),
   platform: string = process.platform,
-  shared: string | null = null,
+  env: NodeJS.ProcessEnv = process.env,
 ): string | null {
-  const found: { version: string; exe: string }[] = [];
-  for (const root of [...(shared ? [shared] : []), testingChromeDir(home)]) {
-    let entries: string[];
-    try {
-      entries = readdirSync(root).filter((e) => e.startsWith("chrome-"));
-    } catch {
-      continue;
+  return chromeCandidates(home, platform, env).find((exe) => existsSync(exe)) ?? null;
+}
+
+const VERSION = /^\d+\.\d+\.\d+\.\d+$/;
+
+/**
+ * The version of the Chrome at `exe` as it is on disk now (an update replaces it under a running Chrome), or null:
+ * macOS from the app's Info.plist (nothing is started), Windows from the newest version folder next to `chrome.exe`
+ * (its `--version` prints nothing), Linux from `chrome --version` ("Google Chrome 156.0.8078.79").
+ */
+export function chromeVersion(exe: string, platform: string = process.platform): string | null {
+  try {
+    if (platform === "darwin") {
+      const plist = readFileSync(path.join(path.dirname(exe), "..", "Info.plist"), "utf8");
+      return /<key>CFBundleShortVersionString<\/key>\s*<string>([\d.]+)<\/string>/.exec(plist)?.[1] ?? null;
     }
-    for (const e of entries) {
-      const dir = path.join(root, e);
-      try {
-        if (!statSync(dir).isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      const exe = testingChromeBinaries(dir, platform).find((b) => existsSync(b));
-      if (exe) found.push({ version: e.slice("chrome-".length), exe });
+    if (platform === "win32") {
+      const versions = readdirSync(path.win32.dirname(exe)).filter((e) => VERSION.test(e));
+      return versions.sort((x, y) => x.localeCompare(y, "en", { numeric: true })).at(-1) ?? null;
     }
+    const out = spawnSync(exe, ["--version"], { encoding: "utf8", timeout: QUICK_TIMEOUT_MS });
+    return /(\d+\.\d+\.\d+\.\d+)/.exec(out.stdout ?? "")?.[1] ?? null;
+  } catch {
+    return null;
   }
-  // Stable: of two with one version, the shared one (listed first) stays first.
-  found.sort((a, b) => b.version.localeCompare(a.version, "en", { numeric: true }));
-  return found[0]?.exe ?? null;
 }
 
 /**
  * Chrome flags on every launch: no first-run screens, nothing updating
- * Chrome's files in the background, and none of the automation markers a
- * launched-for-automation Chrome carries (no `--enable-automation`). Pages
+ * Chrome's components or starting Google's updater from our Chrome (the
+ * computer's own updater keeps Chrome current), and none of the automation
+ * markers a launched-for-automation Chrome carries (no `--enable-automation`). Pages
  * see `prefers-reduced-motion: reduce`, so an animated page holds still: one
  * kept two of a 4-core computer's cores busy whether anyone watched or not,
  * and sent its desktop's viewers a stream of changes. The chip asking to sign
@@ -472,6 +483,7 @@ export const CHROME_ARGS = [
   "--no-default-browser-check",
   "--disable-blink-features=AutomationControlled",
   "--disable-component-update",
+  "--disable-updater-scheduler",
   "--force-prefers-reduced-motion",
   "--disable-features=SigninPromoOnAvatarPill",
   "--restore-last-session",
@@ -480,20 +492,21 @@ const HEADLESS_ARGS = ["--headless=new", "--window-size=1280,800"];
 /**
  * On the agent's desktop: maximized; X11 even when the runner itself runs in a
  * Wayland session. A headed Chrome shows a bar about the automation flag above
- * and, Chrome for Testing, one saying it is only for automated testing: each
- * takes the page's height and people see it. `--test-type` hides the first;
- * its value `gpu` is what hides the second. Its windows' class is the dock's
- * Browser's (`StartupWMClass`), so the dock shows them there.
+ * the page, taking its height, and people see it: `--test-type` hides it. Its
+ * windows' class is the dock's Browser's (`StartupWMClass`), so the dock shows
+ * them there.
  */
-const HEADED_ARGS = ["--start-maximized", "--test-type=gpu", "--ozone-platform=x11", `--class=${BROWSER_WM_CLASS}`];
+const HEADED_ARGS = ["--start-maximized", "--test-type", "--ozone-platform=x11", `--class=${BROWSER_WM_CLASS}`];
 
 /**
- * A normal Chrome user agent for this Chrome's version (no "HeadlessChrome"),
- * as Chrome itself reduces it: major version only, a fixed platform string.
- * Null when the version can't be read from the path (`…/chrome-155.0.8059.84/…`).
+ * A normal Chrome user agent for this Chrome's version, as Chrome itself
+ * reduces it (major version only, a fixed platform string), for a headless
+ * Chrome, which otherwise says "HeadlessChrome": Google's sign-in refuses it
+ * and its search sends it to /sorry. A headed Chrome keeps its own. Null when
+ * the version isn't known.
  */
-export function chromeUserAgent(exe: string, platform: string = process.platform): string | null {
-  const major = /chrome-(\d+)\./.exec(exe)?.[1];
+export function chromeUserAgent(version: string | null, platform: string = process.platform): string | null {
+  const major = version ? /^(\d+)\./.exec(version)?.[1] : undefined;
   if (!major) return null;
   const os =
     platform === "darwin"
@@ -517,7 +530,9 @@ function osLang(): string | null {
 /**
  * Where Chrome keeps the key to its cookies and saved logins: never the
  * person's keychain (macOS asks for the login password the first time),
- * a key of its own in the agent's profile instead.
+ * a key of its own in the agent's profile instead. Google Chrome reads that
+ * key as Chrome for Testing wrote it, so the agents' sign-ins carried over
+ * when they moved to it: these flags never go, or every agent is signed out.
  */
 function secretStoreArgs(platform: string): string[] {
   if (platform === "darwin") return ["--use-mock-keychain"];
@@ -526,11 +541,13 @@ function secretStoreArgs(platform: string): string[] {
 }
 
 /**
- * The whole command line for the agent's Chrome: our flags, headless or headed
- * (on its desktop), its own port (0: Chrome picks), its profile, the page it opens.
+ * The whole command line for the agent's Chrome (`version`: the one on disk):
+ * our flags, headless or headed (on its desktop), its own port (0: Chrome
+ * picks), its profile, the page it opens (`startPage`, the agent's own start
+ * page file, in place of a blank one).
  */
 export function chromeLaunchArgs(
-  exe: string,
+  version: string | null,
   profile: string,
   platform: string = process.platform,
   lang: string | null = osLang(),
@@ -540,7 +557,7 @@ export function chromeLaunchArgs(
   startPage?: string,
   privateNetwork = false,
 ): string[] {
-  const ua = chromeUserAgent(exe, platform);
+  const ua = headed ? null : chromeUserAgent(version, platform);
   return [
     ...CHROME_ARGS,
     ...(headed ? HEADED_ARGS : HEADLESS_ARGS),
@@ -549,12 +566,8 @@ export function chromeLaunchArgs(
     `--user-data-dir=${profile}`,
     ...(ua ? [`--user-agent=${ua}`] : []),
     ...(lang ? [`--lang=${lang}`] : []),
-    // Only Chromium and Chrome for Testing honor --load-extension; Google Chrome stable ignores it
-    // since 137, so on Chrome stable the start page needs a policy (ExtensionInstallForcelist or
-    // NewTabPageLocation) instead.
-    ...(startPage ? [`--load-extension=${startPage}`] : []),
     ...(privateNetwork ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"] : []),
-    startPage && page === "about:blank" ? START_PAGE_URL : page,
+    startPage && page === "about:blank" ? pathToFileURL(startPage).href : page,
   ];
 }
 
@@ -578,8 +591,11 @@ export function chromeEnv(on: ChromeDisplay, base: NodeJS.ProcessEnv = process.e
   return { ...env, DISPLAY: `:${on.display}`, XAUTHORITY: on.xauthority };
 }
 
+/** The start page extension Chrome for Testing loaded (`--load-extension`), which Google Chrome ignores. */
+const OLD_START_PAGE_ID = "mbgkclemiokgppkieijlfaoehgdjlhbl";
+
 /**
- * Before a headed start, in the agent's profile:
+ * Before every start, in the agent's profile:
  * - Chrome draws its own frame. By itself it does only when a window manager
  *   already runs as it starts, and a desktop that just started gets its window
  *   manager a moment later: Chrome would then take that one's title bar, and a
@@ -588,10 +604,10 @@ export function chromeEnv(on: ChromeDisplay, base: NodeJS.ProcessEnv = process.e
  *   reads as it starts): no chip or bubble asks a person to sign in to the
  *   browser. Signing in to sites stays as it is: people sign the agent in to
  *   them on purpose.
- * - No footer under the start page: Chrome 138+ puts a bar of its own below a
- *   new tab page an extension draws (the extension's name, "Customize Chrome"),
- *   shown while the profile's "Show footer on New Tab page"
- *   (`NewTabPage.FooterVisible`, Chromium's `prefs::kNtpFooterVisible`) is on.
+ * - No footer under a new tab page (`NewTabPage.FooterVisible`, Chromium's
+ *   `prefs::kNtpFooterVisible`).
+ * - New tabs no longer point at the old start page extension, which isn't
+ *   loaded anymore (its `extensions.chrome_url_overrides.newtab` entry).
  * A Preferences file that isn't JSON is Chrome's to deal with, and neither is
  * worth failing a start for.
  */
@@ -603,15 +619,21 @@ export function prepareProfile(profile: string) {
     const browser = isRecord(prefs.browser) ? prefs.browser : {};
     const signin = isRecord(prefs.signin) ? prefs.signin : {};
     const ntp = isRecord(prefs.NewTabPage) ? prefs.NewTabPage : {};
-    if (browser.custom_chrome_frame === true && signin.allowed_on_next_startup === false && ntp.FooterVisible === false)
-      return;
-    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    writeJson(file, {
+    const next: Record<string, unknown> = {
       ...prefs,
       browser: { ...browser, custom_chrome_frame: true },
       signin: { ...signin, allowed_on_next_startup: false },
       NewTabPage: { ...ntp, FooterVisible: false },
-    });
+    };
+    const extensions = isRecord(prefs.extensions) ? prefs.extensions : null;
+    const overrides = isRecord(extensions?.chrome_url_overrides) ? extensions.chrome_url_overrides : null;
+    if (extensions && overrides && Array.isArray(overrides.newtab)) {
+      const newtab = overrides.newtab.filter((e) => !JSON.stringify(e).includes(OLD_START_PAGE_ID));
+      next.extensions = { ...extensions, chrome_url_overrides: { ...overrides, newtab } };
+    }
+    if (JSON.stringify(next) === JSON.stringify(prefs)) return;
+    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    writeJson(file, next);
   } catch {
     // Chrome starts with the settings it has.
   }
@@ -644,13 +666,15 @@ export interface OwnChrome {
 /**
  * Chrome didn't start. The message is for people; `detail` (what Chrome
  * printed meanwhile) is for the logs; `missing` lists the libraries this
- * computer lacks, when that is why.
+ * computer lacks, when that is why; `profile`: the agent's profile is what
+ * didn't open (another Chrome holds it).
  */
 export class ChromeStartError extends Error {
   constructor(
     message: string,
     readonly detail: string,
     readonly missing: string[] = [],
+    readonly profile = false,
   ) {
     super(message);
     this.name = "ChromeStartError";
@@ -674,7 +698,7 @@ function missingLibraries(exe: string, output: string): string[] {
 export function missingLibrariesText(missing: string[]): string {
   const names =
     missing.length > 6 ? `${missing.slice(0, 5).join(", ")} and ${missing.length - 5} more` : missing.join(", ");
-  return `the agent's computer is missing system libraries Chrome needs (${names}). Install them on it, then try again.`;
+  return `This computer is missing system libraries Chrome needs (${names}). Install them on it, then try again.`;
 }
 
 /**
@@ -766,6 +790,8 @@ export async function launchChrome(
       throw new ChromeStartError(
         inUse ? "Chrome closed while starting (another Chrome is using this profile)" : "Chrome closed while starting",
         detail,
+        [],
+        inUse,
       );
     }
     // Chromium writes DevToolsActivePort only for port 0. For a fixed, preguarded
@@ -817,25 +843,6 @@ export async function launchChrome(
   // one still running would hold the profile.
   await exited;
   throw new ChromeStartError("Chrome didn't open its debugging port in time", output.trim());
-}
-
-/** "Google Chrome", "Chrome for Testing"… for `hello.browser` (`shared`: the shared install's folder). */
-export function chromeLabel(found: string, home: string = os.homedir(), shared: string | null = null): string {
-  for (const testing of [testingChromeDir(home), ...(shared ? [shared] : [])]) {
-    if (found === testing || isInside(testing, found)) return "Chrome for Testing";
-  }
-  const base = path.basename(found).replace(/\.exe$/i, "");
-  const names: Record<string, string> = {
-    chrome: "Google Chrome",
-    "google-chrome": "Google Chrome",
-    "google-chrome-stable": "Google Chrome",
-    "chromium-browser": "Chromium",
-    chromium: "Chromium",
-    brave: "Brave",
-    "brave-browser": "Brave",
-    "brave-browser-stable": "Brave",
-  };
-  return names[base] ?? base;
 }
 
 /** Keys pressed and released at once: `press` fills in their codes and text. */
@@ -1033,8 +1040,12 @@ export interface BrowserManagerOptions {
   fetch?: typeof fetch;
   /** Tests: the Chrome lookup. */
   chrome?: () => string | null;
-  /** Tests: the computer's home (Chrome for Testing lives under it). */
+  /** Tests: the version of the Chrome on disk (default: `chromeVersion`). */
+  chromeVersion?: (exe: string) => string | null;
+  /** Tests: the computer's home (a Mac's `~/Applications`). */
   userHome?: string;
+  /** System mode: root installed Chrome, so a missing one is the installer's to fix, not the person's. */
+  installedByRoot?: boolean;
   /** Tests: the shared install's folder (default `SYSTEM_BROWSER_DIR`). */
   sharedDir?: string;
   maxSessions?: number;
@@ -1130,6 +1141,10 @@ interface Session {
   crashes: Map<string, number>;
   /** Its `memory.events` when Chrome started or a page last died. */
   memory?: Record<string, number> | null;
+  /** The version of Chrome its running Chrome was started from. */
+  version?: string;
+  /** The newer version on disk it restarts on, or restarted on: once per version. */
+  updatedTo?: string;
 }
 
 /** One Chrome in `chromes.json`. */
@@ -1282,10 +1297,9 @@ export class BrowserManager {
   private readonly maxSessions: number;
   private readonly userHome: string;
   private binary: string | null = null;
-  /** The Chrome for Testing executable every session launches. */
-  private chromePath: string | null = null;
+  /** The version of Chrome on disk when it was last read (`diskVersion`). */
+  private onDisk: { exe: string; version: string | null; at: number } | null = null;
   private ready: Promise<string> | null = null;
-  private chromeInstall: Promise<void> | null = null;
   /** Each agent's session while it opens: commands that come meanwhile get the same one (one queue, one Chrome). */
   private readonly opening = new Map<string, Promise<Session>>();
   private failure: { reason: string; at: number } | null = null;
@@ -1317,7 +1331,7 @@ export class BrowserManager {
 
   /** `hello.browser`: whether this computer can serve the agent browser (cheap: nothing is started). */
   info(): RunnerBrowserInfo {
-    const chrome = this.chrome();
+    const version = this.diskVersion();
     const recent = this.recentFailure();
     if (!this.opts.command && !this.bundled() && !agentBrowserTarget()) {
       return {
@@ -1329,7 +1343,7 @@ export class BrowserManager {
     return {
       available: true,
       version: AGENT_BROWSER_VERSION,
-      ...(chrome ? { chrome: chromeLabel(chrome, this.userHome, this.shared()) } : {}),
+      ...(this.chrome() ? { chrome: version ? `Google Chrome ${version}` : "Google Chrome" } : {}),
     };
   }
 
@@ -1353,9 +1367,20 @@ export class BrowserManager {
     return ownedSafely(file) && lstatSync(file).isFile() ? file : null;
   }
 
-  /** The Chrome for Testing to start: the newest of the shared install's and the user's own (tests: `opts.chrome`). */
+  /** The computer's Google Chrome (tests: `opts.chrome`). */
   private chrome(): string | null {
-    return this.opts.chrome ? this.opts.chrome() : findChrome(this.userHome, process.platform, this.shared());
+    return this.opts.chrome ? this.opts.chrome() : findChrome(this.userHome);
+  }
+
+  /** The version of Chrome on disk, read again after `VERSION_CHECK_MS` or when `fresh`; null without a Chrome. */
+  private diskVersion(fresh = false): string | null {
+    const exe = this.chrome();
+    if (!exe) return null;
+    const known = this.onDisk;
+    if (!fresh && known?.exe === exe && this.now() - known.at < VERSION_CHECK_MS) return known.version;
+    const version = (this.opts.chromeVersion ?? chromeVersion)(exe);
+    this.onDisk = { exe, version, at: this.now() };
+    return version;
   }
 
   private downloadedPath() {
@@ -1376,18 +1401,15 @@ export class BrowserManager {
     return existsSync(downloaded) ? [downloaded] : null;
   }
 
-  /** The binary (downloaded and checked if needed) and a Chrome; throws `browser_unavailable` with the reason. */
+  /** The binary (downloaded and checked if needed); throws `browser_unavailable` with the reason. */
   private ensureReady(): Promise<string[]> {
-    if (this.opts.command) return this.ensureChrome(this.opts.command).then(() => this.opts.command as string[]);
+    if (this.opts.command) return Promise.resolve(this.opts.command);
     const recent = this.recentFailure();
     if (recent) return Promise.reject(new RunnerError("browser_unavailable", recent.reason));
     this.ready ??= this.prepare().finally(() => {
       this.ready = null;
     });
-    return this.ready.then(async (bin) => {
-      await this.ensureChrome([bin]);
-      return [bin];
-    });
+    return this.ready.then((bin) => [bin]);
   }
 
   private async prepare(): Promise<string> {
@@ -1439,62 +1461,8 @@ export class BrowserManager {
   }
 
   /**
-   * Chrome for Testing to drive: found, or installed once (`agent-browser install`). Commands that find none at
-   * the same time share one install, and the user's other runners (one per organization) take turns with this
-   * one (`installTurn`): two would write the same folder, and one would start `chrome` while the other still
-   * writes it (ETXTBSY).
-   */
-  private ensureChrome(command: string[]): Promise<void> {
-    this.chromeInstall ??= this.findOrInstallChrome(command).finally(() => {
-      this.chromeInstall = null;
-    });
-    return this.chromeInstall;
-  }
-
-  private async findOrInstallChrome(command: string[]) {
-    this.chromePath = this.chrome();
-    if (this.chromePath) return;
-    const release = await this.installTurn();
-    try {
-      this.chromePath = this.chrome();
-      if (this.chromePath) return;
-      this.opts.log("installing Chrome for Testing for the agent browser");
-      const out = await this.spawn(command, ["install"], { timeoutMs: INSTALL_TIMEOUT_MS, cwd: this.opts.home });
-      this.chromePath = this.chrome();
-      if (this.chromePath) return;
-      const why = firstLine(out.stderr || out.stdout);
-      const hint =
-        process.platform === "linux"
-          ? ` Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps.`
-          : "";
-      throw this.fail(`Couldn't install a browser for the agent${why ? ` (${why})` : ""}.${hint}`);
-    } finally {
-      release();
-    }
-  }
-
-  /**
-   * `install.lock` next to the user's Chrome for Testing, held across processes (`acquireLock`): while another live
-   * runner holds it, this one waits, at most an install's time; one whose runner is gone is taken over.
-   */
-  private async installTurn(): Promise<() => void> {
-    const dir = path.dirname(testingChromeDir(this.userHome));
-    for (let waited = 0; waited < INSTALL_TIMEOUT_MS; waited += INSTALL_TURN_POLL_MS) {
-      try {
-        const lock = acquireLock(dir, "install", { file: "install.lock" });
-        if (lock.ok) return lock.release;
-      } catch {
-        // A home it can't write to: `agent-browser install` fails there too, and says why.
-        break;
-      }
-      await new Promise((r) => setTimeout(r, INSTALL_TURN_POLL_MS));
-    }
-    return () => {};
-  }
-
-  /**
-   * Gets `agent-browser` and Chrome for Testing ready now, as the first command would (a runner outside system mode
-   * with the browser on, as it starts): that command then finds them, or waits on this. A failure here leaves that
+   * Gets `agent-browser` ready now, as the first command would (a runner outside system mode
+   * with the browser on, as it starts): that command then finds it, or waits on this. A failure here leaves that
    * command to try again at once. Never rejects.
    */
   prepareInBackground(): Promise<void> {
@@ -1912,14 +1880,15 @@ export class BrowserManager {
   }
 
   /**
-   * The agent's Chrome, started when it isn't running: Chrome for Testing with
+   * The agent's Chrome, started when it isn't running: Google Chrome with
    * our flags and the agent's profile, headed on the agent's desktop when it
    * belongs there and the desktop runs (started first), else headless; its pid
    * and display go in `chromes.json`. One running in the other mode starts
    * again in this one on the page it showed, unless someone may be looking
    * (`asked`: a person's own click, `show`, moves it anyway, and never runs it
    * headless: the desktop's own refusal, or Chrome's, is the answer). Starting
-   * the desktop and Chrome are timed into `setup`.
+   * the desktop and Chrome are timed into `setup`. `restart`: one running starts
+   * again where it is, on the page it showed (a new version on disk).
    */
   private async ensureOwnChrome(
     agent: AgentScope,
@@ -1928,6 +1897,7 @@ export class BrowserManager {
     allowed: string[],
     asked = false,
     setup?: BrowserSetup,
+    restart = false,
   ): Promise<OwnChrome> {
     // A profile's Chrome never goes on a desktop: there the acting agent's own tools could read the shared account.
     const profileSession = isProfileKey(session.agentId);
@@ -1935,37 +1905,47 @@ export class BrowserManager {
     const desktop = onDesktop && !profileSession;
     const running = session.chrome;
     if (!running && session.chromeStarting) return session.chromeStarting;
-    if (running && ((running.display !== undefined) === desktop || (!asked && this.inView(session)))) return running;
+    if (running && !restart && ((running.display !== undefined) === desktop || (!asked && this.inView(session)))) {
+      return running;
+    }
     const where = desktop ? await this.desktopFor(agent, session, asked, setup) : null;
     if (asked && !where) throw new RunnerError("desktop_unavailable", "The agent's desktop isn't running");
     const startedAt = this.now();
     let page: string | undefined;
     if (running) {
-      if ((running.display !== undefined) === (where !== null)) return running;
+      if (!restart && (running.display !== undefined) === (where !== null)) return running;
       const url = await this.pageUrl(session).catch(() => null);
       if (url && isWebPage(url) && domainAllowed(url, allowed)) page = new URL(url).href;
-      this.opts.log(`the browser of ${agent.handle} moves ${where ? "to its desktop" : "off its desktop"}`);
+      this.opts.log(
+        `the browser of ${agent.handle} ${restart ? "restarts on a new Chrome" : where ? "moves to its desktop" : "moves off its desktop"}`,
+      );
       await this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS }).catch(() => undefined);
       await this.stopChrome(session);
     }
     const profile = path.join(session.folder, AGENT_BROWSER_PROFILE);
     const starting = (async () => {
-      const exe = this.chromePath ?? this.chrome();
-      if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
+      const exe = this.chrome();
+      if (!exe) {
+        throw new RunnerError(
+          "browser_unavailable",
+          this.opts.installedByRoot ? CHROME_FAILURES.missingServer : CHROME_FAILURES.missing,
+        );
+      }
+      const version = this.diskVersion(true);
       const start = this.opts.startChrome ?? launchChrome;
       await this.clearStaleLock(profile);
       const launch = async (on: ChromeDisplay | null) => {
-        if (on) prepareProfile(profile);
-        const startPage =
-          this.opts.startPageDirectory ??
-          prepareStartPage(
-            path.join(this.opts.home, "start", agentFolderName(agent).suffix),
-            agent,
-            this.opts.startPageData?.(agent),
-          );
+        prepareProfile(profile);
+        const startPage = this.opts.startPageDirectory
+          ? path.join(this.opts.startPageDirectory, START_FILE)
+          : prepareStartPage(
+              path.join(this.opts.home, "start", agentFolderName(agent).suffix),
+              agent,
+              this.opts.startPageData?.(agent),
+            );
         await forgetTabs(profile);
         const args = chromeLaunchArgs(
-          exe,
+          version,
           profile,
           process.platform,
           undefined,
@@ -1980,8 +1960,10 @@ export class BrowserManager {
           if (on) started.display = on.display;
           return started;
         } catch (err) {
-          if (err instanceof ChromeStartError && err.detail) {
-            this.opts.log(`the browser of ${agent.handle} didn't start: ${err.detail}`);
+          if (err instanceof ChromeStartError) {
+            this.opts.log(
+              `the browser of ${agent.handle} didn't start: ${err.message}${err.detail ? ` (${err.detail})` : ""}`,
+            );
           }
           throw err;
         }
@@ -2000,12 +1982,22 @@ export class BrowserManager {
           return launch(null);
         });
       } catch (err) {
+        // Chrome's own words stay in the log: the agent tells the person what failed, plainly.
+        if (!(err instanceof ChromeStartError)) {
+          this.opts.log(`the browser of ${agent.handle} didn't start: ${err instanceof Error ? err.message : err}`);
+        }
+        const failed = err instanceof ChromeStartError ? err : null;
         throw new RunnerError(
-          "internal",
-          `Couldn't start the agent's browser: ${err instanceof Error ? err.message : String(err)}`.slice(0, 400),
+          "browser_unavailable",
+          failed?.profile
+            ? CHROME_FAILURES.profile
+            : failed?.missing.length
+              ? `${CHROME_FAILURES.start} ${missingLibrariesText(failed.missing)}`
+              : CHROME_FAILURES.start,
         );
       }
       session.chrome = chrome;
+      session.version = version ?? undefined;
       session.headed = chrome.display !== undefined;
       session.aliveAt = null;
       session.memory = this.memoryCounters();
@@ -2056,7 +2048,9 @@ export class BrowserManager {
    * agent heard of it shows our notice instead, once: a page that can't even start there (the slice's last task
    * taken, or its memory held by another process) would die again at once, and from then on it stays on Chrome's
    * own page, so nothing starts again and again while the agent isn't there. It ran out of memory when the agents'
-   * memory, which they share, reached its limit since its Chrome started or a page last died.
+   * memory, which they share, reached its limit since its Chrome started or a page last died. A page that dies while a
+   * newer Chrome waits on disk died because the update replaced Chrome's files under it: Chrome restarts on the new
+   * one instead, on that page, after what the agent is doing now.
    */
   private pageCrashed(session: Session, chrome: OwnChrome, page: CrashedPage) {
     if (session.chrome !== chrome) return;
@@ -2066,10 +2060,21 @@ export class BrowserManager {
     const memory = !!before && !!now && OUT_OF_MEMORY.some((k) => (now[k] ?? 0) > (before[k] ?? 0));
     const times = (session.crashes.get(page.targetId) ?? 0) + 1;
     session.crashes.set(page.targetId, times);
-    if (times === 1) page.reopen();
+    const disk = times === 1 ? this.diskVersion(true) : null;
+    const updated = !!disk && !!session.version && disk !== session.version && session.updatedTo !== disk;
+    if (updated) {
+      session.updatedTo = disk;
+      void this.enqueue(session, () => this.restartOnUpdate(session, disk, true)).catch(() => undefined);
+    } else if (times === 1) page.reopen();
     else if (times === 2) page.show(crashPage(memory));
     session.crash = { memory, again: times > 1 };
-    const left = times === 1 ? "reloaded" : times === 2 ? "left on our notice" : "left on Chrome's page";
+    const left = updated
+      ? "restarting on the new Chrome"
+      : times === 1
+        ? "reloaded"
+        : times === 2
+          ? "left on our notice"
+          : "left on Chrome's page";
     this.opts.log(`the browser of ${session.name}: a page ${memory ? "ran out of memory" : "crashed"}, ${left}`);
   }
 
@@ -2203,7 +2208,14 @@ export class BrowserManager {
         }
         continue;
       }
-      if (this.now() - s.lastUsed < this.idleMs) continue;
+      if (this.now() - s.lastUsed < this.idleMs) {
+        const disk = this.diskVersion();
+        if (disk && this.updateDue(s, disk)) {
+          s.updatedTo = disk;
+          void this.enqueue(s, () => this.restartOnUpdate(s, disk)).catch(() => undefined);
+        }
+        continue;
+      }
       this.sessions.delete(agentId);
       this.changed();
       await this.enqueue(s, async () => {
@@ -2211,6 +2223,40 @@ export class BrowserManager {
         await this.stopChrome(s);
       }).catch(() => undefined);
     }
+  }
+
+  /**
+   * Whether the agent's Chrome restarts now on the newer `disk` version (it updated itself): once per version, and
+   * only while nobody needs it, so a browser is never restarted mid-task: no command for `UPDATE_IDLE_MS`, nobody
+   * watching it and no person's turn. One that idles out first simply starts on the new version next time.
+   */
+  private updateDue(s: Session, disk: string) {
+    return (
+      !!s.chrome &&
+      !!s.version &&
+      s.version !== disk &&
+      s.updatedTo !== disk &&
+      !this.inView(s) &&
+      this.now() - s.lastUsed >= UPDATE_IDLE_MS
+    );
+  }
+
+  /**
+   * In the session's queue (nothing else runs meanwhile): its Chrome restarts on the version now on disk, where it
+   * was (its desktop or headless), on the page it showed, with its profile. `crashed`: its page died under the
+   * update, so it restarts whatever else holds. Not a use: its idle time keeps counting from the last one.
+   */
+  private async restartOnUpdate(s: Session, version: string, crashed = false) {
+    if (!crashed && !this.updateDue({ ...s, updatedTo: undefined }, version)) {
+      // Used again meanwhile: a later sweep tries again.
+      if (s.updatedTo === version) s.updatedTo = undefined;
+      return;
+    }
+    if (!s.chrome || this.closed) return;
+    const lastUsed = s.lastUsed;
+    this.opts.log(`the browser of ${s.name} restarts on Google Chrome ${version} (was ${s.version ?? "unknown"})`);
+    await this.ensureOwnChrome(s.agent, s, s.chrome.display !== undefined, s.allowed ?? [], false, undefined, true);
+    s.lastUsed = lastUsed;
   }
 
   private readPids(): Promise<ChromeEntry[]> {
@@ -2517,7 +2563,7 @@ export class BrowserManager {
 
   /**
    * Browser on the agent's desktop (`desktop-browser.ts`): its own Chrome there, in front, for the person who
-   * clicked it, answered once its window is on the desktop (`windowShown`). Chrome for Testing is installed first
+   * clicked it, answered once its window is on the desktop (`windowShown`). `agent-browser` is downloaded first
    * when it isn't here yet (`installing` says so). A Chrome running headless moves there even while someone
    * watches it or a person's turn is open: a person asked, from that desktop. A desktop that can't take it fails
    * the click with its own reason: a click never starts one headless. The click carries no address and no flag, so
@@ -2530,8 +2576,7 @@ export class BrowserManager {
    */
   async show(agent: AgentScope, folder: string, installing: () => void): Promise<void> {
     const clickedAt = this.now();
-    const chrome = this.chromePath ?? this.chrome();
-    if (!this.recentFailure() && (!this.presentCommand() || !chrome)) installing();
+    if (!this.recentFailure() && !this.presentCommand()) installing();
     const session = await this.session(agent, folder);
     const outcome = await this.enqueue(session, async () => {
       const before = session.chrome;
@@ -2597,7 +2642,7 @@ export class BrowserManager {
         ? targets.find((t): t is { id: string } => isRecord(t) && t.type === "page" && typeof t.id === "string")
         : undefined;
       // Chrome takes a new tab only by PUT.
-      return (await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call(`new?${START_PAGE_URL}`, "PUT"))).ok;
+      return (await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call(`new?${NEW_TAB_URL}`, "PUT"))).ok;
     } catch {
       // It stays where it is: on the desktop, behind whatever is in front.
       return false;
@@ -3139,5 +3184,3 @@ const hostOf = (url: string) => {
     return url.slice(0, 80);
   }
 };
-
-const firstLine = (s: string) => (s.trim().split("\n")[0] ?? "").slice(0, 200);

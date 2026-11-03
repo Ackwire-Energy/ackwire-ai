@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import {
@@ -8,6 +8,8 @@ import {
   BROWSER_LIMITS,
   BROWSER_PROTOCOL,
   browserSetupOf,
+  CHROME_FAILURES,
+  chromeFailureKind,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
   parseRunnerFrame,
@@ -28,9 +30,10 @@ import {
   CHROME_ARGS,
   ChromeStartError,
   captureMarks,
-  chromeLabel,
+  chromeCandidates,
   chromeLaunchArgs,
   chromeUserAgent,
+  chromeVersion,
   crashPage,
   DRAG_GAP_MAX_MS,
   DRAG_LAG_MAX_MS,
@@ -56,6 +59,9 @@ afterEach(() => removeDirs(dirs));
 
 const posix = process.platform !== "win32";
 const FAKE = path.join(import.meta.dir, "fake-agent-browser.mjs");
+/** The computer's Google Chrome in these tests, and the version on disk. */
+const CHROME_EXE = "/opt/google/chrome/chrome";
+const CHROME_VERSION = "156.0.8078.79";
 const dev = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
 const ops = { id: "9f00aa11-0000-7000-8000-000000000000", handle: "ops" };
 
@@ -159,7 +165,8 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
     },
     secret: async (_agent, name) => (name in secrets ? { value: secrets[name] as string, site: null } : null),
     command: [process.execPath, FAKE],
-    chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
+    chrome: () => CHROME_EXE,
+    chromeVersion: () => CHROME_VERSION,
     userHome: home,
     startChrome: chromes.start,
     isOurChrome: async () => false,
@@ -245,63 +252,63 @@ test("release target, session cap and Chrome names", () => {
   expect(defaultMaxSessions(2 * GB)).toBe(1);
   expect(defaultMaxSessions(8 * GB)).toBe(6);
   expect(defaultMaxSessions(64 * GB)).toBe(8);
-  expect(chromeLabel("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")).toBe("Google Chrome");
-  expect(chromeLabel("/usr/bin/chromium")).toBe("Chromium");
-  expect(chromeLabel("/home/x/.agent-browser/browsers", "/home/x")).toBe("Chrome for Testing");
-  expect(chromeLabel("/home/x/.agent-browser/browsers/chrome-155.0.1/chrome-linux64/chrome", "/home/x")).toBe(
-    "Chrome for Testing",
-  );
 });
 
-test("only Chrome for Testing is driven: the newest installed one, never the person's own Chrome", () => {
+test("only the computer's Google Chrome is driven, at its standard path on each system", () => {
   const home = tempDir("chrome-home-");
   dirs.push(home);
-  // Nothing installed: null, even with a system Chrome on the computer.
-  expect(findChrome(home, "linux")).toBeNull();
-  const browsers = path.join(home, ".agent-browser", "browsers");
-  for (const v of ["chrome-150.0.1", "chrome-155.0.1"]) {
-    mkdirSync(path.join(browsers, v, "chrome-linux64"), { recursive: true });
-    writeFileSync(path.join(browsers, v, "chrome-linux64", "chrome"), "");
+  const app = path.join("Google Chrome.app", "Contents", "MacOS", "Google Chrome");
+  expect(chromeCandidates(home, "darwin")).toEqual([
+    path.join("/Applications", app),
+    path.join(home, "Applications", app),
+  ]);
+  expect(chromeCandidates(home, "linux")).toEqual(["/opt/google/chrome/chrome"]);
+  expect(
+    chromeCandidates(home, "win32", {
+      ProgramFiles: "C:\\Program Files",
+      "ProgramFiles(x86)": "C:\\Program Files (x86)",
+      LOCALAPPDATA: "C:\\Users\\ana\\AppData\\Local",
+    }),
+  ).toEqual([
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Users\\ana\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe",
+  ]);
+  // No Chrome for Testing, ever: one in agent-browser's folder isn't looked at.
+  mkdirSync(path.join(home, ".agent-browser", "browsers", "chrome-155.0.1", "chrome-linux64"), { recursive: true });
+  writeFileSync(path.join(home, ".agent-browser", "browsers", "chrome-155.0.1", "chrome-linux64", "chrome"), "");
+  const mine = path.join(home, "Applications", app);
+  if (!existsSync(path.join("/Applications", app))) {
+    expect(findChrome(home, "darwin")).toBeNull();
+    mkdirSync(path.dirname(mine), { recursive: true });
+    writeFileSync(mine, "");
+    expect(findChrome(home, "darwin")).toBe(mine);
   }
-  expect(findChrome(home, "linux")).toBe(path.join(browsers, "chrome-155.0.1", "chrome-linux64", "chrome"));
-  const mac = path.join(
-    browsers,
-    "chrome-156.0.1",
-    "chrome-mac-arm64",
-    "Google Chrome for Testing.app",
-    "Contents",
-    "MacOS",
+  // The version on disk: the app's Info.plist on a Mac, the newest version folder on Windows, `--version` on Linux.
+  mkdirSync(path.dirname(mine), { recursive: true });
+  writeFileSync(
+    path.join(home, "Applications", "Google Chrome.app", "Contents", "Info.plist"),
+    "<plist><dict><key>CFBundleShortVersionString</key>\n\t<string>157.0.7000.2</string></dict></plist>",
   );
-  mkdirSync(mac, { recursive: true });
-  writeFileSync(path.join(mac, "Google Chrome for Testing"), "");
-  expect(findChrome(home, "darwin")).toBe(path.join(mac, "Google Chrome for Testing"));
-  // With the shared install: the newest of both by version number (59 is older than 175), the shared one on a tie.
-  const shared = tempDir("shared-browser-");
-  dirs.push(shared);
-  const linux = (root: string, v: string) => {
-    mkdirSync(path.join(root, `chrome-${v}`, "chrome-linux64"), { recursive: true });
-    writeFileSync(path.join(root, `chrome-${v}`, "chrome-linux64", "chrome"), "");
-    return path.join(root, `chrome-${v}`, "chrome-linux64", "chrome");
-  };
-  const own = linux(browsers, "155.0.8059.175");
-  linux(shared, "155.0.8059.59");
-  // What an interrupted install left is no version.
-  mkdirSync(path.join(shared, ".chrome-157.0.1.new", "chrome-linux64"), { recursive: true });
-  writeFileSync(path.join(shared, ".chrome-157.0.1.new", "chrome-linux64", "chrome"), "");
-  expect(findChrome(home, "linux", shared)).toBe(own);
-  const newer = linux(shared, "155.0.8059.180");
-  expect(findChrome(home, "linux", shared)).toBe(newer);
-  linux(browsers, "155.0.8059.180");
-  expect(findChrome(home, "linux", shared)).toBe(newer);
-  expect(chromeLabel(newer, home, shared)).toBe("Chrome for Testing");
-  expect(chromeLabel(newer, home)).toBe("Google Chrome");
-  // On every launch: nothing updating Chrome's files, pages asked to hold still (`prefers-reduced-motion`), no
-  // chip asking to sign in to Chrome itself, and the sites' sessions kept across its restarts.
+  expect(chromeVersion(mine, "darwin")).toBe("157.0.7000.2");
+  const win = path.join(home, "win");
+  for (const d of ["156.0.8078.79", "157.0.8100.9", "157.0.8100.10", "SetupMetrics"]) {
+    mkdirSync(path.join(win, d), { recursive: true });
+  }
+  expect(chromeVersion(path.join(win, "chrome.exe"), "win32")).toBe("157.0.8100.10");
+  const linux = path.join(home, "chrome");
+  writeFileSync(linux, '#!/bin/sh\necho "Google Chrome 156.0.8078.79 "\n', { mode: 0o755 });
+  if (process.platform !== "win32") expect(chromeVersion(linux, "linux")).toBe("156.0.8078.79");
+  expect(chromeVersion(path.join(home, "missing"), "linux")).toBeNull();
+  // On every launch: nothing updating Chrome's components and no updater started by our Chrome, pages asked to hold
+  // still (`prefers-reduced-motion`), no chip asking to sign in to Chrome itself, and the sites' sessions kept across
+  // its restarts.
   expect(CHROME_ARGS).toEqual([
     "--no-first-run",
     "--no-default-browser-check",
     "--disable-blink-features=AutomationControlled",
     "--disable-component-update",
+    "--disable-updater-scheduler",
     "--force-prefers-reduced-motion",
     "--disable-features=SigninPromoOnAvatarPill",
     "--restore-last-session",
@@ -475,11 +482,11 @@ test("a drag keeps the gaps the person made, each at most 100 ms; a click and th
 test.if(posix)("the runner starts the agent's Chrome itself and every command connects to it", async () => {
   const t = setup();
   expect(await t.act("open", ["https://shop.example.com"])).toMatchObject({ success: true });
-  // One Chrome for Testing, on the agent's profile, with our flags and none of the automation markers.
+  // One Google Chrome, on the agent's profile, with our flags and none of the automation markers.
   expect(t.chromes).toHaveLength(1);
   const chrome = t.chromes[0] as FakeChrome;
   const profile = path.join(await t.folder(), ".agentes", "browser");
-  expect(chrome.exe).toBe("/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome");
+  expect(chrome.exe).toBe(CHROME_EXE);
   expect(chrome.profile).toBe(profile);
   for (const f of CHROME_ARGS) expect(chrome.args).toContain(f);
   expect(chrome.args).toContain("--headless=new");
@@ -487,9 +494,13 @@ test.if(posix)("the runner starts the agent's Chrome itself and every command co
   expect(chrome.args).toContain("--remote-debugging-port=0");
   expect(chrome.args).toContain(`--user-data-dir=${profile}`);
   expect(chrome.args.some((a) => a.includes("enable-automation"))).toBe(false);
+  // Headless, it would say "HeadlessChrome": the version on disk's own user agent instead.
   const ua = chrome.args.find((a) => a.startsWith("--user-agent="));
-  expect(ua).toContain("Chrome/155.0.0.0");
+  expect(ua).toContain("Chrome/156.0.0.0");
   expect(ua).not.toContain("Headless");
+  // The agent's start page file, no extension.
+  expect(chrome.args.at(-1)).toMatch(/^file:\/\/.+\/agentes-start\.html$/);
+  expect(chrome.args.some((a) => a.startsWith("--load-extension"))).toBe(false);
 
   const [call] = t.logged();
   const args = call?.args ?? [];
@@ -521,24 +532,38 @@ test.if(posix)("the runner starts the agent's Chrome itself and every command co
   expect(other[other.indexOf("--cdp") + 1]).toBe(String(t.chromes[1]?.port));
 });
 
-test("a normal Chrome user agent for the platform, and the whole launch line", () => {
-  const exe = "/h/.agent-browser/browsers/chrome-155.0.8059.84/chrome-mac-arm64/Google Chrome for Testing";
-  expect(chromeUserAgent(exe, "darwin")).toBe(
+test("a normal Chrome user agent for the platform, and the whole launch line per browser kind", () => {
+  const version = "155.0.8059.84";
+  expect(chromeUserAgent(version, "darwin")).toBe(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
   );
-  expect(chromeUserAgent(exe, "win32")).toContain("Windows NT 10.0; Win64; x64");
-  expect(chromeUserAgent(exe, "linux")).toContain("X11; Linux x86_64");
-  expect(chromeUserAgent("/usr/bin/chrome", "linux")).toBeNull();
-  const args = chromeLaunchArgs(exe, "/p", "darwin", "pt-BR");
+  expect(chromeUserAgent(version, "win32")).toContain("Windows NT 10.0; Win64; x64");
+  expect(chromeUserAgent(version, "linux")).toContain("X11; Linux x86_64");
+  expect(chromeUserAgent(null, "linux")).toBeNull();
+  const args = chromeLaunchArgs(version, "/p", "darwin", "pt-BR");
   expect(args).toContain("--lang=pt-BR");
   expect(args).toContain("--user-data-dir=/p");
-  // Never the person's keychain (macOS would ask for their password).
+  // The key to the agent's cookies and saved logins stays where Chrome for Testing kept it, so sign-ins carry over:
+  // never the person's keychain (macOS would ask for their password), a fixed one on Linux, Windows' own per user.
   expect(args).toContain("--use-mock-keychain");
-  expect(chromeLaunchArgs(exe, "/p", "linux", null)).toContain("--password-store=basic");
+  expect(chromeLaunchArgs(version, "/p", "linux", null)).toContain("--password-store=basic");
+  const windows = chromeLaunchArgs(version, "/p", "win32", null);
+  expect(windows.some((a) => a.startsWith("--password-store") || a === "--use-mock-keychain")).toBe(false);
   expect(args.at(-1)).toBe("about:blank");
-  expect(chromeLaunchArgs("/usr/bin/chrome", "/p", "linux", null).some((a) => a.startsWith("--user-agent"))).toBe(
-    false,
-  );
+  // Headless: our user agent, as "HeadlessChrome" would be refused. Headed (the agent's desktop): Chrome's own.
+  expect(args).toContain("--headless=new");
+  expect(args.some((a) => a.startsWith("--user-agent=") && a.includes("Chrome/155.0.0.0"))).toBe(true);
+  const headed = chromeLaunchArgs(version, "/p", "linux", null, true);
+  expect(headed).not.toContain("--headless=new");
+  expect(headed.some((a) => a.startsWith("--user-agent"))).toBe(false);
+  // The automation flag's bar hidden; no flag only Chrome for Testing knew, nothing starting Google's updater.
+  expect(headed).toContain("--test-type");
+  expect(headed).not.toContain("--test-type=gpu");
+  for (const a of [args, headed]) {
+    expect(a).toContain("--disable-updater-scheduler");
+    expect(a.some((x) => x.startsWith("--load-extension"))).toBe(false);
+  }
+  expect(chromeLaunchArgs(null, "/p", "linux", null).some((a) => a.startsWith("--user-agent"))).toBe(false);
 });
 
 /** Starts a fake Chrome that runs `body` (sh) and exits; what `launchChrome` threw. */
@@ -562,7 +587,7 @@ test.if(posix)(
     let err = await failedStart(loader);
     expect(err.missing).toEqual(["libnspr4.so"]);
     expect(err.message).toBe(
-      "the agent's computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.",
+      "This computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.",
     );
     expect(err.detail).toMatch(
       /^missing libnspr4\.so: \/.+\/chrome: error while loading shared libraries: libnspr4\.so:/,
@@ -589,12 +614,13 @@ test.if(posix)(
     expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more). Install them on it`);
     expect(err.detail).toStartWith(`missing ${all.join(", ")}: `);
 
-    // A profile another Chrome holds, as Chrome for Testing says it and exits.
+    // A profile another Chrome holds, as Chrome says it and exits.
     const held =
       "Failed to create a ProcessSingleton for your profile directory. Aborting now to avoid profile corruption.";
     err = await failedStart(`echo "${held}" >&2; exit 21`);
     expect(err.missing).toEqual([]);
     expect(err.message).toBe("Chrome closed while starting (another Chrome is using this profile)");
+    expect(err.profile).toBe(true);
     expect(err.detail).toBe(held);
 
     // Any other exit, a loader error among them, gets no guess at why; what Chrome said goes to the logs.
@@ -807,6 +833,31 @@ const RELOADED = "The page crashed and was reloaded, so this wasn't done. Read i
 const RELOADED_UNDER = "The page crashed while this ran, and was reloaded. Read it again before you go on.";
 const OUT_OF_MEMORY_UNDER =
   "The page ran out of memory while this ran, and was reloaded. Read it again before you go on.";
+
+test.if(posix)(
+  "a page that dies while a newer Chrome waits on disk restarts Chrome on it, on that page, instead of reloading",
+  async () => {
+    const devtools = fakeDevtools([]);
+    try {
+      let version = CHROME_VERSION;
+      const chromes = chromesAt(devtools);
+      const t = setup({ startChrome: chromes.start, chromeVersion: () => version });
+      await t.act("open", ["https://heavy.example/"]);
+      await waitFor(() => devtools.asked.includes("Network.enable page-0"));
+      // The update replaced Chrome's files under it, and its page died.
+      version = "157.0.8100.10";
+      devtools.crash(0);
+      await waitFor(() => chromes.started.length === 2);
+      expect(chromes.started[1]?.args.at(-1)).toBe("https://heavy.example/");
+      expect(chromes.started[0]?.closed || chromes.started[0]?.killed).toBe(true);
+      expect(devtools.navigated).toEqual([]);
+      // The agent's next action hears its page changed under it.
+      expect(await t.act("click", ["@e1"])).toMatchObject({ success: false, error: RELOADED });
+    } finally {
+      devtools.stop();
+    }
+  },
+);
 
 test.if(posix)(
   "a page that dies is opened again once: a look runs on it, and the agent's next action is told instead of running",
@@ -1325,6 +1376,54 @@ test.if(posix)("an idle browser's Chrome stops, but not while someone watches or
 });
 
 test.if(posix)(
+  "a Chrome that updated itself restarts on the new version once idle, on the same page, once; never mid-task",
+  async () => {
+    let now = 1_000_000;
+    let version = CHROME_VERSION;
+    const logs: string[] = [];
+    const t = setup({ now: () => now, chromeVersion: () => version, log: (l) => logs.push(l) });
+    await t.act("open", ["https://a.example/"], { agent: ops });
+    await t.act("open", ["https://shop.example/cart"]);
+    const of = (agent: { id: string }) => t.chromes.filter((c) => c.profile.includes(agent.id.slice(0, 8)));
+    expect(of(dev)).toHaveLength(1);
+    // The update lands on disk; the runner reads the version again every few minutes.
+    version = "157.0.8100.10";
+    now += 60_000;
+    await t.manager.sweep();
+    expect(t.chromes).toHaveLength(2);
+    // Read again, 6 minutes on: the agent idle since restarts; the one that just acted doesn't.
+    now += 5 * 60_000;
+    await t.act("click", ["@e1"], { agent: ops });
+    await t.manager.sweep();
+    await waitFor(() => of(dev).length === 2);
+    const [before, after] = of(dev);
+    expect(before?.killed || before?.closed).toBe(true);
+    expect(after?.args.at(-1)).toBe("https://shop.example/cart");
+    expect(after?.profile).toBe(before?.profile);
+    expect(after?.args.find((a) => a.startsWith("--user-agent="))).toContain("Chrome/157.0.0.0");
+    expect(logs).toContain(
+      `the browser of agent-01a142cb restarts on Google Chrome 157.0.8100.10 (was ${CHROME_VERSION})`,
+    );
+    expect(of(ops)).toHaveLength(1);
+    // Once per version: no second restart. A person's turn holds the other one off, however idle.
+    now += 60_000;
+    t.manager.setHandoff(ops.id, { status: "pending" });
+    now += 4 * 60_000;
+    await t.manager.sweep();
+    await Bun.sleep(50);
+    expect(of(dev)).toHaveLength(2);
+    expect(of(ops)).toHaveLength(1);
+    // Their turn over: it restarts too, and the restart isn't a use (the idle stop still counts from the last one).
+    t.manager.setHandoff(ops.id, null);
+    await t.manager.sweep();
+    await waitFor(() => of(ops).length === 2);
+    now += 10 * 60_000;
+    await t.manager.sweep();
+    await waitFor(() => (of(dev)[1]?.killed || of(dev)[1]?.closed) === true);
+  },
+);
+
+test.if(posix)(
   "a help request forgotten on a dropped connection still holds its browser for the idle time",
   async () => {
     let now = 1_000_000;
@@ -1469,7 +1568,7 @@ test.if(posix)(
     expect(t.chromes[1]?.profile).toBe(profile);
     expect(t.chromes[1]?.cookies).toEqual(["shop_session", "shop_prefs"]);
     // One page, as before: the agent's command goes on it.
-    expect(t.chromes[1]?.tabs).toEqual(["chrome://newtab/"]);
+    expect(t.chromes[1]?.tabs).toEqual([expect.stringMatching(/^file:\/\/.+\/agentes-start\.html$/)]);
   },
 );
 
@@ -1555,40 +1654,62 @@ test.if(posix)("a command while the browsers close (a runner that just started) 
   expect(t.logged().map((l) => l.args.at(-1))).toEqual(["--all", "https://a.example/"]);
 });
 
-/** A computer without Chrome for Testing until the fake's `install` ran. */
-function setupWithoutChrome(over: Partial<BrowserManagerOptions> = {}) {
-  const box: { t?: ReturnType<typeof setup> } = {};
-  const installs = () => box.t?.logged().filter((l) => l.args[0] === "install").length ?? 0;
-  box.t = setup({
-    chrome: () => (installs() > 0 ? "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome" : null),
-    ...over,
-  });
-  return { t: box.t, installs };
-}
+test.if(posix)(
+  "no Google Chrome: the agent is told plainly what to do, nothing is installed, and a Chrome installed later just works",
+  async () => {
+    let installed = false;
+    const t = setup({ chrome: () => (installed ? CHROME_EXE : null) });
+    const folder = await t.folder();
+    const open = () =>
+      t.manager.act(dev, folder, { op: "browser.act", command: "open", args: ["https://a/"], timeoutSeconds: 30 });
+    const err = await open().then(
+      () => null,
+      (e: unknown) => e as { code?: string; message?: string },
+    );
+    expect(err).toMatchObject({ code: "browser_unavailable", message: CHROME_FAILURES.missing });
+    expect(chromeFailureKind(err?.message ?? "")).toBe("missing");
+    // No Chrome for Testing fallback: agent-browser is never asked to install one, and no Chrome started.
+    expect(t.logged().some((l) => l.args.includes("install"))).toBe(false);
+    expect(t.chromes).toHaveLength(0);
+    // The computer says it can browse (so the agent tries, and tells), without a Chrome to name.
+    expect(t.manager.info()).toEqual({ available: true, version: AGENT_BROWSER_VERSION });
+    installed = true;
+    expect(await open()).toMatchObject({ success: true });
+    expect(t.manager.info()).toMatchObject({ available: true, chrome: `Google Chrome ${CHROME_VERSION}` });
+    // In system mode root installs Chrome: the installer is what to run again.
+    const root = setup({ chrome: () => null, installedByRoot: true });
+    expect(await errorCode(() => root.act("open", ["https://a/"]))).toBe("browser_unavailable");
+    const said = await root.act("open", ["https://a/"]).catch((e: Error) => e.message);
+    expect(said).toBe(CHROME_FAILURES.missingServer);
+    expect(chromeFailureKind(CHROME_FAILURES.missingServer)).toBe("missing");
+  },
+);
 
-test.if(posix)("an agent's first two commands at once share its new session and one Chrome install", async () => {
-  const { t, installs } = setupWithoutChrome();
-  const folder = await t.folder();
-  const act = (command: string, args: string[]) =>
-    t.manager.act(dev, folder, { op: "browser.act", command, args, timeoutSeconds: 30 });
-  // The person's open and the live view's `get url` right after it, as the app sends them.
-  const [opened, url] = await Promise.all([act("open", ["https://a.example/"]), act("get", ["url"])]);
-  expect(opened).toMatchObject({ success: true });
-  // In the same session's queue, behind the open (a second session has no Chrome: "the browser isn't open").
-  expect(url).toMatchObject({ success: true, data: { url: "https://a.example/" } });
-  expect(installs()).toBe(1);
-  expect(t.chromes).toHaveLength(1);
-});
-
-test.if(posix)("two agents' first commands at once install Chrome once", async () => {
-  const { t, installs } = setupWithoutChrome();
-  const answers = await Promise.all([
-    t.act("open", ["https://a.example/"]),
-    t.act("open", ["https://b.example/"], { agent: ops }),
-  ]);
-  expect(answers).toMatchObject([{ success: true }, { success: true }]);
-  expect(installs()).toBe(1);
-});
+test.if(posix)(
+  "a Chrome that won't start, or whose profile won't open, is told in plain words; Chrome's own output stays in the log",
+  async () => {
+    const lines: string[] = [];
+    let failure = new ChromeStartError("Chrome closed while starting", "[1:1:ERROR] some crash text");
+    const t = setup({
+      log: (l) => lines.push(l),
+      startChrome: async () => {
+        throw failure;
+      },
+    });
+    const said = () => t.act("open", ["https://a/"]).catch((e: { code: string; message: string }) => e);
+    expect(await said()).toMatchObject({ code: "browser_unavailable", message: CHROME_FAILURES.start });
+    expect(lines.join("\n")).toContain("[1:1:ERROR] some crash text");
+    failure = new ChromeStartError("Chrome closed while starting (another Chrome is using this profile)", "", [], true);
+    expect(await said()).toMatchObject({ code: "browser_unavailable", message: CHROME_FAILURES.profile });
+    expect(chromeFailureKind(CHROME_FAILURES.profile)).toBe("profile");
+    failure = new ChromeStartError("libs", "", ["libnss3.so"]);
+    const libs = (await said()) as { message: string };
+    expect(libs.message).toStartWith(`${CHROME_FAILURES.start} This computer is missing system libraries`);
+    expect(chromeFailureKind(libs.message)).toBe("start");
+    // Anything else of the browser's (a busy computer) isn't a Chrome failure.
+    expect(chromeFailureKind("This computer already has 8 browsers open (its limit).")).toBeNull();
+  },
+);
 
 /** The agent's desktop as the browser sees it, starting in `startMs`. */
 function fakeDesktop(startMs = 0): NonNullable<BrowserManagerOptions["desktops"]> {
@@ -1614,7 +1735,7 @@ test.if(posix)(
     expect(twice.map((w) => w.started).sort()).toEqual([false, true]);
     expect(t.chromes).toHaveLength(1);
     expect(headless(t.chromes[0])).toBe(true);
-    expect(t.chromes[0]?.args.at(-1)).toBe("chrome://newtab/");
+    expect(t.chromes[0]?.args.at(-1)).toMatch(/^file:\/\/.+\/agentes-start\.html$/);
     expect(t.logged()).toEqual([]);
     expect(t.sockets).toHaveLength(0);
     expect(t.frames).toEqual([]);
@@ -1682,7 +1803,7 @@ test.if(posix)(
   "a command says what it waited on: the first, getting the browser ready, its desktop and its Chrome; the next nothing",
   async () => {
     const chromes = fakeChromes();
-    const { t } = setupWithoutChrome({
+    const t = setup({
       startChrome: async (exe, args, profile) => {
         await sleep(25);
         return chromes.start(exe, args, profile);
@@ -1694,7 +1815,7 @@ test.if(posix)(
       t.manager.act(dev, folder, { op: "browser.act", command, args, timeoutSeconds: 30, desktop: true });
     const first = await act("open", ["https://a.example/"]);
     expect(first).toMatchObject({ success: true });
-    expect(Object.keys(first.setup ?? {}).sort()).toEqual(["desktop", "install", "launch"]);
+    expect(Object.keys(first.setup ?? {}).sort()).toEqual(["desktop", "launch"]);
     for (const ms of Object.values(first.setup ?? {})) expect(ms).toBeGreaterThanOrEqual(10);
     expect((await act("click", ["@e1"])).setup).toBeUndefined();
     // A batch says it too; the runner's log puts it in words.
@@ -1713,15 +1834,8 @@ test.if(posix)(
 );
 
 test.if(posix)(
-  "outside system mode the browser gets ready as the runner starts: a command meanwhile installs nothing more",
+  "outside system mode agent-browser gets ready as the runner starts: one that fails says nothing against the browser",
   async () => {
-    const { t, installs } = setupWithoutChrome();
-    const ready = t.manager.prepareInBackground();
-    await waitFor(() => installs() === 1);
-    expect(await t.act("open", ["https://a.example/"])).toMatchObject({ success: true });
-    await ready;
-    expect(installs()).toBe(1);
-    // One that fails leaves the next command to try at once, and says nothing against the browser meanwhile.
     const home = tempDir("runner-home-");
     dirs.push(home);
     const failing = new BrowserManager({
@@ -1735,40 +1849,6 @@ test.if(posix)(
     });
     await failing.prepareInBackground();
     expect(failing.info()).toMatchObject({ available: true });
-  },
-);
-
-test.if(posix)(
-  "the person's other runner installing Chrome (another organization's, as it starts): this one waits and installs none",
-  async () => {
-    const user = tempDir("user-home-");
-    dirs.push(user);
-    const lock = path.join(user, ".agent-browser", "install.lock");
-    mkdirSync(path.dirname(lock));
-    const other = Bun.spawn(["sleep", "60"]);
-    try {
-      writeFileSync(lock, JSON.stringify({ pid: other.pid, mode: "install", startedAt: new Date().toISOString() }));
-      let othersDone = false;
-      const { t, installs } = setupWithoutChrome({
-        userHome: user,
-        chrome: () => (othersDone ? "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome" : null),
-      });
-      const ready = t.manager.prepareInBackground();
-      await sleep(300);
-      expect(installs()).toBe(0);
-      othersDone = true;
-      rmSync(lock);
-      await ready;
-      expect(await t.act("open", ["https://a.example/"])).toMatchObject({ success: true });
-      expect(installs()).toBe(0);
-      // With nobody else installing, it installs at once, and leaves no lock behind.
-      const alone = setupWithoutChrome({ userHome: user });
-      await alone.t.manager.prepareInBackground();
-      expect(alone.installs()).toBe(1);
-      expect(existsSync(lock)).toBe(false);
-    } finally {
-      other.kill();
-    }
   },
 );
 
@@ -2187,26 +2267,7 @@ test("a download that doesn't match its pinned checksum is never used", async ()
   expect(fetched).toBe("");
 });
 
-/** A Chrome for Testing folder in `root` as `agent-browser install` and the installer lay it out here; its executable. */
-function testingChrome(root: string, version: string) {
-  const dir = path.join(root, `chrome-${version}`);
-  const exe =
-    process.platform === "darwin"
-      ? path.join(
-          dir,
-          "chrome-mac-arm64",
-          "Google Chrome for Testing.app",
-          "Contents",
-          "MacOS",
-          "Google Chrome for Testing",
-        )
-      : path.join(dir, "chrome-linux64", "chrome");
-  mkdirSync(path.dirname(exe), { recursive: true });
-  writeFileSync(exe, "", { mode: 0o755 });
-  return exe;
-}
-
-/** The shared install `install.sh --system` makes: its agent-browser (a script noting what it ran) and its Chrome. */
+/** The shared install `install.sh --system` makes: its agent-browser (a script noting what it ran). */
 function sharedInstall(parts: { agentBrowser?: boolean } = {}) {
   const dir = tempDir("shared-browser-");
   const ran = `${dir}.log`;
@@ -2218,8 +2279,7 @@ function sharedInstall(parts: { agentBrowser?: boolean } = {}) {
       { mode: 0o755 },
     );
   }
-  const exe = testingChrome(dir, "156.0.7000.12");
-  return { dir, exe, ran: () => (existsSync(ran) ? readFileSync(ran, "utf8").trim().split("\n") : []) };
+  return { dir, ran: () => (existsSync(ran) ? readFileSync(ran, "utf8").trim().split("\n") : []) };
 }
 
 /** A runner with nothing of its own (no sidecar, nothing in the user's home) and `shared` as its shared install. */
@@ -2236,6 +2296,8 @@ function withShared(shared: string) {
     execPath: path.join(bin as string, "agentes-runner"),
     userHome: user as string,
     sharedDir: shared,
+    chrome: () => CHROME_EXE,
+    chromeVersion: () => CHROME_VERSION,
     startChrome: chromes.start,
     isOurChrome: async () => false,
     fetch: (async (url: string) => {
@@ -2254,14 +2316,14 @@ function withShared(shared: string) {
 }
 
 test.if(posix)(
-  "the shared install's agent-browser and Chrome are used as they are: nothing is downloaded or installed per user",
+  "the shared install's agent-browser and the computer's Chrome are used as they are: nothing is downloaded or installed",
   async () => {
     const shared = sharedInstall();
     const r = withShared(shared.dir);
-    expect(r.manager.info()).toMatchObject({ available: true, chrome: "Chrome for Testing" });
+    expect(r.manager.info()).toMatchObject({ available: true, chrome: `Google Chrome ${CHROME_VERSION}` });
     expect(await r.act()).toMatchObject({ success: true });
     expect(r.fetched).toEqual([]);
-    expect(r.chromes.map((c) => c.exe)).toEqual([shared.exe]);
+    expect(r.chromes.map((c) => c.exe)).toEqual([CHROME_EXE]);
     expect(shared.ran().some((line) => line.split(" ").includes("install"))).toBe(false);
     expect(shared.ran().at(-1)).toEndWith(" open https://a.example/");
     expect(readdirSync(r.user)).toEqual([]);
@@ -2273,17 +2335,15 @@ test.if(posix)(
   async () => {
     const target = agentBrowserTarget();
     if (!target) return;
-    // Its agent-browser missing: downloaded (refused here, not being the pinned file), its Chrome still the shared one.
+    // Its agent-browser missing: downloaded (refused here, not being the pinned file).
     const noBinary = sharedInstall({ agentBrowser: false });
     let r = withShared(noBinary.dir);
-    expect(r.manager.info()).toMatchObject({ chrome: "Chrome for Testing" });
     expect(await errorCode(r.act)).toBe("browser_unavailable");
     expect(r.fetched).toEqual([agentBrowserUrl(target)]);
     // A folder its group may write: neither is used.
     const open = sharedInstall();
     chmodSync(open.dir, 0o775);
     r = withShared(open.dir);
-    expect(r.manager.info().chrome).toBeUndefined();
     expect(await errorCode(r.act)).toBe("browser_unavailable");
     expect(r.fetched).toEqual([agentBrowserUrl(target)]);
     // An agent-browser anyone may rewrite: never run.
@@ -2297,30 +2357,6 @@ test.if(posix)(
     expect(await errorCode(r.act)).toBe("browser_unavailable");
     expect(r.fetched).toEqual([agentBrowserUrl(target)]);
     expect([...open.ran(), ...loose.ran()]).toEqual([]);
-  },
-);
-
-test.if(posix)(
-  "a Chrome install that fails without a word says so in a sentence, with no empty parentheses",
-  async () => {
-    const home = tempDir("runner-home-");
-    const ws = tempDir();
-    dirs.push(home, ws);
-    const manager = new BrowserManager({
-      home,
-      log: () => {},
-      send: () => true,
-      secret: async () => null,
-      command: ["/bin/sh", "-c", ":"],
-      chrome: () => null,
-      userHome: home,
-    });
-    const act = () =>
-      manager.act(dev, ws, { op: "browser.act", command: "open", args: ["https://a.example"], timeoutSeconds: 5 });
-    expect(await errorCode(act)).toBe("browser_unavailable");
-    const { reason } = manager.info();
-    expect(reason).toStartWith("Couldn't install a browser for the agent.");
-    expect(reason).not.toMatch(/[;—]|\(\)/);
   },
 );
 

@@ -1,7 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
+import {
+  type AgentScope,
+  CHROME_FAILURES,
+  type MachineRequest,
+  type RunnerAccess,
+} from "@agenteschat/adapters/machine-protocol";
 import {
   BrowserManager,
   type BrowserManagerOptions,
@@ -23,7 +28,8 @@ afterEach(() => removeDirs(dirs));
 
 const posix = process.platform !== "win32";
 const FAKE = path.join(import.meta.dir, "fake-agent-browser.mjs");
-const EXE = "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome";
+const EXE = "/opt/google/chrome/chrome";
+const VERSION = "156.0.8078.79";
 const dev: AgentScope = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
 const XAUTH = "/runner/desktop/01a142cb/Xauthority";
 
@@ -94,7 +100,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
       if (fails.libraries) {
         log.push("chrome failed");
         throw new ChromeStartError(
-          "the agent's computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.",
+          "This computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.",
           `missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
           ["libnspr4.so"],
         );
@@ -149,8 +155,8 @@ const last = (t: { chromes: FakeChrome[] }) => t.chromes.at(-1) as FakeChrome;
 const headed = (c: FakeChrome) => !c.args.includes("--headless=new");
 
 test("headed: maximized on the agent's display, no automation bars, the debugging port still Chrome's pick", () => {
-  const args = chromeLaunchArgs(EXE, "/p", "linux", null, true);
-  for (const flag of ["--start-maximized", "--test-type=gpu", "--ozone-platform=x11", "--remote-debugging-port=0"]) {
+  const args = chromeLaunchArgs(VERSION, "/p", "linux", null, true);
+  for (const flag of ["--start-maximized", "--test-type", "--ozone-platform=x11", "--remote-debugging-port=0"]) {
     expect(args).toContain(flag);
   }
   expect(args).toContain("--disable-blink-features=AutomationControlled");
@@ -164,7 +170,7 @@ test("headed: maximized on the agent's display, no automation bars, the debuggin
   // Its windows' class is the dock's Browser's, so the dock shows them on Browser.
   expect(args).toContain("--class=agentes-browser");
   expect(args.at(-1)).toBe("about:blank");
-  expect(chromeLaunchArgs(EXE, "/p", "linux", null, true, "https://shop.example/cart").at(-1)).toBe(
+  expect(chromeLaunchArgs(VERSION, "/p", "linux", null, true, "https://shop.example/cart").at(-1)).toBe(
     "https://shop.example/cart",
   );
   // The runner's own Wayland display and session bus stay out: nothing it opens reaches the person's screen.
@@ -177,7 +183,7 @@ test("headed: maximized on the agent's display, no automation bars, the debuggin
 });
 
 test("headless as before: its own window size, none of the headed flags", () => {
-  const args = chromeLaunchArgs(EXE, "/p", "linux", null);
+  const args = chromeLaunchArgs(VERSION, "/p", "linux", null);
   expect(args).toContain("--headless=new");
   expect(args).toContain("--window-size=1280,800");
   expect(args.some((a) => a.startsWith("--test-type"))).toBe(false);
@@ -215,6 +221,19 @@ test("the profile: Chrome's own frame, whenever its window manager came up, no s
     NewTabPage: { FooterVisible: false, PrevNavigationTime: "1" },
     intl: { a: 1 },
   });
+  // The old start page extension no longer answers new tabs (Google Chrome doesn't load it); others' entries stay.
+  const old = { entry: "chrome-extension://mbgkclemiokgppkieijlfaoehgdjlhbl/start.html", active: true };
+  const other = { entry: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/tab.html", active: false };
+  writeFileSync(prefs, JSON.stringify({ extensions: { chrome_url_overrides: { newtab: [old, other] }, alerts: {} } }));
+  prepareProfile(profile);
+  expect(JSON.parse(readFileSync(prefs, "utf8")).extensions).toEqual({
+    chrome_url_overrides: { newtab: [other] },
+    alerts: {},
+  });
+  // Nothing to change: the file isn't written again.
+  const written = statSync(prefs).mtimeMs;
+  prepareProfile(profile);
+  expect(statSync(prefs).mtimeMs).toBe(written);
   // Not JSON: Chrome's own business.
   writeFileSync(prefs, "{broken");
   prepareProfile(profile);
@@ -244,7 +263,10 @@ test.if(posix)(
     expect(last(other).env).toBeUndefined();
     expect(other.pids()[0].display).toBeUndefined();
     const otherProfile = path.join(await agentWorkspace(other.ws, dev), ".agentes", "browser");
-    expect(existsSync(path.join(otherProfile, "Default", "Preferences"))).toBe(false);
+    // Headless too: no sign-in to Chrome itself (Google Chrome would offer it to an agent signed in to google.com).
+    expect(readFileSync(path.join(otherProfile, "Default", "Preferences"), "utf8")).toContain(
+      '"allowed_on_next_startup":false',
+    );
   },
 );
 
@@ -342,13 +364,14 @@ test.if(posix)(
       () => null,
       (e: unknown) => e as RunnerError,
     );
+    expect(failed?.code).toBe("browser_unavailable");
     expect(failed?.message).toBe(
-      "Couldn't start the agent's browser: the agent's computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.",
+      `${CHROME_FAILURES.start} This computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again.`,
     );
     expect(t.log).toEqual([
       "desktop dev",
       "chrome failed",
-      `the browser of dev didn't start: missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
+      `the browser of dev didn't start: This computer is missing system libraries Chrome needs (libnspr4.so). Install them on it, then try again. (missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so)`,
     ]);
     // Once they're installed, the next command starts it on its desktop.
     t.fails.libraries = false;
@@ -453,7 +476,7 @@ test.if(posix)(
     let installs = 0;
     const installing = () => void installs++;
 
-    // Not running: started on the desktop, with the agent's profile; Chrome for Testing is here, nothing installs.
+    // Not running: started on the desktop, with the agent's profile; nothing installs.
     // Answered once Chrome lists its window's page.
     await t.manager.show(dev, folder, installing);
     expect(t.log).toEqual(["desktop dev", "chrome"]);
@@ -534,36 +557,28 @@ test.if(posix)(
     const third = setup();
     third.fails.headed = 1;
     expect(await failure(third.manager.show(dev, await agentWorkspace(third.ws, dev), () => {}))).toEqual([
-      "internal",
-      "Couldn't start the agent's browser: Chrome closed while starting",
+      "browser_unavailable",
+      CHROME_FAILURES.start,
     ]);
     expect(third.chromes).toHaveLength(0);
   },
 );
 
 test.if(posix)(
-  "Browser on its desktop before the agent's first browser: Chrome for Testing installs first, and says so",
+  "Browser on its desktop without Google Chrome: the click says so plainly, and nothing installs",
   async () => {
-    // A computer without Chrome for Testing until `agent-browser install` ran.
-    let log = "";
-    const installs = () =>
-      existsSync(log)
-        ? readFileSync(log, "utf8")
-            .split("\n")
-            .filter((l) => l && (JSON.parse(l) as { args: string[] }).args[0] === "install").length
-        : 0;
-    const t = setup({ chrome: () => (installs() > 0 ? EXE : null) });
-    log = path.join(t.home, "ab.log");
+    const t = setup({ chrome: () => null });
     const folder = await agentWorkspace(t.ws, dev);
-    const said: number[] = [];
-    await t.manager.show(dev, folder, () => said.push(installs()));
-    // Said before the install, which then ran once; Chrome opened on the desktop.
-    expect(said).toEqual([0]);
-    expect(installs()).toBe(1);
-    expect(headed(last(t))).toBe(true);
-    // Installed: the next click says nothing of it.
-    await t.manager.show(dev, folder, () => said.push(installs()));
-    expect(said).toEqual([0]);
+    let installing = 0;
+    const err = await t.manager
+      .show(dev, folder, () => void installing++)
+      .then(
+        () => null,
+        (e: unknown) => e as RunnerError,
+      );
+    expect([err?.code, err?.message]).toEqual(["browser_unavailable", CHROME_FAILURES.missing]);
+    expect(installing).toBe(0);
+    expect(t.chromes).toHaveLength(0);
   },
 );
 

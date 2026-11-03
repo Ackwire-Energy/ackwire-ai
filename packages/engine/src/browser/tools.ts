@@ -5,6 +5,8 @@ import {
   type BrowserBatchCommand,
   type BrowserSetup,
   browserSetupOf,
+  chromeFailureKind,
+  type ErrorReporter,
   type MachineReplies,
   type PubSub,
 } from "@agenteschat/adapters";
@@ -244,6 +246,50 @@ export interface BrowserToolDeps {
   /** Tests: how long a command waits for a profile another agent holds (`PROFILE_WAIT_MS`), polling this often. */
   profileWaitMs?: number;
   profilePollMs?: number;
+  /** Error reports (ADR 0104): a computer's Google Chrome failing an agent goes there (`reportChromeFailure`). */
+  errors?: ErrorReporter;
+}
+
+/** One report per computer and kind of Chrome failure this often, at most: an agent may try again and again. */
+const CHROME_REPORT_EVERY_MS = 10 * 60_000;
+const chromeReported = new Map<string, number>();
+const ids = (ctx: ToolContext) => ({ orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId });
+
+/**
+ * A computer's Google Chrome failed the agent (missing, not starting, or the profile not opening: the runner's
+ * `CHROME_FAILURES`): reported with the computer, its system and its Chrome, so operators see it in their error reports
+ * and alerts. The agent tells the person meanwhile (`explain`).
+ */
+export async function reportChromeFailure(
+  errors: ErrorReporter | undefined,
+  hub: Pick<MachineCaller, "status"> | undefined,
+  error: unknown,
+  at: { orgId: string; agentId: string; runId?: string; machineId: string },
+  now = Date.now(),
+) {
+  if (!errors || !(error instanceof MachineRequestError) || error.code !== "browser_unavailable") return;
+  const kind = chromeFailureKind(error.message);
+  if (!kind) return;
+  const key = `${at.machineId}:${kind}`;
+  if (now - (chromeReported.get(key) ?? Number.NEGATIVE_INFINITY) < CHROME_REPORT_EVERY_MS) return;
+  // ponytail: per-process memory, so each replica reports once; a shared table if replicas multiply.
+  if (chromeReported.size > 10_000) chromeReported.clear();
+  chromeReported.set(key, now);
+  const machine = await hub?.status(at.machineId).catch(() => null);
+  try {
+    errors.capture(new Error(`Google Chrome failed an agent's browser (${kind})`), {
+      org_id: at.orgId,
+      agent_id: at.agentId,
+      run_id: at.runId,
+      machine_id: at.machineId,
+      os: machine?.os,
+      chrome: machine?.executors.browser?.chrome,
+      browser_failure: kind,
+      reason: error.message,
+    });
+  } catch {
+    // A report that can't be made never fails the agent's tool.
+  }
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -322,7 +368,7 @@ function explain(error: unknown, machineName: string): string {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error.message : String(error);
   switch (error.code) {
     case "browser_unavailable":
-      return `The browser isn't available on the computer ${machineName}: ${error.message}. Tell the person.`;
+      return `The browser isn't available on the computer ${machineName}: ${error.message.replace(/\.$/, "")}. Tell the person.`;
     case "not_allowed":
       return `The browser is turned off on the computer ${machineName}. Only the person at that computer can turn it on; tell the people.`;
     case "paused":
@@ -679,6 +725,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
           ctx.signal,
         );
       } catch (error) {
+        await reportChromeFailure(deps.errors, hub, error, { ...ids(ctx), machineId: status.machineId });
         return { ok: false, text: explain(error, status.machineName) };
       }
       addSetup(reply);
@@ -718,6 +765,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
             ctx.signal,
           );
         } catch (error) {
+          await reportChromeFailure(deps.errors, hub, error, { ...ids(ctx), machineId: status.machineId });
           return [{ ok: false, text: explain(error, status.machineName) }];
         }
         addSetup(reply);

@@ -246,7 +246,7 @@ export class WorkerLink {
     }
   }
 
-  /** Chrome for Testing installs first, for that click. */
+  /** `agent-browser` downloads first, for that click. */
   showing(showId: string) {
     this.write(JSON.stringify({ type: "browser.showing", showId } satisfies WorkerLinkFrame));
   }
@@ -484,7 +484,11 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     home,
     privateNetwork: () => state.privateNetwork === true,
     ...(o.browserPorts
-      ? { fixedPorts: o.browserPorts, startPageDirectory: systemStartPage(process.getuid?.() ?? 0) }
+      ? {
+          fixedPorts: o.browserPorts,
+          startPageDirectory: systemStartPage(process.getuid?.() ?? 0),
+          installedByRoot: true,
+        }
       : {}),
     log,
     send: (frame) => live?.send(frame) ?? false,

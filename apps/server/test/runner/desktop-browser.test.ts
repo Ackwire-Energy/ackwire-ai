@@ -80,7 +80,7 @@ test.if(posix)(
   },
 );
 
-test.if(posix)("Chrome for Testing installing first: a wait note, closed once the browser is open", async () => {
+test.if(posix)("agent-browser downloading first: a wait note, closed once the browser is open", async () => {
   const socket = socketIn();
   let release = () => {};
   await serve(socket, async (installing) => {
