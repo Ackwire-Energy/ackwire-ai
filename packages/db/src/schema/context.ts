@@ -213,6 +213,8 @@ export const contextProposals = pgTable(
     /** `agent_access` only. */
     access: jsonb().$type<ProposedAccessLine[]>(),
     rationale: text().notNull(),
+    /** `skill` only: the skill's file it changes (its whole text in `proposed_text`); null: its body. */
+    skillPath: text(),
     itemIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     status: proposalStatusEnum().notNull().default("pending"),
     decidedByUserId: text().references(() => users.id, { onDelete: "set null" }),

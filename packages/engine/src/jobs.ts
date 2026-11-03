@@ -93,6 +93,8 @@ import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
+import { runSkillUpdates, SKILL_UPDATES_JOB } from "./skill-updates";
+import type { SkillDeps } from "./skills";
 import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
@@ -137,6 +139,8 @@ export interface JobDeps extends RunExecutorDeps {
   gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Skills that update by themselves from their links (job `skills.update`). */
+  skills?: SkillDeps;
   /** Voice messages (job `voice.transcribe`, ADR 0100). */
   voice?: VoiceDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
@@ -985,6 +989,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // Receipts of a push ~15 min later: tokens whose device is gone are deleted.
     "push.receipts": async (job) => {
       await checkPushReceipts({ db: deps.db, push: deps.push }, pushTicketsOf(job.payload.tickets));
+    },
+    // A workspace's skills that update by themselves from their links, once a day.
+    [SKILL_UPDATES_JOB]: async (job) => {
+      if (!deps.skills) return;
+      await runSkillUpdates(deps.skills, orgOf(job));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;

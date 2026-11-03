@@ -192,7 +192,14 @@ export function describeCapabilities(
       );
     }
     if (names.has("update_skill")) {
-      lines.push("- If a skill you loaded was wrong or missing a step, fix it with `update_skill` before you answer.");
+      lines.push(
+        "- A skill you used was wrong, missed a step or hit a pitfall: fix it with `update_skill` before your turn ends, in its language (only skills you used).",
+      );
+    }
+    if (names.has("offer_install_skill")) {
+      lines.push(
+        "- To install a skill: `offer_install_skill`, never your CLI's own skills folder (~/.claude/skills…). To update installed ones from their links: `update_skill_from_source`.",
+      );
     }
     if (loaded.has("share_artifact")) {
       lines.push(

@@ -2006,6 +2006,22 @@
       "done": "Invitación enviada",
       "adminOnly": "Lo envía quien puede invitar"
     },
+    "install_skill": {
+      "title": "Instalar una habilidad",
+      "open": "Instalar",
+      "done": "Instalada",
+      "adminOnly": "La instala quien gestiona agentes"
+    },
+    "update_skills": {
+      "title_one": "Actualizar una habilidad",
+      "title_many": "Actualizar {{count}} habilidades",
+      "title_other": "Actualizar {{count}} habilidades",
+      "update": "Actualizar",
+      "review": "Revisar",
+      "done": "Al día",
+      "waiting": "Espera revisión",
+      "adminOnly": "La actualiza quien gestiona agentes"
+    },
     "agentProposal": {
       "title": "{{agent}} propone un nuevo agente",
       "review": "Revisar",
@@ -6842,6 +6858,46 @@
     "saved": "{{name}} guardada.",
     "refresh": "Actualizar desde el enlace",
     "refreshed": "{{name}} actualizada desde su enlace.",
+    "upToDate": "{{name}} ya tiene lo que tiene su enlace.",
+    "waitingToast": "La actualización de {{name}} cambia archivos que se ejecutan, así que espera una revisión.",
+    "autoUpdate": "Actualizar sola",
+    "autoUpdateHelp": "Lee su enlace todos los días. El texto nuevo entra con Deshacer. Los cambios en scripts esperan a alguien que gestione habilidades.",
+    "autoChip": "Se actualiza sola",
+    "waitingChip": "Actualización en espera",
+    "lastUpdate": "Actualizada desde su enlace {{when}}",
+    "undoUpdate": "Deshacer actualización",
+    "undone": "{{name}} volvió a la versión {{version}}.",
+    "agentsImprove": "Los agentes mejoran las habilidades solos",
+    "agentsImproveHelp": "Cuando un agente ve que una habilidad está mal o le falta un paso, la corrige al momento: una versión nueva que puedes deshacer, y quien hizo la habilidad se entera. Los cambios en scripts esperan a alguien que gestione habilidades.",
+    "agentsImproveThis": "Los agentes mejoran esta habilidad solos",
+    "agentChange": "{{agent}} la cambió {{when}}",
+    "undoAgentChange": "Deshacer cambio",
+    "pending": {
+      "title": "La actualización de su enlace cambia archivos que se ejecutan: {{files}}",
+      "lead": "Aplícala solo si confías en estos archivos. Los agentes los ejecutan en sus computadoras.",
+      "edited": "La actualización desde su enlace reemplazaría lo que los agentes cambiaron en ella",
+      "editedLead": "Aplícala para quedarte con la versión del enlace. Puedes deshacerla después.",
+      "apply": "Aplicar actualización",
+      "dismiss": "No aplicar",
+      "applied": "{{name}} actualizada desde su enlace.",
+      "changedAgain": "Su enlace cambió otra vez. Revisa los archivos nuevos.",
+      "dismissed": "Actualización no aplicada. Un cambio nuevo en su enlace vuelve a preguntar."
+    },
+    "updateFailed": {
+      "no_skill_md": "No se pudo actualizar: su enlace ya no tiene un SKILL.md.",
+      "connection_gone": "No se pudo actualizar: la conexión de GitHub que la leyó ya no existe.",
+      "link_holds_several": "No se pudo actualizar: su enlace ahora tiene varias habilidades.",
+      "link_renamed": "No se pudo actualizar: su enlace ahora tiene otra habilidad.",
+      "owner_gone": "No se pudo actualizar: quien activó la actualización automática ya no puede gestionar habilidades. Actívala de nuevo.",
+      "other": "No se pudo actualizar desde su enlace."
+    },
+    "notice": {
+      "updated": "{{name}} se actualizó desde su enlace",
+      "waiting": "Una actualización de {{name}} cambia sus scripts",
+      "waitingEdited": "Una actualización de {{name}} reemplazaría lo que los agentes cambiaron",
+      "failed": "{{name}} no se pudo actualizar desde su enlace",
+      "edited": "Los agentes mejoraron {{name}}"
+    },
     "remove": "Quitar",
     "removeTitle": "¿Quitar {{name}}?",
     "removeAgents_one": "{{names}} usa esta habilidad y pierde el acceso a ella.",
@@ -10674,7 +10730,11 @@
       "invalidDescription": "La descripción debe tener de 1 a {{max}} caracteres.",
       "tooLarge": "La habilidad es demasiado grande (máx. {{max}} MB).",
       "tooManyFiles": "La habilidad tiene demasiados archivos (máx. {{max}}).",
-      "connectionGone": "La conexión de GitHub que leyó {{repo}} ya no existe. Conecta GitHub de nuevo para actualizar esta habilidad."
+      "connectionGone": "La conexión de GitHub que leyó {{repo}} ya no existe. Conecta GitHub de nuevo para actualizar esta habilidad.",
+      "linkHoldsSeveral": "Su enlace ahora tiene varias habilidades. Instala esta de nuevo desde su propia carpeta.",
+      "linkRenamed": "Su enlace ahora tiene la habilidad {{name}}.",
+      "noLink": "Solo una habilidad instalada desde un enlace se actualiza desde él.",
+      "noPendingUpdate": "No hay ninguna actualización de esta habilidad en espera."
     },
     "agentGroup": {
       "notFound": "Este grupo ya no existe.",
@@ -11988,6 +12048,8 @@
         "creatingChannel": "Creó un canal",
         "offeringConnectAi": "Ofreció conectar una IA",
         "offeringConnectApp": "Ofreció conectar una app",
+        "offeringSkill": "Ofreció instalar una habilidad",
+        "updatingSkills": "Actualizó habilidades",
         "offeringInvites": "Ofreció invitar a personas",
         "proposingAgent": "Propuso un agente",
         "askingAgent": "Le preguntó a otro agente",
@@ -12072,6 +12134,8 @@
       "creatingChannel": "creando un canal",
       "offeringConnectAi": "preparando una IA para conectar",
       "offeringConnectApp": "preparando una app para conectar",
+      "offeringSkill": "preparando una habilidad para instalar",
+      "updatingSkills": "actualizando habilidades",
       "offeringInvites": "preparando las invitaciones",
       "proposingAgent": "proponiendo un agente",
       "askingAgent": "preguntándole a otro agente",
@@ -12183,6 +12247,8 @@
       "action_connect_app": "Conectar {{name}}",
       "action_add_mcp": "Agregar un servidor MCP",
       "action_invite_people": "Invitar a personas",
+      "action_install_skill": "Instalar una habilidad",
+      "action_update_skills": "Actualizar habilidades",
       "agent_proposal": "Propuso un nuevo agente: {{name}}",
       "approval_request": "Solicitud de aprobación: {{title}}",
       "secret_request": "{{agent}} pidió una clave: {{name}}",
@@ -12393,6 +12459,14 @@
     "offer_invites": {
       "label": "Ofrecer invitar personas",
       "description": "Publica una tarjeta cuyo botón abre el diálogo de invitación con las direcciones ya completadas."
+    },
+    "offer_install_skill": {
+      "label": "Ofrecer instalar una habilidad",
+      "description": "Publica una tarjeta cuyo botón abre la instalación con el enlace de la habilidad ya puesto."
+    },
+    "update_skill_from_source": {
+      "label": "Actualizar habilidades desde sus enlaces",
+      "description": "Actualiza habilidades desde donde se instalaron. Los cambios en scripts esperan a una persona."
     },
     "propose_agent": {
       "label": "Proponer un agente",

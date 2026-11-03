@@ -1933,6 +1933,21 @@
       "done": "Davet gönderildi",
       "adminOnly": "Davet etme yetkisi olan biri gönderir"
     },
+    "install_skill": {
+      "title": "Beceri yükle",
+      "open": "Yükle",
+      "done": "Yüklendi",
+      "adminOnly": "Ajanları yöneten biri yükler"
+    },
+    "update_skills": {
+      "title_one": "Bir beceriyi güncelle",
+      "title_other": "{{count}} beceriyi güncelle",
+      "update": "Güncelle",
+      "review": "İncele",
+      "done": "Güncel",
+      "waiting": "İnceleme bekliyor",
+      "adminOnly": "Ajanları yöneten biri günceller"
+    },
     "agentProposal": {
       "title": "{{agent}} yeni bir ajan öneriyor",
       "review": "İncele",
@@ -6563,6 +6578,46 @@
     "saved": "{{name}} kaydedildi.",
     "refresh": "Bağlantıdan güncelle",
     "refreshed": "{{name}} bağlantısından güncellendi.",
+    "upToDate": "{{name}} zaten bağlantısındakiyle aynı.",
+    "waitingToast": "{{name}} güncellemesi çalışan dosyaları değiştiriyor, bu yüzden inceleme bekliyor.",
+    "autoUpdate": "Kendi kendine güncelle",
+    "autoUpdateHelp": "Bağlantısını her gün okur. Yeni metin Geri al ile gelir. Betik değişiklikleri becerileri yöneten birini bekler.",
+    "autoChip": "Kendi kendine güncellenir",
+    "waitingChip": "Güncelleme bekliyor",
+    "lastUpdate": "{{when}} bağlantısından güncellendi",
+    "undoUpdate": "Güncellemeyi geri al",
+    "undone": "{{name}} {{version}} sürümüne döndü.",
+    "agentsImprove": "Ajanlar becerileri kendileri geliştirir",
+    "agentsImproveHelp": "Bir ajan bir becerinin yanlış olduğunu ya da bir adımının eksik olduğunu görünce hemen düzeltir: geri alabileceğiniz yeni bir sürüm olur ve beceriyi oluşturan kişiye haber verilir. Betik değişiklikleri becerileri yöneten birini bekler.",
+    "agentsImproveThis": "Ajanlar bu beceriyi kendileri geliştirir",
+    "agentChange": "{{agent}} {{when}} değiştirdi",
+    "undoAgentChange": "Değişikliği geri al",
+    "pending": {
+      "title": "Bağlantısından gelen güncelleme çalışan dosyaları değiştiriyor: {{files}}",
+      "lead": "Yalnızca bu dosyalara güveniyorsanız uygulayın. Ajanlar bunları kendi bilgisayarlarında çalıştırır.",
+      "edited": "Bağlantısından gelen güncelleme, ajanların değiştirdiklerinin yerine geçer",
+      "editedLead": "Bağlantıdaki sürümü almak için uygula. Sonra geri alabilirsin.",
+      "apply": "Güncellemeyi uygula",
+      "dismiss": "Uygulama",
+      "applied": "{{name}} bağlantısından güncellendi.",
+      "changedAgain": "Bağlantısı yine değişti. Yeni dosyaları inceleyin.",
+      "dismissed": "Güncelleme uygulanmadı. Bağlantısındaki yeni bir değişiklik yeniden sorar."
+    },
+    "updateFailed": {
+      "no_skill_md": "Güncellenemedi: bağlantısında artık SKILL.md yok.",
+      "connection_gone": "Güncellenemedi: onu okuyan GitHub bağlantısı artık yok.",
+      "link_holds_several": "Güncellenemedi: bağlantısında artık birden fazla beceri var.",
+      "link_renamed": "Güncellenemedi: bağlantısında artık başka bir beceri var.",
+      "owner_gone": "Güncellenemedi: kendi kendine güncellemeyi açan kişi artık becerileri yönetemiyor. Yeniden açın.",
+      "other": "Bağlantısından güncellenemedi."
+    },
+    "notice": {
+      "updated": "{{name}} bağlantısından güncellendi",
+      "waiting": "{{name}} güncellemesi betiklerini değiştiriyor",
+      "waitingEdited": "{{name}} güncellemesi, ajanların değiştirdiklerinin yerine geçer",
+      "failed": "{{name}} bağlantısından güncellenemedi",
+      "edited": "Ajanlar {{name}} becerisini geliştirdi"
+    },
     "remove": "Kaldır",
     "removeTitle": "{{name}} kaldırılsın mı?",
     "removeAgents_one": "{{names}} bu beceriyi kullanıyor ve erişimini kaybeder.",
@@ -10268,7 +10323,11 @@
       "invalidDescription": "Açıklama 1 ile {{max}} karakter arasında olmalı.",
       "tooLarge": "Beceri çok büyük (en fazla {{max}} MB).",
       "tooManyFiles": "Becerinin çok fazla dosyası var (en fazla {{max}}).",
-      "connectionGone": "{{repo}} deposunu okuyan GitHub bağlantısı artık yok. Bu beceriyi güncellemek için GitHub'ı yeniden bağlayın."
+      "connectionGone": "{{repo}} deposunu okuyan GitHub bağlantısı artık yok. Bu beceriyi güncellemek için GitHub'ı yeniden bağlayın.",
+      "linkHoldsSeveral": "Bağlantısında artık birden fazla beceri var. Bunu kendi klasöründen yeniden yükleyin.",
+      "linkRenamed": "Bağlantısında artık {{name}} becerisi var.",
+      "noLink": "Yalnızca bağlantıdan yüklenen bir beceri oradan güncellenir.",
+      "noPendingUpdate": "Bu beceri için bekleyen güncelleme yok."
     },
     "agentGroup": {
       "notFound": "Bu grup artık yok.",
@@ -11543,6 +11602,8 @@
         "creatingChannel": "Bir kanal oluşturdu",
         "offeringConnectAi": "Bir yapay zeka bağlamayı önerdi",
         "offeringConnectApp": "Bir uygulama bağlamayı önerdi",
+        "offeringSkill": "Bir beceri yüklemeyi önerdi",
+        "updatingSkills": "Becerileri güncelledi",
         "offeringInvites": "Kişileri davet etmeyi önerdi",
         "proposingAgent": "Bir ajan önerdi",
         "askingAgent": "Başka bir ajana sordu",
@@ -11627,6 +11688,8 @@
       "creatingChannel": "kanal oluşturuyor",
       "offeringConnectAi": "yapay zeka bağlantısını hazırlıyor",
       "offeringConnectApp": "uygulama bağlantısını hazırlıyor",
+      "offeringSkill": "bir beceriyi yüklemeye hazırlıyor",
+      "updatingSkills": "becerileri güncelliyor",
       "offeringInvites": "davetleri hazırlıyor",
       "proposingAgent": "ajan öneriyor",
       "askingAgent": "başka bir ajana soruyor",
@@ -11737,6 +11800,8 @@
       "action_connect_app": "{{name}} bağla",
       "action_add_mcp": "Bir MCP sunucusu ekle",
       "action_invite_people": "Kişileri davet et",
+      "action_install_skill": "Beceri yükle",
+      "action_update_skills": "Becerileri güncelle",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "approval_request": "Onay isteği: {{title}}",
       "secret_request": "{{agent}} bir anahtar istedi: {{name}}",
@@ -11944,6 +12009,14 @@
     "offer_invites": {
       "label": "Kişileri davet etmeyi öner",
       "description": "Düğmesi adresleri doldurulmuş davet penceresini açan bir kart paylaşır."
+    },
+    "offer_install_skill": {
+      "label": "Beceri yüklemeyi öner",
+      "description": "Düğmesi, becerinin bağlantısı doldurulmuş yükleme penceresini açan bir kart paylaşır."
+    },
+    "update_skill_from_source": {
+      "label": "Becerileri bağlantılarından güncelle",
+      "description": "Becerileri yüklendikleri yerden günceller. Betik değişiklikleri bir kişiyi bekler."
     },
     "propose_agent": {
       "label": "Ajan öner",

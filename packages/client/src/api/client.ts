@@ -236,6 +236,8 @@ import type {
   SkillInput,
   SkillPatch,
   SkillPick,
+  SkillSettings,
+  SkillSourceUpdate,
   SpeechKey,
   SpeechKeyInput,
   StartChoice,
@@ -869,8 +871,19 @@ export interface ApiClient {
     learned?(orgId: string, agentId: string): Promise<LearnedSkill[]>;
     /** Undo the agent's last change to its own skill. */
     revert?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Update it from its link: new text applies (undoable), files that run wait (older servers: absent). */
+    updateFromSource?(orgId: string, id: string): Promise<SkillSourceUpdate>;
+    /** Apply the waiting update as it was shown; if its link changed since, it waits again. */
+    approveUpdate?(orgId: string, id: string): Promise<SkillSourceUpdate>;
+    /** Refuse the waiting update. */
+    dismissUpdate?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Back to the version before its last update from its link. */
+    undoUpdate?(orgId: string, id: string): Promise<SkillDetail>;
     /** Bring back a skill archived for disuse. */
     restore?(orgId: string, id: string): Promise<SkillDetail>;
+    /** The workspace's skill settings (older servers: absent). */
+    settings?(orgId: string): Promise<SkillSettings>;
+    saveSettings?(orgId: string, input: SkillSettings): Promise<SkillSettings>;
   };
   access: {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */

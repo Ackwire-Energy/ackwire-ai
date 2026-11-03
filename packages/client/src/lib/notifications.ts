@@ -203,6 +203,18 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "connector_tool_changed") return "connectors.toolChanges.notice" as const;
   if (n.kind === "computer_disk_full") return "machines.shared.diskFullNotice" as const;
   if (n.kind === "computer_no_chrome") return "machines.chromeMissingNotice" as const;
+  if (n.kind === "skill_update") {
+    const to = n.latest.statusTo;
+    return to === "waiting"
+      ? n.latest.reason === "edited" && !n.latest.title
+        ? ("skills.notice.waitingEdited" as const)
+        : ("skills.notice.waiting" as const)
+      : to === "failed"
+        ? ("skills.notice.failed" as const)
+        : to === "edited"
+          ? ("skills.notice.edited" as const)
+          : ("skills.notice.updated" as const);
+  }
   if (n.kind !== "org_standing") return null;
   const to = n.latest.statusTo;
   const billing = billingHoldOf({ state: "hold", reason: n.latest.billingHold ?? null });
@@ -327,7 +339,8 @@ export type OpenTarget =
   | {
       to: "/org/$orgId/settings/$section";
       params: { section: "computers" | "members" | "usage" | "connectors" | "billing" };
-    };
+    }
+  | { to: "/org/$orgId/settings/$section"; params: { section: "skills" }; search?: { skill: string } };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
 export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
@@ -370,6 +383,13 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed")
     return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };
+  // An update of a skill from its link: the skill, in Skills.
+  if (n.kind === "skill_update")
+    return {
+      to: "/org/$orgId/settings/$section",
+      params: { section: "skills" },
+      ...(s.skillId ? { search: { skill: s.skillId } } : {}),
+    };
   if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||

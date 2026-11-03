@@ -12,6 +12,7 @@ import { assertActiveMembership, can, getMembership } from "./organizations";
 import { hookMethodsOf, routineHookKeys } from "./routine-hooks";
 import { nextRoutineTime } from "./routines";
 import { enqueueIndex } from "./search";
+import { restoreSkillSnapshot, type SkillSnapshot } from "./skill-updates";
 import { writeSkillBody } from "./skills";
 import { closeThread, getThread, reopenThread, updateThread } from "./threads";
 import { canonicalJson } from "./tools/json-schema";
@@ -499,6 +500,14 @@ handlers["skill.updated"] = async (deps, a, _userId, direction) => {
     .from(schema.skills)
     .where(and(eq(schema.skills.orgId, a.orgId), eq(schema.skills.id, a.targetId), isNull(schema.skills.deletedAt)));
   if (!skill) throw new NotFoundError("The skill is gone", "action.target_gone");
+  // An update from its link (`update_skill_from_source`): each side a whole version, its text and files.
+  if (typeof obj(a.before).version === "number") {
+    const [from, to] = (direction === "undo" ? [a.after, a.before] : [a.before, a.after]) as SkillSnapshot[];
+    const at = direction === "undo" ? skill.version === from?.version : skill.body === from?.body;
+    if (!from || !to || !at || (direction === "redo" && skill.description !== from.description)) throw changedSince();
+    await restoreSkillSnapshot(deps.db, skill, to);
+    return undefined;
+  }
   const [from, to] =
     direction === "undo" ? [obj(a.after).body, obj(a.before).body] : [obj(a.before).body, obj(a.after).body];
   if (typeof to !== "string" || skill.body !== from) throw changedSince();

@@ -1946,6 +1946,21 @@
       "done": "Uitnodiging verstuurd",
       "adminOnly": "Wie mag uitnodigen, verstuurt het"
     },
+    "install_skill": {
+      "title": "Een skill installeren",
+      "open": "Installeren",
+      "done": "Geïnstalleerd",
+      "adminOnly": "Wie agents beheert, installeert het"
+    },
+    "update_skills": {
+      "title_one": "Een skill bijwerken",
+      "title_other": "{{count}} skills bijwerken",
+      "update": "Bijwerken",
+      "review": "Bekijken",
+      "done": "Bijgewerkt",
+      "waiting": "Wacht op controle",
+      "adminOnly": "Wie agents beheert, werkt het bij"
+    },
     "agentProposal": {
       "title": "{{agent}} stelt een nieuwe agent voor",
       "review": "Bekijken",
@@ -6666,6 +6681,46 @@
     "saved": "{{name}} opgeslagen.",
     "refresh": "Bijwerken vanaf link",
     "refreshed": "{{name}} bijgewerkt vanaf de link.",
+    "upToDate": "{{name}} heeft al wat de link bevat.",
+    "waitingToast": "De update van {{name}} wijzigt bestanden die worden uitgevoerd, dus die wacht op een controle.",
+    "autoUpdate": "Zelf bijwerken",
+    "autoUpdateHelp": "Leest de link elke dag. Nieuwe tekst komt erin met Ongedaan maken. Wijzigingen in scripts wachten op iemand die skills beheert.",
+    "autoChip": "Werkt zichzelf bij",
+    "waitingChip": "Update wacht",
+    "lastUpdate": "Bijgewerkt vanaf de link {{when}}",
+    "undoUpdate": "Update ongedaan maken",
+    "undone": "{{name}} is terug naar versie {{version}}.",
+    "agentsImprove": "Agents verbeteren skills zelf",
+    "agentsImproveHelp": "Vindt een agent een skill fout of mist er een stap, dan verbetert hij die meteen: een nieuwe versie die je ongedaan kunt maken, en wie de skill maakte hoort het. Wijzigingen in scripts wachten op iemand die skills beheert.",
+    "agentsImproveThis": "Agents verbeteren deze skill zelf",
+    "agentChange": "{{agent}} heeft hem gewijzigd {{when}}",
+    "undoAgentChange": "Wijziging ongedaan maken",
+    "pending": {
+      "title": "De update vanaf de link wijzigt bestanden die worden uitgevoerd: {{files}}",
+      "lead": "Pas het alleen toe als je deze bestanden vertrouwt. Agents voeren ze uit op hun computers.",
+      "edited": "De update via de link zou vervangen wat agents eraan hebben veranderd",
+      "editedLead": "Pas hem toe om de versie van de link te nemen. Je kunt het daarna ongedaan maken.",
+      "apply": "Update toepassen",
+      "dismiss": "Niet toepassen",
+      "applied": "{{name}} bijgewerkt vanaf de link.",
+      "changedAgain": "De link is weer gewijzigd. Bekijk de nieuwe bestanden.",
+      "dismissed": "Update niet toegepast. Een nieuwe wijziging in de link vraagt het opnieuw."
+    },
+    "updateFailed": {
+      "no_skill_md": "Bijwerken lukte niet: de link heeft geen SKILL.md meer.",
+      "connection_gone": "Bijwerken lukte niet: de GitHub-koppeling die het las, bestaat niet meer.",
+      "link_holds_several": "Bijwerken lukte niet: de link bevat nu meerdere skills.",
+      "link_renamed": "Bijwerken lukte niet: de link bevat nu een andere skill.",
+      "owner_gone": "Bijwerken lukte niet: wie zelf bijwerken aanzette, kan geen skills meer beheren. Zet het opnieuw aan.",
+      "other": "Bijwerken vanaf de link lukte niet."
+    },
+    "notice": {
+      "updated": "{{name}} is bijgewerkt vanaf de link",
+      "waiting": "Een update van {{name}} wijzigt de scripts",
+      "waitingEdited": "Een update van {{name}} zou vervangen wat agents hebben veranderd",
+      "failed": "{{name}} kon niet bijwerken vanaf de link",
+      "edited": "Agents hebben {{name}} verbeterd"
+    },
     "remove": "Verwijderen",
     "removeTitle": "{{name}} verwijderen?",
     "removeAgents_one": "{{names}} gebruikt deze skill en verliest de toegang ertoe.",
@@ -10409,7 +10464,11 @@
       "invalidDescription": "De beschrijving moet 1 tot {{max}} tekens hebben.",
       "tooLarge": "De skill is te groot (max. {{max}} MB).",
       "tooManyFiles": "De skill heeft te veel bestanden (max. {{max}}).",
-      "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken."
+      "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken.",
+      "linkHoldsSeveral": "De link bevat nu meerdere skills. Installeer deze opnieuw vanuit de eigen map.",
+      "linkRenamed": "De link bevat nu de skill {{name}}.",
+      "noLink": "Alleen een skill die vanaf een link is geïnstalleerd, werkt daarvandaan bij.",
+      "noPendingUpdate": "Er wacht geen update van deze skill."
     },
     "agentGroup": {
       "notFound": "Deze groep bestaat niet meer.",
@@ -11695,6 +11754,8 @@
         "creatingChannel": "Een kanaal gemaakt",
         "offeringConnectAi": "Aangeboden een AI te koppelen",
         "offeringConnectApp": "Aangeboden een app te koppelen",
+        "offeringSkill": "Aangeboden een skill te installeren",
+        "updatingSkills": "Skills bijgewerkt",
         "offeringInvites": "Aangeboden mensen uit te nodigen",
         "proposingAgent": "Een agent voorgesteld",
         "askingAgent": "Een andere agent iets gevraagd",
@@ -11779,6 +11840,8 @@
       "creatingChannel": "een kanaal aan het maken",
       "offeringConnectAi": "een AI klaar aan het zetten om te koppelen",
       "offeringConnectApp": "een app klaar aan het zetten om te koppelen",
+      "offeringSkill": "een skill klaarzetten om te installeren",
+      "updatingSkills": "skills bijwerken",
       "offeringInvites": "uitnodigingen klaar aan het zetten",
       "proposingAgent": "een agent aan het voorstellen",
       "askingAgent": "een andere agent iets aan het vragen",
@@ -11890,6 +11953,8 @@
       "action_connect_app": "{{name}} koppelen",
       "action_add_mcp": "Een MCP-server toevoegen",
       "action_invite_people": "Mensen uitnodigen",
+      "action_install_skill": "Een skill installeren",
+      "action_update_skills": "Skills bijwerken",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
@@ -12097,6 +12162,14 @@
     "offer_invites": {
       "label": "Aanbieden mensen uit te nodigen",
       "description": "Plaatst een kaart met een knop die het uitnodigingsvenster opent met de adressen al ingevuld."
+    },
+    "offer_install_skill": {
+      "label": "Aanbieden een skill te installeren",
+      "description": "Plaatst een kaart waarvan de knop de installatie opent met de link van de skill ingevuld."
+    },
+    "update_skill_from_source": {
+      "label": "Skills bijwerken vanaf hun links",
+      "description": "Werkt skills bij vanaf waar ze zijn geïnstalleerd. Wijzigingen in scripts wachten op een persoon."
     },
     "propose_agent": {
       "label": "Agent voorstellen",

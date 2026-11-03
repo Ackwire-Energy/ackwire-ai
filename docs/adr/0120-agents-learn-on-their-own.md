@@ -102,6 +102,21 @@ Learning never records a secret's value or where it is kept; the credential chec
 | A separate "stale" state for skills before archiving | something reads it |
 | The new judge question and learn prompt checked on a Claude subscription sign-in (its filter refuses some wordings with a 400 that reads like billing) | before turning learning on for a subscription workspace in production |
 
+## Addendum (2026-11-03): agents improve the skills people made
+
+People who rely on many specific skills (a workflow in Claude Code updates its skills after every task, because without it the agents make too many mistakes) want agents to keep them right. Until now a fix to a skill a person made became a proposal someone had to accept, and a skill's files couldn't be changed at all. Agents act by default and people correct them (the owner's direction), so:
+
+1. **`update_skill` takes files.** `{name, body?, files?: [{path, content}]}`, at least one: the whole new body and whole text files to change or add (at most 10). Read before write, as before: the skill loaded with `load_skill` in this run, and an existing file read with `read_skill_file` in this run. Only text files: a binary that doesn't run is refused, and so is `SKILL.md` as a file (the body is `body`). Credentials and permission rules never go in, the files included.
+2. **A person's skill changes at once** while "Agentes melhoram as skills sozinhos" is on for it (ADR 0020, amended 2026-11-03; on by default): a new version with a `skill.updated` receipt in the chat (its `before` and `after` the whole versions, so Desfazer brings the files back too), Desfazer in Skills, and its author told in one gathered notice. Off, it is today's proposal, now one per file changed besides the body's. A locked skill gets proposals too.
+3. **What runs always waits.** A script or another file that runs is never written directly, on or off: it is a proposal for that file, which only who manages agents accepts (not `review_memory` alone) after reading its diff. The rest of the change still applies.
+6. **No loop of fixes.** One skill changes at most 3 times in a run and 20 times a day, and an agent stops proposing changes to it while 10 wait (`SKILL_CHANGE_LIMITS`); past that `update_skill` is refused with the reason. The agent's change also keeps a later update from the skill's link from replacing it unseen: that update waits for a person (ADR 0020, amended 2026-11-03).
+4. **The outside-content guard is unchanged.** A run that read the web, mail or a connected app (`learnTrust` low) applies nothing at once, whatever the setting: every part is a proposal.
+5. **The rule in the prompt** (`capabilities.ts`, checked word for word by the turns eval): "A skill you used was wrong, missed a step or hit a pitfall: fix it with `update_skill` before your turn ends, in its language (only skills you used)." It is in English like every rule, whatever the people's language; the skill keeps its own. The learning job's `skill_fixes` also cover a pitfall the turn worked around.
+
+To keep the DM "oi" request under its ceiling with the longer `update_skill`, `offer_install_skill` and `update_skill_from_source` moved to the on-demand group (`RARE_TOOLS`, one `find_tools` away); the prompt still names them.
+
+Skipped: a screen for a skill's version history (versions are kept; Desfazer covers the last change), deleting a skill's file through `update_skill` (a person removes it), writing binary files.
+
 ## Addendum (2026-11-02): failures are reported
 
 When the judge refuses the `learn` question and the verdict is asked again without it, `continuationVerdict` calls `onLearnFailed`, and the executor reports it (ADR 0104 addendum) with the judge's name and the model and provider of the judge call that failed, the agent's brain, provider, model and account kind apart (`agent_*`), once per workspace an hour. The learning job's refused model call is reported the same way and the job ends `skipped: "model_failed"` instead of failing; a rate limit or an overload still throws so the outbox tries again. A failure while queueing learning at turn end is reported too. This is how a Claude subscription sign-in refusing the wording shows up before learning is turned on for such a workspace.

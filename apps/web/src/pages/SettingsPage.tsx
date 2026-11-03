@@ -104,6 +104,7 @@ export function SettingsPage({
   account,
   machineId,
   install,
+  skill,
 }: {
   section?: SettingsSection;
   connected?: string;
@@ -115,6 +116,8 @@ export function SettingsPage({
   account?: string;
   /** Skills, back from connecting GitHub in Instalar skill: the link to read again. */
   install?: string;
+  /** Skills: the skill to open (a notice of its update). */
+  skill?: string;
   /** Computadores → one computer (`/settings/computers/{id}`). */
   machineId?: string;
 }) {
@@ -200,7 +203,7 @@ export function SettingsPage({
         {current === "connectors" && (
           <ConnectorsSection connected={connected} outcome={outcome} review={review} mail={mail} account={account} />
         )}
-        {current === "skills" && <SkillsSection install={install} connected={connected} />}
+        {current === "skills" && <SkillsSection install={install} connected={connected} skill={skill} />}
         {current === "keys" && (
           <>
             <AiAccountsSection />

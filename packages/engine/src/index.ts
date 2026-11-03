@@ -218,6 +218,7 @@ export * from "./session-screening";
 export * from "./setup-tools";
 export * from "./sidebar-items";
 export * from "./skill-tools";
+export * from "./skill-updates";
 export * from "./skills";
 export * from "./speech-settings";
 export * from "./standing";

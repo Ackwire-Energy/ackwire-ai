@@ -177,6 +177,8 @@ import type {
   Skill,
   SkillDetail,
   SkillPick,
+  SkillSettings,
+  SkillSourceUpdate,
   SpeechKey,
   StartChoice,
   StorageConfig,
@@ -1028,6 +1030,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ skills: LearnedSkill[] }>(`${org(orgId)}/agents/${enc(agentId)}/learned-skills`)).skills,
       revert: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/revert`, { json: {} }),
       restore: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/restore`, { json: {} }),
+      updateFromSource: (orgId, id) =>
+        request<SkillSourceUpdate>(`${org(orgId)}/skills/${enc(id)}/update`, { json: {} }),
+      approveUpdate: (orgId, id) =>
+        request<SkillSourceUpdate>(`${org(orgId)}/skills/${enc(id)}/update/approve`, { json: {} }),
+      dismissUpdate: (orgId, id) =>
+        request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/dismiss`, { json: {} }),
+      undoUpdate: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/undo`, { json: {} }),
+      settings: (orgId) => request<SkillSettings>(`${org(orgId)}/skill-settings`),
+      saveSettings: (orgId, input) =>
+        request<SkillSettings>(`${org(orgId)}/skill-settings`, { method: "PUT", json: input }),
     },
     access: {
       get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),

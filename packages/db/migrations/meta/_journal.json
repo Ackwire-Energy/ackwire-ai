@@ -1350,7 +1350,28 @@
       "idx": 193,
       "version": "7",
       "when": 1793727546494,
-      "tag": "0195_channel_permissions",
+      "tag": "0194_channel_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 194,
+      "version": "7",
+      "when": 1793728196643,
+      "tag": "0195_skill_auto_update",
+      "breakpoints": true
+    },
+    {
+      "idx": 195,
+      "version": "7",
+      "when": 1793730234354,
+      "tag": "0196_agents_improve_skills",
+      "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1793731584844,
+      "tag": "0197_skill_edited_since_source",
       "breakpoints": true
     }
   ]

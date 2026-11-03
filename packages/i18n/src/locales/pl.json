@@ -2064,6 +2064,23 @@
       "done": "Zaproszenie wysłane",
       "adminOnly": "Wysyła je osoba, która może zapraszać"
     },
+    "install_skill": {
+      "title": "Zainstaluj umiejętność",
+      "open": "Zainstaluj",
+      "done": "Zainstalowano",
+      "adminOnly": "Instaluje ją osoba, która zarządza agentami"
+    },
+    "update_skills": {
+      "title_one": "Zaktualizuj umiejętność",
+      "title_few": "Zaktualizuj {{count}} umiejętności",
+      "title_many": "Zaktualizuj {{count}} umiejętności",
+      "title_other": "Zaktualizuj {{count}} umiejętności",
+      "update": "Aktualizuj",
+      "review": "Przejrzyj",
+      "done": "Aktualna",
+      "waiting": "Czeka na przegląd",
+      "adminOnly": "Aktualizuje ją osoba, która zarządza agentami"
+    },
     "agentProposal": {
       "title": "{{agent}} proponuje nowego agenta",
       "review": "Przejrzyj",
@@ -7103,6 +7120,46 @@
     "saved": "Zapisano: {{name}}.",
     "refresh": "Aktualizuj z linku",
     "refreshed": "{{name}}: zaktualizowano z linku.",
+    "upToDate": "{{name}} ma już to, co jest pod jej linkiem.",
+    "waitingToast": "Aktualizacja {{name}} zmienia uruchamiane pliki, więc czeka na przegląd.",
+    "autoUpdate": "Aktualizuj sama",
+    "autoUpdateHelp": "Czyta swój link codziennie. Nowy tekst wchodzi z opcją Cofnij. Zmiany w skryptach czekają na osobę, która zarządza umiejętnościami.",
+    "autoChip": "Aktualizuje się sama",
+    "waitingChip": "Aktualizacja czeka",
+    "lastUpdate": "Zaktualizowano z linku {{when}}",
+    "undoUpdate": "Cofnij aktualizację",
+    "undone": "{{name}}: przywrócono wersję {{version}}.",
+    "agentsImprove": "Agenci sami ulepszają umiejętności",
+    "agentsImproveHelp": "Gdy agent zauważy, że umiejętność jest błędna albo brakuje w niej kroku, od razu ją poprawia: nowa wersja, którą możesz cofnąć, a osoba, która ją utworzyła, dostaje informację. Zmiany w skryptach czekają na osobę, która zarządza umiejętnościami.",
+    "agentsImproveThis": "Agenci sami ulepszają tę umiejętność",
+    "agentChange": "{{agent}}: zmiana {{when}}",
+    "undoAgentChange": "Cofnij zmianę",
+    "pending": {
+      "title": "Aktualizacja z linku zmienia uruchamiane pliki: {{files}}",
+      "lead": "Zastosuj ją tylko wtedy, gdy ufasz tym plikom. Agenci uruchamiają je na swoich komputerach.",
+      "edited": "Aktualizacja z linku zastąpiłaby to, co agenci w niej zmienili",
+      "editedLead": "Zastosuj ją, aby przyjąć wersję z linku. Możesz to potem cofnąć.",
+      "apply": "Zastosuj aktualizację",
+      "dismiss": "Nie stosuj",
+      "applied": "{{name}}: zaktualizowano z linku.",
+      "changedAgain": "Link znowu się zmienił. Przejrzyj nowe pliki.",
+      "dismissed": "Nie zastosowano aktualizacji. Nowa zmiana pod linkiem zapyta ponownie."
+    },
+    "updateFailed": {
+      "no_skill_md": "Nie udało się zaktualizować: pod linkiem nie ma już SKILL.md.",
+      "connection_gone": "Nie udało się zaktualizować: połączenie z GitHub, które ją odczytało, już nie istnieje.",
+      "link_holds_several": "Nie udało się zaktualizować: pod linkiem jest teraz kilka umiejętności.",
+      "link_renamed": "Nie udało się zaktualizować: pod linkiem jest teraz inna umiejętność.",
+      "owner_gone": "Nie udało się zaktualizować: osoba, która włączyła samodzielną aktualizację, nie może już zarządzać umiejętnościami. Włącz ją ponownie.",
+      "other": "Nie udało się zaktualizować z linku."
+    },
+    "notice": {
+      "updated": "{{name}}: zaktualizowano z linku",
+      "waiting": "Aktualizacja {{name}} zmienia jej skrypty",
+      "waitingEdited": "Aktualizacja {{name}} zastąpiłaby to, co zmienili agenci",
+      "failed": "{{name}}: nie udało się zaktualizować z linku",
+      "edited": "Agenci ulepszyli {{name}}"
+    },
     "remove": "Usuń",
     "removeTitle": "Usunąć {{name}}?",
     "removeAgents_one": "{{names}} używa tej umiejętności i straci do niej dostęp.",
@@ -11040,7 +11097,11 @@
       "invalidDescription": "Opis musi mieć od 1 do {{max}} znaków.",
       "tooLarge": "Umiejętność jest za duża (maks. {{max}} MB).",
       "tooManyFiles": "Umiejętność ma za dużo plików (maks. {{max}}).",
-      "connectionGone": "Połączenie z GitHub, które odczytało {{repo}}, już nie istnieje. Połącz ponownie GitHub, żeby zaktualizować tę umiejętność."
+      "connectionGone": "Połączenie z GitHub, które odczytało {{repo}}, już nie istnieje. Połącz ponownie GitHub, żeby zaktualizować tę umiejętność.",
+      "linkHoldsSeveral": "Pod linkiem jest teraz kilka umiejętności. Zainstaluj tę ponownie z jej własnego folderu.",
+      "linkRenamed": "Pod linkiem jest teraz umiejętność {{name}}.",
+      "noLink": "Z linku aktualizuje się tylko umiejętność z niego zainstalowana.",
+      "noPendingUpdate": "Żadna aktualizacja tej umiejętności nie czeka."
     },
     "agentGroup": {
       "notFound": "Ta grupa już nie istnieje.",
@@ -12393,6 +12454,8 @@
         "creatingChannel": "Utworzono kanał",
         "offeringConnectAi": "Zaproponowano połączenie AI",
         "offeringConnectApp": "Zaproponowano połączenie aplikacji",
+        "offeringSkill": "Zaproponowano instalację umiejętności",
+        "updatingSkills": "Zaktualizowano umiejętności",
         "offeringInvites": "Zaproponowano zaproszenie osób",
         "proposingAgent": "Zaproponowano agenta",
         "askingAgent": "Zapytano innego agenta",
@@ -12477,6 +12540,8 @@
       "creatingChannel": "tworzenie kanału",
       "offeringConnectAi": "przygotowywanie połączenia AI",
       "offeringConnectApp": "przygotowywanie połączenia aplikacji",
+      "offeringSkill": "przygotowywanie instalacji umiejętności",
+      "updatingSkills": "aktualizowanie umiejętności",
       "offeringInvites": "przygotowywanie zaproszeń",
       "proposingAgent": "proponowanie agenta",
       "askingAgent": "pytanie innego agenta",
@@ -12590,6 +12655,8 @@
       "action_connect_app": "Połącz {{name}}",
       "action_add_mcp": "Dodaj serwer MCP",
       "action_invite_people": "Zaproś osoby",
+      "action_install_skill": "Zainstaluj umiejętność",
+      "action_update_skills": "Zaktualizuj umiejętności",
       "agent_proposal": "Propozycja nowego agenta: {{name}}",
       "approval_request": "Prośba o zatwierdzenie: {{title}}",
       "secret_request": "{{agent}} prosi o klucz: {{name}}",
@@ -12803,6 +12870,14 @@
     "offer_invites": {
       "label": "Zaproponuj zaproszenie osób",
       "description": "Publikuje kartę z przyciskiem, który otwiera okno zaproszenia z wpisanymi adresami."
+    },
+    "offer_install_skill": {
+      "label": "Zaproponuj instalację umiejętności",
+      "description": "Publikuje kartę, której przycisk otwiera instalację z wpisanym linkiem umiejętności."
+    },
+    "update_skill_from_source": {
+      "label": "Aktualizuj umiejętności z ich linków",
+      "description": "Aktualizuje umiejętności z miejsca, z którego je zainstalowano. Zmiany w skryptach czekają na osobę."
     },
     "propose_agent": {
       "label": "Zaproponuj agenta",

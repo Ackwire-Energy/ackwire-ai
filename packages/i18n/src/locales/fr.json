@@ -2009,6 +2009,22 @@
       "done": "Invitation envoyée",
       "adminOnly": "Une personne autorisée à inviter l'envoie"
     },
+    "install_skill": {
+      "title": "Installer une compétence",
+      "open": "Installer",
+      "done": "Installée",
+      "adminOnly": "Une personne qui gère les agents l'installe"
+    },
+    "update_skills": {
+      "title_one": "Mettre à jour une compétence",
+      "title_many": "Mettre à jour {{count}} compétences",
+      "title_other": "Mettre à jour {{count}} compétences",
+      "update": "Mettre à jour",
+      "review": "Examiner",
+      "done": "À jour",
+      "waiting": "Attend un examen",
+      "adminOnly": "Une personne qui gère les agents la met à jour"
+    },
     "agentProposal": {
       "title": "{{agent}} propose un nouvel agent",
       "review": "Examiner",
@@ -6895,6 +6911,46 @@
     "saved": "{{name}} enregistrée.",
     "refresh": "Mettre à jour depuis le lien",
     "refreshed": "{{name}} mise à jour depuis son lien.",
+    "upToDate": "{{name}} a déjà ce que contient son lien.",
+    "waitingToast": "La mise à jour de {{name}} modifie des fichiers qui s'exécutent, elle attend donc un examen.",
+    "autoUpdate": "Se mettre à jour seule",
+    "autoUpdateHelp": "Lit son lien chaque jour. Le nouveau texte arrive avec Annuler. Les changements de scripts attendent une personne qui gère les compétences.",
+    "autoChip": "Se met à jour seule",
+    "waitingChip": "Mise à jour en attente",
+    "lastUpdate": "Mise à jour depuis son lien {{when}}",
+    "undoUpdate": "Annuler la mise à jour",
+    "undone": "{{name}} est revenue à la version {{version}}.",
+    "agentsImprove": "Les agents améliorent les compétences eux-mêmes",
+    "agentsImproveHelp": "Quand un agent trouve une compétence fausse ou incomplète, il la corrige tout de suite : une nouvelle version que vous pouvez annuler, et la personne qui l'a créée est prévenue. Les changements de scripts attendent une personne qui gère les compétences.",
+    "agentsImproveThis": "Les agents améliorent cette compétence eux-mêmes",
+    "agentChange": "{{agent}} l'a modifiée {{when}}",
+    "undoAgentChange": "Annuler la modification",
+    "pending": {
+      "title": "La mise à jour depuis son lien modifie des fichiers qui s'exécutent : {{files}}",
+      "lead": "Appliquez-la seulement si vous faites confiance à ces fichiers. Les agents les exécutent sur leurs ordinateurs.",
+      "edited": "La mise à jour depuis son lien remplacerait ce que les agents y ont changé",
+      "editedLead": "Applique-la pour prendre la version du lien. Tu pourras l'annuler ensuite.",
+      "apply": "Appliquer la mise à jour",
+      "dismiss": "Ne pas appliquer",
+      "applied": "{{name}} mise à jour depuis son lien.",
+      "changedAgain": "Son lien a encore changé. Examinez les nouveaux fichiers.",
+      "dismissed": "Mise à jour non appliquée. Un nouveau changement de son lien redemandera."
+    },
+    "updateFailed": {
+      "no_skill_md": "Mise à jour impossible : son lien n'a plus de SKILL.md.",
+      "connection_gone": "Mise à jour impossible : la connexion GitHub qui l'a lue n'existe plus.",
+      "link_holds_several": "Mise à jour impossible : son lien contient maintenant plusieurs compétences.",
+      "link_renamed": "Mise à jour impossible : son lien contient maintenant une autre compétence.",
+      "owner_gone": "Mise à jour impossible : la personne qui a activé la mise à jour automatique ne peut plus gérer les compétences. Réactivez-la.",
+      "other": "Mise à jour impossible depuis son lien."
+    },
+    "notice": {
+      "updated": "{{name}} a été mise à jour depuis son lien",
+      "waiting": "Une mise à jour de {{name}} modifie ses scripts",
+      "waitingEdited": "Une mise à jour de {{name}} remplacerait ce que les agents ont changé",
+      "failed": "{{name}} n'a pas pu se mettre à jour depuis son lien",
+      "edited": "Des agents ont amélioré {{name}}"
+    },
     "remove": "Retirer",
     "removeTitle": "Retirer {{name}} ?",
     "removeAgents_one": "{{names}} utilise cette compétence et n'y aura plus accès.",
@@ -10744,7 +10800,11 @@
       "invalidDescription": "La description doit compter de 1 à {{max}} caractères.",
       "tooLarge": "La compétence est trop volumineuse ({{max}} Mo maximum).",
       "tooManyFiles": "La compétence contient trop de fichiers ({{max}} maximum).",
-      "connectionGone": "La connexion GitHub qui a lu {{repo}} n'existe plus. Reconnectez GitHub pour mettre à jour cette compétence."
+      "connectionGone": "La connexion GitHub qui a lu {{repo}} n'existe plus. Reconnectez GitHub pour mettre à jour cette compétence.",
+      "linkHoldsSeveral": "Son lien contient maintenant plusieurs compétences. Installez celle-ci à nouveau depuis son propre dossier.",
+      "linkRenamed": "Son lien contient maintenant la compétence {{name}}.",
+      "noLink": "Seule une compétence installée depuis un lien se met à jour depuis celui-ci.",
+      "noPendingUpdate": "Aucune mise à jour de cette compétence n'est en attente."
     },
     "agentGroup": {
       "notFound": "Ce groupe n'existe plus.",
@@ -12069,6 +12129,8 @@
         "creatingChannel": "A créé un canal",
         "offeringConnectAi": "A proposé de connecter une IA",
         "offeringConnectApp": "A proposé de connecter une app",
+        "offeringSkill": "A proposé d'installer une compétence",
+        "updatingSkills": "A mis à jour des compétences",
         "offeringInvites": "A proposé d'inviter des personnes",
         "proposingAgent": "A proposé un agent",
         "askingAgent": "A interrogé un autre agent",
@@ -12153,6 +12215,8 @@
       "creatingChannel": "création d'un canal",
       "offeringConnectAi": "préparation de la connexion d'une IA",
       "offeringConnectApp": "préparation de la connexion d'une app",
+      "offeringSkill": "préparation de l'installation d'une compétence",
+      "updatingSkills": "mise à jour des compétences",
       "offeringInvites": "préparation des invitations",
       "proposingAgent": "proposition d'un agent",
       "askingAgent": "question à un autre agent",
@@ -12265,6 +12329,8 @@
       "action_connect_app": "Connecter {{name}}",
       "action_add_mcp": "Ajouter un serveur MCP",
       "action_invite_people": "Inviter des personnes",
+      "action_install_skill": "Installer une compétence",
+      "action_update_skills": "Mettre à jour des compétences",
       "agent_proposal": "A proposé un nouvel agent : {{name}}",
       "approval_request": "Demande d'approbation : {{title}}",
       "secret_request": "{{agent}} a demandé une clé : {{name}}",
@@ -12475,6 +12541,14 @@
     "offer_invites": {
       "label": "Proposer d'inviter des personnes",
       "description": "Publie une carte dont le bouton ouvre la fenêtre d'invitation avec les adresses déjà remplies."
+    },
+    "offer_install_skill": {
+      "label": "Proposer d'installer une compétence",
+      "description": "Publie une carte dont le bouton ouvre l'installation avec le lien de la compétence déjà rempli."
+    },
+    "update_skill_from_source": {
+      "label": "Mettre à jour les compétences depuis leurs liens",
+      "description": "Met à jour les compétences depuis l'endroit où elles ont été installées. Les changements de scripts attendent une personne."
     },
     "propose_agent": {
       "label": "Proposer un agent",

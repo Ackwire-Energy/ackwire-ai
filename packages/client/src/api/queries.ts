@@ -135,6 +135,7 @@ import type {
   SidebarSection,
   SkillInput,
   SkillPatch,
+  SkillSettings,
   SpeechKey,
   SpeechKeyInput,
   StartChoice,
@@ -3413,6 +3414,17 @@ export const useSkills = (orgId: string, enabled = true) => {
   return useQuery({ queryKey: keys.skills(orgId), queryFn: () => api.skills.list(orgId), enabled, retry: false });
 };
 
+/** "Agentes melhoram as skills sozinhos" for the workspace; on when the server doesn't say (older servers). */
+export const useSkillSettings = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.skillSettings(orgId),
+    queryFn: () => api.skills.settings?.(orgId) ?? Promise.resolve({ agentsImprove: true }),
+    enabled,
+    retry: false,
+  });
+};
+
 export const useSkill = (orgId: string, id: string | null) => {
   const api = useApi();
   return useQuery({
@@ -3482,6 +3494,8 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "remove"; id: string }
         | { type: "revert"; id: string }
         | { type: "restore"; id: string }
+        | { type: "updateFromSource" | "approveUpdate" | "dismissUpdate" | "undoUpdate"; id: string }
+        | { type: "settings"; settings: SkillSettings }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
       switch (action.type) {
@@ -3503,6 +3517,13 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
           return api.skills.revert?.(orgId, action.id) ?? Promise.resolve();
         case "restore":
           return api.skills.restore?.(orgId, action.id) ?? Promise.resolve();
+        case "updateFromSource":
+        case "approveUpdate":
+        case "dismissUpdate":
+        case "undoUpdate":
+          return api.skills[action.type]?.(orgId, action.id) ?? Promise.resolve();
+        case "settings":
+          return api.skills.saveSettings?.(orgId, action.settings) ?? Promise.resolve();
       }
     },
     // The library and every agent's lists (`keys.skills` is their prefix).

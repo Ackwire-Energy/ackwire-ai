@@ -4696,6 +4696,39 @@
   "actionCard.invite.adminOnly": {
     "value": "Someone who may invite sends it"
   },
+  "actionCard.install_skill.title": {
+    "value": "Install a skill"
+  },
+  "actionCard.install_skill.open": {
+    "value": "Install"
+  },
+  "actionCard.install_skill.done": {
+    "value": "Installed"
+  },
+  "actionCard.install_skill.adminOnly": {
+    "value": "Someone who manages agents installs it"
+  },
+  "actionCard.update_skills.title": {
+    "value": {
+      "one": "Update a skill",
+      "other": "Update {{count}} skills"
+    }
+  },
+  "actionCard.update_skills.update": {
+    "value": "Update"
+  },
+  "actionCard.update_skills.review": {
+    "value": "Review"
+  },
+  "actionCard.update_skills.done": {
+    "value": "Up to date"
+  },
+  "actionCard.update_skills.waiting": {
+    "value": "Waits for review"
+  },
+  "actionCard.update_skills.adminOnly": {
+    "value": "Someone who manages agents updates it"
+  },
   "actionCard.agentProposal.title": {
     "value": "{{agent}} proposes a new agent"
   },
@@ -16081,6 +16114,108 @@
   "skills.refreshed": {
     "value": "{{name}} updated from its link."
   },
+  "skills.upToDate": {
+    "value": "{{name}} already has what its link has."
+  },
+  "skills.waitingToast": {
+    "value": "The update of {{name}} changes files that run, so it waits for a review."
+  },
+  "skills.autoUpdate": {
+    "value": "Update by itself"
+  },
+  "skills.autoUpdateHelp": {
+    "value": "Reads its link every day. New text goes in with Undo. Changes to scripts wait for someone who manages skills."
+  },
+  "skills.autoChip": {
+    "value": "Updates by itself"
+  },
+  "skills.waitingChip": {
+    "value": "Update waiting"
+  },
+  "skills.lastUpdate": {
+    "value": "Updated from its link {{when}}"
+  },
+  "skills.undoUpdate": {
+    "value": "Undo update"
+  },
+  "skills.undone": {
+    "value": "{{name}} is back to version {{version}}."
+  },
+  "skills.agentsImprove": {
+    "value": "Agents improve skills by themselves"
+  },
+  "skills.agentsImproveHelp": {
+    "value": "When an agent finds a skill wrong or missing a step, it fixes it right away: a new version you can undo, and whoever made the skill is told. Changes to scripts wait for someone who manages skills."
+  },
+  "skills.agentsImproveThis": {
+    "value": "Agents improve this skill by themselves"
+  },
+  "skills.agentChange": {
+    "value": "{{agent}} changed it {{when}}"
+  },
+  "skills.undoAgentChange": {
+    "value": "Undo change"
+  },
+  "skills.pending.title": {
+    "value": "The update from its link changes files that run: {{files}}"
+  },
+  "skills.pending.lead": {
+    "value": "Apply it only if you trust these files. Agents run them on their computers."
+  },
+  "skills.pending.edited": {
+    "value": "The update from its link would replace what agents changed in it"
+  },
+  "skills.pending.editedLead": {
+    "value": "Apply it to take its link's version. You can undo it after."
+  },
+  "skills.pending.apply": {
+    "value": "Apply update"
+  },
+  "skills.pending.dismiss": {
+    "value": "Don't apply"
+  },
+  "skills.pending.applied": {
+    "value": "{{name}} updated from its link."
+  },
+  "skills.pending.changedAgain": {
+    "value": "Its link changed again. Review the new files."
+  },
+  "skills.pending.dismissed": {
+    "value": "Update not applied. A new change to its link asks again."
+  },
+  "skills.updateFailed.no_skill_md": {
+    "value": "Couldn't update it: its link no longer has a SKILL.md."
+  },
+  "skills.updateFailed.connection_gone": {
+    "value": "Couldn't update it: the GitHub connection that read it is gone."
+  },
+  "skills.updateFailed.link_holds_several": {
+    "value": "Couldn't update it: its link holds several skills now."
+  },
+  "skills.updateFailed.link_renamed": {
+    "value": "Couldn't update it: its link holds another skill now."
+  },
+  "skills.updateFailed.owner_gone": {
+    "value": "Couldn't update it: whoever turned on updating by itself can no longer manage skills. Turn it on again."
+  },
+  "skills.updateFailed.other": {
+    "value": "Couldn't update it from its link."
+  },
+  "skills.notice.updated": {
+    "value": "{{name}} was updated from its link"
+  },
+  "skills.notice.waiting": {
+    "value": "An update of {{name}} changes its scripts"
+  },
+  "skills.notice.waitingEdited": {
+    "value": "An update of {{name}} would replace what agents changed"
+  },
+  "skills.notice.failed": {
+    "value": "{{name}} couldn't update from its link"
+  },
+  "skills.notice.edited": {
+    "value": "Agents improved {{name}}"
+  },
   "skills.remove": {
     "value": "Remove"
   },
@@ -25045,6 +25180,18 @@
   "errors.skill.connectionGone": {
     "value": "The GitHub connection that read {{repo}} is gone. Connect GitHub again to update this skill."
   },
+  "errors.skill.linkHoldsSeveral": {
+    "value": "Its link holds several skills now. Install this one again from its own folder."
+  },
+  "errors.skill.linkRenamed": {
+    "value": "Its link holds the skill {{name}} now."
+  },
+  "errors.skill.noLink": {
+    "value": "Only a skill installed from a link updates from it."
+  },
+  "errors.skill.noPendingUpdate": {
+    "value": "No update of this skill is waiting."
+  },
   "errors.agentGroup.notFound": {
     "value": "This group no longer exists."
   },
@@ -28226,6 +28373,12 @@
   "chat.work.step.offeringConnectApp": {
     "value": "Offered to connect an app"
   },
+  "chat.work.step.offeringSkill": {
+    "value": "Offered to install a skill"
+  },
+  "chat.work.step.updatingSkills": {
+    "value": "Updated skills"
+  },
   "chat.work.step.offeringInvites": {
     "value": "Offered to invite people"
   },
@@ -28468,6 +28621,12 @@
   },
   "chat.activity.offeringConnectApp": {
     "value": "getting an app ready to connect"
+  },
+  "chat.activity.offeringSkill": {
+    "value": "getting a skill ready to install"
+  },
+  "chat.activity.updatingSkills": {
+    "value": "updating skills"
   },
   "chat.activity.offeringInvites": {
     "value": "getting invitations ready"
@@ -28774,6 +28933,12 @@
   },
   "chat.body.action_invite_people": {
     "value": "Invite people"
+  },
+  "chat.body.action_install_skill": {
+    "value": "Install a skill"
+  },
+  "chat.body.action_update_skills": {
+    "value": "Update skills"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
@@ -29119,6 +29284,18 @@
   },
   "builtinTools.offer_invites.description": {
     "value": "Posts a card whose button opens the invite dialog with the addresses filled in."
+  },
+  "builtinTools.offer_install_skill.label": {
+    "value": "Offer to install a skill"
+  },
+  "builtinTools.offer_install_skill.description": {
+    "value": "Posts a card whose button opens the install dialog with the skill's link filled in."
+  },
+  "builtinTools.update_skill_from_source.label": {
+    "value": "Update skills from their links"
+  },
+  "builtinTools.update_skill_from_source.description": {
+    "value": "Updates skills from where they were installed. Changes to scripts wait for a person."
   },
   "builtinTools.propose_agent.label": {
     "value": "Propose an agent"

@@ -2008,6 +2008,22 @@
       "done": "Invito inviato",
       "adminOnly": "Lo invia chi può invitare"
     },
+    "install_skill": {
+      "title": "Installa una skill",
+      "open": "Installa",
+      "done": "Installata",
+      "adminOnly": "La installa chi gestisce gli agenti"
+    },
+    "update_skills": {
+      "title_one": "Aggiorna una skill",
+      "title_many": "Aggiorna {{count}} skill",
+      "title_other": "Aggiorna {{count}} skill",
+      "update": "Aggiorna",
+      "review": "Rivedi",
+      "done": "Aggiornata",
+      "waiting": "Aspetta una revisione",
+      "adminOnly": "La aggiorna chi gestisce gli agenti"
+    },
     "agentProposal": {
       "title": "{{agent}} propone un nuovo agente",
       "review": "Rivedi",
@@ -6908,6 +6924,46 @@
     "saved": "{{name}} salvata.",
     "refresh": "Aggiorna dal link",
     "refreshed": "{{name}} aggiornata dal suo link.",
+    "upToDate": "{{name}} ha già quello che c'è nel suo link.",
+    "waitingToast": "L'aggiornamento di {{name}} cambia file che vengono eseguiti, quindi aspetta una revisione.",
+    "autoUpdate": "Aggiorna da sola",
+    "autoUpdateHelp": "Legge il suo link ogni giorno. Il testo nuovo entra con Annulla. Le modifiche agli script aspettano chi gestisce le skill.",
+    "autoChip": "Si aggiorna da sola",
+    "waitingChip": "Aggiornamento in attesa",
+    "lastUpdate": "Aggiornata dal suo link {{when}}",
+    "undoUpdate": "Annulla aggiornamento",
+    "undone": "{{name}} è tornata alla versione {{version}}.",
+    "agentsImprove": "Gli agenti migliorano le skill da soli",
+    "agentsImproveHelp": "Quando un agente trova una skill sbagliata o a cui manca un passo, la corregge subito: una nuova versione che puoi annullare, e chi ha creato la skill viene avvisato. Le modifiche agli script aspettano chi gestisce le skill.",
+    "agentsImproveThis": "Gli agenti migliorano questa skill da soli",
+    "agentChange": "{{agent}} l'ha modificata {{when}}",
+    "undoAgentChange": "Annulla modifica",
+    "pending": {
+      "title": "L'aggiornamento dal suo link cambia file che vengono eseguiti: {{files}}",
+      "lead": "Applicalo solo se ti fidi di questi file. Gli agenti li eseguono sui loro computer.",
+      "edited": "L'aggiornamento dal suo link sostituirebbe ciò che gli agenti vi hanno cambiato",
+      "editedLead": "Applicalo per prendere la versione del link. Puoi annullarlo dopo.",
+      "apply": "Applica aggiornamento",
+      "dismiss": "Non applicare",
+      "applied": "{{name}} aggiornata dal suo link.",
+      "changedAgain": "Il suo link è cambiato di nuovo. Rivedi i file nuovi.",
+      "dismissed": "Aggiornamento non applicato. Una nuova modifica al suo link chiederà di nuovo."
+    },
+    "updateFailed": {
+      "no_skill_md": "Impossibile aggiornarla: il suo link non ha più un SKILL.md.",
+      "connection_gone": "Impossibile aggiornarla: il collegamento GitHub che l'ha letta non c'è più.",
+      "link_holds_several": "Impossibile aggiornarla: il suo link ora contiene più skill.",
+      "link_renamed": "Impossibile aggiornarla: il suo link ora contiene un'altra skill.",
+      "owner_gone": "Impossibile aggiornarla: chi ha attivato l'aggiornamento automatico non può più gestire le skill. Riattivalo.",
+      "other": "Impossibile aggiornarla dal suo link."
+    },
+    "notice": {
+      "updated": "{{name}} è stata aggiornata dal suo link",
+      "waiting": "Un aggiornamento di {{name}} cambia i suoi script",
+      "waitingEdited": "Un aggiornamento di {{name}} sostituirebbe ciò che gli agenti hanno cambiato",
+      "failed": "{{name}} non è riuscita ad aggiornarsi dal suo link",
+      "edited": "Gli agenti hanno migliorato {{name}}"
+    },
     "remove": "Rimuovi",
     "removeTitle": "Rimuovere {{name}}?",
     "removeAgents_one": "{{names}} usa questa skill e non potrà più accedervi.",
@@ -10751,7 +10807,11 @@
       "invalidDescription": "La descrizione deve avere da 1 a {{max}} caratteri.",
       "tooLarge": "La skill è troppo grande (massimo {{max}} MB).",
       "tooManyFiles": "La skill ha troppi file (massimo {{max}}).",
-      "connectionGone": "Il collegamento GitHub che ha letto {{repo}} non c'è più. Ricollega GitHub per aggiornare questa skill."
+      "connectionGone": "Il collegamento GitHub che ha letto {{repo}} non c'è più. Ricollega GitHub per aggiornare questa skill.",
+      "linkHoldsSeveral": "Il suo link ora contiene più skill. Installa di nuovo questa dalla sua cartella.",
+      "linkRenamed": "Il suo link ora contiene la skill {{name}}.",
+      "noLink": "Solo una skill installata da un link si aggiorna da lì.",
+      "noPendingUpdate": "Nessun aggiornamento di questa skill è in attesa."
     },
     "agentGroup": {
       "notFound": "Questo gruppo non esiste più.",
@@ -12070,6 +12130,8 @@
         "creatingChannel": "Ha creato un canale",
         "offeringConnectAi": "Ha proposto di collegare un'IA",
         "offeringConnectApp": "Ha proposto di collegare un'app",
+        "offeringSkill": "Ha proposto di installare una skill",
+        "updatingSkills": "Ha aggiornato le skill",
         "offeringInvites": "Ha proposto di invitare persone",
         "proposingAgent": "Ha proposto un agente",
         "askingAgent": "Ha chiesto a un altro agente",
@@ -12154,6 +12216,8 @@
       "creatingChannel": "creando un canale",
       "offeringConnectAi": "preparando il collegamento di un'IA",
       "offeringConnectApp": "preparando il collegamento di un'app",
+      "offeringSkill": "preparando l'installazione di una skill",
+      "updatingSkills": "aggiornando le skill",
       "offeringInvites": "preparando gli inviti",
       "proposingAgent": "proponendo un agente",
       "askingAgent": "chiedendo a un altro agente",
@@ -12266,6 +12330,8 @@
       "action_connect_app": "Collega {{name}}",
       "action_add_mcp": "Aggiungi un server MCP",
       "action_invite_people": "Invita persone",
+      "action_install_skill": "Installa una skill",
+      "action_update_skills": "Aggiorna le skill",
       "agent_proposal": "Ha proposto un nuovo agente: {{name}}",
       "approval_request": "Richiesta di approvazione: {{title}}",
       "secret_request": "{{agent}} ha chiesto una chiave: {{name}}",
@@ -12476,6 +12542,14 @@
     "offer_invites": {
       "label": "Proponi di invitare persone",
       "description": "Pubblica una scheda il cui pulsante apre la finestra di invito con gli indirizzi già compilati."
+    },
+    "offer_install_skill": {
+      "label": "Proponi di installare una skill",
+      "description": "Pubblica una scheda il cui pulsante apre l'installazione con il link della skill già inserito."
+    },
+    "update_skill_from_source": {
+      "label": "Aggiorna le skill dai loro link",
+      "description": "Aggiorna le skill da dove sono state installate. Le modifiche agli script aspettano una persona."
     },
     "propose_agent": {
       "label": "Proponi un agente",

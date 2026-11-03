@@ -95,6 +95,7 @@ export const settingsSearch = (
   do?: "approve" | "deny";
   delete?: 1;
   install?: string;
+  skill?: string;
 } => ({
   connected: typeof search.connected === "string" ? search.connected : undefined,
   outcome: typeof search.outcome === "string" ? search.outcome : undefined,
@@ -105,4 +106,5 @@ export const settingsSearch = (
   do: search.do === "approve" || search.do === "deny" ? search.do : undefined,
   delete: search.delete === undefined ? undefined : 1,
   install: typeof search.install === "string" ? search.install : undefined,
+  skill: typeof search.skill === "string" ? search.skill : undefined,
 });

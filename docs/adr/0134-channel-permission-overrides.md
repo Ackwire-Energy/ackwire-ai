@@ -3,7 +3,7 @@
 - Status: Accepted (built)
 - Date: 2026-11-03
 - Extends: ADR 0085 (roles and permissions, "Next: exceptions per channel"), 0125 (who sees a channel)
-- Code: `packages/db/src/schema/chat.ts` (`channel_permission_overrides`), migration `0195_channel_permissions.sql`;
+- Code: `packages/db/src/schema/chat.ts` (`channel_permission_overrides`), migration `0194_channel_permissions.sql`;
   `packages/engine/src/permissions.ts` (`CHANNEL_KEYS`, `channelPermissions`, `channelMaySql`, `channelOverridesSql`),
   `channels.ts` (`requireChannelAccess`, `managesChannel`, `listChannels` `can`, `postRefusal`),
   `channel-permissions.ts` (`listChannelOverrides`, `setChannelOverride`), `audience.ts` (`audienceSql` with

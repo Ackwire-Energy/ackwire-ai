@@ -1872,6 +1872,20 @@
       "done": "초대 보냄",
       "adminOnly": "초대할 수 있는 사람이 보내요"
     },
+    "install_skill": {
+      "title": "스킬 설치",
+      "open": "설치",
+      "done": "설치됨",
+      "adminOnly": "에이전트를 관리하는 사람이 설치해요"
+    },
+    "update_skills": {
+      "title_other": "스킬 {{count}}개 업데이트",
+      "update": "업데이트",
+      "review": "검토",
+      "done": "최신이에요",
+      "waiting": "검토 대기 중",
+      "adminOnly": "에이전트를 관리하는 사람이 업데이트해요"
+    },
     "agentProposal": {
       "title": "{{agent}}이(가) 새 에이전트를 제안해요",
       "review": "검토",
@@ -6330,6 +6344,46 @@
     "saved": "{{name}}을(를) 저장했어요.",
     "refresh": "링크에서 업데이트",
     "refreshed": "{{name}}을(를) 링크에서 업데이트했어요.",
+    "upToDate": "{{name}}은(는) 이미 링크와 같아요.",
+    "waitingToast": "{{name}} 업데이트는 실행되는 파일을 바꿔서 검토를 기다려요.",
+    "autoUpdate": "자동으로 업데이트",
+    "autoUpdateHelp": "매일 링크를 읽어요. 새 텍스트는 실행 취소할 수 있게 반영돼요. 스크립트 변경은 스킬을 관리하는 사람을 기다려요.",
+    "autoChip": "자동으로 업데이트돼요",
+    "waitingChip": "업데이트 대기 중",
+    "lastUpdate": "{{when}} 링크에서 업데이트됨",
+    "undoUpdate": "업데이트 실행 취소",
+    "undone": "{{name}}을(를) 버전 {{version}}(으)로 되돌렸어요.",
+    "agentsImprove": "에이전트가 스킬을 스스로 개선해요",
+    "agentsImproveHelp": "에이전트가 스킬이 틀렸거나 단계가 빠진 걸 발견하면 바로 고쳐요. 새 버전은 실행 취소할 수 있고, 스킬을 만든 사람에게 알려요. 스크립트 변경은 스킬을 관리하는 사람을 기다려요.",
+    "agentsImproveThis": "에이전트가 이 스킬을 스스로 개선해요",
+    "agentChange": "{{agent}}이(가) {{when}} 변경함",
+    "undoAgentChange": "변경 실행 취소",
+    "pending": {
+      "title": "링크에서 받은 업데이트가 실행되는 파일을 바꿔요: {{files}}",
+      "lead": "이 파일들을 믿을 수 있을 때만 적용하세요. 에이전트가 자기 컴퓨터에서 이 파일들을 실행해요.",
+      "edited": "링크에서 받은 업데이트가 에이전트가 바꾼 내용을 덮어써요",
+      "editedLead": "링크의 버전으로 바꾸려면 적용하세요. 나중에 되돌릴 수 있어요.",
+      "apply": "업데이트 적용",
+      "dismiss": "적용하지 않기",
+      "applied": "{{name}}을(를) 링크에서 업데이트했어요.",
+      "changedAgain": "링크가 또 바뀌었어요. 새 파일을 검토하세요.",
+      "dismissed": "업데이트를 적용하지 않았어요. 링크가 새로 바뀌면 다시 물어봐요."
+    },
+    "updateFailed": {
+      "no_skill_md": "업데이트할 수 없어요: 링크에 SKILL.md가 더 이상 없어요.",
+      "connection_gone": "업데이트할 수 없어요: 읽어 온 GitHub 연결이 없어졌어요.",
+      "link_holds_several": "업데이트할 수 없어요: 링크에 이제 스킬이 여러 개 있어요.",
+      "link_renamed": "업데이트할 수 없어요: 링크에 이제 다른 스킬이 있어요.",
+      "owner_gone": "업데이트할 수 없어요: 자동 업데이트를 켠 사람이 더 이상 스킬을 관리할 수 없어요. 다시 켜 주세요.",
+      "other": "링크에서 업데이트할 수 없었어요."
+    },
+    "notice": {
+      "updated": "{{name}}이(가) 링크에서 업데이트됐어요",
+      "waiting": "{{name}} 업데이트가 스크립트를 바꿔요",
+      "waitingEdited": "{{name}} 업데이트가 에이전트가 바꾼 내용을 덮어써요",
+      "failed": "{{name}}을(를) 링크에서 업데이트하지 못했어요",
+      "edited": "에이전트가 {{name}}을(를) 개선했어요"
+    },
     "remove": "삭제",
     "removeTitle": "{{name}}을(를) 삭제할까요?",
     "removeAgents_other": "{{names}}이(가) 이 스킬을 사용하고 있어서 더 이상 쓸 수 없게 돼요.",
@@ -9937,7 +9991,11 @@
       "invalidDescription": "설명은 1~{{max}}자여야 해요.",
       "tooLarge": "스킬이 너무 커요(최대 {{max}}MB).",
       "tooManyFiles": "스킬의 파일이 너무 많아요(최대 {{max}}개).",
-      "connectionGone": "{{repo}}을(를) 읽은 GitHub 연결이 없어졌어요. 이 스킬을 업데이트하려면 GitHub를 다시 연결하세요."
+      "connectionGone": "{{repo}}을(를) 읽은 GitHub 연결이 없어졌어요. 이 스킬을 업데이트하려면 GitHub를 다시 연결하세요.",
+      "linkHoldsSeveral": "링크에 이제 스킬이 여러 개 있어요. 이 스킬의 폴더에서 다시 설치하세요.",
+      "linkRenamed": "링크에 이제 {{name}} 스킬이 있어요.",
+      "noLink": "링크에서 설치한 스킬만 그 링크에서 업데이트돼요.",
+      "noPendingUpdate": "이 스킬의 대기 중인 업데이트가 없어요."
     },
     "agentGroup": {
       "notFound": "이 그룹은 더 이상 없어요.",
@@ -11183,6 +11241,8 @@
         "creatingChannel": "채널을 만들었어요",
         "offeringConnectAi": "AI 연결을 제안했어요",
         "offeringConnectApp": "앱 연결을 제안했어요",
+        "offeringSkill": "스킬 설치를 제안했어요",
+        "updatingSkills": "스킬을 업데이트했어요",
         "offeringInvites": "사람 초대를 제안했어요",
         "proposingAgent": "에이전트를 제안했어요",
         "askingAgent": "다른 에이전트에게 물었어요",
@@ -11267,6 +11327,8 @@
       "creatingChannel": "채널을 만드는 중",
       "offeringConnectAi": "AI 연결을 준비하는 중",
       "offeringConnectApp": "앱 연결을 준비하는 중",
+      "offeringSkill": "스킬 설치를 준비하는 중",
+      "updatingSkills": "스킬을 업데이트하는 중",
       "offeringInvites": "초대를 준비하는 중",
       "proposingAgent": "에이전트를 제안하는 중",
       "askingAgent": "다른 에이전트에게 묻는 중",
@@ -11376,6 +11438,8 @@
       "action_connect_app": "{{name}} 연결",
       "action_add_mcp": "MCP 서버 추가",
       "action_invite_people": "사람 초대",
+      "action_install_skill": "스킬 설치",
+      "action_update_skills": "스킬 업데이트",
       "agent_proposal": "새 에이전트를 제안했어요: {{name}}",
       "approval_request": "승인 요청: {{title}}",
       "secret_request": "{{agent}}이(가) 키를 요청했어요: {{name}}",
@@ -11580,6 +11644,14 @@
     "offer_invites": {
       "label": "사람 초대 제안",
       "description": "주소가 미리 입력된 초대 대화상자를 여는 버튼이 있는 카드를 게시해요."
+    },
+    "offer_install_skill": {
+      "label": "스킬 설치 제안",
+      "description": "스킬 링크가 채워진 설치 화면을 여는 버튼이 있는 카드를 올려요."
+    },
+    "update_skill_from_source": {
+      "label": "링크에서 스킬 업데이트",
+      "description": "스킬을 설치한 곳에서 업데이트해요. 스크립트 변경은 사람을 기다려요."
     },
     "propose_agent": {
       "label": "에이전트 제안",

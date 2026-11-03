@@ -1884,6 +1884,20 @@
       "done": "Undangan terkirim",
       "adminOnly": "Orang yang boleh mengundang yang mengirimnya"
     },
+    "install_skill": {
+      "title": "Pasang skill",
+      "open": "Pasang",
+      "done": "Terpasang",
+      "adminOnly": "Orang yang mengelola agen yang memasangnya"
+    },
+    "update_skills": {
+      "title_other": "Perbarui {{count}} skill",
+      "update": "Perbarui",
+      "review": "Tinjau",
+      "done": "Sudah terbaru",
+      "waiting": "Menunggu tinjauan",
+      "adminOnly": "Orang yang mengelola agen yang memperbaruinya"
+    },
     "agentProposal": {
       "title": "{{agent}} mengusulkan agen baru",
       "review": "Tinjau",
@@ -6386,6 +6400,46 @@
     "saved": "{{name}} disimpan.",
     "refresh": "Perbarui dari tautan",
     "refreshed": "{{name}} diperbarui dari tautannya.",
+    "upToDate": "{{name}} sudah sama dengan isi tautannya.",
+    "waitingToast": "Pembaruan {{name}} mengubah file yang dijalankan, jadi menunggu tinjauan.",
+    "autoUpdate": "Perbarui sendiri",
+    "autoUpdateHelp": "Membaca tautannya setiap hari. Teks baru masuk dengan Urungkan. Perubahan skrip menunggu orang yang mengelola skill.",
+    "autoChip": "Diperbarui sendiri",
+    "waitingChip": "Pembaruan menunggu",
+    "lastUpdate": "Diperbarui dari tautannya {{when}}",
+    "undoUpdate": "Urungkan pembaruan",
+    "undone": "{{name}} kembali ke versi {{version}}.",
+    "agentsImprove": "Agen memperbaiki skill sendiri",
+    "agentsImproveHelp": "Saat agen menemukan skill yang salah atau kurang satu langkah, agen langsung memperbaikinya: versi baru yang bisa kamu urungkan, dan pembuat skill diberi tahu. Perubahan skrip menunggu orang yang mengelola skill.",
+    "agentsImproveThis": "Agen memperbaiki skill ini sendiri",
+    "agentChange": "{{agent}} mengubahnya {{when}}",
+    "undoAgentChange": "Urungkan perubahan",
+    "pending": {
+      "title": "Pembaruan dari tautannya mengubah file yang dijalankan: {{files}}",
+      "lead": "Terapkan hanya jika kamu memercayai file ini. Agen menjalankannya di komputer mereka.",
+      "edited": "Pembaruan dari tautannya akan mengganti apa yang diubah agen di dalamnya",
+      "editedLead": "Terapkan untuk memakai versi dari tautannya. Kamu bisa membatalkannya nanti.",
+      "apply": "Terapkan pembaruan",
+      "dismiss": "Jangan terapkan",
+      "applied": "{{name}} diperbarui dari tautannya.",
+      "changedAgain": "Tautannya berubah lagi. Tinjau file yang baru.",
+      "dismissed": "Pembaruan tidak diterapkan. Perubahan baru di tautannya akan bertanya lagi."
+    },
+    "updateFailed": {
+      "no_skill_md": "Tidak bisa memperbarui: tautannya tidak punya SKILL.md lagi.",
+      "connection_gone": "Tidak bisa memperbarui: koneksi GitHub yang membacanya sudah tidak ada.",
+      "link_holds_several": "Tidak bisa memperbarui: tautannya sekarang berisi beberapa skill.",
+      "link_renamed": "Tidak bisa memperbarui: tautannya sekarang berisi skill lain.",
+      "owner_gone": "Tidak bisa memperbarui: orang yang menyalakan pembaruan otomatis tidak bisa mengelola skill lagi. Nyalakan lagi.",
+      "other": "Tidak bisa memperbarui dari tautannya."
+    },
+    "notice": {
+      "updated": "{{name}} diperbarui dari tautannya",
+      "waiting": "Pembaruan {{name}} mengubah skripnya",
+      "waitingEdited": "Pembaruan {{name}} akan mengganti apa yang diubah agen",
+      "failed": "{{name}} tidak bisa diperbarui dari tautannya",
+      "edited": "Agen memperbaiki {{name}}"
+    },
     "remove": "Hapus",
     "removeTitle": "Hapus {{name}}?",
     "removeAgents_other": "{{names}} memakai skill ini dan akan kehilangan aksesnya.",
@@ -10012,7 +10066,11 @@
       "invalidDescription": "Deskripsi harus terdiri dari 1 sampai {{max}} karakter.",
       "tooLarge": "Skill terlalu besar (maks {{max}} MB).",
       "tooManyFiles": "Skill punya terlalu banyak file (maks {{max}}).",
-      "connectionGone": "Koneksi GitHub yang membaca {{repo}} sudah tidak ada. Hubungkan GitHub lagi untuk memperbarui skill ini."
+      "connectionGone": "Koneksi GitHub yang membaca {{repo}} sudah tidak ada. Hubungkan GitHub lagi untuk memperbarui skill ini.",
+      "linkHoldsSeveral": "Tautannya sekarang berisi beberapa skill. Pasang skill ini lagi dari foldernya sendiri.",
+      "linkRenamed": "Tautannya sekarang berisi skill {{name}}.",
+      "noLink": "Hanya skill yang dipasang dari tautan yang diperbarui dari tautan itu.",
+      "noPendingUpdate": "Tidak ada pembaruan skill ini yang menunggu."
     },
     "agentGroup": {
       "notFound": "Grup ini sudah tidak ada.",
@@ -11260,6 +11318,8 @@
         "creatingChannel": "Membuat kanal",
         "offeringConnectAi": "Menawarkan menghubungkan AI",
         "offeringConnectApp": "Menawarkan menghubungkan aplikasi",
+        "offeringSkill": "Menawarkan memasang skill",
+        "updatingSkills": "Memperbarui skill",
         "offeringInvites": "Menawarkan mengundang orang",
         "proposingAgent": "Mengusulkan agen",
         "askingAgent": "Bertanya ke agen lain",
@@ -11344,6 +11404,8 @@
       "creatingChannel": "membuat kanal",
       "offeringConnectAi": "menyiapkan AI untuk dihubungkan",
       "offeringConnectApp": "menyiapkan aplikasi untuk dihubungkan",
+      "offeringSkill": "menyiapkan skill untuk dipasang",
+      "updatingSkills": "memperbarui skill",
       "offeringInvites": "menyiapkan undangan",
       "proposingAgent": "mengusulkan agen",
       "askingAgent": "bertanya ke agen lain",
@@ -11453,6 +11515,8 @@
       "action_connect_app": "Hubungkan {{name}}",
       "action_add_mcp": "Tambah server MCP",
       "action_invite_people": "Undang orang",
+      "action_install_skill": "Pasang skill",
+      "action_update_skills": "Perbarui skill",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
       "secret_request": "{{agent}} meminta kunci: {{name}}",
@@ -11657,6 +11721,14 @@
     "offer_invites": {
       "label": "Tawarkan mengundang orang",
       "description": "Memposting kartu yang tombolnya membuka dialog undangan dengan alamat yang sudah terisi."
+    },
+    "offer_install_skill": {
+      "label": "Tawarkan memasang skill",
+      "description": "Memposting kartu yang tombolnya membuka pemasangan dengan tautan skill sudah terisi."
+    },
+    "update_skill_from_source": {
+      "label": "Perbarui skill dari tautannya",
+      "description": "Memperbarui skill dari tempat skill dipasang. Perubahan skrip menunggu seseorang."
     },
     "propose_agent": {
       "label": "Usulkan agen",

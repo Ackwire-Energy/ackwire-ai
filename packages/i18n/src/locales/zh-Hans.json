@@ -1878,6 +1878,20 @@
       "done": "已发送邀请",
       "adminOnly": "由有邀请权限的人发送"
     },
+    "install_skill": {
+      "title": "安装技能",
+      "open": "安装",
+      "done": "已安装",
+      "adminOnly": "由管理智能体的人安装"
+    },
+    "update_skills": {
+      "title_other": "更新 {{count}} 个技能",
+      "update": "更新",
+      "review": "审核",
+      "done": "已是最新",
+      "waiting": "等待审核",
+      "adminOnly": "由管理智能体的人更新"
+    },
     "agentProposal": {
       "title": "{{agent}} 提议创建一个新智能体",
       "review": "查看",
@@ -6386,6 +6400,46 @@
     "saved": "已保存 {{name}}。",
     "refresh": "从链接更新",
     "refreshed": "已从链接更新 {{name}}。",
+    "upToDate": "{{name}} 已经和链接中的内容一致。",
+    "waitingToast": "{{name}} 的更新会修改会运行的文件，所以要等审核。",
+    "autoUpdate": "自动更新",
+    "autoUpdateHelp": "每天读取它的链接。新文本会生效，可撤销。脚本的改动要等管理技能的人处理。",
+    "autoChip": "自动更新",
+    "waitingChip": "更新待处理",
+    "lastUpdate": "{{when}}从链接更新",
+    "undoUpdate": "撤销更新",
+    "undone": "{{name}} 已回到版本 {{version}}。",
+    "agentsImprove": "智能体自行改进技能",
+    "agentsImproveHelp": "智能体发现技能有误或缺少步骤时，会立即修正：生成一个可撤销的新版本，并通知技能的创建者。脚本的改动要等管理技能的人处理。",
+    "agentsImproveThis": "智能体自行改进此技能",
+    "agentChange": "{{agent}} {{when}}修改了它",
+    "undoAgentChange": "撤销修改",
+    "pending": {
+      "title": "来自链接的更新会修改会运行的文件：{{files}}",
+      "lead": "只有在你信任这些文件时才应用。智能体会在它们的电脑上运行这些文件。",
+      "edited": "来自链接的更新会替换智能体对它做的修改",
+      "editedLead": "应用后使用链接中的版本。之后可以撤销。",
+      "apply": "应用更新",
+      "dismiss": "不应用",
+      "applied": "已从链接更新 {{name}}。",
+      "changedAgain": "链接又变了。请审核新的文件。",
+      "dismissed": "未应用更新。链接再有新改动时会再次询问。"
+    },
+    "updateFailed": {
+      "no_skill_md": "无法更新：链接里已经没有 SKILL.md。",
+      "connection_gone": "无法更新：读取它的 GitHub 连接已失效。",
+      "link_holds_several": "无法更新：链接里现在有多个技能。",
+      "link_renamed": "无法更新：链接里现在是另一个技能。",
+      "owner_gone": "无法更新：开启自动更新的人已不能管理技能。请重新开启。",
+      "other": "无法从链接更新。"
+    },
+    "notice": {
+      "updated": "{{name}} 已从链接更新",
+      "waiting": "{{name}} 的一个更新会修改它的脚本",
+      "waitingEdited": "{{name}} 的更新会替换智能体做的修改",
+      "failed": "{{name}} 无法从链接更新",
+      "edited": "智能体改进了 {{name}}"
+    },
     "remove": "移除",
     "removeTitle": "移除 {{name}}？",
     "removeAgents_other": "{{names}} 正在使用这个技能，移除后将无法再使用。",
@@ -10022,7 +10076,11 @@
       "invalidDescription": "描述需为 1 到 {{max}} 个字符。",
       "tooLarge": "技能太大（最大 {{max}} MB）。",
       "tooManyFiles": "技能的文件太多（最多 {{max}} 个）。",
-      "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。"
+      "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。",
+      "linkHoldsSeveral": "链接里现在有多个技能。请从这个技能自己的文件夹重新安装。",
+      "linkRenamed": "链接里现在是技能 {{name}}。",
+      "noLink": "只有从链接安装的技能才会从链接更新。",
+      "noPendingUpdate": "这个技能没有待处理的更新。"
     },
     "agentGroup": {
       "notFound": "这个分组已不存在。",
@@ -11275,6 +11333,8 @@
         "creatingChannel": "创建了频道",
         "offeringConnectAi": "提议连接 AI",
         "offeringConnectApp": "提议连接一个应用",
+        "offeringSkill": "提议安装一个技能",
+        "updatingSkills": "更新了技能",
         "offeringInvites": "提议邀请成员",
         "proposingAgent": "提议了智能体",
         "askingAgent": "询问了另一个智能体",
@@ -11359,6 +11419,8 @@
       "creatingChannel": "创建频道",
       "offeringConnectAi": "准备连接 AI",
       "offeringConnectApp": "准备连接应用",
+      "offeringSkill": "准备安装技能",
+      "updatingSkills": "正在更新技能",
       "offeringInvites": "准备邀请",
       "proposingAgent": "提议智能体",
       "askingAgent": "询问另一个智能体",
@@ -11469,6 +11531,8 @@
       "action_connect_app": "连接 {{name}}",
       "action_add_mcp": "添加 MCP 服务器",
       "action_invite_people": "邀请成员",
+      "action_install_skill": "安装技能",
+      "action_update_skills": "更新技能",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "approval_request": "审批请求：{{title}}",
       "secret_request": "{{agent}} 请求了一个密钥：{{name}}",
@@ -11673,6 +11737,14 @@
     "offer_invites": {
       "label": "提议邀请成员",
       "description": "发布一张卡片，点击按钮即可打开已填好地址的邀请对话框。"
+    },
+    "offer_install_skill": {
+      "label": "提议安装技能",
+      "description": "发布一张卡片，按钮会打开已填好技能链接的安装窗口。"
+    },
+    "update_skill_from_source": {
+      "label": "从链接更新技能",
+      "description": "从安装来源更新技能。脚本的改动要等人处理。"
     },
     "propose_agent": {
       "label": "提议创建智能体",

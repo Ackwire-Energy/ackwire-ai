@@ -3441,8 +3441,33 @@ export interface Skill {
   locked?: boolean;
   useCount?: number;
   lastUsedAt?: string | null;
+  /** "Atualizar sozinha": read from its link every day (older servers leave these out). */
+  autoUpdate?: boolean;
+  /** When its link was last read to update it. */
+  checkedAt?: string | null;
+  /**
+   * An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or would
+   * replace what agents changed since (`edited`, left out by older servers).
+   */
+  pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean; edited?: boolean } | null;
+  /** Why its last update from its link failed: a code (`skill.no_skill_md`, `skill.connection_gone`…). */
+  updateError?: string | null;
+  /** Its last update from its link, or an agent's last change to it (`agentId`), while Desfazer can take it back. */
+  lastUpdate?: { fromVersion: number; at: string; agentId?: string | null } | null;
+  /** "Agentes melhoram as skills sozinhos" set for this skill; null: the workspace's setting. */
+  agentsImprove?: boolean | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * An update from a skill's link: `waiting` when it adds or changes files that run (`scripts`), which a person who
+ * manages skills applies or refuses.
+ */
+export interface SkillSourceUpdate {
+  status: "unchanged" | "updated" | "waiting";
+  skill: SkillDetail;
+  scripts?: string[];
 }
 
 export interface SkillFile {
@@ -3507,6 +3532,15 @@ export interface SkillPatch {
   defaultForNewAgents?: boolean;
   /** Freeze it: agents can't change it. */
   locked?: boolean;
+  /** Update it from its link every day, with the rights of whoever turns it on. */
+  autoUpdate?: boolean;
+  /** Agents improve it by themselves; null follows the workspace. */
+  agentsImprove?: boolean | null;
+}
+
+/** The workspace's skill settings: "Agentes melhoram as skills sozinhos" (on by default). */
+export interface SkillSettings {
+  agentsImprove: boolean;
 }
 
 /** A skill an agent made from its own how-tos (ADR 0120), archived ones too. */
@@ -5509,7 +5543,13 @@ export type NotificationKind =
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
-  | "app_created";
+  | "app_created"
+  /**
+   * An update of a skill from its link: `latest.statusTo` `updated`, `waiting` (it changes files that run: who manages
+   * skills, waiting, the files in `latest.title`) or `failed` (`latest.reason` its code). `source.skillId`, its name in
+   * `source.label`. Opens the skill.
+   */
+  | "skill_update";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5530,6 +5570,8 @@ export interface NotificationSource {
   questionId?: string;
   missionId?: string;
   routineId?: string;
+  /** `skill_update`: the skill. */
+  skillId?: string;
   /** `machine_connected`: the computer. */
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */

@@ -1,6 +1,6 @@
 {
-  "id": "25d8b5fe-8ec5-4026-9b08-b00295dc03f0",
-  "prevId": "9b86b9e0-e581-44cd-81ec-1ecb4f8ef971",
+  "id": "1e66df6a-b38d-4489-96fa-d9b09db865c1",
+  "prevId": "25d8b5fe-8ec5-4026-9b08-b00295dc03f0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2780,143 +2780,6 @@
         "channel_members_one_member": {
           "name": "channel_members_one_member",
           "value": "(\"channel_members\".\"user_id\" is null) <> (\"channel_members\".\"agent_id\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.channel_permission_overrides": {
-      "name": "channel_permission_overrides",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role_id": {
-          "name": "role_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "allow": {
-          "name": "allow",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "deny": {
-          "name": "deny",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "channel_permission_overrides_org_id_channel_id_channels_org_id_id_fk": {
-          "name": "channel_permission_overrides_org_id_channel_id_channels_org_id_id_fk",
-          "tableFrom": "channel_permission_overrides",
-          "tableTo": "channels",
-          "columnsFrom": [
-            "org_id",
-            "channel_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "channel_permission_overrides_org_id_role_id_org_roles_org_id_id_fk": {
-          "name": "channel_permission_overrides_org_id_role_id_org_roles_org_id_id_fk",
-          "tableFrom": "channel_permission_overrides",
-          "tableTo": "org_roles",
-          "columnsFrom": [
-            "org_id",
-            "role_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "channel_permission_overrides_org_id_user_id_organization_members_org_id_user_id_fk": {
-          "name": "channel_permission_overrides_org_id_user_id_organization_members_org_id_user_id_fk",
-          "tableFrom": "channel_permission_overrides",
-          "tableTo": "organization_members",
-          "columnsFrom": [
-            "org_id",
-            "user_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "user_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "channel_permission_overrides_channelId_roleId_unique": {
-          "name": "channel_permission_overrides_channelId_roleId_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "channel_id",
-            "role_id"
-          ]
-        },
-        "channel_permission_overrides_channelId_userId_unique": {
-          "name": "channel_permission_overrides_channelId_userId_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "channel_id",
-            "user_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "channel_permission_overrides_one_target": {
-          "name": "channel_permission_overrides_one_target",
-          "value": "(\"channel_permission_overrides\".\"role_id\" is null) <> (\"channel_permission_overrides\".\"user_id\" is null)"
-        },
-        "channel_permission_overrides_keys": {
-          "name": "channel_permission_overrides_keys",
-          "value": "not (\"channel_permission_overrides\".\"allow\" && \"channel_permission_overrides\".\"deny\") and \"channel_permission_overrides\".\"allow\" <@ array['post', 'talk_to_agents', 'manage_channels']::text[]\n        and \"channel_permission_overrides\".\"deny\" <@ array['post', 'talk_to_agents', 'manage_channels']::text[]"
         }
       },
       "isRLSEnabled": false
@@ -16265,6 +16128,49 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "last_update": {
+          "name": "last_update",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pending_update": {
+          "name": "pending_update",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_hash": {
+          "name": "source_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "update_error": {
+          "name": "update_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auto_update": {
+          "name": "auto_update",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "checked_at": {
+          "name": "checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auto_update_user_id": {
+          "name": "auto_update_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -16317,6 +16223,19 @@
           "tableTo": "agents",
           "columnsFrom": [
             "owner_agent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "skills_auto_update_user_id_users_id_fk": {
+          "name": "skills_auto_update_user_id_users_id_fk",
+          "tableFrom": "skills",
+          "tableTo": "users",
+          "columnsFrom": [
+            "auto_update_user_id"
           ],
           "columnsTo": [
             "id"
@@ -22433,6 +22352,143 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.channel_permission_overrides": {
+      "name": "channel_permission_overrides",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allow": {
+          "name": "allow",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "deny": {
+          "name": "deny",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "channel_permission_overrides_org_id_channel_id_channels_org_id_id_fk": {
+          "name": "channel_permission_overrides_org_id_channel_id_channels_org_id_id_fk",
+          "tableFrom": "channel_permission_overrides",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "org_id",
+            "channel_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "channel_permission_overrides_org_id_role_id_org_roles_org_id_id_fk": {
+          "name": "channel_permission_overrides_org_id_role_id_org_roles_org_id_id_fk",
+          "tableFrom": "channel_permission_overrides",
+          "tableTo": "org_roles",
+          "columnsFrom": [
+            "org_id",
+            "role_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "channel_permission_overrides_org_id_user_id_organization_members_org_id_user_id_fk": {
+          "name": "channel_permission_overrides_org_id_user_id_organization_members_org_id_user_id_fk",
+          "tableFrom": "channel_permission_overrides",
+          "tableTo": "organization_members",
+          "columnsFrom": [
+            "org_id",
+            "user_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "channel_permission_overrides_channelId_roleId_unique": {
+          "name": "channel_permission_overrides_channelId_roleId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "channel_id",
+            "role_id"
+          ]
+        },
+        "channel_permission_overrides_channelId_userId_unique": {
+          "name": "channel_permission_overrides_channelId_userId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "channel_id",
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "channel_permission_overrides_one_target": {
+          "name": "channel_permission_overrides_one_target",
+          "value": "(\"channel_permission_overrides\".\"role_id\" is null) <> (\"channel_permission_overrides\".\"user_id\" is null)"
+        },
+        "channel_permission_overrides_keys": {
+          "name": "channel_permission_overrides_keys",
+          "value": "not (\"channel_permission_overrides\".\"allow\" && \"channel_permission_overrides\".\"deny\") and \"channel_permission_overrides\".\"allow\" <@ array['post', 'talk_to_agents', 'manage_channels']::text[]\n        and \"channel_permission_overrides\".\"deny\" <@ array['post', 'talk_to_agents', 'manage_channels']::text[]"
+        }
+      },
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -22594,7 +22650,8 @@
         "open",
         "answered",
         "expired",
-        "canceled"
+        "canceled",
+        "dismissed"
       ]
     },
     "public.agent_run_status": {

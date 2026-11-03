@@ -115,6 +115,7 @@ const HERE = new Set([
   "offer_connect_ai",
   "offer_connect_app",
   "offer_invites",
+  "offer_install_skill",
   "propose_agent",
   "follow_up",
   "cancel_follow_up",

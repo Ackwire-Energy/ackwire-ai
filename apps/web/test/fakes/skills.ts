@@ -1,7 +1,7 @@
 /**
  * Test fake — skills (apps/server/src/routes/app/skills.ts), same shapes:
  * - `GET/POST …/skills`, `POST …/skills/import { url } | { url, paths } | { zipBase64 }`,
- *   `GET/PATCH/DELETE …/skills/{id}`, `POST …/skills/{id}/reimport`
+ *   `GET/PATCH/DELETE …/skills/{id}`, `POST …/skills/{id}/reimport`, `POST …/skills/{id}/update[/approve|/dismiss|/undo]`
  * - `GET/PUT …/agents/{id}/skills` → `{ skills: (Skill & { enabled })[] }`
  * A repository's root holds three skills to pick and one that can't be installed (`{ choices, skipped }`), and `list`
  * lists a folder's one skill. `acme/secret` is private and no connection reaches it; `contoso/skills` is private and the
@@ -31,6 +31,8 @@ export function createFakeSkills(
   github: () => "none" | "refused" | "ok" = () => "none",
 ): ApiClient["skills"] {
   const assigned = new Map<string, Set<string>>();
+  /** "Agentes melhoram as skills sozinhos" per workspace (on unless saved off). */
+  const settingsOf = new Map<string, boolean>();
   const store = perOrg(async (orgId) => {
     const list: SkillDetail[] = [];
     if (!ctx.seed) return list;
@@ -74,6 +76,8 @@ export function createFakeSkills(
       sourceUrl: null,
       defaultForNewAgents: false,
       body: "# Atendimento\n\nSeja breve e cordial.",
+      // An agent improved it by itself (Agentes melhoram as skills sozinhos): Desfazer in its sheet.
+      lastUpdate: { fromVersion: 1, at: now, agentId: agents[0]?.id ?? null },
       files: [
         { path: "SKILL.md", size: 50, mime: "text/markdown", status: "stored" },
         { path: "respostas.txt", size: 20, mime: "text/plain", status: "stored" },
@@ -96,6 +100,24 @@ export function createFakeSkills(
     const skill: SkillDetail = { ...s, id: mockId("skill"), version: 1, metadata: {}, createdAt: at, updatedAt: at };
     (await store(orgId)).push(skill);
     return clone(skill);
+  };
+  /** Its link read again: the workspace's GitHub refusing as the server does, else a new version. */
+  const readAgain = async (orgId: string, id: string) => {
+    const s = await find(orgId, id);
+    if (s.sourceVia && github() === "none") {
+      throw new ApiError(400, "skill.connection_gone", "The GitHub connection that read contoso/skills is gone", {
+        repo: "contoso/skills",
+      });
+    }
+    if (s.sourceVia && github() === "refused") {
+      throw new ApiError(400, "github.repo_missing", "contoso/skills is private or doesn't exist on GitHub", {
+        repo: "contoso/skills",
+        connection: "refused",
+        app: false,
+      });
+    }
+    s.version += 1;
+    return clone(s);
   };
   const forAgent = async (orgId: string, agentId: string) =>
     (await store(orgId)).map(({ body: _b, files: _f, ...s }) => ({
@@ -179,20 +201,28 @@ export function createFakeSkills(
     },
     reimport: async (orgId, id) => {
       log("skills.reimport", orgId, id);
+      return readAgain(orgId, id);
+    },
+    updateFromSource: async (orgId, id) => {
+      log("skills.updateFromSource", orgId, id);
+      return { status: "updated" as const, skill: await readAgain(orgId, id) };
+    },
+    approveUpdate: async (orgId, id) => {
+      log("skills.approveUpdate", orgId, id);
       const s = await find(orgId, id);
-      if (s.sourceVia && github() === "none") {
-        throw new ApiError(400, "skill.connection_gone", "The GitHub connection that read contoso/skills is gone", {
-          repo: "contoso/skills",
-        });
-      }
-      if (s.sourceVia && github() === "refused") {
-        throw new ApiError(400, "github.repo_missing", "contoso/skills is private or doesn't exist on GitHub", {
-          repo: "contoso/skills",
-          connection: "refused",
-          app: false,
-        });
-      }
-      s.version += 1;
+      Object.assign(s, { pendingUpdate: null, version: s.version + 1 });
+      return { status: "updated" as const, skill: clone(s) };
+    },
+    dismissUpdate: async (orgId, id) => {
+      log("skills.dismissUpdate", orgId, id);
+      const s = await find(orgId, id);
+      if (s.pendingUpdate) s.pendingUpdate = { ...s.pendingUpdate, dismissed: true };
+      return clone(s);
+    },
+    undoUpdate: async (orgId, id) => {
+      log("skills.undoUpdate", orgId, id);
+      const s = await find(orgId, id);
+      Object.assign(s, { lastUpdate: null, version: s.version + 1 });
       return clone(s);
     },
     remove: async (orgId, id) => {
@@ -201,6 +231,12 @@ export function createFakeSkills(
       const i = list.findIndex((x) => x.id === id);
       if (i >= 0) list.splice(i, 1);
       for (const set of assigned.values()) set.delete(id);
+    },
+    settings: async (orgId) => ({ agentsImprove: settingsOf.get(orgId) ?? true }),
+    saveSettings: async (orgId, input) => {
+      log("skills.saveSettings", orgId, input);
+      settingsOf.set(orgId, input.agentsImprove);
+      return { agentsImprove: input.agentsImprove };
     },
     forAgent,
     setForAgent: async (orgId, agentId, skills) => {
