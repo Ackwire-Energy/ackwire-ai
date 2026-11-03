@@ -2291,12 +2291,14 @@
     "busy": "Beschäftigt",
     "hidden": "Unsichtbar",
     "offline": "Offline",
+    "out": "Nicht im Büro",
     "lower": {
       "online": "online",
       "away": "abwesend",
       "busy": "beschäftigt",
       "hidden": "unsichtbar",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "nicht im Büro"
     },
     "setStatus": "Status festlegen",
     "seen": "zuletzt {{when}} gesehen",
@@ -2319,6 +2321,7 @@
       "auto": "Online, solange agentes.chat offen ist.",
       "away": "Eine Weile weg: Alle wissen, dass Antworten dauern können.",
       "busy": "Alle sehen, dass du gerade lieber nicht gestört wirst.",
+      "out": "Nicht bei der Arbeit (Urlaub, freier Tag): alle sehen es, bis dein Status verschwindet.",
       "hidden": "Für alle bist du offline und kannst trotzdem alles nutzen."
     },
     "suggest": {
@@ -2358,6 +2361,9 @@
       "waiting_plan": "Wartet, bis sich das Abo zurücksetzt",
       "waiting_budget": "Wartet, bis sich das Budget zurücksetzt",
       "provider_down": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
+      "out_of_plan": "Planlimit erreicht",
+      "out_of_budget": "Monatsbudget aufgebraucht",
+      "backAt": "zurück {{when}}",
       "work": "Im Hintergrund: {{subject}}"
     },
     "agentWhy": {
@@ -2366,6 +2372,7 @@
       "away": "Untätig seit {{when}}",
       "awayNever": "Hat noch nicht gearbeitet",
       "offline": "Pausiert",
+      "out": "Gerade ohne Limit · antwortet nach dem Reset",
       "noAi": "Keine KI verbunden"
     },
     "bySelf": "Von {{name}} geschrieben · wird gelöscht, wenn es erledigt ist",

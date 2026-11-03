@@ -2363,12 +2363,14 @@
     "busy": "Occupato",
     "hidden": "Invisibile",
     "offline": "Offline",
+    "out": "Fuori ufficio",
     "lower": {
       "online": "online",
       "away": "assente",
       "busy": "occupato",
       "hidden": "invisibile",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "fuori ufficio"
     },
     "setStatus": "Imposta stato",
     "seen": "visto {{when}}",
@@ -2391,6 +2393,7 @@
       "auto": "Online mentre agentes.chat è aperto.",
       "away": "Via per un po': gli altri sanno che le risposte possono tardare.",
       "busy": "Tutti vedono che è meglio non interromperti ora.",
+      "out": "Lontano dal lavoro (ferie, giorno libero): tutti lo vedono finché il tuo stato non sparisce.",
       "hidden": "Appari offline a tutti, ma puoi comunque usare tutto."
     },
     "suggest": {
@@ -2430,6 +2433,9 @@
       "waiting_plan": "In attesa del rinnovo del piano",
       "waiting_budget": "In attesa del rinnovo del budget",
       "provider_down": "Il provider IA non risponde · riprova da solo",
+      "out_of_plan": "Limite del piano raggiunto",
+      "out_of_budget": "Budget del mese esaurito",
+      "backAt": "torna {{when}}",
       "work": "In background: {{subject}}"
     },
     "agentWhy": {
@@ -2438,6 +2444,7 @@
       "away": "Inattivo da {{when}}",
       "awayNever": "Non ha ancora lavorato",
       "offline": "In pausa",
+      "out": "Senza limite per ora · risponde dopo il rinnovo",
       "noAi": "Nessuna IA collegata"
     },
     "bySelf": "Scritto da {{name}} · si cancella quando ha finito",

@@ -2026,7 +2026,7 @@ function withStatus(p: Person, input: StatusInput): Person {
 }
 
 /** How you appear for what you picked (to yourself: hidden stays hidden). */
-const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", hidden: "hidden" } as const;
+const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", out: "out", hidden: "hidden" } as const;
 
 /**
  * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows

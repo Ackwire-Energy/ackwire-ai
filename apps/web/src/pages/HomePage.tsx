@@ -426,7 +426,7 @@ function WorkRow({ w, dir, now }: { w: WorkItem; dir: Dir; now: number }) {
   const { org } = useOrg();
   const agent = dir.agentById.get(w.agentId);
   const shown = useAgentPresence(w.agentId);
-  const line = agentLine(t, shown?.line ?? null);
+  const line = agentLine(t, shown?.line ?? null, i18n.language);
   const name = agent?.name ?? t("channel.unknownAgent");
   const where =
     w.kind === "mission" && w.plan

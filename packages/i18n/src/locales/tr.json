@@ -2279,12 +2279,14 @@
     "busy": "Meşgul",
     "hidden": "Görünmez",
     "offline": "Çevrimdışı",
+    "out": "Ofis dışında",
     "lower": {
       "online": "çevrimiçi",
       "away": "uzakta",
       "busy": "meşgul",
       "hidden": "görünmez",
-      "offline": "çevrimdışı"
+      "offline": "çevrimdışı",
+      "out": "ofis dışında"
     },
     "setStatus": "Durum belirle",
     "seen": "{{when}} görüldü",
@@ -2307,6 +2309,7 @@
       "auto": "agentes.chat açıkken çevrimiçi.",
       "away": "Bir süreliğine dışarıdasınız: kişiler yanıtların gecikebileceğini bilir.",
       "busy": "Herkes şu anda rahatsız etmemenin daha iyi olduğunu görür.",
+      "out": "İşten uzakta (tatil, izin günü): durumun kaybolana kadar herkes görür.",
       "hidden": "Herkese çevrimdışı görünürsünüz ve yine her şeyi kullanabilirsiniz."
     },
     "suggest": {
@@ -2346,6 +2349,9 @@
       "waiting_plan": "Planın sıfırlanmasını bekliyor",
       "waiting_budget": "Bütçenin sıfırlanmasını bekliyor",
       "provider_down": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
+      "out_of_plan": "Plan limiti doldu",
+      "out_of_budget": "Aylık bütçe bitti",
+      "backAt": "dönüş: {{when}}",
       "work": "Arka planda: {{subject}}"
     },
     "agentWhy": {
@@ -2354,6 +2360,7 @@
       "away": "{{when}} beri boşta",
       "awayNever": "Henüz çalışmadı",
       "offline": "Duraklatıldı",
+      "out": "Şimdilik limit yok · sıfırlanınca yanıtlar",
       "noAi": "Bağlı yapay zeka yok"
     },
     "bySelf": "{{name}} yazdı · iş bitince temizlenir",

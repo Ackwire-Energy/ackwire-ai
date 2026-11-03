@@ -38,7 +38,7 @@ export interface AgentShown {
 
 export function usePresenceOf(): PresenceOf {
   const orgId = useOrgId();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const people = usePeople(orgId);
   const agents = useAgentStatuses(orgId);
   const ai = useAiStatus(orgId);
@@ -56,11 +56,11 @@ export function usePresenceOf(): PresenceOf {
         const noAi = aiStateOf(ai.data, agentId) === "no_ai";
         const presence = agentPresenceShown(status, !noAi);
         // Without an AI it does nothing: no line either.
-        const line = !noAi && status?.status ? agentStatusText(t, status.status) : null;
+        const line = !noAi && status?.status ? agentStatusText(t, status.status, i18n.language) : null;
         return { presence, line, status, noAi };
       },
     };
-  }, [people.data, agents.data, ai.data, t]);
+  }, [people.data, agents.data, ai.data, t, i18n.language]);
 }
 
 /** Your own row in the people: your presence as you see it (hidden stays hidden) and your line. */

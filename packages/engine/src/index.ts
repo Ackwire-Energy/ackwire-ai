@@ -178,6 +178,7 @@ export * from "./operator";
 export * from "./operator-events";
 export * from "./operator-review";
 export * from "./organizations";
+export * from "./out-of-office";
 export * from "./outbound";
 export * from "./outbox";
 export * from "./pdf";

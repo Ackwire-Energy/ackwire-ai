@@ -2293,12 +2293,14 @@
     "busy": "Bezet",
     "hidden": "Onzichtbaar",
     "offline": "Offline",
+    "out": "Afwezig",
     "lower": {
       "online": "online",
       "away": "afwezig",
       "busy": "bezet",
       "hidden": "onzichtbaar",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "afwezig"
     },
     "setStatus": "Status instellen",
     "seen": "gezien {{when}}",
@@ -2321,6 +2323,7 @@
       "auto": "Online zolang agentes.chat open is.",
       "away": "Even weg: mensen weten dat antwoorden wat langer kunnen duren.",
       "busy": "Iedereen ziet dat je nu liever niet gestoord wordt.",
+      "out": "Niet aan het werk (vakantie, vrije dag): iedereen ziet het tot je status verdwijnt.",
       "hidden": "Je bent voor iedereen offline en kunt toch alles gebruiken."
     },
     "suggest": {
@@ -2360,6 +2363,9 @@
       "waiting_plan": "Wacht tot het abonnement opnieuw begint",
       "waiting_budget": "Wacht tot het budget opnieuw begint",
       "provider_down": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
+      "out_of_plan": "Planlimiet bereikt",
+      "out_of_budget": "Maandbudget op",
+      "backAt": "terug {{when}}",
       "work": "Op de achtergrond: {{subject}}"
     },
     "agentWhy": {
@@ -2368,6 +2374,7 @@
       "away": "Inactief sinds {{when}}",
       "awayNever": "Heeft nog niet gewerkt",
       "offline": "Gepauzeerd",
+      "out": "Even zonder limiet · antwoordt na de reset",
       "noAi": "Geen AI gekoppeld"
     },
     "bySelf": "Geschreven door {{name}} · verdwijnt als het klaar is",

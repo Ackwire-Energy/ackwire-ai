@@ -1238,7 +1238,7 @@ function AgentRow({
   onPrefetch: () => void;
   onOpen: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const state = useStreams((st) => agentStateIn(st, a.id));
   const busy = state !== "idle" && !waitingFor;
@@ -1250,7 +1250,7 @@ function AgentRow({
   // Background work's minutes move with the anchor's line, every half minute.
   useNow(shown?.line?.kind === "work", 30_000);
   const word = shown ? t(`presence.${shown.presence}`) : null;
-  const line = agentLine(t, shown?.line ?? null);
+  const line = agentLine(t, shown?.line ?? null, i18n.language);
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const agentEntries = useAgentMenu();
