@@ -68,7 +68,7 @@ export function agentWhyKey(
   presence: AgentStatus["presence"],
   activeAt: string | null | undefined,
   noAi: boolean,
-): "online" | "busy" | "away" | "awayNever" | "offline" | "noAi" {
+): "online" | "busy" | "away" | "awayNever" | "out" | "offline" | "noAi" {
   if (noAi) return "noAi";
   if (presence === "away") return activeAt ? "away" : "awayNever";
   return presence;

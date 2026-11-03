@@ -2203,12 +2203,14 @@
     "busy": "Meşgul",
     "hidden": "Görünmez",
     "offline": "Çevrimdışı",
+    "out": "Ofis dışında",
     "lower": {
       "online": "çevrimiçi",
       "away": "uzakta",
       "busy": "meşgul",
       "hidden": "görünmez",
-      "offline": "çevrimdışı"
+      "offline": "çevrimdışı",
+      "out": "ofis dışında"
     },
     "setStatus": "Durum belirle",
     "seen": "{{when}} görüldü",
@@ -2270,6 +2272,9 @@
       "waiting_plan": "Planın sıfırlanmasını bekliyor",
       "waiting_budget": "Bütçenin sıfırlanmasını bekliyor",
       "provider_down": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
+      "out_of_plan": "Plan limiti doldu",
+      "out_of_budget": "Aylık bütçe bitti",
+      "backAt": "dönüş: {{when}}",
       "work": "Arka planda: {{subject}}"
     },
     "agentWhy": {
@@ -2278,6 +2283,7 @@
       "away": "{{when}} beri boşta",
       "awayNever": "Henüz çalışmadı",
       "offline": "Duraklatıldı",
+      "out": "Şimdilik limit yok · sıfırlanınca yanıtlar",
       "noAi": "Bağlı yapay zeka yok"
     },
     "bySelf": "{{name}} yazdı · iş bitince temizlenir",

@@ -118,5 +118,6 @@ export function useAgentPresence(agentId: string | null | undefined): AgentShown
   };
 }
 
-/** An agent's line in words with its emoji, or null. */
-export const agentLine = (t: TFunction, line: AgentStatusLine | null) => (line ? agentStatusText(t, line) : null);
+/** An agent's line in words with its emoji, or null; `locale` words when an agent out of office is back. */
+export const agentLine = (t: TFunction, line: AgentStatusLine | null, locale?: string) =>
+  line ? agentStatusText(t, line, locale) : null;

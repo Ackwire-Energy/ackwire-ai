@@ -2215,12 +2215,14 @@
     "busy": "Beschäftigt",
     "hidden": "Unsichtbar",
     "offline": "Offline",
+    "out": "Nicht im Büro",
     "lower": {
       "online": "online",
       "away": "abwesend",
       "busy": "beschäftigt",
       "hidden": "unsichtbar",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "nicht im Büro"
     },
     "setStatus": "Status festlegen",
     "seen": "zuletzt {{when}} gesehen",
@@ -2282,6 +2284,9 @@
       "waiting_plan": "Wartet, bis sich das Abo zurücksetzt",
       "waiting_budget": "Wartet, bis sich das Budget zurücksetzt",
       "provider_down": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
+      "out_of_plan": "Planlimit erreicht",
+      "out_of_budget": "Monatsbudget aufgebraucht",
+      "backAt": "zurück {{when}}",
       "work": "Im Hintergrund: {{subject}}"
     },
     "agentWhy": {
@@ -2290,6 +2295,7 @@
       "away": "Untätig seit {{when}}",
       "awayNever": "Hat noch nicht gearbeitet",
       "offline": "Pausiert",
+      "out": "Gerade ohne Limit · antwortet nach dem Reset",
       "noAi": "Keine KI verbunden"
     },
     "bySelf": "Von {{name}} geschrieben · wird gelöscht, wenn es erledigt ist",

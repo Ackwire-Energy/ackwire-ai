@@ -2348,12 +2348,14 @@
     "busy": "Nie przeszkadzać",
     "hidden": "Tryb niewidoczny",
     "offline": "Offline",
+    "out": "Poza biurem",
     "lower": {
       "online": "online",
       "away": "zaraz wracam",
       "busy": "nie przeszkadzać",
       "hidden": "tryb niewidoczny",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "poza biurem"
     },
     "setStatus": "Ustaw status",
     "seen": "ostatnio {{when}}",
@@ -2415,6 +2417,9 @@
       "waiting_plan": "Czeka na odnowienie planu",
       "waiting_budget": "Czeka na odnowienie budżetu",
       "provider_down": "Dostawca AI nie działa · ponowi sam",
+      "out_of_plan": "Limit planu wyczerpany",
+      "out_of_budget": "Budżet na ten miesiąc wyczerpany",
+      "backAt": "wraca {{when}}",
       "work": "W tle: {{subject}}"
     },
     "agentWhy": {
@@ -2423,6 +2428,7 @@
       "away": "Bezczynny od {{when}}",
       "awayNever": "Jeszcze nie było pracy",
       "offline": "Wstrzymany",
+      "out": "Na razie bez limitu · odpowie po odnowieniu",
       "noAi": "Brak podłączonej AI"
     },
     "bySelf": "Napisane przez {{name}} · zniknie, gdy skończy",

@@ -21,9 +21,9 @@ const CELL = { sm: 1, lg: 1.5 } as const;
 
 /**
  * The presence badge (ADR 0084): the 9×9 pixel shape from `badgeCells` (the agents' body with its cut corner), in
- * their two-tone dither, with a white mark (busy: a bar, away: a clock), an empty outline for offline and a dotted one
- * for hidden. One path per tone; the colors come from the stylesheet (`.ac-presence`), so it follows the theme. Hidden
- * from screen readers: words beside it say the presence.
+ * their two-tone dither, with a white mark (busy: a bar, away: a clock, out of office: an arrow), an empty outline
+ * for offline and a dotted one for hidden. One path per tone; the colors come from the stylesheet (`.ac-presence`),
+ * so it follows the theme. Hidden from screen readers: words beside it say the presence.
  */
 export function PresenceBadge({ presence, size = "sm", ring = true, className }: PresenceBadgeProps) {
   const { side, paths } = useMemo(() => {

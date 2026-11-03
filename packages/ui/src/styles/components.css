@@ -870,6 +870,10 @@ textarea.ac-input {
 .ac-presence[data-presence="away"] {
   --presence: var(--warn);
 }
+/* An agent out of office (§12): its plan or budget ran out until a reset. */
+.ac-presence[data-presence="out"] {
+  --presence: var(--info);
+}
 .ac-presence__base {
   fill: var(--presence);
 }

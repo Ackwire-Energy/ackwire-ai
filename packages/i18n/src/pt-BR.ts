@@ -2195,7 +2195,16 @@ export const ptBR = {
     busy: "Ocupado",
     hidden: "Oculto",
     offline: "Offline",
-    lower: { online: "online", away: "ausente", busy: "ocupado", hidden: "oculto", offline: "offline" },
+    /** An agent out of office (ADR 0084 §12): its plan or budget ran out until a reset. */
+    out: "Fora do escritório",
+    lower: {
+      online: "online",
+      away: "ausente",
+      busy: "ocupado",
+      hidden: "oculto",
+      offline: "offline",
+      out: "fora do escritório",
+    },
     setStatus: "Definir status",
     seen: "visto {{when}}",
     title: "Definir status",
@@ -2256,6 +2265,10 @@ export const ptBR = {
       waiting_plan: "Esperando o plano renovar",
       waiting_budget: "Esperando o orçamento renovar",
       provider_down: "O provedor de IA está fora do ar · tenta de novo sozinho",
+      out_of_plan: "Sem limite no plano",
+      out_of_budget: "Orçamento do mês esgotado",
+      /** After an out-of-office line: "volta às 15:00", "volta sexta às 9:00" (`chat.usageWhen`). */
+      backAt: "volta {{when}}",
       work: "Em segundo plano: {{subject}}",
     },
     agentWhy: {
@@ -2264,6 +2277,7 @@ export const ptBR = {
       away: "Parado desde {{when}}",
       awayNever: "Ainda não trabalhou",
       offline: "Pausado",
+      out: "Sem limite agora · responde quando renovar",
       noAi: "Sem IA conectada",
     },
     bySelf: "Escrito por {{name}} · some quando terminar",

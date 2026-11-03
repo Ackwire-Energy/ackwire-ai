@@ -2141,12 +2141,14 @@
     "busy": "忙碌",
     "hidden": "隐身",
     "offline": "离线",
+    "out": "不在办公室",
     "lower": {
       "online": "在线",
       "away": "离开",
       "busy": "忙碌",
       "hidden": "隐身",
-      "offline": "离线"
+      "offline": "离线",
+      "out": "不在办公室"
     },
     "setStatus": "设置状态",
     "seen": "{{when}}在线过",
@@ -2208,6 +2210,9 @@
       "waiting_plan": "等待套餐额度重置",
       "waiting_budget": "等待预算重置",
       "provider_down": "AI 服务商出现故障 · 会自动重试",
+      "out_of_plan": "套餐额度已用完",
+      "out_of_budget": "本月预算已用完",
+      "backAt": "恢复：{{when}}",
       "work": "后台进行中：{{subject}}"
     },
     "agentWhy": {
@@ -2216,6 +2221,7 @@
       "away": "自{{when}}起空闲",
       "awayNever": "还没有工作过",
       "offline": "已暂停",
+      "out": "暂时没有额度 · 重置后回复",
       "noAi": "未连接 AI"
     },
     "bySelf": "由 {{name}} 设置 · 完成后自动清除",

@@ -2150,12 +2150,14 @@
     "busy": "Sibuk",
     "hidden": "Tak terlihat",
     "offline": "Offline",
+    "out": "Di luar kantor",
     "lower": {
       "online": "online",
       "away": "sedang pergi",
       "busy": "sibuk",
       "hidden": "tak terlihat",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "di luar kantor"
     },
     "setStatus": "Atur status",
     "seen": "terlihat {{when}}",
@@ -2217,6 +2219,9 @@
       "waiting_plan": "Menunggu paket diatur ulang",
       "waiting_budget": "Menunggu anggaran diatur ulang",
       "provider_down": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
+      "out_of_plan": "Batas paket habis",
+      "out_of_budget": "Anggaran bulan ini habis",
+      "backAt": "kembali {{when}}",
       "work": "Di latar belakang: {{subject}}"
     },
     "agentWhy": {
@@ -2225,6 +2230,7 @@
       "away": "Diam sejak {{when}}",
       "awayNever": "Belum pernah bekerja",
       "offline": "Dijeda",
+      "out": "Batas habis untuk saat ini · menjawab setelah direset",
       "noAi": "Belum ada AI yang terhubung"
     },
     "bySelf": "Ditulis oleh {{name}} · hilang setelah selesai",
