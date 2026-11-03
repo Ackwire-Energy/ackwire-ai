@@ -162,6 +162,12 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   text-align: left;
   cursor: pointer;
 }
+/* A face is 36px by default: held to the column's 32px, as the members column holds it. */
+.thread-pop__row > .ac-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: var(--text-sm);
+}
 .thread-pop__row:hover,
 html:not([data-pointer]) .thread-pop__row:focus-visible {
   outline: none;
