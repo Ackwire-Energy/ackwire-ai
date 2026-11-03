@@ -1822,7 +1822,10 @@ describe("Quem pensa: Automático", () => {
     ]);
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(2);
-    // A fixed model: the effort's four levels, none of them Automático, in the advanced settings.
+    // A fixed model: the effort's four levels, none of them Automático, in the advanced settings, whose row names
+    // what it holds.
+    const row = () => within(d).getByRole("button", { name: /^Configuração avançada/ }).textContent;
+    expect(row()).toContain("Esforço, janela de contexto e quem atende");
     let a = await advanced(d);
     const ramp = within(a).getByRole("slider", { name: "Esforço" });
     expect(ramp.getAttribute("aria-valuemax")).toBe("4");
@@ -1831,6 +1834,8 @@ describe("Quem pensa: Automático", () => {
     await model(d, /^Automático/);
     expect(d.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
     // The model picks the effort too: no ramp to set, and the place says so and how to set it.
+    expect(row()).toContain("Janela de contexto e quem atende");
+    expect(row()).not.toContain("Esforço");
     a = await advanced(d);
     expect(within(a).queryByRole("slider", { name: "Esforço" })).toBeNull();
     expect(a.textContent).toContain(

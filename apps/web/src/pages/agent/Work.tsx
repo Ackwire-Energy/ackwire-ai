@@ -56,9 +56,9 @@ import {
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import {
   type Advanced,
+  advancedContents,
   advancedDefaults,
   advancedParts,
-  advancedSummary,
   isAdvancedDefault,
 } from "@agenteschat/client/lib/brain-advanced";
 import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
@@ -1282,14 +1282,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       </span>
     </SettingNote>
   );
-  // "Configuração avançada" says only what differs from the defaults (`ADVANCED_DEFAULTS`).
+  // "Configuração avançada" names what it holds.
   const advancedNow: Advanced = { effort, contextTokens: shownContext, onlyOwner, fallback };
-  const advancedLine = advancedSummary(t, i18n.language, {
-    kind,
-    autoModel: isAuto(planModel),
-    apiKey,
-    now: advancedNow,
-  });
+  const advancedLine = advancedContents(t, { kind, autoModel: isAuto(planModel) });
   const advancedRow = (
     <AdvancedRow
       line={advancedLine}

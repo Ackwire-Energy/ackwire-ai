@@ -3118,6 +3118,11 @@
           "answers": "Kime yanıt verir",
           "defaults": "Varsayılanlara dön",
           "done": "Bitti",
+          "contents": {
+            "model": "Bağlam penceresi",
+            "auto": "Bağlam penceresi ve kime yanıt verdiği",
+            "fixed": "Çaba, bağlam penceresi ve kime yanıt verdiği"
+          },
           "allDefault": "Tümü varsayılan",
           "effort": "Çaba: {{level}}",
           "context": "Bağlam: {{size}}",

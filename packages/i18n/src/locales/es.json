@@ -3229,6 +3229,11 @@
           "answers": "A quién responde",
           "defaults": "Volver a los valores predeterminados",
           "done": "Listo",
+          "contents": {
+            "model": "Ventana de contexto",
+            "auto": "Ventana de contexto y a quién responde",
+            "fixed": "Esfuerzo, ventana de contexto y a quién responde"
+          },
           "allDefault": "Todo predeterminado",
           "effort": "Esfuerzo: {{level}}",
           "context": "Contexto: {{size}}",

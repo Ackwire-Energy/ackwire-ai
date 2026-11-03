@@ -3254,6 +3254,11 @@
           "answers": "À qui il répond",
           "defaults": "Revenir aux valeurs par défaut",
           "done": "Terminé",
+          "contents": {
+            "model": "Fenêtre de contexte",
+            "auto": "Fenêtre de contexte et à qui il répond",
+            "fixed": "Effort, fenêtre de contexte et à qui il répond"
+          },
           "allDefault": "Tout par défaut",
           "effort": "Effort : {{level}}",
           "context": "Contexte : {{size}}",

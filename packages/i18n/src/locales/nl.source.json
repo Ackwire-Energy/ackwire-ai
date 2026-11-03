@@ -7660,6 +7660,15 @@
   "agentPage.work.brain.advanced.done": {
     "value": "Done"
   },
+  "agentPage.work.brain.advanced.contents.model": {
+    "value": "Context window"
+  },
+  "agentPage.work.brain.advanced.contents.auto": {
+    "value": "Context window and who it answers"
+  },
+  "agentPage.work.brain.advanced.contents.fixed": {
+    "value": "Effort, context window and who it answers"
+  },
   "agentPage.work.brain.advanced.allDefault": {
     "value": "All defaults"
   },

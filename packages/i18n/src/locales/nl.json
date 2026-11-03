@@ -3158,6 +3158,11 @@
           "answers": "Wie het antwoordt",
           "defaults": "Terug naar standaard",
           "done": "Klaar",
+          "contents": {
+            "model": "Contextvenster",
+            "auto": "Contextvenster en wie het antwoordt",
+            "fixed": "Inspanning, contextvenster en wie het antwoordt"
+          },
           "allDefault": "Alles standaard",
           "effort": "Inspanning: {{level}}",
           "context": "Context: {{size}}",

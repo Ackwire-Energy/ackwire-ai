@@ -3027,6 +3027,11 @@
           "answers": "답하는 대상",
           "defaults": "기본값으로 되돌리기",
           "done": "완료",
+          "contents": {
+            "model": "컨텍스트 창",
+            "auto": "컨텍스트 창과 답하는 대상",
+            "fixed": "사고 수준, 컨텍스트 창, 답하는 대상"
+          },
           "allDefault": "모두 기본값",
           "effort": "사고 수준: {{level}}",
           "context": "컨텍스트: {{size}}",

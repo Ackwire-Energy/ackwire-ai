@@ -1,8 +1,8 @@
 import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
-import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines, useModels } from "@agenteschat/client";
+import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
-import { advancedSummary } from "@agenteschat/client/lib/brain-advanced";
+import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -156,7 +156,6 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     ]);
   };
 
-  const apiKey = useAiStatus(orgId).data?.apiKey !== false;
   const usage = view && kind ? thinkingUsage(view, kind) : undefined;
   const limited = usage ? planState(usage).state === "limited" : false;
   const offers = limited && kind && view ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
@@ -299,12 +298,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               <GroupedList>
                 <GroupedRow
                   label={t("agentPage.work.brain.advanced.title")}
-                  sub={advancedSummary(t, i18n.language, {
-                    kind: view.brain,
-                    autoModel: isAuto(view.effectiveModel),
-                    apiKey,
-                    now: advancedOf(view),
-                  })}
+                  sub={advancedContents(t, { kind: view.brain, autoModel: isAuto(view.effectiveModel) })}
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />

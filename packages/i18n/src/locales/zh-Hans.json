@@ -3054,6 +3054,11 @@
           "answers": "回复对象",
           "defaults": "恢复默认",
           "done": "完成",
+          "contents": {
+            "model": "上下文窗口",
+            "auto": "上下文窗口和回复对象",
+            "fixed": "投入程度、上下文窗口和回复对象"
+          },
           "allDefault": "全部为默认",
           "effort": "投入程度：{{level}}",
           "context": "上下文：{{size}}",

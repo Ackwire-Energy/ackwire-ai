@@ -3117,7 +3117,13 @@ export const ptBR = {
           answers: "Quem atende",
           defaults: "Voltar ao padrão",
           done: "Pronto",
-          /** The row's line: nothing changed from the defaults, else only what did. */
+          /** The row's line: what the dialog holds. The effort shows only with a fixed model on a plan. */
+          contents: {
+            model: "Janela de contexto",
+            auto: "Janela de contexto e quem atende",
+            fixed: "Esforço, janela de contexto e quem atende",
+          },
+          /** After a save: nothing changed from the defaults, else only what did. */
           allDefault: "Tudo no padrão",
           effort: "Esforço {{level}}",
           context: "Contexto de {{size}}",

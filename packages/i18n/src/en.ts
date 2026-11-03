@@ -3055,6 +3055,11 @@ export const en = {
           answers: "Who it answers",
           defaults: "Back to defaults",
           done: "Done",
+          contents: {
+            model: "Context window",
+            auto: "Context window and who it answers",
+            fixed: "Effort, context window and who it answers",
+          },
           allDefault: "All defaults",
           effort: "Effort: {{level}}",
           context: "Context: {{size}}",

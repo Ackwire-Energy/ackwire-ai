@@ -3044,6 +3044,11 @@
           "answers": "Siapa yang dijawabnya",
           "defaults": "Kembali ke default",
           "done": "Selesai",
+          "contents": {
+            "model": "Jendela konteks",
+            "auto": "Jendela konteks dan siapa yang dijawabnya",
+            "fixed": "Upaya, jendela konteks, dan siapa yang dijawabnya"
+          },
           "allDefault": "Semua default",
           "effort": "Upaya: {{level}}",
           "context": "Konteks: {{size}}",

@@ -3253,6 +3253,11 @@
           "answers": "A chi risponde",
           "defaults": "Ripristina i predefiniti",
           "done": "Fatto",
+          "contents": {
+            "model": "Finestra di contesto",
+            "auto": "Finestra di contesto e a chi risponde",
+            "fixed": "Impegno, finestra di contesto e a chi risponde"
+          },
           "allDefault": "Tutto predefinito",
           "effort": "Impegno: {{level}}",
           "context": "Contesto: {{size}}",

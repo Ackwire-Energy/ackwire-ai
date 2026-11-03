@@ -3133,6 +3133,11 @@
           "answers": "Wem er antwortet",
           "defaults": "Auf Standard zurücksetzen",
           "done": "Fertig",
+          "contents": {
+            "model": "Kontextfenster",
+            "auto": "Kontextfenster und wem er antwortet",
+            "fixed": "Aufwand, Kontextfenster und wem er antwortet"
+          },
           "allDefault": "Alles Standard",
           "effort": "Aufwand: {{level}}",
           "context": "Kontext: {{size}}",

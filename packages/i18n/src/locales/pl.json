@@ -3337,6 +3337,11 @@
           "answers": "Komu odpowiada",
           "defaults": "Przywróć domyślne",
           "done": "Gotowe",
+          "contents": {
+            "model": "Okno kontekstu",
+            "auto": "Okno kontekstu i komu odpowiada",
+            "fixed": "Wysiłek, okno kontekstu i komu odpowiada"
+          },
           "allDefault": "Wszystko domyślne",
           "effort": "Wysiłek: {{level}}",
           "context": "Kontekst: {{size}}",
