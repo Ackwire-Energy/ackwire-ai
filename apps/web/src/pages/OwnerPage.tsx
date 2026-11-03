@@ -1,5 +1,5 @@
 import { authErrorText } from "@agenteschat/client/lib/errors";
-import { isEmail, passwordState } from "@agenteschat/client/lib/text";
+import { isEmail, nameIsPassword, passwordState } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -9,7 +9,7 @@ import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
 import { prepareBurst } from "@/components/Sky";
-import { PasswordHelp } from "@/pages/AuthPage";
+import { NameHint, PasswordHelp } from "@/pages/AuthPage";
 
 type Problem = "noLink" | "wrongLink" | "taken";
 
@@ -37,6 +37,10 @@ export function OwnerPage({ claim }: { claim: string | null }) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!claim || !ready || pending) return;
+    if (nameIsPassword(name, password)) {
+      setPassword("");
+      return setError(t("auth.flow.nameIsPassword"));
+    }
     setPending(true);
     setError(null);
     const result = await auth.ownerClaim({ token: claim, name: name.trim(), email: email.trim(), password });
@@ -74,16 +78,19 @@ export function OwnerPage({ claim }: { claim: string | null }) {
           )}
           {!problem && (
             <>
-              <Input
-                className="auth__big"
-                aria-label={t("auth.yourName")}
-                autoComplete="name"
-                spellCheck={false}
-                placeholder={t("auth.flow.namePlaceholder")}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
+              <div className="auth__field">
+                <Input
+                  className="auth__big"
+                  aria-label={t("auth.yourName")}
+                  autoComplete="name"
+                  spellCheck={false}
+                  placeholder={t("auth.flow.namePlaceholder")}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                />
+                <NameHint name={name} />
+              </div>
               <Input
                 className="auth__big"
                 type="email"

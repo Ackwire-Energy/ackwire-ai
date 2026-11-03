@@ -938,6 +938,12 @@
   "auth.flow.namePlaceholder": {
     "value": "Your name"
   },
+  "auth.flow.nameIsPassword": {
+    "value": "Is this your name? It's the same as the password you typed."
+  },
+  "auth.flow.nameLooksLikePassword": {
+    "value": "That looks like a password. Your name goes here."
+  },
   "auth.flow.newPassword": {
     "value": "Now a password."
   },
@@ -3085,6 +3091,9 @@
   },
   "shell.handle": {
     "value": "Your @"
+  },
+  "shell.nameEmpty": {
+    "value": "Write your name."
   },
   "shell.timezoneHelp": {
     "value": "Shows your local time on your profile card."

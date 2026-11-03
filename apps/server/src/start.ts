@@ -342,6 +342,7 @@ async function boot(
     emailDelivers: adapters.email.delivers,
     rateLimiter: adapters.rateLimiter,
     humanCheck: adapters.humanCheck,
+    pubsub: adapters.pubsub,
   });
   let stopping = false;
   const app = createApp({

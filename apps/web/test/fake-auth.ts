@@ -15,6 +15,7 @@ export function createFakeAuth(
     oneTime?: AuthResult;
     claim?: AuthResult;
     verification?: AuthResult;
+    updateName?: AuthResult;
     onSignIn?: () => void;
   } = {},
 ) {
@@ -29,6 +30,10 @@ export function createFakeAuth(
     signUp: async (input, humanCheck) => {
       calls.push({ method: "signUp", args: withToken(input, humanCheck) });
       return options.signUp ?? { ok: true };
+    },
+    updateName: async (name) => {
+      calls.push({ method: "updateName", args: [name] });
+      return options.updateName ?? { ok: true };
     },
     sendVerificationEmail: async (email) => {
       calls.push({ method: "sendVerificationEmail", args: [email] });

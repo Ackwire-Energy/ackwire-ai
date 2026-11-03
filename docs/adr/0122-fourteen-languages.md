@@ -8,7 +8,7 @@
   `packages/client/src/lib/grammar.ts`, `locale-sync.ts`; `apps/web/src/i18n/index.ts`,
   `components/LanguageSelect.tsx`; `apps/mobile/src/providers/i18n.ts`, `src/i18n/merge.ts`,
   `src/features/i18n/locales.ts`; `apps/desktop/src/i18n/index.ts`; `packages/engine/src/email/words/*`,
-  `push/messages/*`, `organizations.ts` (`setMyLocale`, `myLocale`); `apps/server/src/routes/app/account.ts`;
+  `push/messages/*`, `organizations.ts` (`setMyLocale`, `myAccount`); `apps/server/src/routes/app/account.ts`;
   `scripts/i18n.ts`; migration `0175_locales.sql`
 
 ## Context

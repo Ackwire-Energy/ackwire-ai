@@ -3,7 +3,7 @@ import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import { errorCode, invitedErrorText } from "@agenteschat/client/lib/errors";
 import { withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { CODE_LENGTH, JOIN_NAME_MAX, JOIN_NOTE_MAX, typedCode } from "@agenteschat/client/lib/join-requests";
-import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import { emailTypoFix, isEmail, nameIsPassword, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ComponentRef, type ReactNode, useRef, useState } from "react";
@@ -16,7 +16,7 @@ import { Button, haptics, Text } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
-import { Quiet } from "./AuthFlow";
+import { NameHint, Quiet } from "./AuthFlow";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, failureText } from "./human-check";
 import { rememberInvite } from "./invite";
@@ -207,7 +207,11 @@ export function LinkSteps({
     if (!ready || sending || asking) return;
     if (step === "email") void toCode();
     else if (step === "name") go("password");
-    else if (step === "password") go("note");
+    else if (step === "password" && nameIsPassword(name, password)) {
+      setPassword("");
+      go("name");
+      setError(t("auth.flow.nameIsPassword"));
+    } else if (step === "password") go("note");
     else if (step === "note") void ask(note.trim());
   };
 
@@ -350,6 +354,7 @@ export function LinkSteps({
             onSubmitEditing={submit}
             autoFocus
           />
+          {error ? <ErrorLine error={error} /> : <NameHint name={name} />}
           {continueButton}
         </>
       );

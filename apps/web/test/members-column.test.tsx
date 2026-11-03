@@ -186,6 +186,17 @@ describe("the members column", () => {
     expect(names()).not.toContain("Bia");
   });
 
+  test("someone's new name (from another device) shows at once", async () => {
+    widthIs(DESKTOP_QUERY);
+    const { state, sockets } = await open();
+    const joao = state.members.find((m) => m.userId === "u-joao");
+    if (joao) joao.name = "João Pedro";
+    await act(async () => sockets.last().push({ type: "event", scope: "org", event: { type: "org.members" } }));
+    await settle(6);
+    expect(row(column() as HTMLElement, "João Pedro")).toBeTruthy();
+    expect(row(column() as HTMLElement, "João")).toBeNull();
+  });
+
   test("a row opens the member's card", async () => {
     widthIs(DESKTOP_QUERY);
     await open();
