@@ -4,11 +4,12 @@ import { type Agent, getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { enqueue } from "./outbox";
 import { channelMaySql, maySql } from "./permissions";
-import { dropForeignMailGrants } from "./tools/scopes";
+import { dropForeignMailGrants, type ForeignMailbox, foreignMailboxes } from "./tools/scopes";
 
 const { agents, users, organizationMembers, orgRoles } = schema;
 
@@ -67,10 +68,43 @@ export async function dropMailIfWidened(
   after: AgentAudience,
   actorId: string,
 ) {
-  const reach = (a: AgentAudience) => ({ ...a, consultable: true });
-  if (widensAudience(reach(before), reach(after), ownerUserId)) {
-    await dropForeignMailGrants(db, orgId, agentId, actorId, actorId);
+  if (widensReach(before, after, ownerUserId)) await dropForeignMailGrants(db, orgId, agentId, actorId, actorId);
+}
+
+const widensReach = (before: AgentAudience, after: AgentAudience, ownerUserId: string | null) =>
+  widensAudience({ ...before, consultable: true }, { ...after, consultable: true }, ownerUserId);
+
+/**
+ * The mailboxes saving `audience` would take from the agent (`dropMailIfWidened`), taking nothing: the apps ask the
+ * person first. Empty when it lets nobody new in, or every mailbox it holds is the actor's own.
+ */
+export async function audienceMailLoss(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  audience: Omit<AgentAudience, "roleIds"> & { roleIds?: string[] },
+): Promise<ForeignMailbox[]> {
+  const agent = await audienceEditable(db, actorId, orgId, agentId);
+  const people = audience.mode === "people";
+  const to: AgentAudience = {
+    mode: audience.mode,
+    userIds: people ? audience.userIds : [],
+    roleIds: people ? (audience.roleIds ?? agent.audienceRoleIds) : [],
+  };
+  if (!widensReach(audienceOf(agent), to, agent.ownerUserId)) return [];
+  return foreignMailboxes(db, orgId, agentId, actorId);
+}
+
+/** The agent, when `actorId` may change who talks to it: its owner or admins (with no owner, admins only). */
+async function audienceEditable(db: Database, actorId: string, orgId: string, agentId: string) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if (!can(membership, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
+    throw new ForbiddenError("Only the agent's owner or an admin can change who talks to it");
   }
+  return agent;
 }
 
 /**
@@ -101,25 +135,6 @@ export async function dropMailForNewRoleMember(
 /** Someone besides its owner can talk to the agent. */
 export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
   widensAudience(OWNER_ONLY, a, ownerUserId);
-
-/**
- * More people for an agent that thinks with a plan (ADR 0059 §5): only the
- * plan's owner, who is the agent's owner, lets them in; admins only narrow.
- */
-export function planSharing(
-  agent: Pick<Agent, "name" | "brain" | "ownerUserId">,
-  actorId: string,
-  from: AgentAudience,
-  to: AgentAudience,
-) {
-  if (!isComputerBrain(agent.brain) || !widensAudience(from, to, agent.ownerUserId)) return;
-  if (agent.ownerUserId && agent.ownerUserId === actorId) return;
-  throw new ForbiddenError(
-    `Only ${agent.name}'s owner can let more people talk to it: it thinks with their plan`,
-    "audience.plan_owner_only",
-    { agentName: agent.name },
-  );
-}
 
 /** What the audience rule needs of a person: whether their roles let them talk to agents, and which roles they hold. */
 export interface Speaker {
@@ -341,9 +356,61 @@ export async function notifyBlocked(
   return out;
 }
 
+/** The outbox job telling a plan's owner that someone else let more people talk to their agent (`queuePlanOpenedEmail`). */
+export const PLAN_OPENED_JOB = "agent.plan_opened";
+
+/**
+ * Who may talk to the agent changed from `from` to `to`, saved as `after`. Audited, naming whose plan it is when it
+ * thinks with its owner's (ADR 0059 §5), and told to that owner (`planOpened`, from `planFrom`: who its plan answered).
+ */
+export async function audienceChanged(
+  db: Executor,
+  orgId: string,
+  actorId: string,
+  after: Pick<Agent, "id" | "brain" | "ownerUserId">,
+  from: AgentAudience,
+  to: AgentAudience,
+  planFrom = from,
+): Promise<boolean> {
+  const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "agent.audience_changed",
+    target: { type: "agent", id: after.id },
+    details: { from, to, ...(planOwner ? { planOwner } : {}) },
+  });
+  return planOpened(db, orgId, actorId, after, planFrom, to);
+}
+
+/**
+ * Someone other than its owner let more people talk to an agent that thinks with its owner's plan (ADR 0059 §5): that
+ * owner hears it by email, once per change, since their plan pays for those conversations.
+ */
+export async function planOpened(
+  db: Executor,
+  orgId: string,
+  actorId: string,
+  after: Pick<Agent, "id" | "brain" | "ownerUserId">,
+  from: AgentAudience,
+  to: AgentAudience,
+): Promise<boolean> {
+  const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
+  if (!planOwner || planOwner === actorId || !widensAudience(from, to, planOwner)) return false;
+  await enqueue(db, {
+    orgId,
+    kind: PLAN_OPENED_JOB,
+    payload: { agentId: after.id, actorId, from, to },
+    dedupeKey: `plan-opened:${crypto.randomUUID()}`,
+  });
+  return true;
+}
+
 /**
  * Changes who can talk to the agent: its owner or admins (with no owner,
- * admins only); on a plan, more people only by its owner (`planSharing`).
+ * admins only), on a plan too (ADR 0059 §5): its owner hears by email when someone else lets more people in.
+ * `mailLossSeen`: the mailboxes the person agreed it loses (`audienceMailLoss`); losing any other refuses the save
+ * (409 `agent.mail_loss_changed`), so a mailbox given after they were asked is never taken unasked.
  * Audited.
  */
 export async function setAgentAudience(
@@ -352,13 +419,9 @@ export async function setAgentAudience(
   orgId: string,
   agentId: string,
   audience: Omit<AgentAudience, "roleIds"> & { roleIds?: string[] },
+  mailLossSeen?: readonly string[],
 ): Promise<Agent> {
-  const membership = await requirePermission(db, actorId, orgId, "read");
-  const agent = await getAgent(db, orgId, agentId);
-  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!can(membership, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
-    throw new ForbiddenError("Only the agent's owner or an admin can change who talks to it");
-  }
+  const agent = await audienceEditable(db, actorId, orgId, agentId);
   if (!AUDIENCE_MODES.includes(audience.mode)) throw new ValidationError("Unknown audience mode");
   const requested = audience.mode === "people" ? [...new Set(audience.userIds)] : [];
   if (requested.length > 500) throw new ValidationError("At most 500 people");
@@ -403,7 +466,6 @@ export async function setAgentAudience(
       roleIds = agent.audienceRoleIds;
     }
     const consultable = audience.consultable ?? agent.consultable;
-    planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds, roleIds, consultable });
     const [updated] = await tx
       .update(agents)
       .set({
@@ -416,19 +478,19 @@ export async function setAgentAudience(
       .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
       .returning();
     if (updated) {
+      if (mailLossSeen && widensReach(audienceOf(agent), audienceOf(updated), agent.ownerUserId)) {
+        const lost = await foreignMailboxes(tx, orgId, agentId, actorId);
+        if (lost.some((m) => !mailLossSeen.includes(m.accountId))) {
+          throw new ConflictError("It holds a mailbox you weren't asked about", "agent.mail_loss_changed");
+        }
+      }
       await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(updated), actorId);
+      await audienceChanged(tx, orgId, actorId, updated, audienceOf(agent), audienceOf(updated));
     }
     return updated;
   });
   if (!updated) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
-  await recordAudit(db, {
-    orgId,
-    actor: { type: "person", id: actorId },
-    action: "agent.audience_changed",
-    target: { type: "agent", id: agentId },
-    details: { from: audienceOf(agent), to: audienceOf(updated) },
-  });
   return updated;
 }

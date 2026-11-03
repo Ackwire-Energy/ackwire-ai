@@ -178,15 +178,14 @@ describe("other agents can consult it", () => {
     expect(canTalkTo(shared, lia.id, await speakerFor(f.db, f.org.id, lia.id))).toBe(false);
   });
 
-  test("the switch: its owner or an admin turns it off, audited; on a plan only its owner turns it back on", async () => {
+  test("the switch: its owner or an admin turns it off and on again, on a plan too, audited", async () => {
     f = await setup({ askAgent: true });
     const { nino } = await world({ brain: "claude_code", audienceMode: "people", audienceUserIds: [] });
     const caio = await addMember(f.db, f.org.id, "admin", "caio");
     const set = (actor: string, consultable: boolean) =>
       setAgentAudience(f.db, actor, f.org.id, nino.id, { mode: "people", userIds: [], consultable }).catch((e) => e);
     expect((await set(caio.id, false)).consultable).toBe(false);
-    expect(await set(caio.id, true)).toMatchObject({ code: "audience.plan_owner_only" });
-    expect((await set(f.owner.id, true)).consultable).toBe(true);
+    expect((await set(caio.id, true)).consultable).toBe(true);
     const audits = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
     expect(audits.map((a) => (a.details as { to: { consultable: boolean } }).to.consultable)).toEqual([false, true]);
     // Absent (an older app): kept.

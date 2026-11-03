@@ -1933,7 +1933,16 @@
     "added": "{{name}}이(가) 채널에 참여했어요.",
     "allow": "{{person}}이(가) 이 에이전트와 대화할 수 있게 허용",
     "allow_female": "{{person}}이(가) 이 에이전트와 대화할 수 있게 허용",
-    "allowed": "완료: 이제 {{person}}이(가) {{name}}와(과) 대화할 수 있어요."
+    "allowed": "완료: 이제 {{person}}이(가) {{name}}와(과) 대화할 수 있어요.",
+    "allowMe": "나도 대화할 수 있게 하기",
+    "allowMe_female": "나도 대화할 수 있게 하기",
+    "allowedMe": "완료: 이제 {{name}}와 대화할 수 있어요.",
+    "mailLossTitle": "메일함 접근 권한을 해제할까요?",
+    "mailLoss": "{{name}}은(는) {{owners}}의 메일함에 접근할 수 있어요. 대화할 수 있는 사람이 늘어나면 {{name}}을(를) 통해 그 메일에 닿을 수 있으므로 이 접근 권한은 해제돼요. 메일함을 연결한 사람이 다시 허용할 수 있어요.",
+    "mailLoss_female": "{{name}}은(는) {{owners}}의 메일함에 접근할 수 있어요. 대화할 수 있는 사람이 늘어나면 {{name}}을(를) 통해 그 메일에 닿을 수 있으므로 이 접근 권한은 해제돼요. 메일함을 연결한 사람이 다시 허용할 수 있어요.",
+    "planTitle": "{{owner}} 님의 플랜을 사용할까요?",
+    "planOpen": "{{name}}와의 대화에는 {{owner}} 님의 {{plan}} 플랜과 그 한도가 쓰여요. {{owner}} 님에게 이메일로 알려요.",
+    "plansTitle": "{{owners}} 님의 플랜을 사용할까요?"
   },
   "teamChecks": {
     "group": "에이전트가 반복하지 않은 일",
@@ -2984,6 +2993,7 @@
         "label_female": "작동 방식",
         "computer": "작업 위치",
         "brain": "생각하는 AI",
+        "brainWith": "{{plan}}(으)로 생각해요",
         "browser": "브라우저",
         "effort": "사고 수준 {{level}}"
       },
@@ -3026,7 +3036,7 @@
         "none": "이 계정이 있는 컴퓨터가 없어요",
         "planModel": "모델",
         "account": "계정",
-        "accountLocked": "{{name}}님만 바꿀 수 있어요",
+        "accountWho": "{{name}} 담당자인 {{owner}}님의 계정만 있어요. 플랜은 주인의 에이전트를 위해서만 생각해요.",
         "accountSignedOut": "로그아웃됨, 다시 로그인하세요",
         "thisComputer": "{{computer}}의 계정",
         "accountMove": "{{agents}}이(가) 사용 중 · 여기로 옮기기",
@@ -3054,7 +3064,7 @@
           "max": "최대"
         },
         "effortText": {
-          "auto": "작업마다 사고 수준을 골라요.",
+          "auto": "자동 모델이 작업마다 사고 수준을 골라요. 사고 수준을 정하려면 모델을 고르세요.",
           "low": "빠르게 답해요. 간단한 질문에 좋아요.",
           "medium": "기본값이에요. 대부분 충분히 생각해요.",
           "high": "어려운 작업에서 더 생각해요. 더 느리고 비용이 더 들어요.",
@@ -3079,6 +3089,11 @@
           "answers": "답하는 대상",
           "defaults": "기본값으로 되돌리기",
           "done": "완료",
+          "contents": {
+            "model": "컨텍스트 창",
+            "auto": "컨텍스트 창과 답하는 대상",
+            "fixed": "사고 수준, 컨텍스트 창, 답하는 대상"
+          },
           "allDefault": "모두 기본값",
           "effort": "사고 수준: {{level}}",
           "context": "컨텍스트: {{size}}",
@@ -6382,15 +6397,16 @@
     "share": {
       "switch": "다른 사람에게도 답해요",
       "switchAll": "다른 사람에게도 답하기",
-      "switchOther": "{{owner}}님에게만 답해요",
-      "onOther": "{{name}}은(는) {{owner}}님의 요금제로 생각해요. 다른 사람이 대화할 수 있게 하는 건 {{owner}}님만 할 수 있어요.",
-      "onOther_female": "{{name}}은(는) {{owner}}님의 요금제로 생각해요. 다른 사람이 대화할 수 있게 하는 건 {{owner}}님만 할 수 있어요.",
       "line": {
         "off": "{{name}}은(는) 내 {{plan}}(으)로 나에게만 답해요.",
         "on": "{{name}}은(는) 내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요.",
         "on_female": "{{name}}은(는) 내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요.",
         "offAll": "내 {{plan}}(으)로 나에게만 답해요.",
         "onAll": "내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요."
+      },
+      "lineOf": {
+        "off": "{{name}}은(는) {{owner}}님의 {{plan}}(으)로 {{owner}}님에게만 답해요.",
+        "on": "{{name}}은(는) {{owner}}님의 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요."
       },
       "plan": {
         "own": "{{provider}} 요금제",
@@ -6405,13 +6421,11 @@
       },
       "savedEveryone": "이제 {{name}}은(는) 다른 사람에게도 답해요.",
       "savedOwner": "이제 {{name}}은(는) 나에게만 답해요.",
+      "savedOwnerOf": "이제 {{name}}은(는) {{owner}}님에게만 답해요.",
       "backOnApi": "{{name}}은(는) 다시 API를 쓰고 여전히 나에게만 답해요.",
       "letEveryone": "{{name}}이(가) 모두에게 답하게 하기",
       "letPeople": "{{name}}이(가) 다른 사람에게도 답하게 하기",
       "pickPeople": "{{name}}은(는) 선택한 사람에게만 답하는데, 아직 선택한 사람이 없어요. 대화할 수 있는 사람에서 선택하세요."
-    },
-    "errors": {
-      "planOwnerOnly": "{{agentName}}의 책임자만 더 많은 사람을 허용할 수 있어요. {{agentName}}은(는) 그 사람의 요금제로 답해요."
     },
     "add": {
       "paste": "붙여넣기",

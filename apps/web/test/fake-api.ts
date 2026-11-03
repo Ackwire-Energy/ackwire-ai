@@ -31,6 +31,7 @@ import type {
   ConsultationConversation,
   Credential,
   Edition,
+  ForeignMailbox,
   FormerAgent,
   Gif,
   GifKey,
@@ -174,6 +175,8 @@ export interface FakeState {
   me: Me | null;
   /** What a one-click proposed agent thinks with (default: what its draft suggested). */
   proposalAi?: "account" | "model" | "none";
+  /** By agent: the mailboxes others gave it, which a wider audience would take (`agents.mailLoss`; default none). */
+  mailLoss?: Record<string, ForeignMailbox[]>;
   /** Overrides `account.authConfig` (default: GitHub only, sign-up open). */
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
@@ -1987,10 +1990,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           }
           agent.previousHandles = [...(agent.previousHandles ?? []).filter((h) => h !== input.handle), agent.handle];
         }
+        // As the backend: a mailbox given since the person was asked refuses the save.
+        const { mailLossSeen, ...fields } = input;
+        if (mailLossSeen && (state.mailLoss?.[agentId] ?? []).some((m) => !mailLossSeen.includes(m.accountId))) {
+          throw new ApiError(409, "agent.mail_loss_changed", "It holds a mailbox you weren't asked about");
+        }
         // One agent coordinates the team at a time (ADR 0093).
-        if (input.coordinator) for (const a of state.agents) a.coordinator = false;
-        Object.assign(agent, input);
+        if (fields.coordinator) for (const a of state.agents) a.coordinator = false;
+        Object.assign(agent, fields);
         return { ...agent };
+      },
+      mailLoss: async (orgId, agentId, audience) => {
+        log("agents.mailLoss", orgId, agentId, audience);
+        return state.mailLoss?.[agentId] ?? [];
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
       purge: async (orgId, agentId) => {
@@ -2180,13 +2192,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const b = brainOf(agentId);
         const brain = input.brain ?? b.brain;
         const changed = brain !== b.brain;
-        // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's alone.
+        // ADR 0059 §5: onto a plan, only its owner talks to it until its owner or an admin lets others in.
         const row = state.agents.find((a) => a.id === agentId);
         // "Só algumas pessoas" with nobody picked already answers its owner alone: the server leaves it as it is.
         const restricted = row?.audience?.mode === "people" && !answersOthers(audienceOf(row), row.ownerUserId);
         const onlyOwner = restricted || (input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner));
-        if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner) && !b.canUsePlans)
-          throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
         const option = b.options.find((o) => o.kind === brain);
         const next: AgentBrain = {

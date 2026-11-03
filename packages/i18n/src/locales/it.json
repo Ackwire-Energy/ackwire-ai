@@ -2068,7 +2068,16 @@
     "added": "{{name}} è entrato nel canale.",
     "allow": "Permetti a {{person}} di parlare con lui",
     "allow_female": "Permetti a {{person}} di parlare con lei",
-    "allowed": "Fatto: ora {{person}} può parlare con {{name}}."
+    "allowed": "Fatto: ora {{person}} può parlare con {{name}}.",
+    "allowMe": "Voglio parlare con lui",
+    "allowMe_female": "Voglio parlare con lei",
+    "allowedMe": "Fatto: ora puoi parlare con {{name}}.",
+    "mailLossTitle": "Togliere l'accesso alla casella di posta?",
+    "mailLoss": "{{name}} ha accesso alla casella di posta di {{owners}}. Se più persone parlano con lui, potrebbero raggiungere quelle email tramite lui, quindi questo accesso viene tolto. Chi ha collegato la casella può darlo di nuovo.",
+    "mailLoss_female": "{{name}} ha accesso alla casella di posta di {{owners}}. Se più persone parlano con lei, potrebbero raggiungere quelle email tramite lei, quindi questo accesso viene tolto. Chi ha collegato la casella può darlo di nuovo.",
+    "planTitle": "Usare il piano di {{owner}}?",
+    "planOpen": "Le conversazioni con {{name}} useranno il piano {{plan}} di {{owner}} e i suoi limiti. {{owner}} riceverà un'email che lo avvisa.",
+    "plansTitle": "Usare i piani di {{owners}}?"
   },
   "teamChecks": {
     "group": "Cosa l'agente non ha ripetuto",
@@ -3197,6 +3206,7 @@
         "label_female": "Come lavora",
         "computer": "Lavora su",
         "brain": "Pensa con",
+        "brainWith": "Pensa con {{plan}}",
         "browser": "Browser",
         "effort": "Impegno {{level}}"
       },
@@ -3251,7 +3261,7 @@
         "none": "Nessun computer lo ha",
         "planModel": "Modello",
         "account": "Account",
-        "accountLocked": "Solo {{name}} può cambiarlo",
+        "accountWho": "Solo account di {{owner}}, responsabile di {{name}}: un piano pensa solo per gli agenti del suo proprietario.",
         "accountSignedOut": "Disconnesso, accedi di nuovo",
         "thisComputer": "Account di {{computer}}",
         "accountMove": "In uso da {{agents}} · Spostalo qui",
@@ -3280,7 +3290,7 @@
           "max": "massimo"
         },
         "effortText": {
-          "auto": "Sceglie l'impegno per ogni attività.",
+          "auto": "Il modello Automatico sceglie l'impegno di ogni attività. Scegli un modello per fissare l'impegno.",
           "low": "Risponde in fretta. Adatto alle domande semplici.",
           "medium": "Il predefinito. Ragiona abbastanza quasi sempre.",
           "high": "Ragiona di più sulle attività difficili. Più lento e costa di più.",
@@ -3305,6 +3315,11 @@
           "answers": "A chi risponde",
           "defaults": "Ripristina i predefiniti",
           "done": "Fatto",
+          "contents": {
+            "model": "Finestra di contesto",
+            "auto": "Finestra di contesto e a chi risponde",
+            "fixed": "Impegno, finestra di contesto e a chi risponde"
+          },
           "allDefault": "Tutto predefinito",
           "effort": "Impegno: {{level}}",
           "context": "Contesto: {{size}}",
@@ -6964,9 +6979,6 @@
     "share": {
       "switch": "Risponde ad altre persone",
       "switchAll": "Rispondono ad altre persone",
-      "switchOther": "Risponde solo a {{owner}}",
-      "onOther": "{{name}} pensa con il piano di {{owner}}. Solo {{owner}} può permettere ad altre persone di parlargli.",
-      "onOther_female": "{{name}} pensa con il piano di {{owner}}. Solo {{owner}} può permettere ad altre persone di parlarle.",
       "line": {
         "off": "{{name}} risponde solo a te, con il tuo {{plan}}.",
         "off_female": "{{name}} risponde solo a te, con il tuo {{plan}}.",
@@ -6974,6 +6986,11 @@
         "on_female": "{{name}} risponde a chiunque possa parlarle, con il tuo {{plan}}.",
         "offAll": "Rispondono solo a te, con il tuo {{plan}}.",
         "onAll": "Rispondono a chiunque possa parlare con loro, con il tuo {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} risponde solo a {{owner}}, con il {{plan}} di {{owner}}.",
+        "on": "{{name}} risponde a chiunque possa parlargli, con il {{plan}} di {{owner}}.",
+        "on_female": "{{name}} risponde a chiunque possa parlarle, con il {{plan}} di {{owner}}."
       },
       "plan": {
         "own": "piano {{provider}}",
@@ -6989,6 +7006,7 @@
       "savedEveryone": "Ora {{name}} risponde ad altre persone.",
       "savedEveryone_female": "Ora {{name}} risponde ad altre persone.",
       "savedOwner": "Ora {{name}} risponde solo a te.",
+      "savedOwnerOf": "Ora {{name}} risponde solo a {{owner}}.",
       "savedOwner_female": "Ora {{name}} risponde solo a te.",
       "backOnApi": "{{name}} è tornato sull'API e risponde ancora solo a te.",
       "backOnApi_female": "{{name}} è tornata sull'API e risponde ancora solo a te.",
@@ -6998,9 +7016,6 @@
       "letPeople_female": "Lascia che {{name}} risponda ad altre persone",
       "pickPeople": "{{name}} risponde solo alle persone scelte, e non ne è stata scelta ancora nessuna. Sceglile in Chi può parlare.",
       "pickPeople_female": "{{name}} risponde solo alle persone scelte, e non ne è stata scelta ancora nessuna. Sceglile in Chi può parlare."
-    },
-    "errors": {
-      "planOwnerOnly": "Solo il responsabile di {{agentName}} può far entrare altre persone: {{agentName}} risponde con il suo piano."
     },
     "add": {
       "paste": "Incolla",

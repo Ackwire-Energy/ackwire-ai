@@ -7,6 +7,7 @@ import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { nanoUsdToUsd } from "@agenteschat/providers";
 import { z } from "zod";
 import { approverIds } from "./approvals";
+import { isComputerBrain, planName } from "./brains/types";
 import { invitationMailProof } from "./crypto";
 import { inertText } from "./email/inert";
 import {
@@ -20,6 +21,7 @@ import {
   ONBOARDING_CREW,
   renderDoc,
   type Scene,
+  type Text,
 } from "./email/layout";
 import { wordsFor } from "./email/words";
 import { dayAndTime } from "./format";
@@ -189,6 +191,22 @@ export type EmailTemplate =
     }
   /** An owner restored a workspace that was being deleted, one email per member. */
   | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
+  /**
+   * Someone else let more people talk to an agent that thinks with the reader's plan (ADR 0059 §5), to the plan's
+   * owner. `plan`: its maker's name ("Claude"). `was`/`now`: who could talk to it, names resolved (the reader aside).
+   * `url`: the agent's Who can talk.
+   */
+  | {
+      kind: "plan_opened";
+      locale: EmailLocale;
+      orgName: string;
+      byName: string;
+      agentName: string;
+      plan: string;
+      was: PlanAudience;
+      now: PlanAudience;
+      url: string;
+    }
   /** An AI app or a personal token got access to the person's account in a workspace (ADR 0119), to that person. */
   | { kind: "app_connected"; locale: EmailLocale; appName: string; orgName: string; url: string }
   /**
@@ -240,6 +258,12 @@ export type EmailTemplate =
     };
 
 /** Pictures linked from this server's own `/email/`. */
+/** Who could talk to an agent, as the plan-owner email names it: everyone, only them, or them and these. */
+export interface PlanAudience {
+  mode: "everyone" | "people" | "owner";
+  names: string[];
+}
+
 export function emailArtAt(publicUrl: string): EmailArt {
   const home = publicUrl.replace(/\/+$/, "");
   return { home, base: `${home}/email/`, files: null };
@@ -696,6 +720,34 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.why(org),
       );
     }
+    case "plan_opened": {
+      const c = w.planOpened;
+      const who = (a: PlanAudience): Text =>
+        a.mode === "everyone"
+          ? c.everyone
+          : a.mode === "owner" || a.names.length === 0
+            ? c.onlyYou
+            : new Intl.ListFormat(lang, { type: "conjunction" }).format([c.you, ...a.names.map((n) => inertText(n))]);
+      return doc(
+        c.subject(t.plan),
+        c.preheader(t.plan),
+        c.headline,
+        [
+          { p: c.body(inertText(t.byName) || w.someone, inertText(t.agentName), t.plan) },
+          {
+            facts: [
+              [c.agent, inertText(t.agentName)],
+              [c.by, inertText(t.byName) || w.someone],
+              [c.was, who(t.was)],
+              [c.now, who(t.now)],
+            ],
+          },
+          { small: c.note },
+          { button: c.button, url: t.url },
+        ],
+        c.why(inertText(t.orgName)),
+      );
+    }
     case "account_deleted": {
       const c = w.accountDeleted;
       const names = new Intl.ListFormat(lang, { type: "conjunction" })
@@ -834,6 +886,84 @@ export async function queueBudgetEmail(
       },
     });
   }
+}
+
+/**
+ * Job `agent.plan_opened` (`planOpened`): the plan-owner email, in their language, through `email.send`. Nothing
+ * when the agent, its owner or the person who changed it is gone, or its owner's plan no longer thinks for it.
+ */
+export async function queuePlanOpenedEmail(
+  db: Database,
+  publicUrl: string,
+  orgId: string,
+  jobId: string,
+  payload: Record<string, unknown>,
+) {
+  const { agentId, actorId } = payload as { agentId: string; actorId: string };
+  const from = payload.from as { mode: PlanAudience["mode"]; userIds: string[]; roleIds: string[] };
+  const to = payload.to as typeof from;
+  const [agent] = await db
+    .select({
+      name: agents.name,
+      ownerUserId: agents.ownerUserId,
+      brain: agents.brain,
+      accountId: agents.brainAccountId,
+      machineId: agents.machineId,
+    })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
+  if (!agent?.ownerUserId || !isComputerBrain(agent.brain) || !agent.machineId) return;
+  const ownerId = agent.ownerUserId;
+  // Its owner's plan thinks there, and they are still in the workspace: not OpenCode's free tier on a computer nobody
+  // connected (ADR 0132), nor a plan that no longer thinks for it.
+  const { planIsOwners } = await import("./brains/select");
+  const signIn = agent.accountId ? { id: agent.accountId } : undefined;
+  if (!(await planIsOwners(db, { orgId, ownerUserId: ownerId }, agent.machineId, signIn))) return;
+  const userIds = [...new Set([ownerId, actorId, ...from.userIds, ...to.userIds])];
+  const roleIds = [...new Set([...from.roleIds, ...to.roleIds])];
+  const [people, roles, [org], [account]] = await Promise.all([
+    db
+      .select({ id: users.id, name: users.name, email: users.email, locale: users.locale })
+      .from(users)
+      .where(inArray(users.id, userIds)),
+    roleIds.length
+      ? db
+          .select({ id: schema.orgRoles.id, name: schema.orgRoles.name })
+          .from(schema.orgRoles)
+          .where(and(eq(schema.orgRoles.orgId, orgId), inArray(schema.orgRoles.id, roleIds)))
+      : Promise.resolve([]),
+    db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId)),
+    agent.accountId
+      ? db
+          .select({ provider: schema.machineAccounts.provider })
+          .from(schema.machineAccounts)
+          .where(eq(schema.machineAccounts.id, agent.accountId))
+      : Promise.resolve([]),
+  ]);
+  const owner = people.find((p) => p.id === ownerId);
+  const actor = people.find((p) => p.id === actorId);
+  if (!owner || !actor || !org) return;
+  const name = new Map([...people, ...roles].map((x) => [x.id, x.name]));
+  const audience = (a: typeof from): PlanAudience => ({
+    mode: a.mode,
+    names: [...a.roleIds, ...a.userIds.filter((id) => id !== ownerId)].flatMap((id) => name.get(id) ?? []),
+  });
+  await queueEmail(db, {
+    orgId,
+    key: `plan-opened:${jobId}`,
+    to: [owner.email],
+    template: {
+      kind: "plan_opened",
+      locale: emailLocale(owner.locale),
+      orgName: org.name,
+      byName: actor.name,
+      agentName: agent.name,
+      plan: planName(agent.brain, account?.provider ?? undefined),
+      was: audience(from),
+      now: audience(to),
+      url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/agents/${agentId}?tab=settings&sec=audience`,
+    },
+  });
 }
 
 /**

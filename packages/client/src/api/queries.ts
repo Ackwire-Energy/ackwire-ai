@@ -42,10 +42,12 @@ import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
+import { ApiError } from "./http";
 import { keys } from "./keys";
 import { keepSending, outbox } from "./outbox";
 import type {
   AgentAction,
+  AgentAudience,
   AgentComputer,
   AgentDatabase,
   AgentDatabaseInput,
@@ -78,6 +80,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  ForeignMailbox,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -676,18 +679,64 @@ export function useDenyAgentProposal(orgId: string) {
   });
 }
 
+function agentChanged(qc: QueryClient, orgId: string, agentId: string) {
+  void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });
+  void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
+}
+
 export function useUpdateAgent(orgId: string, agentId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Partial<AgentInput>) => api.agents.update(orgId, agentId, input),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });
-      void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
+    onSuccess: () => agentChanged(qc, orgId, agentId),
+  });
+}
+
+/**
+ * Lets more people talk to the agent. `ask` gets the mailboxes saving `audience` would take from it (only a mailbox's
+ * owner gives an agent access to it), maybe none, and nothing is saved without its yes: it asks when they are some or
+ * the agent is on someone else's plan (`widenQuestion`). The save sends what was agreed: a mailbox given meanwhile
+ * makes the server refuse it, and `ask` gets the new list.
+ */
+export function useWidenAudience(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: async ({
+      audience,
+      ask,
+    }: {
+      audience: AgentAudience;
+      ask: (m: ForeignMailbox[]) => Promise<boolean>;
+    }) => {
+      for (let tries = 1; ; tries++) {
+        const mailboxes = await api.agents.mailLoss(orgId, agentId, audience).catch((e: unknown) => {
+          // An older server without the check: nothing to ask, as before it.
+          if (e instanceof ApiError && e.status === 404) return null;
+          throw e;
+        });
+        if (!(await ask(mailboxes ?? []))) return null;
+        const mailLossSeen = mailboxes?.map((m) => m.accountId);
+        try {
+          return await api.agents.update(orgId, agentId, { audience, ...(mailLossSeen ? { mailLossSeen } : {}) });
+        } catch (e) {
+          if (!(e instanceof ApiError && e.code === "agent.mail_loss_changed") || tries >= 3) throw e;
+        }
+      }
+    },
+    onSuccess: (saved) => {
+      if (saved) agentChanged(qc, orgId, agentId);
     },
   });
+  const widen = (
+    audience: AgentAudience,
+    ask: (mailboxes: ForeignMailbox[]) => Promise<boolean>,
+    onSaved?: () => void,
+  ) => save.mutate({ audience, ask }, { onSuccess: (saved) => saved && onSaved?.() });
+  return { widen, busy: save.isPending, done: save.isSuccess && save.data !== null };
 }
 
 export function useAddCredential(orgId: string) {

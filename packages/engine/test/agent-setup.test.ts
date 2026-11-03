@@ -2,12 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL } from "@agenteschat/adapters";
 import { and, eq, inArray, schema, sql } from "@agenteschat/db";
 import {
+  type AgentSetupInput,
   applyAgentSetup,
   createAgent,
   createSetupToolSource,
   ForbiddenError,
   getNewAgentSetup,
   NEW_AGENT_DEFAULTS,
+  PLAN_OPENED_JOB,
   PROPOSE_AGENT_TOOL,
   releaseAgents,
   type SetupResult,
@@ -236,18 +238,21 @@ describe("Usar em outros agentes", () => {
       autonomy: null,
     });
 
-    // Ana's plan is hers to give: an admin can't give it, and it thinks only for her agents.
-    expect(
-      await applyAgentSetup(deps, caio.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.theo] }),
-    ).toMatchObject([{ agentId: w.theo, status: "skipped", reason: "account_owner", params: { owner: "ana" } }]);
-    // So is the MacBook's own sign-in: she connected it.
-    const own = { ...ANA_CLAUDE(w.mac), account: null };
-    expect(await applyAgentSetup(deps, caio.id, fx.org.id, { setup: own, agentIds: [w.theo] })).toEqual([
-      { agentId: w.theo, status: "skipped", reason: "account_owner", params: { owner: "ana" } },
+    // Ana's plan thinks only for her agents: an admin gives it to hers (Theo), never to Bia's Zoe.
+    const byAdmin = (setup: AgentSetupInput) =>
+      applyAgentSetup(deps, caio.id, fx.org.id, { setup, agentIds: [w.theo, w.zoe], preview: true });
+    expect(await byAdmin(ANA_CLAUDE(w.mac))).toEqual([
+      { agentId: w.theo, status: "applied" },
+      { agentId: w.zoe, status: "skipped", reason: "account_owner", params: { owner: "ana" } },
+    ]);
+    // So does the MacBook's own sign-in: she connected it.
+    expect(await byAdmin({ ...ANA_CLAUDE(w.mac), account: null })).toEqual([
+      { agentId: w.theo, status: "applied" },
+      { agentId: w.zoe, status: "skipped", reason: "account_owner", params: { owner: "ana" } },
     ]);
     expect(
       await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.zoe] }),
-    ).toEqual([{ agentId: w.zoe, status: "skipped", reason: "account_owner" }]);
+    ).toEqual([{ agentId: w.zoe, status: "skipped", reason: "account_owner", params: { owner: "ana" } }]);
 
     // A sign-in made for one agent thinks for that one: Theo can't share Dev's.
     await fx.db.update(schema.machineAccounts).set({ shared: false }).where(eq(schema.machineAccounts.id, ANAS));
@@ -269,6 +274,30 @@ describe("Usar em outros agentes", () => {
       { agentId: w.dev, status: "applied" },
       { agentId: w.theo, status: "skipped", reason: "account_single", params: { agent: "Dev" } },
     ]);
+  });
+});
+
+describe("Usar em outros agentes on someone else's plan (ADR 0059 §5)", () => {
+  const planJobs = (w: Awaited<ReturnType<typeof world>>) =>
+    w.fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, PLAN_OPENED_JOB));
+
+  test("an admin letting more people talk to Ana's agent on her plan: the preview says so, and Ana gets an email", async () => {
+    const w = await world();
+    const { fx, deps, caio } = w;
+    const open = { ...ANA_CLAUDE(w.mac), onlyOwner: false };
+    const use = (userId: string, setup: AgentSetupInput, preview?: boolean) =>
+      applyAgentSetup(deps, userId, fx.org.id, { setup, agentIds: [w.theo], ...(preview ? { preview } : {}) });
+    expect(await use(caio.id, open, true)).toEqual([{ agentId: w.theo, status: "applied", opensPlan: true }]);
+    // The MacBook's own sign-in is Ana's plan too: she connected it.
+    expect(await use(caio.id, { ...open, account: null }, true)).toEqual([
+      { agentId: w.theo, status: "applied", opensPlan: true },
+    ]);
+    // Only its owner, or Ana herself: nothing to ask.
+    expect(await use(caio.id, { ...open, onlyOwner: true }, true)).toEqual([{ agentId: w.theo, status: "applied" }]);
+    expect(await use(fx.owner.id, open, true)).toEqual([{ agentId: w.theo, status: "applied" }]);
+    expect(await planJobs(w)).toHaveLength(0);
+    expect(await use(caio.id, open)).toEqual([{ agentId: w.theo, status: "applied", opensPlan: true }]);
+    expect(await planJobs(w)).toHaveLength(1);
   });
 });
 

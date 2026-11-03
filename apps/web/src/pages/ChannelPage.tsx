@@ -406,6 +406,8 @@ export interface ChannelChrome {
   dmPersonId?: string;
   /** The agent won't answer me: the composer is off and says why ("O Theo só responde a Walter."). */
   locked?: string;
+  /** Beside `locked`: a way in (who manages agents lets themselves talk to it). */
+  lockedAction?: ReactNode;
   /** Empty conversation: "Diga oi para o Theo". */
   emptyTitle?: string;
   /** Empty conversation: first messages to pick (they go to the composer). */
@@ -2349,7 +2351,11 @@ function ChannelView({
                           {chrome?.composerNote && !chrome.locked && (
                             <p className="ac-composer__hint">{chrome.composerNote}</p>
                           )}
-                          {chrome?.locked && <p className="ac-composer__hint">{chrome.locked}</p>}
+                          {chrome?.locked && (
+                            <p className="ac-composer__hint">
+                              {chrome.locked} {chrome.lockedAction}
+                            </p>
+                          )}
                         </>
                       )}
                     </div>

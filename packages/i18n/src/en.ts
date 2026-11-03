@@ -1958,6 +1958,21 @@ export const en = {
     allow: "Let {{person}} talk to him",
     allow_female: "Let {{person}} talk to her",
     allowed: "Done: {{person}} can now talk to {{name}}.",
+    allowMe: "Let me talk to him",
+    allowMe_female: "Let me talk to her",
+    allowedMe: "Done: you can now talk to {{name}}.",
+    /** Before widening an agent's audience takes mailboxes other people gave it (only a mailbox's owner gives access). */
+    mailLossTitle: "Remove mailbox access?",
+    mailLoss:
+      "{{name}} has access to the mailbox of {{owners}}. With more people talking to him, they could reach those emails through him, so that access is removed. Whoever connected the mailbox can give it again.",
+    mailLoss_female:
+      "{{name}} has access to the mailbox of {{owners}}. With more people talking to her, they could reach those emails through her, so that access is removed. Whoever connected the mailbox can give it again.",
+    /** Before widening an agent on someone else's plan (ADR 0059 §5): it spends their plan, and they get an email. */
+    planTitle: "Use {{owner}}'s plan?",
+    planOpen:
+      "Conversations with {{name}} will use {{owner}}'s {{plan}} plan and its limits. {{owner}} will get an email about it.",
+    /** "Usar em outros agentes" opening the plans of several people: then one `planOpen` line per owner. */
+    plansTitle: "Use the plans of {{owners}}?",
   },
   teamChecks: {
     group: "What the agent didn't repeat",
@@ -3026,6 +3041,7 @@ export const en = {
         label_female: "How she works",
         computer: "Works on",
         brain: "Thinks with",
+        brainWith: "Thinks with {{plan}}",
         browser: "Browser",
         effort: "{{level}} effort",
       },
@@ -3071,7 +3087,9 @@ export const en = {
         none: "No computer has it",
         planModel: "Model",
         account: "Account",
-        accountLocked: "Only {{name}} changes it",
+        /** To an admin: the accounts are the agent's owner's, since a plan thinks only for its owner's agents. */
+        accountWho:
+          "Only accounts of {{owner}}, who is responsible for {{name}}: a plan thinks only for its owner's agents.",
         accountSignedOut: "Signed out, sign in again",
         thisComputer: "{{computer}}'s account",
         accountMove: "In use by {{agents}} · Move it here",
@@ -3088,7 +3106,7 @@ export const en = {
         efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortsLower: { auto: "automatic", low: "low", medium: "medium", high: "high", max: "maximum" },
         effortText: {
-          auto: "Picks the effort for each task.",
+          auto: "The Automatic model picks each task's effort. Pick a model to set the effort yourself.",
           low: "Answers fast. Good for simple questions.",
           medium: "The default. Thinks enough most of the time.",
           high: "Thinks more on hard tasks. Slower and costs more.",
@@ -3113,6 +3131,11 @@ export const en = {
           answers: "Who it answers",
           defaults: "Back to defaults",
           done: "Done",
+          contents: {
+            model: "Context window",
+            auto: "Context window and who it answers",
+            fixed: "Effort, context window and who it answers",
+          },
           allDefault: "All defaults",
           effort: "Effort: {{level}}",
           context: "Context: {{size}}",
@@ -6388,15 +6411,18 @@ export const en = {
     share: {
       switch: "Answers other people",
       switchAll: "Answer other people",
-      switchOther: "Answers only {{owner}}",
-      onOther: "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to him.",
-      onOther_female: "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to her.",
       line: {
         off: "{{name}} answers only you, on your {{plan}}.",
         on: "{{name}} answers anyone who can talk to him, on your {{plan}}.",
         on_female: "{{name}} answers anyone who can talk to her, on your {{plan}}.",
         offAll: "They answer only you, on your {{plan}}.",
         onAll: "They answer anyone who can talk to them, on your {{plan}}.",
+      },
+      /** The same line to an admin, on the plan of the agent's owner. */
+      lineOf: {
+        off: "{{name}} answers only {{owner}}, on {{owner}}'s {{plan}}.",
+        on: "{{name}} answers anyone who can talk to him, on {{owner}}'s {{plan}}.",
+        on_female: "{{name}} answers anyone who can talk to her, on {{owner}}'s {{plan}}.",
       },
       plan: {
         own: "{{provider}} plan",
@@ -6412,14 +6438,11 @@ export const en = {
       },
       savedEveryone: "Now {{name}} answers other people.",
       savedOwner: "{{name}} now answers only you.",
+      savedOwnerOf: "{{name}} now answers only {{owner}}.",
       backOnApi: "{{name}} is back on the API and still answers only you.",
       letEveryone: "Let {{name}} answer everyone",
       letPeople: "Let {{name}} answer other people",
       pickPeople: "{{name}} answers only the people picked, and nobody is picked yet. Pick them under Who can talk.",
-    },
-    errors: {
-      planOwnerOnly:
-        "Only the person responsible for {{agentName}} can let more people in: {{agentName}} answers on their plan.",
     },
     add: {
       paste: "Paste",

@@ -1,4 +1,5 @@
 import type { BrainEffort } from "@agenteschat/adapters";
+import { planOf } from "@agenteschat/providers/plans";
 import type { CodeSetup } from "../git/machine";
 
 export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode";
@@ -25,6 +26,13 @@ export const BRAIN_PLAN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
 /** Brains that run on the agent's computer with a person's plan. */
 export const isComputerBrain = (v: unknown): v is ComputerBrainKind =>
   v === "claude_code" || v === "codex" || v === "cursor" || v === "opencode";
+
+/** The plan's name in a note: the coding plan's maker, else Claude's or ChatGPT's. */
+export function planName(kind: BrainKind, provider?: string): string {
+  const plan = planOf(provider);
+  if (plan) return provider === "opencode" ? plan.name : plan.maker;
+  return isComputerBrain(kind) ? BRAIN_PLAN_NAMES[kind] : "Claude";
+}
 
 /** The account a computer brain runs with (ADR 0041): a folder on the agent's machine. */
 export interface BrainAccount {

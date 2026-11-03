@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, AgentForYouItem, Memory, PlanUsage } from "@agenteschat/client";
+import type { AgentAccess, AgentForYouItem, Memory, OrgSummary, PlanUsage } from "@agenteschat/client";
+import { listsAgent, mailLossText, widenQuestion } from "@agenteschat/client/lib/audience";
 import { planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planLine } from "@agenteschat/ui/plan-state";
 import {
@@ -374,11 +375,68 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     expect(t("mobile.agent.exhaustedF", { name: "Ada" })).toBe("A Ada usou todo o orçamento do mês.");
   });
 
+  test("Pensa com: the plan as the row's name, the model and a fixed model's effort under it, on two lines", async () => {
+    const screen = await Bun.file(
+      new URL("../../src/features/agents/AgentProfileScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain("title={thinksPlan ?? thinks.text}");
+    expect(screen).toContain("{...(thinksUnder ? { subtitle: thinksUnder, subtitleLines: 2 } : {})}");
+    expect(screen).toContain("!isAuto(effortView.effectiveModel)");
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.cell.effort", { level: "médio" })).toBe("esforço médio");
+  });
+
   test("the bars as the web colors them: each window by its own level, the words and the compact bar by the plan's", async () => {
     const parts = await Bun.file(new URL("../../src/features/usage/parts.tsx", import.meta.url).pathname).text();
     expect(parts).toContain('const tone = c[PLAN_TONE[planLevel(shown.top?.used ?? 0, shown.state === "limited")]];');
     expect(parts).toContain('{ color: c[PLAN_TONE[planLevel(used, state === "limited")]] }');
     expect(parts).toContain("const level = planLevel(w.used);");
     expect(parts.match(/color=\{tone\}/g)).toHaveLength(2);
+  });
+});
+
+describe("an agent that doesn't answer me", () => {
+  const kept = agent({ id: "ada", name: "Ada", canTalk: false });
+  const admin = { permissions: ["manage_agents", "talk_to_agents"] } as unknown as OrgSummary;
+  const member = { permissions: ["talk_to_agents"] } as unknown as OrgSummary;
+
+  test("Conversar on its page opens the locked conversation for who manages agents, not for a member outside", () => {
+    expect(listsAgent(admin, kept)).toBe(true);
+    expect(listsAgent(member, kept)).toBe(false);
+    expect(listsAgent(member, { ...kept, canTalk: true })).toBe(true);
+  });
+
+  test("letting more people in asks first, naming whose mailboxes it would lose, each person once", async () => {
+    const t = await translator("pt-BR");
+    const box = (accountId: string, ownerName: string | null, address = `${accountId}@acme.com`) => ({
+      accountId,
+      address,
+      ownerUserId: ownerName ? `u-${ownerName}` : null,
+      ownerName,
+    });
+    expect(t("reach.mailLossTitle")).toBe("Tirar o acesso à caixa de email?");
+    expect(mailLossText(t, kept, [box("joao", "João"), box("vendas", "João"), box("bia", "Bia")])).toStartWith(
+      "Ada tem acesso à caixa de email de João e Bia. Com mais pessoas falando com ela,",
+    );
+    // Its connector left the workspace: the address names it.
+    expect(mailLossText(t, { name: "Theo" }, [box("x", null, "suporte@acme.com")])).toStartWith(
+      "Theo tem acesso à caixa de email de suporte@acme.com. Com mais pessoas falando com ele,",
+    );
+  });
+
+  test("on someone else's plan the one question names whose plan it uses and that they get an email, the mailboxes after", async () => {
+    const t = await translator("pt-BR");
+    const onPlan = { name: "Ada", brain: { kind: "codex" } as NonNullable<typeof kept.brain> };
+    const box = { accountId: "joao", address: "joao@acme.com", ownerUserId: "u-joao", ownerName: "João" };
+    expect(widenQuestion(t, onPlan, "João", [])).toEqual({
+      title: "Usar o plano de João?",
+      description:
+        "As conversas com Ada vão usar o plano do ChatGPT de João e os limites dele. João vai receber um email avisando.",
+    });
+    expect(widenQuestion(t, onPlan, "João", [box])?.description).toContain(
+      "João vai receber um email avisando. Ada tem acesso à caixa de email de João.",
+    );
+    const screen = await Bun.file(new URL("../../src/features/chat/ReachLines.tsx", import.meta.url).pathname).text();
+    expect(screen.match(/ask\(audience\)/g)).toHaveLength(2);
   });
 });

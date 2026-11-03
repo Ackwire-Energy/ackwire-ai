@@ -156,6 +156,7 @@ import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedBar, PinsSheet } from "./PinsSheet";
+import { AgentLocked } from "./ReachLines";
 import { RowSight } from "./row-sight";
 import {
   appendedKeys,
@@ -1950,7 +1951,9 @@ function Chat({
                   onSee={seeRun}
                 />
               ) : null}
-              {member && channel?.can?.post === false ? (
+              {member && dmAgent && !canTalk(dmAgent) ? (
+                <AgentLocked agent={dmAgent} />
+              ) : member && channel?.can?.post === false ? (
                 // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
                 <Text variant="footnote" tone="muted" style={styles.readOnly}>
                   {t("channel.perms.readOnlyComposer")}

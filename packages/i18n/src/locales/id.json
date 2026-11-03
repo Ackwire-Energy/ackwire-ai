@@ -1946,7 +1946,16 @@
     "added": "{{name}} bergabung ke kanal.",
     "allow": "Izinkan {{person}} bicara dengannya",
     "allow_female": "Izinkan {{person}} bicara dengannya",
-    "allowed": "Beres: {{person}} sekarang bisa bicara dengan {{name}}."
+    "allowed": "Beres: {{person}} sekarang bisa bicara dengan {{name}}.",
+    "allowMe": "Izinkan saya bicara dengannya",
+    "allowMe_female": "Izinkan saya bicara dengannya",
+    "allowedMe": "Selesai: sekarang kamu bisa bicara dengan {{name}}.",
+    "mailLossTitle": "Hapus akses kotak surat?",
+    "mailLoss": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi.",
+    "mailLoss_female": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi.",
+    "planTitle": "Pakai paket {{owner}}?",
+    "planOpen": "Percakapan dengan {{name}} akan memakai paket {{plan}} milik {{owner}} dan batasnya. {{owner}} akan menerima email tentang ini.",
+    "plansTitle": "Pakai paket {{owners}}?"
   },
   "teamChecks": {
     "group": "Yang tidak diulangi agen",
@@ -3001,6 +3010,7 @@
         "label_female": "Cara kerjanya",
         "computer": "Bekerja di",
         "brain": "Berpikir dengan",
+        "brainWith": "Berpikir dengan {{plan}}",
         "browser": "Browser",
         "effort": "Upaya {{level}}"
       },
@@ -3043,7 +3053,7 @@
         "none": "Tidak ada komputer yang memilikinya",
         "planModel": "Model",
         "account": "Akun",
-        "accountLocked": "Hanya {{name}} yang bisa mengubahnya",
+        "accountWho": "Hanya akun {{owner}}, penanggung jawab {{name}}: paket hanya berpikir untuk agen milik pemiliknya.",
         "accountSignedOut": "Keluar, masuk lagi",
         "thisComputer": "Akun {{computer}}",
         "accountMove": "Dipakai oleh {{agents}} · Pindahkan ke sini",
@@ -3071,7 +3081,7 @@
           "max": "maksimum"
         },
         "effortText": {
-          "auto": "Memilih upaya untuk setiap tugas.",
+          "auto": "Model Otomatis memilih upaya tiap tugas. Pilih model untuk menetapkan upayanya.",
           "low": "Menjawab cepat. Cocok untuk pertanyaan sederhana.",
           "medium": "Default. Berpikir cukup hampir setiap saat.",
           "high": "Berpikir lebih banyak untuk tugas sulit. Lebih lambat dan lebih mahal.",
@@ -3096,6 +3106,11 @@
           "answers": "Siapa yang dijawabnya",
           "defaults": "Kembali ke default",
           "done": "Selesai",
+          "contents": {
+            "model": "Jendela konteks",
+            "auto": "Jendela konteks dan siapa yang dijawabnya",
+            "fixed": "Upaya, jendela konteks, dan siapa yang dijawabnya"
+          },
           "allDefault": "Semua default",
           "effort": "Upaya: {{level}}",
           "context": "Konteks: {{size}}",
@@ -6438,15 +6453,16 @@
     "share": {
       "switch": "Menjawab orang lain",
       "switchAll": "Jawab orang lain",
-      "switchOther": "Hanya menjawab {{owner}}",
-      "onOther": "{{name}} berpikir dengan paket milik {{owner}}. Hanya {{owner}} yang bisa mengizinkan orang lain berbicara dengannya.",
-      "onOther_female": "{{name}} berpikir dengan paket milik {{owner}}. Hanya {{owner}} yang bisa mengizinkan orang lain berbicara dengannya.",
       "line": {
         "off": "{{name}} hanya menjawab kamu, dengan {{plan}} kamu.",
         "on": "{{name}} menjawab siapa pun yang bisa berbicara dengannya, dengan {{plan}} kamu.",
         "on_female": "{{name}} menjawab siapa pun yang bisa berbicara dengannya, dengan {{plan}} kamu.",
         "offAll": "Mereka hanya menjawab kamu, dengan {{plan}} kamu.",
         "onAll": "Mereka menjawab siapa pun yang bisa berbicara dengan mereka, dengan {{plan}} kamu."
+      },
+      "lineOf": {
+        "off": "{{name}} hanya menjawab {{owner}}, dengan {{plan}} milik {{owner}}.",
+        "on": "{{name}} menjawab siapa pun yang bisa berbicara dengannya, dengan {{plan}} milik {{owner}}."
       },
       "plan": {
         "own": "paket {{provider}}",
@@ -6461,13 +6477,11 @@
       },
       "savedEveryone": "Sekarang {{name}} menjawab orang lain.",
       "savedOwner": "{{name}} sekarang hanya menjawab kamu.",
+      "savedOwnerOf": "{{name}} sekarang hanya menjawab {{owner}}.",
       "backOnApi": "{{name}} kembali memakai API dan tetap hanya menjawab kamu.",
       "letEveryone": "Izinkan {{name}} menjawab semua orang",
       "letPeople": "Izinkan {{name}} menjawab orang lain",
       "pickPeople": "{{name}} hanya menjawab orang yang dipilih, dan belum ada yang dipilih. Pilih mereka di Siapa yang bisa bicara."
-    },
-    "errors": {
-      "planOwnerOnly": "Hanya penanggung jawab {{agentName}} yang bisa mengizinkan lebih banyak orang: {{agentName}} menjawab dengan paket miliknya."
     },
     "add": {
       "paste": "Tempel",

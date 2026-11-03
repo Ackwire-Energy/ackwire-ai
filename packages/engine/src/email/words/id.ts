@@ -318,4 +318,26 @@ export const words: EmailWords = {
     table: (day) => `Tabel lengkapnya: bun run report:autonomy --day ${day}`,
     why: "Kamu menerima email ini karena alamat ini ada di OPS_REPORT_EMAIL di server ini. Email ini dikirim sekali sehari.",
   },
+  planOpened: {
+    subject: (plan) => `Lebih banyak orang bisa bicara dengan agenmu lewat paket ${plan} kamu`,
+    preheader: (plan) => `Percakapan mereka memakai paket ${plan} kamu dan batasnya.`,
+    headline: "Lebih banyak orang bisa bicara dengan agenmu",
+    body: (by, agent, plan) => [
+      { b: by },
+      " membuat lebih banyak orang bisa bicara dengan ",
+      { b: agent },
+      `. Percakapan mereka memakai paket ${plan} kamu dan batasnya.`,
+    ],
+    agent: "Agen",
+    by: "Diubah oleh",
+    was: "Sebelumnya",
+    now: "Sekarang",
+    everyone: "Semua orang di workspace",
+    onlyYou: "Hanya kamu",
+    you: "Kamu",
+    note: "Untuk membatalkannya, ubah Siapa yang bisa bicara di halaman agen.",
+    button: "Lihat siapa yang bisa bicara",
+    why: (org) =>
+      `Kamu menerima email ini karena agenmu di ${org} berpikir dengan paketmu dan orang lain mengubah siapa yang bisa bicara dengannya.`,
+  },
 };

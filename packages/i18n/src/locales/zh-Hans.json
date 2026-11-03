@@ -1937,7 +1937,16 @@
     "added": "{{name}} 已加入频道。",
     "allow": "允许 {{person}} 与他对话",
     "allow_female": "允许 {{person}} 与她对话",
-    "allowed": "完成：{{person}} 现在可以与 {{name}} 对话了。"
+    "allowed": "完成：{{person}} 现在可以与 {{name}} 对话了。",
+    "allowMe": "让我也能和他对话",
+    "allowMe_female": "让我也能和她对话",
+    "allowedMe": "好了：你现在可以和 {{name}} 对话了。",
+    "mailLossTitle": "移除邮箱访问权限？",
+    "mailLoss": "{{name}} 可以访问 {{owners}} 的邮箱。能和他对话的人变多后，他们可能会通过他接触到这些邮件，所以这项访问权限会被移除。连接该邮箱的人可以重新授予。",
+    "mailLoss_female": "{{name}} 可以访问 {{owners}} 的邮箱。能和她对话的人变多后，他们可能会通过她接触到这些邮件，所以这项访问权限会被移除。连接该邮箱的人可以重新授予。",
+    "planTitle": "使用 {{owner}} 的套餐吗？",
+    "planOpen": "和 {{name}} 的对话会使用 {{owner}} 的 {{plan}} 套餐及其额度。{{owner}} 会收到一封邮件通知。",
+    "plansTitle": "使用 {{owners}} 的套餐吗？"
   },
   "teamChecks": {
     "group": "智能体没有重复做的事",
@@ -2998,6 +3007,7 @@
         "label_female": "她的工作方式",
         "computer": "工作位置",
         "brain": "思考方式",
+        "brainWith": "用 {{plan}} 思考",
         "browser": "浏览器",
         "effort": "{{level}}投入"
       },
@@ -3052,7 +3062,7 @@
         "none": "没有电脑可用",
         "planModel": "模型",
         "account": "账号",
-        "accountLocked": "只有 {{name}} 可以更改",
+        "accountWho": "只有 {{name}} 的负责人 {{owner}} 的账号：套餐只为其所有者的智能体思考。",
         "accountSignedOut": "已退出登录，请重新登录",
         "thisComputer": "{{computer}} 的账号",
         "accountMove": "{{agents}} 正在使用 · 移到这里",
@@ -3081,7 +3091,7 @@
           "max": "最高"
         },
         "effortText": {
-          "auto": "为每项任务自动选择投入程度。",
+          "auto": "自动模型会为每项任务选择投入程度。选择一个模型即可固定投入程度。",
           "low": "回复快，适合简单问题。",
           "medium": "默认设置，大多数时候思考得足够充分。",
           "high": "在难题上思考更多，更慢，费用也更高。",
@@ -3106,6 +3116,11 @@
           "answers": "回复对象",
           "defaults": "恢复默认",
           "done": "完成",
+          "contents": {
+            "model": "上下文窗口",
+            "auto": "上下文窗口和回复对象",
+            "fixed": "投入程度、上下文窗口和回复对象"
+          },
           "allDefault": "全部为默认",
           "effort": "投入程度：{{level}}",
           "context": "上下文：{{size}}",
@@ -6438,9 +6453,6 @@
     "share": {
       "switch": "回复其他成员",
       "switchAll": "回复其他成员",
-      "switchOther": "只回复 {{owner}}",
-      "onOther": "{{name}} 使用 {{owner}} 的套餐思考。只有 {{owner}} 可以让其他成员和他对话。",
-      "onOther_female": "{{name}} 使用 {{owner}} 的套餐思考。只有 {{owner}} 可以让其他成员和她对话。",
       "line": {
         "off": "{{name}} 只回复你，使用你的 {{plan}}。",
         "off_female": "{{name}} 只回复你，使用你的 {{plan}}。",
@@ -6448,6 +6460,11 @@
         "on_female": "{{name}} 会回复所有能和她对话的人，使用你的 {{plan}}。",
         "offAll": "它们只回复你，使用你的 {{plan}}。",
         "onAll": "它们会回复所有能和它们对话的人，使用你的 {{plan}}。"
+      },
+      "lineOf": {
+        "off": "{{name}} 只回复 {{owner}}，使用 {{owner}} 的 {{plan}}。",
+        "on": "{{name}} 会回复所有能和他对话的人，使用 {{owner}} 的 {{plan}}。",
+        "on_female": "{{name}} 会回复所有能和她对话的人，使用 {{owner}} 的 {{plan}}。"
       },
       "plan": {
         "own": "{{provider}} 套餐",
@@ -6463,6 +6480,7 @@
       "savedEveryone": "{{name}} 现在会回复其他成员。",
       "savedEveryone_female": "{{name}} 现在会回复其他成员。",
       "savedOwner": "{{name}} 现在只回复你。",
+      "savedOwnerOf": "{{name}} 现在只回复 {{owner}}。",
       "savedOwner_female": "{{name}} 现在只回复你。",
       "backOnApi": "{{name}} 已改回使用 API，仍然只回复你。",
       "backOnApi_female": "{{name}} 已改回使用 API，仍然只回复你。",
@@ -6472,9 +6490,6 @@
       "letPeople_female": "让 {{name}} 回复其他成员",
       "pickPeople": "{{name}} 只回复选中的成员，但目前还没有选中任何人。请在“谁可以对话”中选择。",
       "pickPeople_female": "{{name}} 只回复选中的成员，但目前还没有选中任何人。请在“谁可以对话”中选择。"
-    },
-    "errors": {
-      "planOwnerOnly": "只有 {{agentName}} 的负责人可以让更多人加入：{{agentName}} 使用的是他们的套餐。"
     },
     "add": {
       "paste": "粘贴",

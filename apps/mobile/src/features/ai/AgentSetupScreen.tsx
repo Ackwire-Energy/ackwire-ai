@@ -8,6 +8,7 @@ import {
   sortedResults,
   takers,
 } from "@agenteschat/client/lib/agent-setup";
+import { setupPlanOpens, setupPlanQuestion } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { firstName } from "@agenteschat/client/lib/format";
 import { isAuto } from "@agenteschat/client/lib/providers";
@@ -19,6 +20,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { confirmQuestion } from "../chat/ReachLines";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
@@ -71,7 +73,16 @@ export function AgentSetupScreen({ agentId }: { agentId: string }) {
       return next;
     });
   const use = async () => {
-    if (!setup || chosen.length === 0) return;
+    if (!setup || !view || chosen.length === 0) return;
+    // Letting more people talk to agents on other people's plans asks once, before anything saves.
+    const opens = setupPlanOpens(
+      results,
+      chosen,
+      (id) => dir.agentById.get(id),
+      (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
+    );
+    const provider = view.accounts.find((a) => a.id === view.account)?.provider ?? null;
+    if (!(await confirmQuestion(t, setupPlanQuestion(t, { kind: view.brain, provider }, opens)))) return;
     setBusy(true);
     try {
       const results = await api.agents.applySetup(orgId, { setup, agentIds: chosen });

@@ -7,6 +7,7 @@ import {
   agentView,
   applyAgentSetup,
   archiveAgent,
+  audienceMailLoss,
   audienceOf,
   budgetPercent,
   canTalkTo,
@@ -814,6 +815,10 @@ export function agentRoutes(deps: AppDeps) {
               deprecated: true,
               description: "Ignored. Older apps send it when an agent on a plan replies to everyone.",
             }),
+            mailLossSeen: z.array(z.uuid()).max(500).optional().openapi({
+              description:
+                "With `audience`: the mailboxes the person agreed it loses (`audience/mail-loss`). If it would lose another (given since), 409 `agent.mail_loss_changed` and nothing is saved: ask again.",
+            }),
           }),
         ),
       },
@@ -827,6 +832,7 @@ export function agentRoutes(deps: AppDeps) {
         appearance,
         coordinator,
         acceptPlanTerms: _,
+        mailLossSeen,
         brakes,
         ...rest
       } = c.req.valid("json");
@@ -848,7 +854,7 @@ export function agentRoutes(deps: AppDeps) {
             { pubsub: adapters.pubsub },
           )
         : null;
-      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
+      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience, mailLossSeen);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
       if (coordinator !== undefined)
         agent = await setCoordinator({ db, pubsub: adapters.pubsub }, actor, orgId, agentId, coordinator);
@@ -880,6 +886,39 @@ export function agentRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/audience/mail-loss",
+      tags,
+      security,
+      summary: "The mailboxes a new audience would take from the agent, taking nothing",
+      description:
+        "Letting someone new talk to an agent takes the mailboxes other people gave it (only a mailbox's owner gives an agent access to it, ADR 0038): the apps ask here first and name whose mail goes. Empty when the audience lets nobody new in or every mailbox is the caller's own. Its owner or admins, as for saving the audience.",
+      request: { params: AgentParams, body: body(z.object({ audience: AgentAudience })) },
+      responses: {
+        200: json(
+          z.object({
+            mailboxes: z.array(
+              z.object({
+                accountId: z.uuid(),
+                address: z.string(),
+                ownerUserId: z.string().nullable(),
+                ownerName: z.string().nullable(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const { audience } = c.req.valid("json");
+      return c.json({ mailboxes: await audienceMailLoss(db, c.get("user").id, orgId, agentId, audience) }, 200);
     },
   );
 
@@ -1093,11 +1132,11 @@ export function agentRoutes(deps: AppDeps) {
             fallback: z.boolean().optional(),
             extraUsage: z.boolean().optional().openapi({
               description:
-                "Long work may go on into the plan's paid extra usage when the provider reports it on (ADR 0118; Claude's plans); false: it pauses at 95% of the plan like any other. Omitted = keep.",
+                "Long work may go on into the plan's paid extra usage when the provider reports it on (ADR 0118; Claude's plans); false: it pauses at 95% of the plan like any other. Only the agent's owner changes it (`brain.extra_owner_only`): it bills their plan. Omitted = keep.",
             }),
             onlyOwner: z.boolean().optional().openapi({
               description:
-                "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
+                "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (its owner or an admin, on a plan too). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,
@@ -1105,7 +1144,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             account: z.uuid().nullable().optional().openapi({
               description:
-                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the owner of both the agent and the account chooses it (`account.not_owner`).",
+                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). One of the agent's owner's accounts, chosen by its owner or an admin (`account.not_owner`).",
             }),
             moveAccount: z.boolean().optional().openapi({
               description: "The account thinks for another agent (`account.in_use`): take it from that one (audited).",

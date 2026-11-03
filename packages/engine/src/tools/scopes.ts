@@ -17,7 +17,7 @@ import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
 import type { ToolDefinition } from "./types";
 
-const { agentScopes, agents, mailAccounts, dbConnections } = schema;
+const { agentScopes, agents, mailAccounts, dbConnections, users } = schema;
 
 /**
  * Mail grants (`agent_scopes` rows whose connection is a mailbox, ADR 0038)
@@ -80,9 +80,48 @@ export async function dropForeignMailGrants(
   const foreign = db
     .select({ id: mailAccounts.id })
     .from(mailAccounts)
-    .where(and(eq(mailAccounts.orgId, orgId), sql`${mailAccounts.createdByUserId} is distinct from ${keeperId}`));
+    .where(and(eq(mailAccounts.orgId, orgId), notKeepers(keeperId)));
   const where = and(eq(agentScopes.agentId, agentId), inArray(agentScopes.connectionId, foreign)) as SQL;
   return (await dropMailGrants(db, orgId, where, actorId, "audience_widened")).map((d) => d.accountId);
+}
+
+const notKeepers = (keeperId: string | null) => sql`${mailAccounts.createdByUserId} is distinct from ${keeperId}`;
+
+/** A mailbox someone else gave the agent: what `dropForeignMailGrants` would take, with whose it is. */
+export interface ForeignMailbox {
+  accountId: string;
+  address: string;
+  ownerUserId: string | null;
+  ownerName: string | null;
+}
+
+/** The mailboxes `dropForeignMailGrants` would take from the agent, taking nothing. */
+export async function foreignMailboxes(
+  db: Executor,
+  orgId: string,
+  agentId: string,
+  keeperId: string | null,
+): Promise<ForeignMailbox[]> {
+  return db
+    .selectDistinct({
+      accountId: mailAccounts.id,
+      address: mailAccounts.address,
+      ownerUserId: mailAccounts.createdByUserId,
+      ownerName: users.name,
+    })
+    .from(agentScopes)
+    .innerJoin(mailAccounts, eq(mailAccounts.id, agentScopes.connectionId))
+    .leftJoin(users, eq(users.id, mailAccounts.createdByUserId))
+    .where(
+      and(
+        eq(agentScopes.orgId, orgId),
+        eq(agentScopes.agentId, agentId),
+        like(agentScopes.scope, "mail:%"),
+        eq(mailAccounts.orgId, orgId),
+        notKeepers(keeperId),
+      ),
+    )
+    .orderBy(asc(mailAccounts.address));
 }
 
 /**

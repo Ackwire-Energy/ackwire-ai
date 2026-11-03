@@ -1211,16 +1211,16 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
   expect(auto).toMatchObject({ model: "auto", effectiveModel: "auto", effort: "auto", account: CLAUDE_ID });
   expect(await agentRow()).toMatchObject({ brainModel: "auto", brainEffort: "auto" });
 
-  // An admin sees it locked: changes the effort, not the account (nor the computer's own sign-in, the pairer's).
+  // An admin sees the owner's accounts, no emails, and picks among them as the owner does: the computer's own sign-in
+  // (the owner connected it) and back. Signing in stays the owner's.
   const seen = await getAgentBrain(deps, admin.id, f.org.id, f.agent.id);
   expect(seen).toMatchObject({ account: CLAUDE_ID, canManageAccounts: false, canUsePlans: false });
   expect(seen.accounts.map((a) => [a.email, a.mine])).toEqual([
     [null, false],
     [null, false],
   ]);
-  const locked = await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { account: null }).catch((e) => e);
-  expect(locked).toBeInstanceOf(ForbiddenError);
-  expect(locked.code).toBe("account.not_owner");
+  expect((await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { account: null })).account).toBeNull();
+  expect((await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { account: CLAUDE_ID })).account).toBe(CLAUDE_ID);
   expect(await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { effort: "low" })).toMatchObject({
     account: CLAUDE_ID,
     effort: "low",
@@ -1251,15 +1251,17 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
     .set({ archivedAt: new Date(), brainAccountId: CLAUDE_ID })
     .where(eq(schema.agents.id, theo.id));
 
-  // Someone else's account: only its owner picks it.
+  // Someone else's account never thinks for the owner's agent: not picked by the owner, nor by that account's owner.
   await addAccount(machineId, "0193dddd-0000-4000-8000-000000000003", "claude_code", {
     createdBy: admin.id,
     email: "bia@example.com",
   });
-  const theirs = await setAgentBrain(deps, f.owner.id, f.org.id, f.agent.id, {
-    account: "0193dddd-0000-4000-8000-000000000003",
-  }).catch((e) => e);
-  expect(theirs).toBeInstanceOf(ForbiddenError);
+  for (const by of [f.owner.id, admin.id]) {
+    const theirs = await setAgentBrain(deps, by, f.org.id, f.agent.id, {
+      account: "0193dddd-0000-4000-8000-000000000003",
+    }).catch((e) => e);
+    expect(theirs).toBeInstanceOf(ForbiddenError);
+  }
 
   // Another brain kind: back to the computer's own sign-in, whoever changes it.
   const codex = await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { brain: "codex" });

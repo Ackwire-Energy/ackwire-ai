@@ -2070,7 +2070,16 @@
     "added": "{{name}} a rejoint le canal.",
     "allow": "Laisser {{person}} lui parler",
     "allow_female": "Laisser {{person}} lui parler",
-    "allowed": "C'est fait : {{person}} peut maintenant parler à {{name}}."
+    "allowed": "C'est fait : {{person}} peut maintenant parler à {{name}}.",
+    "allowMe": "Je veux lui parler",
+    "allowMe_female": "Je veux lui parler",
+    "allowedMe": "C'est fait : tu peux maintenant parler à {{name}}.",
+    "mailLossTitle": "Retirer l'accès à la boîte mail ?",
+    "mailLoss": "{{name}} a accès à la boîte mail de {{owners}}. Si plus de personnes lui parlent, elles pourraient atteindre ces e-mails par son intermédiaire, donc cet accès est retiré. La personne qui a connecté la boîte mail peut le redonner.",
+    "mailLoss_female": "{{name}} a accès à la boîte mail de {{owners}}. Si plus de personnes lui parlent, elles pourraient atteindre ces e-mails par son intermédiaire, donc cet accès est retiré. La personne qui a connecté la boîte mail peut le redonner.",
+    "planTitle": "Utiliser le forfait de {{owner}} ?",
+    "planOpen": "Les conversations avec {{name}} utiliseront le forfait {{plan}} de {{owner}} et ses limites. {{owner}} recevra un e-mail pour le prévenir.",
+    "plansTitle": "Utiliser les forfaits de {{owners}} ?"
   },
   "teamChecks": {
     "group": "Ce que l'agent n'a pas refait",
@@ -3198,6 +3207,7 @@
         "label_female": "Sa façon de travailler",
         "computer": "Travaille sur",
         "brain": "Réfléchit avec",
+        "brainWith": "Réfléchit avec {{plan}}",
         "browser": "Navigateur",
         "effort": "Effort {{level}}"
       },
@@ -3252,7 +3262,7 @@
         "none": "Aucun ordinateur ne l'a",
         "planModel": "Modèle",
         "account": "Compte",
-        "accountLocked": "Seul {{name}} le modifie",
+        "accountWho": "Seulement les comptes de {{owner}}, responsable de {{name}} : un plan ne pense que pour les agents de son propriétaire.",
         "accountSignedOut": "Déconnecté, reconnectez-vous",
         "thisComputer": "Compte de {{computer}}",
         "accountMove": "Utilisé par {{agents}} · Le déplacer ici",
@@ -3281,7 +3291,7 @@
           "max": "maximal"
         },
         "effortText": {
-          "auto": "Choisit l'effort pour chaque tâche.",
+          "auto": "Le modèle Automatique choisit l'effort de chaque tâche. Choisissez un modèle pour fixer l'effort.",
           "low": "Répond vite. Idéal pour les questions simples.",
           "medium": "Par défaut. Réfléchit assez la plupart du temps.",
           "high": "Réfléchit davantage sur les tâches difficiles. Plus lent et plus cher.",
@@ -3306,6 +3316,11 @@
           "answers": "À qui il répond",
           "defaults": "Revenir aux valeurs par défaut",
           "done": "Terminé",
+          "contents": {
+            "model": "Fenêtre de contexte",
+            "auto": "Fenêtre de contexte et à qui il répond",
+            "fixed": "Effort, fenêtre de contexte et à qui il répond"
+          },
           "allDefault": "Tout par défaut",
           "effort": "Effort : {{level}}",
           "context": "Contexte : {{size}}",
@@ -6951,9 +6966,6 @@
     "share": {
       "switch": "Répond aux autres personnes",
       "switchAll": "Répondre aux autres personnes",
-      "switchOther": "Ne répond qu'à {{owner}}",
-      "onOther": "{{name}} réfléchit avec l'abonnement de {{owner}}. Seul {{owner}} peut laisser d'autres personnes lui parler.",
-      "onOther_female": "{{name}} réfléchit avec l'abonnement de {{owner}}. Seul {{owner}} peut laisser d'autres personnes lui parler.",
       "line": {
         "off": "{{name}} ne répond qu'à vous, avec votre {{plan}}.",
         "off_female": "{{name}} ne répond qu'à vous, avec votre {{plan}}.",
@@ -6961,6 +6973,10 @@
         "on_female": "{{name}} répond à toute personne qui peut lui parler, avec votre {{plan}}.",
         "offAll": "Ils ne répondent qu'à vous, avec votre {{plan}}.",
         "onAll": "Ils répondent à toute personne qui peut leur parler, avec votre {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} ne répond qu'à {{owner}}, avec le {{plan}} de {{owner}}.",
+        "on": "{{name}} répond à toute personne qui peut lui parler, avec le {{plan}} de {{owner}}."
       },
       "plan": {
         "own": "abonnement {{provider}}",
@@ -6976,6 +6992,7 @@
       "savedEveryone": "{{name}} répond maintenant aux autres personnes.",
       "savedEveryone_female": "{{name}} répond maintenant aux autres personnes.",
       "savedOwner": "{{name}} ne répond plus qu'à vous.",
+      "savedOwnerOf": "{{name}} ne répond plus qu'à {{owner}}.",
       "savedOwner_female": "{{name}} ne répond plus qu'à vous.",
       "backOnApi": "{{name}} est de retour sur l'API et ne répond toujours qu'à vous.",
       "backOnApi_female": "{{name}} est de retour sur l'API et ne répond toujours qu'à vous.",
@@ -6985,9 +7002,6 @@
       "letPeople_female": "Laisser {{name}} répondre aux autres personnes",
       "pickPeople": "{{name}} ne répond qu'aux personnes choisies, et personne n'est encore choisi. Choisissez-les dans Qui peut parler.",
       "pickPeople_female": "{{name}} ne répond qu'aux personnes choisies, et personne n'est encore choisi. Choisissez-les dans Qui peut parler."
-    },
-    "errors": {
-      "planOwnerOnly": "Seule la personne responsable de {{agentName}} peut ouvrir l'accès à plus de personnes : {{agentName}} répond avec son abonnement."
     },
     "add": {
       "paste": "Coller",

@@ -520,6 +520,14 @@ export interface AgentAudience {
   consultable?: boolean;
 }
 
+/** A mailbox someone else gave the agent, which a wider audience takes from it (only its owner gives it again). */
+export interface ForeignMailbox {
+  accountId: string;
+  address: string;
+  ownerUserId: string | null;
+  ownerName: string | null;
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -677,6 +685,8 @@ export interface AgentInput {
   ownerUserId?: string | null;
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
+  /** With `audience`: the mailboxes the person agreed it loses; losing another refuses the save (409). */
+  mailLossSeen?: string[];
   appearance?: AgentLookInput;
   /** Editing only, admins: it coordinates the team (true takes it from whoever had it), ADR 0093. */
   coordinator?: boolean;
@@ -4917,7 +4927,7 @@ export interface AgentBrain {
   accountsSupported: boolean;
   /** Nobody but the agent's owner talks to it ("Atende outras pessoas" off). */
   onlyOwner: boolean;
-  /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
+  /** The viewer owns the agent: only they connect its plan and turn its paid extra usage on or off. */
   canUsePlans: boolean;
   /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
   ownSignIn: boolean;
@@ -5068,6 +5078,8 @@ export interface AgentSetupResult {
   params?: Record<string, string>;
   /** Its Autonomia changes, whatever its AI does: wherever the caller may set it by hand, `skipped` agents too. */
   autonomy?: { from: CommandApproval; to: CommandApproval };
+  /** It lets more people talk to it on its owner's plan, someone else's: the apps ask first (`setupPlanQuestion`). */
+  opensPlan?: true;
 }
 
 /** `GET …/agent-setup`: what a new agent starts thinking with (the last setup saved or used on others). */

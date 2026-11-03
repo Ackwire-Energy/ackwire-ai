@@ -396,7 +396,7 @@ export async function planIsOwners(
   db: Executor,
   agent: Pick<Agent, "orgId" | "ownerUserId">,
   machineId: string,
-  account: BrainAccount | undefined,
+  account: Pick<BrainAccount, "id"> | undefined,
 ): Promise<boolean> {
   const owner = agent.ownerUserId;
   if (!owner) return false;
