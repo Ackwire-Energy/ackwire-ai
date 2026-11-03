@@ -253,6 +253,16 @@
     "chatSearch": "Nach einer Person oder einem Agenten suchen",
     "people": "Personen",
     "nobody": "Noch niemand hier.",
+    "search": "Person oder Agent",
+    "create": "Erstellen",
+    "agentHint": "Ein Name und was er tut",
+    "chatShort": "Unterhaltung",
+    "chatHint": "Eine Person oder ein Agent",
+    "taskHint": "Mit verantwortlicher Person und Frist",
+    "routineHint": "Ein Agent erledigt es selbst, nach Zeitplan",
+    "wikiPage": "Wiki-Seite",
+    "wikiHint": "Zum Lesen für das Team und die Agenten",
+    "inviteHint": "Per E-Mail oder Link",
     "agent": {
       "question": "Was soll er machen?"
     }
@@ -1190,7 +1200,8 @@
       "forum": "Du bist dran",
       "browser": "Browser",
       "secret": "Secret",
-      "join": "Mitglieder"
+      "join": "Mitglieder",
+      "tools": "Tools"
     },
     "review": "Prüfen",
     "answer": "Antworten",

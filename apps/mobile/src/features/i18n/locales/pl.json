@@ -271,6 +271,16 @@
     "chatSearch": "Szukaj osoby albo agenta",
     "people": "Osoby",
     "nobody": "Nikogo tu jeszcze nie ma.",
+    "search": "Osoba lub agent",
+    "create": "Utwórz",
+    "agentHint": "Nazwa i czym się zajmuje",
+    "chatShort": "Rozmowa",
+    "chatHint": "Osoba lub agent",
+    "taskHint": "Z osobą odpowiedzialną i terminem",
+    "routineHint": "Agent zrobi to sam, według harmonogramu",
+    "wikiPage": "Strona wiki",
+    "wikiHint": "Do czytania dla zespołu i agentów",
+    "inviteHint": "Przez e-mail lub link",
     "agent": {
       "question": "Czym będzie się zajmować?"
     }
@@ -1324,7 +1334,8 @@
       "forum": "Twoja kolej",
       "browser": "Przeglądarka",
       "secret": "Sekret",
-      "join": "Członkowie"
+      "join": "Członkowie",
+      "tools": "Narzędzia"
     },
     "review": "Sprawdź",
     "answer": "Odpowiedz",

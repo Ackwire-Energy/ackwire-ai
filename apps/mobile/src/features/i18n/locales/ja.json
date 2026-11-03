@@ -244,6 +244,16 @@
     "chatSearch": "人またはエージェントを検索",
     "people": "人",
     "nobody": "まだ誰もいません。",
+    "search": "人またはエージェント",
+    "create": "作成",
+    "agentHint": "名前と役割",
+    "chatShort": "会話",
+    "chatHint": "人またはエージェント",
+    "taskHint": "担当者と期限つき",
+    "routineHint": "エージェントが予定どおり自動で実行",
+    "wikiPage": "Wikiページ",
+    "wikiHint": "チームとエージェントが読むためのページ",
+    "inviteHint": "メールまたはリンクで",
     "agent": {
       "question": "何をしますか？"
     }
@@ -1123,7 +1133,8 @@
       "forum": "あなたの番",
       "browser": "ブラウザ",
       "secret": "シークレット",
-      "join": "メンバー"
+      "join": "メンバー",
+      "tools": "ツール"
     },
     "review": "レビュー",
     "answer": "返信",
