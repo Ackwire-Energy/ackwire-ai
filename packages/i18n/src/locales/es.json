@@ -2024,7 +2024,10 @@
     "allowed": "Listo: {{person}} ya puede hablar con {{name}}.",
     "allowMe": "Quiero hablar con él",
     "allowMe_female": "Quiero hablar con ella",
-    "allowedMe": "Listo: ya puedes hablar con {{name}}."
+    "allowedMe": "Listo: ya puedes hablar con {{name}}.",
+    "mailLossTitle": "¿Quitar el acceso al buzón?",
+    "mailLoss": "{{name}} tiene acceso al buzón de {{owners}}. Si más personas hablan con él, podrían llegar a esos correos a través de él, así que se quita ese acceso. Quien conectó el buzón puede darlo de nuevo.",
+    "mailLoss_female": "{{name}} tiene acceso al buzón de {{owners}}. Si más personas hablan con ella, podrían llegar a esos correos a través de ella, así que se quita ese acceso. Quien conectó el buzón puede darlo de nuevo."
   },
   "teamChecks": {
     "group": "Lo que el agente no repitió",

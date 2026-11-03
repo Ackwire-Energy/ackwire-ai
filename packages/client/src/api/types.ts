@@ -520,6 +520,14 @@ export interface AgentAudience {
   consultable?: boolean;
 }
 
+/** A mailbox someone else gave the agent, which a wider audience takes from it (only its owner gives it again). */
+export interface ForeignMailbox {
+  accountId: string;
+  address: string;
+  ownerUserId: string | null;
+  ownerName: string | null;
+}
+
 export interface Agent {
   id: string;
   name: string;

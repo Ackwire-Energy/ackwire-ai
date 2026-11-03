@@ -1,9 +1,17 @@
-import { type Agent, type Message, useAddChannelMember, useChannels, useUpdateAgent } from "@agenteschat/client";
-import { audienceWith, audienceWithMe, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
+import {
+  type Agent,
+  type ForeignMailbox,
+  type Message,
+  useAddChannelMember,
+  useChannels,
+  useWidenAudience,
+} from "@agenteschat/client";
+import { audienceWith, audienceWithMe, canEditAudience, mailLossText, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
-import { Button, Icon } from "@agenteschat/ui";
+import { Button, Dialog, DialogFooter, Icon } from "@agenteschat/ui";
+import { type SyntheticEvent, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ConsultPairRow, useConsultById } from "@/components/ConsultGroup";
 import { useOrg } from "@/components/org-context";
@@ -123,23 +131,27 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
-  const update = useUpdateAgent(org.id, agent.id);
+  const save = useWidenAudience(org.id, agent.id);
+  const mailLoss = useMailLossAsk(agent);
   const person = dir.memberById.get(userId)?.name;
   const audience = audienceWith(agent, userId);
   if (!person || !audience || modeOf(agent) === "everyone" || !canEditAudience(org, agent, me.user.id)) return null;
   const g = agentGrammar(agent.name);
   return (
-    <button
-      type="button"
-      className={className}
-      disabled={update.isPending || update.isSuccess}
-      onClick={(ev) => {
-        ev.stopPropagation();
-        update.mutate({ audience }, { onSuccess: () => toast.show(t("reach.allowed", { person, name: g.name })) });
-      }}
-    >
-      {t("reach.allow", { person, context: g.context })}
-    </button>
+    <>
+      <button
+        type="button"
+        className={className}
+        disabled={save.busy || save.done}
+        onClick={(ev) => {
+          ev.stopPropagation();
+          save.widen(audience, mailLoss.ask, () => toast.show(t("reach.allowed", { person, name: g.name })));
+        }}
+      >
+        {t("reach.allow", { person, context: g.context })}
+      </button>
+      {mailLoss.dialog}
+    </>
   );
 }
 
@@ -151,19 +163,61 @@ export function LetMeTalkButton({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const toast = useToast();
-  const update = useUpdateAgent(org.id, agent.id);
+  const save = useWidenAudience(org.id, agent.id);
+  const mailLoss = useMailLossAsk(agent);
   const audience = audienceWithMe(org, agent, me.user.id);
   if (!audience) return null;
   const g = agentGrammar(agent.name);
   return (
-    <Button
-      size="sm"
-      variant="primary"
-      icon="message"
-      disabled={update.isPending || update.isSuccess}
-      onClick={() => update.mutate({ audience }, { onSuccess: () => toast.show(t("reach.allowedMe", g)) })}
-    >
-      {t("reach.allowMe", g)}
-    </Button>
+    <>
+      <Button
+        size="sm"
+        variant="primary"
+        icon="message"
+        disabled={save.busy || save.done}
+        onClick={() => save.widen(audience, mailLoss.ask, () => toast.show(t("reach.allowedMe", g)))}
+      >
+        {t("reach.allowMe", g)}
+      </Button>
+      {mailLoss.dialog}
+    </>
   );
+}
+
+/**
+ * Before a wider audience takes the mailboxes other people gave the agent: whose they are and why, Cancel or Continue.
+ * `ask` answers whether to go on.
+ */
+function useMailLossAsk(agent: Agent) {
+  const { t } = useTranslation();
+  const [asking, setAsking] = useState<{ mailboxes: ForeignMailbox[]; answer: (yes: boolean) => void } | null>(null);
+  const ask = (mailboxes: ForeignMailbox[]) => new Promise<boolean>((answer) => setAsking({ mailboxes, answer }));
+  const answer = (yes: boolean) => {
+    asking?.answer(yes);
+    setAsking(null);
+  };
+  const stop = (e: SyntheticEvent) => e.stopPropagation();
+  const dialog = asking && (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the dialog's clicks and keys bubble through React to the row around the button (an inbox row opens on click)
+    <span onClick={stop} onKeyDown={stop}>
+      <Dialog
+        open
+        onOpenChange={(open) => !open && answer(false)}
+        title={t("reach.mailLossTitle")}
+        description={mailLossText(t, agent, asking.mailboxes)}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button type="button" onClick={() => answer(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="primary" onClick={() => answer(true)}>
+            {t("common.continue")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </span>
+  );
+  return { ask, dialog };
 }

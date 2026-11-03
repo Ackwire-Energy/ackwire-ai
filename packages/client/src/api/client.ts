@@ -10,6 +10,7 @@ import type {
   Agent,
   AgentAccess,
   AgentAction,
+  AgentAudience,
   AgentBrain,
   AgentBrainInput,
   AgentBrowserSettings,
@@ -92,6 +93,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  ForeignMailbox,
   FormerAgent,
   ForumParticipantsInput,
   ForumPost,
@@ -520,6 +522,8 @@ export interface ApiClient {
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
     update(orgId: string, agentId: string, input: Partial<AgentInput>): Promise<Agent>;
+    /** The mailboxes saving `audience` would take from it (others gave them), taking nothing: ask before widening. */
+    mailLoss(orgId: string, agentId: string, audience: AgentAudience): Promise<ForeignMailbox[]>;
     archive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
     purge(orgId: string, agentId: string): Promise<void>;

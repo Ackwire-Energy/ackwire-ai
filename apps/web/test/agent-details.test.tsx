@@ -73,4 +73,29 @@ describe("an agent that doesn't answer an admin", () => {
     const update = state.calls.find((c) => c.method === "agents.update");
     expect(update?.args[2]).toEqual({ audience: { mode: "people", userIds: ["u-walter"], roleIds: ["r-suporte"] } });
   });
+
+  test("letting me in when she holds João's mailbox asks first, naming whose access goes, and Cancel keeps it", async () => {
+    const state = keptOut();
+    state.mailLoss = {
+      [ADA_ID]: [{ accountId: "mb-joao", address: "joao@acme.com", ownerUserId: "u-joao", ownerName: "João" }],
+    };
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const allow = screen().getByRole("button", { name: /Quero falar com/ });
+    await act(async () => fireEvent.click(allow));
+    await settle(2);
+    const ask = screen().getByRole("dialog", { name: "Tirar o acesso à caixa de email?" });
+    expect(ask.textContent).toContain("Ada tem acesso à caixa de email de João.");
+    await act(async () => fireEvent.click(within(ask).getByRole("button", { name: "Cancelar" })));
+    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(state.calls.some((c) => c.method === "agents.update")).toBe(false);
+
+    await act(async () => fireEvent.click(allow));
+    await settle(2);
+    const again = screen().getByRole("dialog", { name: "Tirar o acesso à caixa de email?" });
+    await act(async () => fireEvent.click(within(again).getByRole("button", { name: "Continuar" })));
+    await settle(2);
+    expect(state.calls.filter((c) => c.method === "agents.update")).toHaveLength(1);
+  });
 });

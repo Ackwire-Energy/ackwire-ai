@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, AgentForYouItem, Memory, PlanUsage } from "@agenteschat/client";
+import type { AgentAccess, AgentForYouItem, Memory, OrgSummary, PlanUsage } from "@agenteschat/client";
+import { listsAgent, mailLossText } from "@agenteschat/client/lib/audience";
 import { planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planLine } from "@agenteschat/ui/plan-state";
 import {
@@ -380,5 +381,35 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     expect(parts).toContain('{ color: c[PLAN_TONE[planLevel(used, state === "limited")]] }');
     expect(parts).toContain("const level = planLevel(w.used);");
     expect(parts.match(/color=\{tone\}/g)).toHaveLength(2);
+  });
+});
+
+describe("an agent that doesn't answer me", () => {
+  const kept = agent({ id: "ada", name: "Ada", canTalk: false });
+  const admin = { permissions: ["manage_agents", "talk_to_agents"] } as unknown as OrgSummary;
+  const member = { permissions: ["talk_to_agents"] } as unknown as OrgSummary;
+
+  test("Conversar on its page opens the locked conversation for who manages agents, not for a member outside", () => {
+    expect(listsAgent(admin, kept)).toBe(true);
+    expect(listsAgent(member, kept)).toBe(false);
+    expect(listsAgent(member, { ...kept, canTalk: true })).toBe(true);
+  });
+
+  test("letting more people in asks first, naming whose mailboxes it would lose, each person once", async () => {
+    const t = await translator("pt-BR");
+    const box = (accountId: string, ownerName: string | null, address = `${accountId}@acme.com`) => ({
+      accountId,
+      address,
+      ownerUserId: ownerName ? `u-${ownerName}` : null,
+      ownerName,
+    });
+    expect(t("reach.mailLossTitle")).toBe("Tirar o acesso à caixa de email?");
+    expect(mailLossText(t, kept, [box("joao", "João"), box("vendas", "João"), box("bia", "Bia")])).toStartWith(
+      "Ada tem acesso à caixa de email de João e Bia. Com mais pessoas falando com ela,",
+    );
+    // Its connector left the workspace: the address names it.
+    expect(mailLossText(t, { name: "Theo" }, [box("x", null, "suporte@acme.com")])).toStartWith(
+      "Theo tem acesso à caixa de email de suporte@acme.com. Com mais pessoas falando com ele,",
+    );
   });
 });

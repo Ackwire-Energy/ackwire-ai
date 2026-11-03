@@ -13,7 +13,7 @@ import {
   useUsage,
 } from "@agenteschat/client";
 import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
-import { seesDetails } from "@agenteschat/client/lib/audience";
+import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -327,7 +327,7 @@ function Profile({ id }: { id: string }) {
                 wide
                 icon="chat"
                 label={t("mobile.agent.talk")}
-                disabled={agent?.canTalk === false}
+                disabled={!listsAgent(org, agent)}
                 onPress={() => void openDm()}
               />
             ) : (

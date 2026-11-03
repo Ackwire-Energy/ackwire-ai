@@ -1961,7 +1961,10 @@
     "allowed": "Erledigt: {{person}} kann jetzt mit {{name}} sprechen.",
     "allowMe": "Lass mich mit ihm sprechen",
     "allowMe_female": "Lass mich mit ihr sprechen",
-    "allowedMe": "Erledigt: Du kannst jetzt mit {{name}} sprechen."
+    "allowedMe": "Erledigt: Du kannst jetzt mit {{name}} sprechen.",
+    "mailLossTitle": "Postfachzugriff entfernen?",
+    "mailLoss": "{{name}} hat Zugriff auf das Postfach von {{owners}}. Wenn mehr Leute mit ihm sprechen, könnten sie über ihn an diese E-Mails kommen, daher wird dieser Zugriff entfernt. Wer das Postfach verbunden hat, kann den Zugriff wieder erteilen.",
+    "mailLoss_female": "{{name}} hat Zugriff auf das Postfach von {{owners}}. Wenn mehr Leute mit ihr sprechen, könnten sie über sie an diese E-Mails kommen, daher wird dieser Zugriff entfernt. Wer das Postfach verbunden hat, kann den Zugriff wieder erteilen."
   },
   "teamChecks": {
     "group": "Was der Agent nicht wiederholt hat",

@@ -1963,7 +1963,10 @@
     "allowed": "Klaar: {{person}} kan nu met {{name}} praten.",
     "allowMe": "Ik wil met hem praten",
     "allowMe_female": "Ik wil met haar praten",
-    "allowedMe": "Klaar: je kunt nu met {{name}} praten."
+    "allowedMe": "Klaar: je kunt nu met {{name}} praten.",
+    "mailLossTitle": "Toegang tot de mailbox weghalen?",
+    "mailLoss": "{{name}} heeft toegang tot de mailbox van {{owners}}. Als meer mensen met hem praten, kunnen ze via hem bij die e-mails komen, dus deze toegang wordt weggehaald. Wie de mailbox heeft gekoppeld, kan die toegang opnieuw geven.",
+    "mailLoss_female": "{{name}} heeft toegang tot de mailbox van {{owners}}. Als meer mensen met haar praten, kunnen ze via haar bij die e-mails komen, dus deze toegang wordt weggehaald. Wie de mailbox heeft gekoppeld, kan die toegang opnieuw geven."
   },
   "teamChecks": {
     "group": "Wat de agent niet herhaalde",

@@ -7,6 +7,7 @@ import {
   agentView,
   applyAgentSetup,
   archiveAgent,
+  audienceMailLoss,
   audienceOf,
   budgetPercent,
   canTalkTo,
@@ -880,6 +881,39 @@ export function agentRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/audience/mail-loss",
+      tags,
+      security,
+      summary: "The mailboxes a new audience would take from the agent, taking nothing",
+      description:
+        "Letting someone new talk to an agent takes the mailboxes other people gave it (only a mailbox's owner gives an agent access to it, ADR 0038): the apps ask here first and name whose mail goes. Empty when the audience lets nobody new in or every mailbox is the caller's own. Its owner or admins, as for saving the audience.",
+      request: { params: AgentParams, body: body(z.object({ audience: AgentAudience })) },
+      responses: {
+        200: json(
+          z.object({
+            mailboxes: z.array(
+              z.object({
+                accountId: z.uuid(),
+                address: z.string(),
+                ownerUserId: z.string().nullable(),
+                ownerName: z.string().nullable(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const { audience } = c.req.valid("json");
+      return c.json({ mailboxes: await audienceMailLoss(db, c.get("user").id, orgId, agentId, audience) }, 200);
     },
   );
 

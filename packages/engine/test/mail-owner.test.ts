@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { and, eq, like, schema } from "@agenteschat/db";
 import {
+  audienceMailLoss,
   createRole,
   createRoutine,
   decideApproval,
@@ -145,6 +146,34 @@ test("an agent whose audience someone else widens, or that gets a new owner, los
   expect((await mailScopes()).length).toBeGreaterThan(0);
   await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { ownerUserId: carla.id });
   expect(await mailScopes()).toEqual([]);
+});
+
+test("before widening, the apps can ask which mailboxes would go: whose they are, and nothing is taken", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const carla = await addMember(f.db, f.org.id, "member", "carla");
+  await makeAdmin(f.db, f.org.id, carla.id);
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: f.owner.id, audienceMode: "owner" })
+    .where(eq(schema.agents.id, f.agent.id));
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read");
+
+  const everyone = { mode: "everyone" as const, userIds: [] };
+  expect(await audienceMailLoss(f.db, carla.id, f.org.id, f.agent.id, everyone)).toEqual([
+    { accountId: account.id, address: account.address, ownerUserId: f.owner.id, ownerName: f.owner.name },
+  ]);
+  expect(
+    await audienceMailLoss(f.db, carla.id, f.org.id, f.agent.id, { mode: "people", userIds: [carla.id] }),
+  ).toHaveLength(1);
+  expect((await mailScopes()).length).toBeGreaterThan(0);
+  // Letting nobody new in, or the mailbox being the actor's own: nothing to ask.
+  expect(await audienceMailLoss(f.db, carla.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] })).toEqual([]);
+  expect(await audienceMailLoss(f.db, f.owner.id, f.org.id, f.agent.id, everyone)).toEqual([]);
+  // Only who may change the audience asks.
+  await expect(audienceMailLoss(f.db, lia.id, f.org.id, f.agent.id, everyone)).rejects.toBeInstanceOf(ForbiddenError);
 });
 
 test("an email in someone's own mailbox: they approve their own; asked by anyone else, only they decide", async () => {

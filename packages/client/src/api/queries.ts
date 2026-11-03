@@ -40,10 +40,12 @@ import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
+import { ApiError } from "./http";
 import { keys } from "./keys";
 import { keepSending, outbox } from "./outbox";
 import type {
   AgentAction,
+  AgentAudience,
   AgentComputer,
   AgentDatabase,
   AgentDatabaseInput,
@@ -75,6 +77,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  ForeignMailbox,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -684,6 +687,35 @@ export function useUpdateAgent(orgId: string, agentId: string) {
       void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
     },
   });
+}
+
+/**
+ * Lets more people talk to the agent. When saving `audience` would take mailboxes other people gave it (only a
+ * mailbox's owner gives an agent access to it), `ask` names them first and nothing is saved without its yes.
+ */
+export function useWidenAudience(orgId: string, agentId: string) {
+  const api = useApi();
+  const update = useUpdateAgent(orgId, agentId);
+  const check = useMutation({
+    mutationFn: (audience: AgentAudience) =>
+      api.agents.mailLoss(orgId, agentId, audience).catch((e: unknown) => {
+        // An older server without the check: nothing to ask, as before it.
+        if (e instanceof ApiError && e.status === 404) return [];
+        throw e;
+      }),
+  });
+  const widen = (
+    audience: AgentAudience,
+    ask: (mailboxes: ForeignMailbox[]) => Promise<boolean>,
+    onSaved?: () => void,
+  ) =>
+    check.mutate(audience, {
+      onSuccess: async (mailboxes) => {
+        if (mailboxes.length > 0 && !(await ask(mailboxes))) return;
+        update.mutate({ audience }, { onSuccess: onSaved });
+      },
+    });
+  return { widen, busy: check.isPending || update.isPending, done: update.isSuccess };
 }
 
 export function useAddCredential(orgId: string) {

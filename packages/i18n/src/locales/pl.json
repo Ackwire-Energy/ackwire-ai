@@ -2080,7 +2080,10 @@
     "allowed": "Gotowe: {{person}} może teraz rozmawiać z {{name}}.",
     "allowMe": "Chcę z nim rozmawiać",
     "allowMe_female": "Chcę z nią rozmawiać",
-    "allowedMe": "Gotowe: możesz już rozmawiać z {{name}}."
+    "allowedMe": "Gotowe: możesz już rozmawiać z {{name}}.",
+    "mailLossTitle": "Odebrać dostęp do skrzynki pocztowej?",
+    "mailLoss": "{{name}} ma dostęp do skrzynki pocztowej (należy do: {{owners}}). Gdy więcej osób będzie z nim rozmawiać, mogłyby przez niego dotrzeć do tych e-maili, więc ten dostęp zostanie odebrany. Osoba, która połączyła skrzynkę, może go przyznać ponownie.",
+    "mailLoss_female": "{{name}} ma dostęp do skrzynki pocztowej (należy do: {{owners}}). Gdy więcej osób będzie z nią rozmawiać, mogłyby przez nią dotrzeć do tych e-maili, więc ten dostęp zostanie odebrany. Osoba, która połączyła skrzynkę, może go przyznać ponownie."
   },
   "teamChecks": {
     "group": "Czego agent nie powtórzył",

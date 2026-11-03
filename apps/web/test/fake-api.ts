@@ -30,6 +30,7 @@ import type {
   ConsultationConversation,
   Credential,
   Edition,
+  ForeignMailbox,
   FormerAgent,
   Gif,
   GifKey,
@@ -173,6 +174,8 @@ export interface FakeState {
   me: Me | null;
   /** What a one-click proposed agent thinks with (default: what its draft suggested). */
   proposalAi?: "account" | "model" | "none";
+  /** By agent: the mailboxes others gave it, which a wider audience would take (`agents.mailLoss`; default none). */
+  mailLoss?: Record<string, ForeignMailbox[]>;
   /** Overrides `account.authConfig` (default: GitHub only, sign-up open). */
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
@@ -1987,6 +1990,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.coordinator) for (const a of state.agents) a.coordinator = false;
         Object.assign(agent, input);
         return { ...agent };
+      },
+      mailLoss: async (orgId, agentId, audience) => {
+        log("agents.mailLoss", orgId, agentId, audience);
+        return state.mailLoss?.[agentId] ?? [];
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
       purge: async (orgId, agentId) => {

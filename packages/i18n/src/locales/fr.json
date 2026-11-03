@@ -2027,7 +2027,10 @@
     "allowed": "C'est fait : {{person}} peut maintenant parler à {{name}}.",
     "allowMe": "Je veux lui parler",
     "allowMe_female": "Je veux lui parler",
-    "allowedMe": "C'est fait : tu peux maintenant parler à {{name}}."
+    "allowedMe": "C'est fait : tu peux maintenant parler à {{name}}.",
+    "mailLossTitle": "Retirer l'accès à la boîte mail ?",
+    "mailLoss": "{{name}} a accès à la boîte mail de {{owners}}. Si plus de personnes lui parlent, elles pourraient atteindre ces e-mails par son intermédiaire, donc cet accès est retiré. La personne qui a connecté la boîte mail peut le redonner.",
+    "mailLoss_female": "{{name}} a accès à la boîte mail de {{owners}}. Si plus de personnes lui parlent, elles pourraient atteindre ces e-mails par son intermédiaire, donc cet accès est retiré. La personne qui a connecté la boîte mail peut le redonner."
   },
   "teamChecks": {
     "group": "Ce que l'agent n'a pas refait",

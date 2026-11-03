@@ -76,6 +76,7 @@ import type {
   DeviceRequest,
   DirectMessage,
   DmRead,
+  ForeignMailbox,
   FormerAgent,
   ForumPost,
   ForumSuggestion,
@@ -622,6 +623,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
+      mailLoss: async (orgId, agentId, audience) =>
+        (
+          await request<{ mailboxes: ForeignMailbox[] }>(`${org(orgId)}/agents/${enc(agentId)}/audience/mail-loss`, {
+            json: { audience },
+          })
+        ).mailboxes,
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
       purge: (orgId, agentId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),

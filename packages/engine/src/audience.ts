@@ -8,7 +8,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
-import { dropForeignMailGrants } from "./tools/scopes";
+import { dropForeignMailGrants, type ForeignMailbox, foreignMailboxes } from "./tools/scopes";
 
 const { agents, users, organizationMembers, orgRoles } = schema;
 
@@ -67,10 +67,43 @@ export async function dropMailIfWidened(
   after: AgentAudience,
   actorId: string,
 ) {
-  const reach = (a: AgentAudience) => ({ ...a, consultable: true });
-  if (widensAudience(reach(before), reach(after), ownerUserId)) {
-    await dropForeignMailGrants(db, orgId, agentId, actorId, actorId);
+  if (widensReach(before, after, ownerUserId)) await dropForeignMailGrants(db, orgId, agentId, actorId, actorId);
+}
+
+const widensReach = (before: AgentAudience, after: AgentAudience, ownerUserId: string | null) =>
+  widensAudience({ ...before, consultable: true }, { ...after, consultable: true }, ownerUserId);
+
+/**
+ * The mailboxes saving `audience` would take from the agent (`dropMailIfWidened`), taking nothing: the apps ask the
+ * person first. Empty when it lets nobody new in, or every mailbox it holds is the actor's own.
+ */
+export async function audienceMailLoss(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  audience: Omit<AgentAudience, "roleIds"> & { roleIds?: string[] },
+): Promise<ForeignMailbox[]> {
+  const agent = await audienceEditable(db, actorId, orgId, agentId);
+  const people = audience.mode === "people";
+  const to: AgentAudience = {
+    mode: audience.mode,
+    userIds: people ? audience.userIds : [],
+    roleIds: people ? (audience.roleIds ?? agent.audienceRoleIds) : [],
+  };
+  if (!widensReach(audienceOf(agent), to, agent.ownerUserId)) return [];
+  return foreignMailboxes(db, orgId, agentId, actorId);
+}
+
+/** The agent, when `actorId` may change who talks to it: its owner or admins (with no owner, admins only). */
+async function audienceEditable(db: Database, actorId: string, orgId: string, agentId: string) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if (!can(membership, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
+    throw new ForbiddenError("Only the agent's owner or an admin can change who talks to it");
   }
+  return agent;
 }
 
 /**
@@ -336,12 +369,7 @@ export async function setAgentAudience(
   agentId: string,
   audience: Omit<AgentAudience, "roleIds"> & { roleIds?: string[] },
 ): Promise<Agent> {
-  const membership = await requirePermission(db, actorId, orgId, "read");
-  const agent = await getAgent(db, orgId, agentId);
-  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!can(membership, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
-    throw new ForbiddenError("Only the agent's owner or an admin can change who talks to it");
-  }
+  const agent = await audienceEditable(db, actorId, orgId, agentId);
   if (!AUDIENCE_MODES.includes(audience.mode)) throw new ValidationError("Unknown audience mode");
   const requested = audience.mode === "people" ? [...new Set(audience.userIds)] : [];
   if (requested.length > 500) throw new ValidationError("At most 500 people");

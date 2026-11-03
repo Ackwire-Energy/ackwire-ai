@@ -1903,7 +1903,10 @@
     "allowed": "Beres: {{person}} sekarang bisa bicara dengan {{name}}.",
     "allowMe": "Izinkan saya bicara dengannya",
     "allowMe_female": "Izinkan saya bicara dengannya",
-    "allowedMe": "Selesai: sekarang kamu bisa bicara dengan {{name}}."
+    "allowedMe": "Selesai: sekarang kamu bisa bicara dengan {{name}}.",
+    "mailLossTitle": "Hapus akses kotak surat?",
+    "mailLoss": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi.",
+    "mailLoss_female": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi."
   },
   "teamChecks": {
     "group": "Yang tidak diulangi agen",

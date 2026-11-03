@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentAudience, AudienceMode, OrgRole, OrgSummary } from "../api/types";
+import type { Agent, AgentAudience, AudienceMode, ForeignMailbox, OrgRole, OrgSummary } from "../api/types";
 import { engineOfBrain } from "./brain";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
@@ -127,6 +127,13 @@ export function audienceWithMe(org: OrgSummary | undefined, agent: Agent, myUser
   const next = audienceWith(agent, myUserId);
   return next && !audienceBlocked(agent, next, myUserId) ? next : null;
 }
+
+/** Why to ask before widening its audience: the agent loses the mailboxes others gave it, named by whose they are. */
+export const mailLossText = (t: TFunction, agent: Pick<Agent, "name">, mailboxes: readonly ForeignMailbox[]) =>
+  t("reach.mailLoss", {
+    ...agentGrammar(agent.name),
+    owners: joinNames([...new Set(mailboxes.map((m) => m.ownerName ?? m.address))], t),
+  });
 
 /** One line of "Quem pode falar": the whole workspace (its `everyone` role's mark), a role, or a person. */
 export type AudienceLine<P> =

@@ -4755,6 +4755,13 @@
   "reach.allowedMe": {
     "value": "Done: you can now talk to {{name}}."
   },
+  "reach.mailLossTitle": {
+    "value": "Remove mailbox access?"
+  },
+  "reach.mailLoss": {
+    "value": "{{name}} has access to the mailbox of {{owners}}. With more people talking to him, they could reach those emails through him, so that access is removed. Whoever connected the mailbox can give it again.",
+    "female": "{{name}} has access to the mailbox of {{owners}}. With more people talking to her, they could reach those emails through her, so that access is removed. Whoever connected the mailbox can give it again."
+  },
   "teamChecks.group": {
     "value": "What the agent didn't repeat"
   },

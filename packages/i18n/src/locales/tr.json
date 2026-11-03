@@ -1949,7 +1949,10 @@
     "allowed": "Tamam: {{person}} artık {{name}} ile konuşabilir.",
     "allowMe": "Onunla konuşmak istiyorum",
     "allowMe_female": "Onunla konuşmak istiyorum",
-    "allowedMe": "Tamam: artık {{name}} ile konuşabilirsin."
+    "allowedMe": "Tamam: artık {{name}} ile konuşabilirsin.",
+    "mailLossTitle": "Posta kutusu erişimi kaldırılsın mı?",
+    "mailLoss": "{{name}} bir posta kutusuna erişebiliyor (sahibi: {{owners}}). Onunla daha fazla kişi konuşursa bu e-postalara onun üzerinden ulaşabilirler, bu yüzden bu erişim kaldırılır. Posta kutusunu bağlayan kişi erişimi yeniden verebilir.",
+    "mailLoss_female": "{{name}} bir posta kutusuna erişebiliyor (sahibi: {{owners}}). Onunla daha fazla kişi konuşursa bu e-postalara onun üzerinden ulaşabilirler, bu yüzden bu erişim kaldırılır. Posta kutusunu bağlayan kişi erişimi yeniden verebilir."
   },
   "teamChecks": {
     "group": "Ajanın tekrarlamadıkları",

@@ -1,9 +1,24 @@
-import { type Agent, type Message, useChannels, useUpdateAgent } from "@agenteschat/client";
-import { audienceWith, audienceWithMe, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
+import {
+  type Agent,
+  type ForeignMailbox,
+  type Message,
+  useChannels,
+  useRoles,
+  useWidenAudience,
+} from "@agenteschat/client";
+import {
+  audienceNotice,
+  audienceWith,
+  audienceWithMe,
+  canEditAudience,
+  mailLossText,
+  modeOf,
+} from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Icon, PillButton, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -88,7 +103,7 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
   const me = useMeId();
   const dir = useDirectory();
   const toast = useToast();
-  const update = useUpdateAgent(orgId, agent.id);
+  const save = useWidenAudience(orgId, agent.id);
   const person = dir.memberById.get(userId)?.name;
   const audience = audienceWith(agent, userId);
   if (!person || !audience || !me || modeOf(agent) === "everyone" || !canEditAudience(org ?? undefined, agent, me))
@@ -98,11 +113,10 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
     <PillButton
       label={t("reach.allow", { person, context: g.context })}
       onPress={() => {
-        if (update.isPending || update.isSuccess) return;
+        if (save.busy || save.done) return;
         tapHaptic();
-        update.mutate(
-          { audience },
-          { onSuccess: () => toast({ title: t("reach.allowed", { person, name: g.name }) }) },
+        save.widen(audience, askMailLoss(t, agent), () =>
+          toast({ title: t("reach.allowed", { person, name: g.name }) }),
         );
       }}
     />
@@ -119,7 +133,7 @@ export function LetMeTalkPill({ agent }: { agent: Agent }) {
   const { org } = useOrg();
   const me = useMeId();
   const toast = useToast();
-  const update = useUpdateAgent(orgId, agent.id);
+  const save = useWidenAudience(orgId, agent.id);
   const audience = me ? audienceWithMe(org ?? undefined, agent, me) : null;
   if (!audience) return null;
   const g = agentGrammar(agent.name);
@@ -127,16 +141,56 @@ export function LetMeTalkPill({ agent }: { agent: Agent }) {
     <PillButton
       label={t("reach.allowMe", g)}
       onPress={() => {
-        if (update.isPending || update.isSuccess) return;
+        if (save.busy || save.done) return;
         tapHaptic();
-        update.mutate({ audience }, { onSuccess: () => toast({ title: t("reach.allowedMe", g) }) });
+        save.widen(audience, askMailLoss(t, agent), () => toast({ title: t("reach.allowedMe", g) }));
       }}
     />
   );
 }
 
+/**
+ * In place of the composer, in a conversation with an agent that doesn't answer me (who manages agents opens it): why,
+ * and "Quero falar com ele" when I may let myself in.
+ */
+export function AgentLocked({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const roles = useRoles(useOrgId()).data?.roles;
+  const notice = audienceNotice(
+    t,
+    agent,
+    (id) => dir.memberById.get(id)?.name,
+    (id) => roles?.find((r) => r.id === id)?.name,
+  );
+  return (
+    <View style={styles.locked}>
+      <Text variant="small" tone="muted" style={styles.lockedText}>
+        {notice}
+      </Text>
+      <LetMeTalkPill agent={agent} />
+    </View>
+  );
+}
+
+/** Before a wider audience takes the mailboxes other people gave the agent: whose they are and why, Cancel or Continue. */
+const askMailLoss = (t: TFunction, agent: Agent) => (mailboxes: ForeignMailbox[]) =>
+  new Promise<boolean>((answer) =>
+    Alert.alert(
+      t("reach.mailLossTitle"),
+      mailLossText(t, agent, mailboxes),
+      [
+        { text: t("common.cancel"), style: "cancel", onPress: () => answer(false) },
+        { text: t("common.continue"), onPress: () => answer(true) },
+      ],
+      { cancelable: true, onDismiss: () => answer(false) },
+    ),
+  );
+
 const styles = StyleSheet.create({
   list: { marginTop: 12, gap: 8 },
+  locked: { alignItems: "center", gap: 10, paddingVertical: 6 },
+  lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   one: {

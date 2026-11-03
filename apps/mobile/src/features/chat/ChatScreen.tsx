@@ -156,6 +156,7 @@ import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedBar, PinsSheet } from "./PinsSheet";
+import { AgentLocked } from "./ReachLines";
 import { RowSight } from "./row-sight";
 import {
   appendedKeys,
@@ -1947,7 +1948,9 @@ function Chat({
                   onSee={seeRun}
                 />
               ) : null}
-              {member ? (
+              {member && dmAgent && !canTalk(dmAgent) ? (
+                <AgentLocked agent={dmAgent} />
+              ) : member ? (
                 <Composer
                   placeholder={placeholder}
                   onSend={onSend}

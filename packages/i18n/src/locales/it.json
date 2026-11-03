@@ -2025,7 +2025,10 @@
     "allowed": "Fatto: ora {{person}} può parlare con {{name}}.",
     "allowMe": "Voglio parlare con lui",
     "allowMe_female": "Voglio parlare con lei",
-    "allowedMe": "Fatto: ora puoi parlare con {{name}}."
+    "allowedMe": "Fatto: ora puoi parlare con {{name}}.",
+    "mailLossTitle": "Togliere l'accesso alla casella di posta?",
+    "mailLoss": "{{name}} ha accesso alla casella di posta di {{owners}}. Se più persone parlano con lui, potrebbero raggiungere quelle email tramite lui, quindi questo accesso viene tolto. Chi ha collegato la casella può darlo di nuovo.",
+    "mailLoss_female": "{{name}} ha accesso alla casella di posta di {{owners}}. Se più persone parlano con lei, potrebbero raggiungere quelle email tramite lei, quindi questo accesso viene tolto. Chi ha collegato la casella può darlo di nuovo."
   },
   "teamChecks": {
     "group": "Cosa l'agente non ha ripetuto",
