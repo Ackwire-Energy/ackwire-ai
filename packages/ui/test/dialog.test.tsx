@@ -306,6 +306,7 @@ describe("Dialog without a footer", () => {
         </DialogSearchList>
         <DialogFooter note={undefined} />
         <DialogFooter>{false}</DialogFooter>
+        <DialogFooter>{[false, null]}</DialogFooter>
       </Dialog>,
     );
     const dialog = body().getByRole("dialog", { name: "Membros" });

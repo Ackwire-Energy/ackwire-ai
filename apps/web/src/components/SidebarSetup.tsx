@@ -26,6 +26,7 @@ import {
   type KeyboardEvent,
   type ReactElement,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -45,12 +46,29 @@ export const SIDEBAR_TOOLS = {
   forum: { to: "/org/$orgId/forum", icon: "message" },
 } as const satisfies Record<SidebarItem, { to: string; icon: IconName }>;
 
-/** The person's order of the tools in this workspace (`…/me/sidebar/tools`), saved as `null` when it is the default. */
+/**
+ * The person's order of the tools in this workspace (`…/me/sidebar/tools`), saved as `null` when it is the default.
+ * `put(next, from)` keeps the focus on `from` (or, once it is disabled at an end, its row's other arrow): React moves a
+ * row down by re-inserting its node, which blurs whatever was focused inside it.
+ */
 function useToolOrder(orgId: string) {
   const order = useSidebarToolOrder(orgId);
   const save = useSetSidebarToolOrder(orgId);
-  const put = (next: SidebarItem[]) => {
-    if (!sameOrder(next, order)) save.mutate(sameOrder(next, SIDEBAR_ITEMS) ? null : next);
+  const focused = useRef<HTMLElement | null>(null);
+  const key = order.join();
+  useLayoutEffect(() => {
+    const el = focused.current;
+    focused.current = null;
+    if (!key || !el?.isConnected) return;
+    (el.matches(":disabled")
+      ? el.parentElement?.querySelector<HTMLElement>("[data-move]:not(:disabled)")
+      : el
+    )?.focus();
+  }, [key]);
+  const put = (next: SidebarItem[], from?: Element) => {
+    if (sameOrder(next, order)) return;
+    if (from instanceof HTMLElement) focused.current = from;
+    save.mutate(sameOrder(next, SIDEBAR_ITEMS) ? null : next);
   };
   return { order, put };
 }
@@ -81,7 +99,7 @@ export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: Sideb
       onKeyDown: (e: KeyboardEvent) => {
         if (!e.altKey || !e.shiftKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
         e.preventDefault();
-        put(moveShownTool(order, shown, id, e.key === "ArrowUp" ? -1 : 1));
+        put(moveShownTool(order, shown, id, e.key === "ArrowUp" ? -1 : 1), e.currentTarget);
       },
       onDragStart: (e: DragEvent) => {
         dragging.current = id;
@@ -163,8 +181,9 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 iconOnly
                 icon="chevronUp"
                 aria-label={`${t("contextMenu.moveUp")}: ${t(`shell.${id}`)}`}
+                data-move
                 disabled={i === 0}
-                onClick={() => tools.put(moveSection(tools.order, id, -1))}
+                onClick={(e) => tools.put(moveSection(tools.order, id, -1), e.currentTarget)}
               />
               <Button
                 size="sm"
@@ -172,8 +191,9 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 iconOnly
                 icon="chevronDown"
                 aria-label={`${t("contextMenu.moveDown")}: ${t(`shell.${id}`)}`}
+                data-move
                 disabled={i === tools.order.length - 1}
-                onClick={() => tools.put(moveSection(tools.order, id, 1))}
+                onClick={(e) => tools.put(moveSection(tools.order, id, 1), e.currentTarget)}
               />
             </li>
           ))}
