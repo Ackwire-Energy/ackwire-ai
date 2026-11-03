@@ -142,6 +142,9 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
         title={t("shell.members")}
         subtitle={`#${channelName}${roster.data ? ` · ${t("mobile.chat.here", { count: all.length })}` : ""}`}
       />
+      <Text variant="footnote" tone="muted">
+        {t("channelMembers.caption")}
+      </Text>
       {all.length > SEARCH_FROM ? (
         <SearchField value={q} onChangeText={setQ} placeholder={t("channel.detailsSearch")} autoCorrect={false} />
       ) : null}

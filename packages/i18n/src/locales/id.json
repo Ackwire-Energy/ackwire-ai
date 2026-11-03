@@ -1390,6 +1390,52 @@
     "working_other": "{{count}} agen bekerja"
   },
   "channel": {
+    "settingsNav": {
+      "label": "Pengaturan kanal",
+      "overview": "Ringkasan",
+      "permissions": "Izin",
+      "members": "Anggota"
+    },
+    "perms": {
+      "advanced": "Izin lanjutan",
+      "intro": "Pengecualian hanya berlaku di kanal ini. Bawaan mengikuti peran ruang kerja.",
+      "targets": "Peran dan orang dengan pengecualian",
+      "add": "Tambah peran atau orang",
+      "addSearch": "Cari peran atau orang",
+      "addNone": "Tidak ada peran atau orang yang ditemukan",
+      "groupRoles": "Peran",
+      "groupPeople": "Orang",
+      "clear": "Hapus pengecualian",
+      "stateLabel": "{{key}} untuk {{target}}",
+      "state": {
+        "deny": "Tolak",
+        "inherit": "Bawaan",
+        "allow": "Izinkan"
+      },
+      "keys": {
+        "post": {
+          "title": "Kirim pesan",
+          "line": "Menulis, membalas di utas, dan menyematkan pesan di sini"
+        },
+        "callAgents": {
+          "title": "Panggil agen",
+          "line": "Pesan membangunkan agen di kanal ini"
+        },
+        "manage": {
+          "title": "Kelola kanal",
+          "line": "Ubah nama, siapa yang melihat, anggota, dan izin ini"
+        }
+      },
+      "default": {
+        "allowedBy": "Bawaan: diizinkan oleh peran {{role}}",
+        "notHeld": "Bawaan: peran {{role}} tidak memilikinya",
+        "followsEveryone": "Bawaan: mengikuti {{role}} di kanal ini",
+        "person": "Bawaan: mengikuti peran orang ini"
+      },
+      "readOnlyComposer": "Hanya sebagian orang yang mengirim pesan di kanal ini",
+      "agentsDenied": "Di kanal ini kamu tidak memanggil agen",
+      "forbidden": "Kamu hanya mengubah izin yang kamu punya, untuk peran dan orang di bawahmu"
+    },
     "pins": {
       "title": "Disematkan",
       "button_other": "Pesan yang disematkan ({{count}})",
@@ -2084,6 +2130,7 @@
     "editChannel": "Ubah kanal"
   },
   "channelMembers": {
+    "caption": "Siapa yang bisa melihat kanal ini",
     "addRow": "Tambah orang atau agen",
     "invite": "Undang {{email}} ke {{org}} dan #{{channel}}",
     "inviteOrg": "Undang {{email}} ke {{org}}",
@@ -2885,6 +2932,14 @@
     "nameLabel": "Nama",
     "roleLabel": "Peran",
     "roleHelp": "Apa yang dikerjakannya untuk tim, misalnya Asisten email dan kalender.",
+    "editName": "Ubah nama: {{name}}",
+    "editHandle": "Ubah sebutan: @{{handle}}",
+    "editRole": "Ubah peran: {{role}}",
+    "noRole": "Tanpa peran",
+    "rolePlaceholder": "Contoh: Dukungan",
+    "roleList": "Daftar peran",
+    "roleUse": "Gunakan “{{role}}”",
+    "roleCurrent": "saat ini",
     "edit": "Ubah",
     "chat": "Obrolan",
     "moreActions": "Tindakan lain",
@@ -2929,15 +2984,7 @@
     "budgetDefaultHelp": "Kosong: default ruang kerja.",
     "budgetDefaultHelpAmount": "Kosong: default ruang kerja ({{amount}}).",
     "budgetInvalid": "Gunakan nilai lebih dari nol.",
-    "notFound": "Agen ini tidak ada atau sudah diarsipkan.",
-    "editName": "Ubah nama: {{name}}",
-    "editHandle": "Ubah sebutan: @{{handle}}",
-    "editRole": "Ubah peran: {{role}}",
-    "noRole": "Tanpa peran",
-    "rolePlaceholder": "Contoh: Dukungan",
-    "roleList": "Daftar peran",
-    "roleUse": "Gunakan “{{role}}”",
-    "roleCurrent": "saat ini"
+    "notFound": "Agen ini tidak ada atau sudah diarsipkan."
   },
   "agentPage": {
     "work": {
@@ -4003,20 +4050,6 @@
     },
     "dialog": {
       "title": "Undang ke {{org}}",
-      "emails": "Email",
-      "moreEmails": "Email lainnya…",
-      "checkMarked": "Periksa email yang ditandai: mereka tidak akan menerima undangan.",
-      "withNote": "dengan catatan",
-      "alsoJoin": "Mereka juga bergabung ke",
-      "generalAlways": "Semua orang bergabung ke #{{channel}}",
-      "note": "Catatan di email",
-      "optional": "(opsional)",
-      "notePlaceholder": "Hai. Ayo bergabung ke {{org}}: tim dan agen semuanya ada di sini.",
-      "or": "atau kirim tautannya",
-      "send_other": "Undang {{count}} orang",
-      "sent": "Undangan terkirim ke {{email}}.",
-      "sentMany": "{{count}} undangan terkirim.",
-      "alsoIn": "Mereka juga bergabung ke {{channels}}.",
       "stepOf": "Langkah {{n}} dari {{total}} · {{step}}",
       "steps": {
         "who": "Siapa",
@@ -4024,9 +4057,23 @@
         "where": "Mulai di mana",
         "note": "Catatan"
       },
+      "emails": "Email",
+      "moreEmails": "Email lainnya…",
+      "checkMarked": "Periksa email yang ditandai: mereka tidak akan menerima undangan.",
       "pasteHelp": "Tempel daftar kalau mau: koma, spasi, atau satu per baris.",
       "leftOut": "Yang sudah ada atau sudah diundang tidak ikut.",
+      "withNote": "dengan catatan",
+      "alsoJoin": "Mereka juga bergabung ke",
+      "generalAlways": "Semua orang bergabung ke #{{channel}}",
+      "note": "Catatan di email",
+      "optional": "(opsional)",
+      "notePlaceholder": "Hai. Ayo bergabung ke {{org}}: tim dan agen semuanya ada di sini.",
+      "or": "atau kirim tautannya",
       "continueWith": "Lanjutkan dengan {{count}}",
+      "send_other": "Undang {{count}} orang",
+      "sent": "Undangan terkirim ke {{email}}.",
+      "sentMany": "{{count}} undangan terkirim.",
+      "alsoIn": "Mereka juga bergabung ke {{channels}}.",
       "who": {
         "title": "Siapa yang ingin kamu ajak?",
         "lead": "Kasih tahu email mereka. Tiap orang menerima undangan dan langsung bergabung."
@@ -4410,6 +4457,54 @@
     "flowHint": "Tugas berpindah sendiri, ke kolom pertama tiap tahap: Sedang dikerjakan saat agen mulai, Ditinjau saat siap diperiksa, Selesai saat kamu menyetujuinya.",
     "moreOptions": "Opsi lainnya",
     "showCanceled": "Tampilkan yang dibatalkan",
+    "filterButton": "Saring",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Saya",
+    "display": {
+      "title": "Tampilan",
+      "label": "Tampilan: {{layout}} · {{group}}",
+      "layout": "Tata letak",
+      "group": "Kelompokkan menurut",
+      "sort": "Urutkan menurut",
+      "fields": "Di kartu",
+      "saved": "Disimpan untukmu di ruang kerja ini",
+      "reset": "Kembali ke bawaan",
+      "by": {
+        "stage": "Tahap",
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas"
+      },
+      "order": {
+        "manual": "Manual",
+        "priority": "Prioritas",
+        "due": "Tenggat"
+      },
+      "field": {
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas",
+        "due": "Tenggat",
+        "criteria": "Kriteria",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Jatuhkan di {{name}}",
+      "assignee": "Jatuhkan untuk memberikannya ke {{name}}",
+      "unassign": "Jatuhkan untuk melepas penanggung jawab",
+      "priority": "Jatuhkan untuk prioritas {{priority}}"
+    },
+    "drag": {
+      "role": "tugas yang bisa diseret",
+      "help": "Spasi mengambil tugas, tombol panah memindahkannya, Spasi menjatuhkannya, dan Esc membatalkan.",
+      "picked": "Kamu mengambil #{{number}}. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
+      "moved": "#{{number}}: {{group}}, posisi {{position}} dari {{total}}.",
+      "dropped": "Kamu menjatuhkan #{{number}} di {{group}}.",
+      "canceled": "#{{number}} kembali ke tempatnya.",
+      "assigned": "#{{number}} sekarang dipegang {{name}}.",
+      "unassigned": "#{{number}} sekarang tanpa penanggung jawab.",
+      "prioritized": "#{{number}} sekarang berprioritas {{priority}}."
+    },
     "canceledColumn": "Dibatalkan",
     "columns": {
       "add": "Tambah kolom",
@@ -4652,54 +4747,6 @@
       "agent_asked": "meminta {{name}} mengerjakannya",
       "forum_opened": "membawanya ke forum: {{title}}",
       "forum_evaluated": "membawa kembali hasil forum: {{title}}"
-    },
-    "filterButton": "Saring",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Saya",
-    "display": {
-      "title": "Tampilan",
-      "label": "Tampilan: {{layout}} · {{group}}",
-      "layout": "Tata letak",
-      "group": "Kelompokkan menurut",
-      "sort": "Urutkan menurut",
-      "fields": "Di kartu",
-      "saved": "Disimpan untukmu di ruang kerja ini",
-      "reset": "Kembali ke bawaan",
-      "by": {
-        "stage": "Tahap",
-        "assignee": "Penanggung jawab",
-        "priority": "Prioritas"
-      },
-      "order": {
-        "manual": "Manual",
-        "priority": "Prioritas",
-        "due": "Tenggat"
-      },
-      "field": {
-        "assignee": "Penanggung jawab",
-        "priority": "Prioritas",
-        "due": "Tenggat",
-        "criteria": "Kriteria",
-        "pullRequest": "Pull request",
-        "label": "Label"
-      }
-    },
-    "drop": {
-      "stage": "Jatuhkan di {{name}}",
-      "assignee": "Jatuhkan untuk memberikannya ke {{name}}",
-      "unassign": "Jatuhkan untuk melepas penanggung jawab",
-      "priority": "Jatuhkan untuk prioritas {{priority}}"
-    },
-    "drag": {
-      "role": "tugas yang bisa diseret",
-      "help": "Spasi mengambil tugas, tombol panah memindahkannya, Spasi menjatuhkannya, dan Esc membatalkan.",
-      "picked": "Kamu mengambil #{{number}}. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
-      "moved": "#{{number}}: {{group}}, posisi {{position}} dari {{total}}.",
-      "dropped": "Kamu menjatuhkan #{{number}} di {{group}}.",
-      "canceled": "#{{number}} kembali ke tempatnya.",
-      "assigned": "#{{number}} sekarang dipegang {{name}}.",
-      "unassigned": "#{{number}} sekarang tanpa penanggung jawab.",
-      "prioritized": "#{{number}} sekarang berprioritas {{priority}}."
     }
   },
   "routines": {
@@ -4886,7 +4933,6 @@
         "artifact": "Menjadi dokumen di Drive"
       },
       "ahead": "Disiapkan untuk nanti",
-      "ownActions": "Dilakukan sendiri",
       "createdBy": "Dibuat oleh {{name}} · {{date}}",
       "nameLabel": "Nama rutinitas",
       "editName": "Edit nama",
@@ -4903,7 +4949,8 @@
       "reportHint": {
         "always": "Meski tidak ada yang baru",
         "when_new": "Diam kalau tidak ada yang baru"
-      }
+      },
+      "ownActions": "Dilakukan sendiri"
     },
     "ownActions": {
       "hint": "Setiap jalannya melakukan ini di aplikasi terhubung kamu tanpa bertanya. Tindakan lain di sana meminta persetujuan seseorang dulu, dan merge, deploy, serta rollback selalu meminta.",

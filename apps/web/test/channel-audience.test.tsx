@@ -75,6 +75,9 @@ describe("a channel for departments or roles (ADR 0125)", () => {
     await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
+    // "Quem pode entrar" lives under Permissões (ADR 0134).
+    await click(within(dialog).getByRole("button", { name: "Permissões" }));
+    await settle(2);
     await access(dialog, /Departamentos ou papéis/);
     await settle(3);
     expect(calls(state, "chat.update")).toEqual([]);

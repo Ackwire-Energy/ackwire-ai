@@ -1414,6 +1414,58 @@ export const ptBR = {
     working_other: "{{count}} agentes trabalhando",
   },
   channel: {
+    /** Channel settings' sections, for who manages it (ADR 0134). */
+    settingsNav: {
+      label: "Configurações do canal",
+      overview: "Visão geral",
+      permissions: "Permissões",
+      members: "Membros",
+    },
+    /** A channel's exceptions to the workspace's roles (ADR 0134), said for people who never used Discord. */
+    perms: {
+      advanced: "Permissões avançadas",
+      intro: "Exceções valem só neste canal. Padrão segue os papéis do workspace.",
+      targets: "Papéis e pessoas com exceção",
+      add: "Adicionar papel ou pessoa",
+      addSearch: "Buscar papel ou pessoa",
+      addNone: "Nenhum papel ou pessoa encontrado",
+      groupRoles: "Papéis",
+      groupPeople: "Pessoas",
+      clear: "Tirar exceção",
+      /** The three-state control's name for screen readers: "Enviar mensagens para Vendas". */
+      stateLabel: "{{key}} para {{target}}",
+      state: {
+        deny: "Negar",
+        inherit: "Padrão",
+        allow: "Permitir",
+      },
+      keys: {
+        post: {
+          title: "Enviar mensagens",
+          line: "Escrever, responder em conversas e fixar mensagens aqui",
+        },
+        callAgents: {
+          title: "Chamar agentes",
+          line: "As mensagens acordam os agentes deste canal",
+        },
+        manage: {
+          title: "Gerenciar o canal",
+          line: "Mudar nome, quem vê, membros e estas permissões",
+        },
+      },
+      /** What "Padrão" means right now for the role or person picked. */
+      default: {
+        allowedBy: "Padrão: permitido pelo papel {{role}}",
+        notHeld: "Padrão: o papel {{role}} não tem",
+        followsEveryone: "Padrão: segue {{role}} neste canal",
+        person: "Padrão: segue os papéis dessa pessoa",
+      },
+      /** In place of the composer when the channel's exceptions keep me from sending. */
+      readOnlyComposer: "Só algumas pessoas enviam mensagens neste canal",
+      /** Only for me, after my message mentioned an agent here. */
+      agentsDenied: "Neste canal você não chama agentes",
+      forbidden: "Você só muda permissões que tem, de papéis e pessoas abaixo de você",
+    },
     pins: {
       title: "Fixadas",
       button_one: "Mensagens fixadas ({{count}})",
@@ -2129,6 +2181,8 @@ export const ptBR = {
     editChannel: "Editar canal",
   },
   channelMembers: {
+    /** A small line on top of the members column and sheet: what the list is. */
+    caption: "Quem pode ver este canal",
     addRow: "Adicionar pessoa ou agente",
     /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Convidar {{email}} para a {{org}} e para #{{channel}}",

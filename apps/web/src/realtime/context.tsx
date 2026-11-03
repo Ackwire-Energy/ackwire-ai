@@ -132,6 +132,8 @@ export interface LiveNotice {
   threadId: string | null;
   messageId: string;
   text: string;
+  /** `channel.agents_denied`: this channel's exceptions, not the agent's audience (ADR 0134). */
+  code?: string;
 }
 
 /** `agent.unavailable` (user scope): my message mentioned an agent that doesn't answer me. */
@@ -142,6 +144,7 @@ export interface AgentUnavailableEvent {
   threadId: string | null;
   messageId: string;
   text: string;
+  code?: string;
 }
 
 export const isAgentUnavailable = (e: { type: string }): e is AgentUnavailableEvent =>
@@ -343,7 +346,14 @@ export function createStreamsStore(
     unavailable: (e: AgentUnavailableEvent) => {
       const key = `${e.messageId}:${e.agentId}`;
       const list = (state.notices[e.channelId] ?? []).filter((n) => n.key !== key);
-      const notice = { key, agentId: e.agentId, threadId: e.threadId, messageId: e.messageId, text: e.text };
+      const notice = {
+        key,
+        agentId: e.agentId,
+        threadId: e.threadId,
+        messageId: e.messageId,
+        text: e.text,
+        code: e.code,
+      };
       set({
         ...state,
         streams: dismissRun(state.streams, `pending:${e.agentId}:${e.messageId}`),
@@ -506,6 +516,11 @@ export function RealtimeProvider({
       if (event.type === "channels.layout") {
         void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
         void qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) });
+      }
+      // A channel's exceptions changed (ADR 0134): what I may do there (`can`) and its open permissions page.
+      if (event.type === "channel.permissions" && "channelId" in event && typeof event.channelId === "string") {
+        void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.channelPermissions(orgId, event.channelId) });
       }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {

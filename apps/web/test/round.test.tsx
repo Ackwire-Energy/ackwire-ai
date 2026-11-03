@@ -180,7 +180,14 @@ describe("Detalhes do canal: membros", () => {
   const openDetails = async () => {
     await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
-    return screen().getByRole("dialog", { name: "#eng" });
+    const dialog = screen().getByRole("dialog", { name: "#eng" });
+    // Who manages it lands on Visão geral (ADR 0134); a member sees the members alone.
+    const members = within(dialog).queryByRole("button", { name: "Membros" });
+    if (members) {
+      await click(members);
+      await settle(2);
+    }
+    return dialog;
   };
   /** Opens a row's "⋯" (Radix: keyboard) and returns its menu. */
   const openMenu = async (name: string) => {

@@ -1439,6 +1439,52 @@
     "working_other": "{{count}} agents aan het werk"
   },
   "channel": {
+    "settingsNav": {
+      "label": "Kanaalinstellingen",
+      "overview": "Overzicht",
+      "permissions": "Rechten",
+      "members": "Leden"
+    },
+    "perms": {
+      "advanced": "Geavanceerde rechten",
+      "intro": "Uitzonderingen gelden alleen in dit kanaal. Standaard volgt de rollen van de werkruimte.",
+      "targets": "Rollen en mensen met een uitzondering",
+      "add": "Rol of persoon toevoegen",
+      "addSearch": "Rollen of mensen zoeken",
+      "addNone": "Geen rol of persoon gevonden",
+      "groupRoles": "Rollen",
+      "groupPeople": "Mensen",
+      "clear": "Uitzondering weghalen",
+      "stateLabel": "{{key}} voor {{target}}",
+      "state": {
+        "deny": "Weigeren",
+        "inherit": "Standaard",
+        "allow": "Toestaan"
+      },
+      "keys": {
+        "post": {
+          "title": "Berichten sturen",
+          "line": "Hier schrijven, in threads antwoorden en berichten vastzetten"
+        },
+        "callAgents": {
+          "title": "Agents oproepen",
+          "line": "Berichten wekken de agents van dit kanaal"
+        },
+        "manage": {
+          "title": "Kanaal beheren",
+          "line": "Naam, wie het ziet, leden en deze rechten wijzigen"
+        }
+      },
+      "default": {
+        "allowedBy": "Standaard: toegestaan door de rol {{role}}",
+        "notHeld": "Standaard: de rol {{role}} heeft dit niet",
+        "followsEveryone": "Standaard: volgt {{role}} in dit kanaal",
+        "person": "Standaard: volgt de rollen van deze persoon"
+      },
+      "readOnlyComposer": "Alleen sommige mensen sturen berichten in dit kanaal",
+      "agentsDenied": "In dit kanaal roep je geen agents op",
+      "forbidden": "Je wijzigt alleen rechten die je zelf hebt, voor rollen en mensen onder je"
+    },
     "pins": {
       "title": "Vastgezet",
       "button_one": "Vastgezette berichten ({{count}})",
@@ -2150,6 +2196,7 @@
     "editChannel": "Kanaal bewerken"
   },
   "channelMembers": {
+    "caption": "Wie dit kanaal kan zien",
     "addRow": "Mensen of agents toevoegen",
     "invite": "{{email}} uitnodigen voor {{org}} en #{{channel}}",
     "inviteOrg": "{{email}} uitnodigen voor {{org}}",
@@ -2981,6 +3028,14 @@
     "nameLabel": "Naam",
     "roleLabel": "Rol",
     "roleHelp": "Wat de agent voor het team doet, bijv. assistent voor e-mail en agenda.",
+    "editName": "Naam bewerken: {{name}}",
+    "editHandle": "Vermeldingen bewerken: @{{handle}}",
+    "editRole": "Rol bewerken: {{role}}",
+    "noRole": "Geen rol",
+    "rolePlaceholder": "Bijv. Support",
+    "roleList": "Rollen",
+    "roleUse": "“{{role}}” gebruiken",
+    "roleCurrent": "huidig",
     "edit": "Bewerken",
     "chat": "Chatten",
     "moreActions": "Meer acties",
@@ -3030,15 +3085,7 @@
     "budgetDefaultHelp": "Leeg: de standaard van de werkruimte.",
     "budgetDefaultHelpAmount": "Leeg: de standaard van de werkruimte ({{amount}}).",
     "budgetInvalid": "Gebruik een waarde groter dan nul.",
-    "notFound": "Deze agent bestaat niet of is gearchiveerd.",
-    "editName": "Naam bewerken: {{name}}",
-    "editHandle": "Vermeldingen bewerken: @{{handle}}",
-    "editRole": "Rol bewerken: {{role}}",
-    "noRole": "Geen rol",
-    "rolePlaceholder": "Bijv. Support",
-    "roleList": "Rollen",
-    "roleUse": "“{{role}}” gebruiken",
-    "roleCurrent": "huidig"
+    "notFound": "Deze agent bestaat niet of is gearchiveerd."
   },
   "agentPage": {
     "work": {
@@ -4178,21 +4225,6 @@
     },
     "dialog": {
       "title": "Uitnodigen voor {{org}}",
-      "emails": "E-mailadressen",
-      "moreEmails": "Meer e-mailadressen…",
-      "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
-      "withNote": "met een notitie",
-      "alsoJoin": "Ze komen ook in",
-      "generalAlways": "Iedereen komt in #{{channel}}",
-      "note": "Notitie in de e-mail",
-      "optional": "(optioneel)",
-      "notePlaceholder": "Hoi. Kom erbij in {{org}}: het team en de agents zijn er allemaal.",
-      "or": "of stuur de link",
-      "send_one": "{{count}} persoon uitnodigen",
-      "send_other": "{{count}} mensen uitnodigen",
-      "sent": "Uitnodiging verstuurd naar {{email}}.",
-      "sentMany": "{{count}} uitnodigingen verstuurd.",
-      "alsoIn": "Ze komen ook in {{channels}}.",
       "stepOf": "Stap {{n}} van {{total}} · {{step}}",
       "steps": {
         "who": "Wie",
@@ -4200,9 +4232,24 @@
         "where": "Waar ze beginnen",
         "note": "Notitie"
       },
+      "emails": "E-mailadressen",
+      "moreEmails": "Meer e-mailadressen…",
+      "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
       "pasteHelp": "Plak een lijst als je wilt: komma's, spaties of één per regel.",
       "leftOut": "Wie er al is of al is uitgenodigd, valt erbuiten.",
+      "withNote": "met een notitie",
+      "alsoJoin": "Ze komen ook in",
+      "generalAlways": "Iedereen komt in #{{channel}}",
+      "note": "Notitie in de e-mail",
+      "optional": "(optioneel)",
+      "notePlaceholder": "Hoi. Kom erbij in {{org}}: het team en de agents zijn er allemaal.",
+      "or": "of stuur de link",
       "continueWith": "Doorgaan met {{count}}",
+      "send_one": "{{count}} persoon uitnodigen",
+      "send_other": "{{count}} mensen uitnodigen",
+      "sent": "Uitnodiging verstuurd naar {{email}}.",
+      "sentMany": "{{count}} uitnodigingen verstuurd.",
+      "alsoIn": "Ze komen ook in {{channels}}.",
       "who": {
         "title": "Wie wil je erbij halen?",
         "lead": "Geef me de e-mailadressen. Elke persoon krijgt een uitnodiging en doet direct mee."
@@ -4593,6 +4640,54 @@
     "flowHint": "De taak verschuift vanzelf naar de eerste kolom van elke fase: Bezig als een agent begint, Ter controle als hij klaar is om te checken, Klaar als jij hem goedkeurt.",
     "moreOptions": "Meer opties",
     "showCanceled": "Geannuleerde tonen",
+    "filterButton": "Filteren",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ik",
+    "display": {
+      "title": "Weergave",
+      "label": "Weergave: {{layout}} · {{group}}",
+      "layout": "Indeling",
+      "group": "Groeperen op",
+      "sort": "Sorteren op",
+      "fields": "Op de kaarten",
+      "saved": "Voor jou bewaard in deze werkruimte",
+      "reset": "Terug naar standaard",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit"
+      },
+      "order": {
+        "manual": "Handmatig",
+        "priority": "Prioriteit",
+        "due": "Deadline"
+      },
+      "field": {
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit",
+        "due": "Deadline",
+        "criteria": "Voorwaarden",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Loslaten in {{name}}",
+      "assignee": "Loslaten om aan {{name}} te geven",
+      "unassign": "Loslaten om de toewijzing weg te halen",
+      "priority": "Loslaten voor prioriteit {{priority}}"
+    },
+    "drag": {
+      "role": "versleepbare taak",
+      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
+      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
+      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
+      "canceled": "#{{number}} staat weer op zijn plek.",
+      "assigned": "#{{number}} ligt nu bij {{name}}.",
+      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
+      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
+    },
     "canceledColumn": "Geannuleerd",
     "columns": {
       "add": "Kolom toevoegen",
@@ -4840,54 +4935,6 @@
       "agent_asked": "heeft {{name}} gevraagd het te doen",
       "forum_opened": "heeft het naar het forum gebracht: {{title}}",
       "forum_evaluated": "heeft het resultaat van het forum teruggebracht: {{title}}"
-    },
-    "filterButton": "Filteren",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ik",
-    "display": {
-      "title": "Weergave",
-      "label": "Weergave: {{layout}} · {{group}}",
-      "layout": "Indeling",
-      "group": "Groeperen op",
-      "sort": "Sorteren op",
-      "fields": "Op de kaarten",
-      "saved": "Voor jou bewaard in deze werkruimte",
-      "reset": "Terug naar standaard",
-      "by": {
-        "stage": "Fase",
-        "assignee": "Toegewezen aan",
-        "priority": "Prioriteit"
-      },
-      "order": {
-        "manual": "Handmatig",
-        "priority": "Prioriteit",
-        "due": "Deadline"
-      },
-      "field": {
-        "assignee": "Toegewezen aan",
-        "priority": "Prioriteit",
-        "due": "Deadline",
-        "criteria": "Voorwaarden",
-        "pullRequest": "Pull request",
-        "label": "Label"
-      }
-    },
-    "drop": {
-      "stage": "Loslaten in {{name}}",
-      "assignee": "Loslaten om aan {{name}} te geven",
-      "unassign": "Loslaten om de toewijzing weg te halen",
-      "priority": "Loslaten voor prioriteit {{priority}}"
-    },
-    "drag": {
-      "role": "versleepbare taak",
-      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
-      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
-      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
-      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
-      "canceled": "#{{number}} staat weer op zijn plek.",
-      "assigned": "#{{number}} ligt nu bij {{name}}.",
-      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
-      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
     }
   },
   "routines": {
@@ -5073,7 +5120,6 @@
         "artifact": "Wordt een document in de Drive"
       },
       "ahead": "Klaargezet voor later",
-      "ownActions": "Doet zelf",
       "createdBy": "Gemaakt door {{name}} · {{date}}",
       "nameLabel": "Naam van de routine",
       "editName": "Naam bewerken",
@@ -5090,7 +5136,8 @@
       "reportHint": {
         "always": "Ook als er niets nieuws is",
         "when_new": "Stil als er niets nieuws is"
-      }
+      },
+      "ownActions": "Doet zelf"
     },
     "ownActions": {
       "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",

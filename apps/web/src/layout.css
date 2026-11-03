@@ -511,7 +511,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   color: var(--attention);
 }
 .waitcard[data-done] .waitcard__top .ac-icon {
-  color: var(--success);
+  color: var(--ok);
 }
 .waitcard p {
   gap: 6px;
@@ -544,7 +544,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   color: var(--ink2);
 }
 .waitcard__lines > li[data-given="true"] > .ac-icon {
-  color: var(--success);
+  color: var(--ok);
 }
 .waitcard__needs {
   color: var(--attention);
@@ -10990,6 +10990,214 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 }
 .channel-details__archive {
   color: var(--danger);
+}
+/* Channel settings (ADR 0134): a nav on the left as in Settings, one section in the pane; stacked on a phone. */
+.channel-settings {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+}
+.channel-settings__nav {
+  flex: 0 0 184px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 var(--dialog-pad) var(--dialog-pad);
+}
+.channel-settings__nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.channel-settings__nav .settings__link {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.channel-settings__danger {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.channel-settings__pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: min(420px, 60vh);
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+.channel-settings__pane > .ac-dialog__body,
+.channel-settings__pane > .ac-dialog__list {
+  padding-bottom: var(--dialog-pad);
+}
+@media (max-width: 640px) {
+  .channel-settings {
+    flex-direction: column;
+  }
+  .channel-settings__nav {
+    flex: none;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px var(--dialog-pad) 0;
+    scrollbar-width: none;
+  }
+  .channel-settings__nav ul,
+  .channel-settings__danger {
+    flex-direction: row;
+  }
+  .channel-settings__nav .settings__link {
+    width: auto;
+    white-space: nowrap;
+  }
+  .channel-settings__pane {
+    min-height: 0;
+    padding-top: 4px;
+  }
+}
+/* A channel's exceptions: who on the left, their keys on the right. */
+.channel-perms {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+.channel-perms__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.channel-perms__intro h3 {
+  margin: 0;
+}
+.channel-perms__intro p {
+  margin: 0;
+}
+.channel-perms__grid {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.channel-perms__targets {
+  flex: 0 0 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.channel-perms__targets ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.channel-perms__target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--control-h-md);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--control-r-md);
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.channel-perms__target:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+.channel-perms__target[aria-current="true"] {
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  color: var(--ink);
+  font-weight: 600;
+}
+html:not([data-pointer]) .channel-perms__target:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.channel-perms__target-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.channel-perms__keys {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.channel-perms__keys-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.channel-perms__key {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.channel-perms__key + .channel-perms__key {
+  border-top: 1px solid var(--line);
+}
+.channel-perms__key-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.channel-perms__key-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.channel-perms__default {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--faint);
+}
+.channel-perms__state {
+  display: inline-flex;
+  align-items: center;
+}
+[aria-checked="true"] > .channel-perms__state--deny {
+  color: var(--danger);
+}
+[aria-checked="true"] > .channel-perms__state--allow {
+  color: var(--ok);
+}
+@media (max-width: 640px) {
+  .channel-perms__grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .channel-perms__targets {
+    flex: none;
+  }
+  .channel-perms__key {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 @media (hover: none) {
   .sidebar__section-add {

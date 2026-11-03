@@ -1947,7 +1947,12 @@ function Chat({
                   onSee={seeRun}
                 />
               ) : null}
-              {member ? (
+              {member && channel?.can?.post === false ? (
+                // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
+                <Text variant="footnote" tone="muted" style={styles.readOnly}>
+                  {t("channel.perms.readOnlyComposer")}
+                </Text>
+              ) : member ? (
                 <Composer
                   placeholder={placeholder}
                   onSend={onSend}
@@ -2140,6 +2145,7 @@ const styles = StyleSheet.create({
   day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },
+  readOnly: { textAlign: "center", paddingHorizontal: 16, paddingVertical: 12 },
   composerDock: { position: "absolute", left: 0, right: 0, bottom: 0 },
   jumpDock: { position: "absolute", left: 14, right: 14 },
   jumpEnd: { alignSelf: "flex-end" },

@@ -54,3 +54,15 @@ test("a memory change is undone by who may edit the memory, or its requester wit
   expect(undoesMemoryChange(asked, bot, "davi", reviewer, old, now)).toBe(true);
   expect(undoesMemoryChange({ requestedByUserId: "" }, bot, "", member)).toBe(false);
 });
+
+test("a channel's exceptions (ADR 0134): the list's `can` decides managing when the server sends it", () => {
+  const member = { permissions: ["read", "post"] };
+  const admin = { permissions: ["read", "post", "manage_channels"] };
+  expect(managesChannel({ isMember: true, can: { post: true, callAgents: true, manage: true } }, "u", member)).toBe(
+    true,
+  );
+  expect(managesChannel({ isMember: true, can: { post: true, callAgents: true, manage: false } }, "u", admin)).toBe(
+    false,
+  );
+  expect(managesChannel({ isMember: true }, "u", admin)).toBe(true);
+});

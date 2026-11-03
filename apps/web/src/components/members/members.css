@@ -24,6 +24,14 @@
   flex-direction: column;
   gap: 2px;
 }
+/* "Quem pode ver este canal": what the list is, for whoever doesn't know Discord's. */
+.members-side__caption {
+  margin: 0 0 -8px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
 .members-side__head {
   display: flex;
   align-items: center;

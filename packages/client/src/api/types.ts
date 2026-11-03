@@ -837,6 +837,22 @@ export interface Channel {
   muted?: boolean;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+  /**
+   * Channel list only: what I may do here with its exceptions (ADR 0134): send messages, wake its agents, manage it.
+   * Absent (an older server): the workspace's keys decide.
+   */
+  can?: { post: boolean; callAgents: boolean; manage: boolean };
+}
+
+/** A key a channel may change for a role or a person (ADR 0134). */
+export type ChannelKey = "post" | "talk_to_agents" | "manage_channels";
+export const CHANNEL_KEYS: readonly ChannelKey[] = ["post", "talk_to_agents", "manage_channels"];
+
+/** One exception of a channel: for a role (`everyone`, "Todos", too) or a person. */
+export interface ChannelOverride {
+  target: { type: "role" | "person"; id: string };
+  allow: ChannelKey[];
+  deny: ChannelKey[];
 }
 
 /** Who may join a channel, on creating it or changing it later. */

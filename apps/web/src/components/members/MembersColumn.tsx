@@ -186,6 +186,7 @@ function MembersList({ channelId, people, agents, onAdd }: Lists) {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: arrow keys between the row buttons
     <div className="members-side__groups" onKeyDown={onKey}>
+      <p className="members-side__caption">{t("channelMembers.caption")}</p>
       {groups.map((g) => {
         const label = g.role?.name ?? name(g.key);
         // ponytail: every row is in the DOM (offline capped at 100); virtualize if a channel reaches thousands.

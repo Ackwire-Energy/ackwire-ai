@@ -68,6 +68,7 @@ import type {
   CalendarEventPatch,
   Channel,
   ChannelInput,
+  ChannelOverride,
   ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
@@ -2296,6 +2297,29 @@ export const useRoster = (orgId: string, channelId: string, enabled = true) => {
     staleTime: 30_000,
   });
 };
+
+/** A channel's exceptions (ADR 0134), for who manages it. */
+export const useChannelPermissions = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.channelPermissions(orgId, channelId),
+    queryFn: () => api.chat.permissions(orgId, channelId),
+    enabled,
+  });
+};
+
+/** Sets one exception of a channel: its list and everyone's channel list (`can`) refetch. */
+export function useSetChannelPermission(orgId: string, channelId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (override: ChannelOverride) => api.chat.setPermission(orgId, channelId, override),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.channelPermissions(orgId, channelId) });
+      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+    },
+  });
+}
 
 export function useUpdateChannel(orgId: string, channelId: string) {
   const api = useApi();

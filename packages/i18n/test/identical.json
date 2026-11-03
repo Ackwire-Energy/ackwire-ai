@@ -255,6 +255,7 @@
       "browser.watch.no",
       "calendar.views.agenda",
       "channel.emoji",
+      "channel.perms.groupRoles",
       "chat.tokens",
       "chat.work.error",
       "chat.work.minutes",

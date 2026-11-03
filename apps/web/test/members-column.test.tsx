@@ -305,6 +305,9 @@ describe("answering without a mention, as true for my own messages as who picks 
     );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
+    // Who manages it lands on Visão geral (ADR 0134): its people and agents are under Membros.
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Membros" })));
+    await settle(2);
     const row = within(dialog).getByText("Atlas").closest(".member-row") as HTMLElement;
     const line = row.querySelector(".small")?.textContent;
     const button = within(row).getByRole("button", { name: "Opções de Atlas" });
@@ -368,6 +371,10 @@ describe("the team's coordinator here (ADR 0093)", () => {
       fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
     );
     await settle(3);
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("dialog", { name: /eng/ })).getByRole("button", { name: "Membros" })),
+    );
+    await settle(2);
     const row = within(screen().getByRole("dialog", { name: /eng/ }))
       .getByText("Atlas")
       .closest(".member-row") as HTMLElement;

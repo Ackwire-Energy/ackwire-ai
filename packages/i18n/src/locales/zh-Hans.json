@@ -1390,6 +1390,52 @@
     "working_other": "{{count}} 个智能体正在工作"
   },
   "channel": {
+    "settingsNav": {
+      "label": "频道设置",
+      "overview": "概览",
+      "permissions": "权限",
+      "members": "成员"
+    },
+    "perms": {
+      "advanced": "高级权限",
+      "intro": "例外只在这个频道生效。默认跟随工作区的角色。",
+      "targets": "有例外的角色和成员",
+      "add": "添加角色或成员",
+      "addSearch": "搜索角色或成员",
+      "addNone": "没有找到角色或成员",
+      "groupRoles": "角色",
+      "groupPeople": "成员",
+      "clear": "移除例外",
+      "stateLabel": "{{target}}的{{key}}",
+      "state": {
+        "deny": "拒绝",
+        "inherit": "默认",
+        "allow": "允许"
+      },
+      "keys": {
+        "post": {
+          "title": "发送消息",
+          "line": "在这里发言、在话题中回复和置顶消息"
+        },
+        "callAgents": {
+          "title": "呼叫智能体",
+          "line": "消息会唤醒这个频道的智能体"
+        },
+        "manage": {
+          "title": "管理频道",
+          "line": "修改名称、谁能看到、成员和这些权限"
+        }
+      },
+      "default": {
+        "allowedBy": "默认：由角色{{role}}允许",
+        "notHeld": "默认：角色{{role}}没有此权限",
+        "followsEveryone": "默认：跟随此频道中的{{role}}",
+        "person": "默认：跟随此人的角色"
+      },
+      "readOnlyComposer": "只有部分成员能在这个频道发送消息",
+      "agentsDenied": "你不能在这个频道呼叫智能体",
+      "forbidden": "你只能修改自己拥有的权限，且仅限比你低的角色和成员"
+    },
     "pins": {
       "title": "已置顶",
       "button_other": "置顶消息（{{count}}）",
@@ -2075,6 +2121,7 @@
     "editChannel": "编辑频道"
   },
   "channelMembers": {
+    "caption": "谁能看到这个频道",
     "addRow": "添加成员或智能体",
     "invite": "邀请 {{email}} 加入 {{org}} 和 #{{channel}}",
     "inviteOrg": "邀请 {{email}} 加入 {{org}}",
@@ -2878,6 +2925,14 @@
     "nameLabel": "名称",
     "roleLabel": "角色",
     "roleHelp": "它为团队做什么，例如：邮件和日历助理。",
+    "editName": "编辑名称：{{name}}",
+    "editHandle": "编辑提及：@{{handle}}",
+    "editRole": "编辑角色：{{role}}",
+    "noRole": "无角色",
+    "rolePlaceholder": "例如：客服",
+    "roleList": "角色列表",
+    "roleUse": "使用“{{role}}”",
+    "roleCurrent": "当前",
     "edit": "编辑",
     "chat": "聊天",
     "moreActions": "更多操作",
@@ -2926,15 +2981,7 @@
     "budgetDefaultHelp": "留空：使用工作区默认值。",
     "budgetDefaultHelpAmount": "留空：使用工作区默认值（{{amount}}）。",
     "budgetInvalid": "请输入大于零的值。",
-    "notFound": "该智能体不存在或已归档。",
-    "editName": "编辑名称：{{name}}",
-    "editHandle": "编辑提及：@{{handle}}",
-    "editRole": "编辑角色：{{role}}",
-    "noRole": "无角色",
-    "rolePlaceholder": "例如：客服",
-    "roleList": "角色列表",
-    "roleUse": "使用“{{role}}”",
-    "roleCurrent": "当前"
+    "notFound": "该智能体不存在或已归档。"
   },
   "agentPage": {
     "work": {
@@ -4018,20 +4065,6 @@
     },
     "dialog": {
       "title": "邀请加入 {{org}}",
-      "emails": "邮箱",
-      "moreEmails": "更多邮箱…",
-      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
-      "withNote": "附带留言",
-      "alsoJoin": "同时加入",
-      "generalAlways": "所有人都会加入 #{{channel}}",
-      "note": "邮件中的留言",
-      "optional": "（可选）",
-      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
-      "or": "或发送链接",
-      "send_other": "邀请 {{count}} 人",
-      "sent": "已向 {{email}} 发送邀请。",
-      "sentMany": "已发送 {{count}} 份邀请。",
-      "alsoIn": "他们也会加入 {{channels}}。",
       "stepOf": "第 {{n}} 步，共 {{total}} 步 · {{step}}",
       "steps": {
         "who": "邀请谁",
@@ -4039,9 +4072,23 @@
         "where": "加入频道",
         "note": "留言"
       },
+      "emails": "邮箱",
+      "moreEmails": "更多邮箱…",
+      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
       "pasteHelp": "也可以粘贴一个列表：用逗号、空格分隔，或每行一个。",
       "leftOut": "已经在这里或已被邀请的人不会再收到邀请。",
+      "withNote": "附带留言",
+      "alsoJoin": "同时加入",
+      "generalAlways": "所有人都会加入 #{{channel}}",
+      "note": "邮件中的留言",
+      "optional": "（可选）",
+      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
+      "or": "或发送链接",
       "continueWith": "继续（{{count}} 人）",
+      "send_other": "邀请 {{count}} 人",
+      "sent": "已向 {{email}} 发送邀请。",
+      "sentMany": "已发送 {{count}} 份邀请。",
+      "alsoIn": "他们也会加入 {{channels}}。",
       "who": {
         "title": "你想邀请谁？",
         "lead": "把邮箱告诉我。每个人都会收到邀请，并直接加入。"
@@ -4425,6 +4472,54 @@
     "flowHint": "任务会自动移到每个阶段的第一列：智能体开始时移到“进行中”，可以检查时移到“审核中”，你批准后移到“已完成”。",
     "moreOptions": "更多选项",
     "showCanceled": "显示已取消",
+    "filterButton": "筛选",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "我",
+    "display": {
+      "title": "显示",
+      "label": "显示：{{layout}} · {{group}}",
+      "layout": "布局",
+      "group": "分组依据",
+      "sort": "排序依据",
+      "fields": "卡片上显示",
+      "saved": "已在此工作区为你保存",
+      "reset": "恢复默认",
+      "by": {
+        "stage": "阶段",
+        "assignee": "负责人",
+        "priority": "优先级"
+      },
+      "order": {
+        "manual": "手动",
+        "priority": "优先级",
+        "due": "截止日期"
+      },
+      "field": {
+        "assignee": "负责人",
+        "priority": "优先级",
+        "due": "截止日期",
+        "criteria": "标准",
+        "pullRequest": "拉取请求",
+        "label": "标签"
+      }
+    },
+    "drop": {
+      "stage": "放到{{name}}",
+      "assignee": "放下以交给{{name}}",
+      "unassign": "放下以移除负责人",
+      "priority": "放下以设为{{priority}}优先级"
+    },
+    "drag": {
+      "role": "可拖动的任务",
+      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
+      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
+      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把 #{{number}} 放到了{{group}}。",
+      "canceled": "#{{number}} 回到了原位。",
+      "assigned": "#{{number}} 现在由{{name}}负责。",
+      "unassigned": "#{{number}} 现在没有负责人。",
+      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
+    },
     "canceledColumn": "已取消",
     "columns": {
       "add": "添加列",
@@ -4667,54 +4762,6 @@
       "agent_asked": "请 {{name}} 来完成",
       "forum_opened": "将它提交到论坛：{{title}}",
       "forum_evaluated": "带回了论坛的结果：{{title}}"
-    },
-    "filterButton": "筛选",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "我",
-    "display": {
-      "title": "显示",
-      "label": "显示：{{layout}} · {{group}}",
-      "layout": "布局",
-      "group": "分组依据",
-      "sort": "排序依据",
-      "fields": "卡片上显示",
-      "saved": "已在此工作区为你保存",
-      "reset": "恢复默认",
-      "by": {
-        "stage": "阶段",
-        "assignee": "负责人",
-        "priority": "优先级"
-      },
-      "order": {
-        "manual": "手动",
-        "priority": "优先级",
-        "due": "截止日期"
-      },
-      "field": {
-        "assignee": "负责人",
-        "priority": "优先级",
-        "due": "截止日期",
-        "criteria": "标准",
-        "pullRequest": "拉取请求",
-        "label": "标签"
-      }
-    },
-    "drop": {
-      "stage": "放到{{name}}",
-      "assignee": "放下以交给{{name}}",
-      "unassign": "放下以移除负责人",
-      "priority": "放下以设为{{priority}}优先级"
-    },
-    "drag": {
-      "role": "可拖动的任务",
-      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
-      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
-      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
-      "dropped": "你把 #{{number}} 放到了{{group}}。",
-      "canceled": "#{{number}} 回到了原位。",
-      "assigned": "#{{number}} 现在由{{name}}负责。",
-      "unassigned": "#{{number}} 现在没有负责人。",
-      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
     }
   },
   "routines": {
@@ -4898,7 +4945,6 @@
         "artifact": "生成 Drive 中的文档"
       },
       "ahead": "为之后准备好的",
-      "ownActions": "自动执行",
       "createdBy": "由 {{name}} 创建 · {{date}}",
       "nameLabel": "例行工作名称",
       "editName": "编辑名称",
@@ -4915,7 +4961,8 @@
       "reportHint": {
         "always": "即使没有新内容",
         "when_new": "没有新内容时保持安静"
-      }
+      },
+      "ownActions": "自动执行"
     },
     "ownActions": {
       "hint": "每次运行都会在你已连接的应用中直接执行这些操作，无需询问。其中的其他操作会先请人审批，合并、部署和回滚始终需要审批。",
