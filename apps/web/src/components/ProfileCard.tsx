@@ -12,7 +12,6 @@ import {
   useUpdateAgent,
 } from "@agenteschat/client";
 import {
-  audienceBlocked,
   audienceLines,
   audienceNotice,
   audienceOf,
@@ -52,7 +51,6 @@ import {
   Popover,
   ProviderLogo,
   RoleMark,
-  SettingNote,
   Token,
   useHoverCard,
 } from "@agenteschat/ui";
@@ -598,22 +596,17 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
 }
 
 /**
- * "Editar" beside "Quem pode falar": the agent Settings tab's choice (roles and people), saved the same way. On a
- * plan only its owner lets more people in (ADR 0059 §5).
+ * "Editar" beside "Quem pode falar": the agent Settings tab's choice (roles and people), saved the same way.
  */
 function AudienceEdit({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const dir = useDirectory(org.id);
+  const { org } = useOrg();
   const toast = useToast();
   const update = useUpdateAgent(org.id, agent.id);
   const g = agentGrammar(agent.name);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<AgentAudience>(() => audienceOf(agent));
-  const [blocked, setBlocked] = useState(false);
   const valid = audienceValid(draft, agent.ownerUserId);
-  const ownerName = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : undefined;
-  const ownerFirst = ownerName ? firstName(ownerName) : undefined;
   return (
     <Popover
       open={open}
@@ -621,7 +614,6 @@ function AudienceEdit({ agent }: { agent: Agent }) {
         setOpen(o);
         if (!o) return;
         setDraft(audienceOf(agent));
-        setBlocked(false);
       }}
       side="right"
       align="start"
@@ -637,21 +629,12 @@ function AudienceEdit({ agent }: { agent: Agent }) {
       <AudienceChoice
         compact
         value={draft}
-        onChange={(next) => {
-          const stop = audienceBlocked(agent, next, me.user.id);
-          setBlocked(stop);
-          if (!stop) setDraft(next);
-        }}
+        onChange={setDraft}
         ownerUserId={agent.ownerUserId}
         agentName={agent.name}
         idPrefix={`mcard-audience-${agent.id}`}
         onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
       />
-      {blocked && (
-        <SettingNote icon="lock" live>
-          {t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })}
-        </SettingNote>
-      )}
       {!valid && (
         <span className="small mcard-audience__err" role="alert">
           {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}

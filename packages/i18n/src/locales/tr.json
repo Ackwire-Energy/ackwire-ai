@@ -3029,6 +3029,7 @@
         "label_female": "Nasıl çalışır",
         "computer": "Çalıştığı yer",
         "brain": "Düşündüğü yapay zeka",
+        "brainWith": "{{plan}} ile düşünür",
         "browser": "Tarayıcı",
         "effort": "{{level}} çaba"
       },
@@ -3071,7 +3072,7 @@
         "none": "Hiçbir bilgisayarda yok",
         "planModel": "Model",
         "account": "Hesap",
-        "accountLocked": "Yalnızca {{name}} değiştirebilir",
+        "accountWho": "Yalnızca {{name}} sorumlusu {{owner}} hesapları: bir plan yalnızca sahibinin ajanları için düşünür.",
         "accountSignedOut": "Oturum kapandı, yeniden giriş yapın",
         "thisComputer": "{{computer}} hesabı",
         "accountMove": "{{agents}} kullanıyor · Buraya taşı",
@@ -3099,7 +3100,7 @@
           "max": "en yüksek"
         },
         "effortText": {
-          "auto": "Her görev için çabayı kendisi seçer.",
+          "auto": "Otomatik model her görevin çabasını seçer. Çabayı sabitlemek için bir model seçin.",
           "low": "Hızlı yanıt verir. Basit sorular için iyidir.",
           "medium": "Varsayılan. Çoğu zaman yeterince düşünür.",
           "high": "Zor görevlerde daha çok düşünür. Daha yavaş ve daha pahalıdır.",
@@ -3124,6 +3125,11 @@
           "answers": "Kime yanıt verir",
           "defaults": "Varsayılanlara dön",
           "done": "Bitti",
+          "contents": {
+            "model": "Bağlam penceresi",
+            "auto": "Bağlam penceresi ve kime yanıt verdiği",
+            "fixed": "Çaba, bağlam penceresi ve kime yanıt verdiği"
+          },
           "allDefault": "Tümü varsayılan",
           "effort": "Çaba: {{level}}",
           "context": "Bağlam: {{size}}",
@@ -6571,15 +6577,16 @@
     "share": {
       "switch": "Başka kişilere de yanıt verir",
       "switchAll": "Başka kişilere de yanıt ver",
-      "switchOther": "Yalnızca {{owner}} kişisine yanıt verir",
-      "onOther": "{{name}}, {{owner}} kişisinin planıyla düşünür. Başka kişilerin onunla konuşmasına yalnızca {{owner}} izin verebilir.",
-      "onOther_female": "{{name}}, {{owner}} kişisinin planıyla düşünür. Başka kişilerin onunla konuşmasına yalnızca {{owner}} izin verebilir.",
       "line": {
         "off": "{{name}} yalnızca size yanıt verir, {{plan}} planınızla.",
         "on": "{{name}}, onunla konuşabilen herkese yanıt verir, {{plan}} planınızla.",
         "on_female": "{{name}}, onunla konuşabilen herkese yanıt verir, {{plan}} planınızla.",
         "offAll": "Yalnızca size yanıt verirler, {{plan}} planınızla.",
         "onAll": "Onlarla konuşabilen herkese yanıt verirler, {{plan}} planınızla."
+      },
+      "lineOf": {
+        "off": "{{name}} yalnızca {{owner}} kişisine yanıt verir, {{owner}} kişisinin {{plan}} planıyla.",
+        "on": "{{name}}, onunla konuşabilen herkese yanıt verir, {{owner}} kişisinin {{plan}} planıyla."
       },
       "plan": {
         "own": "{{provider}} planı",
@@ -6594,13 +6601,11 @@
       },
       "savedEveryone": "{{name}} artık başka kişilere de yanıt veriyor.",
       "savedOwner": "{{name}} artık yalnızca size yanıt veriyor.",
+      "savedOwnerOf": "{{name}} artık yalnızca {{owner}} kişisine yanıt veriyor.",
       "backOnApi": "{{name}} yeniden API'de ve hâlâ yalnızca size yanıt veriyor.",
       "letEveryone": "{{name}} herkese yanıt versin",
       "letPeople": "{{name}} başka kişilere de yanıt versin",
       "pickPeople": "{{name}} yalnızca seçilen kişilere yanıt verir ve henüz kimse seçilmedi. Onları Kimler konuşabilir bölümünden seçin."
-    },
-    "errors": {
-      "planOwnerOnly": "Daha fazla kişiye yalnızca {{agentName}} ajanından sorumlu kişi izin verebilir: {{agentName}} onun planıyla yanıt veriyor."
     },
     "add": {
       "paste": "Yapıştır",

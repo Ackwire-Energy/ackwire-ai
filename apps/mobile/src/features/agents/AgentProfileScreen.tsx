@@ -2,6 +2,7 @@ import {
   keys,
   type Memory,
   useAgentAccess,
+  useAgentBrain,
   useAgentDetail,
   useAgentForYou,
   useAiStatus,
@@ -15,11 +16,13 @@ import {
 import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
 import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { formatPercent, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { agentPlan, aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
@@ -171,6 +174,22 @@ function Profile({ id }: { id: string }) {
   // computer only where it tells two apart).
   const thinks =
     agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "", { agents: dir.agents }) : null;
+  // As the web's cell: the plan as the row's name ("Pensa com" › "Claude"), the model under it, and its effort for who
+  // sees it (its owner and admins) where the model is fixed (Automático picks the effort too).
+  const effortView = useAgentBrain(orgId, id, decides && thinks !== null).data;
+  const brainKind = agent?.brain?.kind;
+  const thinksPlan =
+    brainKind && brainKind !== "model"
+      ? planLabel(t, planOfAccount({ kind: brainKind, provider: agent?.brain?.provider ?? null }))
+      : null;
+  const thinksModel = isAuto(agent?.brain?.model) ? t("brain.auto.label") : (agent?.brain?.model ?? null);
+  const thinksEffort =
+    effortView && effortView.brain !== "model" && !isAuto(effortView.effectiveModel)
+      ? t("agentPage.work.cell.effort", {
+          level: t(`agentPage.work.brain.effortsLower.${effortLevel(effortView.effort)}`),
+        })
+      : null;
+  const thinksUnder = [thinksModel, thinksEffort].filter(Boolean).join(" · ");
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,
@@ -453,7 +472,8 @@ function Profile({ id }: { id: string }) {
                   {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
                   <Row
                     leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
-                    title={thinks.text}
+                    title={thinksPlan ?? thinks.text}
+                    {...(thinksUnder ? { subtitle: thinksUnder, subtitleLines: 2 } : {})}
                     {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
                   />
                 </Card>

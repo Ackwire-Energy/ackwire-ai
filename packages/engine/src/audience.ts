@@ -135,25 +135,6 @@ export async function dropMailForNewRoleMember(
 export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
   widensAudience(OWNER_ONLY, a, ownerUserId);
 
-/**
- * More people for an agent that thinks with a plan (ADR 0059 §5): only the
- * plan's owner, who is the agent's owner, lets them in; admins only narrow.
- */
-export function planSharing(
-  agent: Pick<Agent, "name" | "brain" | "ownerUserId">,
-  actorId: string,
-  from: AgentAudience,
-  to: AgentAudience,
-) {
-  if (!isComputerBrain(agent.brain) || !widensAudience(from, to, agent.ownerUserId)) return;
-  if (agent.ownerUserId && agent.ownerUserId === actorId) return;
-  throw new ForbiddenError(
-    `Only ${agent.name}'s owner can let more people talk to it: it thinks with their plan`,
-    "audience.plan_owner_only",
-    { agentName: agent.name },
-  );
-}
-
 /** What the audience rule needs of a person: whether their roles let them talk to agents, and which roles they hold. */
 export interface Speaker {
   talks: boolean;
@@ -359,7 +340,7 @@ export async function notifyBlocked(
 
 /**
  * Changes who can talk to the agent: its owner or admins (with no owner,
- * admins only); on a plan, more people only by its owner (`planSharing`).
+ * admins only), on a plan too (ADR 0059 §5).
  * `mailLossSeen`: the mailboxes the person agreed it loses (`audienceMailLoss`); losing any other refuses the save
  * (409 `agent.mail_loss_changed`), so a mailbox given after they were asked is never taken unasked.
  * Audited.
@@ -417,7 +398,6 @@ export async function setAgentAudience(
       roleIds = agent.audienceRoleIds;
     }
     const consultable = audience.consultable ?? agent.consultable;
-    planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds, roleIds, consultable });
     const [updated] = await tx
       .update(agents)
       .set({

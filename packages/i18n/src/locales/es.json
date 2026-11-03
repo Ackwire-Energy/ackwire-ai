@@ -3140,6 +3140,7 @@
         "label_female": "Cómo trabaja",
         "computer": "Trabaja en",
         "brain": "Piensa con",
+        "brainWith": "Piensa con {{plan}}",
         "browser": "Navegador",
         "effort": "Esfuerzo {{level}}"
       },
@@ -3182,7 +3183,7 @@
         "none": "Ninguna computadora lo tiene",
         "planModel": "Modelo",
         "account": "Cuenta",
-        "accountLocked": "Solo {{name}} lo cambia",
+        "accountWho": "Solo cuentas de {{owner}}, responsable de {{name}}: un plan solo piensa para los agentes de su dueño.",
         "accountSignedOut": "Sesión cerrada, vuelve a iniciar sesión",
         "thisComputer": "Cuenta de {{computer}}",
         "accountMove": "En uso por {{agents}} · Moverla aquí",
@@ -3210,7 +3211,7 @@
           "max": "máximo"
         },
         "effortText": {
-          "auto": "Elige el esfuerzo para cada tarea.",
+          "auto": "El modelo Automático elige el esfuerzo de cada tarea. Elige un modelo para fijar el esfuerzo.",
           "low": "Responde rápido. Bueno para preguntas simples.",
           "medium": "El predeterminado. Piensa lo suficiente casi siempre.",
           "high": "Piensa más en las tareas difíciles. Más lento y más caro.",
@@ -3235,6 +3236,11 @@
           "answers": "A quién responde",
           "defaults": "Volver a los valores predeterminados",
           "done": "Listo",
+          "contents": {
+            "model": "Ventana de contexto",
+            "auto": "Ventana de contexto y a quién responde",
+            "fixed": "Esfuerzo, ventana de contexto y a quién responde"
+          },
           "allDefault": "Todo predeterminado",
           "effort": "Esfuerzo: {{level}}",
           "context": "Contexto: {{size}}",
@@ -6852,15 +6858,17 @@
     "share": {
       "switch": "Responde a otras personas",
       "switchAll": "Responder a otras personas",
-      "switchOther": "Responde solo a {{owner}}",
-      "onOther": "{{name}} piensa con el plan de {{owner}}. Solo {{owner}} puede dejar que otras personas hablen con él.",
-      "onOther_female": "{{name}} piensa con el plan de {{owner}}. Solo {{owner}} puede dejar que otras personas hablen con ella.",
       "line": {
         "off": "{{name}} responde solo a ti, con tu {{plan}}.",
         "on": "{{name}} responde a cualquiera que pueda hablar con él, con tu {{plan}}.",
         "on_female": "{{name}} responde a cualquiera que pueda hablar con ella, con tu {{plan}}.",
         "offAll": "Responden solo a ti, con tu {{plan}}.",
         "onAll": "Responden a cualquiera que pueda hablar con ellos, con tu {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} responde solo a {{owner}}, con el {{plan}} de {{owner}}.",
+        "on": "{{name}} responde a cualquiera que pueda hablar con él, con el {{plan}} de {{owner}}.",
+        "on_female": "{{name}} responde a cualquiera que pueda hablar con ella, con el {{plan}} de {{owner}}."
       },
       "plan": {
         "own": "plan de {{provider}}",
@@ -6875,13 +6883,11 @@
       },
       "savedEveryone": "Ahora {{name}} responde a otras personas.",
       "savedOwner": "{{name}} ahora responde solo a ti.",
+      "savedOwnerOf": "{{name}} ahora responde solo a {{owner}}.",
       "backOnApi": "{{name}} volvió a la API y sigue respondiendo solo a ti.",
       "letEveryone": "Dejar que {{name}} responda a todos",
       "letPeople": "Dejar que {{name}} responda a otras personas",
       "pickPeople": "{{name}} responde solo a las personas elegidas, y todavía no hay nadie elegido. Elígelas en Quién puede hablar."
-    },
-    "errors": {
-      "planOwnerOnly": "Solo la persona responsable de {{agentName}} puede dejar entrar a más personas: {{agentName}} responde con su plan."
     },
     "add": {
       "paste": "Pegar",

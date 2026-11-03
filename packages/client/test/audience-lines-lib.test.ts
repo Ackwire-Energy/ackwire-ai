@@ -52,20 +52,6 @@ describe("audiencePatch", () => {
   });
 });
 
-describe("audienceBlocked", () => {
-  const onPlan = agent({ audience: { mode: "owner", userIds: [] }, brain: { kind: "claude_code" } as Agent["brain"] });
-  const wider = { mode: "people" as const, userIds: ["u-caio"] };
-  test("on a plan only its owner lets more people in", () => {
-    expect(audienceBlocked(onPlan, wider, "u-bia")).toBe(true);
-    expect(audienceBlocked(onPlan, wider, "u-heitor")).toBe(false);
-    expect(audienceBlocked(onPlan, { mode: "owner", userIds: [] }, "u-bia")).toBe(false);
-  });
-
-  test("on the API anyone who may edit it may widen it", () => {
-    expect(audienceBlocked({ ...onPlan, brain: undefined }, wider, "u-bia")).toBe(false);
-  });
-});
-
 describe("agentWorkingIn", () => {
   test("the channel of a run thinking or writing, none when idle", () => {
     const state = {

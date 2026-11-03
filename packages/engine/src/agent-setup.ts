@@ -170,7 +170,7 @@ const skip = (reason: SetupReason, params?: Record<string, string>): Plan => ({
 function refusal(error: unknown): Pick<SetupResult, "reason" | "params"> {
   const { code, params } = (error ?? {}) as { code?: unknown; params?: Record<string, unknown> };
   if (code === "agent.not_owner") return { reason: "not_allowed" };
-  if (code === "account.not_owner" || code === "audience.plan_owner_only") return { reason: "account_owner" };
+  if (code === "account.not_owner") return { reason: "account_owner" };
   if (code === "account.in_use") {
     return {
       reason: "account_single",
@@ -405,9 +405,9 @@ function planFor(
 /** Whether the setup's account (or its computer's own sign-in) can think for the agent, else why not. */
 function takesAccount(
   t: Agent,
-  c: Pick<Parameters<typeof planFor>[1], "setup" | "userId" | "machine" | "account" | "computerName" | "pairerName">,
+  c: Pick<Parameters<typeof planFor>[1], "setup" | "machine" | "account" | "computerName" | "pairerName">,
 ): true | Plan {
-  const { setup, userId, machine } = c;
+  const { setup, machine } = c;
   if (!machine || !brainOptions(machine).some((o) => o.kind === setup.brain && o.available)) return skip("failed");
   if (t.machineId !== machine.id) {
     const where = t.machineId ? c.computerName.get(t.machineId) : undefined;
@@ -416,18 +416,17 @@ function takesAccount(
   if (setup.account) {
     const a = c.account;
     if (!a || a.kind !== setup.brain) return skip("failed");
-    // Only the owner of both the account and the agent chooses it (ADR 0059 §3).
-    if (a.ownerId !== userId) return skip("account_owner", a.ownerName ? { owner: a.ownerName } : undefined);
-    if (t.ownerUserId !== userId) return skip("account_owner");
+    // A plan thinks only for its owner's agents (ADR 0059 §3).
+    if (!a.ownerId || a.ownerId !== t.ownerUserId)
+      return skip("account_owner", a.ownerName ? { owner: a.ownerName } : undefined);
     const other = a.shared ? -1 : a.usedByIds.findIndex((id) => id !== t.id);
     if (other >= 0) return skip("account_single", { agent: a.usedBy[other] ?? "" });
     return true;
   }
   // The computer's own sign-in thinks only for the agents of whoever connected it; on one nobody did, for none.
   if (!machine.pairedByUserId) return skip("failed");
-  if (machine.pairedByUserId !== userId)
+  if (machine.pairedByUserId !== t.ownerUserId)
     return skip("account_owner", c.pairerName ? { owner: c.pairerName } : undefined);
-  if (t.ownerUserId !== userId) return skip("account_owner");
   return true;
 }
 

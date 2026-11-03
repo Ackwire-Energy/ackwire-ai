@@ -63,11 +63,17 @@ export const accountKindOf = (brain: BrainKind | undefined): MachineAccountKind 
   brain === "claude_code" || brain === "codex" ? brain : null;
 
 /**
- * The accounts the agent's page lists, as the web's picker: the viewer's own of that kind (each person picks among
- * theirs), and someone else's only while it is this agent's.
+ * The accounts the agent's page lists, as the web's picker: its owner's of that kind (a plan thinks only for its
+ * owner's agents, ADR 0059 §3), which its owner or an admin picks, and someone else's only while it is this agent's.
  */
-export const agentAccounts = (view: Pick<AgentBrain, "accounts" | "account">, kind: MachineAccountKind) =>
-  view.accounts.filter((a) => a.kind === kind && (a.mine || a.id === view.account));
+export const agentAccounts = (
+  view: Pick<AgentBrain, "accounts" | "account" | "canUsePlans">,
+  kind: MachineAccountKind,
+  ownerUserId: string | null | undefined,
+) =>
+  view.accounts.filter(
+    (a) => a.kind === kind && ((view.canUsePlans ? a.mine : a.ownerId === ownerUserId) || a.id === view.account),
+  );
 
 /** The plan usage of what it thinks with: its account's, or the computer's own sign-in's where that thinks for it. */
 export function thinkingUsage(

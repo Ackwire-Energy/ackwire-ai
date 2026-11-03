@@ -3022,6 +3022,8 @@ export const ptBR = {
         label: "Como trabalha",
         computer: "Trabalha no",
         brain: "Pensa com",
+        /** On a plan: the plan in the label, the model and its effort on the line under it. */
+        brainWith: "Pensa com {{plan}}",
         browser: "Navegador",
         effort: "esforço {{level}}",
       },
@@ -3074,7 +3076,10 @@ export const ptBR = {
         none: "Nenhum computador tem",
         planModel: "Modelo",
         account: "Conta",
-        accountLocked: "Só {{name}} troca",
+        /** To an admin: the accounts are the agent's owner's, since a plan thinks only for its owner's agents. */
+        accountWho: "Só contas de {{owner}}, responsável pelo {{name}}: um plano só pensa pelos agentes do seu dono.",
+        accountWho_female:
+          "Só contas de {{owner}}, responsável pela {{name}}: um plano só pensa pelos agentes do seu dono.",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
         accountMove: "Em uso por {{agents}} · Mover para cá",
@@ -3094,7 +3099,7 @@ export const ptBR = {
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortsLower: { auto: "automático", low: "baixo", medium: "médio", high: "alto", max: "máximo" },
         effortText: {
-          auto: "Escolhe o esforço para cada tarefa.",
+          auto: "O modelo Automático escolhe o esforço de cada tarefa. Escolha um modelo para fixar o esforço.",
           low: "Responde rápido. Bom para perguntas simples.",
           medium: "O padrão. Pensa o suficiente na maioria das vezes.",
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",
@@ -3122,7 +3127,13 @@ export const ptBR = {
           answers: "Quem atende",
           defaults: "Voltar ao padrão",
           done: "Pronto",
-          /** The row's line: nothing changed from the defaults, else only what did. */
+          /** The row's line: what the dialog holds. The effort shows only with a fixed model on a plan. */
+          contents: {
+            model: "Janela de contexto",
+            auto: "Janela de contexto e quem atende",
+            fixed: "Esforço, janela de contexto e quem atende",
+          },
+          /** After a save: nothing changed from the defaults, else only what did. */
           allDefault: "Tudo no padrão",
           effort: "Esforço {{level}}",
           context: "Contexto de {{size}}",
@@ -6484,12 +6495,6 @@ export const ptBR = {
       switch: "Atende outras pessoas",
       /** The same switch for every agent a plan's panel connects. */
       switchAll: "Atendem outras pessoas",
-      /** Off, as someone who isn't the plan's owner sees it. */
-      switchOther: "Só atende {{owner}}",
-      /** Who decides, for someone who isn't the plan's owner: under the switch, and in "Quem pode falar". */
-      onOther: "O {{name}} pensa com o plano de {{owner}}. Só {{owner}} pode deixar outras pessoas falarem com ele.",
-      onOther_female:
-        "A {{name}} pensa com o plano de {{owner}}. Só {{owner}} pode deixar outras pessoas falarem com ela.",
       /** Under the switch, by its state: whom the agent answers and on which plan. `*All`: every agent of a panel. */
       line: {
         off: "O {{name}} só atende você, pelo seu {{plan}}.",
@@ -6498,6 +6503,13 @@ export const ptBR = {
         on_female: "A {{name}} atende quem pode falar com ela, pelo seu {{plan}}.",
         offAll: "Só atendem você, pelo seu {{plan}}.",
         onAll: "Atendem quem pode falar com eles, pelo seu {{plan}}.",
+      },
+      /** The same line to an admin, on the plan of the agent's owner. */
+      lineOf: {
+        off: "O {{name}} só atende {{owner}}, pelo {{plan}} de {{owner}}.",
+        off_female: "A {{name}} só atende {{owner}}, pelo {{plan}} de {{owner}}.",
+        on: "O {{name}} atende quem pode falar com ele, pelo {{plan}} de {{owner}}.",
+        on_female: "A {{name}} atende quem pode falar com ela, pelo {{plan}} de {{owner}}.",
       },
       /** The line's plan, after "pelo seu": a personal plan, a seat (Team, Enterprise) or a coding plan by its name. */
       plan: {
@@ -6517,6 +6529,8 @@ export const ptBR = {
       savedEveryone_female: "Agora a {{name}} atende outras pessoas.",
       savedOwner: "O {{name}} agora só atende você.",
       savedOwner_female: "A {{name}} agora só atende você.",
+      savedOwnerOf: "O {{name}} agora só atende {{owner}}.",
+      savedOwnerOf_female: "A {{name}} agora só atende {{owner}}.",
       backOnApi: "O {{name}} voltou a pensar pela API e ainda só atende você.",
       backOnApi_female: "A {{name}} voltou a pensar pela API e ainda só atende você.",
       letEveryone: "Deixar o {{name}} atender todos",
@@ -6528,10 +6542,6 @@ export const ptBR = {
         "O {{name}} só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
       pickPeople_female:
         "A {{name}} só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
-    },
-    errors: {
-      planOwnerOnly:
-        "Só o responsável por {{agentName}} libera para mais gente: {{agentName}} atende pelo plano dessa pessoa.",
     },
     add: {
       paste: "Colar",

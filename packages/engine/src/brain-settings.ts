@@ -22,7 +22,7 @@ import {
 } from "@agenteschat/providers";
 import { claudeCodeModel, isPlanModelId, OPENCODE_FREE_MODELS, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
-import { type AgentAudience, answersOthers, audienceOf, dropMailIfWidened, OWNER_ONLY, planSharing } from "./audience";
+import { type AgentAudience, answersOthers, audienceOf, dropMailIfWidened, OWNER_ONLY } from "./audience";
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -323,7 +323,10 @@ export interface AgentBrainView {
   accountsSupported: boolean;
   /** Nobody but its owner talks to it ("Atende outras pessoas" off, ADR 0059 §5). */
   onlyOwner: boolean;
-  /** The caller owns the agent: only they choose its plan and let other people talk to it on a plan. */
+  /**
+   * The caller owns the agent, so its plans are the caller's own: they sign one in for it. Admins choose among its
+   * owner's accounts and whom it answers too.
+   */
   canUsePlans: boolean;
   /** The computer's own sign-in can think for it: the person who connected the computer owns the agent. */
   ownSignIn: boolean;
@@ -481,13 +484,13 @@ export interface AgentBrainInput {
    * "Atende outras pessoas" turned off (ADR 0059 §5): true, only its owner talks
    * to it; false, whoever its "who can talk" list lets in (everyone with no
    * list). Omitted = keep it; a switch onto a plan makes it its owner's only,
-   * and only the plan's owner lets more people in (`planSharing`).
+   * until its owner or an admin lets more people in.
    */
   onlyOwner?: unknown;
   /**
    * The account its computer brain runs with (ADR 0041): an account on the
    * agent's computer of the brain's kind, or null for the computer's own
-   * sign-in. Only the owner of both the agent and the account chooses it.
+   * sign-in. One of the agent's owner's accounts, chosen by its owner or an admin.
    * Omitted = keep it (cleared when the brain kind changes).
    */
   account?: unknown;
@@ -502,26 +505,18 @@ export interface AgentBrainInput {
 const EVERYONE: AgentAudience = { mode: "everyone", userIds: [], roleIds: [] };
 
 /** Who it answers after this change: a switch onto a plan makes it its owner's only (ADR 0059 §5). */
-function nextAudience(
-  agent: Agent,
-  brain: BrainKind,
-  changed: boolean,
-  onlyOwner: boolean | undefined,
-): { base: AgentAudience; to: AgentAudience } {
+function nextAudience(agent: Agent, brain: BrainKind, changed: boolean, onlyOwner: boolean | undefined): AgentAudience {
   const current = audienceOf(agent);
   // One that already answers its owner alone keeps its mode: "Só algumas pessoas" with nobody picked stays that.
   const narrow = (a: AgentAudience) => (answersOthers(a, agent.ownerUserId) ? OWNER_ONLY : a);
   const base = changed && isComputerBrain(brain) ? narrow(current) : current;
-  if (onlyOwner === undefined) return { base, to: base };
-  if (onlyOwner) return { base, to: narrow(base) };
-  if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
+  if (onlyOwner === undefined) return base;
+  if (onlyOwner) return narrow(base);
+  if (answersOthers(base, agent.ownerUserId)) return base;
   // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only. One a person
   // restricted ("Só algumas pessoas ou papéis", even with nobody picked yet) stays restricted: never everyone.
   const kept = agent.audienceUserIds.length > 0 || agent.audienceRoleIds.length > 0 || agent.audienceMode === "people";
-  return {
-    base,
-    to: kept ? { mode: "people", userIds: agent.audienceUserIds, roleIds: agent.audienceRoleIds } : EVERYONE,
-  };
+  return kept ? { mode: "people", userIds: agent.audienceUserIds, roleIds: agent.audienceRoleIds } : EVERYONE;
 }
 
 /**
@@ -580,6 +575,13 @@ export async function setAgentBrain(
         : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
   const extraUsage = (input.extraUsage as boolean | undefined) ?? agent.brainExtraUsage;
+  // Paid extra usage bills the plan's owner, who is the agent's owner: an admin picks the account, not this.
+  if (extraUsage !== agent.brainExtraUsage && agent.ownerUserId !== userId) {
+    throw new ForbiddenError(
+      "Only the agent's owner turns its plan's paid extra usage on or off",
+      "brain.extra_owner_only",
+    );
+  }
   if (input.effort !== undefined && input.effort !== null && !isBrainEffortSetting(input.effort)) {
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
@@ -589,11 +591,11 @@ export async function setAgentBrain(
   }
   const contextTokens =
     input.contextTokens === undefined ? agent.contextTokens : (input.contextTokens as number | null);
-  const { base, to } = nextAudience(agent, brain, changed, input.onlyOwner as boolean | undefined);
-  planSharing({ ...agent, brain }, userId, base, to);
+  const to = nextAudience(agent, brain, changed, input.onlyOwner as boolean | undefined);
   const audience = to.mode === agent.audienceMode ? null : to;
   const next = await nextBrainAccount(deps.db, userId, orgId, agent, brain, changed, machine, input.account, {
     move: input.moveAccount === true,
+    admin,
   });
   const account = next.id;
   const accounts = await brainAccounts(deps.db, userId, orgId, agent, machine);
@@ -730,10 +732,10 @@ export async function setAgentBrain(
 /**
  * The account the agent will run with (ADR 0041 §4, ADR 0059 §1–3): kept
  * when nothing asks otherwise, cleared when the brain kind changes. A plan
- * thinks only for its owner's agents, so only the agent's owner chooses: one
- * of their own accounts (on the agent's computer, of the brain's kind; one
- * made for one agent that another uses only with `move`), or the computer's
- * own sign-in when they connected it.
+ * thinks only for its owner's agents, so the choice is among the agent's
+ * owner's accounts (on the agent's computer, of the brain's kind; one made for
+ * one agent that another uses only with `move`), or the computer's own sign-in
+ * when they connected it. The agent's owner or an admin chooses.
  */
 async function nextBrainAccount(
   db: Database,
@@ -744,7 +746,7 @@ async function nextBrainAccount(
   changed: boolean,
   machine: MachineRow | null,
   input: unknown,
-  options: { move: boolean },
+  options: { move: boolean; admin: boolean },
 ): Promise<{ id: string | null; from?: { accountId: string; agentId: string } }> {
   const kept = changed ? null : agent.brainAccountId;
   if (input === undefined) return { id: kept };
@@ -753,11 +755,12 @@ async function nextBrainAccount(
   }
   const wanted = input || null;
   if (wanted === kept) return { id: kept };
-  const ownsAgent = agent.ownerUserId === userId;
+  const owner = agent.ownerUserId;
+  const chooses = options.admin || owner === userId;
   if (wanted === null) {
-    if (machine && !(ownsAgent && machine.pairedByUserId === userId)) {
+    if (machine && !(chooses && owner !== null && machine.pairedByUserId === owner)) {
       throw new ForbiddenError(
-        "Only the agent's owner can choose the computer's own sign-in, when they connected that computer",
+        "The computer's own sign-in thinks only for the agents of whoever connected that computer",
         "account.not_owner",
       );
     }
@@ -769,8 +772,8 @@ async function nextBrainAccount(
       brain,
     });
   }
-  if (!ownsAgent || row.createdBy !== userId) {
-    throw new ForbiddenError("Only the owner of both the account and the agent can choose it", "account.not_owner");
+  if (!chooses || owner === null || row.createdBy !== owner) {
+    throw new ForbiddenError("A plan thinks only for its owner's agents", "account.not_owner");
   }
   // Made for all of its owner's agents there (protocol 29): it thinks for this one too.
   if (row.shared) return { id: row.id };

@@ -327,7 +327,7 @@ describe("who can talk to the agent", () => {
     expect((await f.db.select().from(schema.messages)).some((m) => m.meta.routineBrief !== undefined)).toBe(false);
   });
 
-  test("on a plan only its owner widens it, with nothing to accept, audited as any change; admins narrow", async () => {
+  test("on a plan its owner or an admin widens it, with nothing to accept, audited as any change", async () => {
     const { bia } = await world();
     const caio = await addMember(f.db, f.org.id, "admin", "caio");
     await f.db
@@ -338,17 +338,14 @@ describe("who can talk to the agent", () => {
     const some = { mode: "people" as const, userIds: [bia.id], roleIds: [] };
     const widen = (actor: string, to: typeof everyone | typeof some) =>
       setAgentAudience(f.db, actor, f.org.id, f.agent.id, to).catch((e) => e);
-    expect(await widen(caio.id, everyone)).toMatchObject({ code: "audience.plan_owner_only" });
     expect(audienceOf(await widen(f.owner.id, some))).toEqual({ ...some, consultable: true });
     const audits = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
     expect(audits.map((a) => a.details)).toEqual([
       { from: { mode: "owner", userIds: [], roleIds: [], consultable: true }, to: { ...some, consultable: true } },
     ]);
+    expect((await widen(caio.id, everyone)).audienceMode).toBe("everyone");
     expect((await widen(f.owner.id, everyone)).audienceMode).toBe("everyone");
     expect((await widen(caio.id, some)).audienceMode).toBe("people");
-    expect(await widen(caio.id, everyone)).toBeInstanceOf(ForbiddenError);
-    // On the API nothing of this applies.
-    await f.db.update(schema.agents).set({ brain: "model" }).where(eq(schema.agents.id, f.agent.id));
     expect((await widen(caio.id, everyone)).audienceMode).toBe("everyone");
   });
 

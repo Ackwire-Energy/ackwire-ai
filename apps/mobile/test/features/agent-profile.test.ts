@@ -375,6 +375,17 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     expect(t("mobile.agent.exhaustedF", { name: "Ada" })).toBe("A Ada usou todo o orçamento do mês.");
   });
 
+  test("Pensa com: the plan as the row's name, the model and a fixed model's effort under it, on two lines", async () => {
+    const screen = await Bun.file(
+      new URL("../../src/features/agents/AgentProfileScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain("title={thinksPlan ?? thinks.text}");
+    expect(screen).toContain("{...(thinksUnder ? { subtitle: thinksUnder, subtitleLines: 2 } : {})}");
+    expect(screen).toContain("!isAuto(effortView.effectiveModel)");
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.cell.effort", { level: "médio" })).toBe("esforço médio");
+  });
+
   test("the bars as the web colors them: each window by its own level, the words and the compact bar by the plan's", async () => {
     const parts = await Bun.file(new URL("../../src/features/usage/parts.tsx", import.meta.url).pathname).text();
     expect(parts).toContain('const tone = c[PLAN_TONE[planLevel(shown.top?.used ?? 0, shown.state === "limited")]];');
