@@ -331,4 +331,26 @@ export const words: EmailWords = {
     table: (day) => `La tabla completa: bun run report:autonomy --day ${day}`,
     why: "Recibiste este correo porque esta dirección está en OPS_REPORT_EMAIL en este servidor. Se envía una vez al día.",
   },
+  planOpened: {
+    subject: (plan) => `Más personas pueden hablar con tu agente con tu plan de ${plan}`,
+    preheader: (plan) => `Sus conversaciones usan tu plan de ${plan} y sus límites.`,
+    headline: "Más personas pueden hablar con tu agente",
+    body: (by, agent, plan) => [
+      { b: by },
+      " dejó que más personas hablen con ",
+      { b: agent },
+      `. Sus conversaciones usan tu plan de ${plan} y sus límites.`,
+    ],
+    agent: "Agente",
+    by: "Cambiado por",
+    was: "Antes",
+    now: "Ahora",
+    everyone: "Todos en el workspace",
+    onlyYou: "Solo tú",
+    you: "Tú",
+    note: "Para deshacerlo, cambia Quién puede hablar en la página del agente.",
+    button: "Ver quién puede hablar",
+    why: (org) =>
+      `Recibiste este correo porque un agente tuyo en ${org} piensa con tu plan y otra persona cambió quién puede hablar con él.`,
+  },
 };

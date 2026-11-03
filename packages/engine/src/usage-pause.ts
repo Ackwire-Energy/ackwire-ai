@@ -1,10 +1,9 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, ne, schema, sql } from "@agenteschat/db";
-import { planOf } from "@agenteschat/providers/plans";
 import { extraUsageLeft, planBinding } from "@agenteschat/ui/plan-state";
 import { recordAudit } from "./audit";
 import { storedPlanUsage } from "./brains/select";
-import { BRAIN_PLAN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
+import type { BrainKind } from "./brains/types";
 import { mayStopRun, runRequester } from "./cancel";
 import { ConflictError, ForbiddenError } from "./errors";
 import { publishMessageCreated } from "./events";
@@ -39,12 +38,7 @@ export const nextMonthStart = (now: number) => {
   return Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1);
 };
 
-/** The plan's name in a note: the coding plan's maker, else Claude's or ChatGPT's. */
-export function planName(kind: BrainKind, provider?: string): string {
-  const plan = planOf(provider);
-  if (plan) return provider === "opencode" ? plan.name : plan.maker;
-  return isComputerBrain(kind) ? BRAIN_PLAN_NAMES[kind] : "Claude";
-}
+export { planName } from "./brains/types";
 
 /** What groups the runs that wait on the same thing (they resume one after another): a plan's sign-in or a budget. */
 export const usageWaitKey = (

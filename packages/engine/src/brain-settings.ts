@@ -22,7 +22,14 @@ import {
 } from "@agenteschat/providers";
 import { claudeCodeModel, isPlanModelId, OPENCODE_FREE_MODELS, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
-import { type AgentAudience, answersOthers, audienceOf, dropMailIfWidened, OWNER_ONLY } from "./audience";
+import {
+  type AgentAudience,
+  answersOthers,
+  audienceChanged,
+  audienceOf,
+  dropMailIfWidened,
+  OWNER_ONLY,
+} from "./audience";
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -665,6 +672,7 @@ export async function setAgentBrain(
       });
     if (row && audience) {
       await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(row), userId);
+      await audienceChanged(tx, orgId, userId, row, audienceOf(agent), { ...audience, consultable: agent.consultable });
     }
     return { row, released };
   });
@@ -690,16 +698,6 @@ export async function setAgentBrain(
         to: { brain, model, fallback, extraUsage, account, effort, contextTokens },
         ...options.audit,
       },
-    });
-  }
-  // Recorded as every change of who may talk to an agent is (`setAgentAudience`).
-  if (audience) {
-    await recordAudit(deps.db, {
-      orgId,
-      actor: { type: "person", id: userId },
-      action: "agent.audience_changed",
-      target: { type: "agent", id: agentId },
-      details: { from: audienceOf(agent), to: { ...audience, consultable: agent.consultable } },
     });
   }
   if (next.from) {

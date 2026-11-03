@@ -316,4 +316,26 @@ export const words: EmailWords = {
     table: (day) => `전체 표: bun run report:autonomy --day ${day}`,
     why: "이 주소가 이 서버의 OPS_REPORT_EMAIL에 있어서 이 메일을 보내 드렸어요. 하루에 한 번 보내요.",
   },
+  planOpened: {
+    subject: (plan) => `내 ${plan} 플랜으로 더 많은 사람이 내 에이전트와 대화할 수 있어요`,
+    preheader: (plan) => `그 대화에는 내 ${plan} 플랜과 그 한도가 쓰여요.`,
+    headline: "더 많은 사람이 내 에이전트와 대화할 수 있어요",
+    body: (by, agent, plan) => [
+      { b: by },
+      " 님이 ",
+      { b: agent },
+      `와 대화할 수 있는 사람을 늘렸어요. 그 대화에는 내 ${plan} 플랜과 그 한도가 쓰여요.`,
+    ],
+    agent: "에이전트",
+    by: "변경한 사람",
+    was: "이전",
+    now: "지금",
+    everyone: "워크스페이스의 모든 사람",
+    onlyYou: "나만",
+    you: "나",
+    note: "되돌리려면 에이전트 페이지에서 대화할 수 있는 사람을 바꾸세요.",
+    button: "대화할 수 있는 사람 보기",
+    why: (org) =>
+      `${org}에 있는 내 에이전트가 내 플랜으로 생각하고, 다른 사람이 그 에이전트와 대화할 수 있는 사람을 바꿔서 이 메일을 보내 드렸어요.`,
+  },
 };

@@ -243,6 +243,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect((await changes()).at(-1)).toEqual({
       from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
       to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
+      planOwner: fx.owner.id,
     });
 
     // On, it replies to whoever its "who can talk" list lets in: Bia, not the whole workspace.
@@ -253,6 +254,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect((await changes()).at(-1)).toEqual({
       from: { mode: "owner", userIds: [bia.id], roleIds: [], consultable: true },
       to: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
+      planOwner: fx.owner.id,
     });
     // Nothing about what it thinks with changed: no brain entry for it.
     expect(await audits("agent.brain")).toHaveLength(brainAudits);
@@ -265,6 +267,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect((await changes()).at(-1)).toEqual({
       from: { mode: "people", userIds: [bia.id], roleIds: [], consultable: true },
       to: { mode: "owner", userIds: [], roleIds: [], consultable: true },
+      planOwner: fx.owner.id,
     });
     // Off and on again never widens it: still Bia alone.
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });

@@ -7,6 +7,7 @@ import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { enqueue } from "./outbox";
 import { maySql } from "./permissions";
 import { dropForeignMailGrants, type ForeignMailbox, foreignMailboxes } from "./tools/scopes";
 
@@ -338,9 +339,42 @@ export async function notifyBlocked(
   return out;
 }
 
+/** The outbox job telling a plan's owner that someone else let more people talk to their agent (`queuePlanOpenedEmail`). */
+export const PLAN_OPENED_JOB = "agent.plan_opened";
+
+/**
+ * Who may talk to the agent changed from `from` to `to`, saved as `after`. Audited, naming whose plan it is when it
+ * thinks with its owner's (ADR 0059 §5). When someone else let more people in there, the plan's owner hears it by
+ * email, once per change: their plan pays for those conversations.
+ */
+export async function audienceChanged(
+  db: Executor,
+  orgId: string,
+  actorId: string,
+  after: Pick<Agent, "id" | "brain" | "ownerUserId">,
+  from: AgentAudience,
+  to: AgentAudience,
+) {
+  const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "agent.audience_changed",
+    target: { type: "agent", id: after.id },
+    details: { from, to, ...(planOwner ? { planOwner } : {}) },
+  });
+  if (!planOwner || planOwner === actorId || !widensAudience(from, to, planOwner)) return;
+  await enqueue(db, {
+    orgId,
+    kind: PLAN_OPENED_JOB,
+    payload: { agentId: after.id, actorId, from, to },
+    dedupeKey: `plan-opened:${crypto.randomUUID()}`,
+  });
+}
+
 /**
  * Changes who can talk to the agent: its owner or admins (with no owner,
- * admins only), on a plan too (ADR 0059 §5).
+ * admins only), on a plan too (ADR 0059 §5): its owner hears by email when someone else lets more people in.
  * `mailLossSeen`: the mailboxes the person agreed it loses (`audienceMailLoss`); losing any other refuses the save
  * (409 `agent.mail_loss_changed`), so a mailbox given after they were asked is never taken unasked.
  * Audited.
@@ -417,18 +451,12 @@ export async function setAgentAudience(
         }
       }
       await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(updated), actorId);
+      await audienceChanged(tx, orgId, actorId, updated, audienceOf(agent), audienceOf(updated));
     }
     return updated;
   });
   if (!updated) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
-  await recordAudit(db, {
-    orgId,
-    actor: { type: "person", id: actorId },
-    action: "agent.audience_changed",
-    target: { type: "agent", id: agentId },
-    details: { from: audienceOf(agent), to: audienceOf(updated) },
-  });
   return updated;
 }

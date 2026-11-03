@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { BRAIN_PROTOCOL, userTopic } from "@agenteschat/adapters";
+import { BRAIN_PROTOCOL, createFakeEmailSender, userTopic } from "@agenteschat/adapters";
 import { eq, rowsOf, schema, sql } from "@agenteschat/db";
 import {
   acceptInvitation,
@@ -8,11 +8,13 @@ import {
   audienceSql,
   canTalkTo,
   createAgent,
+  createJobHandlers,
   createOrganization,
   createRole,
   createRoutine,
   dispatchMentions,
   drainOutbox,
+  emailArtAt,
   executeRoutineRun,
   ForbiddenError,
   getAgentBrain,
@@ -24,6 +26,7 @@ import {
   NO_PERSON,
   NotFoundError,
   openDm,
+  PLAN_OPENED_JOB,
   postPersonMessage,
   type RouterStrategy,
   removeMember,
@@ -341,12 +344,63 @@ describe("who can talk to the agent", () => {
     expect(audienceOf(await widen(f.owner.id, some))).toEqual({ ...some, consultable: true });
     const audits = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
     expect(audits.map((a) => a.details)).toEqual([
-      { from: { mode: "owner", userIds: [], roleIds: [], consultable: true }, to: { ...some, consultable: true } },
+      {
+        from: { mode: "owner", userIds: [], roleIds: [], consultable: true },
+        to: { ...some, consultable: true },
+        planOwner: f.owner.id,
+      },
     ]);
     expect((await widen(caio.id, everyone)).audienceMode).toBe("everyone");
     expect((await widen(f.owner.id, everyone)).audienceMode).toBe("everyone");
     expect((await widen(caio.id, some)).audienceMode).toBe("people");
     expect((await widen(caio.id, everyone)).audienceMode).toBe("everyone");
+  });
+
+  test("someone else opening an agent on a person's plan: audited with whose plan, its owner emailed once in their language", async () => {
+    const { bia } = await world();
+    const caio = await addMember(f.db, f.org.id, "admin", "caio");
+    await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, f.owner.id));
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", audienceMode: "owner" })
+      .where(eq(schema.agents.id, f.agent.id));
+    const everyone = { mode: "everyone" as const, userIds: [], roleIds: [] };
+    const jobs = async () => (await f.db.select().from(schema.outbox)).filter((j) => j.kind === PLAN_OPENED_JOB);
+    // A member who doesn't own it can't, so nothing goes out.
+    await expect(setAgentAudience(f.db, bia.id, f.org.id, f.agent.id, everyone)).rejects.toBeInstanceOf(ForbiddenError);
+    // Its owner's own change tells nobody.
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id], roleIds: [] });
+    expect(await jobs()).toHaveLength(0);
+    // An admin's: one job, then one email to the owner, in English, naming who and what changed.
+    await setAgentAudience(f.db, caio.id, f.org.id, f.agent.id, everyone);
+    expect(await jobs()).toHaveLength(1);
+    const [audit] = (await f.db.select().from(schema.auditLog))
+      .filter((a) => a.action === "agent.audience_changed" && a.actorId === caio.id)
+      .map((a) => a.details);
+    expect(audit).toMatchObject({
+      from: { mode: "people", userIds: [bia.id] },
+      to: { mode: "everyone" },
+      planOwner: f.owner.id,
+    });
+    // Narrowing it again isn't more people: no email.
+    await setAgentAudience(f.db, caio.id, f.org.id, f.agent.id, { mode: "owner", userIds: [], roleIds: [] });
+    expect(await jobs()).toHaveLength(1);
+    const email = createFakeEmailSender();
+    await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, email, emailArt: emailArtAt("https://chat.example") }));
+    expect(email.sent).toHaveLength(1);
+    const [sent] = email.sent;
+    const [owner] = await f.db.select().from(schema.users).where(eq(schema.users.id, f.owner.id));
+    expect(sent?.to).toEqual([owner?.email]);
+    expect(sent?.subject).toBe("More people can talk to your agent on your Claude plan");
+    expect(sent?.text).toContain("caio");
+    expect(sent?.text).toContain("You and bia");
+    expect(sent?.text).toContain("Everyone in the workspace");
+    expect(sent?.html).toContain(
+      `https://chat.example/org/${f.org.id}/agents/${f.agent.id}?tab=settings&amp;sec=audience`,
+    );
+    // The brain dialog's "Atende outras pessoas" by an admin tells the owner too.
+    await setAgentBrain({ db: f.db }, caio.id, f.org.id, f.agent.id, { onlyOwner: false });
+    expect(await jobs()).toHaveLength(2);
   });
 
   test("a role lets in whoever holds it, now and later, in every path; leaving the role takes it away", async () => {
