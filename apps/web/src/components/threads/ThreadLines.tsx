@@ -2,7 +2,7 @@ import type { Message, ThreadInfo, ThreadStartMeta } from "@agenteschat/client";
 import { runsInChannel, useChannelThreads } from "@agenteschat/client";
 import { formatTime, relativeTime } from "@agenteschat/client/lib/format";
 import { threadMessageCount, threadStatus, threadTitle } from "@agenteschat/client/lib/threads";
-import { AvatarStack, Button, CountChip, Icon, Popover } from "@agenteschat/ui";
+import { AvatarStack, Button, CountBadge, Icon, Popover } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -241,10 +241,15 @@ export function ChannelThreadsButton({ channelId, channelName }: { channelId: st
       className="thread-pop"
       label={t("threads.popover.label", { channel: channelName })}
       trigger={
-        <Button size="sm" icon="thread" aria-label={t("threads.popover.button", { count: threads.length })}>
-          <span className="thread-pop__label">{t("threads.popover.title")}</span>
-          <CountChip>{count}</CountChip>
-        </Button>
+        <button
+          type="button"
+          className="ac-btn ac-btn--ghost ac-btn--icon channel__icon"
+          aria-label={t("threads.popover.button", { count: threads.length })}
+          title={t("threads.popover.title")}
+        >
+          <Icon name="thread" />
+          {threads.length > 0 && <CountBadge className="channel__icon-count">{count}</CountBadge>}
+        </button>
       }
     >
       <div className="thread-pop__head">

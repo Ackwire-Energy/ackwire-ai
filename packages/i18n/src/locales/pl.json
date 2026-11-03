@@ -1523,7 +1523,11 @@
       "button_other": "Przypięte wiadomości ({{count}})",
       "label": "Przypięte wiadomości na #{{channel}}",
       "in": "Przypięte na #{{channel}}",
-      "unpin": "Odepnij wiadomość od: {{name}}"
+      "unpin": "Odepnij wiadomość od: {{name}}",
+      "empty": "Nic tu jeszcze nie przypięto"
+    },
+    "header": {
+      "pins": "Przypięte wiadomości"
     },
     "membersButton_one": "Członkowie kanału ({{count}})",
     "membersButton_few": "Członkowie kanału ({{count}})",
@@ -10218,6 +10222,33 @@
       "relevance": "Najtrafniejsze"
     },
     "searchHere": "Szukaj w tej rozmowie",
+    "optionHint": {
+      "from": "nazwa",
+      "in": "kanał",
+      "has": "link, plik, obraz lub karta",
+      "mentions": "nazwa"
+    },
+    "moreFiltersHint": "daty, tylko agenci, przypięte",
+    "clearRecentAll": "Wyczyść ostatnie wyszukiwania",
+    "header": {
+      "placeholder": "Szukaj w {{org}}",
+      "clear": "Wyczyść wyszukiwanie"
+    },
+    "panel": {
+      "label": "Wyniki wyszukiwania",
+      "count_one": "{{count}} wynik",
+      "count_few": "{{count}} wyniki",
+      "count_many": "{{count}} wyników",
+      "count_other": "{{count}} wyniki",
+      "filters": "Filtry",
+      "filtersCount_one": "Filtry ({{count}})",
+      "filtersCount_few": "Filtry ({{count}})",
+      "filtersCount_many": "Filtry ({{count}})",
+      "filtersCount_other": "Filtry ({{count}})",
+      "jump": "Przejdź",
+      "jumpLabel": "Przejdź do wiadomości",
+      "threadIn": "wątek na #{{channel}}"
+    },
     "dm": "Wiadomość bezpośrednia z: {{name}}"
   },
   "files": {

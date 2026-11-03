@@ -80,7 +80,7 @@ describe("a channel", () => {
 
   test("the channel's header has the same menu", async () => {
     await go();
-    await rightClick(screen().getByRole("heading", { level: 1, name: "# eng" }));
+    await rightClick(screen().getByRole("heading", { level: 1, name: "eng" }));
     expect(items()).toEqual(["Silenciar canal", "Editar canal", "Copiar link", "Arquivar canal"]);
   });
 });

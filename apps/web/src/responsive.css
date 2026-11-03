@@ -173,11 +173,6 @@
     margin-left: 12px;
   }
 }
-@media (max-width: 420px) {
-  .channel__header .members-stack {
-    display: none;
-  }
-}
 
 /* ── Pages ── */
 @media (max-width: 640px) {

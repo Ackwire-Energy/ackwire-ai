@@ -2,49 +2,24 @@ import type { Agent, Member } from "@agenteschat/client";
 import { agentStateIn, useAiStatus, useRoster } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { picksForMe } from "@agenteschat/client/lib/routing";
-import { Avatar, AvatarStack, Button, Popover, useHoverCard } from "@agenteschat/ui";
+import { Avatar, Button, Icon, Popover, useHoverCard } from "@agenteschat/ui";
 import type { KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { StatusLine } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
-import { useMatchMedia } from "@/hooks/useMatchMedia";
 import { agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { useStreams } from "@/realtime/context";
 
 /** Opening on hover waits a little (a pointer just passing by doesn't open it). */
 export const MEMBERS_OPEN_MS = 150;
-/** Avatars in the stack before "+N". */
-const STACKED = 3;
-/** Up to here the details' words and the faces don't both fit beside the channel's name: the words fold. */
-const PHONE_HEADER = "(max-width: 480px)";
-
-/** "Detalhes do canal" in the channel header; folded to its icon on a phone. */
-export function ChannelDetailsButton({ onClick }: { onClick: () => void }) {
-  const { t } = useTranslation();
-  const folded = useMatchMedia(PHONE_HEADER);
-  return (
-    <Button
-      size="sm"
-      iconOnly={folded}
-      icon={folded ? "info" : undefined}
-      aria-label={folded ? t("channel.details") : undefined}
-      onClick={onClick}
-    >
-      {t("channel.details")}
-    </Button>
-  );
-}
-
 /**
- * The stacked avatars in the channel header: a button ("Membros do canal (5)")
- * whose glass popover lists the people (photo with the presence badge, name,
- * "você", their line or presence) and the agents (the living symbol with its
- * badge, its line or state, role, "responde sem menção"). Each row opens the
- * profile card; the footer opens the details.
+ * The channel header's members button ("Membros do canal (5)"), whose glass popover lists the people (photo with
+ * the presence badge, name, "você", their line or presence) and the agents (the living symbol with its badge, its
+ * line or state, role, "responde sem menção"). Each row opens the profile card; the footer opens the details.
  */
-export function ChannelMembersStack({
+export function ChannelMembersButton({
   channelId,
   people,
   agents,
@@ -59,12 +34,6 @@ export function ChannelMembersStack({
   // Hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
   const card = useHoverCard(MEMBERS_OPEN_MS);
   const total = people.length + agents.length;
-  const all: ({ kind: "person"; m: Member } | { kind: "agent"; a: Agent })[] = [
-    ...people.map((m) => ({ kind: "person" as const, m })),
-    ...agents.map((a) => ({ kind: "agent" as const, a })),
-  ];
-  const shown = all.slice(0, STACKED);
-  const more = total - shown.length;
   if (total === 0) return null;
   return (
     <Popover
@@ -74,17 +43,13 @@ export function ChannelMembersStack({
       align="end"
       className="members-pop"
       trigger={
-        <button type="button" className="members-stack" aria-label={t("channel.membersButton", { count: total })}>
-          <AvatarStack aria-hidden="true">
-            {shown.map((x) =>
-              x.kind === "person" ? (
-                <Avatar key={x.m.userId} size="sm" name={x.m.name} imageUrl={x.m.image} />
-              ) : (
-                <AgentAvatar key={x.a.id} agentId={x.a.id} channelId={channelId} size="sm" name={x.a.name} />
-              ),
-            )}
-          </AvatarStack>
-          {more > 0 && <span className="members-stack__more">+{more}</span>}
+        <button
+          type="button"
+          className="ac-btn ac-btn--ghost ac-btn--icon channel__icon"
+          aria-label={t("channel.membersButton", { count: total })}
+          title={t("channel.membersButton", { count: total })}
+        >
+          <Icon name="members" />
         </button>
       }
     >

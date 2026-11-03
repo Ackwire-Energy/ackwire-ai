@@ -185,7 +185,7 @@ describe("Criar canal", () => {
 
 describe("Detalhes do canal: membros", () => {
   const openDetails = async () => {
-    await click(screen().getByRole("button", { name: "Detalhes do canal" }));
+    await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
     return screen().getByRole("dialog", { name: "#eng" });
   };

@@ -1423,7 +1423,11 @@
       "button_other": "Angeheftete Nachrichten ({{count}})",
       "label": "Angeheftete Nachrichten in #{{channel}}",
       "in": "Angeheftet in #{{channel}}",
-      "unpin": "Nachricht von {{name}} lösen"
+      "unpin": "Nachricht von {{name}} lösen",
+      "empty": "Hier ist noch nichts angeheftet"
+    },
+    "header": {
+      "pins": "Angeheftete Nachrichten"
     },
     "membersButton_one": "Mitglieder des Kanals ({{count}})",
     "membersButton_other": "Mitglieder des Kanals ({{count}})",
@@ -9543,6 +9547,29 @@
       "relevance": "Relevanteste"
     },
     "searchHere": "In dieser Unterhaltung suchen",
+    "optionHint": {
+      "from": "Name",
+      "in": "Kanal",
+      "has": "Link, Datei, Bild oder Karte",
+      "mentions": "Name"
+    },
+    "moreFiltersHint": "Daten, nur Agenten, angeheftet",
+    "clearRecentAll": "Letzte Suchen löschen",
+    "header": {
+      "placeholder": "{{org}} durchsuchen",
+      "clear": "Suche löschen"
+    },
+    "panel": {
+      "label": "Suchergebnisse",
+      "count_one": "{{count}} Ergebnis",
+      "count_other": "{{count}} Ergebnisse",
+      "filters": "Filter",
+      "filtersCount_one": "Filter ({{count}})",
+      "filtersCount_other": "Filter ({{count}})",
+      "jump": "Springen",
+      "jumpLabel": "Zur Nachricht springen",
+      "threadIn": "Thread in #{{channel}}"
+    },
     "dm": "Direktnachricht mit {{name}}"
   },
   "files": {

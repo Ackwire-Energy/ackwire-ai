@@ -2118,6 +2118,8 @@ export interface SearchHit {
   /** Message hits: the message (open it there) and its thread (null = the main timeline). */
   messageId?: string | null;
   threadId?: string | null;
+  /** Message hits in a thread: its title (else its root message's first line); null on the main timeline. */
+  threadTitle?: string | null;
   /** Message hits: a voice message (its snippet is empty, ADR 0100), a GIF or a sticker. `hitText` says which. */
   mediaKind?: MediaKind;
 }

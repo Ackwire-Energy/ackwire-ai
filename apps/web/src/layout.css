@@ -6195,36 +6195,7 @@ html:not([data-pointer]) .run-continue:focus-visible {
     padding: 0 16px 12px;
   }
 }
-/* Channel header: the members stack and its glass list */
-.members-stack {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px 2px 2px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--ink2);
-  font: inherit;
-  cursor: pointer;
-}
-.members-stack:hover {
-  background: var(--plate-soft);
-}
-/* In a row of actions its faces are what shows: its plate reaches into the gap, as a ghost button's does. */
-.ac-acts > .members-stack {
-  padding-right: var(--ghost-plate);
-  margin-right: calc(-1 * var(--ghost-plate));
-}
-html:not([data-pointer]) .members-stack:focus-visible {
-  outline: none;
-  box-shadow: var(--field-ring);
-}
-.members-stack__more {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
+/* Channel header: the members button's glass list */
 .members-pop.ac-popover {
   width: min(320px, 92vw);
   padding: 8px;

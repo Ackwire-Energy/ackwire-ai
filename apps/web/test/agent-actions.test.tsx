@@ -287,7 +287,7 @@ describe("receipts this build doesn't expect", () => {
       const reports = () => logged.mock.calls.filter((args) => args.some((a) => a instanceof TypeError));
       expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
       expect(document.body.textContent).not.toContain("Criei a tarefa #23");
-      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      expect(screen().getByRole("heading", { name: "eng" })).toBeTruthy();
       const messages = within(screen().getByRole("region", { name: "Mensagens" })).getAllByRole("article");
       expect(messages.some((a) => a.textContent?.includes("o login está devolvendo 401"))).toBe(true);
       const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
@@ -362,7 +362,7 @@ describe("receipts this build doesn't expect", () => {
       expect(unshown?.getAttribute("data-agent-row")).toBe(ATLAS_ID);
       expect(within(nav).getAllByText("Ada").length).toBeGreaterThan(0);
       expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
-      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      expect(screen().getByRole("heading", { name: "eng" })).toBeTruthy();
       expect(article().textContent).toContain("Criei a tarefa #23");
       // Atlas comes back fixed: its row is back.
       await act(async () =>

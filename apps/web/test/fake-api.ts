@@ -2701,6 +2701,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
               createdAt: m.createdAt,
               messageId: m.id,
               threadId: m.threadId,
+              threadTitle:
+                m.threadId && m.threadId !== m.id
+                  ? (state.messages.find((r) => r.id === m.threadId)?.body.split("\n")[0] ?? null)
+                  : null,
               author: m.author.id ? { type: m.author.type, id: m.author.id, name } : null,
             };
           });

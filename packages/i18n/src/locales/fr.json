@@ -1473,7 +1473,11 @@
       "button_other": "Messages épinglés ({{count}})",
       "label": "Messages épinglés dans #{{channel}}",
       "in": "Épinglé dans #{{channel}}",
-      "unpin": "Désépingler le message de {{name}}"
+      "unpin": "Désépingler le message de {{name}}",
+      "empty": "Rien n'est encore épinglé ici"
+    },
+    "header": {
+      "pins": "Messages épinglés"
     },
     "membersButton_one": "Membres du canal ({{count}})",
     "membersButton_many": "Membres du canal ({{count}})",
@@ -9947,6 +9951,31 @@
       "relevance": "Plus pertinents"
     },
     "searchHere": "Rechercher dans cette conversation",
+    "optionHint": {
+      "from": "nom",
+      "in": "salon",
+      "has": "lien, fichier, image ou carte",
+      "mentions": "nom"
+    },
+    "moreFiltersHint": "dates, agents seulement, épinglés",
+    "clearRecentAll": "Effacer les recherches récentes",
+    "header": {
+      "placeholder": "Rechercher dans {{org}}",
+      "clear": "Effacer la recherche"
+    },
+    "panel": {
+      "label": "Résultats de la recherche",
+      "count_one": "{{count}} résultat",
+      "count_many": "{{count}} résultats",
+      "count_other": "{{count}} résultats",
+      "filters": "Filtres",
+      "filtersCount_one": "Filtres ({{count}})",
+      "filtersCount_many": "Filtres ({{count}})",
+      "filtersCount_other": "Filtres ({{count}})",
+      "jump": "Aller",
+      "jumpLabel": "Aller au message",
+      "threadIn": "fil dans #{{channel}}"
+    },
     "dm": "Message direct avec {{name}}"
   },
   "files": {

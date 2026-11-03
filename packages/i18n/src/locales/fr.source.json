@@ -3502,6 +3502,12 @@
   "channel.pins.unpin": {
     "value": "Unpin {{name}}'s message"
   },
+  "channel.pins.empty": {
+    "value": "Nothing pinned here yet"
+  },
+  "channel.header.pins": {
+    "value": "Pinned messages"
+  },
   "channel.membersButton": {
     "value": {
       "one": "Channel members ({{count}})",
@@ -23173,6 +23179,57 @@
   },
   "searchPage.searchHere": {
     "value": "Search in this conversation"
+  },
+  "searchPage.optionHint.from": {
+    "value": "name"
+  },
+  "searchPage.optionHint.in": {
+    "value": "channel"
+  },
+  "searchPage.optionHint.has": {
+    "value": "link, file, image or card"
+  },
+  "searchPage.optionHint.mentions": {
+    "value": "name"
+  },
+  "searchPage.moreFiltersHint": {
+    "value": "dates, agents only, pinned"
+  },
+  "searchPage.clearRecentAll": {
+    "value": "Clear recent searches"
+  },
+  "searchPage.header.placeholder": {
+    "value": "Search {{org}}"
+  },
+  "searchPage.header.clear": {
+    "value": "Clear search"
+  },
+  "searchPage.panel.label": {
+    "value": "Search results"
+  },
+  "searchPage.panel.count": {
+    "value": {
+      "one": "{{count}} result",
+      "other": "{{count}} results"
+    }
+  },
+  "searchPage.panel.filters": {
+    "value": "Filters"
+  },
+  "searchPage.panel.filtersCount": {
+    "value": {
+      "one": "Filters ({{count}})",
+      "other": "Filters ({{count}})"
+    }
+  },
+  "searchPage.panel.jump": {
+    "value": "Jump"
+  },
+  "searchPage.panel.jumpLabel": {
+    "value": "Jump to the message"
+  },
+  "searchPage.panel.threadIn": {
+    "value": "thread in #{{channel}}"
   },
   "searchPage.dm": {
     "value": "DM with {{name}}"

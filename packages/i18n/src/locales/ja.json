@@ -1373,7 +1373,11 @@
       "button_other": "ピン留めしたメッセージ（{{count}}）",
       "label": "#{{channel}}のピン留めしたメッセージ",
       "in": "#{{channel}}にピン留め",
-      "unpin": "{{name}}のメッセージのピン留めを外す"
+      "unpin": "{{name}}のメッセージのピン留めを外す",
+      "empty": "まだ何もピン留めされていません"
+    },
+    "header": {
+      "pins": "ピン留めしたメッセージ"
     },
     "membersButton_other": "チャンネルのメンバー（{{count}}）",
     "membersPeople": "人",
@@ -9176,6 +9180,27 @@
       "relevance": "関連度順"
     },
     "searchHere": "この会話を検索",
+    "optionHint": {
+      "from": "名前",
+      "in": "チャンネル",
+      "has": "リンク、ファイル、画像、カード",
+      "mentions": "名前"
+    },
+    "moreFiltersHint": "日付、エージェントのみ、ピン留め",
+    "clearRecentAll": "最近の検索を消去",
+    "header": {
+      "placeholder": "{{org}}を検索",
+      "clear": "検索をクリア"
+    },
+    "panel": {
+      "label": "検索結果",
+      "count_other": "{{count}}件の結果",
+      "filters": "フィルター",
+      "filtersCount_other": "フィルター（{{count}}）",
+      "jump": "移動",
+      "jumpLabel": "メッセージに移動",
+      "threadIn": "#{{channel}}のスレッド"
+    },
     "dm": "{{name}}とのDM"
   },
   "files": {

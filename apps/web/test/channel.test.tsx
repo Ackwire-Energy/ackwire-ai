@@ -49,8 +49,10 @@ const until = (at: number) => act(() => new Promise((r) => setTimeout(r, Math.ma
 describe("Canal", () => {
   test("header, messages with agent replies inline, neutral mentions and code", async () => {
     await open();
-    expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
-    expect(screen().getByText("Código, erros e deploys · Ada e Atlas respondem aqui")).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "eng" })).toBeTruthy();
+    // The topic beside the name; who answers here is the members list's to say.
+    expect(screen().getByText("Código, erros e deploys")).toBeTruthy();
+    expect(screen().queryByText(/respondem aqui/)).toBeNull();
     const log = screen().getByRole("region", { name: "Mensagens" });
     const articles = within(log).getAllByRole("article");
     const ask = articles.find((a) => a.textContent?.includes("o login está devolvendo 401"));
@@ -460,7 +462,9 @@ describe("Canal", () => {
 
   test("channel details: agents and people in groups, no search on a short list", async () => {
     await open();
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
+    );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
     expect(dialog.textContent).toContain("Agentes");
@@ -521,7 +525,9 @@ describe("Canal", () => {
 
   test("admins edit the channel topic from the details", async () => {
     const { state } = await open();
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
+    );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
     await act(async () =>

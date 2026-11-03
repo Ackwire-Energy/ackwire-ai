@@ -1373,7 +1373,11 @@
       "button_other": "Pesan yang disematkan ({{count}})",
       "label": "Pesan yang disematkan di #{{channel}}",
       "in": "Disematkan di #{{channel}}",
-      "unpin": "Lepas sematan pesan {{name}}"
+      "unpin": "Lepas sematan pesan {{name}}",
+      "empty": "Belum ada yang disematkan di sini"
+    },
+    "header": {
+      "pins": "Pesan yang disematkan"
     },
     "membersButton_other": "Anggota kanal ({{count}})",
     "membersPeople": "Orang",
@@ -9243,6 +9247,27 @@
       "relevance": "Paling relevan"
     },
     "searchHere": "Cari di percakapan ini",
+    "optionHint": {
+      "from": "nama",
+      "in": "kanal",
+      "has": "tautan, file, gambar, atau kartu",
+      "mentions": "nama"
+    },
+    "moreFiltersHint": "tanggal, hanya agen, disematkan",
+    "clearRecentAll": "Hapus pencarian terbaru",
+    "header": {
+      "placeholder": "Cari di {{org}}",
+      "clear": "Hapus pencarian"
+    },
+    "panel": {
+      "label": "Hasil pencarian",
+      "count_other": "{{count}} hasil",
+      "filters": "Filter",
+      "filtersCount_other": "Filter ({{count}})",
+      "jump": "Buka",
+      "jumpLabel": "Buka pesannya",
+      "threadIn": "utas di #{{channel}}"
+    },
     "dm": "DM dengan {{name}}"
   },
   "files": {

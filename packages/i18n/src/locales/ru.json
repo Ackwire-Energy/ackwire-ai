@@ -1523,7 +1523,11 @@
       "button_other": "Закреплённые сообщения ({{count}})",
       "label": "Закреплённые сообщения в #{{channel}}",
       "in": "Закреплено в #{{channel}}",
-      "unpin": "Открепить сообщение {{name}}"
+      "unpin": "Открепить сообщение {{name}}",
+      "empty": "Здесь пока ничего не закреплено"
+    },
+    "header": {
+      "pins": "Закреплённые сообщения"
     },
     "membersButton_one": "Участники канала ({{count}})",
     "membersButton_few": "Участники канала ({{count}})",
@@ -10183,6 +10187,33 @@
       "relevance": "По релевантности"
     },
     "searchHere": "Искать в этом разговоре",
+    "optionHint": {
+      "from": "имя",
+      "in": "канал",
+      "has": "ссылка, файл, изображение или карточка",
+      "mentions": "имя"
+    },
+    "moreFiltersHint": "даты, только агенты, закреплённые",
+    "clearRecentAll": "Очистить недавние запросы",
+    "header": {
+      "placeholder": "Поиск в {{org}}",
+      "clear": "Очистить поиск"
+    },
+    "panel": {
+      "label": "Результаты поиска",
+      "count_one": "{{count}} результат",
+      "count_few": "{{count}} результата",
+      "count_many": "{{count}} результатов",
+      "count_other": "{{count}} результата",
+      "filters": "Фильтры",
+      "filtersCount_one": "Фильтры ({{count}})",
+      "filtersCount_few": "Фильтры ({{count}})",
+      "filtersCount_many": "Фильтры ({{count}})",
+      "filtersCount_other": "Фильтры ({{count}})",
+      "jump": "Перейти",
+      "jumpLabel": "Перейти к сообщению",
+      "threadIn": "ветка в #{{channel}}"
+    },
     "dm": "Личные сообщения с {{name}}"
   },
   "files": {

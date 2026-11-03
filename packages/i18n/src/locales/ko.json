@@ -1373,7 +1373,11 @@
       "button_other": "고정된 메시지({{count}})",
       "label": "#{{channel}}의 고정된 메시지",
       "in": "#{{channel}}에 고정됨",
-      "unpin": "{{name}}의 메시지 고정 해제"
+      "unpin": "{{name}}의 메시지 고정 해제",
+      "empty": "아직 고정된 항목이 없어요"
+    },
+    "header": {
+      "pins": "고정된 메시지"
     },
     "membersButton_other": "채널 멤버({{count}})",
     "membersPeople": "사람",
@@ -9169,6 +9173,27 @@
       "relevance": "관련도순"
     },
     "searchHere": "이 대화에서 검색",
+    "optionHint": {
+      "from": "이름",
+      "in": "채널",
+      "has": "링크, 파일, 이미지 또는 카드",
+      "mentions": "이름"
+    },
+    "moreFiltersHint": "날짜, 에이전트만, 고정됨",
+    "clearRecentAll": "최근 검색 지우기",
+    "header": {
+      "placeholder": "{{org}} 검색",
+      "clear": "검색 지우기"
+    },
+    "panel": {
+      "label": "검색 결과",
+      "count_other": "결과 {{count}}개",
+      "filters": "필터",
+      "filtersCount_other": "필터 ({{count}})",
+      "jump": "이동",
+      "jumpLabel": "메시지로 이동",
+      "threadIn": "#{{channel}}의 스레드"
+    },
     "dm": "{{name}}과(와)의 DM"
   },
   "files": {

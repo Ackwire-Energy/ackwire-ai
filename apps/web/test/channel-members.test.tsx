@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -21,12 +21,11 @@ const open = async () => {
 };
 
 describe("channel header: who's here", () => {
-  test("a button with the count; at most 3 avatars, then +N; agents with their look", async () => {
+  test("an icon button with the count in its name, no faces in the header", async () => {
     await open();
-    const stack = screen().getByRole("button", { name: "Membros do canal (4)" });
-    expect(stack.querySelectorAll(".ac-avatar")).toHaveLength(3);
-    expect(stack.textContent).toContain("+1");
-    expect(stack.querySelector('[data-accessory="hat"]')).not.toBeNull();
+    const button = screen().getByRole("button", { name: "Membros do canal (4)" });
+    expect(button.classList.contains("channel__icon")).toBe(true);
+    expect(button.querySelectorAll(".ac-avatar")).toHaveLength(0);
   });
 
   test("the list: people (você, presence), agents (presence or state, chip); arrows; foot opens details", async () => {
@@ -67,31 +66,6 @@ describe("channel header: who's here", () => {
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver detalhes do canal" })));
     await settle(3);
     expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
-  });
-
-  test("on a phone, Detalhes do canal folds to its icon and keeps its name", async () => {
-    const media = spyOn(window, "matchMedia").mockImplementation(
-      (query: string) =>
-        ({
-          matches: query === "(max-width: 480px)",
-          media: query,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList,
-    );
-    try {
-      await open();
-      const details = screen().getByRole("button", { name: "Detalhes do canal" });
-      expect({ icon: details.classList.contains("ac-btn--icon"), words: details.textContent }).toEqual({
-        icon: true,
-        words: "",
-      });
-      await act(async () => fireEvent.click(details));
-      await settle(3);
-      expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
-    } finally {
-      media.mockRestore();
-    }
   });
 
   test("hover opens it after a short delay", async () => {
@@ -145,7 +119,9 @@ describe("answering without a mention, as true for my own messages as who picks 
   };
   /** The details' row line of an agent that answers on its own, and its menu's "Por conta própria" line. */
   const onItsOwn = async () => {
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
+    );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
     const row = within(dialog).getByText("Atlas").closest(".member-row") as HTMLElement;

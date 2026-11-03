@@ -1423,7 +1423,11 @@
       "button_other": "Vastgezette berichten ({{count}})",
       "label": "Vastgezette berichten in #{{channel}}",
       "in": "Vastgezet in #{{channel}}",
-      "unpin": "Bericht van {{name}} losmaken"
+      "unpin": "Bericht van {{name}} losmaken",
+      "empty": "Hier is nog niets vastgezet"
+    },
+    "header": {
+      "pins": "Vastgezette berichten"
     },
     "membersButton_one": "Kanaalleden ({{count}})",
     "membersButton_other": "Kanaalleden ({{count}})",
@@ -9622,6 +9626,29 @@
       "relevance": "Meest relevant"
     },
     "searchHere": "Zoeken in dit gesprek",
+    "optionHint": {
+      "from": "naam",
+      "in": "kanaal",
+      "has": "link, bestand, afbeelding of kaart",
+      "mentions": "naam"
+    },
+    "moreFiltersHint": "datums, alleen agents, vastgezet",
+    "clearRecentAll": "Recente zoekopdrachten wissen",
+    "header": {
+      "placeholder": "Zoeken in {{org}}",
+      "clear": "Zoekopdracht wissen"
+    },
+    "panel": {
+      "label": "Zoekresultaten",
+      "count_one": "{{count}} resultaat",
+      "count_other": "{{count}} resultaten",
+      "filters": "Filters",
+      "filtersCount_one": "Filters ({{count}})",
+      "filtersCount_other": "Filters ({{count}})",
+      "jump": "Ga naar",
+      "jumpLabel": "Ga naar het bericht",
+      "threadIn": "thread in #{{channel}}"
+    },
     "dm": "DM met {{name}}"
   },
   "files": {

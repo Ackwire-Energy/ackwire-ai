@@ -1473,7 +1473,11 @@
       "button_other": "Messaggi fissati ({{count}})",
       "label": "Messaggi fissati in #{{channel}}",
       "in": "Fissato in #{{channel}}",
-      "unpin": "Togli dai fissati il messaggio di {{name}}"
+      "unpin": "Togli dai fissati il messaggio di {{name}}",
+      "empty": "Qui non c'è ancora niente di fissato"
+    },
+    "header": {
+      "pins": "Messaggi fissati"
     },
     "membersButton_one": "Membri del canale ({{count}})",
     "membersButton_many": "Membri del canale ({{count}})",
@@ -9952,6 +9956,31 @@
       "relevance": "Più pertinenti"
     },
     "searchHere": "Cerca in questa conversazione",
+    "optionHint": {
+      "from": "nome",
+      "in": "canale",
+      "has": "link, file, immagine o scheda",
+      "mentions": "nome"
+    },
+    "moreFiltersHint": "date, solo agenti, fissati",
+    "clearRecentAll": "Cancella le ricerche recenti",
+    "header": {
+      "placeholder": "Cerca in {{org}}",
+      "clear": "Cancella la ricerca"
+    },
+    "panel": {
+      "label": "Risultati della ricerca",
+      "count_one": "{{count}} risultato",
+      "count_many": "{{count}} risultati",
+      "count_other": "{{count}} risultati",
+      "filters": "Filtri",
+      "filtersCount_one": "Filtri ({{count}})",
+      "filtersCount_many": "Filtri ({{count}})",
+      "filtersCount_other": "Filtri ({{count}})",
+      "jump": "Vai",
+      "jumpLabel": "Vai al messaggio",
+      "threadIn": "thread in #{{channel}}"
+    },
     "dm": "Messaggio diretto con {{name}}"
   },
   "files": {
