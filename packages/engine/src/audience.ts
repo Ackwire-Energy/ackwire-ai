@@ -344,8 +344,7 @@ export const PLAN_OPENED_JOB = "agent.plan_opened";
 
 /**
  * Who may talk to the agent changed from `from` to `to`, saved as `after`. Audited, naming whose plan it is when it
- * thinks with its owner's (ADR 0059 §5). When someone else let more people in there, the plan's owner hears it by
- * email, once per change: their plan pays for those conversations.
+ * thinks with its owner's (ADR 0059 §5), and told to that owner (`planOpened`, from `planFrom`: who its plan answered).
  */
 export async function audienceChanged(
   db: Executor,
@@ -354,6 +353,7 @@ export async function audienceChanged(
   after: Pick<Agent, "id" | "brain" | "ownerUserId">,
   from: AgentAudience,
   to: AgentAudience,
+  planFrom = from,
 ) {
   const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
   await recordAudit(db, {
@@ -363,6 +363,22 @@ export async function audienceChanged(
     target: { type: "agent", id: after.id },
     details: { from, to, ...(planOwner ? { planOwner } : {}) },
   });
+  await planOpened(db, orgId, actorId, after, planFrom, to);
+}
+
+/**
+ * Someone other than its owner let more people talk to an agent that thinks with its owner's plan (ADR 0059 §5): that
+ * owner hears it by email, once per change, since their plan pays for those conversations.
+ */
+export async function planOpened(
+  db: Executor,
+  orgId: string,
+  actorId: string,
+  after: Pick<Agent, "id" | "brain" | "ownerUserId">,
+  from: AgentAudience,
+  to: AgentAudience,
+) {
+  const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
   if (!planOwner || planOwner === actorId || !widensAudience(from, to, planOwner)) return;
   await enqueue(db, {
     orgId,

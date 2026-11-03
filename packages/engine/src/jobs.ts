@@ -894,7 +894,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       }
       await forgetCodeEmail(deps.db, job);
     },
-    // Someone else let more people talk to an agent on a person's plan: that person's email (`audienceChanged`).
+    // Someone else let more people talk to an agent on a person's plan: that person's email (`planOpened`).
     [PLAN_OPENED_JOB]: async (job) => {
       // No address for the email's link: a server without emailArt sends no email anyway.
       if (!deps.emailArt) return;

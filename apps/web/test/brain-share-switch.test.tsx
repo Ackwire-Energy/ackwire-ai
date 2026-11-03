@@ -37,7 +37,13 @@ async function ada(
   const agent = state.agents.find((a) => a.id === ADA_ID);
   if (agent) {
     agent.ownerUserId = mine ? "u-walter" : "u-joao";
-    agent.brain = { kind: patch.brain ?? "claude_code", model: "Sonnet", ...(provider ? { provider } : {}) };
+    // Its owner's plan thinks for it (`account`): the MacBook's own sign-in.
+    agent.brain = {
+      kind: patch.brain ?? "claude_code",
+      model: "Sonnet",
+      account: "Claude Max",
+      ...(provider ? { provider } : {}),
+    };
     agent.audience = { mode: people ? "people" : patch.onlyOwner === false ? "everyone" : "owner", userIds: [] };
   }
   const api = createFakeApi(state);
@@ -226,6 +232,25 @@ describe("Atende outras pessoas (Quem pensa)", () => {
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: null, fallback: true }]);
+  });
+
+  test("an admin moving João's agent onto his plan with the switch on is asked first", async () => {
+    const state = await ada(
+      { brain: "model", effectiveModel: null, onlyOwner: false, ownSignIn: true },
+      { mine: false, ownPlan: "max" },
+    );
+    const d = await brainDialog();
+    await click(
+      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude/ }),
+    );
+    const a = await advanced(d);
+    await click(replies(a));
+    await done(a);
+    const ask = screen().getByRole("dialog", { name: "Usar o plano de João?" });
+    await click(within(ask).getByRole("button", { name: "Continuar" }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", onlyOwner: false });
   });
 
   test("an admin who doesn't own it: the same switch, its line naming whose plan it is, asked first", async () => {

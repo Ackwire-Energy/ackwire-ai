@@ -889,8 +889,8 @@ export async function queueBudgetEmail(
 }
 
 /**
- * Job `agent.plan_opened` (`audienceChanged`): the plan-owner email, in their language, through `email.send`. Nothing
- * when the agent, its owner or the person who changed it is gone.
+ * Job `agent.plan_opened` (`planOpened`): the plan-owner email, in their language, through `email.send`. Nothing
+ * when the agent, its owner or the person who changed it is gone, or its owner's plan no longer thinks for it.
  */
 export async function queuePlanOpenedEmail(
   db: Database,
@@ -908,11 +908,17 @@ export async function queuePlanOpenedEmail(
       ownerUserId: agents.ownerUserId,
       brain: agents.brain,
       accountId: agents.brainAccountId,
+      machineId: agents.machineId,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
-  if (!agent?.ownerUserId || !isComputerBrain(agent.brain)) return;
+  if (!agent?.ownerUserId || !isComputerBrain(agent.brain) || !agent.machineId) return;
   const ownerId = agent.ownerUserId;
+  // Its owner's plan thinks there, and they are still in the workspace: not OpenCode's free tier on a computer nobody
+  // connected (ADR 0132), nor a plan that no longer thinks for it.
+  const { planIsOwners } = await import("./brains/select");
+  const signIn = agent.accountId ? { id: agent.accountId } : undefined;
+  if (!(await planIsOwners(db, { orgId, ownerUserId: ownerId }, agent.machineId, signIn))) return;
   const userIds = [...new Set([ownerId, actorId, ...from.userIds, ...to.userIds])];
   const roleIds = [...new Set([...from.roleIds, ...to.roleIds])];
   const [people, roles, [org], [account]] = await Promise.all([

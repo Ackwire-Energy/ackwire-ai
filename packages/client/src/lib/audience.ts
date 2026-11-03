@@ -1,3 +1,4 @@
+import { planOf } from "@agenteschat/providers/plans";
 import type { TFunction } from "i18next";
 import type { Agent, AgentAudience, AudienceMode, ForeignMailbox, OrgRole, OrgSummary } from "../api/types";
 import { engineOfBrain } from "./brain";
@@ -121,6 +122,8 @@ export const EVERYONE_AUDIENCE: AgentAudience = { mode: "everyone", userIds: [],
  */
 export const opensOthersPlan = (agent: Agent, next: AgentAudience, myUserId: string) =>
   engineOfBrain(agent.brain?.kind) !== "agent" &&
+  // A plan of theirs thinks for it (`account`): not OpenCode's free tier on a computer nobody connected (ADR 0132).
+  agent.brain?.account !== undefined &&
   agent.ownerUserId != null &&
   agent.ownerUserId !== myUserId &&
   audienceWidens(audienceOf(agent), next, agent.ownerUserId);
@@ -155,7 +158,10 @@ export function widenQuestion(
   const mail = mailboxes.length > 0 ? mailLossText(t, agent, mailboxes) : null;
   if (!planOwner) return mail ? { title: t("reach.mailLossTitle"), description: mail } : null;
   const kind = agent.brain?.kind && agent.brain.kind !== "model" ? agent.brain.kind : "claude_code";
-  const plan = t(`aiAccounts.connect.${kind}`);
+  const provider = agent.brain?.provider ?? undefined;
+  // A coding plan's own name, as the email to its owner says it (the engine's `planName`).
+  const coding = planOf(provider);
+  const plan = coding ? (provider === "opencode" ? coding.name : coding.maker) : t(`aiAccounts.connect.${kind}`);
   const why = t("reach.planOpen", { name: agent.name, owner: planOwner, plan });
   return {
     title: t("reach.planTitle", { owner: planOwner }),

@@ -707,7 +707,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [contextTokens, setContextTokens] = useState<ContextLimit | null>(savedContext);
   // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
   const [adv, setAdv] = useState<Advanced | null>(null);
-  const asks = useWidenAsk(agent);
   const [copying, setCopying] = useState(false);
   // "Levar a autonomia" off: the others keep their own.
   const [withAutonomy, setWithAutonomy] = useState(true);
@@ -764,6 +763,21 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const ofOwner = (a: MachineAccount) => (view.canUsePlans ? a.mine : a.ownerId === agent.ownerUserId);
   const accounts = allAccounts.filter((a) => planOfAccount(a) === card && (ofOwner(a) || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
+  // Moved onto a plan it starts on its owner alone (ADR 0059 §5): "Atende outras pessoas" on then opens that plan.
+  const asks = useWidenAsk(
+    kind === view.brain || kind === "model"
+      ? agent
+      : {
+          ...agent,
+          brain: {
+            kind,
+            model: null,
+            provider: current?.provider ?? null,
+            ...(current || view.ownSignIn ? { account: current?.label ?? "" } : {}),
+          },
+          audience: { mode: "owner", userIds: [], roleIds: [] },
+        },
+  );
   // The computers' rows: whether each one's own sign-ins are there, and their plan (a seat has its own words).
   const ai = useAiAccounts(org.id, view.canUsePlans);
   const rowOf = (machineId: string | undefined) => ai.data?.computers.find((c) => c.machineId === machineId);

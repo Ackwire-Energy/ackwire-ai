@@ -80,13 +80,16 @@ describe("audienceWithMe", () => {
     expect(audienceWithMe(admin, { ...kept, canTalk: true }, "u-caio")).toBeNull();
   });
   test("on someone else's plan an admin lets themselves in too, asked first; its owner isn't asked", () => {
-    const onPlan = { ...kept, brain: { kind: "claude_code" } as Agent["brain"] };
+    const onPlan = { ...kept, brain: { kind: "claude_code", account: "Claude Max" } as Agent["brain"] };
     const next = audienceWithMe(admin, onPlan, "u-caio");
     expect(next).toEqual({ mode: "people", userIds: ["u-caio"], roleIds: ["suporte"] });
     expect(next && opensOthersPlan(onPlan, next, "u-caio")).toBe(true);
     expect(opensOthersPlan(onPlan, { mode: "everyone", userIds: [], roleIds: [] }, "u-heitor")).toBe(false);
     expect(opensOthersPlan(kept, { mode: "everyone", userIds: [], roleIds: [] }, "u-caio")).toBe(false);
     expect(audienceWithMe(member, onPlan, "u-bia")).toBeNull();
+    // No plan of anyone's thinks for it there (OpenCode's free tier on a computer nobody connected): nothing to ask.
+    const free = { ...kept, brain: { kind: "opencode", model: null } as Agent["brain"] };
+    expect(opensOthersPlan(free, { mode: "everyone", userIds: [], roleIds: [] }, "u-caio")).toBe(false);
   });
 });
 
@@ -101,6 +104,8 @@ describe("widenQuestion", () => {
     const plan = widenQuestion(t, ada, "Walter", []);
     expect(plan?.title).toBe('reach.planTitle{"owner":"Walter"}');
     expect(plan?.description).toContain('"plan":"aiAccounts.connect.claude_code"');
+    const glm = { name: "Ada", brain: { kind: "claude_code", provider: "zai" } as Agent["brain"] };
+    expect(widenQuestion(t, glm, "Walter", [])?.description).toContain('"plan":"Z.ai"');
     expect(widenQuestion(t, ada, "Walter", [box])?.description).toMatch(
       /^common\.joinSentences.*reach\.planOpen.*reach\.mailLoss/,
     );

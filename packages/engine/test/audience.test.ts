@@ -360,9 +360,11 @@ describe("who can talk to the agent", () => {
     const { bia } = await world();
     const caio = await addMember(f.db, f.org.id, "admin", "caio");
     await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, f.owner.id));
+    // On the computer its owner connected: that computer's own sign-in is the owner's plan.
+    const { machineId } = await pairMachine(deps(), f.owner.id, f.org.id, { protocol: BRAIN_PROTOCOL, exec: true });
     await f.db
       .update(schema.agents)
-      .set({ brain: "claude_code", audienceMode: "owner" })
+      .set({ brain: "claude_code", audienceMode: "owner", machineId })
       .where(eq(schema.agents.id, f.agent.id));
     const everyone = { mode: "everyone" as const, userIds: [], roleIds: [] };
     const jobs = async () => (await f.db.select().from(schema.outbox)).filter((j) => j.kind === PLAN_OPENED_JOB);
@@ -401,6 +403,28 @@ describe("who can talk to the agent", () => {
     // The brain dialog's "Atende outras pessoas" by an admin tells the owner too.
     await setAgentBrain({ db: f.db }, caio.id, f.org.id, f.agent.id, { onlyOwner: false });
     expect(await jobs()).toHaveLength(2);
+    // So does an admin moving it onto the plan with it on, though it answered everyone already on the API.
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "model", audienceMode: "everyone" })
+      .where(eq(schema.agents.id, f.agent.id));
+    await setAgentBrain({ db: f.db }, caio.id, f.org.id, f.agent.id, { brain: "claude_code", onlyOwner: false });
+    expect(await jobs()).toHaveLength(3);
+    const later = createFakeEmailSender();
+    const drain = () =>
+      drainOutbox(
+        f.db,
+        createJobHandlers({ ...f.jobDeps, email: later, emailArt: emailArtAt("https://chat.example") }),
+      );
+    await drain();
+    expect(later.sent).toHaveLength(2);
+    // On a computer nobody connected no plan of theirs thinks (OpenCode's free tier): the job sends nothing.
+    await f.db.update(schema.machines).set({ pairedByUserId: null }).where(eq(schema.machines.id, machineId));
+    await setAgentAudience(f.db, caio.id, f.org.id, f.agent.id, { mode: "owner", userIds: [], roleIds: [] });
+    await setAgentAudience(f.db, caio.id, f.org.id, f.agent.id, everyone);
+    expect(await jobs()).toHaveLength(4);
+    await drain();
+    expect(later.sent).toHaveLength(2);
   });
 
   test("a role lets in whoever holds it, now and later, in every path; leaving the role takes it away", async () => {

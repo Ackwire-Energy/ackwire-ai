@@ -29,6 +29,7 @@ import {
   audienceOf,
   dropMailIfWidened,
   OWNER_ONLY,
+  planOpened,
 } from "./audience";
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
@@ -670,10 +671,13 @@ export async function setAgentBrain(
         }
         throw error;
       });
+    // Onto a plan it answered nobody on it before: one that keeps answering others opens that plan to them.
+    const planFrom = changed && isComputerBrain(brain) ? OWNER_ONLY : audienceOf(agent);
     if (row && audience) {
       await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(row), userId);
-      await audienceChanged(tx, orgId, userId, row, audienceOf(agent), { ...audience, consultable: agent.consultable });
-    }
+      const to = { ...audience, consultable: agent.consultable };
+      await audienceChanged(tx, orgId, userId, row, audienceOf(agent), to, planFrom);
+    } else if (row && changed) await planOpened(tx, orgId, userId, row, planFrom, audienceOf(row));
     return { row, released };
   });
   caches.agents.delete(`${orgId}:${agentId}`);

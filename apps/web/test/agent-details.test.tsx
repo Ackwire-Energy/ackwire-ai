@@ -134,7 +134,7 @@ describe("an agent that doesn't answer an admin", () => {
   test("on João's Claude plan one question says it uses his plan and he gets an email, and the mailbox it loses", async () => {
     const state = keptOut();
     const ada = state.agents.find((a) => a.id === ADA_ID);
-    if (ada) ada.brain = { kind: "claude_code" } as NonNullable<typeof ada.brain>;
+    if (ada) ada.brain = { kind: "claude_code", account: "Claude Max" } as NonNullable<typeof ada.brain>;
     state.mailLoss = {
       [ADA_ID]: [{ accountId: "mb-joao", address: "joao@acme.com", ownerUserId: "u-joao", ownerName: "João" }],
     };
