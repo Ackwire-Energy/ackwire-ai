@@ -63,10 +63,10 @@ describe("the owner link", () => {
 
   test("a password equal to the name makes no owner: the password is cleared and the line says why", async () => {
     const { calls } = await openOwnerLink();
-    await type(screen().getByRole("textbox", { name: "Seu nome" }), "Admin$10x");
+    await type(screen().getByRole("textbox", { name: "Seu nome" }), "Fake#Pass1x");
     expect(screen().getByRole("status").textContent).toBe("Isso parece uma senha. Aqui vai o seu nome.");
     await type(screen().getByRole("textbox", { name: "E-mail" }), "ana@acme.com");
-    await type(screen().getByLabelText("Crie uma senha"), " Admin$10x ");
+    await type(screen().getByLabelText("Crie uma senha"), " Fake#Pass1x ");
     await click(screen().getByRole("button", { name: /Criar a conta de dono/ }));
     await settle(6);
     expect(calls.some((c) => c.method === "ownerClaim")).toBe(false);

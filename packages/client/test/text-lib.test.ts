@@ -141,7 +141,7 @@ test("holdsText: the same words, spacing aside, never a word cut in the middle",
 });
 
 test("a name that looks like a password: no space, a digit and a symbol; real names never", () => {
-  for (const name of ["Admin$10", "S3nh@forte", " hunter2!xyz ", "P4ss#word", "كلمة١٢٣$سر"])
+  for (const name of ["Fake#Pass1", "S3nh@forte", " hunter2!xyz ", "P4ss#word", "كلمة١٢٣$سر"])
     expect(looksLikePassword(name)).toBe(true);
   for (const name of [
     "Ana 2",
@@ -160,7 +160,7 @@ test("a name that looks like a password: no space, a digit and a symbol; real na
     "Gal·la2024x",
     "J.R.R.Tolkien3",
     "R2-D2",
-    "Admin$10 Souza",
+    "Fake#Pass1 Souza",
     "abc$1",
     "",
   ])
@@ -168,8 +168,8 @@ test("a name that looks like a password: no space, a digit and a symbol; real na
 });
 
 test("the password chosen is the name typed: trimmed, exact, never an empty name", () => {
-  expect(nameIsPassword("Admin$10 ", "Admin$10")).toBe(true);
-  expect(nameIsPassword("Admin$10", "admin$10")).toBe(false);
+  expect(nameIsPassword("Fake#Pass1 ", "Fake#Pass1")).toBe(true);
+  expect(nameIsPassword("Fake#Pass1", "admin$10")).toBe(false);
   expect(nameIsPassword("Ana Souza", "outra-senha-1")).toBe(false);
   expect(nameIsPassword("  ", "  ")).toBe(false);
 });
