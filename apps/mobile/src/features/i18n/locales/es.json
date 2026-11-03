@@ -262,16 +262,16 @@
     "chatSearch": "Busca una persona o un agente",
     "people": "Personas",
     "nobody": "Todavía no hay nadie aquí.",
-    "ask": {
-      "question": "¿Qué necesitas?",
-      "placeholder": "P. ej. revisar el texto de la página de precios antes del viernes",
-      "to": "Para",
-      "sendF": "Pedir a {{name}}",
-      "sendM": "Pedir a {{name}}",
-      "more": "O empieza algo nuevo",
-      "person": "Chatear con una persona",
-      "noAgents": "Para pedirle algo a un agente, empieza por crear el tuyo."
-    },
+    "search": "Persona o agente",
+    "create": "Crear",
+    "agentHint": "Un nombre y lo que hace",
+    "chatShort": "Conversación",
+    "chatHint": "Una persona o un agente",
+    "taskHint": "Con responsable y fecha límite",
+    "routineHint": "Un agente lo hace solo, según el horario",
+    "wikiPage": "Página de la wiki",
+    "wikiHint": "Para que la lean el equipo y los agentes",
+    "inviteHint": "Por correo o enlace",
     "agent": {
       "question": "¿Qué va a hacer?"
     }
@@ -1267,7 +1267,8 @@
       "forum": "Tu turno",
       "browser": "Navegador",
       "secret": "Secreto",
-      "join": "Miembros"
+      "join": "Miembros",
+      "tools": "Herramientas"
     },
     "review": "Revisar",
     "answer": "Responder",

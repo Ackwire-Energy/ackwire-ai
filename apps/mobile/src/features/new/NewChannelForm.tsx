@@ -35,7 +35,7 @@ export function NewChannelForm() {
   };
   return (
     <SheetScreen>
-      <SheetHeader title={t("mobile.chats.newChannel")} icon="back" />
+      <SheetHeader title={t("mobile.chats.newChannel")} />
       <View style={[styles.field, surface]}>
         <Icon name="hash" size={20} color={c.faint} />
         <TextInput

@@ -244,16 +244,16 @@
     "chatSearch": "사람이나 에이전트 검색",
     "people": "사람",
     "nobody": "아직 아무도 없어요.",
-    "ask": {
-      "question": "무엇이 필요하세요?",
-      "placeholder": "예: 금요일 전에 가격 페이지 문구 검토하기",
-      "to": "대상",
-      "sendF": "{{name}}에게 요청",
-      "sendM": "{{name}}에게 요청",
-      "more": "또는 새로 시작하기",
-      "person": "사람과 채팅",
-      "noAgents": "에이전트에게 일을 맡기려면 먼저 에이전트를 만들어 주세요."
-    },
+    "search": "사람 또는 에이전트",
+    "create": "만들기",
+    "agentHint": "이름과 하는 일",
+    "chatShort": "대화",
+    "chatHint": "사람 또는 에이전트",
+    "taskHint": "담당자와 마감일 포함",
+    "routineHint": "에이전트가 일정에 맞춰 알아서 해요",
+    "wikiPage": "Wiki 페이지",
+    "wikiHint": "팀과 에이전트가 읽을 수 있도록",
+    "inviteHint": "이메일 또는 링크로",
     "agent": {
       "question": "어떤 일을 하나요?"
     }
@@ -1133,7 +1133,8 @@
       "forum": "내 차례",
       "browser": "브라우저",
       "secret": "비밀 정보",
-      "join": "멤버"
+      "join": "멤버",
+      "tools": "도구"
     },
     "review": "검토",
     "answer": "답장",

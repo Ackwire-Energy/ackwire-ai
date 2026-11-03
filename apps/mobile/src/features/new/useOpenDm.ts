@@ -1,16 +1,18 @@
 import { keys, useApi } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/ui";
+import { requestComposerText } from "../chat/composer-request";
 import { chatHref } from "../links/logic";
 import { useOrgId } from "../shared/hooks";
 import { closeSheetsAndOpen } from "./parts";
 
 /**
- * Opens (or creates) the direct conversation with an agent or a person, closing the sheets on the way.
- * `then` runs first with the conversation's id (a request from "Novo" is posted there); if it fails, the
- * sheets stay open with what was typed.
+ * Opens (or creates) the direct conversation with an agent or a person, closing the sheets on the way. `compose`: the
+ * conversation opens ready to type (its composer focused). `replace`: the screen it is opened from gives way to it
+ * ("New", pushed over the tabs: back from the conversation goes to the tabs, with no pop and push between).
  */
 export function useOpenDm() {
   const { t } = useTranslation();
@@ -19,13 +21,14 @@ export function useOpenDm() {
   const qc = useQueryClient();
   const toast = useToast();
   return useCallback(
-    (target: { agentId: string } | { userId: string }, then?: (channelId: string) => Promise<unknown>) =>
+    (target: { agentId: string } | { userId: string }, how: { compose?: boolean; replace?: boolean } = {}) =>
       api.dms
         .open(orgId, target)
-        .then(async ({ channelId }) => {
-          if (then) await then(channelId);
+        .then(({ channelId }) => {
           void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
-          closeSheetsAndOpen(chatHref(channelId));
+          if (how.compose) requestComposerText(channelId, "");
+          if (how.replace) router.replace(chatHref(channelId));
+          else closeSheetsAndOpen(chatHref(channelId));
         })
         .catch(() => toast({ title: t("mobile.app.failed"), icon: "x" })),
     [api, orgId, qc, toast, t],

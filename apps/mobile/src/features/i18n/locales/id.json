@@ -244,16 +244,16 @@
     "chatSearch": "Cari orang atau agen",
     "people": "Orang",
     "nobody": "Belum ada siapa pun di sini.",
-    "ask": {
-      "question": "Kamu butuh apa?",
-      "placeholder": "Mis. tinjau teks halaman harga sebelum Jumat",
-      "to": "Untuk",
-      "sendF": "Minta ke {{name}}",
-      "sendM": "Minta ke {{name}}",
-      "more": "Atau mulai hal baru",
-      "person": "Mengobrol dengan seseorang",
-      "noAgents": "Untuk meminta sesuatu ke agen, mulailah dengan membuat agenmu."
-    },
+    "search": "Orang atau agen",
+    "create": "Buat",
+    "agentHint": "Nama dan tugasnya",
+    "chatShort": "Percakapan",
+    "chatHint": "Seseorang atau agen",
+    "taskHint": "Dengan penanggung jawab dan tenggat",
+    "routineHint": "Agen mengerjakannya sendiri, sesuai jadwal",
+    "wikiPage": "Halaman wiki",
+    "wikiHint": "Untuk dibaca tim dan agen",
+    "inviteHint": "Lewat email atau tautan",
     "agent": {
       "question": "Apa yang akan dikerjakannya?"
     }
@@ -1133,7 +1133,8 @@
       "forum": "Giliranmu",
       "browser": "Browser",
       "secret": "Rahasia",
-      "join": "Anggota"
+      "join": "Anggota",
+      "tools": "Alat"
     },
     "review": "Tinjau",
     "answer": "Balas",

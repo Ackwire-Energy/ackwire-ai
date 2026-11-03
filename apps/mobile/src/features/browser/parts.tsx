@@ -18,7 +18,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { Icon, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
-import { LIVE_KEYS, type LiveKey, type PageGap, touchOnPage } from "./logic";
+import { keyPastDraft, LIVE_KEYS, type LiveKey, type PageGap, touchOnPage } from "./logic";
 
 /** Why the page can't be shown: the server's reason, or the stream ended / not allowed. */
 export type Unavailable = PageGap | null;
@@ -140,10 +140,20 @@ export function TypeBar({
   const [text, setText] = useState("");
   const [secret, setSecret] = useState(false);
   const [keys, setKeys] = useState(false);
+  // The draft as typed, read by a held Backspace's repeats before the state catches up.
+  const draft = useRef("");
+  const edit = (next: string) => {
+    draft.current = next;
+    setText(next);
+  };
   const send = () => {
-    if (!text) return;
+    if (!text) {
+      // Return with nothing drafted: Enter in the field there (a form's submit, a new line).
+      if (keyPastDraft(draft.current, "Enter")) onKey("Enter");
+      return;
+    }
     onText(text);
-    setText("");
+    edit("");
   };
   const key = (k: LiveKey) => {
     tapHaptic();
@@ -172,7 +182,11 @@ export function TypeBar({
       <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
         <TextInput
           value={text}
-          onChangeText={setText}
+          onChangeText={edit}
+          onKeyPress={(e) => {
+            // Only Backspace here: Return comes through `send`, so Enter never goes twice.
+            if (e.nativeEvent.key === "Backspace" && keyPastDraft(draft.current, "Backspace")) onKey("Backspace");
+          }}
           autoFocus={autoFocus}
           placeholder={secret ? t("mobile.browser.live.typeMarkedSecret") : t("mobile.browser.live.typeMarked")}
           placeholderTextColor={c.faint}

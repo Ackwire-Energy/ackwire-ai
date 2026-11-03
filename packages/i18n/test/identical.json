@@ -2752,6 +2752,7 @@
       "mission.kind",
       "mission.minutes",
       "mission.plan.section",
+      "new.chatShort",
       "onb.logo",
       "plus.audio",
       "plus.photos",
@@ -2762,6 +2763,7 @@
     "de": [
       "activityNow.kind.browser",
       "activityNow.kind.secret",
+      "activityNow.kind.tools",
       "activityNow.next.routine",
       "agent.talk",
       "browser.live.key.Escape",
@@ -2837,6 +2839,7 @@
     ],
     "nl": [
       "activityNow.kind.browser",
+      "activityNow.kind.tools",
       "activityNow.next.routine",
       "agents.title",
       "blocks.thousand",

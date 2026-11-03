@@ -186,6 +186,7 @@ function ChartView({
 }
 
 function ChartTable({ spec }: { spec: ChartSpec }) {
+  const c = useColors();
   const { t, i18n } = useTranslation();
   const { header, rows } = chartTable(spec, i18n.language, {
     item: t("mobile.chart.item"),
@@ -197,6 +198,7 @@ function ChartTable({ spec }: { spec: ChartSpec }) {
       header={header.map(cell)}
       rows={rows.map((r) => r.map(cell))}
       align={header.map((_, j) => (j ? "right" : "left"))}
+      surface={c.sunken}
     />
   );
 }

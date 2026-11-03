@@ -1,7 +1,7 @@
 import { useHeaderHeight } from "expo-router/react-navigation";
 import type { ReactElement, ReactNode } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { FadeIn, FadeOutUp, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/ui";
 import { FadingHeaderTitle, useCoverScroll, useScrollFade } from "@/ui/cover";
@@ -11,7 +11,9 @@ import { FocusLive, PushedHeader } from "./parts";
 /**
  * A pushed screen with a large title (Issues, Drive): the title in Funnel Display is part of the content and
  * scrolls away; the bar's own title fades in as it goes, over a bar the content scrolls under (the system
- * glass on iOS 26). The same shape as the tabs' `LargeTitleScreen`, without the tab bar's room.
+ * glass on iOS 26). The same shape as the tabs' `LargeTitleScreen`, without the tab bar's room. `collapsed` folds the
+ * large title away (a search field under it took the focus, as the system's search bar does); content that should
+ * slide up with it carries a `LinearTransition` layout.
  */
 export function PushedLargeTitle({
   title,
@@ -19,6 +21,7 @@ export function PushedLargeTitle({
   refreshControl,
   onScrollBeginDrag,
   bottomInset = 24,
+  collapsed = false,
   children,
 }: {
   title: string;
@@ -27,6 +30,8 @@ export function PushedLargeTitle({
   onScrollBeginDrag?: () => void;
   /** Room under the content (a bottom bar over it needs more). */
   bottomInset?: number;
+  /** The large title folded away (a search in progress). */
+  collapsed?: boolean;
   children?: ReactNode;
 }) {
   const c = useColors();
@@ -53,11 +58,18 @@ export function PushedLargeTitle({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: insets.bottom + bottomInset }}
         >
-          <Animated.View style={[styles.head, titleFade]}>
-            <Text variant="display" accessibilityRole="header" numberOfLines={1}>
-              {title}
-            </Text>
-          </Animated.View>
+          {/* The title shows at once when the screen opens; it fades only when it comes back after a search. */}
+          <LayoutAnimationConfig skipEntering>
+            {collapsed ? null : (
+              <Animated.View entering={FadeIn.duration(200)} exiting={FadeOutUp.duration(180)}>
+                <Animated.View style={[styles.head, titleFade]}>
+                  <Text variant="display" accessibilityRole="header" numberOfLines={1}>
+                    {title}
+                  </Text>
+                </Animated.View>
+              </Animated.View>
+            )}
+          </LayoutAnimationConfig>
           {children}
         </Animated.ScrollView>
       </FocusLive>

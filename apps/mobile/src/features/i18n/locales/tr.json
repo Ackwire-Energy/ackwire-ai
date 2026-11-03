@@ -253,16 +253,16 @@
     "chatSearch": "Bir kişi veya ajan arayın",
     "people": "Kişiler",
     "nobody": "Burada henüz kimse yok.",
-    "ask": {
-      "question": "Neye ihtiyacınız var?",
-      "placeholder": "Ör. cumadan önce fiyatlandırma sayfasının metnini gözden geçir",
-      "to": "Kime",
-      "sendF": "{{name}} ajanına sor",
-      "sendM": "{{name}} ajanına sor",
-      "more": "Ya da yeni bir şey başlatın",
-      "person": "Bir kişiyle sohbet et",
-      "noAgents": "Bir ajandan bir şey istemek için önce kendi ajanınızı oluşturun."
-    },
+    "search": "Kişi veya ajan",
+    "create": "Oluştur",
+    "agentHint": "Adı ve ne yaptığı",
+    "chatShort": "Sohbet",
+    "chatHint": "Bir kişi veya bir ajan",
+    "taskHint": "Sorumlu kişi ve son tarihle",
+    "routineHint": "Bir ajan bunu kendi başına, planlanan saatte yapar",
+    "wikiPage": "Wiki sayfası",
+    "wikiHint": "Ekibin ve ajanların okuması için",
+    "inviteHint": "E-posta veya bağlantıyla",
     "agent": {
       "question": "Bu ajan ne yapacak?"
     }
@@ -1200,7 +1200,8 @@
       "forum": "Sıra sizde",
       "browser": "Tarayıcı",
       "secret": "Gizli bilgi",
-      "join": "Üyeler"
+      "join": "Üyeler",
+      "tools": "Araçlar"
     },
     "review": "İncele",
     "answer": "Yanıtla",
