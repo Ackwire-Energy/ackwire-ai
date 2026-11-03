@@ -454,6 +454,19 @@ html:not([data-pointer]) .ac-link:focus-visible {
   color: var(--ink-muted);
   text-wrap: pretty;
 }
+/* A section's heading inside a picker's list (`PickerHeading`): its label, then what picking one means. */
+.ac-picker-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block: var(--space-2) var(--space-1);
+}
+.ac-picker-head__desc {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  text-wrap: pretty;
+}
 .ac-field__error {
   font-size: 13px;
   line-height: 18px;

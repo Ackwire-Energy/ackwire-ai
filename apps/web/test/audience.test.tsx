@@ -72,6 +72,11 @@ describe("Quem pode falar com a Ada", () => {
     expect(results.textContent).not.toContain("everyone");
     const text = results.textContent ?? "";
     expect(text.indexOf("Papéis")).toBeLessThan(text.indexOf("Pessoas"));
+    // Each section's heading is the kit's picker heading: the roles' description under its label, apart.
+    expect([...results.querySelectorAll(".ac-picker-head")].map((h) => h.textContent)).toEqual([
+      "PapéisQuem tem o papel pode falar, inclusive quem entrar nele depois.",
+      "Pessoas",
+    ]);
     expect(
       within(results)
         .getByLabelText(/Suporte/)
