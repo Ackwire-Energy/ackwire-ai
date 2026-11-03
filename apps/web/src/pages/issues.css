@@ -1293,7 +1293,7 @@ button.issue-file {
 button.issue-file:hover {
   box-shadow: var(--e2), var(--top);
 }
-button.issue-file:focus-visible {
+html:not([data-pointer]) button.issue-file:focus-visible {
   box-shadow: var(--focus-ring);
   outline: none;
 }
@@ -1394,7 +1394,7 @@ button.issue-file:focus-visible {
 .issue-files__add:hover {
   color: var(--ink);
 }
-.issue-files__add:focus-visible {
+html:not([data-pointer]) .issue-files__add:focus-visible {
   box-shadow: var(--focus-ring);
   outline: none;
 }
@@ -1433,7 +1433,7 @@ button.issue-file:focus-visible {
   text-align: left;
   cursor: pointer;
 }
-.issue-files__open:focus-visible {
+html:not([data-pointer]) .issue-files__open:focus-visible {
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm);
   outline: none;
