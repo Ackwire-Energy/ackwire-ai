@@ -1071,6 +1071,23 @@ export const ptBR = {
     secret_request: "Um agente precisa de um segredo seu",
     waiting: "Tem algo esperando você",
   },
+  // The island at the top of the screen (ADR 0071 §9): what reaches me while the app is open.
+  island: {
+    label: "Notificações novas",
+    expand: "Ver notificações",
+    reply: "Responder",
+    otherAnswer: "Outra resposta",
+    review: "Revisar",
+    open: "Abrir",
+    dismiss: "Dispensar",
+    send: "Enviar",
+    placeholder: "Escreva sua resposta…",
+    sent: "Enviado",
+    answered: "Você respondeu: {{choice}}",
+    failed: "Não foi. Tente de novo.",
+    all: "Ver todas",
+    closes: "fecha",
+  },
   contextMenu: {
     label: "Ações",
     react: "Reagir",
@@ -3167,6 +3184,8 @@ export const ptBR = {
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Entre na página do Cursor. O {{computer}} termina sozinho.",
           cursorKey: "Usar uma chave de API do Cursor",
+          /** Beside the sign-in button: its link, to open in another browser or profile. */
+          copyLink: "Copiar link",
           openAgain: "Abrir de novo",
           stepTwo: "Cole o código que o Claude mostrar",
           codeLabel: "Código do Claude",

@@ -1029,6 +1029,22 @@
     "secret_request": "에이전트가 비밀 정보를 요청해요",
     "waiting": "기다리는 항목이 있어요"
   },
+  "island": {
+    "label": "새 알림",
+    "expand": "알림 보기",
+    "reply": "답장",
+    "otherAnswer": "다른 답변",
+    "review": "검토",
+    "open": "열기",
+    "dismiss": "닫기",
+    "send": "보내기",
+    "placeholder": "답변을 입력하세요…",
+    "sent": "보냄",
+    "answered": "내 답변: {{choice}}",
+    "failed": "보내지 못했어요. 다시 시도해 주세요.",
+    "all": "모두 보기",
+    "closes": "닫기"
+  },
   "contextMenu": {
     "label": "작업",
     "react": "반응 추가",
@@ -3073,6 +3089,7 @@
           "opencodeFree": "OpenCode의 무료 모델은 키가 필요 없어요. OpenCode 콘솔의 키를 쓰면 유료 모델도 쓸 수 있어요.",
           "cursorFinish": "Cursor 페이지에서 로그인하면 {{computer}}에서 로그인이 자동으로 완료돼요.",
           "cursorKey": "대신 Cursor API 키 사용",
+          "copyLink": "링크 복사",
           "openAgain": "다시 열기",
           "stepTwo": "Claude가 보여 주는 코드를 붙여넣으세요",
           "codeLabel": "Claude 코드",

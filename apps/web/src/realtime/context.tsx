@@ -92,6 +92,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { checkAppVersion } from "@/lib/app-version";
 import { desktopNotice, inDesktopApp, thisMac } from "@/lib/desktop";
+import { feedIsland, island } from "@/lib/island";
 import { notificationAudience } from "@/lib/sounds";
 import { useToast } from "@/lib/toast";
 import { settleShownPushes } from "@/lib/web-push";
@@ -475,6 +476,8 @@ export function RealtimeProvider({
       applyUnreadEvent(qc, orgId, event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
       if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
+      // The island at the top (ADR 0071 §9): what reaches me while I'm here, and what I settled elsewhere leaves.
+      if (isNotificationEvent(event)) feedIsland(event);
       // Its sound (ADR 0070): in one tab only, and in the background only what matters.
       if (isNotificationEvent(event) && event.type === "notification.upserted") {
         const { mine, background } = notificationAudience();
@@ -578,6 +581,8 @@ export function RealtimeProvider({
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("online", wake);
     return () => {
+      // Another workspace (or none): its notices go with it.
+      island.clear();
       document.removeEventListener("visibilitychange", wake);
       window.removeEventListener("online", wake);
       offReconnect();

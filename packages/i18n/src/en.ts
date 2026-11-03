@@ -1074,6 +1074,23 @@ export const en = {
     secret_request: "An agent needs a secret from you",
     waiting: "Something is waiting for you",
   },
+  // The island at the top of the screen (ADR 0071 §9): what reaches me while the app is open.
+  island: {
+    label: "New notifications",
+    expand: "Show notifications",
+    reply: "Reply",
+    otherAnswer: "Another answer",
+    review: "Review",
+    open: "Open",
+    dismiss: "Dismiss",
+    send: "Send",
+    placeholder: "Write your answer…",
+    sent: "Sent",
+    answered: "You answered: {{choice}}",
+    failed: "It didn't go through. Try again.",
+    all: "See all",
+    closes: "closes",
+  },
   contextMenu: {
     label: "Actions",
     react: "React",
@@ -3102,6 +3119,8 @@ export const en = {
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself.",
           cursorKey: "Use a Cursor API key instead",
+          /** Beside the sign-in button: its link, to open in another browser or profile. */
+          copyLink: "Copy link",
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",

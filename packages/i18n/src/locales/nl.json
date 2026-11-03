@@ -1065,6 +1065,22 @@
     "secret_request": "Een agent heeft een geheim van je nodig",
     "waiting": "Er wacht iets op jou"
   },
+  "island": {
+    "label": "Nieuwe meldingen",
+    "expand": "Meldingen tonen",
+    "reply": "Beantwoorden",
+    "otherAnswer": "Ander antwoord",
+    "review": "Bekijken",
+    "open": "Openen",
+    "dismiss": "Verbergen",
+    "send": "Versturen",
+    "placeholder": "Schrijf je antwoord…",
+    "sent": "Verstuurd",
+    "answered": "Je antwoordde: {{choice}}",
+    "failed": "Dat lukte niet. Probeer het opnieuw.",
+    "all": "Alles bekijken",
+    "closes": "sluit"
+  },
   "contextMenu": {
     "label": "Acties",
     "react": "Reageren",
@@ -3209,6 +3225,7 @@
           "opencodeFree": "De gratis modellen van OpenCode hebben geen sleutel nodig. Een sleutel uit de OpenCode-console voegt de betaalde toe.",
           "cursorFinish": "Log in op de pagina van Cursor, dan rondt {{computer}} het inloggen vanzelf af.",
           "cursorKey": "Gebruik liever een Cursor-API-sleutel",
+          "copyLink": "Link kopiëren",
           "openAgain": "Opnieuw openen",
           "stepTwo": "Plak de code die Claude toont",
           "codeLabel": "Claude-code",

@@ -1101,6 +1101,22 @@
     "secret_request": "Un agent a besoin d'un secret de votre part",
     "waiting": "Quelque chose vous attend"
   },
+  "island": {
+    "label": "Nouvelles notifications",
+    "expand": "Voir les notifications",
+    "reply": "Répondre",
+    "otherAnswer": "Autre réponse",
+    "review": "Examiner",
+    "open": "Ouvrir",
+    "dismiss": "Ignorer",
+    "send": "Envoyer",
+    "placeholder": "Écrivez votre réponse…",
+    "sent": "Envoyé",
+    "answered": "Vous avez répondu : {{choice}}",
+    "failed": "L’envoi a échoué. Réessayez.",
+    "all": "Tout voir",
+    "closes": "ferme"
+  },
   "contextMenu": {
     "label": "Menu d'actions",
     "react": "Réagir",
@@ -3310,6 +3326,7 @@
           "opencodeFree": "Les modèles gratuits d'OpenCode ne demandent aucune clé. Une clé de la console OpenCode ajoute les modèles payants.",
           "cursorFinish": "Connectez-vous sur la page de Cursor, et la connexion se termine toute seule sur {{computer}}.",
           "cursorKey": "Utiliser plutôt une clé API Cursor",
+          "copyLink": "Copier le lien",
           "openAgain": "Rouvrir",
           "stepTwo": "Collez le code affiché par Claude",
           "codeLabel": "Code Claude",

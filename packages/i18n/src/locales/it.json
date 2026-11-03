@@ -1101,6 +1101,22 @@
     "secret_request": "Un agente ha bisogno di un segreto da te",
     "waiting": "Qualcosa ti aspetta"
   },
+  "island": {
+    "label": "Nuove notifiche",
+    "expand": "Mostra notifiche",
+    "reply": "Rispondi",
+    "otherAnswer": "Altra risposta",
+    "review": "Rivedi",
+    "open": "Apri",
+    "dismiss": "Ignora",
+    "send": "Invia",
+    "placeholder": "Scrivi la tua risposta…",
+    "sent": "Inviato",
+    "answered": "Hai risposto: {{choice}}",
+    "failed": "Non è andato a buon fine. Riprova.",
+    "all": "Vedi tutte",
+    "closes": "chiude"
+  },
   "contextMenu": {
     "label": "Azioni",
     "react": "Reagisci",
@@ -3309,6 +3325,7 @@
           "opencodeFree": "I modelli gratuiti di OpenCode non richiedono chiavi. Una chiave dalla console di OpenCode aggiunge quelli a pagamento.",
           "cursorFinish": "Accedi sulla pagina di Cursor e l'accesso si completa da solo su {{computer}}.",
           "cursorKey": "Usa invece una chiave API di Cursor",
+          "copyLink": "Copia link",
           "openAgain": "Apri di nuovo",
           "stepTwo": "Incolla il codice che mostra Claude",
           "codeLabel": "Codice di Claude",

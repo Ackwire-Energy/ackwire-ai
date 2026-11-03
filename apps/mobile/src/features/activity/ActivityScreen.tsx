@@ -7,11 +7,9 @@ import {
   useRoutines,
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
-import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
-import { restrictionOf } from "@agenteschat/client/lib/notifications";
 import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -51,13 +49,12 @@ import {
   joinRequestLine,
   nextRoutine,
   placeOf,
-  runFailedLines,
   type SayWords,
   subtitleOf,
   upcomingDay,
   waitingCardOf,
-  whoOf,
 } from "./logic";
+import { useNoticeTitle } from "./noticeTitle";
 
 /**
  * Atividade: on the grouped gray, what waits on you on top as cards (who asks,
@@ -339,9 +336,6 @@ function NextWhen({ routine, agent }: { routine: Pick<Routine, "nextRunAt">; age
   );
 }
 
-/** Stands in for the names in the translated title, so they can be drawn bold. */
-const NAMES = "\u2063names\u2063";
-
 /**
  * One item, in Conversas' row: the faces, who did what (the names bold)
  * and when, the snippet and where; a red dot on the right while unread. Swipe right to mark read or unread,
@@ -350,7 +344,6 @@ const NAMES = "\u2063names\u2063";
 const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppNotification; divider: boolean }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const dir = useDirectory();
   const c = useColors();
   const when = useWhen();
   const act = useNotificationAction(orgId);
@@ -361,33 +354,8 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const web = href ? null : notificationWebPath(n, orgId);
   const unread = n.readAt === null;
 
-  // A restriction on agentes.chat Cloud: its whole line under the headline, and a held agent's name heads it.
-  const restriction = restrictionOf(n);
-  const held = restriction?.code === "agent.paused";
-  const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));
-  const names = held
-    ? (n.source.label ?? "")
-    : who.second
-      ? who.more > 0
-        ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
-        : t("mobile.names.two", { first: who.first, second: who.second })
-      : who.first;
-  const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
-  const template = held
-    ? t("standing.notification.agentHold", { name: NAMES })
-    : n.kind === "app_created"
-      ? appCreatedLine(t, n)
-      : t(`mobile.activity.kind.${kind}`, {
-          names: NAMES,
-          count: who.total,
-          // `plan_reset_unknown`: the plan's name.
-          plan: n.latest.title ?? "",
-          defaultValue: NAMES,
-        });
-  // Agents that failed for one cause close together: one line for all, who they are under it.
-  const failed = runFailedLines(t, n, (id) => dir.nameOf({ type: "agent", id }));
-  const parts = failed ? [failed.title] : template.split(NAMES);
-  const title = parts.join(names);
+  // Who did what, as the island says it too; a restriction or several agents' failures go under it.
+  const { parts, names, title, restriction, failed } = useNoticeTitle(n);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.
   const say: SayWords = (w, otherwise = "") => {
     const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;

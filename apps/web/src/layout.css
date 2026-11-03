@@ -242,6 +242,8 @@ p {
  * then the page, laid out as before (a row: the page's main column and anything beside it).
  */
 .shell__work {
+  /* The island's place (components/notice-island.css): centered over the work area. */
+  position: relative;
   flex: 1 1 560px;
   min-width: 0;
   height: 100%;
@@ -8952,7 +8954,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* "Adicionar conta": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
+/* "Add account": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
    sits nearer its own words than the next step's. Wrapped, its lines never end on a word alone, in a plan's panel or
    out of one (an agent's brain, Settings). */
 .agp-addacct {
@@ -8964,11 +8966,15 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .agp-addacct:focus {
   outline: none;
 }
+/* Back as the arrow before the title, as every other back in the app; its plate reaches out so the arrow sits on the
+   block's edge, under the steps' column. */
 .agp-addacct__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 4px;
+}
+.agp-addacct__head > .ac-btn {
+  margin-inline-start: -8px;
 }
 .agp-addacct__head > b {
   font-size: 15px;
@@ -9035,6 +9041,13 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-weight: 650;
   letter-spacing: 0.08em;
   user-select: all;
+}
+/* A sign-in's button and "Copy link" beside it, wrapping under it when the column is narrow. */
+.agp-addacct__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .agp-addacct__wait {
   flex: none;
