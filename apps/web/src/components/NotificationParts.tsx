@@ -106,7 +106,6 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
   );
 }
 
-
 type WhatKey =
   | "mention"
   | "mentionIn"

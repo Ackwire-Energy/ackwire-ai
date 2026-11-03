@@ -132,8 +132,7 @@ export function createIsland({ life = ISLAND_LIFE_MS, max = ISLAND_MAX }: { life
     dismiss(id: string) {
       const item = items.find((i) => i.n.id === id);
       if (!item) return;
-      items =
-        item.n.waiting && !item.small ? items.map((i) => (i === item ? { ...i, small: true } : i)) : without(id);
+      items = item.n.waiting && !item.small ? items.map((i) => (i === item ? { ...i, small: true } : i)) : without(id);
       emit();
     },
     /** Swiped up (or Esc on the closed island): what isn't waiting leaves, what is shrinks. */

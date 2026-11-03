@@ -79,7 +79,10 @@ export function desktopNotice(
   return {
     title: oneLine(t(`desktopNotice.${kind}`), NOTICE_TITLE_MAX),
     // The snippet, an approval's action, or the word for a GIF, a sticker or a voice message (ADR 0091, 0100).
-    body: oneLine(noticeLine(n, (media) => mediaWord(t, media)), NOTICE_BODY_MAX),
+    body: oneLine(
+      noticeLine(n, (media) => mediaWord(t, media)),
+      NOTICE_BODY_MAX,
+    ),
     path: `/org/${encodeURIComponent(orgId)}/notifications`,
   };
 }

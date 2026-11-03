@@ -78,7 +78,7 @@ import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/A
 import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
-import { type Dir, Face, Headline, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
+import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { AllowTalkButton } from "@/components/ReachLines";
 import { colorOf, prepareBurst } from "@/components/Sky";

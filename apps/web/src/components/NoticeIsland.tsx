@@ -44,10 +44,7 @@ export function NoticeIsland() {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const channels = useChannels(org.id);
-  const channelName = useCallback(
-    (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "",
-    [channels.data],
-  );
+  const channelName = useCallback((id: string) => channels.data?.find((c) => c.id === id)?.name ?? "", [channels.data]);
   const snap = useSyncExternalStore(island.subscribe, island.get, island.get);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -99,7 +96,7 @@ export function NoticeIsland() {
       duration: 380,
       easing: "cubic-bezier(.3,1.4,.5,1)",
     });
-  }, [snap.seq, open]);
+  }, [snap.seq, open, snap.items.length]);
 
   // Open: Esc or a click outside closes it.
   useEffect(() => {
@@ -233,15 +230,7 @@ function Line({ n, className }: { n: AppNotification; className?: string }) {
 }
 
 /** One notice on the open island: who and what, the whole line, and the answer right there. */
-function NoticeRow({
-  n,
-  dir,
-  channelName,
-}: {
-  n: AppNotification;
-  dir: Dir;
-  channelName: (id: string) => string;
-}) {
+function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; channelName: (id: string) => string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const act = useNotificationAction(org.id);
