@@ -11,7 +11,8 @@ import { Button } from "../components/Button";
 import { cx } from "../cx";
 import { useDarkTheme } from "../hooks/useDarkTheme";
 import { Icon } from "../icons/Icon";
-import type { WidgetSpec, WidgetStatus } from "./spec";
+import { DitherLine } from "./ChartPieces";
+import type { KpiWidgetSpec, WidgetSpec, WidgetStatus } from "./spec";
 import { widgetTileVars } from "./tiles";
 import { WidgetBody } from "./WidgetBody";
 
@@ -42,6 +43,8 @@ export type WidgetCardProps = {
   locale: string;
   /** Under the body: who updated it and when, "updating…", or why it failed with Resolve. */
   footer: ReactNode;
+  /** Before the title: the face of the agent who looks after it (the footer then only says when). */
+  face?: ReactNode;
   buildingText?: string;
   /** The head's own buttons (Update now, its menu), shown on hover and focus. */
   actions?: ReactNode;
@@ -67,6 +70,7 @@ export function WidgetCard({
   size,
   locale,
   footer,
+  face,
   buildingText,
   actions,
   onOpen,
@@ -88,6 +92,7 @@ export function WidgetCard({
     <article
       className={cx("ac-card wg", className)}
       data-state={status}
+      data-kind={spec?.kind}
       data-w={size.w}
       data-h={size.h}
       data-organize={organize ? "" : undefined}
@@ -98,6 +103,7 @@ export function WidgetCard({
     >
       <span className="wg__sweep" aria-hidden="true" />
       <div className="wg__head">
+        {face && <span className="wg__face">{face}</span>}
         {onOpen && !organize ? (
           <button type="button" className="wg__title" onClick={onOpen}>
             {title}
@@ -154,10 +160,39 @@ export function WidgetCard({
           size={size}
           locale={locale}
           buildingText={buildingText}
+          sparkApart
         />
       </div>
       <div className="wg__foot">{footer}</div>
+      <WidgetBleed spec={status === "building" ? null : spec} color={color} size={size} />
     </article>
+  );
+}
+
+/** A number's trend line, drawn apart from its body (`sparkApart`): null for anything else. */
+function sparkOf(spec: WidgetSpec | null): KpiWidgetSpec["spark"] | null {
+  return spec?.kind === "kpi" && spec.spark && spec.spark.length > 1 ? spec.spark : null;
+}
+
+/**
+ * A number's trend at the card's bottom, edge to edge under the footer and clipped by the card's corners: the line's
+ * dither runs out at the bottom edge and the last point keeps its square inside the card. Null for any other kind.
+ */
+export function WidgetBleed({
+  spec,
+  color,
+  size,
+}: {
+  spec: WidgetSpec | null;
+  color: string;
+  size: { w: 1 | 2; h: 1 | 2 };
+}) {
+  const spark = sparkOf(spec);
+  if (!spark) return null;
+  return (
+    <div className="wg__bleed">
+      <DitherLine className="wk-spark" values={spark} color={color} height={size.h === 2 ? 120 : 56} bleed dot />
+    </div>
   );
 }
 

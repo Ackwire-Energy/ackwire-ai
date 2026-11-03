@@ -27,6 +27,8 @@ export interface WidgetBodyProps {
   locale: string;
   /** While it is built: "Theo is building the widget and the routine that will update it…". */
   buildingText?: string;
+  /** A number's trend line is drawn by the card, edge to edge at its bottom (`WidgetBleed`), not in the body. */
+  sparkApart?: boolean;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface WidgetBodyProps {
  * tones); numbers in the app's font, bold, tabular. Being built, the agent's dither moves under the words. A note
  * keeps to two lines and ends in an ellipsis past them (`wk-clamp`), never cut inside a word.
  */
-export function WidgetBody({ spec, status, color, size, locale, buildingText }: WidgetBodyProps) {
+export function WidgetBody({ spec, status, color, size, locale, buildingText, sparkApart = false }: WidgetBodyProps) {
   if (status === "building" || !spec) {
     return (
       <div className="wk-build">
@@ -46,7 +48,7 @@ export function WidgetBody({ spec, status, color, size, locale, buildingText }: 
   }
   switch (spec.kind) {
     case "kpi":
-      return <KpiBody spec={spec} color={color} locale={locale} />;
+      return <KpiBody spec={spec} color={color} locale={locale} spark={!sparkApart} />;
     case "goal":
       return <GoalBody spec={spec} locale={locale} />;
     case "bars":
@@ -60,7 +62,17 @@ export function WidgetBody({ spec, status, color, size, locale, buildingText }: 
   }
 }
 
-function KpiBody({ spec, color, locale }: { spec: KpiWidgetSpec; color: string; locale: string }) {
+function KpiBody({
+  spec,
+  color,
+  locale,
+  spark,
+}: {
+  spec: KpiWidgetSpec;
+  color: string;
+  locale: string;
+  spark: boolean;
+}) {
   const shown = useCountUp(spec.value);
   return (
     <>
@@ -76,7 +88,7 @@ function KpiBody({ spec, color, locale }: { spec: KpiWidgetSpec; color: string; 
           {spec.note}
         </div>
       )}
-      {spec.spark && spec.spark.length > 1 && (
+      {spark && spec.spark && spec.spark.length > 1 && (
         <DitherLine className="wk-spark" values={spec.spark} color={color} height={40} bleed dot />
       )}
     </>
@@ -110,6 +122,7 @@ function BarsBody({ spec, size, locale }: { spec: BarsWidgetSpec; size: { w: 1 |
   const labels = spec.labels.slice(0, room);
   return (
     <>
+      {spec.unit && <div className="wk-cap">{spec.unit}</div>}
       <div className="wk-bars">
         {labels.map((label, i) => {
           const value = spec.values[i] ?? 0;
@@ -121,7 +134,8 @@ function BarsBody({ spec, size, locale }: { spec: BarsWidgetSpec; size: { w: 1 |
               data-alert={i === spec.alertIndex || undefined}
               title={`${label}: ${formatWithUnit(value, spec.unit, locale)}`}
             >
-              <span className="wk-bar__v">{formatWithUnit(value, spec.unit, locale)}</span>
+              {/* Only the number: the unit is the tag above the bars, said once. */}
+              <span className="wk-bar__v">{formatWidgetNumber(value, locale)}</span>
               <span className="wk-bar__b" style={{ height: `${Math.max(4, (Math.max(0, value) / max) * 100)}%` }} />
             </div>
           );
@@ -133,7 +147,7 @@ function BarsBody({ spec, size, locale }: { spec: BarsWidgetSpec; size: { w: 1 |
           <span key={i}>{label}</span>
         ))}
       </div>
-      {spec.note && <div className="wk-sub wk-clamp">{spec.note}</div>}
+      {spec.note && <p className="wk-note wk-clamp">{spec.note}</p>}
     </>
   );
 }
@@ -154,6 +168,7 @@ function LineBody({
   const step = Math.max(1, Math.ceil(spec.labels.length / 7));
   return (
     <>
+      {spec.unit && <div className="wk-cap">{spec.unit}</div>}
       <DitherLine className="wk-line" values={spec.values} color={color} height={size.h === 2 ? 210 : 96} dot />
       <div className="wk-axis wk-axis--line">
         {spec.labels.map((label, i) =>
@@ -164,7 +179,7 @@ function LineBody({
         )}
       </div>
       {spec.note ? (
-        <div className="wk-sub wk-clamp">{spec.note}</div>
+        <p className="wk-note wk-clamp">{spec.note}</p>
       ) : last !== undefined ? (
         <div className="wk-sub">{formatWithUnit(last, spec.unit, locale)}</div>
       ) : null}

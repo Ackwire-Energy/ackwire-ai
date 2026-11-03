@@ -1,12 +1,4 @@
-import type {
-  Agent,
-  PinnableBlock,
-  Widget,
-  WidgetFormat,
-  WidgetKind,
-  WidgetSchedule,
-  WidgetSize,
-} from "@agenteschat/client";
+import type { Agent, PinnableBlock, Widget, WidgetFormat, WidgetSchedule, WidgetSize } from "@agenteschat/client";
 import {
   useAgents,
   useConfirmWidget,
@@ -16,36 +8,32 @@ import {
   usePinWidget,
   useRemoveWidget,
   useTestWidget,
-  useWidgetCost,
   useWidgetDraft,
   useWidgetSuggestions,
-  widgetCostLine,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { formatUsd, joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import {
+  BuildingDither,
   Button,
   Dialog,
   DialogFooter,
   Icon,
-  type IconName,
   Input,
+  PixelSpinner,
+  Popover,
   Segmented,
   Select,
   Switch,
-  TabPanel,
-  Tabs,
-  Textarea,
   useDarkTheme,
   useNow,
-  WidgetCard,
+  WidgetBleed,
+  WidgetBody,
   WidgetGlyph,
   widgetTileVars,
 } from "@agenteschat/ui";
 import {
-  type ExampleWords,
-  exampleWidgetSpec,
   sizeToLayout,
   WIDGET_FORMATS,
   WIDGET_SCHEDULES,
@@ -56,33 +44,20 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentPickerDialog } from "@/components/agents/AgentPickerDialog";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
-import { failureText, neutralWidgetTitle } from "@/components/widgets/parts";
+import { failureText } from "@/components/widgets/parts";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import "@/pages/dashboards.css";
 
 /** The destination select's value for the person's own home board ("My Home"). */
 const HOME = "home";
-/** What "Pin from chat" offers for keeping a block updated: daily, hourly, or not at all. */
-const PIN_SCHEDULES: readonly WidgetSchedule[] = ["day", "hour", "manual"];
 /** A widget's title, as long as the server takes it (ADR 0134). */
 const TITLE_MAX = 80;
 
-/** The words of a preview's example data in the reader's language (`widgets.example.*`). */
-export function exampleWordsOf(t: TFunction): ExampleWords {
-  return {
-    days: (["d1", "d2", "d3", "d4", "d5", "d6", "d7"] as const).map((d) => t(`widgets.example.days.${d}`)),
-    vsYesterday: t("widgets.example.vsYesterday"),
-    goalLine: t("widgets.example.goalLine"),
-    goalNote: t("widgets.example.goalNote"),
-    lineNote: t("widgets.example.lineNote"),
-    rows: [t("widgets.example.row1"), t("widgets.example.row2"), t("widgets.example.row3")],
-    rowMeta: [t("widgets.example.meta1"), t("widgets.example.meta2"), t("widgets.example.meta3")],
-    items: [t("widgets.example.item1"), t("widgets.example.item2")],
-  };
-}
+type Mode = "ask" | "pin";
 
 export interface NewWidgetDialogProps {
   orgId: string;
@@ -91,35 +66,40 @@ export interface NewWidgetDialogProps {
   /** The board it goes on by default; null = My Home. */
   dashboardId: string | null;
   /** Which way it opens: asking an agent, or pinning a chart from the chat. */
-  tab?: "ask" | "pin";
+  tab?: Mode;
 }
 
 /**
- * New widget (ADR 0134 §3): ask an agent the person can talk to for a number, chart or list it keeps up to date —
- * what to follow (with the agent's suggestions), who looks after it, the format, how often it updates, an alert and
- * its condition — or pin a chart an agent already sent. Beside the form, the preview at its size, the steps it will
- * take and what it costs; under it, the board it goes on. Asking is tested first: Test has the agent build a draft
- * with real data, shown live in the preview, and only a draft that worked for what is asked now can be created.
- * Used by a board's page and by Home.
+ * New widget (ADR 0134 §3). The dialog is the widget itself, large on a dotted stage, and the card is the form: what
+ * to follow is written in its body (with the agent's suggestions), the agent's face in its footer opens the list of
+ * agents, the schedule beside it how often it updates, the bell in its head the alert, S/M/L its size; its title is
+ * edited in place. Test has the agent build it there with real data (a draft), and only a draft that worked for what
+ * is asked now can be created; after the test the ask folds into one line that opens it again. Or a chart an agent
+ * already sent in the chat is pinned. Under the card, the board it goes on. Used by a board's page and by Home.
  */
 export function NewWidgetDialog({ orgId, open, onClose, dashboardId, tab = "ask" }: NewWidgetDialogProps) {
   const { t } = useTranslation();
+  const [mode, setMode] = useState<Mode>(tab);
+  // Closed: the next opening starts the way it was asked to.
+  useEffect(() => {
+    if (!open) setMode(tab);
+  }, [open, tab]);
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={t("dashboards.newWidget.title")}
-      description={t("dashboards.newWidget.subtitle")}
+      title={mode === "pin" ? t("dashboards.newWidget.pinTitle") : t("dashboards.newWidget.title")}
+      description={mode === "pin" ? t("dashboards.newWidget.pinSubtitle") : t("dashboards.newWidget.cardSubtitle")}
       closeLabel={t("common.close")}
-      width={980}
-      className="db-dialog db-nw"
+      width={620}
+      className="db-dialog nw"
     >
-      {open && <NewWidgetBody orgId={orgId} dashboardId={dashboardId} initialTab={tab} onClose={onClose} />}
+      {open && (
+        <NewWidgetBody orgId={orgId} dashboardId={dashboardId} mode={mode} setMode={setMode} onClose={onClose} />
+      )}
     </Dialog>
   );
 }
-
-type Tab = "ask" | "pin";
 
 /**
  * Where the test of what is asked stands: none yet, the draft being built (or the test being sent), built (`ok`),
@@ -138,12 +118,14 @@ function phaseOf(sending: boolean, draft: Widget | undefined, draftId: string | 
 function NewWidgetBody({
   orgId,
   dashboardId,
-  initialTab,
+  mode,
+  setMode,
   onClose,
 }: {
   orgId: string;
   dashboardId: string | null;
-  initialTab: Tab;
+  mode: Mode;
+  setMode: (mode: Mode) => void;
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -154,28 +136,31 @@ function NewWidgetBody({
   const now = useNow(30_000);
   const id = useId();
   const agents = (useAgents(orgId).data ?? []).filter((a) => !a.former && canTalk(a));
-  const [tab, setTab] = useState<Tab>(initialTab);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [picked, setPicked] = useState<number | null>(null);
   const [format, setFormat] = useState<WidgetFormat>("auto");
-  const [schedule, setSchedule] = useState<WidgetSchedule>(initialTab === "pin" ? "day" : "hour");
+  const [schedule, setSchedule] = useState<WidgetSchedule>(mode === "pin" ? "day" : "hour");
   const [alertOn, setAlertOn] = useState(true);
   const [condition, setCondition] = useState("");
+  const [alertOpen, setAlertOpen] = useState(false);
   const [size, setSize] = useState<WidgetSize>("m");
   const [dest, setDest] = useState<string>(dashboardId ?? HOME);
   const [block, setBlock] = useState<number | null>(null);
+  const [choosing, setChoosing] = useState(false);
   // The test: the draft it made, the ask it was made for, and the title as the person edits it (null = the agent's).
   const [draftId, setDraftId] = useState<string | null>(null);
   const [testedFor, setTestedFor] = useState<string | null>(null);
   const [titleEdit, setTitleEdit] = useState<string | null>(null);
+  // After a test the ask folds into one line; this opens it again for a change.
+  const [editing, setEditing] = useState(false);
+  const askField = useRef<HTMLTextAreaElement>(null);
 
   const agent = agents.find((a) => a.id === agentId) ?? agents[0];
-  const suggestions = useWidgetSuggestions(orgId, agent?.id, tab === "ask");
-  const cost = useWidgetCost(orgId, agent?.id, schedule, tab === "ask");
+  const suggestions = useWidgetSuggestions(orgId, agent?.id, mode === "ask");
   const boards = useDashboards(orgId);
   const home = useHomeDashboard(orgId, dest === HOME);
-  const pinnable = usePinnableBlocks(orgId, tab === "pin");
+  const pinnable = usePinnableBlocks(orgId, mode === "pin");
   const test = useTestWidget(orgId);
   const confirm = useConfirmWidget(orgId);
   const remove = useRemoveWidget(orgId);
@@ -198,6 +183,13 @@ function NewWidgetBody({
       pending.current = null;
     };
   }, []);
+  // The ask opened again after a test: the cursor goes to its end.
+  useEffect(() => {
+    const field = askField.current;
+    if (!editing || !field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [editing]);
 
   const sources = suggestions.data?.sources ?? [];
   const sugs = suggestions.data?.suggestions ?? [];
@@ -211,37 +203,30 @@ function NewWidgetBody({
   ];
   const where = destOptions.find((o) => o.value === dest)?.label ?? t("dashboards.home");
   const targetId = dest === HOME ? (home.data?.id ?? null) : dest;
-  const words = exampleWordsOf(t);
 
   const asked = text.trim();
   // What a test answers for: what is asked, of whom, in what format (schedule, alert, size and board don't count).
   const askKey = JSON.stringify([asked, agent?.id ?? "", format]);
   const phase: TestPhase =
-    tab === "ask" ? phaseOf(test.isPending, draft, draftId, draftId !== null && testedFor !== askKey) : "none";
-  const tested = phase === "ok" && draft !== undefined ? draft : null;
-  const title = tested ? (titleEdit ?? tested.title) : "";
+    mode === "ask" ? phaseOf(test.isPending, draft, draftId, draftId !== null && testedFor !== askKey) : "none";
+  // The draft's data, still shown (dimmed) once the ask changed since the test.
+  const built = draft?.status === "ok" && draft.spec ? draft : null;
+  const tested = phase === "ok" ? built : null;
+  const stale = phase === "stale";
+  const asking = mode === "ask" && (phase === "none" || editing);
   const testedWhen = tested?.refreshedAt
     ? relativeTime(t, i18n.language, tested.refreshedAt, new Date(now))
     : t("common.now");
 
-  // The preview: the chosen block as it is; the draft as the agent built it; or example data of the kind asked (the
-  // agent's pick for "auto"), named by its format until the agent names it.
-  const previewAgent: Agent | undefined = tab === "pin" ? (chosen ? dir.anyAgent(chosen.agentId) : undefined) : agent;
-  const previewKind: WidgetKind = format === "auto" ? (sug?.kind ?? sugs[0]?.kind ?? "kpi") : format;
-  const unnamed = neutralWidgetTitle(t, format === "auto" ? null : format);
-  const preview: { title: string; spec: WidgetSpec } | null =
-    tab === "pin"
-      ? chosen && { title: chosen.title, spec: chosen.spec as WidgetSpec }
-      : tested?.spec
-        ? { title: title.trim() || neutralWidgetTitle(t, tested.kind), spec: tested.spec }
-        : asked && phase !== "testing" && phase !== "failed"
-          ? { title: sug ? sug.title : unnamed, spec: exampleWidgetSpec(previewKind, words) }
-          : null;
-  const name = previewAgent?.name ?? agent?.name ?? "";
-  const agentName = agent?.name ?? t("dashboards.newWidget.theAgent");
+  // Whose card it is: the agent asked, or the one who sent the chosen block.
+  const owner: Agent | undefined = mode === "pin" ? (chosen ? dir.anyAgent(chosen.agentId) : undefined) : agent;
+  const name = owner?.name ?? agent?.name ?? t("dashboards.newWidget.theAgent");
+  const color = colorOf(owner ?? agent);
+  const title = titleEdit ?? (mode === "pin" ? (chosen?.title ?? "") : (built?.title ?? ""));
+  const shownSpec: WidgetSpec | null = mode === "pin" ? ((chosen?.spec as WidgetSpec | undefined) ?? null) : null;
 
   const failed = (error: unknown) => toast.show(errorText(t, error, i18n.language), "error");
-  const canTest = tab === "ask" && Boolean(agent) && asked.length > 0 && targetId !== null && phase !== "testing";
+  const canTest = mode === "ask" && Boolean(agent) && asked.length > 0 && targetId !== null && phase !== "testing";
   const busy = confirm.isPending || pin.isPending;
   const alertInput = { enabled: alertOn, condition: alertOn ? condition.trim() : "" };
 
@@ -252,7 +237,8 @@ function NewWidgetBody({
     pending.current = null;
     if (before) remove.mutate(before);
     setDraftId(null);
-    setTitleEdit(null);
+    setEditing(false);
+    setAlertOpen(false);
     const forAsk = askKey;
     const made = (draftMade: Widget) => {
       // Closed while it was sent: nobody will create it.
@@ -267,11 +253,14 @@ function NewWidgetBody({
     const refused = (error: unknown) => {
       if (alive.current) failed(error);
     };
+    // The person's own title, else a suggestion's when its ask is the one sent; else the agent names it.
+    const own = titleEdit?.trim() || undefined;
+    const named = own ?? (sug && asked === (sug.prompt || sug.title) ? sug.title : undefined);
     const input = {
       dashboardId: targetId,
       agentId: agent.id,
       prompt: asked,
-      ...(sug && asked === (sug.prompt || sug.title) ? { title: sug.title } : {}),
+      ...(named ? { title: named } : {}),
       format,
       schedule,
       alert: alertInput,
@@ -285,12 +274,13 @@ function NewWidgetBody({
   const create = () => {
     if (!tested || targetId === null || busy) return;
     confirming.current = true;
+    const own = titleEdit?.trim();
     confirm.mutate(
       {
         widgetId: tested.id,
         dashboardId: targetId,
         // Only a title the person wrote: theirs is kept from then on; otherwise the agent's from the test stays.
-        ...(titleEdit?.trim() && titleEdit.trim() !== tested.title ? { title: titleEdit.trim() } : {}),
+        ...(own && own !== tested.title ? { title: own } : {}),
         size,
         schedule,
         alert: alertInput,
@@ -309,28 +299,42 @@ function NewWidgetBody({
     );
   };
 
-  const submit = () => {
-    if (tab === "pin") {
-      if (!chosen || targetId === null || busy) return;
-      pin.mutate(
-        { dashboardId: targetId, messageId: chosen.messageId, block: chosen.block, schedule, size },
-        {
-          onSuccess: () => {
-            toast.show(t("dashboards.newWidget.created", { where }));
-            onClose();
-          },
-          onError: failed,
+  /** Pin: the chosen block goes on the board as it is, kept up to date or not. */
+  const pinIt = () => {
+    if (!chosen || targetId === null || busy) return;
+    const own = titleEdit?.trim();
+    pin.mutate(
+      {
+        dashboardId: targetId,
+        messageId: chosen.messageId,
+        block: chosen.block,
+        schedule,
+        size,
+        ...(own && own !== chosen.title ? { title: own } : {}),
+      },
+      {
+        onSuccess: () => {
+          toast.show(t("dashboards.newWidget.created", { where }));
+          onClose();
         },
-      );
-      return;
-    }
-    if (tested) create();
+        onError: failed,
+      },
+    );
+  };
+
+  const submit = () => {
+    if (mode === "pin") pinIt();
+    else if (tested) create();
     else runTest();
   };
 
-  const pickTab = (next: Tab) => {
-    setTab(next);
-    if (next === "pin" && !PIN_SCHEDULES.includes(schedule)) setSchedule("day");
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setTitleEdit(null);
+    setEditing(false);
+    setAlertOpen(false);
+    setSchedule(next === "pin" ? "day" : "hour");
+    if (next === "ask") setBlock(null);
   };
   const pickSuggestion = (index: number) => {
     const s = sugs[index];
@@ -338,364 +342,385 @@ function NewWidgetBody({
     setPicked(index);
     setText(s.prompt || s.title);
     if (s.alert) setCondition(s.alert);
+    setSize(s.kind === "kpi" || s.kind === "goal" ? "s" : "m");
   };
   const pickAgent = (next: string) => {
     setAgentId(next);
     setPicked(null);
   };
+  const pickBlock = (index: number) => {
+    const b = blocks[index];
+    setBlock(index);
+    setTitleEdit(null);
+    if (b) setSize(b.spec.kind === "kpi" || b.spec.kind === "goal" ? "s" : "m");
+  };
 
+  const layout = sizeToLayout(size);
   const tones = (who: { appearance?: unknown } | undefined) => widgetTileVars(colorOf(who), dark);
-  const scheduleInline = t(`widgets.schedulesInline.${schedule}`);
 
-  // "Who looks after it": face, name and role (what it reads shows in the steps, beside the preview).
-  const agentOptions = agents.map((a) => ({
-    value: a.id,
-    label: a.name,
-    description: a.role || undefined,
-    leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
-  }));
   const formatOptions = WIDGET_FORMATS.map((f) => ({
     value: f,
     label: t(`widgets.kinds.${f}`),
-    description: t(`dashboards.newWidget.formatHints.${f}`, { name: agentName }),
+    description: t(`dashboards.newWidget.formatHints.${f}`, { name }),
     leading: <WidgetGlyph kind={f} size={20} />,
   }));
+  /** The format, as a dropdown: boxed while the ask is written, quiet beside the folded ask. */
+  const formatSelect = (boxed: boolean) => (
+    <Select<WidgetFormat>
+      className={boxed ? "nwc-pk nwc-pk--box" : "nwc-pk"}
+      size="sm"
+      aria-label={t("dashboards.newWidget.format")}
+      value={format}
+      onValueChange={setFormat}
+      options={formatOptions}
+      renderValue={(o) => (
+        <span className="nwc-pk__v">
+          <WidgetGlyph kind={o.value} size={18} />
+          {o.value === "auto" && boxed ? t("dashboards.newWidget.formatAuto") : o.label}
+        </span>
+      )}
+    />
+  );
+  const scheduleWords = (s: WidgetSchedule, inline: boolean) => {
+    if (s === "manual") {
+      if (mode === "pin") return inline ? t("dashboards.newWidget.noUpdateInline") : t("dashboards.newWidget.noUpdate");
+      return inline ? t("dashboards.newWidget.manualInline") : t("dashboards.newWidget.manual");
+    }
+    return inline ? t(`widgets.schedulesInline.${s}`) : t(`widgets.schedules.${s}`);
+  };
+  // Only the schedules: what each costs stays out of this dialog (the agent's budget still applies to every run).
+  const scheduleSelect = (
+    <Select<WidgetSchedule>
+      className="nwc-pk"
+      size="sm"
+      aria-label={t("dashboards.newWidget.updates")}
+      value={schedule}
+      onValueChange={setSchedule}
+      options={WIDGET_SCHEDULES.map((s) => ({ value: s, label: scheduleWords(s, false) }))}
+      renderValue={(o) => (
+        <span className="nwc-pk__v">
+          <Icon name="repeat" size={14} />
+          {scheduleWords(o.value, true)}
+        </span>
+      )}
+    />
+  );
 
-  const askForm = (
-    <>
-      <div className="db-f">
-        <label className="db-lbl" htmlFor={`${id}-what`}>
-          {t("dashboards.newWidget.what")}
-        </label>
-        <Textarea
-          id={`${id}-what`}
-          rows={2}
-          value={text}
-          maxLength={2000}
-          placeholder={t("dashboards.newWidget.whatPlaceholder")}
-          onChange={(e) => {
-            setText(e.target.value);
-            if (sug && e.target.value !== (sug.prompt || sug.title)) setPicked(null);
-          }}
+  // The alert, behind the bell: on or off, and when.
+  const alertSugs = [...new Set(sugs.map((s) => s.alert).filter((a): a is string => Boolean(a)))];
+  const alertLine = alertOn
+    ? condition.trim()
+      ? t("widgets.alert.line", { condition: condition.trim() })
+      : t("widgets.alert.lineAny")
+    : t("widgets.alert.none");
+  const bell = (
+    <Popover
+      label={t("dashboards.newWidget.alert")}
+      side="bottom"
+      align="end"
+      open={alertOpen}
+      onOpenChange={setAlertOpen}
+      className="nw-alert"
+      trigger={
+        <button
+          type="button"
+          className="nwc-bell"
+          aria-label={t("dashboards.newWidget.alert")}
+          data-on={alertOn || undefined}
+          title={alertLine}
+        >
+          <Icon name="bell" size={16} />
+          {alertOn && <span>{t("dashboards.newWidget.alertOn")}</span>}
+        </button>
+      }
+    >
+      <div className="nw-alert__row">
+        <Switch
+          id={`${id}-alert`}
+          checked={alertOn}
+          onCheckedChange={setAlertOn}
+          aria-describedby={`${id}-alert-hint`}
         />
-        {sugs.length > 0 && (
-          // biome-ignore lint/a11y/useSemanticElements: toggle buttons under a field's label, not a fieldset
-          <div className="db-sugs" role="group" aria-label={t("dashboards.newWidget.suggestions")}>
-            {sugs.map((s, i) => (
-              <button
-                key={s.title}
-                type="button"
-                className="db-sug"
-                aria-pressed={picked === i}
-                style={tones(agent)}
-                onClick={() => pickSuggestion(i)}
-              >
-                <span className="db-sug__glyph">
-                  <WidgetGlyph kind={s.kind} size={18} />
-                </span>
-                {s.title}
-              </button>
-            ))}
-          </div>
-        )}
+        <span>
+          <label htmlFor={`${id}-alert`}>
+            <b>{t("widgets.alert.label")}</b>
+          </label>
+          <small id={`${id}-alert-hint`}>{t("widgets.alert.hint")}</small>
+        </span>
       </div>
-      <div className="db-pair">
-        <div className="db-f">
-          <span className="db-lbl" aria-hidden="true">
-            {t("dashboards.newWidget.who")}
-          </span>
-          {agents.length === 0 ? (
-            <p className="db-hint">{t("dashboards.newWidget.noAgents")}</p>
-          ) : (
-            <Select
-              aria-label={t("dashboards.newWidget.who")}
-              value={agent?.id}
-              onValueChange={pickAgent}
-              options={agentOptions}
-              renderValue={(o) => (
-                <span className="db-dd">
-                  <AgentAvatar agentId={o.value} name={o.label} size="xs" />
-                  {o.label}
-                </span>
-              )}
-            />
-          )}
-        </div>
-        <div className="db-f">
-          <span className="db-lbl" aria-hidden="true">
-            {t("dashboards.newWidget.format")}
-          </span>
-          <Select<WidgetFormat>
-            aria-label={t("dashboards.newWidget.format")}
-            value={format}
-            onValueChange={setFormat}
-            options={formatOptions}
-            renderValue={(o) => (
-              <span className="db-dd">
-                <WidgetGlyph kind={o.value} size={20} />
-                {o.label}
-              </span>
-            )}
-          />
-        </div>
-      </div>
-      {tested && (
-        <div className="db-f">
-          <label className="db-lbl" htmlFor={`${id}-title`}>
-            {t("dashboards.newWidget.titleField")}
+      {alertOn && (
+        <>
+          <label className="nw-alert__cond" htmlFor={`${id}-cond`}>
+            {t("widgets.alert.condition")}
           </label>
           <Input
-            id={`${id}-title`}
-            value={title}
-            maxLength={TITLE_MAX}
-            placeholder={neutralWidgetTitle(t, tested.kind)}
-            onChange={(e) => setTitleEdit(e.target.value)}
+            id={`${id}-cond`}
+            value={condition}
+            maxLength={200}
+            placeholder={t("widgets.alert.placeholder")}
+            onChange={(e) => setCondition(e.target.value)}
           />
+          {alertSugs.length > 0 && (
+            <span className="nw-alert__sugs">
+              {alertSugs.map((a) => (
+                <button key={a} type="button" aria-pressed={condition.trim() === a} onClick={() => setCondition(a)}>
+                  {a}
+                </button>
+              ))}
+            </span>
+          )}
+        </>
+      )}
+      <span className="nw-alert__foot">
+        <Button size="sm" onClick={() => setAlertOpen(false)}>
+          {t("dashboards.newWidget.alertDone")}
+        </Button>
+      </span>
+    </Popover>
+  );
+
+  // ── The card's parts ──────────────────────────────────────────────────
+  const blockPicks = (
+    <>
+      <p className="nw-hint">{t("dashboards.newWidget.pickFromChat")}</p>
+      {pinnable.isSuccess && blocks.length === 0 ? (
+        <p className="nw-hint">{t("dashboards.newWidget.noBlocks")}</p>
+      ) : (
+        <div className="nw-picks" role="radiogroup" aria-label={t("dashboards.newWidget.fromChat")}>
+          {blocks.map((b, i) => (
+            // biome-ignore lint/a11y/useSemanticElements: a block's row (its glyph, title and place) in a radio group
+            <button
+              key={`${b.messageId}:${b.block}`}
+              type="button"
+              role="radio"
+              className="nw-pick"
+              aria-checked={block === i}
+              style={tones(dir.anyAgent(b.agentId))}
+              onClick={() => pickBlock(i)}
+            >
+              <span className="nw-pick__glyph">
+                <WidgetGlyph kind={b.spec.kind} size={28} />
+              </span>
+              <span className="nw-pick__text">
+                <b>{b.title}</b>
+                <small>{placeOf(t, i18n.language, b, dir.anyAgent(b.agentId)?.name ?? "")}</small>
+              </span>
+              <span className="nw-radio" aria-hidden="true" />
+            </button>
+          ))}
         </div>
       )}
-      <div className="db-f">
-        <span className="db-lbl">{t("dashboards.newWidget.updates")}</span>
-        <Segmented
-          label={t("dashboards.newWidget.updates")}
-          value={schedule}
-          onValueChange={setSchedule}
-          options={WIDGET_SCHEDULES.map((s) => ({ value: s, label: t(`widgets.schedulesShort.${s}`) }))}
-        />
+    </>
+  );
+
+  const askBox = (
+    <>
+      <textarea
+        ref={askField}
+        className="nwc-ask"
+        rows={2}
+        value={text}
+        maxLength={2000}
+        aria-label={t("dashboards.newWidget.what")}
+        placeholder={t("dashboards.newWidget.what")}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (sug && e.target.value !== (sug.prompt || sug.title)) setPicked(null);
+        }}
+        onKeyDown={(e) => {
+          // Enter tests (Shift+Enter is a new line).
+          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          runTest();
+        }}
+      />
+      {phase === "none" && !asked && sugs.length > 0 && (
+        // biome-ignore lint/a11y/useSemanticElements: toggle buttons under the ask, not a fieldset
+        <div className="nw-sugs" role="group" aria-label={t("dashboards.newWidget.suggestions")}>
+          {sugs.map((s, i) => (
+            <button
+              key={s.title}
+              type="button"
+              className="nw-sug"
+              aria-pressed={picked === i}
+              style={tones(agent)}
+              onClick={() => pickSuggestion(i)}
+            >
+              <span className="nw-sug__glyph">
+                <WidgetGlyph kind={s.kind} size={18} />
+              </span>
+              {s.title}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="nwc-row">
+        {formatSelect(true)}
+        {editing && built && <span className="nw-hint">{t("dashboards.newWidget.enterTests")}</span>}
       </div>
-      <div className="db-f db-alert">
-        <div className="db-alert__row">
-          <Switch
-            id={`${id}-alert`}
-            checked={alertOn}
-            onCheckedChange={setAlertOn}
-            aria-describedby={`${id}-alert-hint`}
-          />
-          <span>
-            <label htmlFor={`${id}-alert`}>
-              <b>{t("widgets.alert.label")}</b>
-            </label>
-            <small id={`${id}-alert-hint`}>{t("widgets.alert.hint")}</small>
+      {editing && built?.spec && (
+        <div className="nwc-was" data-stale={stale || undefined}>
+          <WidgetBody spec={built.spec} status="ok" color={color} size={layout} locale={i18n.language} sparkApart />
+        </div>
+      )}
+    </>
+  );
+
+  /** What the card shows once asked: being built, why it failed, or the data. */
+  const content: ReactNode =
+    mode === "pin" ? (
+      shownSpec && (
+        <WidgetBody spec={shownSpec} status="ok" color={color} size={layout} locale={i18n.language} sparkApart />
+      )
+    ) : phase === "testing" ? (
+      <div className="wk-build nw-build">
+        <BuildingDither color={color} />
+        <p>{t("dashboards.newWidget.testing", { name })}</p>
+      </div>
+    ) : phase === "failed" ? (
+      <div className="nw-fail" role="status">
+        <Icon name="alert" size={18} />
+        <div>
+          <b>{t("dashboards.newWidget.failedTitle", { name })}</b>
+          <p>{failureText(t, draft?.failure ?? null, name)}</p>
+          <span className="nw-fail__acts">
+            <Button size="sm" icon="refresh" disabled={!canTest} onClick={runTest}>
+              {t("dashboards.newWidget.tryAgain")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+              {t("dashboards.newWidget.editAsk")}
+            </Button>
           </span>
         </div>
-        {alertOn && (
-          <label className="db-cond" htmlFor={`${id}-cond`}>
-            <span>{t("widgets.alert.condition")}</span>
-            <Input
-              id={`${id}-cond`}
-              value={condition}
-              maxLength={200}
-              placeholder={t("widgets.alert.placeholder")}
-              onChange={(e) => setCondition(e.target.value)}
-            />
-          </label>
-        )}
       </div>
-    </>
-  );
+    ) : built?.spec ? (
+      <WidgetBody spec={built.spec} status="ok" color={color} size={layout} locale={i18n.language} sparkApart />
+    ) : null;
 
-  const pinForm = (
-    <>
-      <div className="db-f">
-        <span className="db-lbl" id={`${id}-blocks`}>
-          {t("dashboards.newWidget.fromChat")}
-        </span>
-        {pinnable.isSuccess && blocks.length === 0 ? (
-          <p className="db-hint">{t("dashboards.newWidget.noBlocks")}</p>
-        ) : (
-          <div className="db-picks" role="radiogroup" aria-labelledby={`${id}-blocks`}>
-            {blocks.map((b, i) => (
-              // biome-ignore lint/a11y/useSemanticElements: a block's row (its glyph, title and place) in a radio group
-              <button
-                key={`${b.messageId}:${b.block}`}
-                type="button"
-                role="radio"
-                className="db-pick"
-                aria-checked={block === i}
-                style={tones(dir.anyAgent(b.agentId))}
-                onClick={() => setBlock(i)}
-              >
-                <span className="db-pick__glyph">
-                  <WidgetGlyph kind={b.spec.kind} size={28} />
-                </span>
-                <span className="db-pick__text">
-                  <b>{b.title}</b>
-                  <small>{placeOf(t, i18n.language, b, dir.anyAgent(b.agentId)?.name ?? "")}</small>
-                </span>
-                <span className="db-radio" aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        )}
-        <small className="db-hint">
+  const folded =
+    mode === "pin" ? (
+      chosen && (
+        <button
+          type="button"
+          className="nwc-asked"
+          aria-label={t("dashboards.newWidget.repick")}
+          title={t("dashboards.newWidget.repick")}
+          onClick={() => setBlock(null)}
+        >
           <Icon name="pin" size={14} />
-          {t("dashboards.newWidget.pinHint")}
-        </small>
-      </div>
-      <div className="db-f">
-        <span className="db-lbl">{t("dashboards.newWidget.keepUpdated")}</span>
-        <Segmented
-          label={t("dashboards.newWidget.keepUpdated")}
-          value={schedule}
-          onValueChange={setSchedule}
-          options={PIN_SCHEDULES.map((s) => ({
-            value: s,
-            label: s === "manual" ? t("dashboards.newWidget.onlyPin") : t(`widgets.schedulesShort.${s}`),
-          }))}
-        />
-      </div>
-    </>
-  );
-
-  // What happens once it's made, in order: who builds it and from what, its routine, its alert, its cost (and what
-  // the test cost, once there was one).
-  const costLine = widgetCostLine(schedule, cost.data);
-  const costText =
-    costLine.kind === "day" || costLine.kind === "week"
-      ? t(`widgets.cost.${costLine.kind}`, { amount: formatUsd(i18n.language, costLine.usd), name })
-      : t(`widgets.cost.${costLine.kind}`, { name });
-  const lastCost = phase === "ok" || phase === "failed" ? (draft?.lastCostUsd ?? null) : null;
-  const testCost =
-    lastCost === null ? undefined : t("dashboards.newWidget.testCost", { cost: formatUsd(i18n.language, lastCost) });
-  const steps: { icon: IconName; title: string; hint?: string }[] =
-    tab === "ask"
-      ? [
-          {
-            icon: "bolt",
-            title: t("dashboards.newWidget.steps.builds", { name }),
-            hint: sources.length
-              ? t("dashboards.newWidget.steps.reads", { sources: joinNames(sources, t) })
-              : undefined,
-          },
-          schedule === "manual"
-            ? { icon: "routines", title: t("dashboards.newWidget.steps.noRoutine") }
-            : {
-                icon: "routines",
-                title: t("dashboards.newWidget.steps.routine", { title: preview?.title ?? unnamed }),
-                hint: t("dashboards.newWidget.steps.routineHint", { schedule: t(`widgets.schedules.${schedule}`) }),
-              },
-          alertOn
-            ? {
-                icon: "bell",
-                title: t("dashboards.newWidget.steps.alert", {
-                  condition: condition.trim() || t("widgets.alert.placeholder"),
-                }),
-                hint: t("dashboards.newWidget.steps.alertHint"),
-              }
-            : {
-                icon: "bell",
-                title: t("dashboards.newWidget.steps.noAlert"),
-                hint: t("dashboards.newWidget.steps.noAlertHint"),
-              },
-          { icon: "coin", title: costText, hint: testCost },
-        ]
-      : [
-          {
-            icon: "pin",
-            title: t("dashboards.newWidget.steps.pinAsIs"),
-            hint: chosen ? placeOf(t, i18n.language, chosen, name) : undefined,
-          },
-          schedule === "manual"
-            ? {
-                icon: "routines",
-                title: t("dashboards.newWidget.steps.noRedo"),
-                hint: t("dashboards.newWidget.steps.noRedoHint"),
-              }
-            : {
-                icon: "routines",
-                title: t("dashboards.newWidget.steps.redoes", {
-                  name: name || t("dashboards.newWidget.theAgent"),
-                  schedule: scheduleInline,
-                }),
-                hint: t("dashboards.newWidget.steps.redoesHint"),
-              },
-        ];
-
-  // Over the preview: example data, real data and when it came, or that the ask changed since the test.
-  const note =
-    tab !== "ask"
-      ? ""
-      : tested
-        ? t("dashboards.newWidget.tested", { when: testedWhen })
-        : phase === "stale"
-          ? t("dashboards.newWidget.stale")
-          : preview && phase === "none"
-            ? t("widgets.preview.example")
-            : "";
-
-  const stage: ReactNode =
-    tab === "ask" && (phase === "testing" || phase === "failed") ? (
-      // The draft being built with real data, or why it didn't work, with Try again.
-      <WidgetCard
-        key={`test:${phase}:${size}`}
-        className="db-pv__card"
-        data-size={size}
-        title={unnamed}
-        spec={null}
-        status={phase === "testing" ? "building" : "failed"}
-        color={colorOf(agent)}
-        size={sizeToLayout(size)}
-        locale={i18n.language}
-        buildingText={phase === "testing" ? t("dashboards.newWidget.testing", { name }) : undefined}
-        footer={
-          phase === "failed" ? (
-            <span className="wg__warn" role="status">
-              <Icon name="alert" size={14} />
-              <span>
-                {t("dashboards.newWidget.testFailed", { reason: failureText(t, draft?.failure ?? null, name) })}{" "}
-                <button type="button" className="wg__resolve" disabled={!canTest} onClick={runTest}>
-                  {t("dashboards.newWidget.tryAgain")}
-                </button>
-              </span>
-            </span>
-          ) : null
-        }
-      />
-    ) : preview ? (
-      <WidgetCard
-        key={`${tested ? "real" : "example"}:${preview.spec.kind}:${size}`}
-        className="db-pv__card"
-        data-size={size}
-        title={preview.title}
-        spec={preview.spec}
-        status="ok"
-        color={colorOf(previewAgent)}
-        size={sizeToLayout(size)}
-        locale={i18n.language}
-        footer={
-          <>
-            {previewAgent && <AgentAvatar agentId={previewAgent.id} name={previewAgent.name} size="xs" />}
-            <span className="db-pv__when">
-              {t("widgets.foot", { name, when: tested ? testedWhen : t("common.now"), schedule: scheduleInline })}
-            </span>
-          </>
-        }
-      />
+          <span>{placeOf(t, i18n.language, chosen, name)}</span>
+          <Icon name="edit" size={14} />
+        </button>
+      )
     ) : (
-      <WidgetCard
-        className="db-pv__card db-pv__card--empty"
-        data-size={size}
-        title=""
-        spec={null}
-        status="building"
-        color={colorOf(previewAgent ?? agent)}
-        size={sizeToLayout(size)}
-        locale={i18n.language}
-        buildingText={
-          tab === "pin"
-            ? t("dashboards.newWidget.pickBlock")
-            : t("dashboards.newWidget.emptyPreview", { name: agent?.name ?? "" })
-        }
-        footer={null}
-      />
+      <button
+        type="button"
+        className="nwc-asked"
+        aria-label={t("dashboards.newWidget.editAskOf", { ask: asked })}
+        title={t("dashboards.newWidget.editAsk")}
+        onClick={() => setEditing(true)}
+      >
+        <span>{t("dashboards.newWidget.quoted", { ask: asked })}</span>
+        <Icon name="edit" size={14} />
+      </button>
     );
 
-  const previewPane: ReactNode = (
-    <aside className="db-pv" aria-label={t("widgets.preview.label")}>
-      <div className="db-pv__label">
-        <span>{t("widgets.preview.label")}</span>
-        <span className="db-pv__note" data-tone={phase === "stale" ? "warn" : undefined}>
-          {note}
+  const body: ReactNode =
+    mode === "pin" && !chosen ? (
+      blockPicks
+    ) : asking ? (
+      askBox
+    ) : (
+      <>
+        <div className="nwc-row">
+          {folded}
+          {mode === "ask" && formatSelect(false)}
+        </div>
+        <div className="nwc-content">{content}</div>
+      </>
+    );
+
+  const foot: ReactNode =
+    phase === "testing" ? (
+      <>
+        <PixelSpinner size={14} color={color} />
+        <span className="wg__when">{t("dashboards.newWidget.buildingFoot", { name })}</span>
+      </>
+    ) : (
+      <>
+        {mode === "ask" ? (
+          <button
+            type="button"
+            className="nwc-who"
+            aria-haspopup="dialog"
+            aria-label={t("dashboards.newWidget.whoButton", { name })}
+            disabled={agents.length === 0}
+            onClick={() => setChoosing(true)}
+          >
+            {agent && <AgentAvatar agentId={agent.id} name={agent.name} size="xs" />}
+            <b>{agent?.name ?? t("dashboards.newWidget.noAgents")}</b>
+            <Icon name="chevronDown" size={12} />
+          </button>
+        ) : (
+          owner && (
+            <span className="nwc-who nwc-who--still">
+              <AgentAvatar agentId={owner.id} name={owner.name} size="xs" />
+              <b>{owner.name}</b>
+            </span>
+          )
+        )}
+        <span className="wg__dot" aria-hidden="true">
+          ·
         </span>
+        {scheduleSelect}
+        {tested && <span className="nwc-when">{testedWhen}</span>}
+      </>
+    );
+
+  // Pinning: no face until a block (and so its agent) is chosen.
+  const face = mode === "pin" ? owner : agent;
+  const card = (
+    <article
+      className="ac-card wg nwc"
+      data-size={size}
+      data-w={layout.w}
+      data-h={layout.h}
+      data-state={phase === "testing" ? "building" : "ok"}
+      data-stale={(stale && !editing) || undefined}
+      aria-label={title.trim() || t("dashboards.newWidget.title")}
+      aria-busy={phase === "testing" || undefined}
+      style={widgetTileVars(color, dark)}
+    >
+      <span className="wg__sweep" aria-hidden="true" />
+      <div className="wg__head">
+        {face && (
+          <span className="wg__face">
+            <AgentAvatar agentId={face.id} name={face.name} size="xs" />
+          </span>
+        )}
+        <input
+          className="nwc__title"
+          value={title}
+          maxLength={TITLE_MAX}
+          spellCheck={false}
+          autoComplete="off"
+          aria-label={t("dashboards.newWidget.titleField")}
+          placeholder={
+            mode === "pin" ? t("dashboards.newWidget.titleField") : t("dashboards.newWidget.titlePlaceholder", { name })
+          }
+          onChange={(e) => setTitleEdit(e.target.value)}
+        />
+        {tested && (
+          <span
+            className="nwc__badge"
+            role="img"
+            aria-label={t("dashboards.newWidget.tested", { when: testedWhen })}
+            title={t("dashboards.newWidget.tested", { when: testedWhen })}
+          >
+            <Icon name="check" size={14} />
+          </span>
+        )}
+        {mode === "ask" && bell}
         <Segmented
           size="sm"
           label={t("widgets.sizes.label")}
@@ -704,35 +729,85 @@ function NewWidgetBody({
           options={WIDGET_SIZES.map((s) => ({ value: s, label: t(`widgets.sizes.${s}`) }))}
         />
       </div>
-      <div className="db-pv__stage" data-size={size}>
-        {stage}
-      </div>
-      {tab === "ask" && asked && (phase === "none" || phase === "stale") && (
-        <p className="db-hint db-pv__first">
-          <Icon name="info" size={14} />
-          {t("dashboards.newWidget.testFirst")}
-        </p>
+      {stale && !editing && (
+        <div className="nwc__stale" role="status">
+          <Icon name="info" size={16} />
+          <span>
+            <b>{t("dashboards.newWidget.stale")}.</b> {t("dashboards.newWidget.staleHint")}
+          </span>
+          <Button size="sm" icon="refresh" disabled={!canTest} onClick={runTest}>
+            {t("dashboards.newWidget.testAgain")}
+          </Button>
+        </div>
       )}
-      <ul className="db-steps">
-        {steps.map((s) => (
-          <li key={`${s.icon}:${s.title}`}>
-            <Icon name={s.icon} size={16} />
-            <span>
-              <b>{s.title}</b>
-              {s.hint && <small>{s.hint}</small>}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </aside>
+      <div className="wg__body">{body}</div>
+      <div className="wg__foot">{foot}</div>
+      {!asking && <WidgetBleed spec={shownSpec ?? built?.spec ?? null} color={color} size={layout} />}
+    </article>
   );
 
-  const grid = (form: ReactNode) => (
-    <div className="db-nw__grid">
-      <div className="db-nw__form">{form}</div>
-      {previewPane}
-    </div>
-  );
+  // Under the card: what it reads and how it keeps up (once there is a result), or the other way to make one.
+  const readsFrom = tested?.sources.length ? tested.sources : sources;
+  const below: ReactNode =
+    mode === "ask" && tested ? (
+      <p className="nw-footnote">
+        <Icon name="plug" size={14} />
+        <span>
+          {[
+            readsFrom.length ? t("dashboards.newWidget.steps.reads", { sources: joinNames(readsFrom, t) }) : null,
+            schedule === "manual" ? t("dashboards.newWidget.steps.noRoutine") : t("dashboards.newWidget.inRoutines"),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </p>
+    ) : mode === "pin" && chosen ? (
+      <p className="nw-footnote">
+        <Icon name="pin" size={14} />
+        <span>
+          {schedule === "manual"
+            ? t("dashboards.newWidget.pinAsIs")
+            : t("dashboards.newWidget.pinRedoes", { name, schedule: scheduleWords(schedule, true) })}
+        </span>
+      </p>
+    ) : mode === "pin" ? (
+      <button type="button" className="nw-quiet" onClick={() => switchMode("ask")}>
+        <Icon name="chevronLeft" size={14} />
+        {t("dashboards.newWidget.tabAsk")}
+      </button>
+    ) : phase === "none" && !editing ? (
+      <button type="button" className="nw-quiet" onClick={() => switchMode("pin")}>
+        <Icon name="pin" size={14} />
+        {t("dashboards.newWidget.orPin")}
+      </button>
+    ) : null;
+
+  const primary =
+    mode === "pin" ? (
+      <Button type="submit" variant="primary" disabled={!chosen || targetId === null || busy} loading={pin.isPending}>
+        {t("dashboards.newWidget.pin")}
+      </Button>
+    ) : phase === "testing" ? (
+      <Button variant="primary" disabled loading>
+        {t("dashboards.newWidget.testingShort")}
+      </Button>
+    ) : stale ? (
+      <Button variant="primary" icon="refresh" disabled={!canTest} onClick={runTest}>
+        {t("dashboards.newWidget.testAgain")}
+      </Button>
+    ) : tested ? (
+      <Button type="submit" variant="primary" disabled={busy || targetId === null} loading={confirm.isPending}>
+        {t("dashboards.newWidget.create")}
+      </Button>
+    ) : phase === "failed" ? (
+      <Button variant="primary" disabled>
+        {t("dashboards.newWidget.create")}
+      </Button>
+    ) : (
+      <Button type="submit" variant="primary" disabled={!canTest}>
+        {t("dashboards.newWidget.test")}
+      </Button>
+    );
 
   return (
     <form
@@ -742,22 +817,14 @@ function NewWidgetBody({
         submit();
       }}
     >
-      <div className="db-nw__tabs">
-        <Tabs
-          value={tab}
-          onValueChange={pickTab}
-          label={t("dashboards.newWidget.title")}
-          items={[
-            { value: "ask", label: t("dashboards.newWidget.tabAsk") },
-            { value: "pin", label: t("dashboards.newWidget.tabPin") },
-          ]}
-        >
-          <TabPanel value="ask">{grid(askForm)}</TabPanel>
-          <TabPanel value="pin">{grid(pinForm)}</TabPanel>
-        </Tabs>
+      <div className="ac-dialog__body nw-body">
+        <div className="nw-stage">
+          {card}
+          {below}
+        </div>
       </div>
-      <DialogFooter className="db-nw__foot">
-        <span className="db-dest">
+      <DialogFooter className="nw-foot">
+        <span className="nw-dest">
           <Icon name="grid" size={16} />
           <label htmlFor={`${id}-dest`}>{t("dashboards.newWidget.destination")}</label>
           <Select id={`${id}-dest`} size="sm" value={dest} onValueChange={setDest} options={destOptions} />
@@ -765,30 +832,17 @@ function NewWidgetBody({
         <Button variant="ghost" onClick={onClose}>
           {t("common.cancel")}
         </Button>
-        {tab === "pin" ? (
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!chosen || targetId === null || busy}
-            loading={pin.isPending}
-          >
-            {t("dashboards.newWidget.pin")}
-          </Button>
-        ) : tested ? (
-          <>
-            <Button icon="refresh" disabled={!canTest || busy} onClick={runTest}>
-              {t("dashboards.newWidget.testAgain")}
-            </Button>
-            <Button type="submit" variant="primary" disabled={busy || targetId === null} loading={confirm.isPending}>
-              {t("dashboards.newWidget.create")}
-            </Button>
-          </>
-        ) : (
-          <Button type="submit" variant="primary" icon="bolt" disabled={!canTest} loading={phase === "testing"}>
-            {t("dashboards.newWidget.test")}
-          </Button>
-        )}
+        {primary}
       </DialogFooter>
+      <AgentPickerDialog
+        open={choosing}
+        onClose={() => setChoosing(false)}
+        agents={agents}
+        value={agent?.id}
+        onPick={pickAgent}
+        title={t("dashboards.newWidget.who")}
+        description={t("dashboards.newWidget.whoHint")}
+      />
     </form>
   );
 }

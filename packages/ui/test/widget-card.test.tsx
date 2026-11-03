@@ -68,6 +68,56 @@ describe("a widget's body, by kind", () => {
     expect(down.container.querySelector(".wk-num__suf")?.textContent).toBe("abertos");
   });
 
+  test("a number's trend runs edge to edge at the card's bottom, under the footer", () => {
+    const { container } = card({ kind: "kpi", value: 7, spark: [1, 3, 2, 5] });
+    const article = container.querySelector("article") as HTMLElement;
+    expect(article.getAttribute("data-kind")).toBe("kpi");
+    // Not in the padded body: after the footer, in its own clipped strip.
+    expect(article.querySelector(".wg__body .wk-spark")).toBeNull();
+    const bleed = article.querySelector(".wg__bleed");
+    expect(bleed?.querySelector(".wk-spark")).toBeTruthy();
+    expect(bleed?.previousElementSibling?.classList.contains("wg__foot")).toBe(true);
+    // Alone (the chat's own renderers), the body still draws it.
+    cleanup();
+    const alone = render(
+      <WidgetBody
+        spec={{ kind: "kpi", value: 7, spark: [1, 3, 2, 5] }}
+        status="ok"
+        color="sky"
+        size={{ w: 1, h: 1 }}
+        locale="en"
+      />,
+    );
+    expect(alone.container.querySelector(".wk-spark")).toBeTruthy();
+    // A number without a trend has no strip.
+    cleanup();
+    expect(card({ kind: "kpi", value: 7 }).container.querySelector(".wg__bleed")).toBeNull();
+  });
+
+  test("bars read only their numbers; the unit is one tag above them and the note a caption under them", () => {
+    const { container } = card({
+      kind: "bars",
+      labels: ["Theo", "Atlas", "Ada"],
+      values: [48, 1240, 0],
+      unit: "rodadas por dia",
+      note: "Ada não tem rotina, mas carrega 35 issues abertas.",
+    });
+    expect(container.querySelector(".wk-cap")?.textContent).toBe("rodadas por dia");
+    expect([...container.querySelectorAll(".wk-bar__v")].map((v) => v.textContent)).toEqual(["48", "1.240", "0"]);
+    // The unit still reads in each bar's tip.
+    expect(container.querySelector(".wk-bar")?.getAttribute("title")).toBe("Theo: 48 rodadas por dia");
+    const note = container.querySelector(".wk-note");
+    expect(note?.textContent).toBe("Ada não tem rotina, mas carrega 35 issues abertas.");
+    expect(note?.classList.contains("wk-clamp")).toBe(true);
+  });
+
+  test("the agent's face leads the title when given", () => {
+    const { container } = card({ kind: "kpi", value: 1 }, { face: <span className="face">T</span> });
+    const head = container.querySelector(".wg__head");
+    expect(head?.firstElementChild?.classList.contains("wg__face")).toBe(true);
+    expect(head?.querySelector(".wg__face .face")).toBeTruthy();
+  });
+
   test("a goal: its share, the track filled that far, its line and its note", () => {
     const { container } = card({ kind: "goal", pct: 62, line: "R$ 248 mil de R$ 400 mil", note: "Bate no dia 27." });
     expect(container.querySelector(".wk-num")?.textContent).toBe("62%");
@@ -103,7 +153,7 @@ describe("a widget's body, by kind", () => {
     });
     expect(container.querySelector(".wk-line")).toBeTruthy();
     expect(container.querySelectorAll(".wk-axis span")).toHaveLength(7);
-    expect(container.querySelector(".wk-sub")?.textContent).toBe("3,9 min no último · −36%");
+    expect(container.querySelector(".wk-note")?.textContent).toBe("3,9 min no último · −36%");
   });
 
   test("a list: each row with its word, in its tone; a summary: its sentences", () => {

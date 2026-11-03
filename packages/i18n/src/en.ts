@@ -12495,7 +12495,7 @@ export const en = {
       dropped: "You dropped “{{title}}” at position {{position}} of {{total}}.",
       canceled: "“{{title}}” went back to its place.",
     },
-    add: { label: "Add widget" },
+    add: { label: "Add widget", short: "Widget" },
     alert: {
       label: "Tell me when something is off",
       hint: "The alert goes to Waiting on you, with what changed.",
@@ -12588,6 +12588,14 @@ export const en = {
       confirm: "Remove",
     },
     // end of widgets
+  },
+  // Choosing an agent in a dialog: each one's face, name, role and connectors.
+  agentPicker: {
+    search: "Search agents",
+    list: "Agents",
+    empty: "No agent matches “{{q}}”",
+    noConnectors: "No connectors",
+    more: "+{{count}}",
   },
   // Dashboards (ADR 0134): the boards' page, a board, its dialogs. The web and the phone add their own keys here.
   dashboards: {
@@ -12744,6 +12752,35 @@ export const en = {
       testCost: "This test cost {{cost}}",
       testFirst: "Test it first to see the real result",
       titleField: "Title",
+      titlePlaceholder: "Title · {{name}} suggests one on the test",
+      cardSubtitle:
+        "Write on the card what you want to see. Its parts change who looks after it, when it updates, the alert and its size.",
+      pinTitle: "Pin a block from the chat",
+      pinSubtitle: "The card comes from the chat; you choose its title and whether it is redone.",
+      pickFromChat: "Choose a block an agent already sent:",
+      orPin: "Or pin a block that already came in the chat",
+      repick: "Choose another block",
+      formatAuto: "Automatic format",
+      enterTests: "Enter tests again",
+      quoted: "“{{ask}}”",
+      editAsk: "Change the ask",
+      editAskOf: "Change the ask: {{ask}}",
+      testingShort: "Testing…",
+      buildingFoot: "{{name}} building…",
+      failedTitle: "{{name}} couldn't build it",
+      staleHint: "Test again to see how it looks.",
+      whoButton: "Who looks after it: {{name}}",
+      whoHint: "Whoever looks after it builds the widget from what it reads through its connectors.",
+      alert: "Alert",
+      alertOn: "Alerts",
+      alertDone: "Done",
+      manual: "Only when I ask",
+      manualInline: "only when I ask",
+      noUpdate: "Don't update",
+      noUpdateInline: "doesn't update",
+      inRoutines: "the routine shows in Routines",
+      pinAsIs: "Stays as it is, no routine",
+      pinRedoes: "{{name}} redoes it {{schedule}} with a routine",
       /** Under each format in the "Format" dropdown. */
       formatHints: {
         auto: "{{name}} picks the one that shows it best",

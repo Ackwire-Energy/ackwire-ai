@@ -13,19 +13,13 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { exampleWordsOf, HOME } from "./logic";
+import { HOME } from "./logic";
 
 /** An agent's name and color by id (one that left the team keeps its look on what it made). */
 export function useAgentLook(agentId: string | null | undefined): { name: string; color: AgentColorName } {
   const dir = useDirectory();
   const agent = agentId ? dir.anyAgent(agentId) : undefined;
   return { name: agent?.name ?? "", color: agentLook(agent).color };
-}
-
-/** The words of a preview's example data, in the reader's language. */
-export function useExampleWords() {
-  const { t } = useTranslation();
-  return useMemo(() => exampleWordsOf((key) => t(key)), [t]);
 }
 
 /** A board by id, or My Home (`home`): made the first time it is opened. */

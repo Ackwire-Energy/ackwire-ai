@@ -136,7 +136,14 @@ export function DitherLine({
         <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} aria-hidden="true">
           <path d={smoothPath(points)} fill="none" stroke={ink} strokeWidth={2} strokeLinecap="round" />
           {dot && last && (
-            <rect x={Math.round(last[0]) - 3} y={Math.round(last[1]) - 3} width={6} height={6} fill={ink} />
+            // Kept whole inside the box: edge to edge, the last point sits on the right edge.
+            <rect
+              x={Math.max(0, Math.min(width - 6, Math.round(last[0]) - 3))}
+              y={Math.max(0, Math.min(height - 6, Math.round(last[1]) - 3))}
+              width={6}
+              height={6}
+              fill={ink}
+            />
           )}
         </svg>
       )}

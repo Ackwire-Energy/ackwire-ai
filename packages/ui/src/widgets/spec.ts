@@ -69,7 +69,10 @@ export interface BarsWidgetSpec {
   values: number[];
   /** The bar to call out (the one the alert is about), by index. */
   alertIndex?: number;
-  /** As in a chat chart: "%", "R$", "ms"… */
+  /**
+   * What every value counts, once for the whole chart ("%", "R$", "runs per day"): shown as a tag above the bars,
+   * never repeated in each bar's label, which reads only the number.
+   */
   unit?: string;
   note?: string;
 }
@@ -79,6 +82,7 @@ export interface LineWidgetSpec {
   kind: "line";
   labels: string[];
   values: number[];
+  /** What the values count, once for the whole chart ("ms", "orders"): a tag above the line. */
   unit?: string;
   /** "1,320 yesterday · +33% this week". */
   note?: string;
@@ -123,7 +127,8 @@ export const WIDGET_LIMITS = {
   line: 120,
   delta: 40,
   affix: 12,
-  unit: 8,
+  /** A bars or line widget's unit: a short tag above the chart ("runs per day"), not a suffix on every value. */
+  unit: 32,
 } as const;
 
 /** Scheduled widgets a workspace may keep at once (`manual` ones don't count). */

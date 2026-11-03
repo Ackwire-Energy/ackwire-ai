@@ -126,13 +126,19 @@ describe("My Home as a mural (ADR 0134)", () => {
     expect(card.querySelector(".wk-num")?.textContent).toBe("R$18.420");
     expect(card.querySelector(".wg__foot")?.textContent).toContain("Ada");
     expect(card.querySelector(".wg__foot")?.textContent).toContain("a cada hora");
+    // Her face leads the title; the footer only says who and when.
+    expect(card.querySelector(".wg__head > .wg__face .ac-avatar")).toBeTruthy();
+    expect(card.querySelector(".wg__foot .ac-avatar")).toBeNull();
     expect(card.getAttribute("data-w")).toBe("1");
     // The bars, and the failed one with its reason and Resolve.
     expect(widget("Pedidos por status").querySelectorAll(".wk-bar")).toHaveLength(3);
     const failed = widget("Tempo de build");
     expect(failed.getAttribute("data-state")).toBe("failed");
     expect(failed.textContent).toContain("A última atualização terminou sem dados.");
-    // A widget is added from the header's "+": the board itself has no add tile.
+    // A widget is added from the header's pill (Organize and + Widget, one control): the board has no add tile.
+    const pill = within(mural()).getByRole("group", { name: "Meu Início" });
+    expect(within(pill).getByRole("button", { name: "Organizar" }).getAttribute("aria-pressed")).toBe("false");
+    expect(within(pill).getByRole("button", { name: "Adicionar widget" }).textContent).toBe("Widget");
     expect(within(mural()).getAllByRole("button", { name: "Adicionar widget" })).toHaveLength(1);
     expect(mural().querySelector(".wgrid")?.querySelector("button[aria-label='Adicionar widget']")).toBeNull();
   });

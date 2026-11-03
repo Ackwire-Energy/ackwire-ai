@@ -2,12 +2,19 @@ import { describe, expect, test } from "bun:test";
 import type { DashboardList, DashboardSummary } from "@agenteschat/client";
 import { type OpenTarget, targetPath } from "@agenteschat/client/lib/notifications";
 import { chartAreaTones, chartInk } from "@agenteschat/ui/sky/chart";
+import { agentPickNow, chooseAgent, closeAgentPick, openAgentPick } from "../../src/features/dashboards/agent-pick";
 import {
+  AGENT_SEARCH_FROM,
   accessPerson,
+  agentsMatching,
+  asksInCard,
   audienceChanged,
   audienceDraftOf,
   audienceReady,
+  barValueText,
   barWords,
+  bleedPoints,
+  bleedSeries,
   boardMenuKeys,
   confirmTitle,
   dashboardWaitingCard,
@@ -22,8 +29,10 @@ import {
   isDashboardNotice,
   isTall,
   layoutChanged,
+  mixHex,
   moveWidgetItem,
   newWidgetAction,
+  newWidgetBarLabel,
   phoneRows,
   pickMenuLabel,
   pinDraftNow,
@@ -35,6 +44,7 @@ import {
   shareInputOf,
   shownWidgetTitle,
   sizeFor,
+  softCardColor,
   testKeyOf,
   testPhase,
   thumbRects,
@@ -515,5 +525,104 @@ describe("dashboards in links, notifications and routines", () => {
     expect(routineTitle({ name: "Refresh Sales today", prompt: "", widget })).toBe("Sales today");
     expect(routineTitle({ name: "Daily report", prompt: "", widget: null })).toBe("Daily report");
     expect(targetIcon({ type: "widget", widgetId: "w1", dashboardId: "d1" })).toBe("chart");
+  });
+});
+
+describe("the widget card", () => {
+  test("a soft surface: the raised white on the light board, 78% of the raised tone over the dark one", () => {
+    expect(softCardColor("#ffffff", "#f2f2f7", false)).toBe("#ffffff");
+    expect(softCardColor("#1c1c1b", "#0f0f0e", true)).toBe(mixHex("#1c1c1b", "#0f0f0e", 0.78));
+    expect(mixHex("#ffffff", "#000000", 0.5)).toBe("#808080");
+    expect(mixHex("#1c1c1b", "#0f0f0e", 1)).toBe("#1c1c1b");
+    // Not a hex color: the first one back.
+    expect(mixHex("red", "#000000", 0.5)).toBe("red");
+  });
+
+  test("a number's trend and a bare line run along the card's bottom; a line with labels or a note doesn't", () => {
+    expect(bleedSeries({ kind: "kpi", value: 3, spark: [1, 2, 3] }, false)).toEqual([1, 2, 3]);
+    expect(bleedSeries({ kind: "kpi", value: 3, spark: [1, 2, 3] }, true)).toEqual([1, 2, 3]);
+    expect(bleedSeries({ kind: "kpi", value: 3, spark: [1] }, false)).toBeNull();
+    expect(bleedSeries({ kind: "kpi", value: 3 }, false)).toBeNull();
+    const line = { kind: "line" as const, labels: ["a", "b"], values: [1, 2] };
+    expect(bleedSeries(line, false)).toEqual([1, 2]);
+    expect(bleedSeries(line, true)).toBeNull();
+    expect(bleedSeries({ ...line, note: "up" }, false)).toBeNull();
+    expect(bleedSeries({ kind: "bars", labels: ["a"], values: [1] }, false)).toBeNull();
+    expect(bleedSeries(null, false)).toBeNull();
+  });
+
+  test("the edge-to-edge line starts at the left edge, leaves room for its square and for the fade", () => {
+    const points = bleedPoints([0, 5, 10], 206, 50);
+    expect(points[0]?.[0]).toBe(0);
+    expect(points[2]?.[0]).toBe(200);
+    // The highest value at the top padding, the lowest at 62% of the height.
+    expect(points[2]?.[1]).toBe(6);
+    expect(points[0]?.[1]).toBe(31);
+    expect(points.every(([, y]) => y >= 6 && y <= 31)).toBe(true);
+    // A flat series sits low, all on one line.
+    const flat = bleedPoints([4, 4], 100, 50);
+    expect(flat[0]?.[1]).toBe(flat[1]?.[1]);
+    expect(bleedPoints([], 100, 50)).toEqual([]);
+    expect(bleedPoints([1, 2], 0, 50)).toEqual([]);
+  });
+
+  test("a bar's value is only the number, whole when it fits, else short; never cut", () => {
+    expect(barValueText(48, "en", 40)).toBe("48");
+    expect(barValueText(18420, "en", 60)).toBe("18,420");
+    expect(barValueText(18420, "en", 30)).toBe("18.4K");
+    expect(barValueText(1250000, "en", 20)).toBe("1.3M");
+    expect(barValueText(48, "en", 30)).not.toContain("…");
+  });
+});
+
+describe("New widget: the card is the form", () => {
+  test("the ask is a field before the first test and while it's edited; else a folded line", () => {
+    expect(asksInCard("untested", false)).toBe(true);
+    expect(asksInCard("ok", false)).toBe(false);
+    expect(asksInCard("stale", false)).toBe(false);
+    expect(asksInCard("failed", false)).toBe(false);
+    expect(asksInCard("testing", false)).toBe(false);
+    expect(asksInCard("ok", true)).toBe(true);
+  });
+
+  test("the bar says Create after a good test, Test again after a stale or failed one, else Test", () => {
+    expect(newWidgetBarLabel("ok")).toBe("create");
+    expect(newWidgetBarLabel("stale")).toBe("testAgain");
+    expect(newWidgetBarLabel("failed")).toBe("testAgain");
+    expect(newWidgetBarLabel("untested")).toBe("test");
+    expect(newWidgetBarLabel("testing")).toBe("test");
+  });
+});
+
+describe("Who looks after it", () => {
+  const agents = [
+    { id: "a1", name: "Theo", role: "Sales analyst" },
+    { id: "a2", name: "Nina", role: "Atendimento" },
+    { id: "a3", name: "Lia", role: null },
+  ];
+
+  test("a search keeps agents by name or role, accents and case aside, in their order", () => {
+    expect(agentsMatching(agents, "").map((a) => a.id)).toEqual(["a1", "a2", "a3"]);
+    expect(agentsMatching(agents, "  ").map((a) => a.id)).toEqual(["a1", "a2", "a3"]);
+    expect(agentsMatching(agents, "THEO").map((a) => a.id)).toEqual(["a1"]);
+    expect(agentsMatching(agents, "sales").map((a) => a.id)).toEqual(["a1"]);
+    expect(agentsMatching(agents, "atendímento").map((a) => a.id)).toEqual(["a2"]);
+    expect(agentsMatching(agents, "zzz")).toEqual([]);
+  });
+
+  test("the search shows only past a handful of agents", () => {
+    expect(AGENT_SEARCH_FROM).toBeGreaterThan(6);
+  });
+
+  test("the picked agent goes back to the card at once, and nothing goes back once it closed", () => {
+    const applied: string[] = [];
+    openAgentPick({ agentId: "a1", apply: (id) => applied.push(id) });
+    chooseAgent("a2");
+    expect(applied).toEqual(["a2"]);
+    expect(agentPickNow()?.agentId).toBe("a2");
+    closeAgentPick();
+    chooseAgent("a3");
+    expect(applied).toEqual(["a2"]);
+    expect(agentPickNow()).toBeNull();
   });
 });

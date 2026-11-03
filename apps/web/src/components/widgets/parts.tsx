@@ -18,6 +18,11 @@ export function useWidgetAgent(agentId: string) {
   return { agent, name: agent?.name ?? t("channel.unknownAgent"), color: colorOf(agent) };
 }
 
+/** The face of the agent who looks after a widget, at the start of its card's title (`WidgetCard`'s `face`). */
+export function WidgetFace({ agentId, name }: { agentId: string; name: string }) {
+  return <AgentAvatar agentId={agentId} name={name} size="xs" />;
+}
+
 /** What a widget is called until its agent names it: its kind ("Number", "Bars"…), or "New widget" (ADR 0134). */
 export function neutralWidgetTitle(t: TFunction, kind: WidgetKind | null): string {
   return kind ? t(`widgets.kinds.${kind}`) : t("widgets.untitled");
@@ -101,9 +106,9 @@ export function WidgetFoot({
         </span>
       </span>
     );
+  // The agent's face leads the card's title (`WidgetCard`'s `face`): the footer only says who and when.
   return (
     <>
-      <AgentAvatar agentId={widget.agentId} name={name} size="xs" />
       <span className="wg__when">
         <b>{name}</b>
         {widget.refreshedAt && (
@@ -115,5 +120,40 @@ export function WidgetFoot({
         <span className="wg__dot">·</span> {schedule}
       </span>
     </>
+  );
+}
+
+/**
+ * A board's head controls as one pill (ADR 0134): "Organize" (pressed while organizing, then "Done") and "+ Widget"
+ * side by side, a hairline between them. Home's mural and a board's page use it.
+ */
+export function BoardActionsPill({
+  label,
+  arranging,
+  onArrange,
+  onAdd,
+}: {
+  /** The group's name ("My Home", the board's title). */
+  label: string;
+  arranging: boolean;
+  /** Absent: no Organize (an empty board has nothing to move). */
+  onArrange?: () => void;
+  onAdd: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: two buttons that read as one control, not a fieldset
+    <span className="wb-pill" role="group" aria-label={label}>
+      {onArrange && (
+        <button type="button" aria-pressed={arranging} onClick={onArrange}>
+          <Icon name={arranging ? "check" : "grid"} size={16} />
+          {arranging ? t("widgets.organize.done") : t("widgets.organize.start")}
+        </button>
+      )}
+      <button type="button" aria-label={t("widgets.add.label")} title={t("widgets.add.label")} onClick={onAdd}>
+        <Icon name="plus" size={16} />
+        {t("widgets.add.short")}
+      </button>
+    </span>
   );
 }

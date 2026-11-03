@@ -25,8 +25,6 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-const tab = (dialog: HTMLElement, name: string) =>
-  act(async () => fireEvent.mouseDown(within(dialog).getByRole("tab", { name }), { button: 0 }));
 
 const open = async (
   path: string,
@@ -40,7 +38,7 @@ const open = async (
   prepare?.(fake);
   const view = await renderApp(path, { api });
   await settle(8);
-  return { state, fake, router: view.router, services: view.services };
+  return { state, fake, api, router: view.router, services: view.services };
 };
 const callOf = (state: { calls: { method: string; args: unknown[] }[] }, method: string) =>
   state.calls.find((c) => c.method === method);
@@ -254,30 +252,56 @@ describe("New widget (ADR 0134 §3)", () => {
     return { ...opened, dialog: screen().getByRole("dialog", { name: "Novo widget" }) };
   };
 
-  const button = (dialog: HTMLElement, name: string) => within(dialog).queryByRole("button", { name });
-  const preview = (dialog: HTMLElement) => within(dialog).getByRole("complementary", { name: "Prévia" });
+  const button = (dialog: HTMLElement, name: string | RegExp) => within(dialog).queryByRole("button", { name });
+  /** The widget being made: the card in the dialog, named by its title. */
+  const card = (dialog: HTMLElement) => dialog.querySelector("article.nwc") as HTMLElement;
+  const ask = (dialog: HTMLElement) => within(dialog).getByLabelText("O que você quer acompanhar?");
+  const combo = (dialog: HTMLElement, name: string) => within(dialog).getByRole("combobox", { name });
+  /** The bell's popover: the alert's switch and its condition. */
+  const openAlert = async (dialog: HTMLElement) => {
+    await click(within(card(dialog)).getByRole("button", { name: "Aviso" }));
+    await settle(2);
+    return screen().getByRole("dialog", { name: "Aviso" });
+  };
+  const closeAlert = async () => {
+    await click(within(screen().getByRole("dialog", { name: "Aviso" })).getByRole("button", { name: "Pronto" }));
+    await settle(2);
+  };
+  /** "Who looks after it": the agent in the card's footer opens a dialog of agents. */
+  const openAgents = async (dialog: HTMLElement, current: string) => {
+    await click(within(card(dialog)).getByRole("button", { name: `Quem cuida: ${current}` }));
+    await settle(4);
+    return screen().getByRole("dialog", { name: "Quem cuida" });
+  };
+  const agentRow = (picker: HTMLElement, name: string) =>
+    within(picker)
+      .getAllByRole("button")
+      .find((b) => b.classList.contains("apk-row") && b.querySelector("b")?.textContent === name) as HTMLElement;
 
-  test("who and the format are dropdowns; a suggestion fills the ask; preview, steps and cost follow", async () => {
+  test("the card is the form: the ask in its body, suggestions, the format and the schedule as dropdowns", async () => {
     const { dialog } = await start();
-    // Nothing asked yet: the preview says what it will show, and there is nothing to test.
-    expect(dialog.textContent).toContain("Diga o que quer acompanhar e Ada mostra aqui como vai ficar.");
+    // Nothing asked yet: nothing to test, and the other way to make one under the card.
     expect((button(dialog, "Testar") as HTMLButtonElement).disabled).toBe(true);
     expect(button(dialog, "Criar widget")).toBeNull();
+    expect(button(dialog, "Ou fixe um bloco que já veio no chat")).toBeTruthy();
+    // The title is written on the card; the agent names it on the test.
+    expect((within(card(dialog)).getByLabelText("Título") as HTMLInputElement).placeholder).toBe(
+      "Título · Ada sugere ao testar",
+    );
 
-    // Who looks after it: Ada's face and name; in the list, her role under her name (what she reads is in the steps).
-    const who = within(dialog).getByRole("combobox", { name: "Quem cuida" });
-    expect(who.textContent).toContain("Ada");
-    who.focus();
-    await act(async () => fireEvent.keyDown(who, { key: "Enter" }));
-    const ada = screen().getByRole("option", { name: /^Ada/ });
-    expect(ada.textContent).toContain("Dev");
-    expect(ada.textContent).not.toContain("lê");
-    expect(ada.querySelector(".ac-avatar")).toBeTruthy();
-    await click(ada);
-    await settle(2);
+    // A suggestion fills the ask (and the alert's condition); the suggestions go once something is asked.
+    await click(within(dialog).getByRole("button", { name: "PRs esperando revisão" }));
+    await settle(3);
+    expect((ask(dialog) as HTMLTextAreaElement).value).toBe("Os PRs que esperam revisão há mais de um dia");
+    expect(within(dialog).queryByRole("group", { name: "Sugestões" })).toBeNull();
+    const alert = await openAlert(dialog);
+    expect(within(alert).getByRole("switch", { name: "Me avisar quando algo fugir do normal" })).toBeTruthy();
+    expect((within(alert).getByLabelText("Avisar se") as HTMLInputElement).value).toBe("algum esperar mais de 2 dias");
+    await closeAlert();
+
     // The format: Automatic first, each with what it shows.
-    const format = within(dialog).getByRole("combobox", { name: "Formato" });
-    expect(format.textContent).toContain("Automático");
+    const format = combo(dialog, "Formato");
+    expect(format.textContent).toContain("Formato automático");
     format.focus();
     await act(async () => fireEvent.keyDown(format, { key: "Enter" }));
     const formats = screen().getAllByRole("option");
@@ -286,36 +310,63 @@ describe("New widget (ADR 0134 §3)", () => {
     await click(formats[0] as HTMLElement);
     await settle(2);
 
-    await click(within(dialog).getByRole("button", { name: "PRs esperando revisão" }));
-    await settle(3);
-    expect((within(dialog).getByLabelText("O que você quer acompanhar?") as HTMLTextAreaElement).value).toBe(
-      "Os PRs que esperam revisão há mais de um dia",
-    );
-    expect((within(dialog).getByLabelText("Avisar se") as HTMLInputElement).value).toBe(
-      "algum esperar mais de 2 dias",
-    );
-    const pane = preview(dialog);
-    expect(within(pane).getByRole("article", { name: "PRs esperando revisão" })).toBeTruthy();
-    expect(pane.textContent).toContain("dados de exemplo");
-    expect(pane.textContent).toContain("Teste antes para ver o resultado de verdade");
-    expect(pane.textContent).toContain("Ada monta agora, com os dados de verdade");
-    expect(pane.textContent).toContain("Lê GitHub e Sentry");
-    expect(pane.textContent).toContain("Cria a rotina “PRs esperando revisão”");
-    expect(pane.textContent).toContain("A cada hora · aparece em Rotinas");
-    expect(pane.textContent).toContain("Avisa em Esperando você se algum esperar mais de 2 dias");
-    // 24 runs a day at the agent's recent cost per run.
-    expect(pane.textContent).toMatch(/≈ US\$\s0,36 por dia do orçamento de Ada/);
+    // How often it updates: only the schedules, no cost anywhere in the dialog.
+    const schedule = combo(dialog, "Atualiza");
+    expect(schedule.textContent).toContain("a cada hora");
+    schedule.focus();
+    await act(async () => fireEvent.keyDown(schedule, { key: "Enter" }));
+    expect(screen().getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "A cada 30 min",
+      "A cada hora",
+      "Todo dia às 8h",
+      "Toda segunda às 8h",
+      "Só quando eu pedir",
+    ]);
+    await click(screen().getByRole("option", { name: "A cada hora" }));
+    await settle(2);
+    expect(dialog.textContent).not.toMatch(/US\$|orçamento/);
     expect((button(dialog, "Testar") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  test("Test builds a draft with real data; Create widget puts it on the board, title as edited", async () => {
+  test("the agent in the card's footer opens a dialog of agents with their roles and connectors", async () => {
+    const { api, dialog } = await start();
+    await act(async () => {
+      await api.access.set(ORG_ID, ADA_ID, {
+        all: false,
+        connectors: { "conn-gh": true },
+        scopes: [],
+        tools: { allow: [], deny: [] },
+      });
+    });
+    const picker = await openAgents(dialog, "Ada");
+    await settle(4);
+    const ada = agentRow(picker, "Ada");
+    const atlas = agentRow(picker, "Atlas");
+    // Each one's face, name and role; the chosen one checked; what each reads with, by its connectors.
+    expect(ada.getAttribute("aria-pressed")).toBe("true");
+    expect(ada.querySelector(".ac-avatar")).toBeTruthy();
+    expect(ada.textContent).toContain("Dev");
+    expect([...ada.querySelectorAll(".ac-chip__text")].map((c) => c.textContent)).toEqual(["GitHub"]);
+    expect(ada.querySelector(".connector-icon")).toBeTruthy();
+    expect(atlas.getAttribute("aria-pressed")).toBe("false");
+    expect(atlas.textContent).toContain("Ops");
+    expect(atlas.textContent).toContain("Sem conectores");
+    // Two agents: no search.
+    expect(within(picker).queryByRole("searchbox")).toBeNull();
+    // Choosing closes it and the card is Atlas's.
+    await click(atlas);
+    await settle(4);
+    expect(screen().queryByRole("dialog", { name: "Quem cuida" })).toBeNull();
+    expect(within(card(dialog)).getByRole("button", { name: "Quem cuida: Atlas" })).toBeTruthy();
+  });
+
+  test("Test builds the card in place with real data; Create widget puts it on the board as titled", async () => {
     const { state, fake, dialog } = await start();
     await click(within(dialog).getByRole("button", { name: "PRs esperando revisão" }));
-    await pick(within(dialog).getByRole("combobox", { name: "Formato" }), /^Número/);
-    await click(segment(dialog, "Atualiza", "Todo dia · 8h"));
+    await pick(combo(dialog, "Formato"), /^Número/);
+    await pick(combo(dialog, "Atualiza"), "Todo dia às 8h");
     await click(segment(dialog, "Tamanho", "G"));
     await settle(3);
-    expect(preview(dialog).textContent).toContain("Todo dia às 8h · aparece em Rotinas");
 
     await click(button(dialog, "Testar") as HTMLElement);
     await settle(6);
@@ -332,24 +383,27 @@ describe("New widget (ADR 0134 §3)", () => {
         size: "l",
       },
     ]);
-    // The draft, built with real data: on no board, shown in the preview with what the test cost.
+    // The draft, built with real data in the card itself; the ask folds into one line that opens it again.
     const draftId = fake.drafts[0]?.id as string;
     expect(fake.drafts).toHaveLength(1);
-    const pane = preview(dialog);
-    expect(pane.textContent).toContain("Dados de verdade · agora");
-    expect(pane.textContent).not.toContain("dados de exemplo");
-    expect(pane.textContent).toMatch(/Este teste custou US\$\s0,01/);
-    expect(within(pane).getByRole("article", { name: "PRs esperando revisão" }).querySelector(".wk-num")).toBeTruthy();
+    const built = card(dialog);
+    expect(within(built).getByRole("img", { name: "Dados de verdade · agora" })).toBeTruthy();
+    expect(built.querySelector(".wk-num")).toBeTruthy();
+    expect(within(dialog).queryByLabelText("O que você quer acompanhar?")).toBeNull();
+    expect(
+      within(built).getByRole("button", { name: "Mudar o pedido: Os PRs que esperam revisão há mais de um dia" }),
+    ).toBeTruthy();
+    // What it reads and how it keeps up, under the card; no cost.
+    expect(dialog.textContent).toContain("Lê GitHub e Sentry · a rotina aparece em Rotinas");
+    expect(dialog.textContent).not.toMatch(/US\$|custou/);
     expect(button(dialog, "Testar")).toBeNull();
-    expect(button(dialog, "Testar de novo")).toBeTruthy();
 
-    // Its title, the agent's, can be changed before it is created; the schedule changes without a new test.
-    const title = within(dialog).getByLabelText("Título") as HTMLInputElement;
+    // Its title, the agent's, is edited on the card; the schedule changes without a new test.
+    const title = within(built).getByLabelText("Título") as HTMLInputElement;
     expect(title.value).toBe("PRs esperando revisão");
     await type(title, "PRs parados");
-    await click(segment(dialog, "Atualiza", "A cada hora"));
-    await settle(2);
-    expect(within(pane).getByRole("article", { name: "PRs parados" })).toBeTruthy();
+    await pick(combo(dialog, "Atualiza"), "A cada hora");
+    expect(card(dialog).getAttribute("aria-label")).toBe("PRs parados");
     await click(button(dialog, "Criar widget") as HTMLElement);
     await settle(6);
     expect(callOf(state, "dashboards.confirmWidget")?.args).toEqual([
@@ -371,12 +425,13 @@ describe("New widget (ADR 0134 §3)", () => {
     expect(screen().getByRole("article", { name: "PRs parados" })).toBeTruthy();
   });
 
-  test("the agent's title is kept when nobody edits it; no title is sent", async () => {
+  test("Enter tests; the agent's title is kept when nobody edits it, and no title is sent", async () => {
     const { state, dialog } = await start();
-    await type(within(dialog).getByLabelText("O que você quer acompanhar?"), "erros em produção hoje");
-    await click(button(dialog, "Testar") as HTMLElement);
+    await type(ask(dialog), "erros em produção hoje");
+    await act(async () => fireEvent.keyDown(ask(dialog), { key: "Enter" }));
     await settle(6);
-    expect((within(dialog).getByLabelText("Título") as HTMLInputElement).value).toBe("Erros em produção hoje");
+    expect(callsOf(state, "dashboards.testWidget")).toHaveLength(1);
+    expect((within(card(dialog)).getByLabelText("Título") as HTMLInputElement).value).toBe("Erros em produção hoje");
     await click(button(dialog, "Criar widget") as HTMLElement);
     await settle(6);
     const sent = callOf(state, "dashboards.confirmWidget")?.args[2] as Record<string, unknown>;
@@ -388,20 +443,21 @@ describe("New widget (ADR 0134 §3)", () => {
     });
   });
 
-  test("while it builds: the agent at it, Test waits; then the real result and Create widget", async () => {
+  test("while it builds: the agent at it in the card, Test waits; then the real result and Create widget", async () => {
     const { fake, services, dialog } = await start((fake) => {
       withSuggestions(fake);
       fake.holdDrafts = true;
     });
-    await type(within(dialog).getByLabelText("O que você quer acompanhar?"), "erros em produção hoje");
+    await type(ask(dialog), "erros em produção hoje");
     await click(button(dialog, "Testar") as HTMLElement);
     await settle(6);
-    const pane = preview(dialog);
-    expect(pane.textContent).toContain("Ada está montando com os dados de verdade…");
-    expect((button(dialog, "Testar") as HTMLButtonElement).disabled).toBe(true);
+    const building = card(dialog);
+    expect(building.textContent).toContain("Ada está montando com os dados de verdade…");
+    expect(building.querySelector(".wg__foot")?.textContent).toBe("Ada montando…");
+    expect((button(dialog, "Testando…") as HTMLButtonElement).disabled).toBe(true);
     expect(button(dialog, "Criar widget")).toBeNull();
-    // Its name, while the agent hasn't named it: the format's, never the ask.
-    expect(within(pane).getByRole("article", { name: "Novo widget" })).toBeTruthy();
+    // Unnamed while the agent hasn't named it: never the ask.
+    expect(building.getAttribute("aria-label")).toBe("Novo widget");
 
     const draftId = fake.drafts[0]?.id as string;
     fake.finish(draftId, {
@@ -410,22 +466,19 @@ describe("New widget (ADR 0134 §3)", () => {
     });
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
-    expect(pane.textContent).toContain("Dados de verdade");
-    expect(within(pane).getByRole("article", { name: "Erros hoje" })).toBeTruthy();
+    expect(within(card(dialog)).getByRole("img", { name: /^Dados de verdade/ })).toBeTruthy();
+    expect(card(dialog).getAttribute("aria-label")).toBe("Erros hoje");
     expect(button(dialog, "Criar widget")).toBeTruthy();
   });
 
-  test("a changed ask or format makes the test stale; a new test drops the old draft", async () => {
+  test("a changed ask, agent or format makes the test stale; a new test drops the old draft", async () => {
     const { state, fake, dialog } = await start();
-    const ask = within(dialog).getByLabelText("O que você quer acompanhar?");
-    await type(ask, "erros em produção hoje");
-    await click(segment(dialog, "Atualiza", "Quando eu pedir"));
-    await click(within(dialog).getByRole("switch", { name: "Me avisar quando algo fugir do normal" }));
-    await settle(3);
-    const pane = preview(dialog);
-    expect(pane.textContent).toContain("Sem rotina: atualiza quando você pedir");
-    expect(pane.textContent).toContain("Só gasta quando você pede para atualizar");
-    expect(pane.textContent).toContain("Sem avisos");
+    await type(ask(dialog), "erros em produção hoje");
+    await pick(combo(dialog, "Atualiza"), "Só quando eu pedir");
+    const alert = await openAlert(dialog);
+    await click(within(alert).getByRole("switch", { name: "Me avisar quando algo fugir do normal" }));
+    await closeAlert();
+    expect(within(card(dialog)).getByRole("button", { name: "Aviso" }).getAttribute("title")).toBe("Sem avisos");
     await click(button(dialog, "Testar") as HTMLElement);
     await settle(6);
     expect(callOf(state, "dashboards.testWidget")?.args[2]).toEqual({
@@ -437,43 +490,57 @@ describe("New widget (ADR 0134 §3)", () => {
       size: "m",
     });
     const first = fake.drafts[0]?.id as string;
+    expect(dialog.textContent).toContain("Sem rotina: atualiza quando você pedir");
     expect(button(dialog, "Criar widget")).toBeTruthy();
 
-    // The size and the alert don't touch the test; the ask does.
+    // The size doesn't touch the test; another agent does (and back, it holds again).
     await click(segment(dialog, "Tamanho", "P"));
     await settle(2);
     expect(button(dialog, "Criar widget")).toBeTruthy();
-    await type(ask, "erros em produção desta semana");
-    await settle(2);
-    expect(pane.textContent).toContain("Mudou desde o teste");
-    expect(pane.textContent).toContain("Teste antes para ver o resultado de verdade");
+    await click(agentRow(await openAgents(dialog, "Ada"), "Atlas"));
+    await settle(3);
+    expect(card(dialog).querySelector(".nwc__stale")?.textContent).toContain(
+      "Mudou desde o teste. Teste de novo para ver como fica.",
+    );
     expect(button(dialog, "Criar widget")).toBeNull();
-    // Back as it was tested: the test holds again.
-    await type(ask, "erros em produção hoje");
+    await click(agentRow(await openAgents(dialog, "Atlas"), "Ada"));
+    await settle(3);
+    expect(card(dialog).querySelector(".nwc__stale")).toBeNull();
+    expect(button(dialog, "Criar widget")).toBeTruthy();
+
+    // The folded ask opens again: a changed ask is stale, the same one holds.
+    await click(within(card(dialog)).getByRole("button", { name: "Mudar o pedido: erros em produção hoje" }));
     await settle(2);
+    expect(dialog.textContent).toContain("Enter testa de novo");
+    await type(ask(dialog), "erros em produção desta semana");
+    expect(button(dialog, "Criar widget")).toBeNull();
+    expect(button(dialog, "Testar de novo")).toBeTruthy();
+    await type(ask(dialog), "erros em produção hoje");
     expect(button(dialog, "Criar widget")).toBeTruthy();
     // The format too.
-    await pick(within(dialog).getByRole("combobox", { name: "Formato" }), /^Lista/);
-    expect(pane.textContent).toContain("Mudou desde o teste");
+    await pick(combo(dialog, "Formato"), /^Lista/);
+    expect(button(dialog, "Criar widget")).toBeNull();
 
-    await click(button(dialog, "Testar") as HTMLElement);
+    await click(button(dialog, "Testar de novo") as HTMLElement);
     await settle(6);
     expect(callsOf(state, "dashboards.testWidget")).toHaveLength(2);
     expect(callsOf(state, "dashboards.removeWidget").map((c) => c.args)).toEqual([[ORG_ID, first]]);
     expect(fake.drafts.map((d) => d.id)).not.toContain(first);
     expect(button(dialog, "Criar widget")).toBeTruthy();
+    expect(within(dialog).queryByLabelText("O que você quer acompanhar?")).toBeNull();
   });
 
-  test("a test that fails says why, with Try again; closing the dialog drops the draft", async () => {
+  test("a test that fails says why in the card, with Try again; closing the dialog drops the draft", async () => {
     const { state, fake, dialog } = await start();
-    await type(within(dialog).getByLabelText("O que você quer acompanhar?"), "status do failover");
+    await type(ask(dialog), "status do failover");
     await click(button(dialog, "Testar") as HTMLElement);
     await settle(6);
-    const pane = preview(dialog);
-    expect(pane.textContent).toContain("Não deu certo: The source isn't connected for me.");
-    expect(button(dialog, "Criar widget")).toBeNull();
+    const failedCard = card(dialog);
+    expect(failedCard.textContent).toContain("Ada não conseguiu montar");
+    expect(failedCard.textContent).toContain("The source isn't connected for me.");
+    expect((button(dialog, "Criar widget") as HTMLButtonElement).disabled).toBe(true);
     const first = fake.drafts[0]?.id as string;
-    await click(within(pane).getByRole("button", { name: "Tentar de novo" }));
+    await click(within(failedCard).getByRole("button", { name: "Tentar de novo" }));
     await settle(6);
     expect(callsOf(state, "dashboards.testWidget")).toHaveLength(2);
     expect(callsOf(state, "dashboards.removeWidget").map((c) => c.args)).toEqual([[ORG_ID, first]]);
@@ -490,7 +557,7 @@ describe("New widget (ADR 0134 §3)", () => {
     expect(fake.drafts).toHaveLength(0);
   });
 
-  test("pinning a chart from the chat: pick it, keep it updated or not, Pin", async () => {
+  test("pinning a chart from the chat: pick it in the card, keep it updated or not, Pin", async () => {
     const { state, dialog } = await start((fake) => {
       myBoard(fake);
       fake.pinnable = [
@@ -512,20 +579,22 @@ describe("New widget (ADR 0134 §3)", () => {
         },
       ];
     });
-    await tab(dialog, "Fixar do chat");
+    await click(button(dialog, "Ou fixe um bloco que já veio no chat") as HTMLElement);
     await settle(4);
+    expect(within(dialog).getByRole("heading", { name: "Fixar um bloco do chat" })).toBeTruthy();
     const pin = within(dialog).getByRole("button", { name: "Fixar" }) as HTMLButtonElement;
     expect(pin.disabled).toBe(true);
-    expect(dialog.textContent).toContain("Escolha um bloco do chat.");
+    expect(dialog.textContent).toContain("Escolha um bloco que um agente já mandou:");
     const block = segment(dialog, "Blocos que os agentes mandaram no chat", /Deploys da semana/);
     expect(block.textContent).toContain("Ada em #eng");
     await click(block);
-    await click(segment(dialog, "Manter atualizado", "Não, só fixar"));
     await settle(3);
-    const preview = within(dialog).getByRole("complementary", { name: "Prévia" });
-    expect(within(preview).getByRole("article", { name: "Deploys da semana" })).toBeTruthy();
-    expect(preview.textContent).toContain("Fixa o bloco como está no chat");
-    expect(preview.textContent).toContain("Não atualiza sozinho");
+    const pinned = card(dialog);
+    expect((within(pinned).getByLabelText("Título") as HTMLInputElement).value).toBe("Deploys da semana");
+    expect([...pinned.querySelectorAll(".wk-bar__v")].map((v) => v.textContent)).toEqual(["3", "5", "2"]);
+    expect(within(pinned).queryByRole("button", { name: "Aviso" })).toBeNull();
+    await pick(combo(dialog, "Atualiza"), "Não atualizar");
+    expect(dialog.textContent).toContain("Fica como está, sem rotina");
     await click(pin);
     await settle(6);
     const call = callOf(state, "dashboards.pinWidget");

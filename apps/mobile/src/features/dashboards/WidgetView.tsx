@@ -12,7 +12,16 @@ import type {
 } from "@agenteschat/client";
 import type { ChartSpec } from "@agenteschat/client/lib/chart";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
-import { Canvas } from "@shopify/react-native-skia";
+import {
+  areaCells,
+  CHART_CELL,
+  cellPaths,
+  chartAreaTones,
+  chartInk,
+  lineTops,
+  smoothPath,
+} from "@agenteschat/ui/sky/chart";
+import { Canvas, Path, Rect, Skia } from "@shopify/react-native-skia";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, StyleSheet, View } from "react-native";
@@ -27,17 +36,19 @@ import Animated, {
 import { CHROME_MAX_SCALE, Icon, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
 import { Line } from "../chat/ChartCard";
 import { AgentFace } from "../shared/Face";
-import { useSurface } from "../shared/parts";
 import { DitherShape } from "./Dither";
 import { useAgentLook, useWidgetWords } from "./hooks";
 import {
+  barValueText,
   barWords,
+  bleedPoints,
+  bleedSeries,
   formatWidgetNumber,
-  formatWithUnit,
   goalShare,
   isTall,
   roundRectPath,
   shownWidgetTitle,
+  softCardColor,
   topRoundedPath,
   widgetTones,
 } from "./logic";
@@ -46,9 +57,15 @@ import {
  * The phone's widget (ADR 0134): a block an agent keeps up to date, drawn from its spec like the web's. Numbers in
  * the app's sans at weight 700 with tabular figures; charts as the chat draws them (a clean stroke in the agent's
  * deep tone over a dither in its light one: the line is the chat's own); bars and a goal's fill as outlined shapes
- * filled with the same 2-point Bayer dither. While the agent builds it, a dither sweep; while it updates, the last
- * data stays, dimmed; when it failed, dimmed with the reason under it.
+ * filled with the same 2-point Bayer dither. A chart's unit is one small tag above it (each bar reads only its
+ * number); a note is a muted caption under a hairline. A number's trend (and a bare line on a board) runs edge to
+ * edge along the card's bottom. While the agent builds it, a dither sweep; while it updates, the last data stays,
+ * dimmed; when it failed, dimmed with the reason under it.
  */
+
+/** The card's padding: the edge-to-edge chart cancels it. */
+const PAD_X = 18;
+const PAD_Y = 16;
 
 function useWidth(): [number, (e: LayoutChangeEvent) => void] {
   const [width, setWidth] = useState(0);
@@ -70,12 +87,15 @@ export const WidgetBody = memo(function WidgetBody({
   status,
   agentId,
   big = false,
+  bleed = false,
 }: {
   spec: WidgetSpec | null;
   status: WidgetStatus;
   agentId: string;
   /** The widget's own screen and the previews: bigger numbers and charts. */
   big?: boolean;
+  /** The card draws the trend (or the bare line) along its bottom (`bleedSeries`): not here. */
+  bleed?: boolean;
 }) {
   const { t } = useTranslation();
   const look = useAgentLook(agentId);
@@ -94,21 +114,31 @@ export const WidgetBody = memo(function WidgetBody({
   const dim = status === "updating" ? 0.45 : status === "failed" ? 0.5 : 1;
   return (
     <View style={{ opacity: dim }}>
-      <SpecBody spec={spec} color={look.color} big={big} />
+      <SpecBody spec={spec} color={look.color} big={big} bleed={bleed} />
     </View>
   );
 });
 
-function SpecBody({ spec, color, big }: { spec: WidgetSpec; color: AgentColorName; big: boolean }) {
+function SpecBody({
+  spec,
+  color,
+  big,
+  bleed,
+}: {
+  spec: WidgetSpec;
+  color: AgentColorName;
+  big: boolean;
+  bleed: boolean;
+}) {
   switch (spec.kind) {
     case "kpi":
-      return <Kpi spec={spec} color={color} big={big} />;
+      return <Kpi spec={spec} color={color} big={big} bleed={bleed} />;
     case "goal":
       return <Goal spec={spec} color={color} big={big} />;
     case "bars":
       return <Bars spec={spec} color={color} big={big} />;
     case "line":
-      return <LineBody spec={spec} color={color} big={big} />;
+      return <LineBody spec={spec} color={color} big={big} bleed={bleed} />;
     case "list":
       return <List spec={spec} />;
     case "text":
@@ -117,11 +147,24 @@ function SpecBody({ spec, color, big }: { spec: WidgetSpec; color: AgentColorNam
 }
 
 /** The big number: what comes before and after it smaller, how it moved, its trend. */
-function Kpi({ spec, color, big }: { spec: KpiWidgetSpec; color: AgentColorName; big: boolean }) {
+function Kpi({
+  spec,
+  color,
+  big,
+  bleed,
+}: {
+  spec: KpiWidgetSpec;
+  color: AgentColorName;
+  big: boolean;
+  bleed: boolean;
+}) {
   const { i18n } = useTranslation();
   const { colors: c } = useTheme();
   const spark = spec.spark ?? [];
-  const trend = useMemo(() => (spark.length > 1 ? lineSpec(spark.map((_, i) => String(i)), spark) : null), [spark]);
+  const trend = useMemo(
+    () => (!bleed && spark.length > 1 ? lineSpec(spark.map((_, i) => String(i)), spark) : null),
+    [spark, bleed],
+  );
   return (
     <View>
       <Text variant="display" numberOfLines={1} style={[styles.num, big ? styles.numBig : null, { color: c.ink }]}>
@@ -205,6 +248,7 @@ function Bars({ spec, color, big }: { spec: BarsWidgetSpec; color: AgentColorNam
   const max = Math.max(0, ...spec.values) || 1;
   return (
     <View>
+      <UnitTag unit={spec.unit} />
       <View onLayout={onLayout} style={[styles.bars, { height, gap }]}>
         {width > 0
           ? spec.values.map((v, i) => {
@@ -217,10 +261,13 @@ function Bars({ spec, color, big }: { spec: BarsWidgetSpec; color: AgentColorNam
                     <Text
                       variant="caption"
                       numberOfLines={1}
+                      // The short form already fits: this only guards a very large text size.
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
                       maxFontSizeMultiplier={CHROME_MAX_SCALE}
                       style={[styles.barValue, { color: alert ? c.warn : c.ink2 }]}
                     >
-                      {formatWithUnit(v, undefined, i18n.language)}
+                      {barValueText(v, i18n.language, slot)}
                     </Text>
                   ) : null}
                   {bw > 1 ? (
@@ -248,25 +295,103 @@ function Bars({ spec, color, big }: { spec: BarsWidgetSpec; color: AgentColorNam
           </Text>
         ))}
       </View>
-      {spec.note ? (
-        <Text variant="footnote" tone="ink2" numberOfLines={2} style={styles.note}>
-          {spec.note}
-        </Text>
-      ) : null}
+      <Note text={spec.note} />
     </View>
   );
 }
 
 /** The chat's line: bare on a card, with its points and labels (tap one for its value) on the widget's screen. */
-function LineBody({ spec, color, big }: { spec: LineWidgetSpec; color: AgentColorName; big: boolean }) {
-  const chart = useMemo(() => lineSpec(spec.labels, spec.values, spec.unit), [spec.labels, spec.values, spec.unit]);
+function LineBody({
+  spec,
+  color,
+  big,
+  bleed,
+}: {
+  spec: LineWidgetSpec;
+  color: AgentColorName;
+  big: boolean;
+  bleed: boolean;
+}) {
+  // The unit is the tag above: a tapped point reads only its number.
+  const chart = useMemo(() => lineSpec(spec.labels, spec.values), [spec.labels, spec.values]);
   return (
     <View>
-      <Line spec={chart} accent={color} big={big} spark={!big} height={big ? 160 : 80} />
-      {spec.note ? (
-        <Text variant="footnote" tone="ink2" numberOfLines={2} style={styles.note}>
-          {spec.note}
-        </Text>
+      <UnitTag unit={spec.unit} />
+      {bleed ? null : <Line spec={chart} accent={color} big={big} spark={!big} height={big ? 160 : 80} />}
+      <Note text={spec.note} />
+    </View>
+  );
+}
+
+/** What a chart's values count, once, as a small tag above it ("runs per day"). */
+function UnitTag({ unit }: { unit?: string | undefined }) {
+  const { colors: c } = useTheme();
+  if (!unit?.trim()) return null;
+  return (
+    <View style={[styles.unit, { backgroundColor: c.plate }]}>
+      <Text
+        variant="caption"
+        numberOfLines={1}
+        maxFontSizeMultiplier={CHROME_MAX_SCALE}
+        style={[styles.unitText, { color: c.ink2 }]}
+      >
+        {unit.trim()}
+      </Text>
+    </View>
+  );
+}
+
+/** A chart's note: a muted caption of up to two lines, under a hairline. */
+function Note({ text }: { text?: string | undefined }) {
+  const { colors: c } = useTheme();
+  if (!text) return null;
+  return (
+    <Text variant="footnote" tone="muted" numberOfLines={2} style={[styles.note, { borderTopColor: c.line2 }]}>
+      {text}
+    </Text>
+  );
+}
+
+/**
+ * A trend along the card's bottom, edge to edge (the card's rounded corners clip it): the chat's clean stroke in the
+ * agent's deep tone over its dither, which fades out toward the bottom edge, and a square on the last point.
+ */
+function BleedLine({ values, color, height }: { values: number[]; color: AgentColorName; height: number }) {
+  const { colors: c, scheme } = useTheme();
+  const dark = scheme === "dark";
+  const [width, onLayout] = useWidth();
+  const points = useMemo(() => (width > 10 ? bleedPoints(values, width, height) : []), [values, width, height]);
+  const stroke = useMemo(() => (points.length > 1 ? Skia.Path.MakeFromSVGString(smoothPath(points)) : null), [points]);
+  const area = useMemo(() => {
+    if (points.length < 2) return [];
+    const cols = Math.ceil(width / CHART_CELL);
+    const rows = Math.ceil(height / CHART_CELL);
+    const cells = cellPaths(areaCells(cols, rows, lineTops(points, cols)), cols, rows, CHART_CELL, true);
+    return [...cells].flatMap(([v, d]) => {
+      const path = Skia.Path.MakeFromSVGString(d);
+      return path ? [{ v, path }] : [];
+    });
+  }, [points, width, height]);
+  const [near, far] = chartAreaTones(color, dark);
+  const ink = chartInk(color, dark);
+  const last = points[points.length - 1];
+  // The square stands out of the line in a ring of the card's own color.
+  const ring = softCardColor(c.raised, c.grouped, dark);
+  return (
+    <View onLayout={onLayout} style={[styles.bleed, { height }]} accessible={false}>
+      {width > 0 && stroke ? (
+        <Canvas style={{ width, height }}>
+          {area.map((p) => (
+            <Path key={p.v} path={p.path} color={p.v === 1 ? near : far} />
+          ))}
+          <Path path={stroke} color={ink} style="stroke" strokeWidth={2.4} strokeCap="round" strokeJoin="round" />
+          {last ? (
+            <>
+              <Rect x={last[0] - 5} y={last[1] - 5} width={10} height={10} color={ring} />
+              <Rect x={last[0] - 3.5} y={last[1] - 3.5} width={7} height={7} color={ink} />
+            </>
+          ) : null}
+        </Canvas>
       ) : null}
     </View>
   );
@@ -390,39 +515,77 @@ export interface WidgetCardData {
   h?: 1 | 2;
 }
 
+/** The card's soft surface (no border, no shadow): its background, by theme. */
+export function useWidgetSurface() {
+  const { colors: c, scheme } = useTheme();
+  return useMemo(
+    () => ({ backgroundColor: softCardColor(c.raised, c.grouped, scheme === "dark") }),
+    [c.raised, c.grouped, scheme],
+  );
+}
+
 /**
- * A widget on a board: its title, what it shows, and a footer that says who looks after it and when it last
- * updated ("updating…" while it does, the failure and Resolve when it didn't). The card has the design system's cut
- * corner and is neutral (the agent's tones are only in the data). `footer` replaces the footer (a preview's).
+ * A widget on a board: the agent's small face and the title in a quiet line, what it shows, and a light footer that
+ * says when it last updated (and how often, when there's room): "updating…" while it does, the failure and Resolve
+ * when it didn't. A number's trend runs edge to edge along the bottom. The card has the design system's cut corner
+ * and a soft surface, neutral (the agent's tones are only in the data). `head` replaces the title line, `above` goes
+ * between it and the data, `body` replaces the data and `footer` the footer (New widget's card is its form).
  */
 export function WidgetCard({
   widget: w,
   big = false,
+  head,
+  above,
+  body,
   footer,
   onPress,
   label,
 }: {
   widget: WidgetCardData;
   big?: boolean;
+  head?: ReactNode;
+  above?: ReactNode;
+  body?: ReactNode;
   footer?: ReactNode;
   onPress?: () => void;
   /** What a screen reader says for the whole card when it opens. */
   label?: string;
 }) {
   const { t } = useTranslation();
-  const surface = useSurface();
+  const surface = useWidgetSurface();
+  const look = useAgentLook(w.agentId);
   // A 2-high (L) widget on a board draws its data big, as on its own screen.
   const large = big || isTall(w.h ?? 1);
   const title = shownWidgetTitle(w.title, w.kind, (key) => t(key));
+  const drawn = body === undefined && (w.status === "ok" || w.status === "updating" || w.status === "failed");
+  const bleed = drawn ? bleedSeries(w.spec, large) : null;
+  const bleedHeight = w.spec?.kind === "line" ? (large ? 120 : 76) : large ? 72 : 48;
   const content = (
     <>
-      <Text variant="footnote" tone="muted" numberOfLines={large ? 2 : 1} style={styles.title}>
-        {title}
-      </Text>
+      {head === undefined ? (
+        <View style={styles.head}>
+          <AgentFace agentId={w.agentId} size={16} live={false} />
+          <Text variant="footnote" tone="muted" numberOfLines={large ? 2 : 1} style={[styles.title, styles.grow]}>
+            {title}
+          </Text>
+        </View>
+      ) : (
+        head
+      )}
+      {above}
       <View style={styles.body}>
-        <WidgetBody spec={w.spec} status={w.status} agentId={w.agentId} big={large} />
+        {body === undefined ? (
+          <WidgetBody spec={w.spec} status={w.status} agentId={w.agentId} big={large} bleed={Boolean(bleed)} />
+        ) : (
+          body
+        )}
       </View>
       {footer === undefined ? <WidgetFoot widget={w} /> : footer}
+      {bleed ? (
+        <View style={[styles.bleedBox, w.status === "ok" ? null : styles.dim]}>
+          <BleedLine values={bleed} color={look.color} height={bleedHeight} />
+        </View>
+      ) : null}
     </>
   );
   if (!onPress) return <View style={[styles.card, surface]}>{content}</View>;
@@ -441,7 +604,7 @@ export function WidgetCard({
   );
 }
 
-/** "Theo · 12 min ago" (and how often, when there's room), "Theo updating…", or "Didn't update · Resolve". */
+/** "12 min ago · every hour" (how often only when there's room), "Theo updating…", or "Didn't update · Resolve". */
 function WidgetFoot({ widget: w }: { widget: WidgetCardData }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
@@ -467,13 +630,11 @@ function WidgetFoot({ widget: w }: { widget: WidgetCardData }) {
       </View>
     );
   const when = w.refreshedAt ? words.ago(w.refreshedAt) : "";
-  const line =
-    w.w === 2 && when
-      ? t("widgets.foot", { name: look.name, when, schedule: t(`widgets.schedulesInline.${w.schedule}`) })
-      : [look.name, when].filter(Boolean).join(" · ");
+  const often = w.w === 2 || !when ? t(`widgets.schedulesInline.${w.schedule}`) : "";
+  const line = [when, often].filter(Boolean).join(" · ");
+  if (!line) return null;
   return (
     <View style={styles.foot}>
-      <AgentFace agentId={w.agentId} size={16} live={false} />
       <Text variant="caption" tone="faint" numberOfLines={1} style={styles.grow}>
         {line}
       </Text>
@@ -487,16 +648,19 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderBottomRightRadius: 20,
     borderBottomLeftRadius: 6,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    gap: 6,
+    paddingHorizontal: PAD_X,
+    paddingTop: PAD_Y,
+    paddingBottom: PAD_Y,
+    gap: 10,
     minWidth: 0,
+    // The edge-to-edge trend is clipped by the rounded corners.
+    overflow: "hidden",
     // Two widgets side by side stand as tall as each other.
     flexGrow: 1,
   },
-  cardIn: { gap: 6 },
-  title: { fontWeight: "600" },
+  cardIn: { gap: 10, flexGrow: 1 },
+  head: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
+  title: { fontSize: 12.5, lineHeight: 16, fontWeight: "600", letterSpacing: 0.1 },
   body: { flexGrow: 1, minWidth: 0 },
   num: { fontSize: 30, lineHeight: 34, fontWeight: "700", letterSpacing: -0.9, fontVariant: ["tabular-nums"] },
   numBig: { fontSize: 40, lineHeight: 44, letterSpacing: -1.2 },
@@ -511,12 +675,21 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     justifyContent: "center",
   },
-  bars: { flexDirection: "row", alignItems: "flex-end", paddingTop: 14 },
+  unit: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 1,
+    marginBottom: 4,
+  },
+  unitText: { fontWeight: "600" },
+  bars: { flexDirection: "row", alignItems: "flex-end", paddingTop: 18 },
   bar: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "flex-end", height: "100%" },
-  barValue: { fontWeight: "600", fontVariant: ["tabular-nums"], marginBottom: 2 },
+  barValue: { fontWeight: "700", fontVariant: ["tabular-nums"], marginBottom: 3 },
   axis: { flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 4 },
   axisLabel: { flex: 1, minWidth: 0, textAlign: "center" },
-  note: { marginTop: 4 },
+  note: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: "row", alignItems: "baseline", gap: 8, paddingVertical: 6 },
   meta: { flexShrink: 0, maxWidth: "45%" },
   grow: { flex: 1, minWidth: 0 },
@@ -527,4 +700,8 @@ const styles = StyleSheet.create({
   field: { borderRadius: 6, overflow: "hidden" },
   band: { position: "absolute", top: 0, bottom: 0 },
   foot: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // Out to the card's edges and its bottom: the card's padding cancelled.
+  bleedBox: { marginHorizontal: -PAD_X, marginBottom: -PAD_Y, marginTop: -4 },
+  bleed: { width: "100%" },
+  dim: { opacity: 0.45 },
 });

@@ -4,31 +4,35 @@ import {
   useHomeDashboard,
   useRemoveWidget,
   useTestWidget,
-  useWidgetCost,
   useWidgetDraft,
   useWidgetSuggestions,
   type Widget,
-  widgetCostLine,
   type WidgetFormat,
   type WidgetSchedule,
   type WidgetSuggestion,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { formatUsd } from "@agenteschat/client/lib/format";
-import { sizeToLayout, WIDGET_FORMATS, WIDGET_LIMITS, type WidgetSize } from "@agenteschat/ui/widgets/spec";
+import {
+  sizeToLayout,
+  WIDGET_FORMATS,
+  WIDGET_LIMITS,
+  WIDGET_SCHEDULES,
+  WIDGET_SIZES,
+  type WidgetSize,
+} from "@agenteschat/ui/widgets/spec";
 import { router } from "expo-router";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Button,
+  fieldText,
   GroupedFooter,
-  GroupedHeader,
   GroupedList,
   GroupedRow,
   Icon,
-  type IconName,
+  systemText,
   Text,
   useTheme,
   useToast,
@@ -39,36 +43,36 @@ import { AgentFace } from "../shared/Face";
 import { useDirectory, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
-import { TextArea } from "../shared/TextArea";
-import { useAgentLook, useExampleWords, useWidgetWords } from "./hooks";
+import { closeAgentPick, openAgentPick } from "./agent-pick";
+import { useAgentLook, useWidgetWords } from "./hooks";
 import {
+  asksInCard,
   confirmTitle,
   destinationsOf,
   HOME,
-  newWidgetAction,
+  newWidgetBarLabel,
   previewKind,
   realBoardId,
-  shownWidgetTitle,
   sizeFor,
   testKeyOf,
   testPhase,
-  widgetPreview,
 } from "./logic";
 import { type PickItem, usePickMenu } from "./menu";
-import { KindGlyph, ScheduleChoice, SizeChoice } from "./parts";
-import { BuildingSweep, WidgetCard } from "./WidgetView";
+import { KindGlyph } from "./parts";
+import { BuildingSweep, WidgetBody, WidgetCard } from "./WidgetView";
 
 /** The longest ask and alert condition the server takes (ADR 0134). */
 const PROMPT_MAX = 2000;
 const CONDITION_MAX = 200;
 
 /**
- * "New widget", pushed (never a sheet; ADR 0134): the widget on top (example data until it is tested), what to follow
- * with the agent's suggestions, who looks after it and the format (rows that open a pick menu), how often it updates,
- * whether to alert (and when), and where it goes; then what happens next and what it costs. "Test" in the bar builds a
- * draft with real data, shown live on top; once it worked, its title can be changed and "Create" confirms it. Changing
- * the ask, the agent or the format after a test asks for a new one; testing again or leaving deletes the draft.
- * `dashboardId`: the board it starts on (`home` for My Home).
+ * "New widget", pushed (never a sheet; ADR 0134). The card is the form: the ask is typed inside the card, with the
+ * agent's suggestions under it while it is empty; the card's header holds its title, a bell that turns the alert on
+ * (and its condition, in the card) and the size; its footer says who looks after it (a pushed screen to change) and
+ * how often it updates (a pick menu). "Test" in the bar has the agent build a draft with real data in place; then the
+ * ask folds into one line that opens it again, and "Create" confirms the draft. Changing the ask, the agent or the
+ * format after a test marks it stale (Test again); a failed test says why, with Try again. Where it goes sits under the
+ * card. Testing again or leaving deletes the draft. `dashboardId`: the board it starts on (`home` for My Home).
  */
 export function NewWidgetScreen({ dashboardId }: { dashboardId: string }) {
   return (
@@ -79,14 +83,13 @@ export function NewWidgetScreen({ dashboardId }: { dashboardId: string }) {
 }
 
 function NewWidget({ dashboardId }: { dashboardId: string }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { colors: c } = useTheme();
   const insets = useSafeAreaInsets();
   const orgId = useOrgId();
   const toast = useToast();
   const failed = useFailed();
   const dir = useDirectory();
-  const words = useExampleWords();
   const widgetWords = useWidgetWords();
   const pick = usePickMenu();
   const list = useDashboards(orgId);
@@ -101,14 +104,16 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   // Null until the person picks one: the size follows the kind (S for a number or a goal, M otherwise).
   const [size, setSize] = useState<WidgetSize | null>(null);
   const [schedule, setSchedule] = useState<WidgetSchedule>("hour");
-  const [alert, setAlert] = useState(true);
+  const [alert, setAlert] = useState(false);
   const [condition, setCondition] = useState("");
   const [dest, setDest] = useState(dashboardId);
   const [pickDest, setPickDest] = useState(false);
   // The test: the draft it made (as it came back, until its live view loads), and what it was asked with.
   const [tested, setTested] = useState<{ widget: Widget; key: string } | null>(null);
-  // The person's title for the tested draft; null keeps the agent's.
+  // The person's title; null keeps the agent's (it names the draft when the test is done).
   const [title, setTitle] = useState<string | null>(null);
+  // The ask opened again after a test (its folded line tapped).
+  const [editing, setEditing] = useState(false);
   // The first agent until the person picks one.
   useEffect(() => {
     const first = agents[0];
@@ -125,6 +130,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     live.current.gone = false;
     return () => {
       live.current.gone = true;
+      closeAgentPick();
       const id = live.current.draftId;
       if (id && !live.current.confirmed) {
         live.current.draftId = null;
@@ -135,8 +141,6 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
 
   const look = useAgentLook(agentId);
   const suggestions = useWidgetSuggestions(orgId, agentId);
-  const sources = suggestions.data?.sources ?? [];
-  const cost = useWidgetCost(orgId, agentId, schedule);
   const destinations = destinationsOf(list.data);
   // A board asked for is only known once the list is: never fall back to My Home before it is.
   const destination = destinations.find((d) => d.id === dest) ?? (list.data ? destinations[0] : undefined);
@@ -149,11 +153,12 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   const draft: Widget | null = tested && !draftQ.isError ? (draftQ.data ?? tested.widget) : null;
   const currentKey = testKeyOf(text, agentId, format);
   const phase = testPhase({ pending: test.isPending, draft, testedKey: tested?.key ?? null, currentKey });
-  const action = newWidgetAction(phase);
+  const barLabel = newWidgetBarLabel(phase);
+  const asking = asksInCard(phase, editing);
   // Once tested, the size follows what the agent built (unless one was picked).
   const kind = phase === "ok" && draft?.kind ? draft.kind : previewKind(format, picked?.kind ?? null);
   const sized = sizeFor(kind, size);
-  const preview = widgetPreview(text, format, picked?.kind ?? null, words, size);
+  const layout = sizeToLayout(sized);
   const asked = Boolean(text.trim() && agentId && target);
   const busy = test.isPending || confirm.isPending;
   const ready = asked && !busy && phase !== "testing";
@@ -163,6 +168,11 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     setAgentId(id);
     setPicked(null);
   };
+  // The agent's screen sends its choice back through this (the latest closure).
+  const applyAgent = useRef(pickAgent);
+  useLayoutEffect(() => {
+    applyAgent.current = pickAgent;
+  });
   const suggest = (s: WidgetSuggestion) => {
     setText(s.prompt || s.title);
     setPicked(s);
@@ -178,14 +188,14 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   };
   const alertInput = { enabled: alert, condition: alert ? condition.trim() : "" };
 
-  /** Test (and Test again, Try again): the previous draft goes, a new one is built with real data. */
+  /** Test (and Test again, Try again): the previous draft goes, a new one is built with real data in the card. */
   const runTest = () => {
     if (!asked || !agentId || !target || busy) return;
     const previous = live.current.draftId;
     if (previous) removeDraft.current(previous);
     live.current.draftId = null;
     setTested(null);
-    setTitle(null);
+    setEditing(false);
     const key = currentKey;
     test
       .mutateAsync({
@@ -241,25 +251,12 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     );
   };
 
-  const openAgents = () =>
-    pick(
-      t("dashboards.newWidget.who"),
-      agents.map(
-        (a): PickItem<string> => ({
-          key: a.id,
-          label: a.name,
-          hint: a.role || null,
-          // The face's top on the name's line, as beside every name in the app.
-          leading: (
-            <View style={styles.faceTop}>
-              <AgentFace agentId={a.id} size={28} live={false} />
-            </View>
-          ),
-        }),
-      ),
-      agentId,
-      pickAgent,
-    );
+  /** "Who looks after it": its own screen, pushed (the choice comes back through `agent-pick`). */
+  const openAgents = () => {
+    if (agents.length === 0) return;
+    openAgentPick({ agentId, apply: (id) => applyAgent.current(id) });
+    router.push("/agent-pick");
+  };
   const openFormats = () =>
     pick(
       t("dashboards.newWidget.format"),
@@ -267,67 +264,193 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         (f): PickItem<WidgetFormat> => ({
           key: f,
           label: t(`widgets.kinds.${f}`),
-          hint: f === "auto" ? t("mobile.dashboards.formatAuto", { name: look.name }) : null,
+          hint:
+            f === "auto"
+              ? t("mobile.dashboards.formatAuto", { name: look.name })
+              : t(`dashboards.newWidget.formatHints.${f}`),
           leading: <KindGlyph kind={f} size={20} color={c.muted} />,
         }),
       ),
       format,
       setFormat,
     );
+  // How often: the schedules' words only (what it spends is not this menu's business).
+  const openSchedules = () =>
+    pick(
+      t("dashboards.newWidget.updates"),
+      WIDGET_SCHEDULES.map(
+        (s): PickItem<WidgetSchedule> => ({
+          key: s,
+          label: t(`widgets.schedules.${s}`),
+          leading: <Icon name="clock" size={18} color={c.muted} />,
+        }),
+      ),
+      schedule,
+      setSchedule,
+    );
 
-  const costLine = widgetCostLine(schedule, cost.data);
-  const costText =
-    costLine.kind === "day" || costLine.kind === "week"
-      ? t(`widgets.cost.${costLine.kind}`, { amount: formatUsd(i18n.language, costLine.usd), name: look.name })
-      : t(`widgets.cost.${costLine.kind}`, { name: look.name });
-  const readsStep = sources.length > 0 ? t("dashboards.newWidget.steps.reads", { sources: sources.join(", ") }) : null;
-  const routineStep =
-    schedule === "manual"
-      ? t("dashboards.newWidget.steps.noRoutine")
-      : t("dashboards.newWidget.steps.routineHint", { schedule: t(`widgets.schedules.${schedule}`) });
-  const alertStep = alert
-    ? t("dashboards.newWidget.steps.alert", { condition: condition.trim() || t("widgets.alert.placeholder") })
-    : t("dashboards.newWidget.steps.noAlertHint");
-  const steps: ({ icon: IconName; text: string } | null)[] = [
-    { icon: "bolt", text: t("dashboards.newWidget.steps.builds", { name: look.name }) },
-    readsStep ? { icon: "server", text: readsStep } : null,
-    { icon: "clock", text: routineStep },
-    { icon: "bell", text: alertStep },
-    { icon: "chart", text: costText },
-  ];
+  const suggestionList = suggestions.data?.suggestions ?? [];
+  const formatWord = format === "auto" ? t("mobile.dashboards.newWidget.autoFormat") : t(`widgets.kinds.${format}`);
+  const formatPick = (
+    <Pressable
+      onPress={openFormats}
+      disabled={phase === "testing"}
+      accessibilityRole="button"
+      accessibilityLabel={`${t("dashboards.newWidget.format")}: ${formatWord}`}
+      style={[styles.pickBox, { borderColor: c.line2 }]}
+    >
+      <KindGlyph kind={format} size={15} color={c.muted} />
+      <Text variant="footnote" numberOfLines={1} style={[styles.semibold, { color: c.ink2 }]}>
+        {formatWord}
+      </Text>
+      <Icon name="down" size={12} color={c.muted} />
+    </Pressable>
+  );
 
-  const say = (key: string) => t(key);
-  // "Real data · just now · This test cost $0.01".
-  const testedCaption = (w: Widget) => {
-    const real = t("dashboards.newWidget.tested", { when: w.refreshedAt ? widgetWords.ago(w.refreshedAt) : "" });
-    if (w.lastCostUsd == null) return real;
-    return `${real} · ${t("dashboards.newWidget.testCost", { cost: formatUsd(i18n.language, w.lastCostUsd) })}`;
-  };
-  const exampleCaption = [
-    t("widgets.preview.label"),
-    t("widgets.preview.example"),
-    t("dashboards.newWidget.testFirst"),
-  ].join(" · ");
-  const layout = sizeToLayout(sized);
+  // ── The card's header: the agent's face, the title, the check of a good test, the bell and the size.
+  const titleValue = title ?? draft?.title ?? "";
+  const head = (
+    <View style={styles.head}>
+      {agentId ? <AgentFace agentId={agentId} size={16} live={false} /> : null}
+      <TextInput
+        value={titleValue}
+        onChangeText={setTitle}
+        placeholder={
+          draft
+            ? t("mobile.dashboards.widget.titlePlaceholder")
+            : t("mobile.dashboards.newWidget.titleHint", { name: look.name })
+        }
+        placeholderTextColor={c.faint}
+        accessibilityLabel={t("mobile.dashboards.widget.title")}
+        maxLength={WIDGET_LIMITS.title}
+        returnKeyType="done"
+        style={[styles.titleInput, { color: c.ink2 }]}
+      />
+      {phase === "ok" ? (
+        <View
+          style={[styles.okBadge, { backgroundColor: c.plate }]}
+          accessible
+          accessibilityLabel={t("mobile.dashboards.newWidget.realData")}
+        >
+          <Icon name="check" size={13} color={c.ink2} />
+        </View>
+      ) : null}
+      <Pressable
+        onPress={() => setAlert((v) => !v)}
+        accessibilityRole="switch"
+        accessibilityLabel={t("widgets.alert.label")}
+        accessibilityState={{ checked: alert }}
+        hitSlop={6}
+        style={[styles.bell, alert ? { backgroundColor: c.plate } : null]}
+      >
+        <Icon name="bell" size={16} color={alert ? c.ink : c.muted} />
+        {alert ? (
+          <Text variant="caption" style={[styles.semibold, { color: c.ink }]}>
+            {t("mobile.dashboards.newWidget.alerts")}
+          </Text>
+        ) : null}
+      </Pressable>
+      <View style={[styles.sizes, { backgroundColor: c.sunken }]} accessibilityRole="radiogroup">
+        {WIDGET_SIZES.map((s) => {
+          const on = s === sized;
+          return (
+            <Pressable
+              key={s}
+              onPress={() => setSize(s)}
+              accessibilityRole="radio"
+              accessibilityLabel={`${t("widgets.sizes.label")}: ${t(`widgets.sizes.${s}`)}`}
+              accessibilityHint={t(`mobile.dashboards.sizeHint.${s}`)}
+              accessibilityState={{ selected: on }}
+              hitSlop={4}
+              style={[styles.size, on ? { backgroundColor: c.raised } : null]}
+            >
+              <Text variant="caption" style={[styles.semibold, { color: on ? c.ink : c.muted }]}>
+                {t(`widgets.sizes.${s}`)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 
-  let top: ReactNode;
-  if (phase === "testing") {
-    // Building with real data: a neutral title (the agent names it when it is done), never the ask.
-    top = (
-      <View style={[styles.ghost, { borderColor: c.line2 }]}>
-        <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.semibold}>
-          {shownWidgetTitle(draft?.title, draft?.kind ?? format, say)}
+  // ── Between the header and the data, after a test: the ask folded into a line, and the format.
+  const above = asking ? null : (
+    <View style={styles.gap8}>
+      <View style={styles.askedRow}>
+        <Pressable
+          onPress={() => setEditing(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t("mobile.dashboards.newWidget.editAsk")}
+          accessibilityHint={text.trim()}
+          disabled={phase === "testing"}
+          style={styles.asked}
+        >
+          <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+            {t("mobile.dashboards.newWidget.asked", { ask: text.trim() })}
+          </Text>
+          <Icon name="pen" size={13} color={c.muted} />
+        </Pressable>
+        {formatPick}
+      </View>
+      {phase === "stale" ? (
+        <Text variant="caption" style={[styles.semibold, { color: c.warn }]}>
+          {t("dashboards.newWidget.stale")}
         </Text>
-        <BuildingSweep
-          color={look.color}
-          text={t("dashboards.newWidget.testing", { name: look.name })}
-          height={44}
+      ) : null}
+    </View>
+  );
+
+  // ── The data's place: the ask while typing it, the build, the failure, or the draft (the card's own drawing).
+  let body: ReactNode;
+  if (asking) {
+    body = (
+      <View style={styles.gap10}>
+        <TextInput
+          value={text}
+          onChangeText={type}
+          multiline
+          textAlignVertical="top"
+          placeholder={t("dashboards.newWidget.what")}
+          placeholderTextColor={c.faint}
+          accessibilityLabel={t("dashboards.newWidget.what")}
+          accessibilityHint={t("dashboards.newWidget.whatPlaceholder")}
+          maxLength={PROMPT_MAX}
+          autoFocus={editing}
+          style={[styles.ask, { color: c.ink }]}
         />
+        {!text.trim() && phase === "untested" && suggestionList.length > 0 ? (
+          <View style={styles.suggestions}>
+            {suggestionList.map((s) => (
+              <Pressable
+                key={s.title}
+                onPress={() => suggest(s)}
+                accessibilityRole="button"
+                style={[styles.suggestion, { backgroundColor: c.chip }]}
+              >
+                <KindGlyph kind={s.kind} size={14} color={c.muted} />
+                <Text variant="footnote" numberOfLines={1} style={[styles.semibold, { color: c.ink2 }]}>
+                  {s.title}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <View style={styles.formatRow}>{formatPick}</View>
+        {editing && draft?.spec ? (
+          <View style={phase === "stale" ? styles.staleData : null}>
+            <WidgetBody spec={draft.spec} status={draft.status} agentId={draft.agentId} big={sized === "l"} />
+          </View>
+        ) : null}
       </View>
     );
+  } else if (phase === "testing") {
+    body = (
+      <BuildingSweep color={look.color} text={t("dashboards.newWidget.testing", { name: look.name })} height={44} />
+    );
   } else if (phase === "failed" && draft) {
-    top = (
-      <View style={[styles.ghost, styles.failedBox, { borderColor: c.line2 }]}>
+    body = (
+      <View style={styles.failed}>
         <View style={styles.failedLine}>
           <Icon name="info" size={16} color={c.warn} />
           <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
@@ -337,80 +460,70 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         <Button size="sm" variant="secondary" label={t("dashboards.newWidget.tryAgain")} onPress={runTest} />
       </View>
     );
-  } else if (phase === "ok" && draft) {
-    top = (
-      <>
-        <View style={layout.w === 1 ? styles.previewHalf : styles.previewFull}>
-          <WidgetCard
-            big
-            widget={{
-              title: title?.trim() || draft.title,
-              kind: draft.kind,
-              spec: draft.spec,
-              status: draft.status,
-              agentId: draft.agentId,
-              refreshedAt: draft.refreshedAt,
-              schedule,
-              w: layout.w,
-              h: layout.h,
-            }}
-            footer={null}
-          />
-        </View>
-        <Text variant="caption" tone="faint" style={styles.center}>
-          {testedCaption(draft)}
-        </Text>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="play"
-          label={t("dashboards.newWidget.testAgain")}
-          onPress={runTest}
-        />
-      </>
-    );
-  } else if (preview && agentId) {
-    top = (
-      <>
-        <View style={preview.w === 1 ? styles.previewHalf : styles.previewFull}>
-          <WidgetCard
-            big
-            widget={{
-              title: picked?.title ?? "",
-              kind: preview.kind,
-              spec: preview.spec,
-              status: "ok",
-              agentId,
-              refreshedAt: null,
-              schedule,
-              w: preview.w,
-              h: preview.h,
-            }}
-            footer={null}
-          />
-        </View>
-        {phase === "stale" ? (
-          <Text variant="caption" style={[styles.center, { color: c.warn }]}>
-            {t("dashboards.newWidget.stale")}
-          </Text>
-        ) : (
-          <Text variant="caption" tone="faint" style={styles.center}>
-            {exampleCaption}
-          </Text>
-        )}
-      </>
-    );
-  } else {
-    top = (
-      <View style={[styles.ghost, { borderColor: c.line2 }]}>
-        <BuildingSweep
-          color={look.color}
-          text={t("dashboards.newWidget.emptyPreview", { name: look.name })}
-          height={44}
-        />
+  } else if (phase === "stale" && draft?.spec) {
+    body = (
+      <View style={styles.staleData}>
+        <WidgetBody spec={draft.spec} status={draft.status} agentId={draft.agentId} big={sized === "l"} />
       </View>
     );
   }
+  // Else (a good test): undefined, so the card draws the draft itself (its trend edge to edge).
+
+  // ── The footer: the alert's condition when the bell is on, then who looks after it and how often.
+  const footer = (
+    <View style={styles.gap10}>
+      {alert ? (
+        <View style={[styles.condition, { backgroundColor: c.sunken }]}>
+          <Icon name="bell" size={14} color={c.muted} />
+          <Text variant="footnote" tone="muted" style={styles.semibold}>
+            {t("widgets.alert.condition")}
+          </Text>
+          <TextInput
+            value={condition}
+            onChangeText={setCondition}
+            placeholder={t("widgets.alert.placeholder")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("widgets.alert.condition")}
+            accessibilityHint={t("widgets.alert.hint")}
+            maxLength={CONDITION_MAX}
+            returnKeyType="done"
+            style={[styles.conditionInput, { color: c.ink }]}
+          />
+        </View>
+      ) : null}
+      <View style={styles.foot}>
+        <Pressable
+          onPress={openAgents}
+          disabled={agents.length === 0 || phase === "testing"}
+          accessibilityRole="button"
+          accessibilityLabel={`${t("dashboards.newWidget.who")}: ${look.name}`}
+          hitSlop={6}
+          style={styles.footPick}
+        >
+          <Text variant="footnote" numberOfLines={1} style={[styles.semibold, { color: c.ink2 }]}>
+            {look.name || t("dashboards.newWidget.theAgent")}
+          </Text>
+          <Icon name="down" size={12} color={c.muted} />
+        </Pressable>
+        <Text variant="footnote" tone="faint">
+          {"·"}
+        </Text>
+        <Pressable
+          onPress={openSchedules}
+          accessibilityRole="button"
+          accessibilityLabel={`${t("dashboards.newWidget.updates")}: ${t(`widgets.schedules.${schedule}`)}`}
+          hitSlop={6}
+          style={[styles.footPick, styles.shrink]}
+        >
+          <Icon name="clock" size={13} color={c.muted} />
+          <Text variant="footnote" numberOfLines={1} style={[styles.shrink, { color: c.ink2 }]}>
+            {t(`widgets.schedulesInline.${schedule}`)}
+          </Text>
+          <Icon name="down" size={12} color={c.muted} />
+        </Pressable>
+      </View>
+    </View>
+  );
 
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
@@ -419,9 +532,9 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         solid={false}
         grouped
         action={
-          action === "create"
+          barLabel === "create"
             ? { label: t("mobile.dashboards.create"), disabled: busy || !target, onPress: create }
-            : { label: t("dashboards.newWidget.test"), disabled: !ready, onPress: runTest }
+            : { label: t(`dashboards.newWidget.${barLabel}`), disabled: !ready, onPress: runTest }
         }
       />
       <ScrollView
@@ -430,110 +543,37 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
       >
-        <View style={styles.preview}>{top}</View>
-
-        {phase === "ok" && draft ? (
-          <>
-            <GroupedHeader>{t("mobile.dashboards.widget.title")}</GroupedHeader>
-            <TextArea
-              value={title ?? draft.title}
-              onChangeText={setTitle}
-              placeholder={t("mobile.dashboards.widget.titlePlaceholder")}
-              accessibilityLabel={t("mobile.dashboards.widget.title")}
-              multiline={false}
-              minHeight={46}
-              maxLength={WIDGET_LIMITS.title}
-              returnKeyType="done"
-            />
-          </>
-        ) : null}
-
-        <GroupedHeader>{t("dashboards.newWidget.what")}</GroupedHeader>
-        <TextArea
-          value={text}
-          onChangeText={type}
-          placeholder={t("dashboards.newWidget.whatPlaceholder")}
-          accessibilityLabel={t("dashboards.newWidget.what")}
-          maxLength={PROMPT_MAX}
-          minHeight={72}
+        <WidgetCard
+          big={sized === "l"}
+          widget={{
+            title: titleValue,
+            kind: draft?.kind ?? kind,
+            spec: draft?.spec ?? null,
+            status: draft?.status ?? "ok",
+            agentId: agentId ?? "",
+            refreshedAt: draft?.refreshedAt ?? null,
+            schedule,
+            w: 2,
+            h: layout.h,
+          }}
+          head={head}
+          above={above}
+          body={body}
+          footer={footer}
         />
-        {(suggestions.data?.suggestions ?? []).length > 0 ? (
-          <View style={styles.suggestions}>
-            {(suggestions.data?.suggestions ?? []).map((s) => {
-              const on = picked?.title === s.title;
-              return (
-                <Pressable
-                  key={s.title}
-                  onPress={() => suggest(s)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  style={[styles.suggestion, { backgroundColor: on ? c.ink : c.chip }]}
-                >
-                  <KindGlyph kind={s.kind} size={14} color={on ? c.bg : c.muted} />
-                  <Text variant="subhead" numberOfLines={1} style={[styles.semibold, { color: on ? c.bg : c.ink2 }]}>
-                    {s.title}
-                  </Text>
-                </Pressable>
-              );
+        {phase === "ok" && draft ? (
+          <Text variant="caption" tone="faint" style={styles.caption}>
+            {t("dashboards.newWidget.tested", {
+              when: draft.refreshedAt ? widgetWords.ago(draft.refreshedAt) : "",
             })}
-          </View>
+          </Text>
         ) : null}
-
-        <View style={styles.gap} />
-        <GroupedList>
-          <GroupedRow
-            label={t("dashboards.newWidget.who")}
-            value={look.name}
-            valueLeading={agentId ? <AgentFace agentId={agentId} size={22} live={false} /> : null}
-            chevron
-            disabled={agents.length === 0}
-            onPress={openAgents}
-          />
-          <GroupedRow
-            label={t("dashboards.newWidget.format")}
-            value={t(`widgets.kinds.${format}`)}
-            valueLeading={<KindGlyph kind={format} size={16} color={c.faint} />}
-            chevron
-            onPress={openFormats}
-          />
-        </GroupedList>
         {agents.length === 0 && !dir.loading ? (
           <GroupedFooter>{t("dashboards.newWidget.noAgents")}</GroupedFooter>
         ) : null}
 
-        <GroupedHeader>{t("widgets.sizes.label")}</GroupedHeader>
-        <SizeChoice value={sized} onChange={setSize} />
-
-        <GroupedHeader>{t("dashboards.newWidget.updates")}</GroupedHeader>
-        <View style={styles.bleed}>
-          <ScheduleChoice value={schedule} onChange={setSchedule} />
-        </View>
-
         <View style={styles.gap} />
         <GroupedList>
-          <GroupedRow
-            icon="bell"
-            label={t("widgets.alert.label")}
-            labelLines={2}
-            sub={alert ? t("widgets.alert.hint") : t("widgets.alert.none")}
-            subLines={2}
-            toggle={alert}
-            onPress={() => setAlert((v) => !v)}
-          />
-          {alert ? (
-            <View style={styles.condition}>
-              <TextArea
-                value={condition}
-                onChangeText={setCondition}
-                placeholder={t("widgets.alert.placeholder")}
-                accessibilityLabel={t("widgets.alert.condition")}
-                multiline={false}
-                minHeight={46}
-                maxLength={CONDITION_MAX}
-                returnKeyType="done"
-              />
-            </View>
-          ) : null}
           <GroupedRow
             icon="chart"
             label={t("dashboards.newWidget.destination")}
@@ -555,19 +595,6 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
               ))
             : null}
         </GroupedList>
-
-        <View style={styles.steps}>
-          {steps.map((step) =>
-            step ? (
-              <View key={step.icon} style={styles.step}>
-                <Icon name={step.icon} size={14} color={c.faint} />
-                <Text variant="footnote" tone="faint" style={styles.grow}>
-                  {step.text}
-                </Text>
-              </View>
-            ) : null,
-          )}
-        </View>
       </ScrollView>
     </View>
   );
@@ -575,39 +602,63 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 16, paddingTop: 4 },
-  preview: { alignItems: "center", gap: 8, paddingTop: 8 },
-  previewFull: { width: "100%" },
-  previewHalf: { width: "60%" },
-  ghost: {
-    width: "100%",
-    gap: 8,
-    borderWidth: 1.5,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
-    borderBottomLeftRadius: 6,
-    padding: 14,
+  in: { paddingHorizontal: 16, paddingTop: 8 },
+  head: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
+  titleInput: { flex: 1, minWidth: 0, paddingVertical: 4, ...fieldText("footnote", "600") },
+  okBadge: { width: 22, height: 22, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  bell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 28,
+    paddingHorizontal: 6,
+    borderRadius: 8,
   },
-  failedBox: { alignItems: "flex-start" },
-  failedLine: { flexDirection: "row", alignItems: "flex-start", gap: 8, alignSelf: "stretch" },
-  center: { textAlign: "center" },
-  suggestions: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingTop: 8 },
+  sizes: { flexDirection: "row", padding: 2, borderRadius: 9 },
+  size: { minWidth: 26, height: 24, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  ask: { minHeight: 56, paddingTop: 4, paddingBottom: 2, ...systemText("body", "500") },
+  suggestions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   suggestion: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 32,
+    height: 30,
     maxWidth: "100%",
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    borderRadius: 15,
   },
+  formatRow: { flexDirection: "row" },
+  pickBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    height: 28,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexShrink: 0,
+  },
+  askedRow: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
+  asked: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 },
+  staleData: { opacity: 0.38 },
+  failed: { gap: 10, alignItems: "flex-start" },
+  failedLine: { flexDirection: "row", alignItems: "flex-start", gap: 8, alignSelf: "stretch" },
+  condition: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  conditionInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("footnote") },
+  foot: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
+  footPick: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4 },
+  caption: { textAlign: "center", paddingTop: 8 },
   semibold: { fontWeight: "600", flexShrink: 1 },
-  faceTop: { alignSelf: "flex-start" },
-  bleed: { marginHorizontal: -16 },
-  gap: { height: 18 },
-  condition: { paddingHorizontal: 14, paddingBottom: 12 },
-  steps: { gap: 6, paddingHorizontal: 16, paddingTop: 14 },
-  step: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  shrink: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
+  gap: { height: 18 },
+  gap8: { gap: 8 },
+  gap10: { gap: 10 },
 });

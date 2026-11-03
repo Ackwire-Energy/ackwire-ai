@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { useNow } from "@/hooks/useNow";
 import { type GridMove, useGridDrag } from "@/lib/grid-drag";
 import { useToast } from "@/lib/toast";
-import { useWidgetAgent, WidgetFoot, widgetTitle } from "./parts";
+import { useWidgetAgent, WidgetFace, WidgetFoot, widgetTitle } from "./parts";
 import { RemoveWidgetDialog } from "./RemoveWidgetDialog";
 import "./widgets.css";
 
@@ -241,6 +241,7 @@ function BoardWidget({
       size={{ w: widget.layout.w, h: widget.layout.h }}
       locale={i18n.language}
       buildingText={t("widgets.status.building", { name })}
+      face={<WidgetFace agentId={widget.agentId} name={name} />}
       onOpen={onOpen}
       footer={
         <WidgetFoot

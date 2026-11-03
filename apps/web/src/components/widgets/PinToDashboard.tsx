@@ -112,13 +112,11 @@ export function PinToDashboard({
               color={color}
               size={sizeToLayout(size)}
               locale={i18n.language}
+              face={<AgentAvatar agentId={agentId} name={name} size="xs" />}
               footer={
-                <>
-                  <AgentAvatar agentId={agentId} name={name} size="xs" />
-                  <span className="wg__when">
-                    <b>{name}</b> <span className="wg__dot">·</span> {t(`widgets.schedulesInline.${chosen}`)}
-                  </span>
-                </>
+                <span className="wg__when">
+                  <b>{name}</b> <span className="wg__dot">·</span> {t(`widgets.schedulesInline.${chosen}`)}
+                </span>
               }
             />
           </div>

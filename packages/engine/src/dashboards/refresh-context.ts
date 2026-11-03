@@ -16,8 +16,9 @@ const { dashboards, dashboardWidgets, dashboardWidgetUpdates, users } = schema;
 export const WIDGET_KIND_MANUAL = [
   `- kpi (one number): { "kind": "kpi", "value": 18420, "prefix": "R$", "suffix": "%", "delta": { "text": "+12%", "up": true }, "note": "vs. yesterday", "spark": [numbers, oldest first, at most ${WIDGET_LIMITS.spark}] }. \`up\` true means the good direction, whatever the sign.`,
   `- goal (progress to a goal): { "kind": "goal", "pct": 0 to 100, "line": "248 of 400", "note": "At this pace…" }.`,
-  `- bars (a ranking or a count per category): { "kind": "bars", "labels": [...], "values": [numbers, one per label], "unit": "%", "note": "…", "alertIndex": the bar the alert is about }, at most ${WIDGET_LIMITS.points} bars.`,
+  `- bars (a ranking or a count per category): { "kind": "bars", "labels": [...], "values": [numbers, one per label], "unit": "runs per day", "note": "…", "alertIndex": the bar the alert is about }, at most ${WIDGET_LIMITS.points} bars.`,
   `- line (something over time, oldest first): { "kind": "line", "labels": [...], "values": [numbers, one per label], "unit": "ms", "note": "…" }, at most ${WIDGET_LIMITS.points} points.`,
+  `A bars or line \`unit\` (at most ${WIDGET_LIMITS.unit} characters) is what every value counts, written once: it shows as a tag above the chart, so \`values\` are plain numbers and \`labels\` never repeat it ("Ada", not "Ada: 48 runs").`,
   `- list (a few things with a word each): { "kind": "list", "rows": [{ "text": "…", "meta": "2 h ago", "tone": "ok" or "warn" }] }, at most ${WIDGET_LIMITS.rows} rows.`,
   `- text (a short summary): { "kind": "text", "items": ["sentence", …] }, at most ${WIDGET_LIMITS.items} sentences.`,
   `Every \`note\` is one short sentence of at most ${WIDGET_LIMITS.note} characters (a longer one is refused: shorten it, never cut it).`,

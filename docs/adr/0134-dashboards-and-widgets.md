@@ -33,11 +33,13 @@ people than asked.
    (2×2), and its place is one order on the board (`position`), packed by the grid. "Organize" drags to reorder and
    changes sizes; the phone shows a 2-wide widget across the row. A board holds at most 24 widgets; a workspace at most
    200 boards (people's home boards apart).
-3. **Where a widget comes from.** "+ Widget": what to follow (with three suggestions per agent, asked once a day of the
-   workspace's cheap model from the agent's role and the connections it may read), the agent that looks after it
-   (only one the person can talk to), the format, how often it updates, an alert on or off with its condition ("drops
-   20% below yesterday"), the size and the board; a preview with example data of that kind, the steps it will take and
-   what it costs. "Pin" on a chart an agent sent (on the chart in the message, or "Pin from chat" in the dialog): the
+3. **Where a widget comes from.** "+ Widget" (beside "Organize", one pill in the board's head): the dialog is the
+   widget itself, and the card is the form. What to follow is written in its body (with three suggestions per agent,
+   asked once a day of the workspace's cheap model from the agent's role and the connections it may read); the
+   agent's face in its footer opens a dialog of the agents the person can talk to (each with its role and the
+   connectors it reads with); beside it how often it updates; the bell in its head an alert on or off with its
+   condition ("drops 20% below yesterday"); S/M/L its size; the format a dropdown; the board under the card. Nothing
+   shows example data: Test builds the card in place (§16). "Pin" on a chart an agent sent (on the chart in the message, or "Pin from chat" in the dialog): the
    widget keeps the chart's data as it was and the message's agent looks after it; updating it is optional ("No, just
    pin" is `manual`). Agents make widgets too (§10).
 4. **The routine that redoes it is a routine.** A widget that updates has its own row in `routines` (made the first
@@ -74,9 +76,11 @@ people than asked.
    Monday at 08:00 (in the time zone of whoever set it up), or only when asked (`manual`): never more often than every
    30 minutes, so the 15-minute floor of routines never binds. A workspace keeps at most 60 widgets updating on a
    schedule (`widget.scheduled_cap`; manual ones don't count): a sane ceiling for a team's boards that bounds what
-   unattended refreshes cost. The cost shown before creating is runs a day × the agent's average cost of a routine run
-   in its last 30 days (at least three runs), else its model's price for a typical refresh (8,000 tokens in, 1,000
-   out), "≈ US$ X a day of <agent>'s budget" (a week for weekly ones); on a computer brain's plan it says the plan pays.
+   unattended refreshes cost. The estimate (`GET …/widget-cost`) is runs a day × the agent's average cost of a routine
+   run in its last 30 days (at least three runs), else its model's price for a typical refresh (8,000 tokens in, 1,000
+   out), "≈ US$ X a day of <agent>'s budget" (a week for weekly ones); on a computer brain's plan it says the plan
+   pays. The New widget dialog lists only the schedules, without it: a price beside each choice read as a bill for a
+   choice that is the agent's budget either way.
    The Model Gateway's budget check still holds every run, and usage is recorded with the agent and the workspace as
    for any run.
 8. **Who sees and who edits a board.** `workspace` (every member), `roles` (whoever holds one of its roles at the time,
@@ -139,8 +143,9 @@ people than asked.
     `searchHref`).
 16. **Test before creating.** "+ Widget" asks the agent first and creates after: "Test" makes a draft
     (`dashboard_widgets.draft`) that its agent builds at once with real data, through the same refresh run as any
-    widget (`update_widget`, a history row, failure reasons, its cost recorded); the preview shows it building, then
-    the real result and what the test cost (`lastCostUsd`), or why it failed with "Try again". Only when it worked
+    widget (`update_widget`, a history row, failure reasons, its cost recorded); the card shows it building in place,
+    then the real result (the ask folds into one line that opens it again), or why it failed with "Try again". Only
+    when it worked
     does "Create widget" confirm it (`POST …/widgets/{id}/confirm`; `widget.not_tested`, 409, before that): it goes
     first on the board chosen then, with the size, schedule and alert chosen then, keeping the tested data and its
     history (no second build), and its routine gets its schedule. Changing the ask, the agent or the format makes the
@@ -163,7 +168,7 @@ people than asked.
 - One more kind of routine: Routines lists widget routines with their widget, and the routine code paths branch on the
   `widget` target in a few places (firing, the ledger's end, the agent's routine tools, which refuse to change them).
 - A widget's refresh costs the agent's budget like any routine run; the cap of 60 scheduled widgets per workspace and
-  the 30-minute floor bound it, and the dialog says the cost before anything is made.
+  the 30-minute floor bound it, and the Model Gateway checks the budget before every run.
 - Data an agent fetched reaches whoever sees the board (§12). Agents can't widen that by themselves (§11), and a
   routine never does.
 - No new permission: showing a board needs `post`, deciding everything else follows the board's own rules and

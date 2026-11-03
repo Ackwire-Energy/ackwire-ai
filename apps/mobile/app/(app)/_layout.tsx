@@ -125,6 +125,7 @@ function AppStack() {
       <Stack.Screen name="board-edit-roles" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-pick" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget-pin" options={{ ...pushed, ...scrollUnder }} />
       {/* Search where the tab bar has no room for it (Android, iOS before 26). */}
       <Stack.Screen name="find" options={{ ...pushed, ...scrollUnder }} />

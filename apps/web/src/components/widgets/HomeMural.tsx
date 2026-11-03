@@ -1,10 +1,10 @@
 import type { Dashboard, HomeTile } from "@agenteschat/client";
 import { useHomeDashboard } from "@agenteschat/client";
-import { Button } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NewWidgetDialog } from "@/components/dashboards/NewWidgetDialog";
 import { useOpenParam } from "@/lib/open-param";
+import { BoardActionsPill } from "./parts";
 import { BoardTile, type TileOrganize, WidgetBoard } from "./WidgetBoard";
 import { WidgetPanel } from "./WidgetPanel";
 import "./widgets.css";
@@ -48,22 +48,11 @@ export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting:
         {board.widgets.length > 0 && <span className="list-group-head__count">{board.widgets.length}</span>}
         {editable && (
           <span className="home-sec__acts">
-            <button
-              type="button"
-              className="home-sec__more"
-              aria-pressed={arranging}
-              onClick={() => setArranging((v) => !v)}
-            >
-              {arranging ? t("widgets.organize.done") : t("widgets.organize.start")}
-            </button>
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              icon="plus"
-              aria-label={t("widgets.add.label")}
-              title={t("widgets.add.label")}
-              onClick={() => setAdding(true)}
+            <BoardActionsPill
+              label={t("widgets.home")}
+              arranging={arranging}
+              onArrange={() => setArranging((v) => !v)}
+              onAdd={() => setAdding(true)}
             />
           </span>
         )}

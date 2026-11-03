@@ -1760,6 +1760,23 @@ export const featureKeysPtBR = {
       titleSaved: "Título salvo",
     },
     formatAuto: "{{name}} escolhe o melhor",
+    /** New widget's card, which is the form. */
+    newWidget: {
+      titleHint: "Título · {{name}} sugere ao testar",
+      alerts: "Avisa",
+      realData: "Dados de verdade",
+      editAsk: "Mudar o pedido",
+      asked: "“{{ask}}”",
+      autoFormat: "Formato automático",
+    },
+    /** "Who looks after it", pushed from New widget's card. */
+    agentPick: {
+      search: "Buscar agentes",
+      noMatch: "Nenhum agente com esse nome ou papel.",
+      note: "Cada agente lê só os apps a que tem acesso.",
+      reads: "Lê {{apps}}",
+      noApps: "Nenhum app conectado",
+    },
     notice: {
       widget_alert_one: "{{names}} sinalizou um widget",
       widget_alert_other: "{{names}} sinalizaram um widget",

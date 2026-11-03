@@ -22,7 +22,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useFocusAtEnd, useSent } from "@/components/EditInPlace";
 import { useNow } from "@/hooks/useNow";
 import { useToast } from "@/lib/toast";
-import { failureText, useWidgetAgent, WidgetFoot, widgetTitle } from "./parts";
+import { failureText, useWidgetAgent, WidgetFace, WidgetFoot, widgetTitle } from "./parts";
 import { RemoveWidgetDialog } from "./RemoveWidgetDialog";
 import "./widgets.css";
 
@@ -188,6 +188,7 @@ function PanelBody({ orgId, widget, onClose }: { orgId: string; widget: WidgetDe
         size={{ w: 2, h: 2 }}
         locale={i18n.language}
         buildingText={t("widgets.status.building", { name })}
+        face={<WidgetFace agentId={widget.agentId} name={name} />}
         footer={
           <WidgetFoot
             widget={widget}

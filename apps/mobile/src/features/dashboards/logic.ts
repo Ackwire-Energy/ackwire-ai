@@ -514,3 +514,108 @@ export const setPinDraft = (draft: PinDraft | null) => {
   pinDraft = draft;
 };
 export const pinDraftNow = (): PinDraft | null => pinDraft;
+
+// ── The widget card ──────────────────────────────────────────────────────────
+
+/**
+ * A widget card's soft surface (ADR 0134): no border and no shadow, only a background a step off the board's
+ * (`board`). On the light grouped gray that is the raised white; on the dark board, 78% of the raised tone over it (a
+ * quieter card). Opaque `#rrggbb`, so marks drawn on the card can be ringed in it.
+ */
+export function softCardColor(raised: string, board: string, dark: boolean): string {
+  if (!dark) return raised;
+  return mixHex(raised, board, 0.78);
+}
+
+/** `a` at `share` (0–1) over `b`, both `#rrggbb` (anything else gives `a` back). */
+export function mixHex(a: string, b: string, share: number): string {
+  const parse = (hex: string) =>
+    /^#[0-9a-f]{6}/i.test(hex) ? [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) : null;
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return a;
+  return `#${x
+    .map((v, i) =>
+      Math.round(v * share + (y[i] ?? 0) * (1 - share))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+/**
+ * The series a card draws edge to edge along its bottom: a number's trend, or a line with no note on a board (no axis
+ * to keep inside the padding). Null when it draws its chart inside (a big line with its labels, a line with a note).
+ */
+export function bleedSeries(spec: WidgetSpec | null | undefined, big: boolean): number[] | null {
+  if (!spec) return null;
+  if (spec.kind === "kpi") return (spec.spark?.length ?? 0) > 1 ? (spec.spark ?? null) : null;
+  if (spec.kind === "line" && !big && !spec.note && spec.values.length > 1) return spec.values;
+  return null;
+}
+
+/**
+ * Where an edge-to-edge line's points sit in a `width` × `height` box: from the left edge to `edge` points short of the
+ * right one (room for the last point's square), the line in the upper part so the dither under it has room to fade
+ * out before the bottom.
+ */
+export function bleedPoints(values: readonly number[], width: number, height: number, edge = 6): [number, number][] {
+  if (values.length === 0 || width <= 0 || height <= 0) return [];
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const span = hi - lo || 1;
+  const top = edge;
+  const bottom = Math.max(top + 1, Math.round(height * 0.62));
+  const step = values.length > 1 ? (width - edge) / (values.length - 1) : 0;
+  return values.map((v, i) => [
+    Math.round(i * step * 10) / 10,
+    Math.round((bottom - ((v - lo) / span) * (bottom - top)) * 10) / 10,
+  ]);
+}
+
+/**
+ * The number over a bar: the whole number when it fits the bar's `slot` (points wide), else the short form ("18K"),
+ * never cut with an ellipsis. Only the number: the unit is the chart's tag.
+ */
+export function barValueText(value: number, locale: string, slot: number): string {
+  const full = formatWidgetNumber(value, locale);
+  // About 7 points per character at the caption size, weight 700.
+  if (full.length * 7 <= slot) return full;
+  return new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+// ── New widget: the card is the form ─────────────────────────────────────────
+
+/**
+ * Whether New widget's card shows the ask as a field: before the first test, and while the person edits it after one.
+ * Otherwise the ask folds into one line on the card that opens the field again.
+ */
+export const asksInCard = (phase: TestPhase, editing: boolean): boolean => editing || phase === "untested";
+
+/** The bar's action word on New widget: Create after a good test, Test again after one, else Test. */
+export function newWidgetBarLabel(phase: TestPhase): "create" | "testAgain" | "test" {
+  if (phase === "ok") return "create";
+  return phase === "stale" || phase === "failed" ? "testAgain" : "test";
+}
+
+// ── Agent picker ─────────────────────────────────────────────────────────────
+
+/** Past this many agents the picker gets a search field. */
+export const AGENT_SEARCH_FROM = 7;
+
+const foldWords = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+/** The agents a typed search keeps, by name or role (accents and case aside), in their order. */
+export function agentsMatching<T extends { name: string; role?: string | null }>(
+  agents: readonly T[],
+  query: string,
+): T[] {
+  const q = foldWords(query);
+  if (!q) return [...agents];
+  return agents.filter((a) => foldWords(a.name).includes(q) || foldWords(a.role ?? "").includes(q));
+}

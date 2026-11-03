@@ -1757,6 +1757,23 @@ export const featureKeysEn = {
     },
     /** The second line of "Automatic" in New widget's Format menu. */
     formatAuto: "{{name}} picks the best one",
+    /** New widget's card, which is the form. */
+    newWidget: {
+      titleHint: "Title · {{name}} suggests one when testing",
+      alerts: "Alerts",
+      realData: "Real data",
+      editAsk: "Change the ask",
+      asked: "“{{ask}}”",
+      autoFormat: "Auto format",
+    },
+    /** "Who looks after it", pushed from New widget's card. */
+    agentPick: {
+      search: "Search agents",
+      noMatch: "No agent with that name or role.",
+      note: "Each agent reads only the apps it was given access to.",
+      reads: "Reads {{apps}}",
+      noApps: "No connected apps",
+    },
     notice: {
       widget_alert_one: "{{names}} flagged a widget",
       widget_alert_other: "{{names}} flagged a widget",

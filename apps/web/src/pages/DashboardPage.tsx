@@ -28,6 +28,7 @@ import { ShareDashboardDialog } from "@/components/dashboards/ShareDialog";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { BoardActionsPill } from "@/components/widgets/parts";
 import { WidgetBoard } from "@/components/widgets/WidgetBoard";
 import { WidgetPanel } from "@/components/widgets/WidgetPanel";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -136,19 +137,12 @@ function Board({
                 {t("dashboards.share.action")}
               </Button>
             )}
-            {board.canEdit && !empty && (
-              <Button size="sm" variant="ghost" aria-pressed={arranging} onClick={() => setArranging((a) => !a)}>
-                {arranging ? t("widgets.organize.done") : t("widgets.organize.start")}
-              </Button>
-            )}
             {board.canEdit && (
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="plus"
-                aria-label={t("widgets.add.label")}
-                onClick={() => setAdding(true)}
+              <BoardActionsPill
+                label={board.title}
+                arranging={arranging}
+                onArrange={empty ? undefined : () => setArranging((a) => !a)}
+                onAdd={() => setAdding(true)}
               />
             )}
             {(board.canEdit || board.canManage) && (

@@ -42,23 +42,105 @@
   }
 }
 
-/* ── The widget ─────────────────────────────────────────────────────────── */
+/* A board's head: "Organize" and "+ Widget" as one raised pill, a hairline between them (gone under the pointer). */
+.wb-pill {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.wb-pill > button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 12px 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.wb-pill > button + button::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: -1px;
+  width: 1px;
+  background: var(--line2);
+  transition: opacity 0.15s;
+}
+.wb-pill > button:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.wb-pill > button:hover::before,
+.wb-pill > button:hover + button::before,
+.wb-pill > button[aria-pressed="true"]::before,
+.wb-pill > button[aria-pressed="true"] + button::before {
+  opacity: 0;
+}
+.wb-pill > button:active {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.wb-pill > button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+html:not([data-pointer]) .wb-pill > button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/*
+ * ── The widget ─────────────────────────────────────────────────────────
+ * A soft surface, a shade off the page and no border (a hairline only under the pointer); 20px inside. The agent's
+ * face leads the small muted title; a chart's unit is a tag above it; a note is a quiet caption under a hairline;
+ * the footer only says who and when, lighter still.
+ */
 .wg {
   position: relative;
   --card-pad: 0;
+  --wg-bg: color-mix(in srgb, var(--sunken) 70%, var(--raised));
   padding: 0;
   gap: 0;
   min-height: 156px;
+  background: var(--wg-bg);
+  box-shadow: none;
   transition:
     box-shadow 0.2s,
     transform 0.2s;
+}
+[data-theme="dark"] .wg {
+  --wg-bg: color-mix(in srgb, var(--raised) 78%, var(--bg));
+}
+.wg:hover {
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .wg__head {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 30px;
-  padding: 12px 10px 0 16px;
+  padding: 16px 14px 0 20px;
+}
+.wg__face {
+  display: inline-flex;
+  flex: none;
 }
 .wg__title {
   flex: 1;
@@ -68,10 +150,11 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 650;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   line-height: 20px;
-  color: var(--ink2);
+  color: var(--muted);
   text-align: start;
   white-space: nowrap;
   overflow: hidden;
@@ -81,7 +164,7 @@ button.wg__title {
   cursor: pointer;
 }
 button.wg__title:hover {
-  color: var(--ink);
+  color: var(--ink2);
 }
 html:not([data-pointer]) button.wg__title:focus-visible {
   outline: none;
@@ -113,7 +196,7 @@ html:not([data-pointer]) button.wg__title:focus-visible {
 .wg__body {
   flex: 1;
   min-width: 0;
-  padding: 8px 16px 4px;
+  padding: 12px 20px 8px;
   transition:
     opacity 0.25s,
     filter 0.25s;
@@ -123,17 +206,39 @@ html:not([data-pointer]) button.wg__title:focus-visible {
   align-items: center;
   gap: 6px;
   min-height: 20px;
-  padding: 6px 16px 12px;
-  font-size: 12.5px;
+  padding: 8px 20px 16px;
+  font-size: 12px;
   line-height: 18px;
-  color: var(--muted);
+  color: var(--faint);
 }
 .wg__foot .ac-avatar {
   flex: none;
 }
 .wg__foot b {
   font-weight: 600;
-  color: var(--ink2);
+  color: var(--muted);
+}
+/*
+ * A number's trend, edge to edge at the bottom under the footer (`WidgetBleed`): clipped by the card's lower
+ * corners (the cut one included), its dither running out at the bottom edge.
+ */
+.wg__bleed {
+  margin-top: -6px;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-section) 4px;
+  transition:
+    opacity 0.25s,
+    filter 0.25s;
+}
+.wg__bleed .wk-spark {
+  margin: 0;
+}
+.wg[data-state="updating"] .wg__bleed {
+  opacity: 0.45;
+}
+.wg[data-state="failed"] .wg__bleed {
+  opacity: 0.5;
+  filter: grayscale(1);
 }
 .wg__when {
   min-width: 0;
@@ -270,7 +375,7 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
   margin-left: 2px;
 }
 .wk-sub {
-  margin-top: 2px;
+  margin-top: 4px;
   font-size: 13px;
   line-height: 18px;
   color: var(--ink2);
@@ -313,12 +418,38 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
 .wk-spark {
   margin-top: 8px;
 }
+/* A chart's unit, said once: a small tag above it. */
+.wk-cap {
+  display: inline-block;
+  max-width: 100%;
+  margin: -4px 0 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--plate);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+/* A chart's note: a quiet caption under a hairline, at most two lines (`wk-clamp`). */
+.wk-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
+}
 .wk-bars {
   display: flex;
   align-items: flex-end;
   gap: 10px;
   height: 96px;
-  padding-top: 16px;
+  padding-top: 20px;
 }
 .wg[data-h="2"] .wk-bars {
   height: 210px;
@@ -336,10 +467,11 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
   min-width: 0;
   height: 100%;
 }
+/* Only the number, whole: never cut, even when it is wider than its bar. */
 .wk-bar__v {
   margin-bottom: 3px;
-  font-size: 12.5px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -361,7 +493,7 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
   display: flex;
   gap: 10px;
   padding-top: 5px;
-  border-top: 1px solid var(--line-strong);
+  border-top: 1px solid var(--line2);
 }
 .wk-axis span {
   flex: 1;
