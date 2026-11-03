@@ -143,8 +143,12 @@ const MAX_OUTPUT_CHARS = 50_000;
 const MAX_STDOUT = 8 * 1024 * 1024;
 /** How often the version of Chrome on disk is read again (it updates itself). */
 const VERSION_CHECK_MS = 5 * 60_000;
-/** A Chrome a newer version waits for on disk restarts once its session had no command for this long. */
-const UPDATE_IDLE_MS = 2 * 60_000;
+/**
+ * A Chrome a newer version waits for on disk restarts once its session had no command, viewer or person's turn for
+ * this long: an agent may pause minutes mid-task (a build, a reply) and find its page as it left it. Its idle stop
+ * (`BROWSER_IDLE_MS`) comes later.
+ */
+const UPDATE_IDLE_MS = 10 * 60_000;
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 const QUICK_TIMEOUT_MS = 15_000;
 /** One input command on the relay: a click or a key answers in milliseconds. */
@@ -461,7 +465,8 @@ export function chromeVersion(exe: string, platform: string = process.platform):
 }
 
 /**
- * Chrome flags on every launch: no first-run screens, nothing updating
+ * Chrome flags on every launch: no first-run screens (nor the search engine
+ * choice Google Chrome shows in some countries), nothing updating
  * Chrome's components or starting Google's updater from our Chrome (the
  * computer's own updater keeps Chrome current), and none of the automation
  * markers a launched-for-automation Chrome carries (no `--enable-automation`). Pages
@@ -484,6 +489,7 @@ export const CHROME_ARGS = [
   "--disable-blink-features=AutomationControlled",
   "--disable-component-update",
   "--disable-updater-scheduler",
+  "--disable-search-engine-choice-screen",
   "--force-prefers-reduced-motion",
   "--disable-features=SigninPromoOnAvatarPill",
   "--restore-last-session",
@@ -589,6 +595,13 @@ export function chromeEnv(on: ChromeDisplay, base: NodeJS.ProcessEnv = process.e
     if (v !== undefined && k !== "WAYLAND_DISPLAY" && k !== "DBUS_SESSION_BUS_ADDRESS") env[k] = v;
   }
   return { ...env, DISPLAY: `:${on.display}`, XAUTHORITY: on.xauthority };
+}
+
+/** The version of Chrome that last ran on `profile` (its `extensions.last_chrome_version`), or null. */
+export function profileChromeVersion(profile: string): string | null {
+  const prefs = readJson<unknown>(path.join(profile, "Default", "Preferences"));
+  const extensions = isRecord(prefs) && isRecord(prefs.extensions) ? prefs.extensions : null;
+  return typeof extensions?.last_chrome_version === "string" ? extensions.last_chrome_version : null;
 }
 
 /** The start page extension Chrome for Testing loaded (`--load-extension`), which Google Chrome ignores. */
@@ -1145,6 +1158,8 @@ interface Session {
   version?: string;
   /** The newer version on disk it restarts on, or restarted on: once per version. */
   updatedTo?: string;
+  /** When a sweep last found someone watching it or a person's turn open on it. */
+  heldAt?: number;
 }
 
 /** One Chrome in `chromes.json`. */
@@ -1932,6 +1947,13 @@ export class BrowserManager {
         );
       }
       const version = this.diskVersion(true);
+      const last = profileChromeVersion(profile);
+      if (version && last && Number.parseInt(last, 10) > Number.parseInt(version, 10)) {
+        this.opts.log(
+          `the browser of ${agent.handle} didn't start: Chrome ${version} is older than its profile's ${last}`,
+        );
+        throw new RunnerError("browser_unavailable", CHROME_FAILURES.outdated);
+      }
       const start = this.opts.startChrome ?? launchChrome;
       await this.clearStaleLock(profile);
       const launch = async (on: ChromeDisplay | null) => {
@@ -2199,6 +2221,7 @@ export class BrowserManager {
       // A person on its desktop may be working in it without a command: that counts as use.
       if (this.desktopWatched(s)) s.lastUsed = this.now();
       if (s.stream || s.streamOpening || this.held(agentId)) {
+        s.heldAt = this.now();
         // `agent-browser` stops on its own idle timeout: a command keeps it up for whoever is still on the page.
         // Not a use: once nobody holds it, its idle time counts from the last real one.
         if (s.chrome && this.now() - (s.commandAt ?? 0) >= this.idleMs - 2 * SWEEP_MS) {
@@ -2227,8 +2250,8 @@ export class BrowserManager {
 
   /**
    * Whether the agent's Chrome restarts now on the newer `disk` version (it updated itself): once per version, and
-   * only while nobody needs it, so a browser is never restarted mid-task: no command for `UPDATE_IDLE_MS`, nobody
-   * watching it and no person's turn. One that idles out first simply starts on the new version next time.
+   * only while nobody needs it, so a browser is never restarted mid-task: no command, nobody watching it and no
+   * person's turn for `UPDATE_IDLE_MS`. One that idles out first simply starts on the new version next time.
    */
   private updateDue(s: Session, disk: string) {
     return (
@@ -2237,7 +2260,7 @@ export class BrowserManager {
       s.version !== disk &&
       s.updatedTo !== disk &&
       !this.inView(s) &&
-      this.now() - s.lastUsed >= UPDATE_IDLE_MS
+      this.now() - Math.max(s.lastUsed, s.heldAt ?? 0) >= UPDATE_IDLE_MS
     );
   }
 

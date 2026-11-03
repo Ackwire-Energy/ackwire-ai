@@ -309,6 +309,7 @@ test("only the computer's Google Chrome is driven, at its standard path on each 
     "--disable-blink-features=AutomationControlled",
     "--disable-component-update",
     "--disable-updater-scheduler",
+    "--disable-search-engine-choice-screen",
     "--force-prefers-reduced-motion",
     "--disable-features=SigninPromoOnAvatarPill",
     "--restore-last-session",
@@ -1391,7 +1392,12 @@ test.if(posix)(
     now += 60_000;
     await t.manager.sweep();
     expect(t.chromes).toHaveLength(2);
-    // Read again, 6 minutes on: the agent idle since restarts; the one that just acted doesn't.
+    // Read again 6 minutes on: an agent may pause that long mid-task (a build, a reply), so nothing restarts yet.
+    now += 5 * 60_000;
+    await t.manager.sweep();
+    await Bun.sleep(50);
+    expect(t.chromes).toHaveLength(2);
+    // 11 minutes on: the agent idle since restarts; the one that just acted doesn't.
     now += 5 * 60_000;
     await t.act("click", ["@e1"], { agent: ops });
     await t.manager.sweep();
@@ -1405,21 +1411,21 @@ test.if(posix)(
       `the browser of agent-01a142cb restarts on Google Chrome 157.0.8100.10 (was ${CHROME_VERSION})`,
     );
     expect(of(ops)).toHaveLength(1);
-    // Once per version: no second restart. A person's turn holds the other one off, however idle.
+    // A person's turn holds the other one off, however idle; the restart wasn't a use, so the first one's idle stop
+    // still counts from its last command (once per version: it never restarted again).
     now += 60_000;
     t.manager.setHandoff(ops.id, { status: "pending" });
-    now += 4 * 60_000;
-    await t.manager.sweep();
-    await Bun.sleep(50);
-    expect(of(dev)).toHaveLength(2);
-    expect(of(ops)).toHaveLength(1);
-    // Their turn over: it restarts too, and the restart isn't a use (the idle stop still counts from the last one).
-    t.manager.setHandoff(ops.id, null);
-    await t.manager.sweep();
-    await waitFor(() => of(ops).length === 2);
-    now += 10 * 60_000;
+    now += 11 * 60_000;
     await t.manager.sweep();
     await waitFor(() => (of(dev)[1]?.killed || of(dev)[1]?.closed) === true);
+    expect(of(dev)).toHaveLength(2);
+    expect(of(ops)).toHaveLength(1);
+    // Their turn just over: the agent may carry on where they left it, so it doesn't restart then.
+    t.manager.setHandoff(ops.id, null);
+    await t.manager.sweep();
+    await Bun.sleep(50);
+    expect(of(ops)).toHaveLength(1);
+    expect(of(ops)[0]?.killed || of(ops)[0]?.closed).toBe(false);
   },
 );
 
@@ -1708,6 +1714,30 @@ test.if(posix)(
     expect(chromeFailureKind(libs.message)).toBe("start");
     // Anything else of the browser's (a busy computer) isn't a Chrome failure.
     expect(chromeFailureKind("This computer already has 8 browsers open (its limit).")).toBeNull();
+  },
+);
+
+test.if(posix)(
+  "a Chrome a major version older than the one that last ran on the agent's profile doesn't start on it, and says so",
+  async () => {
+    const t = setup({ chromeVersion: () => "155.0.7000.1" });
+    const folder = await t.folder();
+    const prefs = path.join(folder, ".agentes", "browser", "Default", "Preferences");
+    mkdirSync(path.dirname(prefs), { recursive: true });
+    const lastRan = (version: string) =>
+      writeFileSync(prefs, JSON.stringify({ extensions: { last_chrome_version: version } }));
+    const open = () =>
+      t.manager
+        .act(dev, folder, { op: "browser.act", command: "open", args: ["https://a/"], timeoutSeconds: 30 })
+        .catch((e: { code: string; message: string }) => e);
+    lastRan("156.0.8078.80");
+    const err = (await open()) as { code: string; message: string };
+    expect(err).toMatchObject({ code: "browser_unavailable", message: CHROME_FAILURES.outdated });
+    expect(chromeFailureKind(err.message)).toBe("outdated");
+    expect(t.chromes).toHaveLength(0);
+    // Older within its major version (Chrome for Testing 156.0.8078.80 to Google Chrome 156.0.8078.79): it starts.
+    lastRan("155.0.7100.0");
+    expect(await open()).toMatchObject({ success: true });
   },
 );
 

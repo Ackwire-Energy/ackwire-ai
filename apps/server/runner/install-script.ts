@@ -93,8 +93,11 @@ export const GOOGLE_APT = {
   keyring: "/usr/share/keyrings/google-chrome.gpg",
   sources: "/etc/apt/sources.list.d/google-chrome.sources",
   uri: "https://dl.google.com/linux/chrome-stable/deb/",
-  /** Unattended upgrades take Chrome's updates too (written only when the installer installed Chrome). */
-  unattended: "/etc/apt/apt.conf.d/52agentes-google-chrome",
+  /**
+   * A systemd timer (`.timer`, `.service`) upgrading Chrome alone every 6 hours, written only when the installer
+   * installed Chrome: a Debian without unattended upgrades would otherwise never update it.
+   */
+  updates: "/etc/systemd/system/agentes-chrome-update",
   /** `--desktop`: hides Chrome's own menu entry, so the agents' menus don't offer a second Chrome on the default profile. */
   desktopEntry: "/usr/local/share/applications/google-chrome.desktop",
 } as const;
@@ -127,7 +130,7 @@ export const GOOGLE_APT = {
  * at its browser's first use; one that can't be fetched is left to that first
  * use, warned about), Google Chrome stable from Google's apt repository
  * (`GOOGLE_APT`, its key checked against its fingerprint) when the computer
- * has none, kept up to date by its package updates, the launcher at
+ * has none, upgraded every 6 hours by a timer of its own, the launcher at
  * `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
@@ -183,7 +186,7 @@ CHROME_KEY_FPR=${shQuote(GOOGLE_APT.fingerprint)}
 CHROME_KEYRING=${shQuote(GOOGLE_APT.keyring)}
 CHROME_SOURCES=${shQuote(GOOGLE_APT.sources)}
 CHROME_URI=${shQuote(GOOGLE_APT.uri)}
-CHROME_UNATTENDED=${shQuote(GOOGLE_APT.unattended)}
+CHROME_UPDATES=${shQuote(GOOGLE_APT.updates)}
 CHROME_DESKTOP=${shQuote(GOOGLE_APT.desktopEntry)}
 
 DIR=""
@@ -461,10 +464,10 @@ chrome_key() {
   return "$KEY_RC"
 }
 
-# Google Chrome stable from Google's apt repository, set up as its own package sets it up, so the computer's package
-# updates keep it current (unattended upgrades included). Its sandbox helper never runs as root for the agents' users:
-# Chrome sandboxes with user namespaces (which --system's Debian has), and dpkg keeps that mode across upgrades. The
-# package makes itself the default web browser: the computer's own choice is put back.
+# Google Chrome stable from Google's apt repository, set up as its own package sets it up, and upgraded every 6 hours by
+# a timer of its own, whether or not this computer updates itself. Its sandbox helper never runs as root for the agents'
+# users: Chrome sandboxes with user namespaces (which --system's Debian has), and dpkg keeps that mode across upgrades.
+# The package makes itself the default web browser: the computer's own choice is put back.
 install_chrome() {
   chrome_key || return 1
   SANDBOX="$(dirname "$CHROME_EXE")/chrome-sandbox"
@@ -480,9 +483,18 @@ install_chrome() {
   apt_install google-chrome-stable || return 1
   if [ -n "$WWW" ]; then update-alternatives --set x-www-browser "$WWW" || true; fi
   if [ -n "$GNOME_WWW" ]; then update-alternatives --set gnome-www-browser "$GNOME_WWW" || true; fi
-  mkdir -p "$(dirname "$CHROME_UNATTENDED")"
-  printf '%s\\n' 'Unattended-Upgrade::Origins-Pattern { "origin=Google LLC,codename=stable"; };' > "$CHROME_UNATTENDED"
-  chmod 644 "$CHROME_UNATTENDED"
+  mkdir -p "$(dirname "$CHROME_UPDATES")"
+  printf '%s\\n' '[Unit]' "Description=Google Chrome's updates for the agents' browsers" 'After=network-online.target' '' \\
+    '[Service]' 'Type=oneshot' 'Environment=DEBIAN_FRONTEND=noninteractive' \\
+    "ExecStart=/bin/sh -c 'apt-get -qq -o DPkg::Lock::Timeout=600 update; apt-get -qq -o DPkg::Lock::Timeout=600 install -y --only-upgrade --no-install-recommends google-chrome-stable'" \\
+    > "$CHROME_UPDATES.service"
+  printf '%s\\n' '[Unit]' "Description=Google Chrome's updates for the agents' browsers" '' '[Timer]' \\
+    'OnCalendar=00/6:00' 'RandomizedDelaySec=1h' 'Persistent=true' '' '[Install]' 'WantedBy=timers.target' \\
+    > "$CHROME_UPDATES.timer"
+  chmod 644 "$CHROME_UPDATES.service" "$CHROME_UPDATES.timer"
+  TIMER="\${CHROME_UPDATES##*/}.timer"
+  systemctl daemon-reload || true
+  systemctl enable --now "$TIMER" 2>/dev/null || systemctl enable "$TIMER" || true
 }
 
 chrome_version() { "$CHROME_EXE" --version 2>/dev/null | sed -n 's/^Google Chrome \\([0-9.]*\\).*/\\1/p'; }
@@ -505,7 +517,7 @@ get_chrome() {
       return 0
     fi
     V=$(chrome_version)
-    t_step "Google Chrome\${V:+ $V}, updated with this computer's packages"
+    t_step "Google Chrome\${V:+ $V}, upgraded every 6 hours"
   fi
   if [ "$DESKTOP" -eq 1 ]; then
     mkdir -p "$(dirname "$CHROME_DESKTOP")"

@@ -436,7 +436,7 @@ function rootLinux() {
     .replace(/^CHROME_EXE=.*$/m, `CHROME_EXE=${shQuote(at("google/chrome/chrome"))}`)
     .replace(/^CHROME_KEYRING=.*$/m, `CHROME_KEYRING=${shQuote(at("keyrings/google-chrome.gpg"))}`)
     .replace(/^CHROME_SOURCES=.*$/m, `CHROME_SOURCES=${shQuote(at("apt/sources.list.d/google-chrome.sources"))}`)
-    .replace(/^CHROME_UNATTENDED=.*$/m, `CHROME_UNATTENDED=${shQuote(at("apt/apt.conf.d/52agentes-google-chrome"))}`)
+    .replace(/^CHROME_UPDATES=.*$/m, `CHROME_UPDATES=${shQuote(at("systemd/agentes-chrome-update"))}`)
     .replace(/^CHROME_DESKTOP=.*$/m, `CHROME_DESKTOP=${shQuote(at("applications/google-chrome.desktop"))}`);
   return { ...pc, at, script };
 }
@@ -484,7 +484,7 @@ const sha256 = (text: string) => createHash("sha256").update(text).digest("hex")
 /**
  * Root on x86_64 Linux with its Bun already at the pinned version, a curl that serves agent-browser, and apt with
  * Google's repository: its `apt-get install google-chrome-stable` puts a Chrome (156.0.8078.79) where its package
- * does, unless `aptFails` names a package it fails on; `gpg` reads Google's key with fingerprint `fingerprint`; the
+ * does, unless `aptFails` names a package it fails on; `systemctl` logs what it is asked; `gpg` reads Google's key with fingerprint `fingerprint`; the
  * computer's default browser is Firefox.
  */
 function rootX64(opts: { fingerprint?: string; aptFails?: string } = {}) {
@@ -518,6 +518,10 @@ esac
 `,
   );
   fake("dpkg", '#!/bin/sh\n[ "$1" = --print-architecture ] && echo amd64\n');
+  fake(
+    "systemctl",
+    '#!/bin/sh\necho "systemctl $*" >> "$LOG"\necho "systemd 257 (257.9)"\necho "+PAM +BPF_FRAMEWORK"\n',
+  );
   fake("dpkg-statoverride", '#!/bin/sh\n[ "$1" = --list ] && exit 1\necho "dpkg-statoverride $*" >> "$LOG"\n');
   fake(
     "gpg",
@@ -582,27 +586,29 @@ test.skipIf(process.platform === "win32")(
     );
     // Its sandbox helper never set-user-id root, for this install and every upgrade, before the package lands.
     expect(r.log).toContain(`dpkg-statoverride --add root root 0755 ${pc.at("google/chrome/chrome-sandbox")}\napt-get`);
-    // Updated with the computer's other packages (unattended upgrades included), never pinned.
-    expect(read(pc.at("apt/apt.conf.d/52agentes-google-chrome"))).toBe(
-      'Unattended-Upgrade::Origins-Pattern { "origin=Google LLC,codename=stable"; };\n',
+    // Upgraded every 6 hours by a timer of its own, whether or not the computer updates itself; never pinned.
+    expect(read(pc.at("systemd/agentes-chrome-update.timer"))).toContain("OnCalendar=00/6:00\nRandomizedDelaySec=1h\n");
+    expect(read(pc.at("systemd/agentes-chrome-update.service"))).toContain(
+      "install -y --only-upgrade --no-install-recommends google-chrome-stable'\n",
     );
+    expect(r.log).toContain("systemctl enable --now agentes-chrome-update.timer\n");
     // The computer's default browser stays its own.
     expect(r.log).toContain("update-alternatives --set x-www-browser /usr/bin/firefox\n");
     // The agents' menus offer no second Chrome on the default profile.
     expect(read(pc.at("applications/google-chrome.desktop"))).toContain("NoDisplay=true\n");
-    expect(r.out).toContain("Google Chrome 156.0.8078.79, updated with this computer's packages");
+    expect(r.out).toContain("Google Chrome 156.0.8078.79, upgraded every 6 hours");
     // No Chrome for Testing anywhere.
     expect(r.log).not.toContain("chrome-for-testing");
     expect(readdirSync(pc.browser())).toEqual([`agent-browser-${AGENT_BROWSER_VERSION}`]);
     expect(existsSync(pc.at("opt/agentes-runner.mjs"))).toBe(true);
 
     // Again, with Chrome there: nothing of it is installed or set again, whoever installed it.
-    rmSync(pc.at("apt/apt.conf.d/52agentes-google-chrome"));
+    rmSync(pc.at("systemd/agentes-chrome-update.timer"));
     const again = pc.run();
     expect(again.status).toBe(0);
     expect(again.log.split("google-chrome-stable").length).toBe(2);
     expect(again.out).toContain("Google Chrome 156.0.8078.79, updated by this computer's own updates");
-    expect(existsSync(pc.at("apt/apt.conf.d/52agentes-google-chrome"))).toBe(false);
+    expect(existsSync(pc.at("systemd/agentes-chrome-update.timer"))).toBe(false);
   },
   30_000,
 );

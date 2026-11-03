@@ -617,7 +617,9 @@ export const BROWSER_LIMITS = {
 /**
  * What the agent is told, in plain words, when the computer's Google Chrome fails it (a `browser_unavailable` error,
  * whose message starts with one of these): missing (`missingServer` where root installs it), not starting (more may
- * follow: the libraries it lacks), or the agent's profile not opening. The server reports each (`chromeFailureKind`).
+ * follow: the libraries it lacks), the agent's profile not opening, or Chrome older than the one that last opened the
+ * agent's profile (by a major version: an older Chrome can't open what a newer one wrote, and the agent would seem
+ * signed out). The server reports each (`chromeFailureKind`).
  */
 export const CHROME_FAILURES = {
   missing: "Google Chrome isn't installed on this computer. Install it from google.com/chrome, then try again.",
@@ -625,15 +627,18 @@ export const CHROME_FAILURES = {
     "Google Chrome isn't installed on this computer. Its admin should run the agentes.chat installer on it again.",
   start: "Google Chrome didn't start on this computer.",
   profile: "The agent's browser profile on this computer didn't open. Try again in a minute.",
+  outdated:
+    "Google Chrome on this computer is older than the one the agent's browser last ran on. Update Google Chrome on it, then try again.",
 } as const;
 
-export type ChromeFailure = "missing" | "start" | "profile";
+export type ChromeFailure = "missing" | "start" | "profile" | "outdated";
 
 /** Which of `CHROME_FAILURES` a runner's message is, or null for another one (an older runner's, a busy computer). */
 export function chromeFailureKind(message: string): ChromeFailure | null {
   if (message.startsWith("Google Chrome isn't installed")) return "missing";
   if (message.startsWith(CHROME_FAILURES.start)) return "start";
   if (message.startsWith(CHROME_FAILURES.profile)) return "profile";
+  if (message.startsWith(CHROME_FAILURES.outdated)) return "outdated";
   return null;
 }
 

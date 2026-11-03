@@ -993,8 +993,8 @@ Commands run as the user that runs the runner, so give it a dedicated user or a 
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
 On a Linux server, the installer's `--system` option (below) installs Google Chrome from Google's apt
-repository (its signing key checked against its fingerprint) when the computer has none, and turns on
-unattended upgrades for it, so it stays current with the computer's other packages. With the command
+repository (its signing key checked against its fingerprint) when the computer has none, with a
+systemd timer (`agentes-chrome-update.timer`) that upgrades it, and nothing else, every 6 hours. With the command
 above, install Google Chrome yourself (on Debian and Ubuntu, the `.deb` from google.com/chrome adds
 Google's repository). Computers that ran Chrome for Testing for their agents move to Google Chrome when
 the installer runs again (or the runner updates, outside `--system`), and the agents stay signed in.
