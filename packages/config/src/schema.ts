@@ -159,14 +159,14 @@ export const envVars = {
   TERMS_URL: {
     schema: z.url().optional(),
     description:
-      "Your terms of service, linked on the sign-in and sign-up screens and the help pages when `PRIVACY_URL` is set too, and where this server's /terms leads. Default on agentes.chat Cloud (https://app.agentes.chat): its /terms page.",
+      "Your terms of service, linked on the sign-in and sign-up screens when `PRIVACY_URL` is set too, and where this server's /terms leads. Default on agentes.chat Cloud (https://app.agentes.chat): its /terms page.",
     section: "Sign-in",
     example: "https://example.com/terms",
   },
   PRIVACY_URL: {
     schema: z.url().optional(),
     description:
-      "Your privacy policy, linked on the sign-in and sign-up screens and the help pages together with `TERMS_URL`, and where this server's /privacy leads. Default on agentes.chat Cloud (https://app.agentes.chat): its /privacy page.",
+      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`, and where this server's /privacy leads. Default on agentes.chat Cloud (https://app.agentes.chat): its /privacy page.",
     section: "Sign-in",
     example: "https://example.com/privacy",
   },

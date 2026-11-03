@@ -682,7 +682,7 @@ describe("agent page: memory and proposals", () => {
   test("the side column is one link to how memory works", async () => {
     await go("?tab=memory");
     const link = screen().getByRole("link", { name: "Como a memória funciona" });
-    expect(link.getAttribute("href")).toBe("https://app.agentes.chat/help/memory?lang=pt-BR");
+    expect(link.getAttribute("href")).toBe("https://agentes.chat/pt/docs/memory");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     expect(link.closest(".agp-col")?.textContent).toBe("Como a memória funciona");
     const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });

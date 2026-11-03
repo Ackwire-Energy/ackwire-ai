@@ -1,3 +1,4 @@
+import { docsUrl } from "@agenteschat/i18n/docs";
 import { appLocale } from "@agenteschat/i18n/locale";
 import type { FetchLike } from "../api/http";
 import type { Instance } from "../api/types";
@@ -11,12 +12,12 @@ import type { Instance } from "../api/types";
 export const CLOUD_SERVER = "https://app.agentes.chat";
 
 /**
- * A help page on the Cloud (app.agentes.chat), in the reader's language (English where it has no page), at a
- * section. Every edition and app links there, with only the page, the language and the section: no server,
- * organization or person.
+ * A help page on the public docs site, in the reader's language, at a section. Every edition and app links there,
+ * with only the page, the language and the section: no server, organization or person. Every language has every
+ * page (`@agenteschat/i18n` help test), so no English fallback here.
  */
 export const helpUrl = (slug: string, locale: string, section?: string) =>
-  `${CLOUD_SERVER}/help/${slug}?lang=${appLocale([locale], true) ?? "en"}${section ? `#${section}` : ""}`;
+  docsUrl(appLocale([locale], true) ?? "en", slug, section);
 
 /** The app API contract these apps speak; a server serves its `minApi` up to its `api` (`GET /api/instance`). */
 export const APP_API = 1;
