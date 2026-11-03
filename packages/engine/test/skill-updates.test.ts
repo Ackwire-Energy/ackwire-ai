@@ -343,6 +343,25 @@ describe("an agent's change and its link's next update", () => {
     const [row] = await f.db.select().from(schema.skills).where(eq(schema.skills.id, skill.id));
     expect([row?.linkBase, row?.editedSinceSource]).toEqual([null, false]);
   });
+
+  test("Desfazer mudança on the agents' only change: undone in its history, and the link's next update needs nobody", async () => {
+    f = await setup();
+    const { gh, deps, skill } = await install(f, { "deploy/SKILL.md": skillMd("# v1") });
+    await f.db.insert(schema.agentSkills).values({ orgId: f.org.id, agentId: f.agent.id, skillId: skill.id });
+    const ctx = await runFor(f, f.owner.id);
+    const run = { id: ctx.runId as string, orgId: f.org.id };
+    await addRunStep(f.db, run, "tool_call", { toolUseId: "tu_load", name: "load_skill", input: { name: "deploy" } });
+    await addRunStep(f.db, run, "tool_result", { toolUseId: "tu_load", name: "load_skill", content: "ok" });
+    await call(deps, ctx, "update_skill", { name: "deploy", body: "# v1\nWarm the cache." });
+
+    const back = await undoSkillUpdate(deps, f.owner.id, f.org.id, skill.id);
+    expect(back.body).toBe("# v1");
+    expect(back.changes.map((c) => c.undone)).toEqual([true]);
+    const [row] = await f.db.select().from(schema.skills).where(eq(schema.skills.id, skill.id));
+    expect([row?.linkBase, row?.editedSinceSource]).toEqual([null, false]);
+    gh.state.files = { "deploy/SKILL.md": skillMd("# v2") };
+    expect((await updateSkillFromSource(deps, f.owner.id, f.org.id, skill.id)).status).toBe("updated");
+  });
 });
 
 /** A run of the agent on `userId`'s message in #general. */

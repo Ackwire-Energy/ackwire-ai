@@ -1,4 +1,4 @@
-import { and, type Database, eq, isNotNull, isNull, schema } from "@agenteschat/db";
+import { and, type Database, eq, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { sha256 } from "./crypto";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -163,7 +163,7 @@ export async function updateSkillFromSource(
   // A person chose the waiting update: Desfazer gives the choice back.
   const waited =
     waiting && options.approved === hash
-      ? { waited: { pending: waiting, sourceHash: s.sourceHash, linkBase: s.linkBase } }
+      ? { waited: { pending: waiting, sourceHash: s.sourceHash, linkBase: s.linkBase, edited: s.editedSinceSource } }
       : {};
   const skill = await mark({
     pendingUpdate: null,
@@ -234,7 +234,7 @@ export async function undoSkillUpdate(deps: SkillDeps, actorId: string, orgId: s
   if (!s.lastUpdate || s.lastUpdate.version !== s.version)
     throw new ValidationError("There is no update from its link to undo", "skill.nothing_to_undo");
   const row = await restoreSkillSnapshot(deps.db, s, s.lastUpdate.from);
-  const back = s.lastUpdate.waited;
+  const { waited: back, prior, agentId } = s.lastUpdate;
   const [cleared] = await deps.db
     .update(skills)
     .set({
@@ -244,12 +244,23 @@ export async function undoSkillUpdate(deps: SkillDeps, actorId: string, orgId: s
             pendingUpdate: back.pending,
             sourceHash: back.sourceHash,
             linkBase: back.linkBase,
-            editedSinceSource: !!back.pending.edited,
+            editedSinceSource: back.edited ?? !!back.pending.edited,
           }
         : {}),
+      ...(prior ? { editedSinceSource: prior.edited, linkBase: prior.linkBase } : {}),
     })
     .where(eq(skills.id, s.id))
     .returning();
+  // An agent's change undone here is undone in its history too (the skill's page, `revertSkillChange`).
+  if (agentId)
+    await deps.db
+      .update(schema.agentActions)
+      .set({ undoneAt: new Date(), undoneByUserId: actorId })
+      .where(
+        sql`${schema.agentActions.id} = (select a.id from ${schema.agentActions} a where a.org_id = ${orgId}
+          and a.kind = 'skill.updated' and a.target_id = ${s.id} and a.agent_id = ${agentId} and a.undone_at is null
+          order by a.created_at desc limit 1)`,
+      );
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: actorId },

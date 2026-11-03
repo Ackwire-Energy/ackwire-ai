@@ -264,15 +264,10 @@ export function SkillScreen({ id }: { id: string }) {
     <SettingsPage title={s?.name ?? t("skills.title")} subtitle={subtitle}>
       {skill.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
       {skill.isError && !s ? (
-        <>
-          <View style={styles.note}>
-            <Note icon="x">{t("common.loadFailed")}</Note>
-          </View>
-          <Gap />
-          <GroupedList>
-            <GroupedRow icon="down" label={t("common.retry")} onPress={() => skill.refetch()} />
-          </GroupedList>
-        </>
+        <View style={[styles.note, styles.retry]}>
+          <Note icon="x">{t("common.loadFailed")}</Note>
+          <Button size="sm" variant="secondary" label={t("common.retry")} onPress={() => void skill.refetch()} />
+        </View>
       ) : null}
       {s ? (
         <>
@@ -1042,6 +1037,7 @@ export function EditSkillScreen({ id }: { id: string }) {
 
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
+  retry: { gap: 10, alignItems: "flex-start" },
   search: { paddingTop: 14, paddingBottom: 8 },
   loading: { marginVertical: 16 },
   page: { paddingHorizontal: 16, paddingVertical: 14 },

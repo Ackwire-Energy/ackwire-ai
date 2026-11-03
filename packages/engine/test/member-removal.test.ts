@@ -225,6 +225,19 @@ for (const brain of ["cursor", "opencode"] as const) {
   });
 }
 
+test("deleting the account: their agents on a plan someone else's computer gives go back to the API too", async () => {
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, MAC);
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: caio.id, machineId, brain: "opencode", brainAccountId: null })
+    .where(eq(schema.agents.id, f.agent.id));
+
+  await deleteAccount(f.db, caio.id, { pubsub: f.pubsub });
+  // No owner now, so no plan thinks for it; the computer stays (it isn't theirs).
+  expect(await agentRow()).toMatchObject({ ownerUserId: null, machineId, brain: "model", brainAccountId: null });
+});
+
 test("leaving on one's own is quiet, and the agents skip a blocked owner", async () => {
   const blocked = await addMember(f.db, f.org.id, "member", "old");
   await changeMemberRole(f.db, f.owner.id, f.org.id, blocked.id, "owner");

@@ -1246,7 +1246,7 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     await import("./workspace-deletion");
   const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
   const { dropMailOfOwner } = await import("./tools/scopes");
-  const { plan, closed, released, removed, mailActions } = await db.transaction(async (tx) => {
+  const { plan, closed, released, removed, mailActions, ownerless } = await db.transaction(async (tx) => {
     // First, as creating a workspace does: one made in another tab meanwhile is in the plan below and closes with them.
     await lockWorkspacesOf(tx, userId);
     const mine = await tx
@@ -1284,6 +1284,24 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
       await offPlansNotOwners(tx, computer.orgId, freed);
       removed.push({ computer, freed });
     }
+    // Their agents are left with no owner, and a plan thinks only for its owner's (`planIsOwners`): whatever computer
+    // brain they had, they go back to the API.
+    const ownerless = plan.leaves.length
+      ? await tx
+          .update(agents)
+          .set({ brain: "model", brainAccountId: null, updatedAt: new Date() })
+          .where(
+            and(
+              inArray(
+                agents.orgId,
+                plan.leaves.map((o) => o.id),
+              ),
+              eq(agents.ownerUserId, userId),
+              ne(agents.brain, "model"),
+            ),
+          )
+          .returning({ id: agents.id, orgId: agents.orgId })
+      : [];
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
@@ -1304,7 +1322,7 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
       payload: { userId },
       maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
     });
-    return { plan, closed, released, removed, mailActions };
+    return { plan, closed, released, removed, mailActions, ownerless };
   });
   for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
   await announceReleasedAccounts(options.pubsub, released);
@@ -1319,7 +1337,9 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     const changed = [
       ...released.agents.filter((a) => a.orgId === org.id).flatMap((a) => a.agentIds),
       ...removed.filter((r) => r.computer.orgId === org.id).flatMap((r) => r.freed),
+      ...ownerless.filter((a) => a.orgId === org.id).map((a) => a.id),
     ];
+    for (const id of changed) caches.agents.delete(`${org.id}:${id}`);
     await announceMembers(options.pubsub, org.id, [...new Set(changed)]);
   }
   for (const one of closed) await afterClosing({ ...options, db }, one);

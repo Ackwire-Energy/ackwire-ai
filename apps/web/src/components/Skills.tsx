@@ -720,7 +720,12 @@ function TextDiff({ before, after }: { before: SkillText; after: SkillText }) {
         />
       )}
       {before.body !== after.body && (
-        <Diff {...labels} code lines={diffLines(before.body.split("\n"), after.body.split("\n"))} />
+        <Diff
+          {...labels}
+          code
+          aria-label="SKILL.md"
+          lines={diffLines(before.body.split("\n"), after.body.split("\n"))}
+        />
       )}
     </>
   );
@@ -769,7 +774,12 @@ function PendingDiff({ skill: s }: { skill: SkillDetail }) {
               {f.large || f.after === null ? (
                 <p className="small muted">{t("skills.diff.large")}</p>
               ) : (
-                <Diff {...labels} code lines={diffLines(f.before?.split("\n") ?? [], f.after.split("\n"))} />
+                <Diff
+                  {...labels}
+                  code
+                  aria-label={f.path}
+                  lines={diffLines(f.before?.split("\n") ?? [], f.after.split("\n"))}
+                />
               )}
             </div>
           ))}
@@ -927,11 +937,12 @@ function ChangeRow({
   const toast = useToast();
   const action = useSkillAction(org.id);
   const [open, setOpen] = useState(false);
+  const line = t("skills.agentChange", { agent, when: relativeTime(t, i18n.language, c.at) });
   return (
     <li className="skill-history__row">
       <span className="skill-line">
         <span className="small">
-          {t("skills.agentChange", { agent, when: relativeTime(t, i18n.language, c.at) })}
+          {line}
           {c.undone && <> · {t("skills.history.undone")}</>}
         </span>
         <Button size="sm" variant="ghost" icon="eye" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -964,6 +975,7 @@ function ChangeRow({
           addedLabel={t("proposals.added")}
           removedLabel={t("proposals.removed")}
           code
+          aria-label={line}
           lines={diffLines(c.before.split("\n"), c.after.split("\n"))}
         />
       )}

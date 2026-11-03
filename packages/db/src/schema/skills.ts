@@ -115,7 +115,11 @@ export const skills = pgTable(
         pending: SkillPendingUpdate;
         sourceHash: string | null;
         linkBase: { body: string; description: string; at: string } | null;
+        /** `editedSinceSource` then (absent on older rows: the update's `edited`). */
+        edited?: boolean;
       };
+      /** An agent's change: `editedSinceSource` and `linkBase` before it, as undoing it leaves them. */
+      prior?: { edited: boolean; linkBase: { body: string; description: string; at: string } | null };
     }>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
