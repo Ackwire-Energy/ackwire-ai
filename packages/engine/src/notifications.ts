@@ -143,6 +143,13 @@ export const NOTIFICATION_KINDS = [
    * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.
    */
   "app_created",
+  /**
+   * Someone asked the team's right hand for a change only others may decide, and sent it to them ("Pedir a um
+   * admin", ADR 0134): each person who may decide it, one row per proposal (`source.proposalId`, or `source.messageId`
+   * for a new agent's card), `source.agentId` and its name in `label` the agent it changes, `latest.text` why.
+   * Waiting; done once someone decides it.
+   */
+  "change_request",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -173,6 +180,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
+  /** `change_request`: the proposed change to decide (ADR 0134). */
+  proposalId?: string;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
   userId?: string;
   /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */

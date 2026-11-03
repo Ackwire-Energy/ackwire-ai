@@ -58,7 +58,14 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
   "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
-  "setup:write": ["offer_connect_ai", "create_channel", "propose_agent", "offer_connect_app", "offer_invites"],
+  "setup:write": [
+    "offer_connect_ai",
+    "create_channel",
+    "propose_agent",
+    "offer_connect_app",
+    "offer_invites",
+    "propose_settings_change",
+  ],
   "sandbox:run": [
     "run_code",
     "write_file",
@@ -192,6 +199,11 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   offer_invites: {
     label: "Offer to invite people",
     description: "Posts a card whose button opens the invite dialog with the addresses filled in.",
+  },
+  propose_settings_change: {
+    label: "Propose a teammate's settings",
+    description:
+      "Posts a card with a teammate's new model, AI, budget, owner, audience or channels. A person applies it.",
   },
   run_code: { label: "Run code", description: "Runs Python, Node or bash on the agent's computer." },
   write_file: { label: "Write to environment", description: "Writes a file in the code environment." },

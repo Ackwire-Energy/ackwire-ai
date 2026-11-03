@@ -574,10 +574,12 @@ export type ChannelEvent =
       channelId: string;
       threadId: string | null;
       messageId: string;
-      state: "pending" | "creating" | "created" | "denied";
+      state: "pending" | "creating" | "created" | "denied" | "superseded";
       agentId: string | null;
       decidedByUserId: string | null;
       decidedAt: string | null;
+      /** Sent to whoever may create agents ("Pedir a um admin", ADR 0134). */
+      askedAt?: string;
       /** Created in one click: the lines of its draft it got (ids only). */
       applied?: { channelIds: string[]; connectionIds: string[]; mailAccountIds: string[] };
       /** The routine made with it. */

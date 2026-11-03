@@ -12,13 +12,15 @@ import { prefixService, toolPrefixOf, toolPrefixOfConnection } from "./connector
 import { customScope, isCustom } from "./connectors/custom";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { publishDelivery } from "./delivery";
-import { ConflictError, NotFoundError, ValidationError } from "./errors";
+import { openPersonAgentDm } from "./dms";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { DEFAULT_MAIL_POLICY, setAgentMail } from "./mail/policies";
 import { setAgentChannels } from "./management";
-import { getMessage, type Message } from "./messages";
+import { getMessage, type Message, postPersonMessage } from "./messages";
 import type { Notice } from "./notices";
+import { notify, resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
 import { maySql, type RolePermission } from "./permissions";
 import { type RoutineAccess, type RoutineReport, routineAccessOf, routineReportOf } from "./routine-brief";
@@ -116,7 +118,8 @@ export interface ProposalApplied {
   mailAccountIds: string[];
 }
 
-export type AgentProposalState = "pending" | "creating" | "created" | "denied";
+/** `superseded`: a newer card of the same agent, for the same handle in the same conversation, took its place. */
+export type AgentProposalState = "pending" | "creating" | "created" | "denied" | "superseded";
 
 /**
  * `meta.actionCard` of an agent's proposal of a new agent (ADR 0081). Unlike the Connect card it keeps its
@@ -127,7 +130,8 @@ export interface AgentProposalCard {
   kind: "agent_proposal";
   /** The person behind the run that proposed it; null when nobody was. */
   forUserId: string | null;
-  params: { draft: AgentDraft; why: string };
+  /** `firstTask`: what "Criar e testar" sends the new agent in the clicker's DM with it (ADR 0134). */
+  params: { draft: AgentDraft; why: string; firstTask?: string };
   state: AgentProposalState;
   /** The agent made from it. */
   agentId: string | null;
@@ -139,6 +143,11 @@ export interface AgentProposalCard {
   applied?: ProposalApplied;
   /** The routine made with it. */
   routineId?: string | null;
+  /**
+   * When the person it is for, who can't create agents, sent it to whoever may ("Pedir a um admin", ADR 0134): from
+   * then on they may open the card from their inbox, though they aren't in its conversation.
+   */
+  askedAt?: string;
 }
 
 export interface AgentProposalView extends AgentProposalCard {
@@ -550,7 +559,11 @@ async function proposalMessage(db: Database, userId: string, orgId: string, mess
   if (!message || !card || !message.authorAgentId) {
     throw new NotFoundError("Proposal not found", "agent_proposal.not_found");
   }
-  const { membership } = await requireChannelAccess(db, userId, orgId, message.channelId);
+  const asked = card.askedAt ? await getMembership(db, userId, orgId) : null;
+  const { membership } =
+    asked && can(asked, "create_agents")
+      ? { membership: asked }
+      : await requireChannelAccess(db, userId, orgId, message.channelId);
   return { message, card, proposedBy: message.authorAgentId, membership };
 }
 
@@ -641,6 +654,7 @@ async function settle(
   got?: string,
 ) {
   const { message, card } = found;
+  await resolveNotifications(deps, message.orgId, { groupKey: askGroup(message.id) }).catch(() => 0);
   await publishChannelEvent(deps.pubsub, {
     type: "agent.proposal.updated",
     channelId: message.channelId,
@@ -713,7 +727,13 @@ export interface ProposedAgentDeps {
  * workspace's apps (an admin's), the mailboxes (only their owner's) and the routine (the agent's owner: them). A line
  * they can't give stays on the card for whoever can; the agent hears what it got and what waits.
  */
-export async function createProposedAgent(deps: ProposedAgentDeps, userId: string, orgId: string, messageId: string) {
+export async function createProposedAgent(
+  deps: ProposedAgentDeps,
+  userId: string,
+  orgId: string,
+  messageId: string,
+  options: { test?: boolean } = {},
+) {
   const found = await claim(deps, userId, orgId, messageId, "creating");
   const { draft } = found.card.params;
   let agent: Agent;
@@ -740,11 +760,17 @@ export async function createProposedAgent(deps: ProposedAgentDeps, userId: strin
   };
   await setCard(deps.db, found.message, card, "creating");
   await settle(deps, { ...found, card }, userId, agent, given.said);
+  const firstTask = found.card.params.firstTask;
+  // "Criar e testar": its first task, from the clicker, in their DM with it (their run, their permissions).
+  const dm = options.test && firstTask ? await openPersonAgentDm(deps.db, orgId, userId, agent.id) : null;
+  if (dm && firstTask) await postPersonMessage(deps, userId, orgId, dm.id, { body: firstTask });
   return {
     agent: (await getAgent(deps.db, orgId, agent.id)) ?? agent,
     proposal: view(found.message, card, found.proposedBy, true),
     /** The AI it got, which the clicker's accounts decide (not the one suggested when it was proposed). */
     ai: given.ai,
+    /** "Criar e testar": the DM its first task went to. */
+    testChannelId: dm?.id ?? null,
   };
 }
 
@@ -1000,6 +1026,103 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
     said,
     ai: thinks ? ai.kind : ("none" as const),
   };
+}
+
+/**
+ * A newer card of the same agent for the same handle, in the same conversation, takes the place of the open ones
+ * before it ("Trocada pela proposta mais nova"): the person revised what they need. Cards for other handles stay,
+ * so a whole team proposed at once keeps every card.
+ */
+export async function supersedeOlderProposals(deps: AgentProposalDeps, newer: Message, handle: string) {
+  if (!newer.authorAgentId) return;
+  const older = await deps.db
+    .select()
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, newer.orgId),
+        eq(messages.channelId, newer.channelId),
+        eq(messages.authorAgentId, newer.authorAgentId),
+        sql`${messages.id} <> ${newer.id}`,
+        sql`${messages.meta}->'actionCard'->>'kind' = 'agent_proposal'`,
+        sql`${messages.meta}->'actionCard'->>'state' = 'pending'`,
+        sql`${messages.meta}->'actionCard'->'params'->'draft'->>'handle' = ${handle}`,
+        isNull(messages.deletedAt),
+      ),
+    );
+  for (const m of older) {
+    const card = agentProposalOf(m.meta);
+    if (!card || !(await setCard(deps.db, m, { ...card, state: "superseded" }, "pending"))) continue;
+    await resolveNotifications(deps, m.orgId, { groupKey: askGroup(m.id) });
+    await publishChannelEvent(deps.pubsub, {
+      type: "agent.proposal.updated",
+      channelId: m.channelId,
+      threadId: m.threadId,
+      messageId: m.id,
+      state: "superseded",
+      agentId: null,
+      decidedByUserId: null,
+      decidedAt: null,
+    });
+  }
+}
+
+const askGroup = (messageId: string) => `change_request:agent:${messageId}`;
+
+/**
+ * "Pedir a um admin" on a new agent's card (ADR 0134): the person it is for can't create agents, so it goes to
+ * whoever may, as an inbox entry (waiting) that opens the card; their click creates it as them. Once per card.
+ */
+export async function askAgentProposal(deps: AgentProposalDeps, userId: string, orgId: string, messageId: string) {
+  const found = await proposalMessage(deps.db, userId, orgId, messageId);
+  const { message, card } = found;
+  if (card.forUserId !== userId)
+    throw new ForbiddenError("Only the person it was proposed for can send it", "agent_proposal.not_requester");
+  if (card.state !== "pending") throw new ConflictError("This proposal was already decided", "agent_proposal.decided");
+  if (expired(card)) throw new ConflictError("This proposal expired", "agent_proposal.expired");
+  if (card.askedAt) throw new ConflictError("It was already sent", "agent_proposal.asked");
+  if (can(found.membership, "create_agents"))
+    throw new ConflictError("You can create it yourself", "agent_proposal.yours");
+  const next: AgentProposalCard = { ...card, askedAt: new Date().toISOString() };
+  const [row] = await deps.db
+    .update(messages)
+    .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard}', ${JSON.stringify(next)}::jsonb)` })
+    .where(
+      and(
+        eq(messages.id, message.id),
+        eq(messages.orgId, orgId),
+        sql`${messages.meta}->'actionCard'->>'state' = 'pending'`,
+        sql`not (${messages.meta}->'actionCard' ? 'askedAt')`,
+      ),
+    )
+    .returning({ id: messages.id });
+  if (!row) throw new ConflictError("It was already sent", "agent_proposal.asked");
+  const deciders = await deps.db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), maySql(orgId, organizationMembers.userId, "create_agents")));
+  await notify(deps, {
+    orgId,
+    userIds: deciders.map((d) => d.userId),
+    kind: "change_request",
+    groupKey: askGroup(message.id),
+    waiting: true,
+    actor: { type: "user", id: userId },
+    source: { messageId: message.id, agentId: found.proposedBy, label: card.params.draft.name },
+    latest: { text: card.params.why },
+  }).catch(() => {});
+  await publishChannelEvent(deps.pubsub, {
+    type: "agent.proposal.updated",
+    channelId: message.channelId,
+    threadId: message.threadId,
+    messageId: message.id,
+    state: next.state,
+    agentId: null,
+    decidedByUserId: null,
+    decidedAt: null,
+    askedAt: next.askedAt,
+  });
+  return view(message, next, found.proposedBy, false);
 }
 
 /** "Recusar": the card stays, marked denied, and the agent that proposed it is told. */

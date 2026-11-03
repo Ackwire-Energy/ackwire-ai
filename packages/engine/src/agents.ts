@@ -458,6 +458,32 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
   caches.channelMembers.deletePrefix(`${orgId}:`);
 }
 
+/**
+ * Brings an archived agent back (an archive's Undo, ADR 0134): its handle was kept for it all along (`takenHandles`
+ * holds archived agents'), so nothing else took it meanwhile. Not a deleted one.
+ */
+export async function unarchiveAgent(db: Database, actorId: string, orgId: string, agentId: string) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const [back] = await db
+    .update(agents)
+    .set({ archivedAt: null, updatedAt: new Date() })
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)))
+    .returning({ name: agents.name, handle: agents.handle });
+  if (!back) throw new NotFoundError("Agent not found");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "agent.unarchived",
+    target: { type: "agent", id: agentId },
+    details: { name: back.name, handle: back.handle },
+  });
+  caches.agents.delete(`${orgId}:${agentId}`);
+  caches.agents.delete(`${orgId}:team`);
+  caches.agents.delete(`${orgId}:archived`);
+  caches.agents.delete(`${orgId}:old-handles`);
+  caches.channelMembers.deletePrefix(`${orgId}:`);
+}
+
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {
   await requirePermission(db, actorId, orgId, "read");
   return db

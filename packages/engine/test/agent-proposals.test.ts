@@ -5,6 +5,7 @@ import {
   type AgentProposalCard,
   addChannelMember,
   agentProposalOf,
+  askAgentProposal,
   ConflictError,
   createAgent,
   createAgentFromProposal,
@@ -785,5 +786,77 @@ describe("an agent's role says what it does, in as many words as it takes", () =
       id,
     );
     expect(made.agent.role).toBe(LONG_ROLE);
+  });
+});
+
+describe("the right hand's agent cards (ADR 0134)", () => {
+  /** A run of Lodi on what `userId` wrote in their DM with it. */
+  async function lodiRun(fx: Fixture, userId: string): Promise<ToolContext> {
+    const [lodi] = await fx.db
+      .select()
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, fx.org.id), eq(schema.agents.builtin, "right_hand")));
+    if (!lodi) throw new Error("no right hand");
+    const dm = await openPersonAgentDm(fx.db, fx.org.id, userId, lodi.id);
+    const ctx = await runFor(fx, userId, "preciso de alguém pro design", dm.id);
+    await fx.db.update(schema.agentRuns).set({ agentId: lodi.id }).where(eq(schema.agentRuns.id, ctx.runId));
+    return { ...ctx, agentId: lodi.id };
+  }
+
+  test("Criar e testar sends its first task from the clicker, in their DM with it", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id);
+    const out = await propose(f, ctx, { ...ADA, first_task: "Desenha a tela de login." });
+    const messageId = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    expect((await cardOf(f, messageId)).params.firstTask).toBe("Desenha a tela de login.");
+    const made = await createProposedAgent(
+      { db: f.db, pubsub: f.pubsub, gateway: f.gateway },
+      f.owner.id,
+      f.org.id,
+      messageId,
+      { test: true },
+    );
+    const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, made.agent.id);
+    expect(made.testChannelId).toBe(dm.id);
+    const said = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm.id));
+    expect(said.map((m) => [m.authorUserId, m.body])).toEqual([[f.owner.id, "Desenha a tela de login."]]);
+  });
+
+  test("a newer card for the same handle takes the older one's place; another handle's stays", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id);
+    const first = (await propose(f, ctx, ADA)).data as { agentProposal: { messageId: string } };
+    const other = (await propose(f, ctx, { ...ADA, name: "Lia", handle: "lia" })).data as typeof first;
+    await propose(f, ctx, { ...ADA, role: "Designer de produto" });
+    expect((await cardOf(f, first.agentProposal.messageId)).state).toBe("superseded");
+    expect((await cardOf(f, other.agentProposal.messageId)).state).toBe("pending");
+  });
+
+  test("in a member's DM the card is posted all the same; they send it, and an admin creates it from the inbox", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Rocha");
+    const ctx = await lodiRun(f, bia.id);
+    const out = await propose(f, ctx, ADA);
+    expect(out.isError).toBeUndefined();
+    expect(out.content).toContain("the card lets them send it to an admin or owner");
+    const messageId = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    // Ana isn't in Bia's DM: until Bia sends it, the card isn't hers to open.
+    expect(getAgentProposal({ db: f.db }, f.owner.id, f.org.id, messageId)).rejects.toThrow();
+    expect(askAgentProposal({ db: f.db }, f.owner.id, f.org.id, messageId)).rejects.toThrow();
+    await askAgentProposal({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, messageId);
+    expect(askAgentProposal({ db: f.db }, bia.id, f.org.id, messageId)).rejects.toThrow(/already sent/);
+    const inbox = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(and(eq(schema.notifications.orgId, f.org.id), eq(schema.notifications.kind, "change_request")));
+    expect(inbox.map((n) => [n.userId, n.waiting])).toEqual([[f.owner.id, true]]);
+    expect((await getAgentProposal({ db: f.db }, f.owner.id, f.org.id, messageId)).canDecide).toBe(true);
+    const made = await createProposedAgent({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, messageId);
+    expect(made.agent.ownerUserId).toBe(f.owner.id);
+    const [done] = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.id, inbox[0]?.id ?? ""));
+    expect(done?.doneAt).not.toBeNull();
   });
 });

@@ -173,6 +173,8 @@ export async function rightHandPrompt(
       "# Your cards",
       "- Every change is a card the person clicks, applied as whoever clicks it. Never say it is done before the click.",
       "- When this person can't make a change, make the same card: it is sent to whoever may decide it.",
+      "- A new agent: propose_agent, with first_task when there is something to try it on (the card offers 'Criar e testar').",
+      "- A teammate's model, AI account, budget, owner, who talks to it, channels, reply mode or archiving it: propose_settings_change. Its instructions, role or apps: propose_instruction_change.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
       "- Never ask for a key, password or token in the chat: say where the setting is, the card's dialog takes it.",
     ].join("\n"),
