@@ -239,21 +239,6 @@ const SETUP_FIELDS = [
   "machineId",
 ] as const;
 
-/**
- * The workspace's own computer, standing and limits (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
- * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
- * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
- * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
- * computer, and one active again waits for one. `org.deleting` (an owner deleted it) sets its deletion there, so the
- * closing screen takes its place at once. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a full
- * workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they are
- * read again, and `agent.coordinator` (ADR 0093) that another agent coordinates the team, or none: the agents are.
- * `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. `org.members` (someone
- * joined or left, or a role changed, ADR 0085) refetches the people, Members, the roles, `me`, the agents, the
- * routines (roles decide whom an agent answers) and the channels (roles decide which ones are listed, ADR 0125), and the pages of the agents it names (their owner or brain changed
- * when someone left). Returns whether the
- * event was one of these.
- */
 /** Every channel's members and roster (the members column, the channel's details): read again. */
 const refreshChannelMembers = (qc: QueryClient, orgId: string, channelId?: string) =>
   qc.invalidateQueries({
@@ -290,6 +275,21 @@ export function applyMembershipEvent(qc: QueryClient, orgId: string, event: Chan
   return true;
 }
 
+/**
+ * The workspace's own computer, standing and limits (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
+ * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
+ * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
+ * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
+ * computer, and one active again waits for one. `org.deleting` (an owner deleted it) sets its deletion there, so the
+ * closing screen takes its place at once. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a full
+ * workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they are
+ * read again, and `agent.coordinator` (ADR 0093) that another agent coordinates the team, or none: the agents are.
+ * `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. `org.members` (someone
+ * joined or left, or a role changed, ADR 0085) refetches the people, Members, the roles, `me`, the agents, the
+ * routines (roles decide whom an agent answers) and the channels (roles decide which ones are listed, ADR 0125), and the pages of the agents it names (their owner or brain changed
+ * when someone left). Returns whether the
+ * event was one of these.
+ */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "org.members") {
     // Who is in which channel follows who is in the workspace (a newcomer joins #general and the invited channels).
