@@ -13,7 +13,7 @@ import {
 import { handleRequest } from "../../runner/handlers";
 import { copiedFiles, missionWorktree, readProjectConfig, setupCommandFor } from "../../runner/mission-worktree";
 import { agentWorkspace } from "../../runner/paths";
-import { TaskManager } from "../../runner/tasks";
+import { commitChanges, TaskManager } from "../../runner/tasks";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -451,4 +451,22 @@ test.skipIf(!posix || !hasGit)("baseCheck answers how many commits the base move
   const unknown = await runTask(tasks, frames, id(11), "true", { baseCheck: { branch: "gone", sha: head } });
   expect(unknown.started.baseBehind).toBeUndefined();
   expect(parseBaseBehind({ baseBehind: -1 })).toBeUndefined();
+});
+
+test.skipIf(!posix || !hasGit)("a checkout without an author commits as the agent on the server's host", async () => {
+  const repo = tempDir("author-");
+  dirs.push(repo);
+  // No global or system config, so the checkout really has no user.email.
+  const env = { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+  spawnSync("git", ["init", "-q", "-b", "main"], { cwd: repo, env: { ...process.env, ...env } });
+  const author = () => spawnSync("git", ["log", "-1", "--format=%ae"], { cwd: repo, encoding: "utf8" }).stdout.trim();
+
+  writeFileSync(path.join(repo, "a.txt"), "a\n");
+  const first = await commitChanges(repo, "one", { env, handle: "dev", startSha: "", host: "chat.example.test" });
+  expect(first.error).toBeUndefined();
+  expect(author()).toBe("dev@agents.chat.example.test");
+
+  writeFileSync(path.join(repo, "b.txt"), "b\n");
+  await commitChanges(repo, "two", { env, handle: "dev", startSha: "" });
+  expect(author()).toBe("dev@agents.invalid");
 });

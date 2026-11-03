@@ -911,6 +911,7 @@ export class RunnerDaemon implements RequestObserver {
       privateNetwork: Boolean(
         (this.session?.network ?? c)?.networkLauncher || (this.session?.network ?? c)?.networkMark,
       ),
+      ...(c ? { commitHost: new URL(c.server).hostname } : {}),
       limits: {
         maxConcurrentTasks: c?.maxConcurrentTasks ?? DEFAULT_LIMITS.maxConcurrentTasks,
         taskMaxSeconds: c?.taskMaxSeconds ?? DEFAULT_LIMITS.taskMaxSeconds,
@@ -1087,6 +1088,7 @@ export class RunnerDaemon implements RequestObserver {
       accounts: this.accounts,
       ...(this.self.compiled ? { wrapperCommand: [...this.self.command, "task-wrapper"] } : {}),
       onSettled: (t) => this.taskSettled(t),
+      commitHost: () => this.workerState().commitHost,
       ...(this.opts.caffeinate !== undefined ? { caffeinate: this.opts.caffeinate } : {}),
     });
     await tasks.init();
