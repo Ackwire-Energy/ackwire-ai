@@ -4,9 +4,11 @@ import {
   type ContentBlock,
   contextLimitsFor,
   contextWindowWithin,
+  IMAGE_CHARS,
   isContextLimit,
   type ModelMessage,
   type ModelRequest,
+  promptChars,
 } from "@agenteschat/providers";
 import {
   createFakeJudge,
@@ -18,7 +20,9 @@ import {
 } from "../src";
 import {
   CHARS_PER_TOKEN,
+  compactToolResults,
   contextBudgetTokens,
+  dropOldImages,
   estimateRequestTokens,
   fitContextWindow,
   MAX_CONTEXT_TOKENS,
@@ -86,6 +90,42 @@ describe("estimate", () => {
     expect(withResult).toBeGreaterThan(t0 + 300);
     const tool = { name: "read_file", description: "Read a file.", inputSchema: { type: "object" } };
     expect(estimateRequestTokens({ ...base, tools: [tool] })).toBeGreaterThan(t0);
+  });
+
+  test("past the images a request carries, the oldest results' images go first, a note in their place", () => {
+    const result = (id: string, data: string): ModelMessage => ({
+      role: "user",
+      content: [{ type: "tool_result", toolUseId: id, content: id, images: [{ mediaType: "image/png", data }] }],
+    });
+    const messages = [result("old", "x".repeat(6)), result("new", "y".repeat(6))];
+    expect(dropOldImages(messages, 12)).toBe(messages);
+    const [old, recent] = dropOldImages(messages, 10);
+    expect(old?.content).toEqual([
+      {
+        type: "tool_result",
+        toolUseId: "old",
+        content: "old\n[Image removed to save space. Read the file again if you need it.]",
+      },
+    ]);
+    expect(recent).toBe(messages[1]);
+  });
+
+  test("an image counts as about a large image's tokens, never its base64; removing its result drops it", () => {
+    const messages = conversation([{ id: "a", name: "read_skill_file", content: "diagram.png" }]);
+    const image = { mediaType: "image/png", data: "x".repeat(1_000_000) };
+    const shown: ModelMessage[] = [
+      ...messages.slice(0, -1),
+      { role: "user", content: [{ type: "tool_result", toolUseId: "a", content: "diagram.png", images: [image] }] },
+    ];
+    const extra = estimateRequestTokens({ system, messages: shown }) - estimateRequestTokens({ system, messages });
+    expect(Math.abs(extra - IMAGE_CHARS / CHARS_PER_TOKEN)).toBeLessThanOrEqual(1);
+    expect(promptChars({ system, messages: shown }) - promptChars({ system, messages })).toBeLessThan(IMAGE_CHARS + 20);
+    const compacted = compactToolResults(shown, new Set(["a"]));
+    expect(results(compacted)[0]).toEqual({
+      type: "tool_result",
+      toolUseId: "a",
+      content: removedPlaceholder(IMAGE_CHARS + 11),
+    });
   });
 
   test("budget is the window minus the output and the margin, capped for cost", () => {

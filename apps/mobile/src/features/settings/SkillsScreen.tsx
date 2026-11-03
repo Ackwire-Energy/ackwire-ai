@@ -9,6 +9,7 @@ import {
   useSkillUsage,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -210,7 +211,10 @@ export function SkillScreen({ id }: { id: string }) {
     f.status === "script"
       ? { value: t("skills.runsOnPc") }
       : f.status === "ignored"
-        ? { value: t("skills.needsSandbox"), sub: t("skills.reinstall") }
+        ? {
+            value: t("skills.needsSandbox"),
+            sub: `${t("skills.reinstall")} ${t("skills.assetLimit", { max: SKILL_ASSET_MB })}`,
+          }
         : { value: f.mime };
 
   return (

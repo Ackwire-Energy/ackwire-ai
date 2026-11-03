@@ -23,6 +23,7 @@ import {
   ProviderError,
   type StopReason,
   type SystemBlock,
+  type ToolImage,
   textOf,
 } from "@agenteschat/providers";
 import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
@@ -110,7 +111,7 @@ import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
-import { fitContextWindow } from "./context-budget";
+import { dropOldImages, fitContextWindow } from "./context-budget";
 import {
   advance as advanceContinuation,
   type ContinuationState,
@@ -586,7 +587,7 @@ export interface Transcript {
       askedAt?: number;
       /** A mission tool's own wait (a blocking decision, a review): its id; the answer comes as `result`. */
       waitId?: string;
-      result?: { content: string; isError: boolean };
+      result?: { content: string; isError: boolean; images?: ToolImage[] };
     }[];
   };
 }
@@ -3272,6 +3273,11 @@ async function executeRunInner(
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
+        const pictured = dropOldImages(transcript.messages);
+        if (pictured !== transcript.messages) {
+          transcript.messages = pictured;
+          await saveTranscript(db, transcript);
+        }
         const fitted = await fitContextWindow(judge, {
           orgId: run.orgId,
           agentId: agent.id,
@@ -3629,13 +3635,14 @@ async function executeRunInner(
             calls.push({ toolUseId: use.id, name: use.name, waitId: wait.id });
             waits.push(wait.id);
           } else {
-            const { content, isError } = outcome.output;
+            const { content, isError, images } = outcome.output;
             calls.push({
               toolUseId: use.id,
               name: use.name,
               result: {
                 content: cutShort && isError ? `${CUT_BY_RESTART}\n${content}` : content,
                 isError: isError === true,
+                ...(images?.length ? { images } : {}),
               },
             });
           }
@@ -3672,6 +3679,7 @@ async function executeRunInner(
               toolUseId: c.toolUseId,
               content: c.result?.content ?? "",
               ...(c.result?.isError ? { isError: true } : {}),
+              ...(c.result?.images ? { images: c.result.images } : {}),
             })),
           });
           // Going in circles (`stuck.ts`): only a step that repeats is judged, and the next verdict needs new steps.

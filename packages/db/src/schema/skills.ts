@@ -53,7 +53,7 @@ export const skills = pgTable(
   (t) => [unique().on(t.orgId, t.slug), index().on(t.orgId)],
 );
 
-/** A skill's supporting files (references, templates, examples), per version. Scripts are listed, never stored. */
+/** A skill's supporting files (references, templates, examples, images), per version. */
 export const skillFiles = pgTable(
   "skill_files",
   {
@@ -66,7 +66,10 @@ export const skillFiles = pgTable(
     path: text().notNull(),
     size: integer().notNull(),
     mime: text().notNull(),
-    /** `stored` (text the model may read), `script` (kept for the sandbox, never shown) or `ignored` (binaries, listed only). */
+    /**
+     * `stored` (the model may read it: text, images, other files), `script` (kept for the sandbox, never shown) or
+     * `ignored` (listed only: a binary past what a skill keeps; size 0 when installed before binaries were kept).
+     */
     status: text().notNull(),
     storageConfigId: uuid(),
     blobKey: text(),

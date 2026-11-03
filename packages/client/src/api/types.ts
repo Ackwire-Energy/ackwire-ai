@@ -3408,7 +3408,7 @@ export interface SkillFile {
   path: string;
   size: number;
   mime: string;
-  /** `script`: runs on the agent's PC; `ignored`: old imports whose scripts never run (reinstall to use them). */
+  /** `script`: runs on the agent's PC; `ignored`: listed only, past what a skill keeps or from an older import. */
   status: "stored" | "ignored" | "script";
 }
 

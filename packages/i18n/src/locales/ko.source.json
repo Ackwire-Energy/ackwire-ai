@@ -15429,13 +15429,16 @@
     "value": "Files"
   },
   "skills.needsSandbox": {
-    "value": "needs a sandbox"
+    "value": "not kept"
+  },
+  "skills.assetLimit": {
+    "value": "A skill keeps up to {{max}} MB of images and other files."
   },
   "skills.runsOnPc": {
     "value": "runs on the agent's PC"
   },
   "skills.reinstall": {
-    "value": "Reinstall to use the scripts."
+    "value": "Reinstall the skill so agents can use this file."
   },
   "skills.edit": {
     "value": "Edit"
