@@ -237,7 +237,7 @@ export function AccountSection() {
 
 class NameRefused extends Error {
   constructor(readonly result: Extract<AuthResult, { ok: false }>) {
-    super(result.message);
+    super(result.code);
   }
 }
 

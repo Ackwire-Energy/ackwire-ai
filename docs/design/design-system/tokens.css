@@ -63,7 +63,7 @@
   --chosen-lift: none;
   --spring: cubic-bezier(0.34, 1.4, 0.5, 1); --out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
-  --radius-sm: 6px; --radius-item: 10px; --radius-md: 10px; --radius-btn: 12px; --radius-lg: 14px;
+  --radius-xs: 4px; --radius-sm: 6px; --radius-item: 10px; --radius-md: 10px; --radius-btn: 12px; --radius-lg: 14px;
   --radius-xl: 18px; --radius-section: 20px; --radius-cut: 2px; --radius-full: 999px;
   --radius-agent: 30% 30% 30% 9%;
   /* The control ruler: everything you click or type in is one of three heights, radius

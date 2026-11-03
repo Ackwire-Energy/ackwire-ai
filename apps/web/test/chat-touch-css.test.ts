@@ -14,7 +14,8 @@ test("what ships gives the emoji popover one scroll, the menu's two lines one le
   expect(last(shipped, ".ac-emoji", "min-height")).toBe("0");
   expect(last(shipped, ".ac-emoji__search", "flex")).toBe("none");
   expect(last(shipped, ".ac-emoji__tabs", "flex")).toBe("none");
-  expect(last(shipped, ".ac-emoji__scroll", "overflow-y")).toBe("auto");
+  // Never sideways, up and down only: the minifier joins overflow-x and overflow-y into one shorthand.
+  expect(last(shipped, ".ac-emoji__scroll", "overflow")).toBe("hidden auto");
 
   // The line under the reactions stops 8px in from each side, where a separator does.
   expect(last(shipped, ".ac-menu__separator", "margin")).toBe("4px var(--menu-item-px)");

@@ -11102,6 +11102,9 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
     padding: 8px var(--dialog-pad) 0;
     scrollbar-width: none;
   }
+  .channel-settings__nav::-webkit-scrollbar {
+    display: none;
+  }
   .channel-settings__nav ul,
   .channel-settings__danger {
     flex-direction: row;

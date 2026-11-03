@@ -49,7 +49,7 @@ export interface SelectProps<V extends string = string> {
 }
 
 /** The options, a line before the first of a run of action rows that follows choices. */
-function renderItems<V extends string>(items: SelectOption<V>[], all: SelectOption<V>[]) {
+function renderItems<V extends string>(items: SelectOption<V>[], all: typeof items) {
   return items.map((o) => {
     const item = <SelectItem key={o.value} option={o} />;
     const before = all[all.indexOf(o) - 1];
