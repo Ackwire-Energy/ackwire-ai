@@ -1889,8 +1889,9 @@ function ChannelView({
                     onDetails={() => setDetailsOpen(true)}
                   />
                   {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                  {isMember && <SearchHereButton channelId={channel.id} />}
                   <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
+                  {/* Search stays the last on the right, in a DM too. */}
+                  {isMember && <SearchHereButton channelId={channel.id} />}
                 </div>
               </header>
             )}

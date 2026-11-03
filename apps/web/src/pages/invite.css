@@ -40,17 +40,16 @@
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-/* Who invited · the faces and names of who works there: one line, wrapping between the two. */
-.invite__org-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 6px;
-}
+/*
+ * Who invited, then the faces and names of who works there on a line of their own: on a shared line the faces
+ * wrapped and left a dot hanging. The faces' line keeps room above for what they wear: an accessory reaches 9/16 of
+ * an 18px face over it (ACCESSORY_REACH in the agent engine), so a hat never touches the words above.
+ */
 .invite__crew {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 10px;
 }
 .invite__faces {
   display: inline-flex;

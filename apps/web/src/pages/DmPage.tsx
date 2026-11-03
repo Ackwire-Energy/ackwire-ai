@@ -96,9 +96,10 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       </div>
       {/* Its tasks (ADR 0128), while it has any: they open in the side panel. */}
       {agent && <AgentTasksPill />}
-      <SearchHereButton channelId={dm.data.channelId} />
       {agent && <ComputerButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
+      {/* Search stays the last on the right, as in a channel. */}
+      <SearchHereButton channelId={dm.data.channelId} />
     </header>
   );
   return (

@@ -187,20 +187,15 @@ function OrgLine({ org }: { org: OrgFacts }) {
       )}
       <div className="invite__org-text">
         <b className="invite__org-name ac-captop">{org.name}</b>
-        {(org.by || crew) && (
-          <span className="invite__org-line">
-            {org.by && <span>{t("invite.from", { name: org.by })}</span>}
-            {org.by && crew && <span aria-hidden="true">·</span>}
-            {crew && (
-              <span className="invite__crew">
-                <span className="invite__faces" aria-hidden="true">
-                  {agents.map((a) => (
-                    <AgentAvatar key={a.id} name={a.name} appearance={lookOf(a)} size="xs" />
-                  ))}
-                </span>
-                <span>{crew}</span>
-              </span>
-            )}
+        {org.by && <span>{t("invite.from", { name: org.by })}</span>}
+        {crew && (
+          <span className="invite__crew">
+            <span className="invite__faces" aria-hidden="true">
+              {agents.map((a) => (
+                <AgentAvatar key={a.id} name={a.name} appearance={lookOf(a)} size="xs" />
+              ))}
+            </span>
+            <span>{crew}</span>
           </span>
         )}
       </div>
