@@ -12,6 +12,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import type { ContentBlock, ModelMessage } from "@agenteschat/providers";
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
@@ -47,7 +48,7 @@ import { learnTrust } from "./learn";
 import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary, judgeOf, memoryJudging } from "./summaries";
 
-const { contextItems, messages, outcomes } = schema;
+const { agentRuns, contextItems, messages, outcomes } = schema;
 
 /** How an item is labeled when shown to a model (defense against memory poisoning). */
 export function itemLabel(item: Pick<ContextItem, "kind" | "verified" | "trust"> & { disputed?: boolean }) {
@@ -60,6 +61,29 @@ export function itemLabel(item: Pick<ContextItem, "kind" | "verified" | "trust">
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** The tool that reopens what a history shows cut short (token-trim B9, `cutOldToolSteps`). */
+export const EXPAND_TOOL = "expand";
+
+/** A call of the run whole, as `expand` returns it: its name, arguments and result (null: no such call). */
+function toolCallText(messages: ModelMessage[], id: string): string | null {
+  let call: Extract<ContentBlock, { type: "tool_use" }> | undefined;
+  let result: Extract<ContentBlock, { type: "tool_result" }> | undefined;
+  for (const m of messages) {
+    if (typeof m.content === "string") continue;
+    for (const b of m.content) {
+      if (b.type === "tool_use" && b.id === id) call = b;
+      else if (b.type === "tool_result" && b.toolUseId === id) result = b;
+    }
+  }
+  if (!call && !result) return null;
+  return [
+    call ? `Tool call ${call.name} ${JSON.stringify(call.input)}` : "",
+    result ? `Result${result.isError ? " (error)" : ""}:\n${result.content}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
 
 /**
  * Built-in tools over the organization's context (ADR 0017), all
@@ -242,9 +266,9 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
     },
     {
-      name: "expand",
+      name: EXPAND_TOOL,
       description:
-        "Open a context item by id: its full content and the sources it came from (also archived items). Also a message of the conversation shown cut short, by the id its cut names.",
+        "Open a context item by id: its full content and the sources it came from (also archived items). Also a message of the conversation, or a tool call or result of this run, shown cut short, by the id its cut names.",
       scope: "context:read",
       inputSchema: {
         type: "object",
@@ -253,8 +277,17 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const allowed = await visible(ctx);
         const id = str(input.item_id);
+        // A call of this run its history shows cut short (`cutOldToolSteps`): whole, from the run's own transcript.
+        if (ctx.runId && /^[\w.:-]{1,128}$/.test(id)) {
+          const [run] = await ctx.db
+            .select({ transcript: agentRuns.transcript })
+            .from(agentRuns)
+            .where(and(eq(agentRuns.orgId, ctx.orgId), eq(agentRuns.id, ctx.runId)));
+          const text = toolCallText((run?.transcript as { messages?: ModelMessage[] } | null)?.messages ?? [], id);
+          if (text !== null) return { content: text };
+        }
+        const allowed = await visible(ctx);
         if (!/^[0-9a-f-]{36}$/i.test(id)) return { content: "Not found.", isError: true };
         const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
         const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
