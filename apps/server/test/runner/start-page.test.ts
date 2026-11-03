@@ -31,6 +31,11 @@ test("the offline page has no permissions or network assets and updates without 
   expect(id).toBe(START_PAGE_ID);
   expect(read("start.html")).toContain('aria-hidden="true"');
   expect(read("start.html")).not.toMatch(/<a\b|<button\b/);
+  // The desktop's band right below the window shows the agentes.chat logo: the page carries no second one, and
+  // fades into that band's tone (desktop-look.ts's backdrop, 0.81 0.90 1.00).
+  expect(read("start.html")).not.toContain("agentes<b>.chat");
+  expect(read("start.css")).not.toContain("wallpaper.png");
+  expect(read("start.css")).toContain("linear-gradient(transparent,#cfe6ff)");
   expect(read("start.js")).toContain('fetch("data.json"');
   expect(read("start.js")).not.toContain("https://");
   const before = statSync(path.join(dir, "manifest.json")).mtimeMs;

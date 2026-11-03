@@ -585,6 +585,10 @@ export function chromeEnv(on: ChromeDisplay, base: NodeJS.ProcessEnv = process.e
  *   reads as it starts): no chip or bubble asks a person to sign in to the
  *   browser. Signing in to sites stays as it is: people sign the agent in to
  *   them on purpose.
+ * - No footer under the start page: Chrome 138+ puts a bar of its own below a
+ *   new tab page an extension draws (the extension's name, "Customize Chrome"),
+ *   shown while the profile's "Show footer on New Tab page"
+ *   (`NewTabPage.FooterVisible`, Chromium's `prefs::kNtpFooterVisible`) is on.
  * A Preferences file that isn't JSON is Chrome's to deal with, and neither is
  * worth failing a start for.
  */
@@ -595,12 +599,15 @@ export function prepareProfile(profile: string) {
     if (!isRecord(prefs)) return;
     const browser = isRecord(prefs.browser) ? prefs.browser : {};
     const signin = isRecord(prefs.signin) ? prefs.signin : {};
-    if (browser.custom_chrome_frame === true && signin.allowed_on_next_startup === false) return;
+    const ntp = isRecord(prefs.NewTabPage) ? prefs.NewTabPage : {};
+    if (browser.custom_chrome_frame === true && signin.allowed_on_next_startup === false && ntp.FooterVisible === false)
+      return;
     mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
     writeJson(file, {
       ...prefs,
       browser: { ...browser, custom_chrome_frame: true },
       signin: { ...signin, allowed_on_next_startup: false },
+      NewTabPage: { ...ntp, FooterVisible: false },
     });
   } catch {
     // Chrome starts with the settings it has.
