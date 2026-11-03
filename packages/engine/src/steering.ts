@@ -69,8 +69,8 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     /** Parked waiting for its computer brain, its plan or its budget (`waitingForBrain`). */
     const parked =
       active.status === "waiting_input"
-        ? ((active.transcript as { waitingForBrain?: { waitId?: string; code?: string } } | null)?.waitingForBrain ??
-          null)
+        ? ((active.transcript as { waitingForBrain?: { waitId?: string; code?: string; source?: string } } | null)
+            ?.waitingForBrain ?? null)
         : null;
     // Long work paused near a limit is no wait a message moves (`holdsMessages`): it isn't woken for it.
     const brainWait = parked?.code === "usage_pause" ? null : parked;
@@ -89,8 +89,9 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
         ...(active.status === "waiting_input" && active.waitingMachineId
           ? { computer: brainWait?.code === "busy" ? ("queued" as const) : ("away" as const) }
           : {}),
-        ...(brainWait?.code === "plan_limit" || brainWait?.code === "budget"
-          ? { usage: brainWait.code === "budget" ? ("budget" as const) : ("plan" as const) }
+        // On its plan or budget (long work paused near one too, by its `source`), as a reload says (`usageWaitSql`).
+        ...(parked?.code === "plan_limit" || parked?.code === "budget" || parked?.code === "usage_pause"
+          ? { usage: parked.code === "budget" || parked.source === "budget" ? ("budget" as const) : ("plan" as const) }
           : {}),
       });
     }

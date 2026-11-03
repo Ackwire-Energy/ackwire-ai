@@ -2802,8 +2802,9 @@ async function executeRunInner(
             t.postedCount++;
             return card;
           }
+          const forUserId = await personOfMessage(tx, run.orgId, run.triggerMessageId).catch(() => null);
           // Its conversation already heard it waits on this limit: one note speaks for every turn waiting there.
-          const join = cut ? null : await joinUsageNote(tx, run, replyThreadId, u.code, resetsAt, now);
+          const join = cut ? null : await joinUsageNote(tx, run, replyThreadId, forUserId, u.code, resetsAt, now);
           if (join) {
             joined = join.note;
             return null;
@@ -2822,7 +2823,6 @@ async function executeRunInner(
                   known ? "plan_limit_wait" : "plan_limit_wait_unknown",
                   `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
                 ];
-          const forUserId = await personOfMessage(tx, run.orgId, run.triggerMessageId).catch(() => null);
           const m = await post(
             tx,
             replyThreadId,

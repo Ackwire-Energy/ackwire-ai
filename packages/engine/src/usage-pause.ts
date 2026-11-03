@@ -425,17 +425,19 @@ export async function usageWaitNoteEnded(
 export const CANCELED_NOTE_QUIET_MS = 15 * 60_000;
 
 /**
- * One "I'll answer when it resets" note per agent, conversation and wait. When the agent's last word in this
- * conversation (`threadId`: a thread, or null for the main timeline) already says it waits on the same limit (`code`,
- * a reset within a minute of `resetsAt`, or both unknown) and its run isn't back at work, a newly parked turn posts
- * none: a note still waiting takes the turn in (`usageWait.runIds`, its "Don't run it" stops them all) and comes back
- * to be published; one cancelled less than `CANCELED_NOTE_QUIET_MS` ago stays as it is (`note: null`), the turn's
- * receipt says it waits. Null: the turn posts its own note.
+ * One "I'll answer when it resets" note per agent, conversation, person and wait. When the agent's word in this
+ * conversation (`threadId`: a thread, or null for the main timeline) since it last said anything else holds a note to
+ * the same person (`forUserId`: only who asked can stop it) on the same limit (`code`, a reset within a minute of
+ * `resetsAt`, or both unknown) whose run isn't back at work, a newly parked turn posts none: a note still waiting
+ * takes the turn in (`usageWait.runIds`, its "Don't run it" stops them all) and comes back to be published; one
+ * cancelled less than `CANCELED_NOTE_QUIET_MS` ago stays as it is (`note: null`), the turn's receipt says it waits.
+ * Null: the turn posts its own note.
  */
 export async function joinUsageNote(
   tx: Executor,
   run: { id: string; orgId: string; agentId: string; channelId: string },
   threadId: string | null,
+  forUserId: string | null,
   code: string,
   resetsAt: string | undefined,
   now = Date.now(),
@@ -444,7 +446,8 @@ export async function joinUsageNote(
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtext(${`usage-note:${run.agentId}:${run.channelId}:${threadId ?? ""}`}))`,
   );
-  const [last] = await tx
+  // ponytail: looks back 20 messages; a longer run of notes to other people just posts a new note.
+  const recent = await tx
     .select()
     .from(messages)
     .where(
@@ -458,10 +461,20 @@ export async function joinUsageNote(
       ),
     )
     .orderBy(desc(messages.createdAt))
-    .limit(1);
-  const w = last?.meta.usageWait as
-    | { code?: string; resetsAt?: string; ended?: boolean; canceled?: boolean; canceledAt?: string }
-    | undefined;
+    .limit(20);
+  type Wait = {
+    code?: string;
+    forUserId?: string | null;
+    resetsAt?: string;
+    ended?: boolean;
+    canceled?: boolean;
+    canceledAt?: string;
+  };
+  const waitOf = (m: Message) => (m.meta.actionCard ? undefined : (m.meta.usageWait as Wait | undefined));
+  // Its notes to other people in a channel don't end its word to this one; anything else it said does.
+  const stop = recent.findIndex((m) => !waitOf(m) || (waitOf(m)?.forUserId ?? null) === forUserId);
+  const last = stop < 0 ? undefined : recent[stop];
+  const w = last && waitOf(last);
   if (!last || !w || w.code !== code || w.ended) return null;
   const sameReset =
     w.resetsAt && resetsAt

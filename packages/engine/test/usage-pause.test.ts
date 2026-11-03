@@ -1,7 +1,8 @@
 import { afterEach, expect, setSystemTime, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
+import { channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  addChannelMember,
   type Brain,
   type BrainEvent,
   type BrainTurn,
@@ -26,7 +27,7 @@ import {
   usageWaitKey,
   wakePlanWaits,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
@@ -750,6 +751,34 @@ test("one note per conversation and limit: a later ask joins it, its Não rodar 
   expect(await notes(f, "plan_limit_wait")).toHaveLength(2);
 });
 
+test("one note per person in a channel: someone else's ask gets its own note, which only they can stop", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const resetsAt = later(3600_000).toISOString();
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, { body: "@dev e eu?" });
+  await drainOutbox(f.db, handlers);
+  // Ana again: her note takes it in, though Bia's is the agent's last word.
+  await post(f, "@dev e aí?");
+  await drainOutbox(f.db, handlers);
+  const [a, b, c] = await runs(f);
+  const shown = await notes(f, "plan_limit_wait");
+  expect(shown.map((n) => n.meta.usageWait)).toEqual([
+    expect.objectContaining({ runId: a?.id, forUserId: f.owner.id, runIds: [c?.id] }),
+    expect.objectContaining({ runId: b?.id, forUserId: bia.id }),
+  ]);
+  await cancelRun({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, b?.id ?? "");
+  expect((await runs(f)).map((r) => r.status)).toEqual(["waiting_input", "canceled", "waiting_input"]);
+});
+
 test("another reset is another note, and so is another conversation", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   await computerAgent(f, { brainFallback: false });
@@ -765,6 +794,16 @@ test("another reset is another note, and so is another conversation", async () =
   await post(f, "@dev e no fio?", other.id);
   await drainOutbox(f.db, handlers);
   expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
+  expect(await notes(f, "plan_limit_wait", other.id)).toHaveLength(1);
+  // More in the thread goes into its waiting turn: the message's receipt says it waits on the plan, live too.
+  const steered: { usage?: string }[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => {
+    const event = e as { type?: string; usage?: string };
+    if (event.type === "agent.run.steered") steered.push(event);
+  });
+  await post(f, "@dev mais uma", other.id);
+  await drainOutbox(f.db, handlers);
+  expect(steered).toEqual([expect.objectContaining({ usage: "plan" })]);
   expect(await notes(f, "plan_limit_wait", other.id)).toHaveLength(1);
 
   clearPlanLimits();
