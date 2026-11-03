@@ -351,7 +351,14 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
         ]
       : []),
     ...(can(org, "create_agents")
-      ? [{ key: "agent", icon: "plus" as const, label: t("shell.createAgent"), onPress: leaveFor("/new-agent") }]
+      ? [
+          {
+            key: "agent",
+            icon: "plus" as const,
+            label: t("shell.createAgent"),
+            onPress: leaveFor(`/new-agent?channel=${channelId}`),
+          },
+        ]
       : []),
   ];
   const toggle = (key: string) => {

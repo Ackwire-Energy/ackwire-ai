@@ -4726,7 +4726,11 @@ function AddMembersDialog({
             className="member-row member-row--add"
             onClick={() => {
               onInvite();
-              void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } });
+              void navigate({
+                to: "/org/$orgId/agents/new",
+                params: { orgId: org.id },
+                search: { channel: channel.id },
+              });
             }}
           >
             <span className="member-row__plus" aria-hidden="true">
