@@ -20,19 +20,15 @@ export function useWatchableComputer(agentId: string) {
 /** The entry's states worth hearing on the button (the web's dot): someone is needed there, or it's in use. */
 const SAYS: ReadonlySet<string> = new Set(["needsYou", "needsOther", "working", "you", "other"]);
 
-/**
- * "Computador" in an agent's DM header, as the web's: for whoever may watch the agent's computer (the
- * profile's entry shows to the same people) once it has one, it opens it full screen. While the agent needs
- * someone there or works on it, a screen reader hears that too.
- */
-export function DmComputerButton({ agentId, onOpen }: { agentId: string; onOpen?: () => void }) {
+/** What a screen reader hears with the DM header's computer entry (the web's dot), "" when nothing worth hearing. */
+export function useComputerSays(agentId: string) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const view = useWatchableComputer(agentId);
   const f = view?.facts;
-  if (!view || !f) return null;
+  if (!f) return "";
   const entry = entryState(f);
-  const says = SAYS.has(entry.kind)
+  return SAYS.has(entry.kind)
     ? entryLine(t, entry, {
         edition: f.edition,
         locale: i18n.language,
@@ -43,6 +39,18 @@ export function DmComputerButton({ agentId, onOpen }: { agentId: string; onOpen?
         emailPromised: false,
       })
     : "";
+}
+
+/**
+ * "Computador" in an agent's DM header, as the web's: for whoever may watch the agent's computer (the
+ * profile's entry shows to the same people) once it has one, it opens it full screen. While the agent needs
+ * someone there or works on it, a screen reader hears that too.
+ */
+export function DmComputerButton({ agentId, onOpen }: { agentId: string; onOpen?: () => void }) {
+  const { t } = useTranslation();
+  const view = useWatchableComputer(agentId);
+  const says = useComputerSays(agentId);
+  if (!view) return null;
   return (
     <IconButton
       icon="laptop"

@@ -24,7 +24,7 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text } from "@/ui";
-import { useWatchableComputer } from "../chat/DmComputerButton";
+import { useComputerSays, useWatchableComputer } from "../chat/DmComputerButton";
 import { openComputer } from "../computer/AgentComputerRow";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
@@ -59,10 +59,13 @@ export function QueueButton({
   queue,
   onPress,
   icon = "wait",
+  says = "",
 }: {
   queue: ComputerQueue;
   onPress: () => void;
   icon?: IconName;
+  /** The agent's computer state a screen reader hears too (`useComputerSays`). */
+  says?: string;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -71,7 +74,7 @@ export function QueueButton({
       to={0.9}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={queueButtonText(t, queue)}
+      accessibilityLabel={says ? `${queueButtonText(t, queue)}, ${says}` : queueButtonText(t, queue)}
       hitSlop={4}
       style={styles.button}
     >
@@ -81,6 +84,11 @@ export function QueueButton({
       </View>
     </PressScale>
   );
+}
+
+/** An agent's DM header while turns wait: the laptop with the count, saying what its computer says. */
+export function DmQueueButton({ agentId, ...props }: { agentId: string; queue: ComputerQueue; onPress: () => void }) {
+  return <QueueButton {...props} icon="laptop" says={useComputerSays(agentId)} />;
 }
 
 /**

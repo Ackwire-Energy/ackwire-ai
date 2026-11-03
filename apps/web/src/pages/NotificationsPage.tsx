@@ -949,7 +949,7 @@ function Row({
                     : n.kind === "issue_comment"
                       ? t("notifications.showComments", { count: n.count })
                       : n.kind === "run_failed"
-                        ? t("notifications.showAgents", { count: n.count })
+                        ? t("notifications.showAgents", { count: runFailedGroupOf(n)?.agents ?? n.count })
                         : t("notifications.showReplies", { count: n.count })}
                 </button>
                 {s.open &&

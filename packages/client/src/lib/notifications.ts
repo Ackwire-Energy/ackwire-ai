@@ -230,10 +230,10 @@ export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
 
 /** Grouped (several replies or comments, several agents' failures of one cause): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>
-  n.count > 1 &&
-  ((n.kind === "thread_reply" && !!n.source.threadId && !!channelOf(n)) ||
-    (n.kind === "issue_comment" && !!n.source.issueId) ||
-    runFailedGroupOf(n) !== null);
+  runFailedGroupOf(n) !== null ||
+  (n.count > 1 &&
+    ((n.kind === "thread_reply" && !!n.source.threadId && !!channelOf(n)) ||
+      (n.kind === "issue_comment" && !!n.source.issueId)));
 
 /** Causes a shared failure row says in words (`notifications.failedCause.<reason>`); the plan's need its name. */
 const FAILED_CAUSES = new Set([

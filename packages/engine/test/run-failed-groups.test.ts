@@ -86,3 +86,18 @@ test("an agent's good run takes it off the row; the last one left reads as its o
   await resolveRunFailed(deps(), run(AGENTS[2] as string));
   expect(await inbox()).toHaveLength(0);
 });
+
+test("the agent that made a shared row leaves it once: its later good runs leave the count matching the list", async () => {
+  f = await setup();
+  clock = Date.parse("2026-11-02T12:00:00Z");
+  for (const a of AGENTS.slice(0, 3)) await fail(a);
+  const events: RealtimeEvent[] = [];
+  f.pubsub.subscribe(userTopic(f.org.id, f.owner.id), (e) => events.push(e));
+  await resolveRunFailed(deps(), run(AGENTS[0] as string));
+  const after = events.length;
+  await resolveRunFailed(deps(), run(AGENTS[0] as string));
+  const [row] = await inbox();
+  expect(row?.count).toBe(2);
+  expect(row?.latest.failures?.map((x) => x.agentId)).toEqual(AGENTS.slice(1, 3));
+  expect(events.length).toBe(after);
+});

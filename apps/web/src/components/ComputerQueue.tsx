@@ -31,7 +31,7 @@ import {
   Message as MessageRow,
   useNow,
 } from "@agenteschat/ui";
-import { type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -342,13 +342,18 @@ export function FanOutStrip({ message, otherwise = null }: { message: Message; o
  * The conversation header's computer button: "Computer · 9 waiting" while anyone waits for this computer, opening the
  * line, else `idle` (a DM's own Computer button). `onOpenComputer` gives the line "Open the computer".
  */
+/** The computer's state a header button shows as a dot (`brw-dm`), and says to a screen reader. */
+export type EntrySignal = { state?: "waiting" | "live"; style?: CSSProperties; line?: string };
+
 export function QueueButton({
   machineId,
   idle = null,
+  signal,
   onOpenComputer,
 }: {
   machineId: string | null;
   idle?: ReactNode;
+  signal?: EntrySignal;
   onOpenComputer?: () => void;
 }) {
   const { t } = useTranslation();
@@ -359,11 +364,19 @@ export function QueueButton({
   return (
     <>
       {waiting > 0 ? (
-        <Button size="sm" icon="computer" className="cq-btn" onClick={() => setOpen(true)}>
+        <Button
+          size="sm"
+          icon="computer"
+          className={signal ? "cq-btn brw-dm" : "cq-btn"}
+          data-state={signal?.state}
+          style={signal?.style}
+          onClick={() => setOpen(true)}
+        >
           <span className="cq-btn__label">{queueButtonText(t, q.data)}</span>
           <CountChip size="sm" className="cq-btn__count" aria-hidden="true">
             {waiting > 99 ? "99+" : waiting}
           </CountChip>
+          {signal?.line && <span className="ac-visually-hidden">{signal.line}</span>}
         </Button>
       ) : (
         idle

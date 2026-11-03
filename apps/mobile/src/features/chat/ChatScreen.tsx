@@ -107,7 +107,7 @@ import { chatHref, consultationHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
 import { FanStrip } from "../queue/parts";
-import { QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
+import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -1360,11 +1360,15 @@ function Chat({
     (isThread && info) || dm || channel ? (
       <>
         {queueShown && barQueue && queueMachineId ? (
-          <QueueButton
-            queue={barQueue}
-            icon={dmComputer ? "laptop" : undefined}
-            onPress={() => openQueue(queueMachineId, dmComputer)}
-          />
+          dmComputer ? (
+            <DmQueueButton
+              agentId={dmComputer.agentId}
+              queue={barQueue}
+              onPress={() => openQueue(queueMachineId, dmComputer)}
+            />
+          ) : (
+            <QueueButton queue={barQueue} onPress={() => openQueue(queueMachineId)} />
+          )
         ) : dmComputer ? (
           <DmComputerButton agentId={dmComputer.agentId} onOpen={leavePlace} />
         ) : null}

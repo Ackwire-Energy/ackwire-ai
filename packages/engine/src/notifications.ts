@@ -633,39 +633,53 @@ export async function joinRunFailure(
  * row left with none is done. A row left with one reads as that one's again.
  */
 export async function dropRunFailure(deps: NotificationDeps, orgId: string, key: string): Promise<void> {
-  const rows = await deps.db
-    .select()
+  const open = and(eq(notifications.orgId, orgId), eq(notifications.kind, "run_failed"), isNull(notifications.doneAt));
+  // A shared row keeps its creator's groupKey after the creator leaves it, so groupKey only names rows from before
+  // `failures`.
+  const candidates = await deps.db
+    .select({ id: notifications.id, userId: notifications.userId })
     .from(notifications)
     .where(
       and(
-        eq(notifications.orgId, orgId),
-        eq(notifications.kind, "run_failed"),
-        isNull(notifications.doneAt),
-        or(eq(notifications.groupKey, key), hasFailure(key)),
+        open,
+        or(hasFailure(key), and(eq(notifications.groupKey, key), sql`${notifications.latest}->'failures' is null`)),
       ),
     );
-  const done: string[] = [];
-  for (const r of rows) {
-    const rest = failuresOf(r).filter((f) => f.key !== key);
-    const first = rest[0];
-    if (!first) {
-      done.push(r.id);
-      continue;
-    }
-    const { key: _, ...source } = first;
-    const [row] = await deps.db
-      .update(notifications)
-      .set({
-        actors: rest.reduce<NotificationActor[]>((list, f) => mergeActors({ type: "agent", id: f.agentId }, list), []),
-        count: Math.max(1, r.count - 1),
-        source,
-        latest: { ...r.latest, failures: rest },
-      })
-      .where(eq(notifications.id, r.id))
-      .returning();
-    if (row) await publishRow(deps, row);
+  for (const c of candidates) {
+    // Same lock as `notifyRunFailed`, so a join and a drop on one row never overwrite each other.
+    await deps.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`run-failed:${orgId}:${c.userId}`}))`);
+      const d = { ...deps, db: tx };
+      const [r] = await tx
+        .select()
+        .from(notifications)
+        .where(and(open, eq(notifications.id, c.id)));
+      if (!r) return;
+      const before = failuresOf(r);
+      const rest = before.filter((f) => f.key !== key);
+      if (rest.length === before.length) return;
+      const first = rest[0];
+      if (!first) {
+        await resolveNotifications(d, orgId, { ids: [r.id] });
+        return;
+      }
+      const { key: _, ...source } = first;
+      const [row] = await tx
+        .update(notifications)
+        .set({
+          actors: rest.reduce<NotificationActor[]>(
+            (list, f) => mergeActors({ type: "agent", id: f.agentId }, list),
+            [],
+          ),
+          count: Math.max(rest.length, r.count - 1),
+          source,
+          latest: { ...r.latest, failures: rest },
+        })
+        .where(eq(notifications.id, r.id))
+        .returning();
+      if (row) await publishRow(d, row);
+    });
   }
-  if (done.length) await resolveNotifications(deps, orgId, { ids: done });
 }
 
 /**
