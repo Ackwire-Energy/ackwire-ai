@@ -738,6 +738,30 @@ test.if(posix)(
 );
 
 test.if(posix)(
+  "protocol 40: compacted, then closed as idle before the next turn: the resumed process opens with the conversation once",
+  async () => {
+    const { m, spawns, turn } = setup({ idleMs: 50 });
+    const conversation = "# This conversation\n\n## Your team\nOther agents: @ops.";
+    const said = async (n: number, prompt: string) => {
+      const { final } = await turn(n, prompt, { conversation, session: { id: SESSION(1), resume: n > 1 } });
+      return final.type === "done" ? final.text : "";
+    };
+    const closed = async () => {
+      const proc = m.process(AGENT.id, SESSION(1));
+      await waitFor(() => m.size === 0 && proc?.exited === true, 4000);
+    };
+    expect(await said(1, "first")).toBe(`echo 1: ${conversation}\n\nfirst`);
+    expect(await said(2, "COMPACT")).toBe("echo 2: COMPACT");
+    await closed();
+    expect(await said(3, "resumed")).toBe(`echo 1: ${conversation}\n\nresumed`);
+    await closed();
+    // Not compacted since: no second copy.
+    expect(await said(4, "again")).toBe("echo 1: again");
+    expect(spawns().map((x) => x.args.at(-2))).toEqual(["--session-id", "--resume", "--resume"]);
+  },
+);
+
+test.if(posix)(
   "protocol 40: new sessions of one agent in one checkout send the same launch and system text, its CLAUDE.md included; another checkout keeps the agent's part",
   async () => {
     const { ws, spawns, turn } = setup({ idleMs: 50 });
