@@ -1,7 +1,16 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -122,6 +131,11 @@ export const brainKey = (agentId: string, session: string) => `${agentId}:${sess
 
 export const BRAIN_IDLE_MS = 3 * 60_000;
 export const BRAIN_MAX_PROCESSES = 1;
+/**
+ * How long a session's first system text is kept after its last use: Claude Code's prompt cache lives 1 hour
+ * (subscriptions, and `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` on keys), plus a margin.
+ */
+export const SESSION_SYSTEM_KEEP_MS = 75 * 60_000;
 /** `reclaimIdle`: how long it waits for the closed process to exit (its memory is free only then). */
 export const RECLAIM_EXIT_MS = 2_000;
 /** Text deltas are sent at most this often (batched). */
@@ -1148,6 +1162,8 @@ interface Live {
   sig: string;
   /** What `ran` remembers for it: the session, in its account. */
   ranKey: string;
+  /** Where its session's first system text is kept (`sessionSystem`). */
+  keptSystem: string;
   busy: boolean;
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
@@ -1594,7 +1610,14 @@ export class BrainManager {
     const mode = req.permissions?.mode === "plan" ? "plan" : "work";
     const launch = brainProfileLaunch(mode, req.personalMcp === true);
     const system = typeof req.system === "string" ? req.system : "";
-    writeFileSync(systemFile, launch.settingSources === "" ? system + repoInstructions(cwd) : system, { mode: 0o600 });
+    const ranKey = ranKeyOf(req, session);
+    const withRepo = launch.settingSources === "";
+    const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
+    writeFileSync(
+      systemFile,
+      this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system)),
+      { mode: 0o600 },
+    );
     let mcpConfigFile: string | undefined;
     const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
@@ -1694,7 +1717,8 @@ export class BrainManager {
       proc,
       account: ctx.accountHome && typeof req.account === "string" ? req.account : null,
       sig,
-      ranKey: ranKeyOf(req, session),
+      ranKey,
+      keptSystem,
       busy: false,
       lastUsed: Date.now(),
       idleTimer: null,
@@ -1709,6 +1733,53 @@ export class BrainManager {
       `[${ctx.agent.handle}] brain ${persistent ? "process" : "one-shot"} for ${session.slice(0, 8)} (${resume ? "resume" : "new"})`,
     );
     return live;
+  }
+
+  /**
+   * Where a session's first system text is kept (out of the per-process folders `drop` removes). Per folder and
+   * launch shape too: another `cwd` (a checkout cloned meanwhile) or one where Claude Code reads `CLAUDE.md` itself
+   * breaks the cached prefix anyway, and needs that folder's instructions in, or out of, the text.
+   */
+  private keptSystemFile(agentId: string, ranKey: string, cwd: string, withRepo: boolean) {
+    const name = createHash("sha256")
+      .update(JSON.stringify([agentId, ranKey, cwd, withRepo]))
+      .digest("hex")
+      .slice(0, 32);
+    return path.join(this.opts.root, "sessions", `${name}.txt`);
+  }
+
+  /**
+   * A session's appended system text stays the one it began with, as on a warm process: Claude Code builds its
+   * prompt from it, so a resume with other bytes would write the whole cached prefix again instead of reading it.
+   * Kept per agent, account, session and folder; dropped `SESSION_SYSTEM_KEEP_MS` after its last use (the cache is gone).
+   */
+  private sessionSystem(file: string, resume: boolean, fresh: () => string): string {
+    const dir = path.dirname(file);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const now = Date.now();
+    // A process warm for longer than that still uses its text: `drop` dates it from its close.
+    const live = new Set([...this.live.values()].map((l) => l.keptSystem));
+    for (const name of readdirSync(dir)) {
+      const f = path.join(dir, name);
+      if (live.has(f)) continue;
+      try {
+        if (now - statSync(f).mtimeMs > SESSION_SYSTEM_KEEP_MS) rmSync(f, { force: true });
+      } catch {
+        // gone meanwhile
+      }
+    }
+    if (resume) {
+      try {
+        const kept = readFileSync(file, "utf8");
+        utimesSync(file, now / 1000, now / 1000);
+        return kept;
+      } catch {
+        // not kept (a new runner, or past the cache): this text becomes the session's
+      }
+    }
+    const text = fresh();
+    writeFileSync(file, text, { mode: 0o600 });
+    return text;
   }
 
   private armIdle(live: Live) {
@@ -1788,6 +1859,13 @@ export class BrainManager {
     if (this.live.get(live.key) === live) this.live.delete(live.key);
     if (!live.proc.exited) live.proc.close();
     this.bridge.delete(live.id);
+    // Its last turn just used the cache: kept for an hour from now.
+    try {
+      const now = Date.now() / 1000;
+      utimesSync(live.keptSystem, now, now);
+    } catch {
+      // nothing kept
+    }
     const dir = path.join(this.opts.root, live.id);
     // The process may still read its files while it exits.
     const cleanup = () => rmSync(dir, { recursive: true, force: true });

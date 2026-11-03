@@ -4,7 +4,7 @@
 // $ANTHROPIC_AUTH_TOKEN, the OAuth token it holds (`oauthToken`: read where
 // $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR says, as Claude Code does, or $CLAUDE_CODE_OAUTH_TOKEN),
 // $CLAUDE_CODE_OAUTH_TOKEN itself (`oauthEnv`), the descriptor (`oauthFd`) and its `--settings`
-// file's `env` to $FAKE_CLAUDE_LOG (one JSON line).
+// file's `env` and its `--append-system-prompt-file`'s text (`system`) to $FAKE_CLAUDE_LOG (one JSON line).
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
 // of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate,
@@ -60,9 +60,14 @@ if (log) {
   try {
     settingsEnv = at >= 0 ? (JSON.parse(readFileSync(args[at + 1], "utf8")).env ?? null) : null;
   } catch {}
+  const sysAt = args.indexOf("--append-system-prompt-file");
+  let system = null;
+  try {
+    system = sysAt >= 0 ? readFileSync(args[sysAt + 1], "utf8") : null;
+  } catch {}
   appendFileSync(
     log,
-    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, oauthToken, oauthEnv, oauthFd, baseUrl, settingsEnv, compactWindow })}\n`,
+    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, oauthToken, oauthEnv, oauthFd, baseUrl, settingsEnv, compactWindow, system })}\n`,
   );
 }
 const flag = (name) => {
