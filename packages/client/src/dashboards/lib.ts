@@ -131,6 +131,9 @@ export const WIDGET_FAILURE_CODES = [
   "audience",
   "failing",
   "stopped",
+  "missing_credential",
+  "timeout",
+  "invalid_data",
 ] as const;
 export type WidgetFailureCode = (typeof WIDGET_FAILURE_CODES)[number];
 

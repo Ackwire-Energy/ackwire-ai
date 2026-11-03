@@ -22,7 +22,7 @@ export type DashboardRow = typeof schema.dashboards.$inferSelect;
 export type WidgetRow = typeof schema.dashboardWidgets.$inferSelect;
 export type WidgetUpdateRow = typeof schema.dashboardWidgetUpdates.$inferSelect;
 
-/** `home`: a person's own board on Início (one each, always private); `board`: any other. */
+/** `home`: a person's own board on Home (one each, always private); `board`: any other. */
 export type DashboardKind = "board" | "home";
 export const DASHBOARD_KINDS: readonly DashboardKind[] = ["board", "home"];
 

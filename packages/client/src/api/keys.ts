@@ -234,7 +234,7 @@ export const keys = {
   dashboards: (orgId: string) => ["org", orgId, "dashboards"] as const,
   dashboardList: (orgId: string) => ["org", orgId, "dashboards", "list"] as const,
   dashboard: (orgId: string, dashboardId: string) => ["org", orgId, "dashboards", "one", dashboardId] as const,
-  /** My home board ("My Home", the Início mural). */
+  /** My home board ("My Home", the Home mural). */
   dashboardHome: (orgId: string) => ["org", orgId, "dashboards", "home"] as const,
   widget: (orgId: string, widgetId: string) => ["org", orgId, "dashboards", "widget", widgetId] as const,
   widgetCost: (orgId: string, agentId: string, schedule: string) =>

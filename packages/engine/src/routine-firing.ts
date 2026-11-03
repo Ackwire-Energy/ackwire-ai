@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, isNull, lt, ne, schema, sql } from "@agenteschat/db";
 import { stopRun } from "./cancel";
+import { widgetRoutineHeld } from "./dashboards/refresh-ledger";
 import { notifyRoutineStalled, notifyRoutineWaitingPlan } from "./notification-producers";
 import { deferEventRun } from "./routine-events";
 import { endRoutineRun } from "./routine-ledger";
@@ -316,6 +317,10 @@ export async function pauseRoutinesOfCreator(deps: FiringDeps, orgId: string, us
   for (const r of rows) {
     await pauseRoutine(deps, r, "creator_left");
     await haltRoutineRuns(deps, orgId, r.id, { code: "creator_left" });
+    // A widget's routine says it on its widget now, not at its next Resolve (ADR 0134 §6).
+    if ((r.target as { type?: unknown } | null)?.type === "widget") {
+      await widgetRoutineHeld(deps, r, "creator_left").catch(() => {});
+    }
   }
   return rows.length;
 }

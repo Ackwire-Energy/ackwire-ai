@@ -25,6 +25,7 @@ import { runAuthority, UUID } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { type HandOff, handOffsFrom } from "./consultations";
+import { widgetRunContext } from "./dashboards/refresh-context";
 import { isAgentOnlyDm } from "./dms";
 import { cutText } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
@@ -1233,6 +1234,14 @@ async function routineContext(
     dueAt: (current?.at ?? trigger.createdAt).toISOString(),
   };
   const zone = safeZone(row?.timezone ?? orgZone);
+  // A widget's refresh (ADR 0134 §5): its widget's own block; it speaks only through update_widget.
+  if (brief.widget) {
+    const widget = await widgetRunContext(db, run.orgId, brief.widget, current?.event ?? null);
+    if (widget) {
+      const lastAt = last ? (last.startedAt ?? last.at) : null;
+      return { zone, ...widget, timeLine: routineTimeLine(brief, zone, lastAt, now) };
+    }
+  }
   const dueAt = new Date(brief.dueAt);
   const [creator, place, said, prepared] = await Promise.all([
     brief.creatorUserId ? userNameOf(db, brief.creatorUserId) : Promise.resolve(null),

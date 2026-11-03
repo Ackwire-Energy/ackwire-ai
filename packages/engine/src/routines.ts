@@ -38,6 +38,9 @@ import {
 } from "./connector-triggers";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { nextCronTime, zonedTimeForward } from "./cron";
+import { dashboardRights, viewerOf } from "./dashboards/access";
+import { isWidgetChangeRun, widgetFiring, widgetRunStarting } from "./dashboards/refresh-fire";
+import { widgetRoutineGone, widgetRoutineHeld } from "./dashboards/refresh-ledger";
 import { openDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishRoutineRuns, publishUserEvent } from "./events";
@@ -116,6 +119,8 @@ const {
   organizationMembers,
   users,
   webhookEndpoints,
+  dashboards,
+  dashboardWidgets,
 } = schema;
 
 export type RoutineTarget =
@@ -129,7 +134,12 @@ export type RoutineTarget =
    */
   | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string }
   /** Opens a forum topic each time (ADR 0022): the prompt is its goal, these agents discuss it. */
-  | { type: "forum"; agentIds: string[]; rounds?: number };
+  | { type: "forum"; agentIds: string[]; rounds?: number }
+  /**
+   * Redoes a widget in place (ADR 0134 §4): its runs speak only through `update_widget`. Its schedule, instructions
+   * and name follow the widget (`syncWidgetRoutine`); people change them from the widget, never here.
+   */
+  | { type: "widget"; widgetId: string; dashboardId: string };
 export const ROUTINE_EVENTS = [
   "sentry.issue_created",
   "github.pr_opened",
@@ -334,6 +344,8 @@ export interface RoutineView {
   usage: { runs: number; tokens: number; costNanoUsd: number; billedTo: "api" | "plan" | "mixed" };
   /** Actions approved ahead for its runs (or waiting to be) that may still run, soonest first; readers only. */
   ahead: RoutineAheadView[];
+  /** A widget's routine (ADR 0134 §4): the widget it redoes, which it opens; absent for any other routine. */
+  widget?: { id: string; dashboardId: string; title: string } | null;
 }
 
 export interface RoutineInput {
@@ -400,6 +412,24 @@ type RoutineRow = typeof routines.$inferSelect;
 type RunRow = typeof routineRuns.$inferSelect;
 
 const targetOf = (r: RoutineRow) => r.target as unknown as RoutineTarget;
+
+/** The widget a widget routine redoes ('' for any other routine). */
+const widgetIdOf = (r: RoutineRow) => {
+  const t = targetOf(r);
+  return t.type === "widget" ? t.widgetId : "";
+};
+
+/** The board of a widget routine's widget ('' for any other routine). */
+const widgetBoardOf = (r: RoutineRow) => {
+  const t = targetOf(r);
+  return t.type === "widget" ? t.dashboardId : "";
+};
+
+/**
+ * Routines lists a widget's routine only while the widget updates on a schedule (ADR 0134 §4): one that updates only
+ * when asked has no slot of its own to show.
+ */
+const listedInRoutines = (r: RoutineRow) => targetOf(r).type !== "widget" || Boolean(r.cron);
 
 /** The next slot of a scheduled routine after `after`: its rule, else its cron (older routines). */
 export function nextRoutineTime(r: Pick<RoutineRow, "rule" | "cron" | "timezone">, after: Date): Date | null {
@@ -868,6 +898,15 @@ async function views(
   );
   const machineName = new Map(machineRows.map((m) => [m.id, m.name]));
   const agentById = new Map(agentRows.map((a) => [a.id, a]));
+  // A widget's routine is shown with its widget (ADR 0134 §4).
+  const widgetIds = [...new Set(rows.map(widgetIdOf).filter(Boolean))];
+  const widgetRows = await lookup(widgetIds, () =>
+    db
+      .select({ id: dashboardWidgets.id, dashboardId: dashboardWidgets.dashboardId, title: dashboardWidgets.title })
+      .from(dashboardWidgets)
+      .where(and(eq(dashboardWidgets.orgId, orgId), inArray(dashboardWidgets.id, widgetIds))),
+  );
+  const widgetById = new Map(widgetRows.map((w) => [w.id, w]));
   const week = new Map<string, { status: string; runs: number; started: number }[]>();
   for (const w of weekRows) {
     const entry = { status: w.status, runs: Number(w.runs), started: Number(w.started) };
@@ -1006,6 +1045,7 @@ async function views(
         billedTo: billedTo(used, kind),
       },
       ahead: right.reads ? (ahead.get(r.id) ?? []).map((a) => ({ ...a, canCancel: right.cancelsAhead })) : [],
+      ...(targetOf(r).type === "widget" ? { widget: widgetById.get(widgetIdOf(r)) ?? null } : {}),
     };
   });
 }
@@ -1251,6 +1291,8 @@ async function checkRoutineCap(db: Database, orgId: string, agentId: string, exc
         isNull(routines.deletedAt),
         ne(routines.triggerType, "once"),
         sql`coalesce(${routines.target}->>'reminder', 'false') <> 'true'`,
+        // A widget's routine counts in the workspace's cap of scheduled widgets instead (ADR 0134 §7).
+        sql`coalesce(${routines.target}->>'type', '') <> 'widget'`,
         exceptId ? ne(routines.id, exceptId) : undefined,
       ),
     );
@@ -1411,14 +1453,22 @@ function hooksOf(deps: RoutineDeps): RoutineHookConfig {
 
 /** The organization's routines as the person sees them (ADR 0053 §9: outcomes only where they don't read). */
 export async function listRoutines(db: Database, actorId: string, orgId: string, hooks?: RoutineHookConfig) {
-  await requirePermission(db, actorId, orgId, "read");
+  const membership = await requirePermission(db, actorId, orgId, "read");
   const rows = await db
     .select()
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
   const sees = await routineSeer(db, orgId, actorId);
-  return views(db, rows.filter(sees), actorId, hooks);
+  // A widget's routine shows only to who sees its board (ADR 0134 §8): a private board's are its owner's alone.
+  const boardIds = [...new Set(rows.map(widgetBoardOf).filter(Boolean))];
+  const viewer = viewerOf(membership, actorId);
+  const boards = await lookup(boardIds, () =>
+    db.select().from(dashboards).where(and(eq(dashboards.orgId, orgId), inArray(dashboards.id, boardIds))),
+  );
+  const seenBoards = new Set(boards.filter((b) => dashboardRights(b, viewer).see).map((b) => b.id));
+  const listed = (r: RoutineRow) => listedInRoutines(r) && (!widgetBoardOf(r) || seenBoards.has(widgetBoardOf(r)));
+  return views(db, rows.filter((r) => sees(r) && listed(r)), actorId, hooks);
 }
 
 /**
@@ -1548,6 +1598,19 @@ export async function updateRoutine(
   const { db } = deps;
   const current = await loadRoutine(db, orgId, id);
   await requireRoutineEditor(db, actorId, orgId, current);
+  // A widget's routine follows its widget (ADR 0134 §4): only pausing and resuming it happen here.
+  if (
+    targetOf(current).type === "widget" &&
+    (patch.name !== undefined ||
+      patch.prompt !== undefined ||
+      patch.agentId !== undefined ||
+      patch.trigger !== undefined ||
+      patch.target !== undefined ||
+      patch.report !== undefined ||
+      patch.ownActions !== undefined)
+  ) {
+    throw new ForbiddenError(WIDGET_ROUTINE_FIXED, "routine.widget_fixed");
+  }
   const set: Partial<typeof routines.$inferInsert> = {};
   const agentId = patch.agentId ?? current.agentId;
   if (patch.agentId !== undefined && patch.agentId !== current.agentId) {
@@ -1700,6 +1763,9 @@ export async function updateRoutine(
   return view as RoutineView;
 }
 
+/** Why a widget's routine isn't changed here (ADR 0134 §4). */
+export const WIDGET_ROUTINE_FIXED = "This routine keeps a widget up to date: change it from its widget";
+
 /** Deletes a routine: it never fires again and its work in progress stops (§6.7); its run history stays. */
 export async function deleteRoutine(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
   const current = await loadRoutine(deps.db, orgId, id);
@@ -1734,6 +1800,8 @@ async function dropRoutine(deps: RoutineDeps, actorId: string, current: RoutineR
     .set({ active: false, nextRunAt: null, deletedAt: new Date(), updatedAt: new Date() })
     .where(eq(routines.id, current.id));
   await haltRoutineRuns(deps, orgId, current.id, { code: "deleted", byUserId: actorId });
+  // Its widget stays, updating only when asked (ADR 0134 §4).
+  if (targetOf(current).type === "widget") await widgetRoutineGone(deps, orgId, current.id);
   await cancelRoutineAhead(deps, orgId, current.id, actorId);
   // A mail routine's watch (and its Composio trigger) goes with it.
   await syncMailWatch(deps, current, null);
@@ -1761,6 +1829,8 @@ export async function duplicateRoutine(
   const { db } = deps;
   const current = await loadRoutine(db, orgId, id);
   await requireRoutineManager(db, actorId, orgId, current.agentId);
+  // A widget has one routine (ADR 0134 §4): a copy would redo it twice.
+  if (targetOf(current).type === "widget") throw new ForbiddenError(WIDGET_ROUTINE_FIXED, "routine.widget_fixed");
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
@@ -2032,13 +2102,16 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   };
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
   if (!routine || routine.deletedAt) return skip("deleted");
-  if (!routine.active && run.trigger !== "manual") return skip("paused");
+  // A widget's change request is a person's ask too: it runs while a person keeps that routine paused (ADR 0134 §6).
+  if (!routine.active && run.trigger !== "manual" && !isWidgetChangeRun(run)) return skip("paused");
   // Its workspace is on hold or suspended, or its agent held: the slot passes, the routine keeps its
   // schedule (`standing.ts`).
   const refusal = await standingRefusal(db, run.orgId, routine.agentId);
   if (refusal) return skip(refusal.code.replace(".", "_"));
   const paused = async (reason: RoutinePausedReason) => {
     await pauseRoutine(deps, routine, reason);
+    // A widget's routine says it on its widget (ADR 0134 §6).
+    if (targetOf(routine).type === "widget") await widgetRoutineHeld(deps, routine, reason).catch(() => {});
     return skip(reason);
   };
   const creator = routine.createdByUserId;
@@ -2139,6 +2212,15 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     return;
   }
 
+  // A widget's refresh (ADR 0134 §4): its widget and board are still there and its creator still sees the board.
+  let widget: RoutineBrief["widget"];
+  if (target.type === "widget") {
+    const firing = await widgetFiring(db, routine.orgId, target, creator, membership);
+    if ("skip" in firing) return skip(firing.skip);
+    if ("pause" in firing) return paused(firing.pause);
+    widget = firing.widget;
+  }
+
   // Where it reports: its channel or the conversation it was asked in, else the creator's DM with the agent.
   let deliverTo: RoutineBrief["deliverTo"];
   if (target.type === "channel" || target.type === "conversation") {
@@ -2175,7 +2257,10 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     report: routineReportOf(routine.report),
     trigger: run.trigger,
     dueAt: run.at.toISOString(),
+    ...(widget ? { widget } : {}),
   };
+  // The widget shows it is being redone (its last data stays on screen).
+  if (widget) await widgetRunStarting(deps, routine.orgId, widget.widgetId);
   const started = await startRoutineRun(deps, {
     orgId: routine.orgId,
     agentId: agent.id,

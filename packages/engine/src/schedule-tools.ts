@@ -308,9 +308,12 @@ function routineLine(r: RoutineView, where: string, handle: string | null, promp
   ].join("\n");
 }
 
-/** Reminders are a person's own: never listed as routines. */
+/**
+ * Reminders are a person's own: never listed as routines. A widget's routine is its widget's (ADR 0134 §4):
+ * list_dashboards shows it there.
+ */
 const isRoutine = (r: RoutineView) =>
-  r.trigger.type !== "once" && !(r.target.type === "conversation" && r.target.reminder);
+  r.trigger.type !== "once" && !(r.target.type === "conversation" && r.target.reminder) && r.target.type !== "widget";
 
 /**
  * Conversations whose routines' instructions a run nobody is behind may see: public
@@ -410,6 +413,13 @@ async function triggerOf(ctx: ToolContext, raw: Record<string, unknown>): Promis
 async function ownRoutine(ctx: ToolContext, id: string, anyAgent = false) {
   const row = await routineRow(ctx.db, ctx.orgId, id);
   if (!row || row.deletedAt) return { row: null, error: `You have no routine ${id}. Use list_routines.` };
+  // A widget's routine follows its widget (ADR 0134 §4): people change it there; its agent changes nothing of it.
+  if ((row.target as { type?: unknown }).type === "widget") {
+    return {
+      row: null,
+      error: `Routine ${id} keeps a widget up to date: change it from its widget (its schedule, instructions or alert), not as a routine. Tell the person to open the widget on its dashboard.`,
+    };
+  }
   if (row.agentId !== ctx.agentId && !anyAgent) {
     return {
       row: null,

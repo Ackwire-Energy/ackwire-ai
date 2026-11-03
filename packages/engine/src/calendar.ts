@@ -907,7 +907,15 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
   const routineRows = await db
     .select()
     .from(routines)
-    .where(and(eq(routines.orgId, orgId), eq(routines.active, true), eq(routines.triggerType, "schedule")));
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        eq(routines.active, true),
+        eq(routines.triggerType, "schedule"),
+        // A widget's refreshes aren't slots on a calendar (every 30 minutes would fill it; ADR 0134 §4).
+        sql`coalesce(${routines.target}->>'type', '') <> 'widget'`,
+      ),
+    );
   const routineRuns: { routineId: string; name: string; agentId: string; at: string; target: unknown }[] = [];
   const sees = await routineSeer(db, orgId, userId);
   for (const r of routineRows) {

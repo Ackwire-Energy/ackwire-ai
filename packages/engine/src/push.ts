@@ -296,6 +296,9 @@ export const PUSH_PLACE_KEYS = [
   "machineId",
   "topicId",
   "issueNumber",
+  // A widget or a board (ADR 0134): the apps open the widget, else the board.
+  "dashboardId",
+  "widgetId",
 ] as const;
 
 /** The in-app page a browser notification opens: the inbox, which opens the notification itself. */
@@ -393,6 +396,7 @@ export async function deliverPush(
     routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     screen: source.screen ?? null,
     reminder: latest.reminder === true,
+    reason: typeof latest.reason === "string" ? latest.reason : null,
   };
 
   let sent = 0;

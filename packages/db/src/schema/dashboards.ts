@@ -44,7 +44,7 @@ export interface DashboardProposalRow {
 
 /**
  * Dashboards (ADR 0134): a board of widgets that agents keep up to date. `kind` `home` is a person's own board on
- * Início (one per person, always private); `board` is any other. Who sees it: `audience` `workspace` (every
+ * Home (one per person, always private); `board` is any other. Who sees it: `audience` `workspace` (every
  * member), `roles` (whoever holds one of `audience_role_ids` at the time, ADR 0085, as a channel's audience, ADR
  * 0125) or `private` (its owner only). Who edits: `edit_policy` `viewers` (whoever sees it) or `owner` (its owner
  * and admins). An agent that made it is `owner_agent_id` ("created by"); the person it made it for owns it.
@@ -132,7 +132,7 @@ export const dashboardWidgets = pgTable(
     /** `half` | `hour` | `day` | `week` | `manual`. */
     schedule: text().notNull().default("manual"),
     alertEnabled: boolean().notNull().default(false),
-    /** "cair 20% abaixo de ontem"; empty: when something is off. */
+    /** "drops 20% below yesterday"; empty: when something is off. */
     alertCondition: text().notNull().default(""),
     /** Who hears its alerts: whoever turned them on or last changed the condition. */
     alertUserId: text().references(() => users.id, { onDelete: "set null" }),
@@ -179,7 +179,7 @@ export const dashboardWidgetUpdates = pgTable(
     agentRunId: uuid(),
     /** `ok` | `failed`. */
     status: text().notNull(),
-    /** The agent's one line for this update ("R$ 18.420 · +12% vs. ontem"). */
+    /** The agent's one line for this update ("$18,420 · +12% vs. yesterday"). */
     summary: text().notNull().default(""),
     spec: jsonb().$type<Record<string, unknown>>(),
     /** The alert it raised, in the agent's words; null when none. */

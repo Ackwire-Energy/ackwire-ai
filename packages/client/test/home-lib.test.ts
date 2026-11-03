@@ -8,6 +8,7 @@ import {
   homeDone,
   homeMentions,
   homeWaiting,
+  homeWidgetFailures,
   startingOut,
   startPlace,
   stepPermissions,
@@ -104,6 +105,19 @@ describe("Início's sections", () => {
     ];
     expect(upcomingRoutines(list, NOW).map((x) => x.id)).toEqual(["soon", "next", "later"]);
     expect(upcomingRoutines(list, NOW, 1).map((x) => x.id)).toEqual(["soon"]);
+    // A widget's own routine redoes its widget in place (ADR 0134): never in "Coming up".
+    const widget = { ...r("widget", 10), target: { type: "widget" as const, widgetId: "w", dashboardId: "d" } };
+    expect(upcomingRoutines([...list, widget], NOW).map((x) => x.id)).toEqual(["soon", "next", "later"]);
+  });
+
+  test("widgets that stopped updating wait on me until resolved, newest first (ADR 0134)", () => {
+    const list = [
+      n({ id: "old", kind: "widget_failed", updatedAt: at(60) }),
+      n({ id: "new", kind: "widget_failed", updatedAt: at(5) }),
+      n({ id: "done", kind: "widget_failed", updatedAt: at(1), doneAt: at(1) }),
+      n({ id: "alert", kind: "widget_alert", waiting: true, updatedAt: at(2) }),
+    ];
+    expect(homeWidgetFailures(list, NOW).map((x) => x.id)).toEqual(["new", "old"]);
   });
 
   test("when it comes: today, tomorrow, a day of this week, then the date", () => {

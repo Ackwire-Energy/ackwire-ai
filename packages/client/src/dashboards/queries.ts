@@ -89,7 +89,7 @@ export function useDashboard(orgId: string, dashboardId: string | null | undefin
   });
 }
 
-/** My home board (the Início mural, "My Home"), made on first use. */
+/** My home board (the Home mural, "My Home"), made on first use. */
 export function useHomeDashboard(orgId: string, enabled = true) {
   const api = useApi();
   return useQuery({

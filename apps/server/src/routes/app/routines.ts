@@ -95,8 +95,8 @@ const Target = z.union([
       description: "Opens a forum topic each time: the prompt is its goal; the routine's agent writes the synthesis.",
     }),
 ]);
-/** What routines show: also `conversation` (a thread or DM, from an agent's `schedule_reminder` or `create_routine`). */
-const TargetView = z.union([
+/** Where an edit may point a routine: also `conversation` (a thread or DM, from an agent's reminder or routine). */
+const TargetEdit = z.union([
   ...Target.options,
   z.object({
     type: z.literal("conversation"),
@@ -105,6 +105,13 @@ const TargetView = z.union([
     reminder: z.boolean().optional().openapi({ description: "A plain reminder (the agent's message, no run)." }),
     forUserId: z.string().optional(),
   }),
+]);
+/** What routines show: also a widget's own routine (ADR 0134 §4), whose target never changes from here. */
+const TargetView = z.union([
+  ...TargetEdit.options,
+  z
+    .object({ type: z.literal("widget"), widgetId: z.uuid(), dashboardId: z.uuid() })
+    .openapi({ description: "Redoes a widget in place (ADR 0134 §4): its schedule and instructions change there." }),
 ]);
 /** A structured schedule (the period picker): RRULE-like, in a time zone. */
 const ScheduleRuleSchema = z
@@ -343,6 +350,11 @@ const Routine = z
       .string()
       .nullable()
       .openapi({ description: "Its creator, whose reach it has (kept on edit); null once they left." }),
+    widget: z
+      .object({ id: z.uuid(), dashboardId: z.uuid(), title: z.string() })
+      .nullable()
+      .optional()
+      .openapi({ description: "A widget's own routine (ADR 0134 §4): the widget it redoes, which opens it." }),
     lastRun: RoutineRun.nullable(),
     recentRuns: z.array(RoutineRun).openapi({ description: "The last runs, newest first (at most 14)." }),
     usage: z
@@ -719,7 +731,7 @@ export function routineRoutes(deps: AppDeps) {
               description:
                 "A schedule phrase is parsed again (in `timezone`, else the routine's own zone); `nextRunAt` is recomputed.",
             }),
-            target: TargetView.optional(),
+            target: TargetEdit.optional(),
             active: z.boolean().optional().openapi({
               description: "`true` resumes it and clears `pausedReason` and `failuresInRow`.",
             }),
