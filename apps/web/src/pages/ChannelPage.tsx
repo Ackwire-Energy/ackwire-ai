@@ -262,7 +262,7 @@ import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfM
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
-import { InviteOfferRow, useInviteOffer } from "@/components/invite/InviteDialog";
+import { InviteOfferRow, useInviteDialog, useInviteOffer } from "@/components/invite/InviteDialog";
 import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
@@ -4638,7 +4638,7 @@ function AddMembersDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  /** An address nobody here has was picked: the invite dialog takes over, so this closes with what opened it. */
+  /** The invite dialog or a new agent's page takes over: this closes with what opened it. */
   onInvite: () => void;
   channel: Channel;
   exclude: Set<PickKey>;
@@ -4658,6 +4658,9 @@ function AddMembersDialog({
   const rows = useMemberRows(q, exclude);
   // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
   const invite = useInviteOffer(q);
+  const inviteDialog = useInviteDialog();
+  const navigate = useNavigate();
+  const creates = can(org, "create_agents");
   const add = useMutation({
     mutationFn: async () => {
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
@@ -4679,9 +4682,16 @@ function AddMembersDialog({
         onQueryChange={setQ}
         searchLabel={t("channelMembers.addSearch")}
         searchPlaceholder={t("channelMembers.addSearch")}
-        isEmpty={rows.length === 0 && !invite}
-        emptyText={t("channelMembers.addEmpty", { q })}
+        isEmpty={false}
+        emptyText=""
       >
+        {rows.length === 0 && !invite && (
+          <p className="ac-dialog__empty">
+            {q.trim()
+              ? t("channelMembers.addEmpty", { q: q.trim() })
+              : t("channelMembers.addEveryone", { org: org.name, channel: channel.name })}
+          </p>
+        )}
         <MemberPickerRows
           rows={rows}
           selected={selected}
@@ -4695,6 +4705,36 @@ function AddMembersDialog({
           }
         />
         {invite && <InviteOfferRow email={invite} channel={channel} onPick={onInvite} />}
+        {!invite && inviteDialog && can(org, "invite_people") && (
+          <button
+            type="button"
+            className="member-row member-row--add"
+            onClick={() => {
+              onInvite();
+              inviteDialog.open({ channelId: channel.id });
+            }}
+          >
+            <span className="member-row__plus" aria-hidden="true">
+              <Icon name="mail" />
+            </span>
+            {t("shell.invite")}
+          </button>
+        )}
+        {creates && (
+          <button
+            type="button"
+            className="member-row member-row--add"
+            onClick={() => {
+              onInvite();
+              void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } });
+            }}
+          >
+            <span className="member-row__plus" aria-hidden="true">
+              <Icon name="plus" />
+            </span>
+            {t("shell.createAgent")}
+          </button>
+        )}
       </DialogSearchList>
       <DialogFooter bar>
         <Button onClick={onClose}>{t("common.cancel")}</Button>

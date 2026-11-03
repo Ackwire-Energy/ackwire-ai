@@ -5193,7 +5193,10 @@
     "value": "Search people or agents"
   },
   "channelMembers.addEmpty": {
-    "value": "Everyone is already here, or nobody found for “{{q}}”."
+    "value": "Nobody outside the channel matches “{{q}}”."
+  },
+  "channelMembers.addEveryone": {
+    "value": "Everyone in {{org}} is already in #{{channel}}."
   },
   "channelMembers.addConfirm": {
     "value": {
