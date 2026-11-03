@@ -1078,6 +1078,7 @@
     "uses_other": "{{count}}回使用",
     "confirmed": "人が確認済み",
     "unconfirmed": "未確認",
+    "details": "技術的な詳細",
     "before": "以前の内容: {{text}}",
     "fix": "修正",
     "forgetTitle": "このメモリを忘れますか？",

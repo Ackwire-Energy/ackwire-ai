@@ -66,6 +66,7 @@ describe("agents reuse past work", () => {
             name: "save_how_to",
             input: {
               title: "List the Northwind models",
+              key: "northwind api list models",
               how: `GET ${MODELS_URL} with the NORTHWIND_API_KEY secret as a bearer token; script scripts/northwind-models.sh`,
             },
           },
@@ -190,7 +191,11 @@ describe("agents reuse past work", () => {
         body: "@dev do it",
       });
       const invoke = toolCaller(f, channelId, msg.id, background);
-      return invoke("save_how_to", { title, how: `GET https://api.northwind.example/${title} with NORTHWIND_API_KEY` });
+      return invoke("save_how_to", {
+        title,
+        key: title,
+        how: `GET https://api.northwind.example/${title} with NORTHWIND_API_KEY`,
+      });
     };
     const itemNamed = async (title: string) =>
       (await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.title, title)))[0];

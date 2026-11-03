@@ -2804,6 +2804,9 @@
   "memory.unconfirmed": {
     "value": "Not confirmed yet"
   },
+  "memory.details": {
+    "value": "Technical details"
+  },
   "memory.before": {
     "value": "It used to say: {{text}}"
   },

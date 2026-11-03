@@ -165,4 +165,14 @@ describe("the lists under the sky", () => {
     expect(mostUsed(list).map((m) => m.id)).toEqual(["m3", "m1"]);
     expect(searchMemories(list, "DEPLOY").map((m) => m.id)).toEqual(["m1"]);
   });
+
+  test("search finds a memory by its plain summary too", () => {
+    const summed = memory({
+      id: "m9",
+      agentId: "ada",
+      text: "supabase secrets set KEY",
+      summary: "Gravar senhas sem expô-las",
+    });
+    expect(searchMemories([...list, summed], "senhas").map((m) => m.id)).toEqual(["m9"]);
+  });
 });

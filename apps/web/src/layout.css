@@ -9792,6 +9792,22 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+.agp-subhead:first-child {
+  margin-top: 0;
+}
+.agp-subhead + p {
+  margin: 0 0 8px;
+}
+/* A learned item's technical detail, folded under its plain summary */
+.agp-mem__details > summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.agp-mem__details > p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .agp-skill-body {
   margin: 0;
   max-height: 320px;

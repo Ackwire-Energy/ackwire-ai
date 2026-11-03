@@ -38,6 +38,8 @@ import {
   howToSql,
   howToSubject,
   isHowTo,
+  learnedQuietly,
+  savedReceiptLine,
   supersede,
 } from "./items";
 import { kindFamily, overlap } from "./judgments";
@@ -144,7 +146,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "save_how_to",
       description:
-        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, which key it needs from a person through request_secret, never a secret's value, name or where it is kept) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same title replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
+        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, which key it needs from a person through request_secret, never a secret's value, name or where it is kept) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same key replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -153,11 +155,18 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             type: "string",
             minLength: 3,
             maxLength: 120,
-            description: "What it does, e.g. 'List the models of the Acme API'",
+            description:
+              "One plain line a person who doesn't code understands, in the language of the conversation, no paths, code or ids, e.g. 'Listar os modelos da API da Acme'. The technical detail goes in how.",
+          },
+          key: {
+            type: "string",
+            minLength: 3,
+            maxLength: 120,
+            description: KEY_DESCRIPTION,
           },
           how: { type: "string", minLength: 10, maxLength: 1500 },
         },
-        required: ["title", "how"],
+        required: ["title", "key", "how"],
         additionalProperties: false,
       },
       describe: (input) => ({ title: `Save how to: ${str(input.title)}` }),
@@ -176,7 +185,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               scopeId: ctx.agentId,
               agentId: ctx.agentId,
               title,
-              subject: howToSubject(title),
+              subject: howToSubject(str(input.key).trim() || title),
               content: str(input.how).trim(),
               sourceIds: [ctx.triggerMessageId],
               // Where it was worked out: a public channel's reaches every run, a private one's stays there.
@@ -303,14 +312,15 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "remember",
       description:
-        'Save what you learned, on your own, as you go: when a person corrects you, states how they want things done (even in passing), or you learn a lasting fact about the company, its people or its systems. Cite what grounds it (basis: person_said when a person in this conversation said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true so you follow it in every conversation (word it without private details from this one). Never credentials, where secrets are kept, or rules about permissions or approvals.',
+        'Save what you learned, on your own, as you go: when a person corrects you, states how they want things done (even in passing), or you learn a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person in this conversation said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true so you follow it in every conversation (word it without private details from this one). Never credentials, where secrets are kept, or rules about permissions or approvals.',
       scope: "memory:write",
       inputSchema: {
         type: "object",
         properties: {
           content: { type: "string", minLength: 3, maxLength: 2000 },
           kind: { type: "string", enum: ["fact", "preference", "decision", "note"] },
-          title: { type: "string", maxLength: 200 },
+          title: { type: "string", minLength: 3, maxLength: 200, description: PLAIN_TITLE },
+          key: { type: "string", maxLength: 120, description: KEY_DESCRIPTION },
           everywhere: { type: "boolean" },
           basis: { type: "string", enum: ["person_said", "found"] },
         },
@@ -349,7 +359,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               scopeId: ctx.agentId,
               agentId: ctx.agentId,
               title: str(input.title),
-              subject: str(input.title) || content.slice(0, 120),
+              subject: str(input.key).trim() || str(input.title) || content.slice(0, 120),
               content,
               sourceIds: [ctx.triggerMessageId],
               // A rule about the agent's own conduct holds in every conversation: no channel keeps it out of a run.
@@ -369,7 +379,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               : { ...memoryJudging(deps), mayReplace: (old) => old.createdByKind !== "person" },
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
-          // The memory card in the chat only for what a person said; the rest is a quiet receipt.
+          // The memory card and the receipt only for what a person said; the agent's own finding stays quiet.
           if (said)
             await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, res.item).catch(() => {});
           if (res.action === "outweighed") {
@@ -395,7 +405,11 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       scope: "memory:write",
       inputSchema: {
         type: "object",
-        properties: { item_id: { type: "string" }, content: { type: "string", minLength: 3, maxLength: 2000 } },
+        properties: {
+          item_id: { type: "string" },
+          content: { type: "string", minLength: 3, maxLength: 2000 },
+          title: { type: "string", minLength: 3, maxLength: 200, description: PLAIN_TITLE },
+        },
         required: ["item_id", "content"],
         additionalProperties: false,
       },
@@ -414,7 +428,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               scopeId: item.scopeId,
               agentId: item.agentId,
               subject: item.subjectKey,
-              title: item.title,
+              // A title describing the old text would be shown above the new one: none rather than a stale one.
+              title: str(input.title).trim(),
               content: str(input.content),
               sourceIds: [...item.sourceIds, ctx.triggerMessageId],
               channelIds: [...new Set([...item.channelIds, ctx.channelId])],
@@ -427,15 +442,19 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               createdByKind: requester ? "person" : (item.createdByKind as "agent" | "job"),
               createdById: requester ?? ctx.agentId,
             });
-            await recordAgentActions(tx, ctx, [
-              {
-                kind: "memory.updated",
-                target: { type: "memory", id: row.id },
-                params: { text: cutText(row.content, 500), previousText: cutText(item.content, 500) },
-                before: { itemId: item.id },
-                after: { itemId: row.id },
-              },
-            ]);
+            if (requester || !learnedQuietly(item))
+              await recordAgentActions(tx, ctx, [
+                {
+                  kind: "memory.updated",
+                  target: { type: "memory", id: row.id },
+                  params: {
+                    text: cutText(row.title || row.content, 500),
+                    previousText: cutText(item.title || item.content, 500),
+                  },
+                  before: { itemId: item.id },
+                  after: { itemId: row.id },
+                },
+              ]);
             return row;
           });
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: next.id }).catch(() => {});
@@ -466,15 +485,16 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             .update(contextItems)
             .set({ status: "archived", updatedAt: new Date() })
             .where(eq(contextItems.id, item.id));
-          await recordAgentActions(tx, ctx, [
-            {
-              kind: "memory.forgotten",
-              target: { type: "memory", id: item.id },
-              params: { text: cutText(item.content, 500) },
-              before: { itemId: item.id },
-              after: { itemId: item.id },
-            },
-          ]);
+          if (requester || !learnedQuietly(item))
+            await recordAgentActions(tx, ctx, [
+              {
+                kind: "memory.forgotten",
+                target: { type: "memory", id: item.id },
+                params: { text: cutText(item.title || item.content, 500) },
+                before: { itemId: item.id },
+                after: { itemId: item.id },
+              },
+            ]);
         });
         await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: item.id }).catch(() => {});
         await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, item).catch(() => {});
@@ -661,17 +681,30 @@ async function triggerAuthor(ctx: ToolContext) {
 const personMayRead = (item: ContextItem | undefined, person: string | null, agentId: string) =>
   !item || ((!item.agentId || item.agentId === agentId) && (item.scopeType !== "person" || item.scopeId === person));
 
-/** A new memory, or a new version of one: a receipt with Undo. The same thing again (merged) has nothing to undo. */
+/**
+ * What a memory is about, apart from its plain title (shown to people, in their language): the same thing saved again,
+ * from any conversation, lands on the same key and replaces or strengthens the old one.
+ */
+const PLAIN_TITLE =
+  "One plain line a person who doesn't code understands, in the language of the conversation, no paths, code or ids (shown first; content holds the detail).";
+const KEY_DESCRIPTION =
+  "A short, stable name for what this is about, in English, technical words welcome ('northwind api list models'; for a term, the term itself). The same thing always gets the same key; two different things never share one.";
+
+/**
+ * A new memory, or a new version of one: a receipt with Undo, its line the plain summary (the title). The same thing
+ * again (merged) has nothing to undo; what the agent learned quietly has none (`savedReceiptLine`), it lives in the Memory tab.
+ */
 async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
-  if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return;
+  const line = savedReceiptLine(res);
+  if (!line) return;
   const replaced = res.action === "superseded" ? res.previous : undefined;
   await recordAgentActions(ctx.db, ctx, [
     {
       kind: "memory.saved",
       target: { type: "memory", id: res.item.id },
       params: {
-        text: cutText(res.item.content, 500),
-        ...(replaced ? { previousText: cutText(replaced.content, 500) } : {}),
+        text: cutText(line, 500),
+        ...(replaced ? { previousText: cutText(replaced.title || replaced.content, 500) } : {}),
       },
       before: replaced ? { itemId: replaced.id } : null,
       after: { itemId: res.item.id },

@@ -16,7 +16,7 @@ import {
 } from "@agenteschat/db";
 import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
-import { agentIdsWithDetails, seesAgentDetails } from "../audience";
+import { agentIdsSeen, isPlaybook, readsPlaybook, seesAgentDetails } from "../audience";
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
@@ -129,6 +129,30 @@ export const HOW_TO_WORD = "howto";
 export const howToSubject = (title: string) => `${HOW_TO_WORD} ${title}`;
 export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
   i.kind === "note" && i.subjectKey.split(" ").includes(HOW_TO_WORD);
+/**
+ * Learning with no chat receipt (ADR 0120): the agent's playbook, and anything it found on its own (no person's words
+ * among the evidence), like where a script lives. It stays in the Memory tab and in later runs.
+ */
+export const learnedQuietly = (i: Pick<ContextItem, "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">) =>
+  isPlaybook(i) || !i.evidence.some((e) => e.type === "human");
+/**
+ * What a chat receipt for a saved memory says: its plain title, or a person's own words. None for what was learned
+ * quietly (`learnedQuietly`), nor for an agent's untitled item (its text may be technical).
+ */
+export const receiptLine = (
+  i: Pick<ContextItem, "title" | "content" | "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">,
+) => (learnedQuietly(i) ? "" : i.title.trim() || (i.createdByKind === "person" ? i.content : ""));
+/**
+ * The receipt line for a write, "" for none. A quiet write that replaces or disputes what a person said, or what a
+ * person wrote (an app's import has no human evidence), still gets one: a person's memory never changes unseen.
+ */
+export function savedReceiptLine(res: Pick<ConsolidateResult, "action" | "item" | "previous">) {
+  if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return "";
+  const p = res.previous;
+  if (!learnedQuietly(res.item) || !p || (p.createdByKind !== "person" && learnedQuietly(p)))
+    return receiptLine(res.item);
+  return res.item.title.trim() || p.title.trim() || p.content;
+}
 export const howToSql = () =>
   sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
 
@@ -448,16 +472,16 @@ export async function listContextItems(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const [visible, seen] = await Promise.all([
     userVisibleChannels(db, orgId, actorId),
-    agentIdsWithDetails(db, actorId, orgId),
+    agentIdsSeen(db, actorId, orgId),
   ]);
-  return db
+  const rows = await db
     .select()
     .from(contextItems)
     .where(
       and(
         eq(contextItems.orgId, orgId),
         // An agent's memory is part of how it works: only for who sees its details.
-        or(isNull(contextItems.agentId), inArray(contextItems.agentId, [...seen])),
+        or(isNull(contextItems.agentId), inArray(contextItems.agentId, [...seen.details])),
         preferencesSeenBy(membership, actorId),
         filter.createdBy?.length ? inArray(contextItems.createdByKind, filter.createdBy) : undefined,
         filter.agentId ? eq(contextItems.agentId, filter.agentId) : undefined,
@@ -468,6 +492,7 @@ export async function listContextItems(
     )
     .orderBy(desc(contextItems.pinned), desc(contextItems.relevance), desc(contextItems.updatedAt))
     .limit(Math.min(filter.limit ?? 100, 500));
+  return rows.filter((i) => !isPlaybook(i) || seen.playbook.has(i.agentId ?? ""));
 }
 
 /** Whether someone who reads `visible` may see an item: every channel it came from (org-wide ones too). */
@@ -481,8 +506,8 @@ export const itemVisibleIn = (item: Pick<ContextItem, "channelIds">, visible: re
  */
 export async function listAgentMemoryRows(db: Database, actorId: string, orgId: string, agentId: string) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const visible = await userVisibleChannels(db, orgId, actorId);
-  const items = await db
+  const [visible, agent] = await Promise.all([userVisibleChannels(db, orgId, actorId), getAgent(db, orgId, agentId)]);
+  const rows = await db
     .select()
     .from(contextItems)
     .where(
@@ -493,7 +518,8 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
         arrayContained(contextItems.channelIds, visible),
       ),
     );
-  return { items, visible };
+  const playbook = !!agent && readsPlaybook(agent, actorId, membership);
+  return { items: rows.filter((i) => playbook || !isPlaybook(i)), visible };
 }
 
 /**
@@ -519,7 +545,13 @@ export async function listOrgMemoryRows(db: Database, actorId: string, orgId: st
     .orderBy(desc(contextItems.updatedAt))
     .limit(limit);
   // An agent's memory is part of how it works: only for who sees its details.
-  const items = rows.filter((r) => seesAgentDetails(r.agent, actorId, membership)).map((r) => r.item);
+  const items = rows
+    .filter(
+      (r) =>
+        seesAgentDetails(r.agent, actorId, membership) &&
+        (!isPlaybook(r.item) || readsPlaybook(r.agent, actorId, membership)),
+    )
+    .map((r) => r.item);
   return { items, visible };
 }
 
@@ -578,7 +610,8 @@ export async function editContextItem(
         scopeId: item.scopeId,
         agentId: item.agentId,
         subject: item.subjectKey,
-        title: input.title ?? item.title,
+        // A summary of the old text would sit above the new one: kept only when the person edited it too.
+        title: input.title ?? "",
         content: input.content ?? item.content,
         sourceIds: item.sourceIds,
         channelIds: item.channelIds,

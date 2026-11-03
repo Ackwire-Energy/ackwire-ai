@@ -3286,6 +3286,12 @@ export const en = {
       cancel: "Cancel",
       forgotten: "Forgotten. It's in Archived if you want it back.",
       saved: "Saved. It counts as verified now.",
+      /** The agent's own how-tos, lessons and notes, apart from what it learned about people. */
+      playbook: "How {{name}} works",
+      playbookNote:
+        "Ways of working it keeps for itself. They don't show in the chat. What it picked up from outside and never used again leaves on its own and stays in Archived.",
+      /** Folds the technical text under a learned item's plain summary. */
+      details: "Technical details",
       skills: "Skills it made",
       skillUses_zero: "never loaded",
       skillUses_one: "loaded once",

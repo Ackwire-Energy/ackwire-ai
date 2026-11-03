@@ -8298,6 +8298,15 @@
   "agentPage.memory.saved": {
     "value": "Saved. It counts as verified now."
   },
+  "agentPage.memory.playbook": {
+    "value": "How {{name}} works"
+  },
+  "agentPage.memory.playbookNote": {
+    "value": "Ways of working it keeps for itself. They don't show in the chat. What it picked up from outside and never used again leaves on its own and stays in Archived."
+  },
+  "agentPage.memory.details": {
+    "value": "Technical details"
+  },
   "agentPage.memory.skills": {
     "value": "Skills it made"
   },

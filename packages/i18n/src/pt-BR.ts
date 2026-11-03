@@ -3371,6 +3371,11 @@ export const ptBR = {
       cancel: "Cancelar",
       forgotten: "Esquecido. Fica em Arquivadas se quiser de volta.",
       saved: "Salvo. Agora conta como verificado.",
+      playbook: "Como o {{name}} trabalha",
+      playbook_female: "Como a {{name}} trabalha",
+      playbookNote:
+        "Jeitos de trabalhar que guardou para si. Não aparecem na conversa. O que pegou de fora e não voltou a usar sai sozinho e fica em Arquivadas.",
+      details: "Detalhes técnicos",
       skills: "Skills que criou",
       skillUses_zero: "nunca carregada",
       skillUses_one: "carregada uma vez",

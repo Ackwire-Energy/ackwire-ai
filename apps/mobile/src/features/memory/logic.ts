@@ -30,5 +30,5 @@ export const mostUsed = (memories: Memory[]) =>
 
 export function searchMemories(memories: Memory[], q: string) {
   const needle = q.trim().toLowerCase();
-  return memories.filter((m) => m.text.toLowerCase().includes(needle));
+  return memories.filter((m) => `${m.summary ?? ""} ${m.text}`.toLowerCase().includes(needle));
 }

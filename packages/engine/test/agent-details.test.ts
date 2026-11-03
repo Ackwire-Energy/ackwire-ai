@@ -129,3 +129,33 @@ test("reviewing memory without configuring the workspace neither lists nor decid
   await expect(decideProposal(f.db, bia.id, f.org.id, forOrg.id, "reject")).rejects.toThrow();
   expect((await listProposals(f.db, f.owner.id, f.org.id)).map((p) => p.canDecide)).toEqual([true]);
 });
+
+test("an agent's playbook stays out of a plain member's list and search, even one it answers", async () => {
+  f = await setup();
+  const bia = await addMember(f.db, f.org.id, "member", "Bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await answers(f, "everyone");
+  const lesson = await consolidateItem(f.db, {
+    orgId: f.org.id,
+    kind: "lesson",
+    scopeType: "agent",
+    agentId: f.agent.id,
+    channelIds: [],
+    content: "Run the database push before the deploy.",
+    evidence: [{ type: "self", ref: "x", agentId: f.agent.id, at: "" }],
+    confidence: 0.8,
+    createdByKind: "agent",
+    createdById: f.agent.id,
+  });
+  await drainOutbox(f.db, f.handlers);
+  const deps = { db: f.db, search: f.search, gateway: f.gateway };
+  const found = async (userId: string) =>
+    (await searchForUser(deps, userId, f.org.id, { text: "deploy" })).filter((h) => h.kind === "context_item").length;
+
+  expect(await listContextItems(f.db, bia.id, f.org.id, { agentId: f.agent.id })).toEqual([]);
+  expect(await found(bia.id)).toBe(0);
+  expect((await listContextItems(f.db, f.owner.id, f.org.id, { agentId: f.agent.id })).map((i) => i.id)).toEqual([
+    lesson.item.id,
+  ]);
+  expect(await found(f.owner.id)).toBe(1);
+});
