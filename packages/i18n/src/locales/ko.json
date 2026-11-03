@@ -1419,7 +1419,7 @@
         },
         "callAgents": {
           "title": "에이전트 부르기",
-          "line": "메시지가 이 채널의 에이전트를 깨워요"
+          "line": "이 채널의 에이전트에게 답장 받기"
         },
         "manage": {
           "title": "채널 관리",
@@ -1428,11 +1428,11 @@
       },
       "default": {
         "allowedBy": "기본값: {{role}} 역할로 허용",
-        "notHeld": "기본값: {{role}} 역할에는 없어요",
+        "notHeld": "기본값: {{role}} 역할로 허용 안 됨",
         "followsEveryone": "기본값: 이 채널의 {{role}}을(를) 따라요",
         "person": "기본값: 이 사람의 역할을 따라요"
       },
-      "readOnlyComposer": "이 채널에서는 일부 사람만 메시지를 보내요",
+      "readOnlyComposer": "이 채널에서는 메시지를 보낼 수 없어요",
       "agentsDenied": "이 채널에서는 에이전트를 부를 수 없어요",
       "forbidden": "내가 가진 권한만, 나보다 아래인 역할과 사람에게만 바꿀 수 있어요"
     },

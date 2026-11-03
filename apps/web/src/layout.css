@@ -511,7 +511,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   color: var(--attention);
 }
 .waitcard[data-done] .waitcard__top .ac-icon {
-  color: var(--ok);
+  color: var(--success);
 }
 .waitcard p {
   gap: 6px;
@@ -544,7 +544,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   color: var(--ink2);
 }
 .waitcard__lines > li[data-given="true"] > .ac-icon {
-  color: var(--ok);
+  color: var(--success);
 }
 .waitcard__needs {
   color: var(--attention);

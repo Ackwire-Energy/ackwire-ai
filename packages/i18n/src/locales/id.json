@@ -1419,7 +1419,7 @@
         },
         "callAgents": {
           "title": "Panggil agen",
-          "line": "Pesan membangunkan agen di kanal ini"
+          "line": "Dapat balasan dari agen di kanal ini"
         },
         "manage": {
           "title": "Kelola kanal",
@@ -1428,13 +1428,13 @@
       },
       "default": {
         "allowedBy": "Bawaan: diizinkan oleh peran {{role}}",
-        "notHeld": "Bawaan: peran {{role}} tidak memilikinya",
+        "notHeld": "Bawaan: tidak diizinkan oleh peran {{role}}",
         "followsEveryone": "Bawaan: mengikuti {{role}} di kanal ini",
         "person": "Bawaan: mengikuti peran orang ini"
       },
-      "readOnlyComposer": "Hanya sebagian orang yang mengirim pesan di kanal ini",
+      "readOnlyComposer": "Kamu tidak bisa mengirim pesan di kanal ini",
       "agentsDenied": "Di kanal ini kamu tidak memanggil agen",
-      "forbidden": "Kamu hanya mengubah izin yang kamu punya, untuk peran dan orang di bawahmu"
+      "forbidden": "Kamu hanya bisa mengubah izin yang kamu punya, untuk peran dan orang di bawahmu"
     },
     "pins": {
       "title": "Disematkan",

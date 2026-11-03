@@ -1446,7 +1446,7 @@ export const ptBR = {
         },
         callAgents: {
           title: "Chamar agentes",
-          line: "As mensagens acordam os agentes deste canal",
+          line: "Receber respostas dos agentes deste canal",
         },
         manage: {
           title: "Gerenciar o canal",
@@ -1456,15 +1456,15 @@ export const ptBR = {
       /** What "Padrão" means right now for the role or person picked. */
       default: {
         allowedBy: "Padrão: permitido pelo papel {{role}}",
-        notHeld: "Padrão: o papel {{role}} não tem",
+        notHeld: "Padrão: não permitido pelo papel {{role}}",
         followsEveryone: "Padrão: segue {{role}} neste canal",
         person: "Padrão: segue os papéis dessa pessoa",
       },
       /** In place of the composer when the channel's exceptions keep me from sending. */
-      readOnlyComposer: "Só algumas pessoas enviam mensagens neste canal",
+      readOnlyComposer: "Você não pode enviar mensagens neste canal",
       /** Only for me, after my message mentioned an agent here. */
-      agentsDenied: "Neste canal você não chama agentes",
-      forbidden: "Você só muda permissões que tem, de papéis e pessoas abaixo de você",
+      agentsDenied: "Você não pode chamar agentes neste canal",
+      forbidden: "Você só pode mudar permissões que tem, de papéis e pessoas abaixo de você",
     },
     pins: {
       title: "Fixadas",

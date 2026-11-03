@@ -50,7 +50,9 @@ export function ChannelPermissions({ channelId }: { channelId: string }) {
       .filter((r) => !isEveryone(r) && saved.some((o) => sameTarget(o.target, { type: "role", id: r.id })))
       .map((r) => ({ type: "role" as const, id: r.id })),
     ...saved.filter((o) => o.target.type === "person").map((o) => o.target),
-    ...added.filter((a) => !saved.some((o) => sameTarget(o.target, a))),
+    ...added.filter(
+      (a) => !saved.some((o) => sameTarget(o.target, a)) && !(everyoneTarget && sameTarget(a, everyoneTarget)),
+    ),
   ];
   const current = (picked && targets.find((x) => sameTarget(x, picked))) ?? targets[0] ?? null;
   const roleById = (id: string) => roles.find((r) => r.id === id);
@@ -74,6 +76,8 @@ export function ChannelPermissions({ channelId }: { channelId: string }) {
     const deny = was.deny.filter((k) => k !== key);
     if (state === "allow") allow.push(key);
     if (state === "deny") deny.push(key);
+    // Kept listed and picked when its last key goes back to Padrão, so the focus stays on the control.
+    setAdded((list) => (list.some((a) => sameTarget(a, x)) ? list : [...list, x]));
     save.mutate({ target: x, allow, deny }, { onError: (e) => toast.show(errorText(t, e), "error") });
   };
   const clear = (x: Target) => {
@@ -196,7 +200,6 @@ export function ChannelPermissions({ channelId }: { channelId: string }) {
                     size="sm"
                     label={t("channel.perms.stateLabel", { key: name, target: nameOf(current) })}
                     value={state}
-                    disabled={save.isPending}
                     onValueChange={(next) => change(current, key, next)}
                     options={(["deny", "inherit", "allow"] as const).map((s) => ({
                       value: s,

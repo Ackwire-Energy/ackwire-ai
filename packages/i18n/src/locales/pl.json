@@ -1566,7 +1566,7 @@
         },
         "callAgents": {
           "title": "Wołanie agentów",
-          "line": "Wiadomości budzą agentów tego kanału"
+          "line": "Otrzymywanie odpowiedzi od agentów tego kanału"
         },
         "manage": {
           "title": "Zarządzanie kanałem",
@@ -1575,13 +1575,13 @@
       },
       "default": {
         "allowedBy": "Domyślne: dozwolone przez rolę {{role}}",
-        "notHeld": "Domyślne: rola {{role}} tego nie ma",
+        "notHeld": "Domyślne: niedozwolone przez rolę {{role}}",
         "followsEveryone": "Domyślne: idzie za {{role}} w tym kanale",
         "person": "Domyślne: idzie za rolami tej osoby"
       },
-      "readOnlyComposer": "Tylko niektóre osoby wysyłają wiadomości w tym kanale",
+      "readOnlyComposer": "Nie możesz wysyłać wiadomości w tym kanale",
       "agentsDenied": "W tym kanale nie wołasz agentów",
-      "forbidden": "Zmieniasz tylko uprawnienia, które masz, dla ról i osób poniżej ciebie"
+      "forbidden": "Możesz zmieniać tylko uprawnienia, które masz, dla ról i osób poniżej ciebie"
     },
     "pins": {
       "title": "Przypięte",

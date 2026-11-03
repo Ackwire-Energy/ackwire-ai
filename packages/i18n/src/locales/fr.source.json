@@ -3599,7 +3599,7 @@
     "value": "Call agents"
   },
   "channel.perms.keys.callAgents.line": {
-    "value": "Messages wake this channel's agents"
+    "value": "Get replies from this channel's agents"
   },
   "channel.perms.keys.manage.title": {
     "value": "Manage the channel"
@@ -3611,7 +3611,7 @@
     "value": "Default: allowed by the {{role}} role"
   },
   "channel.perms.default.notHeld": {
-    "value": "Default: the {{role}} role doesn't have it"
+    "value": "Default: not allowed by the {{role}} role"
   },
   "channel.perms.default.followsEveryone": {
     "value": "Default: follows {{role}} in this channel"
@@ -3620,13 +3620,13 @@
     "value": "Default: follows this person's roles"
   },
   "channel.perms.readOnlyComposer": {
-    "value": "Only some people send messages in this channel"
+    "value": "You can't send messages in this channel"
   },
   "channel.perms.agentsDenied": {
     "value": "You can't call agents in this channel"
   },
   "channel.perms.forbidden": {
-    "value": "You only change permissions you hold, for roles and people below you"
+    "value": "You can only change permissions you have, for roles and people below you"
   },
   "channel.pins.title": {
     "value": "Pinned"

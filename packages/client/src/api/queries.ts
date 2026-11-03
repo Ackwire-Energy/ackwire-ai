@@ -2308,14 +2308,32 @@ export const useChannelPermissions = (orgId: string, channelId: string, enabled 
   });
 };
 
-/** Sets one exception of a channel: its list and everyone's channel list (`can`) refetch. */
+/**
+ * Sets one exception of a channel, at once on screen (the three-state control keeps its focus under the arrow keys),
+ * one save at a time in order; then its list and everyone's channel list (`can`) refetch.
+ */
 export function useSetChannelPermission(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const key = keys.channelPermissions(orgId, channelId);
   return useMutation({
+    scope: { id: `channel-permissions:${channelId}` },
     mutationFn: (override: ChannelOverride) => api.chat.setPermission(orgId, channelId, override),
+    onMutate: async (override) => {
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<ChannelOverride[]>(key);
+      const rest = (before ?? []).filter(
+        (o) => o.target.type !== override.target.type || o.target.id !== override.target.id,
+      );
+      const empty = override.allow.length === 0 && override.deny.length === 0;
+      qc.setQueryData<ChannelOverride[]>(key, empty ? rest : [...rest, override]);
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(key, ctx.before);
+    },
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey: keys.channelPermissions(orgId, channelId) });
+      void qc.invalidateQueries({ queryKey: key });
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
     },
   });

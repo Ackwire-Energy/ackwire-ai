@@ -1468,7 +1468,7 @@
         },
         "callAgents": {
           "title": "Agents oproepen",
-          "line": "Berichten wekken de agents van dit kanaal"
+          "line": "Antwoorden krijgen van de agents van dit kanaal"
         },
         "manage": {
           "title": "Kanaal beheren",
@@ -1477,13 +1477,13 @@
       },
       "default": {
         "allowedBy": "Standaard: toegestaan door de rol {{role}}",
-        "notHeld": "Standaard: de rol {{role}} heeft dit niet",
+        "notHeld": "Standaard: niet toegestaan door de rol {{role}}",
         "followsEveryone": "Standaard: volgt {{role}} in dit kanaal",
         "person": "Standaard: volgt de rollen van deze persoon"
       },
-      "readOnlyComposer": "Alleen sommige mensen sturen berichten in dit kanaal",
+      "readOnlyComposer": "Je kunt geen berichten sturen in dit kanaal",
       "agentsDenied": "In dit kanaal roep je geen agents op",
-      "forbidden": "Je wijzigt alleen rechten die je zelf hebt, voor rollen en mensen onder je"
+      "forbidden": "Je kunt alleen rechten wijzigen die je zelf hebt, voor rollen en mensen onder je"
     },
     "pins": {
       "title": "Vastgezet",

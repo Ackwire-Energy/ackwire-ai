@@ -1468,7 +1468,7 @@
         },
         "callAgents": {
           "title": "Ajan çağırma",
-          "line": "Mesajlar bu kanalın ajanlarını uyandırır"
+          "line": "Bu kanalın ajanlarından yanıt alma"
         },
         "manage": {
           "title": "Kanalı yönetme",
@@ -1477,11 +1477,11 @@
       },
       "default": {
         "allowedBy": "Varsayılan: {{role}} rolüyle izinli",
-        "notHeld": "Varsayılan: {{role}} rolünde yok",
+        "notHeld": "Varsayılan: {{role}} rolüyle izinli değil",
         "followsEveryone": "Varsayılan: bu kanalda {{role}} rolünü izler",
         "person": "Varsayılan: bu kişinin rollerini izler"
       },
-      "readOnlyComposer": "Bu kanalda yalnızca bazı kişiler mesaj gönderebilir",
+      "readOnlyComposer": "Bu kanalda mesaj gönderemezsiniz",
       "agentsDenied": "Bu kanalda ajan çağıramazsınız",
       "forbidden": "Yalnızca sahip olduğunuz izinleri, sizden aşağıdaki roller ve kişiler için değiştirebilirsiniz"
     },

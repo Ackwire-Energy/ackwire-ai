@@ -1451,7 +1451,7 @@ export const en = {
         },
         callAgents: {
           title: "Call agents",
-          line: "Messages wake this channel's agents",
+          line: "Get replies from this channel's agents",
         },
         manage: {
           title: "Manage the channel",
@@ -1461,15 +1461,15 @@ export const en = {
       /** What "Padrão" means right now for the role or person picked. */
       default: {
         allowedBy: "Default: allowed by the {{role}} role",
-        notHeld: "Default: the {{role}} role doesn't have it",
+        notHeld: "Default: not allowed by the {{role}} role",
         followsEveryone: "Default: follows {{role}} in this channel",
         person: "Default: follows this person's roles",
       },
       /** In place of the composer when the channel's exceptions keep me from sending. */
-      readOnlyComposer: "Only some people send messages in this channel",
+      readOnlyComposer: "You can't send messages in this channel",
       /** Only for me, after my message mentioned an agent here. */
       agentsDenied: "You can't call agents in this channel",
-      forbidden: "You only change permissions you hold, for roles and people below you",
+      forbidden: "You can only change permissions you have, for roles and people below you",
     },
     pins: {
       title: "Pinned",

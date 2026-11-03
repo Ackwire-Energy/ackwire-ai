@@ -1517,7 +1517,7 @@
         },
         "callAgents": {
           "title": "Appeler les agents",
-          "line": "Les messages réveillent les agents de ce canal"
+          "line": "Recevoir les réponses des agents de ce canal"
         },
         "manage": {
           "title": "Gérer le canal",
@@ -1526,13 +1526,13 @@
       },
       "default": {
         "allowedBy": "Par défaut : autorisé par le rôle {{role}}",
-        "notHeld": "Par défaut : le rôle {{role}} ne l’a pas",
+        "notHeld": "Par défaut : non autorisé par le rôle {{role}}",
         "followsEveryone": "Par défaut : suit {{role}} dans ce canal",
         "person": "Par défaut : suit les rôles de cette personne"
       },
-      "readOnlyComposer": "Seules certaines personnes envoient des messages dans ce canal",
+      "readOnlyComposer": "Vous ne pouvez pas envoyer de messages dans ce canal",
       "agentsDenied": "Dans ce canal, vous n’appelez pas les agents",
-      "forbidden": "Vous ne changez que les autorisations que vous avez, pour les rôles et les personnes en dessous de vous"
+      "forbidden": "Vous ne pouvez changer que les autorisations que vous avez, pour les rôles et les personnes en dessous de vous"
     },
     "pins": {
       "title": "Épinglés",

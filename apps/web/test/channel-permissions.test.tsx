@@ -72,12 +72,31 @@ describe("channel permissions (ADR 0134)", () => {
     });
   });
 
+  test("arrow keys move the three-state control at once and keep the focus on it while it saves", async () => {
+    const state = await go();
+    const dialog = await openSettings();
+    await click(within(dialog).getByRole("button", { name: "Permissões" }));
+    await settle(3);
+    const post = within(dialog).getByRole("radiogroup", { name: "Enviar mensagens para Todos" });
+    const inherit = within(post).getByRole("radio", { name: "Padrão" });
+    inherit.focus();
+    await act(async () => fireEvent.keyDown(inherit, { key: "ArrowRight" }));
+    const allow = within(post).getByRole("radio", { name: "Permitir" });
+    expect(allow.getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(allow);
+    expect((allow as HTMLButtonElement).disabled).toBe(false);
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "chat.setPermission").map((c) => c.args.at(-1))).toEqual([
+      { target: { type: "role", id: "role-everyone" }, allow: ["post"], deny: [] },
+    ]);
+  });
+
   test("when the channel keeps me from sending, a quiet line stands where the composer was", async () => {
     await go((state) => {
       const eng = state.channels.find((c) => c.id === ENG_ID);
       if (eng) eng.can = { post: false, callAgents: true, manage: false };
     });
-    expect(screen().getByText("Só algumas pessoas enviam mensagens neste canal")).toBeTruthy();
+    expect(screen().getByText("Você não pode enviar mensagens neste canal")).toBeTruthy();
     expect(screen().queryByRole("combobox", { name: "Mensagem para #eng" })).toBeNull();
   });
 

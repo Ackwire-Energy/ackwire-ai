@@ -1468,7 +1468,7 @@
         },
         "callAgents": {
           "title": "Agenten rufen",
-          "line": "Nachrichten wecken die Agenten dieses Kanals"
+          "line": "Antworten von den Agenten dieses Kanals bekommen"
         },
         "manage": {
           "title": "Kanal verwalten",
@@ -1477,13 +1477,13 @@
       },
       "default": {
         "allowedBy": "Standard: erlaubt durch die Rolle {{role}}",
-        "notHeld": "Standard: die Rolle {{role}} hat das nicht",
+        "notHeld": "Standard: nicht erlaubt durch die Rolle {{role}}",
         "followsEveryone": "Standard: folgt {{role}} in diesem Kanal",
         "person": "Standard: folgt den Rollen dieser Person"
       },
-      "readOnlyComposer": "Nur manche Personen senden Nachrichten in diesem Kanal",
+      "readOnlyComposer": "Du kannst in diesem Kanal keine Nachrichten senden",
       "agentsDenied": "In diesem Kanal rufst du keine Agenten",
-      "forbidden": "Du änderst nur Berechtigungen, die du hast, für Rollen und Personen unter dir"
+      "forbidden": "Du kannst nur Berechtigungen ändern, die du hast, für Rollen und Personen unter dir"
     },
     "pins": {
       "title": "Angeheftet",

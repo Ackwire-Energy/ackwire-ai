@@ -1419,7 +1419,7 @@
         },
         "callAgents": {
           "title": "呼叫智能体",
-          "line": "消息会唤醒这个频道的智能体"
+          "line": "获得这个频道智能体的回复"
         },
         "manage": {
           "title": "管理频道",
@@ -1428,11 +1428,11 @@
       },
       "default": {
         "allowedBy": "默认：由角色{{role}}允许",
-        "notHeld": "默认：角色{{role}}没有此权限",
+        "notHeld": "默认：角色{{role}}不允许",
         "followsEveryone": "默认：跟随此频道中的{{role}}",
         "person": "默认：跟随此人的角色"
       },
-      "readOnlyComposer": "只有部分成员能在这个频道发送消息",
+      "readOnlyComposer": "你不能在这个频道发送消息",
       "agentsDenied": "你不能在这个频道呼叫智能体",
       "forbidden": "你只能修改自己拥有的权限，且仅限比你低的角色和成员"
     },

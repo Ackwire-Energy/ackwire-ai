@@ -554,7 +554,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
 /** The refusal to post for someone `requireChannelAccess` found can't: `channel.post_denied` when only this channel's exceptions stop them. */
 export const postRefusal = (workspace: Membership) =>
   can(workspace, "post")
-    ? new ForbiddenError("Only some people send messages in this channel", "channel.post_denied")
+    ? new ForbiddenError("You can't send messages in this channel", "channel.post_denied")
     : new ForbiddenError();
 
 /**
