@@ -552,6 +552,8 @@ export interface Agent {
   brain?: AgentBrainLine;
   /** It coordinates the team (ADR 0093): one per workspace; absent from an older server. */
   coordinator?: boolean;
+  /** A built-in agent the product ships (ADR 0134): `right_hand`, the team's right hand. Null or absent for the others. */
+  builtin?: "right_hand" | null;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
   /**
