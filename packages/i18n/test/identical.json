@@ -329,6 +329,7 @@
       "presence.hidden",
       "presence.lower.hidden",
       "presence.until.m30",
+      "profile.roles",
       "recurrence.wd.SA.short",
       "roles.admin",
       "roles.adminLower",

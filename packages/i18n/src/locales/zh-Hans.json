@@ -1061,6 +1061,8 @@
     "mention": "提及",
     "copyHandle": "复制 @{{handle}}",
     "handleCopied": "@ 已复制。",
+    "copyId": "复制 ID",
+    "idCopied": "ID 已复制。",
     "editAgent": "编辑智能体",
     "openPage": "打开完整页面",
     "moveUp": "上移",
@@ -2018,6 +2020,12 @@
   "profile": {
     "audience": "谁可以对话",
     "cardLabel": "个人资料",
+    "roles": "角色",
+    "memberSince": "加入时间",
+    "messageTo": "发给 {{name}} 的消息",
+    "audienceEdit": "编辑",
+    "nowIn": "正在 #{{channel}} 中",
+    "more": "更多",
     "of": "{{name}} 的个人资料",
     "presence": "在线状态",
     "offline": "尚未加入",
@@ -3816,7 +3824,7 @@
   "members": {
     "column": {
       "label": "#{{channel}} 的成员",
-      "group": "{{name}} — {{count}}",
+      "group": "{{name}} · {{count}}",
       "ownerTitle": "工作区所有者",
       "more": "再显示 {{count}} 个",
       "find": "查找人员和智能体"

@@ -1061,6 +1061,8 @@
     "mention": "멘션",
     "copyHandle": "@{{handle}} 복사",
     "handleCopied": "@를 복사했어요.",
+    "copyId": "ID 복사",
+    "idCopied": "ID를 복사했어요.",
     "editAgent": "에이전트 편집",
     "openPage": "전체 페이지 열기",
     "moveUp": "위로 이동",
@@ -2014,6 +2016,12 @@
   "profile": {
     "audience": "대화할 수 있는 사람",
     "cardLabel": "프로필",
+    "roles": "역할",
+    "memberSince": "워크스페이스 참여일",
+    "messageTo": "{{name}}에게 보낼 메시지",
+    "audienceEdit": "편집",
+    "nowIn": "지금 #{{channel}}에서",
+    "more": "더 보기",
     "of": "{{name}}의 프로필",
     "presence": "상태",
     "offline": "아직 참여하지 않았어요",
@@ -3768,7 +3776,7 @@
   "members": {
     "column": {
       "label": "#{{channel}} 멤버",
-      "group": "{{name}} — {{count}}",
+      "group": "{{name}} · {{count}}",
       "ownerTitle": "워크스페이스 소유자",
       "more": "{{count}}명 더 보기",
       "find": "사람과 에이전트 찾기"

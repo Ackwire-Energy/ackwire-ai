@@ -23,6 +23,14 @@ const typeIn = (el: HTMLTextAreaElement, value: string) =>
 const keyDown = (el: Element, key: string) => act(async () => fireEvent.keyDown(el, { key }));
 const composer = () => screen().getByRole("combobox", { name: /Mensagem para/ }) as HTMLTextAreaElement;
 const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
+/** The card's ⋯ (Radix opens it on pointer down): its entries. */
+const openMore = async (card: HTMLElement) => {
+  await act(async () =>
+    fireEvent.pointerDown(within(card).getByRole("button", { name: "Mais" }), { button: 0, ctrlKey: false }),
+  );
+  await settle(2);
+  return screen().getByRole("menu", { name: "Mais" });
+};
 
 describe("@mention autocomplete", () => {
   test("query right before the caret", () => {
@@ -104,7 +112,7 @@ describe("@mention autocomplete", () => {
 describe("profile card", () => {
   const card = () => screen().getByRole("dialog", { name: "Perfil" });
 
-  test("person: role, presence, local time and Mensagem direta", async () => {
+  test("person: role, presence, local time, the message box and Mensagem direta in the ⋯", async () => {
     await go(`c/${ENG_ID}`);
     await click(screen().getAllByRole("button", { name: "Perfil de João" })[0] as HTMLElement);
     await settle(4);
@@ -115,12 +123,12 @@ describe("profile card", () => {
     // Their zone in words, never its IANA id.
     expect(c.textContent).toMatch(/\d{2}:\d{2} · Lisboa/);
     expect(c.textContent).not.toContain("Europe/Lisbon");
-    expect(within(c).getByRole("link", { name: "Mensagem direta" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/dm/person/u-joao`,
-    );
+    expect(within(c).getByRole("textbox", { name: /^Mensagem para João/ })).toBeTruthy();
+    const more = await openMore(c);
+    expect(within(more).getByRole("menuitem", { name: "Mensagem direta" })).toBeTruthy();
   });
 
-  test("agent: role, owner, model, budget used (%), DM, and its page in the panel beside the channel", async () => {
+  test("agent: role, owner, model, budget used (%), the message box, and its page in the panel from the ⋯", async () => {
     await go(`c/${ENG_ID}`);
     await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
     await settle(6);
@@ -133,10 +141,8 @@ describe("profile card", () => {
     expect(c.textContent).toContain("31% do orçamento usado este mês");
     expect(c.textContent).not.toContain("US$");
     expect(within(c).getByRole("meter", { name: "Orçamento usado no mês" })).toBeTruthy();
-    expect(within(c).getByRole("link", { name: "Mensagem direta" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
-    );
-    await click(within(c).getByRole("button", { name: "Ver perfil" }));
+    expect(within(c).getByRole("textbox", { name: "Mensagem para a Ada" })).toBeTruthy();
+    await click(within(await openMore(c)).getByRole("menuitem", { name: "Ver perfil" }));
     await settle(4);
     expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
@@ -264,7 +270,7 @@ describe("profile card", () => {
     await act(async () => fireEvent.pointerEnter(name, { pointerType: "mouse" }));
     await wait(500);
     await settle(3);
-    expect(within(card()).getByRole("button", { name: "Ver perfil" })).toBeTruthy();
+    expect(within(card()).getByRole("button", { name: "Mais" })).toBeTruthy();
     expect(document.activeElement).toBe(box);
     await act(async () => fireEvent.pointerLeave(name, { pointerType: "mouse" }));
     await wait(HOVER_CLOSE_MS + 50);

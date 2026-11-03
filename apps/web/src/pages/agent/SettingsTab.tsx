@@ -1,6 +1,6 @@
 import { type AgentAudience, useAgentDetail, useAgentGroups, useSettings, useUsage } from "@agenteschat/client";
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
-import { audienceSummary, audienceWidens } from "@agenteschat/client/lib/audience";
+import { audienceBlocked, audienceSummary } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
@@ -150,8 +150,7 @@ export function SettingsTab({
   const onPlan = engineOfBrain(agent.brain?.kind) !== "agent";
   const [blocked, setBlocked] = useState(false);
   const chooseAudience = (next: AgentAudience) => {
-    if (onPlan && agent.ownerUserId !== me.user.id && audienceWidens(saved.audience, next, agent.ownerUserId))
-      return setBlocked(true);
+    if (audienceBlocked(agent, next, me.user.id)) return setBlocked(true);
     setBlocked(false);
     set("audience", next);
   };

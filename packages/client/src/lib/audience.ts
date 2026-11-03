@@ -1,8 +1,10 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentAudience, AudienceMode, OrgSummary } from "../api/types";
+import type { Agent, AgentAudience, AudienceMode, OrgRole, OrgSummary } from "../api/types";
+import { engineOfBrain } from "./brain";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { can } from "./permissions";
+import { isEveryone, sortRoles } from "./roles";
 
 /** The agent's audience; absent = everyone (older servers). */
 export function audienceOf(agent: Agent): Required<AgentAudience> {
@@ -101,6 +103,49 @@ export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
 /** Only the agent's owner and who manages agents change who talks to it (same rule as the backend). */
 export const canEditAudience = (org: OrgSummary | undefined, agent: Agent, myUserId: string) =>
   can(org, "manage_agents") || (agent.ownerUserId != null && agent.ownerUserId === myUserId);
+
+/** What a save sends: the people and roles only when it answers some people. */
+export const audiencePatch = (a: AgentAudience): AgentAudience => ({
+  mode: a.mode,
+  userIds: a.mode === "people" ? a.userIds : [],
+  roleIds: a.mode === "people" ? (a.roleIds ?? []) : [],
+  consultable: a.consultable ?? true,
+});
+
+/** On a plan (ADR 0059 §5) only its owner lets more people in: anyone else choosing `next` is stopped. */
+export const audienceBlocked = (agent: Agent, next: AgentAudience, myUserId: string) =>
+  engineOfBrain(agent.brain?.kind) !== "agent" &&
+  agent.ownerUserId !== myUserId &&
+  audienceWidens(audienceOf(agent), next, agent.ownerUserId);
+
+/** One line of "Quem pode falar": the whole workspace (its `everyone` role's mark), a role, or a person. */
+export type AudienceLine<P> =
+  | { kind: "everyone"; role?: OrgRole }
+  | { kind: "role"; role: OrgRole }
+  | { kind: "person"; person: P };
+
+/**
+ * Who it answers, one line each: everyone; only its owner; or its roles (top first), then its people. Its owner
+ * isn't among the people (it always may); only the roles and people we know.
+ */
+export function audienceLines<P extends { userId: string }>(
+  agent: Agent,
+  roles: readonly OrgRole[],
+  members: readonly P[],
+): AudienceLine<P>[] {
+  const a = audienceOf(agent);
+  const person = (id: string) => members.find((m) => m.userId === id);
+  if (a.mode === "everyone") return [{ kind: "everyone", role: roles.find(isEveryone) }];
+  const ids = a.mode === "owner" ? (agent.ownerUserId ? [agent.ownerUserId] : []) : a.userIds;
+  const people = ids
+    .filter((id) => a.mode === "owner" || id !== agent.ownerUserId)
+    .flatMap((id) => {
+      const p = person(id);
+      return p ? [{ kind: "person" as const, person: p }] : [];
+    });
+  const picked = a.mode === "people" ? sortRoles(roles.filter((r) => a.roleIds.includes(r.id))) : [];
+  return [...picked.map((role) => ({ kind: "role" as const, role })), ...people];
+}
 
 /** "Pessoal" (only the owner) or "Restrito" (some people); nothing for everyone. */
 export function audienceChip(t: TFunction, agent: Agent): string | null {

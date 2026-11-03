@@ -1097,6 +1097,8 @@
     "mention": "Vermelden",
     "copyHandle": "@{{handle}} kopiëren",
     "handleCopied": "@ gekopieerd.",
+    "copyId": "ID kopiëren",
+    "idCopied": "ID gekopieerd.",
     "editAgent": "Agent bewerken",
     "openPage": "Volledige pagina openen",
     "moveUp": "Omhoog",
@@ -2092,6 +2094,12 @@
   "profile": {
     "audience": "Wie kan praten",
     "cardLabel": "Profiel",
+    "roles": "Rollen",
+    "memberSince": "Lid sinds",
+    "messageTo": "Bericht aan {{name}}",
+    "audienceEdit": "Bewerken",
+    "nowIn": "nu, in #{{channel}}",
+    "more": "Meer",
     "of": "Profiel van {{name}}",
     "presence": "Aanwezigheid",
     "offline": "Nog niet lid geworden",
@@ -3960,7 +3968,7 @@
   "members": {
     "column": {
       "label": "Leden van #{{channel}}",
-      "group": "{{name}} — {{count}}",
+      "group": "{{name}} · {{count}}",
       "ownerTitle": "Eigenaar van de workspace",
       "more": "Nog {{count}} tonen",
       "find": "Mensen en agents zoeken"

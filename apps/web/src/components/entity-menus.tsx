@@ -90,6 +90,22 @@ function useCopyHandle() {
       : [];
 }
 
+/** "Copiar ID", last in its menu, as in Discord. */
+function useCopyId() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  return (id: string): MenuEntry[] => [
+    { kind: "separator" },
+    {
+      kind: "item",
+      id: "copy-id",
+      label: t("contextMenu.copyId"),
+      icon: "copy",
+      run: () => void copyText(id, () => toast.show(t("contextMenu.idCopied"))),
+    },
+  ];
+}
+
 /** "Mencionar": `@handle` in the composer, inside a conversation only. */
 function useMention() {
   const { t } = useTranslation();
@@ -178,8 +194,8 @@ export function useChannelMenu() {
 }
 
 /**
- * An agent (sidebar row, its face or name in a message): talk, its profile, mention, copy @, mark its DM read, edit
- * (its owner and admins), its link, and stop while it works.
+ * An agent (sidebar row, its face or name in a message, its card's ⋯): talk, its profile, mention, copy @, mark its DM
+ * read, edit (its owner and admins), its link, stop while it works, its id.
  */
 export function useAgentMenu() {
   const { t } = useTranslation();
@@ -192,6 +208,7 @@ export function useAgentMenu() {
   const dms = useDms(org.id).data;
   const markRead = useMarkRead();
   const copyHandle = useCopyHandle();
+  const copyId = useCopyId();
   const mention = useMention();
   return (a: Pick<Agent, "id" | "name" | "handle" | "ownerUserId">): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === a.id);
@@ -253,11 +270,15 @@ export function useAgentMenu() {
             },
           ] satisfies MenuEntry[])
         : []),
+      ...copyId(a.id),
     ];
   };
 }
 
-/** A person (sidebar row, their face or name in a message): DM, their card (`openCard`), mention, copy @, mark read. */
+/**
+ * A person (sidebar row, their face or name in a message, their card's ⋯): DM, their card (`openCard`), mention, copy @,
+ * mark read, their id.
+ */
 export function usePersonMenu() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -265,6 +286,7 @@ export function usePersonMenu() {
   const dms = useDms(org.id).data;
   const markRead = useMarkRead();
   const copyHandle = useCopyHandle();
+  const copyId = useCopyId();
   const mention = useMention();
   return (p: { userId: string; name: string; handle?: string | null }, openCard?: () => void): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === p.userId);
@@ -291,6 +313,7 @@ export function usePersonMenu() {
       ...mention(handle),
       ...copyHandle(handle),
       ...markRead(dm?.channelId, dm?.unread ?? 0),
+      ...copyId(p.userId),
     ];
   };
 }

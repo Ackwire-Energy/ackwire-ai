@@ -86,13 +86,20 @@ describe("a channel", () => {
 });
 
 describe("an agent", () => {
-  test("Shift+F10 on its row: talk, profile, copy @, edit (owner or admin), link", async () => {
+  test("Shift+F10 on its row: talk, profile, copy @, edit (owner or admin), link, id", async () => {
     await go();
     const row = within(nav()).getByRole("link", { name: /^Ada/ });
     row.focus();
     await act(async () => fireEvent.keyDown(row, { key: "F10", shiftKey: true }));
     await settle(2);
-    expect(items()).toEqual(["Mensagem direta", "Ver perfil", "Copiar @ada", "Editar agente", "Copiar link"]);
+    expect(items()).toEqual([
+      "Mensagem direta",
+      "Ver perfil",
+      "Copiar @ada",
+      "Editar agente",
+      "Copiar link",
+      "Copiar ID",
+    ]);
     await pick("Copiar @ada");
     expect(copied.at(-1)).toBe("@ada");
   });
@@ -109,12 +116,14 @@ describe("an agent", () => {
 });
 
 describe("a person", () => {
-  test("their sidebar row: DM and copy @", async () => {
+  test("their sidebar row: DM, copy @ and copy id", async () => {
     await go();
     const row = nav().querySelector('a[href$="/dm/person/u-joao"]');
     if (!row) throw new Error("no row for João");
     await rightClick(row);
-    expect(items()).toEqual(["Mensagem direta", "Copiar @joao"]);
+    expect(items()).toEqual(["Mensagem direta", "Copiar @joao", "Copiar ID"]);
+    await pick("Copiar ID");
+    expect(copied.at(-1)).toBe("u-joao");
   });
 
   test("their name in a message: also their card and Mencionar, which types the @ in the composer", async () => {

@@ -3486,6 +3486,10 @@ html:not([data-pointer]) .ac-date__day:focus-visible {
 .ac-token__label {
   white-space: nowrap;
 }
+/* One that stays (no ✕): even on both sides. */
+.ac-token:not(:has(.ac-token__remove)) {
+  padding-right: 10px;
+}
 .ac-token__remove {
   display: inline-flex;
   align-items: center;

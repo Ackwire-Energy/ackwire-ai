@@ -2,7 +2,6 @@ import type { Agent, AppNotification, Mission, Routine } from "@agenteschat/clie
 import {
   useAgentStatuses,
   useAiStatus,
-  useAskAgent,
   useChannels,
   useDms,
   useMissionList,
@@ -10,6 +9,7 @@ import {
   useNotifications,
   useOverview,
   useRoutines,
+  useSendDm,
   useSetStart,
   useWorkingRuns,
 } from "@agenteschat/client";
@@ -231,7 +231,7 @@ function AskAgent({ agents, composer }: { agents: Agent[]; composer: RefObject<H
   const { t } = useTranslation();
   const { org } = useOrg();
   const navigate = useNavigate();
-  const ask = useAskAgent(org.id);
+  const ask = useSendDm(org.id);
   const [picked, setPicked] = useState<string | null>(null);
   const [text, setText] = useState("");
   const agent = agents.find((a) => a.id === picked) ?? agents[0];

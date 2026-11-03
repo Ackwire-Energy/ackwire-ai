@@ -1097,6 +1097,8 @@
     "mention": "Bahset",
     "copyHandle": "@{{handle}} kopyala",
     "handleCopied": "@ kopyalandı.",
+    "copyId": "ID’yi kopyala",
+    "idCopied": "ID kopyalandı.",
     "editAgent": "Ajanı düzenle",
     "openPage": "Tam sayfa aç",
     "moveUp": "Yukarı taşı",
@@ -2079,6 +2081,12 @@
   "profile": {
     "audience": "Kimler konuşabilir",
     "cardLabel": "Profil",
+    "roles": "Roller",
+    "memberSince": "Çalışma alanında şu tarihten beri",
+    "messageTo": "{{name}} için mesaj",
+    "audienceEdit": "Düzenle",
+    "nowIn": "şu an #{{channel}} kanalında",
+    "more": "Daha fazla",
     "of": "{{name}} profili",
     "presence": "Durum",
     "offline": "Henüz katılmadı",
@@ -3879,7 +3887,7 @@
   "members": {
     "column": {
       "label": "#{{channel}} üyeleri",
-      "group": "{{name}} — {{count}}",
+      "group": "{{name}} · {{count}}",
       "ownerTitle": "Çalışma alanının sahibi",
       "more": "{{count}} tane daha göster",
       "find": "Kişi ve ajan ara"

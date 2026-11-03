@@ -71,6 +71,7 @@ import type {
   DeletionProofInput,
   DirectMessage,
   DmRead,
+  DmTarget,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -954,15 +955,15 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
 }
 
 /**
- * Início's "Peça a um agente" (ADR 0108): the DM with the agent (made if new), the message sent there and kept in its
- * cache, so the conversation opens with it and the agent at work.
+ * A message straight into a DM (Início's "Peça a um agente", ADR 0108, and the profile card's box): the DM (made if
+ * new), the message sent there and kept in its cache, so the conversation opens with it (and the agent at work).
  */
-export function useAskAgent(orgId: string) {
+export function useSendDm(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ agentId, body }: { agentId: string; body: string }) => {
-      const { channelId } = await api.dms.open(orgId, { agentId });
+    mutationFn: async ({ body, ...target }: DmTarget & { body: string }) => {
+      const { channelId } = await api.dms.open(orgId, target);
       return api.chat.post(orgId, channelId, { body, clientId: newClientId() });
     },
     onSuccess: (message) => {

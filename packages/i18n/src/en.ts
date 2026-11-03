@@ -1106,6 +1106,8 @@ export const en = {
     mention: "Mention",
     copyHandle: "Copy @{{handle}}",
     handleCopied: "@ copied.",
+    copyId: "Copy ID",
+    idCopied: "ID copied.",
     editAgent: "Edit agent",
     openPage: "Open full page",
     moveUp: "Move up",
@@ -2036,6 +2038,12 @@ export const en = {
   profile: {
     audience: "Who can talk",
     cardLabel: "Profile",
+    roles: "Roles",
+    memberSince: "Member since",
+    messageTo: "Message {{name}}",
+    audienceEdit: "Edit",
+    nowIn: "now, in #{{channel}}",
+    more: "More",
     of: "Profile of {{name}}",
     presence: "Presence",
     offline: "Hasn't joined yet",
@@ -3778,7 +3786,7 @@ export const en = {
     /** The channel's members column (and its sheet on a phone). */
     column: {
       label: "Members of #{{channel}}",
-      group: "{{name}} — {{count}}",
+      group: "{{name}} · {{count}}",
       ownerTitle: "Workspace owner",
       more: "Show {{count}} more",
       find: "Find people and agents",

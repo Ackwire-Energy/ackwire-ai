@@ -320,7 +320,7 @@ Against `channel-*`, `search-*`, `search-from-*`, `results-*`, `jumped-*`, `thre
 4. Online: online, away and busy people not listed above.
 5. Offline: everyone else (a hidden person reads offline, ADR 0084), by name.
 
-Empty groups don't show. Headers read "NAME — N" (`members.column.group`), with the role's mark (16px circle)
+Empty groups don't show. Headers read "NAME · N" (`members.column.group`), with the role's mark (16px circle)
 when it has one. Data is already on the client: `channelPeople` / `channelAgents` in ChannelPage,
 `Member.roleIds`, `useRoles` (any member may read it: `listRoles` needs only `read`), `usePersonPresence`. No
 new endpoint.
@@ -349,7 +349,7 @@ same grouped list. Swipe right or the scrim closes it (reuse the drawer touch ha
 
 ### i18n (slice 3)
 
-`members.column.label` ("Membros de #{{channel}}"), `members.column.group` ("{{name}} — {{count}}"),
+`members.column.label` ("Membros de #{{channel}}"), `members.column.group` ("{{name}} · {{count}}"),
 `members.column.owner` ("Dono", or reuse `roles.owner`), `members.column.ownerTitle` ("Dono do workspace"),
 `members.column.more` ("Mostrar mais {{count}}"), `members.column.find` ("Buscar pessoas e agentes"),
 `rolesPage.hoist`, `rolesPage.hoistDesc`. Reuse `presence.online` / `presence.offline` for the group names and

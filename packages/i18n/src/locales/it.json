@@ -1133,6 +1133,8 @@
     "mention": "Menziona",
     "copyHandle": "Copia @{{handle}}",
     "handleCopied": "@ copiato.",
+    "copyId": "Copia ID",
+    "idCopied": "ID copiato.",
     "editAgent": "Modifica agente",
     "openPage": "Apri pagina intera",
     "moveUp": "Sposta su",
@@ -2160,6 +2162,12 @@
   "profile": {
     "audience": "Chi può parlare",
     "cardLabel": "Profilo",
+    "roles": "Ruoli",
+    "memberSince": "Nello spazio di lavoro da",
+    "messageTo": "Messaggio per {{name}}",
+    "audienceEdit": "Modifica",
+    "nowIn": "ora, in #{{channel}}",
+    "more": "Altro",
     "of": "Profilo di {{name}}",
     "presence": "Presenza",
     "offline": "Non è ancora entrato",
@@ -4081,7 +4089,7 @@
   "members": {
     "column": {
       "label": "Membri di #{{channel}}",
-      "group": "{{name}} — {{count}}",
+      "group": "{{name}} · {{count}}",
       "ownerTitle": "Proprietario del workspace",
       "more": "Mostra altri {{count}}",
       "find": "Cerca persone e agenti"

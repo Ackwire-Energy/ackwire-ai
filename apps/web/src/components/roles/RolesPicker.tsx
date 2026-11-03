@@ -17,6 +17,8 @@ export function RolesPicker({
   label,
   trigger,
   size,
+  side,
+  align = "end",
 }: {
   roles: readonly OrgRole[];
   value: readonly string[];
@@ -25,6 +27,9 @@ export function RolesPicker({
   label: string;
   trigger?: ReactNode;
   size?: "sm";
+  /** Beside the trigger instead of under it (a profile card opens it to its right). */
+  side?: "bottom" | "right";
+  align?: "start" | "end";
 }) {
   const { t } = useTranslation();
   const givable = sortRoles(roles.filter((r) => !isEveryone(r) && r.givable));
@@ -34,7 +39,8 @@ export function RolesPicker({
   return (
     <Menu
       label={label}
-      align="end"
+      side={side}
+      align={align}
       trigger={
         trigger ?? (
           <Button size={size} className="roles-picker" aria-label={label}>

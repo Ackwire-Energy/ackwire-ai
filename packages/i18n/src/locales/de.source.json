@@ -2708,6 +2708,12 @@
   "contextMenu.handleCopied": {
     "value": "@ copied."
   },
+  "contextMenu.copyId": {
+    "value": "Copy ID"
+  },
+  "contextMenu.idCopied": {
+    "value": "ID copied."
+  },
   "contextMenu.editAgent": {
     "value": "Edit agent"
   },
@@ -5085,6 +5091,24 @@
   },
   "profile.cardLabel": {
     "value": "Profile"
+  },
+  "profile.roles": {
+    "value": "Roles"
+  },
+  "profile.memberSince": {
+    "value": "Member since"
+  },
+  "profile.messageTo": {
+    "value": "Message {{name}}"
+  },
+  "profile.audienceEdit": {
+    "value": "Edit"
+  },
+  "profile.nowIn": {
+    "value": "now, in #{{channel}}"
+  },
+  "profile.more": {
+    "value": "More"
   },
   "profile.of": {
     "value": "Profile of {{name}}"
@@ -9541,7 +9565,7 @@
     "value": "Members of #{{channel}}"
   },
   "members.column.group": {
-    "value": "{{name}} — {{count}}"
+    "value": "{{name}} · {{count}}"
   },
   "members.column.ownerTitle": {
     "value": "Workspace owner"

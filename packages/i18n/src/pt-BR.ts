@@ -1103,6 +1103,8 @@ export const ptBR = {
     mention: "Mencionar",
     copyHandle: "Copiar @{{handle}}",
     handleCopied: "@ copiado.",
+    copyId: "Copiar ID",
+    idCopied: "ID copiado.",
     editAgent: "Editar agente",
     openPage: "Abrir em página inteira",
     moveUp: "Mover para cima",
@@ -2061,6 +2063,12 @@ export const ptBR = {
   profile: {
     audience: "Quem pode falar",
     cardLabel: "Perfil",
+    roles: "Papéis",
+    memberSince: "No workspace desde",
+    messageTo: "Mensagem para {{name}}",
+    audienceEdit: "Editar",
+    nowIn: "agora, em #{{channel}}",
+    more: "Mais",
     of: "Perfil de {{name}}",
     presence: "Presença",
     offline: "Ainda não entrou",
@@ -3895,7 +3903,7 @@ export const ptBR = {
     /** The channel's members column (and its sheet on a phone). */
     column: {
       label: "Membros de #{{channel}}",
-      group: "{{name}} — {{count}}",
+      group: "{{name}} · {{count}}",
       ownerTitle: "Dono do workspace",
       more: "Mostrar mais {{count}}",
       find: "Buscar pessoas e agentes",

@@ -1061,6 +1061,8 @@
     "mention": "Sebut",
     "copyHandle": "Salin @{{handle}}",
     "handleCopied": "@ disalin.",
+    "copyId": "Salin ID",
+    "idCopied": "ID disalin.",
     "editAgent": "Ubah agen",
     "openPage": "Buka halaman penuh",
     "moveUp": "Pindah ke atas",
@@ -2026,6 +2028,12 @@
   "profile": {
     "audience": "Siapa yang bisa bicara",
     "cardLabel": "Profil",
+    "roles": "Peran",
+    "memberSince": "Di ruang kerja sejak",
+    "messageTo": "Pesan untuk {{name}}",
+    "audienceEdit": "Ubah",
+    "nowIn": "sekarang, di #{{channel}}",
+    "more": "Lainnya",
     "of": "Profil {{name}}",
     "presence": "Kehadiran",
     "offline": "Belum bergabung",
@@ -3799,7 +3807,7 @@
   "members": {
     "column": {
       "label": "Anggota #{{channel}}",
-      "group": "{{name}} — {{count}}",
+      "group": "{{name}} · {{count}}",
       "ownerTitle": "Pemilik workspace",
       "more": "Tampilkan {{count}} lagi",
       "find": "Cari orang dan agen"
