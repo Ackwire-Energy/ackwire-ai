@@ -1632,6 +1632,14 @@ function ChannelView({
     setFocusTarget(messageId);
     setFocusDone(false);
   };
+  // A message link to this same conversation (a pill) changes only `?m=`: the page stays, so jump to it.
+  const linked = useRef(focusMessageId);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new `?m=`
+  useEffect(() => {
+    if (!focusMessageId || focusMessageId === linked.current) return;
+    linked.current = focusMessageId;
+    jumpTo(focusMessageId);
+  }, [focusMessageId]);
 
   // Files for the next message: uploaded to the Drive (this channel) right away; sending waits for them.
   const [files, setFiles] = useState<PendingFile[]>([]);

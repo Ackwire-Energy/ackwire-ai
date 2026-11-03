@@ -71,6 +71,30 @@ describe("a message link in a message is a pill", () => {
     expect(router.state.location.search).toEqual({ m: TARGET });
   });
 
+  test("a pill to a message of the same conversation jumps to it there", async () => {
+    const state = withLinks("");
+    const earlier = "00000000-0000-4000-8000-0000000000ea";
+    state.messages.push({
+      id: earlier,
+      channelId: GENERAL_ID,
+      threadId: null,
+      author: { type: "person" as const, id: "u-joao" },
+      body: "a pauta de sexta",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: new Date(Date.now() - 120_000).toISOString(),
+    });
+    const last = state.messages.find((m) => m.id === "00000000-0000-4000-8000-0000000000e9");
+    if (last) last.body = `vê ${at(messagePath(ORG_ID, { id: earlier, channelId: GENERAL_ID }))}`;
+    await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    const row = document.querySelector(`[data-message-id="${earlier}"]`);
+    expect(row?.classList.contains("ac-msg--focus")).toBe(false);
+    await act(async () => fireEvent.click(screen().getByRole("link", { name: "Mensagem de João em #general" })));
+    await settle(6);
+    expect(document.querySelector(`[data-message-id="${earlier}"]`)?.classList.contains("ac-msg--focus")).toBe(true);
+  });
+
   test("a reply's pill says Thread and opens its thread; a DM's names who it's with", async () => {
     const reply = at(messagePath(ORG_ID, { id: REPLY, channelId: ENG_ID, threadId: TARGET }));
     const dm = at(messagePath(ORG_ID, { id: IN_DM, channelId: DM_ID }));

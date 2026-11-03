@@ -464,6 +464,18 @@ export async function isChannelMember(db: Executor, orgId: string, channelId: st
   return row !== undefined;
 }
 
+/** Every person in `hereId` is also in `thereId`: what `thereId` says may be repeated in `hereId`. */
+export async function peopleAllIn(db: Executor, orgId: string, hereId: string, thereId: string) {
+  const [row] = rowsOf<{ ok: boolean }>(
+    await db.execute(sql`select not exists (
+        select 1 from ${channelMembers} h
+        where h.org_id = ${orgId}::uuid and h.channel_id = ${hereId}::uuid and h.user_id is not null
+          and not exists (select 1 from ${channelMembers} t where t.channel_id = ${thereId}::uuid and t.user_id = h.user_id)
+      ) as ok`),
+  );
+  return row?.ok === true;
+}
+
 /**
  * Which of `channelIds` a person reads, by the rule of `requireChannelAccess`: a member, or a forum (open to the
  * organization); archived channels left out. For screens that quote a conversation outside it (run history).

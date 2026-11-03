@@ -21,7 +21,7 @@ import { agentsByHandle, handleOf } from "../agents";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
 import { UUID } from "../authority";
 import { caches } from "../cache";
-import { isChannelMember } from "../channels";
+import { isChannelMember, peopleAllIn } from "../channels";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
 import { type DescribedMessage, describeMessages, messageIdOf } from "../message-links";
@@ -788,11 +788,14 @@ function conversationText(rows: DescribedMessage[], focus: string | null) {
 /**
  * A message outside what the agent may read (`agentSearchChannels`) that a message of this conversation was sent
  * because of (`meta.agentDm` or `meta.postedFrom`: "asked in #general to DM you"), read by the person this run
- * answers when they are in its channel (ADR 0017): "where did he ask?" gets the request itself.
+ * answers when they are in its channel and so is everyone in this one, who reads the reply (ADR 0017): "where did he
+ * ask?" gets the request itself.
  */
 async function originReadable(ctx: ToolContext, origin: DescribedMessage) {
   const person = await personBehindCall(ctx);
   if (!person || !(await isChannelMember(ctx.db, ctx.orgId, origin.channelId, person))) return false;
+  const isPublic = origin.channelKind === "channel" && origin.visibility === "public";
+  if (!isPublic && !(await peopleAllIn(ctx.db, ctx.orgId, ctx.channelId, origin.channelId))) return false;
   const [cited] = await ctx.db
     .select({ id: messages.id })
     .from(messages)
@@ -800,6 +803,7 @@ async function originReadable(ctx: ToolContext, origin: DescribedMessage) {
       and(
         eq(messages.orgId, ctx.orgId),
         eq(messages.channelId, ctx.channelId),
+        eq(messages.authorAgentId, ctx.agentId),
         isNull(messages.deletedAt),
         or(
           sql`${messages.meta}->'agentDm'->>'fromMessageId' = ${origin.id}`,

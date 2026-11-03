@@ -47,4 +47,5 @@ channel's or thread's messages, each with who wrote it, where and its link, with
 `search_context` message hits now name their author, place and link. One narrow exception: from a conversation where
 the agent sent a message because of another (`send_dm`'s `meta.agentDm`, `post_message`'s `meta.postedFrom`, with
 `fromMessageId`), that origin message alone may be read, quoted and linked when the person behind the run is in its
-conversation; otherwise its later runs learn only who asked, and the channel only when it is public.
+conversation and, unless it is a public channel, so is every person in the conversation the agent speaks in; otherwise
+its later runs learn only who asked, and the channel only when it is public.

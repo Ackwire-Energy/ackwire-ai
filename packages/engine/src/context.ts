@@ -24,6 +24,7 @@ import { NO_PERSON, speakerFor } from "./audience";
 import { runAuthority, UUID } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
+import { peopleAllIn } from "./channels";
 import { type HandOff, handOffsFrom } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { cutText } from "./format";
@@ -31,7 +32,7 @@ import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
 import { type MessageMedia, mediaOf } from "./media";
-import { describeMessages } from "./message-links";
+import { type DescribedMessage, describeMessages } from "./message-links";
 import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
@@ -662,7 +663,7 @@ export async function buildRunContext(
     // Who "# Your team" lists (below) depends on it: read with the rest, not one more round trip before the model call.
     listsTeam ? speakerFor(db, run.orgId, trigger.authorUserId) : NO_PERSON,
     background ? null : appLanguageOf(db, trigger.authorUserId),
-    originNotes(db, run.orgId, agent.id, history, trigger.authorUserId),
+    originNotes(db, run.orgId, agent.id, run.channelId, history, trigger.authorUserId),
   ]);
   // One statement, two parts: what agents already did in this thread (or DM),
   // and this agent's own work in other conversations the requester is in.
@@ -1541,13 +1542,15 @@ const ORIGIN_QUOTE = 300;
 /**
  * Why the agent sent its messages here from another conversation (`meta.agentDm` of `send_dm`, `meta.postedFrom` of
  * `post_message`), one line each, so "where did he ask?" has an answer: who asked and where, with the request quoted
- * and linked when `requester` (whom this run answers) is in that conversation; otherwise who asked, and the channel
- * only when it is public (ADR 0017: a private conversation's name never reaches someone outside it).
+ * and linked when `requester` (whom this run answers) is in that conversation and, unless it is a public channel, so is
+ * everyone here (the reply is read by all of them); otherwise who asked, and the channel only when it is public
+ * (ADR 0017: a private conversation's name never reaches someone outside it).
  */
 async function originNotes(
   db: Database,
   orgId: string,
   agentId: string,
+  hereId: string,
   history: Message[],
   requester: string | null,
 ): Promise<Map<string, string>> {
@@ -1573,7 +1576,12 @@ async function originNotes(
             ),
           )
       : [];
+  const isPublic = (o: DescribedMessage) => o.channelKind === "channel" && o.visibility === "public";
   const member = new Set(inThem.map((r) => r.id));
+  for (const o of origins.values()) {
+    if (member.has(o.channelId) && !isPublic(o) && !(await peopleAllIn(db, orgId, hereId, o.channelId)))
+      member.delete(o.channelId);
+  }
   const notes = new Map<string, string>();
   for (const [id, originId] of from) {
     const o = origins.get(originId);
@@ -1587,8 +1595,7 @@ async function originNotes(
         `[Why you sent it]: ${who} asked in ${o.where}: "${o.meta?.readOutside === true ? neutralizeUntrusted(quote) : quote}" ${o.link}`,
       );
     } else {
-      const where =
-        o.channelKind === "channel" && o.visibility === "public" ? o.where : "a conversation this person isn't in";
+      const where = isPublic(o) ? o.where : "a conversation not everyone here is in";
       notes.set(id, `[Why you sent it]: ${who} asked in ${where}.`);
     }
   }

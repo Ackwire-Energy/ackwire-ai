@@ -129,7 +129,7 @@ describe("where an agent was asked", () => {
     const board = await createChannel(f.db, bia.id, f.org.id, { name: "diretoria", visibility: "private" });
     await addChannelMember(f.db, bia.id, f.org.id, board.id, { agentId: f.agent.id });
     const { asked, dm, where, seen } = await theExchange(board.id, bia, requests);
-    expect(seen).toContain("[Why you sent it]: bia asked in a conversation this person isn't in.");
+    expect(seen).toContain("[Why you sent it]: bia asked in a conversation not everyone here is in.");
     expect(seen).not.toContain("diretoria");
     expect(seen).not.toContain(asked.id);
     const ctx = await runOn(dm.id, where.id);
@@ -143,6 +143,44 @@ describe("where an agent was asked", () => {
     expect(later.content).toContain("manda os acessos de hoje");
     // Still not the rest of the channel.
     expect(await read(ctx, { channel: "diretoria" })).toMatchObject({ isError: true });
+  });
+
+  test("asked in a private channel to post in a public one: never quoted there, someone outside it reads the reply", async () => {
+    const requests: ModelRequest[] = [];
+    f = await setup({
+      contextTools: true,
+      reply: (req: ModelRequest) => {
+        requests.push(req);
+        return { chunks: ["ok"] };
+      },
+    });
+    const leo = await addMember(f.db, f.org.id, "member", "leo");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: leo.id });
+    const board = await createChannel(f.db, f.owner.id, f.org.id, { name: "diretoria", visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, board.id, { agentId: f.agent.id });
+    const asked = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: board.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "avisa no general que o corte de verba sai sexta",
+    });
+    // What post_message stores for the message it posts in #general.
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
+      body: "Aviso: sai sexta.",
+      meta: { postedFrom: { requesterUserId: f.owner.id, fromChannelId: board.id, fromMessageId: asked.id } },
+    });
+    const why = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev quem pediu isso?",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const seen = JSON.stringify(requests.at(-1)?.messages);
+    expect(seen).toContain("[Why you sent it]: ana asked in a conversation not everyone here is in.");
+    expect(seen).not.toContain("corte de verba");
+    expect(seen).not.toContain("diretoria");
+    expect(await read(await runOn(f.general.id, why.id), { message: asked.id })).toMatchObject({ isError: true });
   });
 });
 

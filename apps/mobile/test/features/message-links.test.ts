@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { messagePath, parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { messageRefWords, parseInline } from "../../src/features/chat/logic";
+import { messageRefHref } from "../../src/features/links/app-links";
 import { chatHref } from "../../src/features/links/logic";
 import { translator } from "./fixtures";
 
@@ -35,5 +36,15 @@ describe("a message link in the phone's chat", () => {
     expect(chatHref(CH, TH, M)).toBe(`/chat/${CH}?thread=${TH}&m=${M}`);
     // "Copiar link da mensagem": a reply's link is its thread's.
     expect(messagePath(ORG, { id: M, channelId: CH, threadId: TH })).toBe(`/org/${ORG}/threads/${TH}?m=${M}`);
+  });
+
+  test("a tap on another workspace's message switches to it first", () => {
+    const card = { id: M, channelId: CH, threadId: null, kind: "channel" as const, name: "general", author: "Bia" };
+    expect(messageRefHref(ORG, card, ORG, SERVER)).toBe(`/chat/${CH}?m=${M}`);
+    const other = "00000000-0000-4000-8000-000000000002";
+    const href = messageRefHref(other, card, ORG, SERVER);
+    expect(href.startsWith("/link?")).toBe(true);
+    expect(href).toContain(`org=${other}`);
+    expect(decodeURIComponent(href)).toContain(`/chat/${CH}?m=${M}`);
   });
 });

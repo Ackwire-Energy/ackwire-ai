@@ -1,10 +1,12 @@
 import { useMessageCard } from "@agenteschat/client";
 import { type MessageLink, messageRefLabel } from "@agenteschat/client/lib/message-links";
-import { router } from "expo-router";
+import { type Href, router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, StyleSheet } from "react-native";
+import { serverUrl } from "@/lib/server";
+import { useOrg } from "@/providers/org";
 import { Icon } from "@/ui";
-import { chatHref } from "../links/logic";
+import { messageRefHref } from "../links/app-links";
 import { useColors } from "../shared/hooks";
 import { messageRefWords } from "./logic";
 
@@ -16,6 +18,7 @@ import { messageRefWords } from "./logic";
 export function MessageRefText({ link }: { link: MessageLink }) {
   const { t } = useTranslation();
   const c = useColors();
+  const { orgId } = useOrg();
   const card = useMessageCard(link.orgId, link.messageId);
   const icon = <Icon name="chat" size={14} color={c.ink} />;
   if (card.isPending) {
@@ -35,7 +38,7 @@ export function MessageRefText({ link }: { link: MessageLink }) {
     <RNText
       accessibilityRole="link"
       accessibilityLabel={messageRefLabel(t, m)}
-      onPress={() => router.push(chatHref(m.channelId, m.threadId, m.id))}
+      onPress={() => router.push(messageRefHref(link.orgId, m, orgId, serverUrl()) as Href)}
       style={[styles.ref, { backgroundColor: c.sunken, color: c.ink }]}
     >
       {messageRefWords(t, m)}

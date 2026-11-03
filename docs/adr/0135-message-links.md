@@ -45,11 +45,18 @@ replies), a DM's at a route that lists no DMs, the phone had none, and a pasted 
 6. **Where the agent was asked.** `send_dm` (in `meta.agentDm`) and `post_message` (in `meta.postedFrom`) keep the
    message that asked (`fromMessageId`, `fromThreadId`). The agent's later runs where it sent them read one line under
    each: "[Why you sent it]: Bia asked in #general: "…" <link>", the request cut to 300 characters. The quote and the
-   link show only when the person this run answers is in that conversation; otherwise the line names who asked, and
-   the channel only when it is public, never a private conversation's name.
+   link show only when the person this run answers is in that conversation and, unless it is a public channel, so is
+   every person where the agent now speaks (the reply is read by all of them: asked in a private channel to post in
+   #general, the agent never quotes the private request in #general); otherwise the line names who asked, and the
+   channel only when it is public, never a private conversation's name.
 7. **The one exception to ADR 0017.** From the conversation where it sent such a message, `read_conversation` opens
-   that origin message even outside the agent's search channels, when the person behind the run is in its channel;
-   only that message, never the rest of that conversation.
+   that origin message even outside the agent's search channels, when the person behind the run is in its channel
+   and so is everyone in the conversation it reads from (point 6's rule); only that message, never the rest of that
+   conversation. A person behind the run who isn't in a public channel the agent reads still gets it quoted: a public
+   channel is open to the whole workspace, as `search_context` already treats it.
+8. **Same conversation.** A pill to a message of the conversation already open changes only `?m=`; the open page
+   jumps to it (paging back as for any `?m=`). On the phone, a pill to another workspace's message opens through
+   `/link`, which switches to that workspace first.
 
 ## Consequences
 
