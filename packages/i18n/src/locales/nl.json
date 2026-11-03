@@ -12465,5 +12465,160 @@
       "message": "Bericht aan {{name}}",
       "chooseOnWeb": "Kies hem op agentes.chat, in Instellingen › Computers."
     }
+  },
+  "taskManager": {
+    "title": "Taakbeheer",
+    "nav": "Taakbeheer",
+    "search": "Zoek een taak, agent of app",
+    "working_one": "{{count}} bezig",
+    "working_other": "{{count}} bezig",
+    "waiting_one": "{{count}} wacht op jou",
+    "waiting_other": "{{count}} wachten op jou",
+    "all": "Alle",
+    "now": "Nu",
+    "agentTasks": "Taken van {{name}}",
+    "tasks_one": "{{count}} taak",
+    "tasks_other": "{{count}} taken",
+    "free": "Vrij",
+    "columns": {
+      "task": "Taak",
+      "state": "Status",
+      "using": "Gebruikt nu",
+      "time": "Tijd",
+      "computer": "Draait op"
+    },
+    "sections": {
+      "asked": "Gevraagd door mensen",
+      "background": "Routines op de achtergrond"
+    },
+    "state": {
+      "working": "Bezig",
+      "ok": "Wacht op je akkoord",
+      "answer": "Wacht op een antwoord",
+      "computerBusy": "Wacht op ruimte op de computer",
+      "inLine": "In de rij · {{position}}e",
+      "computerOffline": "Wacht op de computer",
+      "plan": "Wacht op het abonnement",
+      "budget": "Wacht op het budget",
+      "queued": "In de wachtrij",
+      "stopping": "Stoppen…",
+      "stopped": "Gestopt"
+    },
+    "where": {
+      "dm": "Direct bericht",
+      "routine": "Routine «{{name}}»",
+      "background": "Op de achtergrond"
+    },
+    "askedBy": "{{name}} vroeg het",
+    "askedByYou": "Jij vroeg het",
+    "servers": "Onze servers",
+    "plan": "{{done}} van {{total}} klaar",
+    "program": {
+      "browser": "Browser",
+      "screen": "Computerscherm",
+      "terminal": "Terminal",
+      "agentes": "agentes",
+      "thinking": "Denkt na",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Stappen bekijken",
+      "stop": "Stoppen",
+      "stopTask": "Taak stoppen",
+      "stopAll": "Alles stoppen",
+      "stopAllOf": "Alles van {{name}} stoppen",
+      "open": "Openen in het gesprek",
+      "openManager": "Openen in Taakbeheer"
+    },
+    "confirm": {
+      "title_one": "De taak van {{name}} stoppen?",
+      "title_other": "De {{count}} taken van {{name}} stoppen?",
+      "body": "Wat al gedaan is, blijft bewaard, en {{name}} hoort dat jij het hebt gestopt.",
+      "short": "{{name}} hoort dat jij het hebt gestopt.",
+      "reason": "Waarom? (optioneel)",
+      "stop_one": "Stoppen",
+      "stop_other": "{{count}} stoppen"
+    },
+    "ended": {
+      "title": "Vandaag afgelopen",
+      "done": "Klaar",
+      "stopped": "Door jou gestopt",
+      "stoppedBy": "Door {{name}} gestopt",
+      "failed": "Niet afgemaakt",
+      "none": "Vandaag is er nog niets afgelopen."
+    },
+    "empty": {
+      "title": "Er werkt nu geen agent",
+      "body": "Zodra een agent een taak begint, verschijnt die hier."
+    },
+    "strip": {
+      "tasks_one": "{{name}} werkt aan {{count}} taak",
+      "tasks_other": "{{name}} werkt aan {{count}} taken",
+      "waiting_one": "{{count}} wacht op jou",
+      "waiting_other": "{{count}} wachten op jou",
+      "see": "Bekijken",
+      "hide": "Sluiten",
+      "stopHere": "Deze stoppen",
+      "here": "hier"
+    },
+    "stopped": {
+      "line": "Je hebt deze taak gestopt",
+      "lineBy": "{{name}} heeft deze taak gestopt",
+      "told": "{{agent}} weet het en gaat pas weer verder als iemand erom vraagt.",
+      "reason": "Reden: «{{reason}}»",
+      "sayWhy": "Zeg waarom",
+      "whyPlaceholder": "Wil je zeggen waarom? (optioneel)",
+      "send": "Versturen"
+    },
+    "activity": "Afgelopen 30 min",
+    "failed": "Stoppen lukte niet. Probeer het opnieuw.",
+    "queue": {
+      "title": "De rij voor de computer",
+      "sub": "{{name}} · iedereen in de werkruimte ziet dezelfde volgorde",
+      "see": "Rij bekijken",
+      "full_one": "Vol · {{count}} in de rij",
+      "full_other": "Vol · {{count}} in de rij",
+      "room": "Heeft ruimte",
+      "working": "Nu bezig",
+      "line": "In de rij",
+      "first": "Jij gaat voor",
+      "place": "{{position}}e",
+      "waiting": "wacht al {{time}}",
+      "running": "al {{time}}",
+      "person": "Gevraagd door {{name}}",
+      "personHidden": "Gevraagd door iemand",
+      "agent": "Gevraagd door {{name}}",
+      "routine": "Routine «{{name}}»",
+      "empty": "Niemand in de rij.",
+      "note": "Mensen gaan voor. Agents die samen zijn opgeroepen, beginnen een voor een, in de volgorde waarin ze werden opgeroepen.",
+      "computers": "Computers",
+      "back": "Terug naar de taken"
+    },
+    "navWhat": "Wat elke agent nu doet, en stoppen wat nodig is",
+    "cards": {
+      "label": "Agents",
+      "previous": "Vorige agents",
+      "next": "Meer agents"
+    },
+    "table": "Taken",
+    "noResults": "Geen taak past bij deze zoekopdracht.",
+    "toggleAgent": "Taken van {{name}} tonen of verbergen",
+    "using": "Gebruikt {{names}}",
+    "activityOf": "Wat {{name}} de afgelopen 30 min deed",
+    "activityAll": "Wat de agents de afgelopen 30 min deden",
+    "panel": {
+      "steps": "Stappen",
+      "noSteps": "Nog geen stappen."
+    },
+    "agentPanel": {
+      "now_one": "{{count}} nu",
+      "now_other": "{{count}} nu",
+      "wells": {
+        "now": "Nu",
+        "waiting": "Wacht op jou",
+        "done": "Vandaag klaar"
+      },
+      "none": "{{name}} is nu vrij."
+    }
   }
 }

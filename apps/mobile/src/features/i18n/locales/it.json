@@ -1244,6 +1244,10 @@
     "anyAgent": "Tutti gli agenti",
     "create": "Crea"
   },
+  "taskManager": {
+    "loadFailed": "Impossibile caricare le attività.",
+    "gone": "Questa attività non c'è più."
+  },
   "homeNow": {
     "working_one": "{{count}} al lavoro",
     "working_many": "{{count}} al lavoro",
