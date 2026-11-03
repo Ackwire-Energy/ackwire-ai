@@ -272,7 +272,7 @@ export function decidersOf<P extends Pick<Person, "userId" | "name" | "role" | "
   return p.decider.type === "user" ? [...new Set([p.decider.name, ...admins])] : admins;
 }
 
-/** "Enviado para Heitor e Bia · 14:02" under a card someone sent on with "Pedir a um admin" (ADR 0134). */
+/** "Enviado para Ana e Bruno · 14:02" under a card someone sent on with "Pedir a um admin" (ADR 0134). */
 export function sentToText(t: TFunction, locale: string, names: readonly string[], askedAt: string): string {
   const when = formatTime(locale, askedAt);
   return names.length
