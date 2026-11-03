@@ -949,8 +949,8 @@ export function useAddChannelMember(orgId: string) {
 }
 
 /**
- * Puts a message in the right cache: the channel list, or its thread.
- * Replaces the optimistic copy (same `clientId`), which always waits in the
+ * Puts a message in the right cache: the channel list, or its thread (a thread's list starts with its root
+ * when the channel list has it). Replaces the optimistic copy (same `clientId`), which always waits in the
  * channel list (a thread may not be loaded yet): a reply's copy is removed
  * from there too, or it would stay "sending…" next to the real one.
  */
@@ -960,7 +960,20 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   const withoutLocal = (list: Message[] | undefined) =>
     message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
   if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
-  qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
+  // A thread's first list holds its root, as the server lists it: a panel opened on it shows the root.
+  const root = message.threadId
+    ? qc.getQueryData<Message[]>(channelKey)?.find((m) => m.id === message.threadId)
+    : undefined;
+  qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list) ?? (root && [root]), message));
+}
+
+/**
+ * A new top-level message may get agent replies in its thread: its thread's list starts now, with the message as
+ * its root (what the server lists first), so a thread opened on it before any reply still shows it.
+ */
+export function startThreadCache(qc: ReturnType<typeof useQueryClient>, orgId: string, message: Message) {
+  if (message.threadId) return;
+  qc.setQueryData<Message[]>(keys.thread(orgId, message.channelId, message.id), (list) => list ?? [message]);
 }
 
 /**
