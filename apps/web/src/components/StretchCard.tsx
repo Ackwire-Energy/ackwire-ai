@@ -9,13 +9,15 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
+import { RequestDone } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
 /**
  * A stretch's pause card (ADR 0089), in place of its text: the agents did what they may do on their own since a
  * person last acted, and wait here. Continuar starts exactly the wake-ups it holds, with a fresh allowance; the card
- * then says who let them go on. Money only for people who can see costs; everyone else reads the percentage.
+ * then folds to one quiet line saying who let them go on. Money only for people who can see costs; everyone else
+ * reads the percentage.
  */
 export function StretchCardView({ message, card }: { message: Message; card: StretchCard }) {
   const { t, i18n } = useTranslation();
@@ -52,27 +54,31 @@ export function StretchCardView({ message, card }: { message: Message; card: Str
       setPending(false);
     }
   };
+  const text = stretchCardText(t, card, names, cost);
+  if (continued) {
+    return (
+      <RequestDone done label={text}>
+        {by === me.user.id
+          ? t("stretchCard.continuedByYou", { time })
+          : t("stretchCard.continued", {
+              name: (by && dir.memberById.get(by)?.name) ?? t("channel.unknownPerson"),
+              time,
+            })}
+      </RequestDone>
+    );
+  }
   return (
-    <div className="waitcard" data-done={continued || undefined}>
+    <div className="waitcard">
       <span className="waitcard__top ac-iconline">
-        <Icon name={continued ? "check" : "pause"} size={16} />
-        <span>{stretchCardText(t, card, names, cost)}</span>
+        <Icon name="pause" size={16} />
+        <span>{text}</span>
       </span>
-      {continued && by ? (
-        <span className="small muted">
-          {by === me.user.id
-            ? t("stretchCard.continuedByYou", { time })
-            : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })}
+      {may && (
+        <span className="waitcard__acts">
+          <Button size="sm" variant="primary" loading={pending} onClick={go}>
+            {t("run.continueRun")}
+          </Button>
         </span>
-      ) : (
-        !continued &&
-        may && (
-          <span className="waitcard__acts">
-            <Button size="sm" variant="primary" loading={pending} onClick={go}>
-              {t("run.continueRun")}
-            </Button>
-          </span>
-        )
       )}
     </div>
   );

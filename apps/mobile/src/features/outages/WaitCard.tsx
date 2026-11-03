@@ -1,10 +1,11 @@
 import { type Message, useMachines } from "@agenteschat/client";
+import { awayText } from "@agenteschat/client/lib/computer-queue";
 import { brainUnavailableOf, waitCardState, waitsForComputer } from "@agenteschat/client/lib/machine-outages";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Icon, LineIcon, ProviderLogo, Text } from "@/ui";
-import { useColors, useEdition, useOrgId } from "../shared/hooks";
+import { useColors, useEdition, useNow, useOrgId } from "../shared/hooks";
 import { waitCardText } from "./logic";
 import { openSwitchComputer } from "./OutageNotice";
 import { useMachineOutages } from "./queries";
@@ -34,6 +35,29 @@ function useBrainWait(m: Pick<Message, "meta" | "author">) {
 export function BrainWait({ message, fallback }: { message: Pick<Message, "meta" | "author">; fallback: ReactNode }) {
   const card = useBrainWait(message);
   return card ? <WaitCard card={card} /> : fallback;
+}
+
+/**
+ * "Away 3 min" on the waiting card's name line, beside its time, while its computer is still away and the agent
+ * still waits for it (never in the card's own words).
+ */
+export function AwayPill({ message: m }: { message: Pick<Message, "meta" | "author"> }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const now = useNow(30_000);
+  const outages = useMachineOutages();
+  const info = brainUnavailableOf(m.meta);
+  if (!info?.machineId) return null;
+  const state = waitCardState(info, outages.data?.outages, m.author.type === "agent" ? m.author.id : null);
+  const o = state.kind === "waiting" ? outages.data?.outages.find((x) => x.machineId === state.machineId) : undefined;
+  if (!o) return null;
+  return (
+    <View style={[styles.pill, { backgroundColor: `${c.amber}22` }]}>
+      <Text variant="caption" numberOfLines={1} style={[styles.pillText, { color: c.amber }]}>
+        {awayText(t, o.offlineSince, now)}
+      </Text>
+    </View>
+  );
 }
 
 /**
@@ -86,4 +110,7 @@ const styles = StyleSheet.create({
   body: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   grow: { flex: 1, minWidth: 0 },
   acts: { flexDirection: "row" },
+  // Never wraps: on a full name line it moves whole to the next.
+  pill: { flexShrink: 0, alignSelf: "center", paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999 },
+  pillText: { fontWeight: "600" },
 });

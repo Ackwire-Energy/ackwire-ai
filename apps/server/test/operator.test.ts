@@ -1030,6 +1030,46 @@ test("analytics: counts in the dates, and one connector's; 401 without the token
   });
 });
 
+test("work analytics: fleet-wide and one workspace's; 401 without the token, 400 past 90 days", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const range = `from=${today}&to=${today}`;
+  const paths = [`/analytics/work`, `/analytics/work/orgs/${acme.orgId}`];
+  for (const path of paths) {
+    for (const authorization of [null, "Bearer wrong"])
+      expect((await op(`${path}?${range}`, authorization)).status).toBe(401);
+    const far = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    const res = await op(`${path}?from=${far}&to=${today}`);
+    expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([
+      400,
+      "analytics.range",
+    ]);
+  }
+  expect((await op(`/analytics/work/orgs/not-a-uuid?${range}`)).status).toBe(400);
+
+  // Earlier tests here spent tokens too: only what this one adds is counted.
+  type OrgWork = { orgId: string; agents: { agentId: string; tokens: { input: number; output: number } }[] };
+  const agentTokens = async () =>
+    (await body<OrgWork>(await op(`/analytics/work/orgs/${acme.orgId}?${range}`))).agents.find(
+      (a) => a.agentId === acme.agentId,
+    )?.tokens ?? { input: 0, output: 0 };
+  const before = await agentTokens();
+  await t.db.insert(schema.usageRecords).values({
+    orgId: acme.orgId,
+    agentId: acme.agentId,
+    provider: "anthropic",
+    model: "claude-sonnet-5-5",
+    requestedModel: "claude-sonnet-5-5",
+    inputTokens: 40,
+    outputTokens: 2,
+    costNanoUsd: 0,
+  });
+  const fleet = await body<{ bucket: string; workspaces: { orgId: string }[] }>(await op(`/analytics/work?${range}`));
+  expect(fleet.bucket).toBe("hour");
+  expect(fleet.workspaces.map((w) => w.orgId)).toContain(acme.orgId);
+  const after = await agentTokens();
+  expect([after.input - before.input, after.output - before.output]).toEqual([40, 2]);
+});
+
 test("the OpenAPI document is the committed contract (ADR 0056)", async () => {
   const doc = await body(await op("/openapi.json"));
   const file = Bun.file(`${import.meta.dir}/operator-openapi.json`);

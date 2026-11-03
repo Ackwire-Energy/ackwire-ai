@@ -36,7 +36,7 @@ const STEPS: ReadonlySet<string> = new Set<ConnectAiStep>(["claude", "chatgpt", 
 export interface StretchCard {
   kind: "stretch_paused";
   state: "paused" | "continued";
-  /** `runs`: the steps agents may start on their own (`limit`); `spend`: `limit`% of an agent's monthly budget. */
+  /** `runs`: the steps agents may take on their own ran out (`limit`, never shown); `spend`: `limit`% of an agent's monthly budget. */
   reason: "runs" | "spend";
   limit: number;
   /** The person behind the work (else the routine's creator): with the agents' owners and admins, who may go on. */
@@ -63,15 +63,16 @@ export function stretchCardOf(meta: Record<string, unknown> | null | undefined):
 }
 
 /**
- * "Ada e Theo pararam para te consultar · 50 passos sozinhos desde o seu pedido", in the reader's language. `cost`:
- * what the budget share is in money, for people who may see it ("US$ 10,00"); everyone else reads the percentage.
+ * "Ada e Theo pararam para checar com você antes de continuar", in the reader's language. A budget pause says the
+ * share it used, and `cost` that share in money for people who may see it ("US$ 10,00"). No step count: it means
+ * nothing to the person (an old card's `limit` on a run pause is never shown).
  */
 export function stretchCardText(t: TFunction, card: StretchCard, names: string[], cost?: string | null) {
   // Plurals by `count` and the `_cost` context are past what the typed keys can check here.
   const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
   const agents = joinNames(names, t);
   const count = names.length;
-  if (card.reason === "runs") return say("chat.body.stretch_paused_runs", { agents, count, steps: card.limit });
+  if (card.reason === "runs") return say("chat.body.stretch_paused_runs", { agents, count });
   return say("chat.body.stretch_paused_spend", {
     agents,
     count,

@@ -3483,6 +3483,22 @@ export const useMachineOutages = (orgId: string, enabled = true) => {
   });
 };
 
+/**
+ * A computer's line (who works on it, who waits, estimates). `computer.queue` events refetch it; while anything
+ * waits it also refetches every 30 s, so the estimates keep counting down.
+ */
+export const useMachineQueue = (orgId: string, machineId: string | null | undefined, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.machineQueue(orgId, machineId ?? ""),
+    queryFn: () => api.machines.queue(orgId, machineId ?? ""),
+    enabled: enabled && Boolean(machineId),
+    retry: false,
+    refetchInterval: (q) => ((q.state.data?.waiting.length ?? 0) > 0 ? 30_000 : false),
+    meta: { quiet: true },
+  });
+};
+
 /** "Trocar computador": moves waiting agents off an offline computer; outages, agents, computers and chats follow. */
 export function useMoveAgents(orgId: string) {
   const api = useApi();

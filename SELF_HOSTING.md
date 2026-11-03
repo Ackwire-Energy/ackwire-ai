@@ -820,6 +820,9 @@ stops), and brings it back (with `SUPPORT_EMAIL` set, its people see where to wr
 legal hold), closed, with everything in it, without telling it.
 `GET /analytics` and `GET /analytics/connectors/{connector}` say how much each connector is used,
 by day, workspace and agent, in counts the server always keeps: never what a tool was sent or answered.
+`GET /analytics/work` and `GET /analytics/work/orgs/{orgId}` say how much the agents work and spend:
+turns by who started them and how they ended, waits for room on a computer, reply times, and tokens by
+type and who pays, with what they would cost through the API, per workspace or per agent, never what anyone wrote.
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
 far each one is, and asks for a single-use code that the computer connects with

@@ -467,8 +467,8 @@ test("folders, tools and settings from the app: system folders refused, everythi
     name: "box",
     maxConcurrentTasks: 3,
     taskMaxSeconds: 14400,
-    brainIdleMinutes: 10,
-    brainMaxProcesses: 3,
+    brainIdleMinutes: 3,
+    brainMaxProcesses: 1,
     workspace: expect.any(String),
     managedBy: "desktop",
   });

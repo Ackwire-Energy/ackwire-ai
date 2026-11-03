@@ -55,6 +55,7 @@ async function setup(
     /** A fake server for the approvals the runner can't decide by itself. */
     ask?: CodexAppServersOptions["ask"];
     onRateLimits?: CodexAppServersOptions["onRateLimits"];
+    maxProcesses?: number;
   } = {},
 ) {
   const root = tempDir("brain-codex-app-");
@@ -73,6 +74,7 @@ async function setup(
   const app = new CodexAppServers({
     runs,
     deltaMs: 5,
+    ...(opts.maxProcesses ? { maxProcesses: opts.maxProcesses } : {}),
     ...(opts.ask ? { ask: opts.ask } : {}),
     ...(opts.onRateLimits ? { onRateLimits: opts.onRateLimits } : {}),
   });
@@ -290,6 +292,29 @@ test.skipIf(!posix)(
     expect(
       await t.app.steer(AGENT.id, { runId: run(3), session: SESSION, messages: [{ uuid: U2, text: "late" }] }),
     ).toEqual({ status: "no_turn" });
+    expect(t.app.size).toBe(1);
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "one kept, several at once: with every app-server busy a turn still gets its own (steering reaches both); the cap is back once they end",
+  async () => {
+    const t = await setup({ maxProcesses: 1 });
+    const SESSION2 = "0193cccc-0000-7000-8000-000000000002";
+    const a = start(t.ctx, request(11, "WAIT a"));
+    const b = start(t.ctx, request(12, "WAIT b", { session: { id: SESSION2, resume: false } }));
+    await waitFor(() => deltas(a.events).includes("Working") && deltas(b.events).includes("Working"), 10_000);
+    expect(t.starts().map((s) => s.start)).toEqual(["app-server", "app-server"]);
+    for (const [n, session, uuid] of [
+      [11, SESSION, U1],
+      [12, SESSION2, U2],
+    ] as const)
+      expect(await t.app.steer(AGENT.id, { runId: run(n), session, messages: [{ uuid, text: "go" }] })).toEqual({
+        status: "accepted",
+        accepted: [uuid],
+      });
+    await Promise.all([a.done, b.done]);
     expect(t.app.size).toBe(1);
   },
   20_000,

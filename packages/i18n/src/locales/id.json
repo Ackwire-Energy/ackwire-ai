@@ -1480,6 +1480,7 @@
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
     "queued_other": "{{names}} sedang antre untuk komputer",
     "away_other": "{{names}} menunggu komputer",
+    "queuedNext": "{{names}} mengantre untuk komputer · berikutnya",
     "nobody": "Tidak ada agen yang akan menjawab",
     "status": {
       "seen": "Sudah melihat",
@@ -7479,6 +7480,67 @@
       "noneText": "Tidak menjalankan program atau menyimpan file"
     }
   },
+  "queue": {
+    "button_other": "Komputer · {{count}} menunggu",
+    "buttonIdle": "Komputer",
+    "see": "Lihat antrean",
+    "label": "Antrean {{name}}",
+    "full": "Penuh",
+    "fullNext": "Penuh · berikutnya mulai sekitar {{n}} mnt lagi",
+    "free": "Tidak ada yang mengantre",
+    "workingNow": "Sedang bekerja · {{n}}",
+    "inLine": "Dalam antrean · {{n}}",
+    "allStarted": "semua mulai dalam ~{{n}} mnt",
+    "nothingWorking": "Tidak ada yang berjalan sekarang",
+    "rule": "Orang didahulukan. Agen yang disebut bersamaan mulai satu per satu.",
+    "youFirst": "Kamu duluan",
+    "startsIn": "mulai ~{{n}} mnt lagi",
+    "startsAfter": "mulai setelah {{after}} selesai",
+    "left": "sisa ~{{n}} mnt",
+    "who": "{{name}}",
+    "away": "Pergi {{time}}",
+    "purpose": {
+      "you": "menjawab kamu",
+      "person": "menjawab {{name}}",
+      "someone": "menjawab seseorang",
+      "agent": "diminta {{name}}",
+      "someAgent": "diminta agen",
+      "routine": "rutinitas",
+      "work": "kerja panjang"
+    },
+    "where": {
+      "yourDm": "DM kamu",
+      "dm": "DM dengan {{name}}",
+      "thread": "thread di #{{name}}",
+      "private": "percakapan pribadi"
+    },
+    "live": {
+      "nextEta": "Menunggu komputer. Giliran berikutnya, sekitar {{n}} mnt lagi",
+      "nextAfter": "Menunggu komputer. Giliran berikutnya setelah {{after}} selesai",
+      "next": "Menunggu komputer. Giliran berikutnya",
+      "behind": "Dalam antrean, ke-{{nth}}. Setelah {{names}}",
+      "position": "Dalam antrean, ke-{{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}",
+      "two": "{{n}}",
+      "few": "{{n}}",
+      "other": "{{n}}"
+    },
+    "fan": {
+      "called_other": "{{count}} agen dipanggil",
+      "answered_other": "{{count}} menjawab",
+      "working_other": "{{count}} bekerja",
+      "inLine_other": "{{count}} mengantre",
+      "failed_other": "{{count}} tidak menjawab",
+      "chip": {
+        "answered": "menjawab",
+        "working": "bekerja",
+        "inLine": "mengantre",
+        "failed": "tidak menjawab"
+      }
+    }
+  },
   "access": {
     "matrixTitle": "Akses agen",
     "matrixHint": "Tindakan sensitif (merge, deploy, berbagi, bayar) selalu meminta persetujuan, di level apa pun. Untuk mengaturnya per alat, buka Alat milik konektor.",
@@ -10341,13 +10403,14 @@
   "usageViews": {
     "signedOut": "Sudah keluar",
     "whose": "Milik {{name}}",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "Batasnya muncul setelah akun ini dipakai lagi.",
     "unused": "Tidak ada agen yang memakai akun ini.",
     "usesNow": "sedang memakainya",
     "monthTokens": "{{tokens}} token bulan ini",
     "tokens": "{{tokens}} token",
     "equivalent": "≈ {{amount}} lewat API",
+    "thisMonth": "Bulan ini",
+    "moreAgents_other": "+{{count}} agen",
     "paid": "{{amount}} dibayar",
     "budgetShare": "{{percent}} dari anggaran",
     "estimate": "Paket hanya memberi tahu pemakaian seluruh akun. Bagian tiap agen adalah perkiraan, dari pemakaian masing-masing.",
@@ -10868,9 +10931,9 @@
       "issue_work_start": "Tolong kerjakan tugas #{{number}}.",
       "issue_taken": "Mengambil tugas #{{number}}.",
       "done": "Selesai.",
-      "stretch_paused_runs_other": "{{agents}} berhenti untuk memastikan denganmu · {{steps}} langkah tanpamu sejak permintaanmu",
-      "stretch_paused_spend_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{percent}}% anggaran bulan ini untuk ini tanpamu",
-      "stretch_paused_spend_cost_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{amount}} ({{percent}}% anggaran bulan ini) untuk ini tanpamu",
+      "stretch_paused_runs_other": "{{agents}} berhenti sebentar untuk memastikan denganmu sebelum lanjut",
+      "stretch_paused_spend_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{percent}}% anggaran bulan ini",
+      "stretch_paused_spend_cost_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{amount}} ({{percent}}% anggaran bulan ini)",
       "memory": {
         "proposed": "Usulan dibuat: {{text}}",
         "forgot": "Memori diperbarui: melupakan \"{{text}}\".",
