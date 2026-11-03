@@ -986,7 +986,6 @@ export async function listIssueActivity(db: Database, actor: IssueActor, orgId: 
   return rows.map(activityView);
 }
 
-
 /**
  * Files attached from a box (new issue, comment): at most 10, in the org, not in the trash and uploaded by
  * this author, so an id alone can't pull someone else's file into an issue.

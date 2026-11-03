@@ -263,7 +263,6 @@ export function NewIssueDialog({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={t("issues.form.titleShort")}
                 aria-label={t("issues.form.title")}
-                // biome-ignore lint/a11y/noAutofocus: the dialog opens to write the title
                 autoFocus
               />
               <DetailsSection title={t("issues.description")}>
@@ -405,7 +404,6 @@ export function NewIssueDialog({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("issues.form.titleShort")}
               aria-label={t("issues.form.title")}
-              // biome-ignore lint/a11y/noAutofocus: the dialog opens to write the title
               autoFocus
             />
             <textarea

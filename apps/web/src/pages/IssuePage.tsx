@@ -195,6 +195,7 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
       >
         <TabPanel value="details">
           <WorkBox issue={i} />
+          <IssueWorkBlock issue={i} />
           {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
           <DetailsSection title={t("issues.description")}>
             {i.description ? (
