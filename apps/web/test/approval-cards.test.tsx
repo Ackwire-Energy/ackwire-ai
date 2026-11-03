@@ -43,4 +43,49 @@ describe("Aprovações: requests sharing a card", () => {
       "approved",
     ]);
   });
+
+  test("waiting requests of one kind in a row: one card, 'Aprovar todos', unfolding into each", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const sql = (id: string, query: string, minutes: number) => ({
+      ...merge,
+      id,
+      tool: "supabase_execute_sql",
+      title: "Supabase: Execute sql",
+      detail: `execute_sql · query=${query}`,
+      params: { query },
+      createdAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    });
+    state.approvals.splice(0, 1, sql("ap-s1", "select 1", 4), sql("ap-s2", "select 2", 3), sql("ap-s3", "select 3", 2));
+    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(state) });
+    await settle(4);
+    const run = document.querySelector(".ap-run") as HTMLElement;
+    expect(run.getAttribute("aria-label")).toMatch(/^3 pedidos de Ada para /);
+    // The card is the run: no group head over it, and its requests folded.
+    expect(run.closest(".ap-group")).toBeNull();
+    expect(within(run).queryAllByRole("article")).toHaveLength(0);
+    // The keyboard: the run is no one request (no `data-id`), Enter unfolds it.
+    expect(run.dataset.id).toBeUndefined();
+    run.focus();
+    await act(async () => fireEvent.keyDown(run, { key: "Enter" }));
+    expect(within(run).getAllByRole("article")).toHaveLength(3);
+    // Deciding its first request keeps the rest unfolded.
+    const [one] = within(run).getAllByRole("article");
+    await act(async () =>
+      fireEvent.click(within(one as HTMLElement).getAllByRole("button", { name: /^Aprovar/ })[0] as HTMLElement),
+    );
+    await settle(4);
+    const rest = document.querySelector(".ap-run") as HTMLElement;
+    expect(within(rest).getAllByRole("article")).toHaveLength(2);
+    await act(async () =>
+      fireEvent.click(within(rest).getAllByRole("button", { name: "Aprovar todos" })[0] as HTMLElement),
+    );
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
+      ORG_ID,
+      ["ap-s2", "ap-s3"],
+      "approve",
+    ]);
+  });
 });

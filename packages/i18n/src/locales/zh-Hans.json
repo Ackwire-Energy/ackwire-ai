@@ -2289,12 +2289,19 @@
       "partialAdmin": "管理员",
       "waitingCount_other": "{{count}} 项等待中"
     },
+    "run": {
+      "head_other": "{{name}} 的 {{count}} 个{{what}}请求",
+      "approve": "全部批准",
+      "show": "逐个查看"
+    },
     "always": {
       "button": "始终批准",
-      "hint": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}，不限参数。",
-      "hint_female": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}，不限参数。",
-      "hintTarget": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}。",
-      "hintTarget_female": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}。",
+      "reads": "始终批准读取",
+      "note": "从现在起涵盖 {{actions}}，任何值都适用。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteTarget": "从现在起涵盖 {{actions}}。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteReads": "从现在起仅涵盖 {{actions}} 在此项目（{{target}}）中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteReadsAll": "从现在起仅涵盖 {{actions}} 在此连接中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
+      "readsRule": "{{tool}} 的读取",
       "pushTo": "推送到 {{repo}} 的 {{branch}}",
       "done": "已批准。{{name}} 不会再询问这项操作。",
       "undoHere": "如需撤销，请前往 {{name}} 页面的“工具和权限”。",
@@ -10780,6 +10787,9 @@
       },
       "gave": "已提供",
       "answered": "已回答",
+      "autoApproved": "已自动批准（由 {{name}} 始终批准）",
+      "autoApprovedReads": "已自动批准（读取由 {{name}} 始终批准）",
+      "autoApprovedNobody": "已自动批准",
       "error": "错误",
       "seconds": "{{n}} 秒",
       "minutes": "{{n}} 分钟",

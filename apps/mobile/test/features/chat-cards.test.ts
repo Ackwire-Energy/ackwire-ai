@@ -139,7 +139,8 @@ describe("what an agent changed reads whole", () => {
 describe("a shared approval card with actions approved ahead", () => {
   test("each waiting item says it approves a future action; an approved one says when and can be canceled", () => {
     const cards = source("cards.tsx");
-    const start = cards.indexOf("function ApprovalGroupAsk(");
+    // Each item of a shared card is drawn by its own component.
+    const start = cards.indexOf("function ApprovalGroupItem(");
     const group = cards.slice(start, cards.indexOf("\nfunction ", start + 1));
     expect(group).toContain("<ApprovalAheadLine approval={a} />");
     expect(group).toContain('t("approval.ahead.scheduled"');
@@ -177,5 +178,47 @@ describe("a plan account's agents on the phone (Contas dos planos)", () => {
     expect(
       ascending(at(parts, ["!children ? (", "{children}\n      {children && renews ?", "text.updated(usage.at)"])),
     ).toBe(true);
+  });
+});
+
+describe("an approval card's layout", () => {
+  const cards = source("cards.tsx");
+  const fn = (name: string) => {
+    const start = cards.indexOf(`function ${name}(`);
+    return cards.slice(start, cards.indexOf("\nfunction ", start + 1));
+  };
+
+  test("the buttons sit in one row under the request, Aprovar, Aprovar sempre, Agora não, what it covers under them", () => {
+    for (const name of ["ApprovalAsk", "ApprovalGroupItem"]) {
+      const card = fn(name);
+      const row = card.slice(card.indexOf("<View style={styles.itemActs}>"));
+      expect([
+        name,
+        ascending(
+          at(row, [
+            'variant="primary"',
+            "<ApproveAlwaysButton",
+            't("approval.notNow")',
+            "</View>",
+            "<ApproveAlwaysHint",
+          ]),
+        ),
+      ]).toEqual([name, true]);
+      // Never a wide button stretched beside the text: each its own width, left-aligned in the row.
+      expect([name, row.slice(0, row.indexOf("</View>")).includes(" wide")]).toEqual([name, false]);
+    }
+    expect(cards).toContain('itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }');
+  });
+
+  test("waiting requests of one kind in a row fold into one run: its head, Aprovar todos and Ver cada um", () => {
+    const group = fn("ApprovalGroupAsk");
+    for (const piece of [
+      "approvalRuns(items)",
+      't("approval.run.head"',
+      't("approval.run.approve")',
+      'label: t("approval.run.show")',
+      "approveAlwaysAlso(items, a)",
+    ])
+      expect([piece, group.includes(piece)]).toEqual([piece, true]);
   });
 });

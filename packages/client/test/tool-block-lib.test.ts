@@ -18,6 +18,7 @@ import {
   toolHint,
   toolItemsLive,
   toolItemsSaved,
+  toolLineHint,
   toolNow,
   toolPhrase,
   toolWhy,
@@ -707,5 +708,48 @@ describe("a lone quick read that only fed the answer shows no card", () => {
     expect(workSteps({ ...mixed.work, calls: [{ name: "browser_navigate" }, { name: "create_issue" }] }, browser)).toBe(
       4,
     );
+  });
+});
+
+describe("a call a rule approved for good", () => {
+  test("its line says so quietly, who approved it and whether only reads, and never folds into another", () => {
+    const at = (s: number) => new Date(Date.UTC(2026, 10, 2, 10, 0, s)).toISOString();
+    const sql = (id: string, seq: number, autoApproved?: unknown) => [
+      {
+        seq,
+        kind: "tool_call" as const,
+        data: { toolUseId: id, name: "db_execute_sql", input: {} },
+        createdAt: at(seq),
+      },
+      {
+        seq: seq + 1,
+        kind: "tool_result" as const,
+        data: { toolUseId: id, content: "[]", ...(autoApproved ? { autoApproved } : {}) },
+        createdAt: at(seq + 1),
+      },
+    ];
+    const work = workFromSteps([
+      ...sql("t1", 1),
+      ...sql("t2", 3, { by: "Ana", reads: true }),
+      ...sql("t3", 5, { by: null, reads: false }),
+    ]);
+    const hints = toolItemsSaved(work).flatMap((i) => (i.kind === "call" ? [toolLineHint(t, i.line)] : []));
+    expect(hints.slice(1)).toEqual(['chat.work.autoApprovedReads|{"name":"Ana"}', "chat.work.autoApprovedNobody"]);
+    expect(hints).toHaveLength(3);
+  });
+
+  test("live too: the line says it as soon as the call ends, and stays its own line", () => {
+    const sql = { connector: "Banco" };
+    const s = [
+      start("a", "banco_execute_sql", sql),
+      end("a"),
+      start("b", "banco_execute_sql", sql),
+      { ...end("b"), autoApproved: { by: "Ana", reads: true } } as Ev,
+    ].reduce(applyChannelEvent, emptyStreams);
+    const hints = toolItemsLive(s.runs.r1?.work ?? []).flatMap((i) =>
+      i.kind === "call" ? [toolLineHint(t, i.line)] : [],
+    );
+    expect(hints).toHaveLength(2);
+    expect(hints[1]).toBe('chat.work.autoApprovedReads|{"name":"Ana"}');
   });
 });

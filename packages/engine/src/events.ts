@@ -209,6 +209,8 @@ export type ChannelEvent =
       failed?: boolean;
       /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
       held?: boolean;
+      /** On the end: a rule ("Aprovar sempre") let it run without asking, whose person, a reads one or not. */
+      autoApproved?: { by: string | null; reads: boolean };
       /** On the end of a permission check it refused (`failed`): the policy's own reason, to the agent. */
       why?: string;
       /** With `why`: the refusal's code (`person`, `outside`…), which the apps say in the person's words. */

@@ -1,5 +1,5 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
-import { useCancelApproval, useDecideApproval } from "@agenteschat/client";
+import { useCancelApproval, useDecideApproval, useDecideApprovals } from "@agenteschat/client";
 import {
   type ApprovalAction,
   aheadPhase,
@@ -15,6 +15,7 @@ import {
   approvalTitle,
   approvalWaitsFor,
   approveAlwaysHint,
+  approveAlwaysLabel,
   decisionOutcome,
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
@@ -76,16 +77,26 @@ function waitingFor(t: TFunction, approval: Approval, agent: Agent | undefined, 
 }
 
 /**
- * "Aprovar sempre", where the request offers it: approves this one and the agent's next calls of its kind, with
- * any values. The line under it says what that covers; the toast, where to undo it.
+ * "Aprovar sempre" ("Aprovar sempre leituras" for a SQL tool's reads), where the request offers it: approves this one
+ * and the agent's next calls of its kind, and with it `also` (the requests of that kind waiting beside it,
+ * `approveAlwaysAlso`). The line under it says exactly what that covers and where to undo it.
  */
-export function ApproveAlways({ approval, agent }: { approval: Approval; agent: Agent | undefined }) {
+export function ApproveAlways({
+  approval,
+  agent,
+  also = [],
+}: {
+  approval: Approval;
+  agent: Agent | undefined;
+  also?: string[];
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const navigate = useNavigate();
   const openPanel = useOpenAgentPanel();
   const decide = useDecideApproval(org.id);
+  const others = useDecideApprovals(org.id);
   if (!approveAlwaysOffered(approval)) return null;
   const g = agentGrammar(agent?.name ?? t("channel.unknownAgent"));
   const kind = approval.approveAlways;
@@ -100,32 +111,32 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
         });
   const always = (el: HTMLElement) => {
     const burst = prepareBurst(el);
-    decide.mutate(
-      { id: approval.id, decision: "approve", always: true },
-      {
-        onSuccess: () => {
-          burst();
-          toast.show(
-            t("approval.always.done", { name: g.name }),
-            "info",
-            { label: t("approval.always.open"), run: open },
-            t("approval.always.undoHere", { context: g.context, name: g.name }),
-          );
-        },
+    // Not `mutate`'s own onSuccess: the decided event can unmount this button before the reply, and that callback
+    // would then never send `also`. A failure is shown by the query client's mutation cache.
+    decide.mutateAsync({ id: approval.id, decision: "approve", always: true }).then(
+      () => {
+        burst();
+        if (also.length) others.mutate({ ids: also, decision: "approve" });
+        toast.show(
+          t("approval.always.done", { name: g.name }),
+          "info",
+          { label: t("approval.always.open"), run: open },
+          t("approval.always.undoHere", { context: g.context, name: g.name }),
+        );
       },
+      () => {},
     );
   };
   return (
     <>
       <Button
-        variant="ghost"
         size="sm"
         icon="check"
-        disabled={decide.isPending}
+        disabled={decide.isPending || others.isPending}
         loading={decide.isPending}
         onClick={(e) => always(e.currentTarget)}
       >
-        {t("approval.always.button")}
+        {approveAlwaysLabel(t, approval)}
       </Button>
       <p className="small muted ap-always" title={kind?.actions.join(", ") || kind?.tool}>
         {approveAlwaysHint(t, approval, g.name)}

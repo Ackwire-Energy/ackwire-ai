@@ -2436,10 +2436,21 @@
       "waitingCount_many": "{{count}} pendientes",
       "waitingCount_other": "{{count}} pendientes"
     },
+    "run": {
+      "head_one": "{{count}} pedido de {{name}} para {{what}}",
+      "head_many": "{{count}} pedidos de {{name}} para {{what}}",
+      "head_other": "{{count}} pedidos de {{name}} para {{what}}",
+      "approve": "Aprobar todos",
+      "show": "Ver cada uno"
+    },
     "always": {
       "button": "Aprobar siempre",
-      "hint": "Aprueba esta y las próximas iguales de {{name}}: {{actions}}, con cualquier valor.",
-      "hintTarget": "Aprueba esta y las próximas iguales de {{name}}: {{actions}}.",
+      "reads": "Aprobar siempre las lecturas",
+      "note": "Cubre {{actions}} de ahora en adelante, con cualquier valor. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "noteTarget": "Cubre {{actions}} de ahora en adelante. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "noteReads": "Cubre solo las lecturas de {{actions}} en este proyecto ({{target}}) de ahora en adelante. Lo que cambia datos sigue pidiendo. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "noteReadsAll": "Cubre solo las lecturas de {{actions}} en esta conexión de ahora en adelante. Lo que cambia datos sigue pidiendo. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "readsRule": "Lecturas de {{tool}}",
       "pushTo": "push a {{branch}} en {{repo}}",
       "done": "Aprobado. {{name}} no volverá a pedir esto.",
       "undoHere": "Para deshacerlo, ve a Herramientas y acceso, en la página de {{name}}.",
@@ -11470,6 +11481,9 @@
       },
       "gave": "entregado",
       "answered": "respondido",
+      "autoApproved": "Aprobado automáticamente (siempre aprobado por {{name}})",
+      "autoApprovedReads": "Aprobado automáticamente (lectura siempre aprobada por {{name}})",
+      "autoApprovedNobody": "Aprobado automáticamente",
       "error": "error",
       "seconds": "{{n}} s",
       "minutes": "{{n}} min",

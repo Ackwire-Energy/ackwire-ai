@@ -2309,10 +2309,27 @@ export const en = {
       waitingCount_one: "{{count}} waiting",
       waitingCount_other: "{{count}} waiting",
     },
+    /** Several waiting requests of one kind in a row, folded into one: "3 requests from Ada to Run sql". */
+    run: {
+      head_one: "{{count}} request from {{name}} to {{what}}",
+      head_other: "{{count}} requests from {{name}} to {{what}}",
+      approve: "Approve all",
+      /** Unfolds the run into its requests, each with its own decision. */
+      show: "See each one",
+    },
     always: {
       button: "Always approve",
-      hint: "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values.",
-      hintTarget: "Approves this one and the next ones like it from {{name}}: {{actions}}.",
+      /** The SQL tool's reads of one project only (anything else it runs still asks). */
+      reads: "Always approve reads",
+      note: "Covers {{actions}} from now on, with any values. To undo: Tools and access, on {{name}}'s page.",
+      noteTarget: "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page.",
+      /** `target`: the call's other arguments, as `project_id=abc`. */
+      noteReads:
+        "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
+      noteReadsAll:
+        "Covers only reads by {{actions}} on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
+      /** A remembered SQL reads rule in Tools and access. */
+      readsRule: "Reads by {{tool}}",
       pushTo: "push to {{branch}} in {{repo}}",
       done: "Approved. {{name}} won't ask for this again.",
       undoHere: "To undo it, go to Tools and access, on {{name}}'s page.",
@@ -10494,6 +10511,10 @@ export const en = {
       },
       gave: "given",
       answered: "answered",
+      /** A call that ran without asking under "Always approve": who approved it for good. */
+      autoApproved: "Approved automatically (always approved by {{name}})",
+      autoApprovedReads: "Approved automatically (read always approved by {{name}})",
+      autoApprovedNobody: "Approved automatically",
       error: "error",
       seconds: "{{n}} s",
       minutes: "{{n}} min",

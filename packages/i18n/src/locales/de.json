@@ -2365,10 +2365,20 @@
       "waitingCount_one": "{{count}} wartet",
       "waitingCount_other": "{{count}} warten"
     },
+    "run": {
+      "head_one": "{{count}} Anfrage von {{name}}: {{what}}",
+      "head_other": "{{count}} Anfragen von {{name}}: {{what}}",
+      "approve": "Alle freigeben",
+      "show": "Einzeln ansehen"
+    },
     "always": {
       "button": "Immer freigeben",
-      "hint": "Gibt diese und alle gleichartigen von {{name}} frei: {{actions}}, mit beliebigen Werten.",
-      "hintTarget": "Gibt diese und alle gleichartigen von {{name}} frei: {{actions}}.",
+      "reads": "Lesezugriffe immer freigeben",
+      "note": "Gilt ab jetzt für {{actions}}, mit beliebigen Werten. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "noteTarget": "Gilt ab jetzt für {{actions}}. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "noteReads": "Gilt ab jetzt nur für Lesezugriffe von {{actions}} in diesem Projekt ({{target}}). Was Daten ändert, fragt weiter nach. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "noteReadsAll": "Gilt ab jetzt nur für Lesezugriffe von {{actions}} über diese Verbindung. Was Daten ändert, fragt weiter nach. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "readsRule": "Lesezugriffe von {{tool}}",
       "pushTo": "Push auf {{branch}} in {{repo}}",
       "done": "Freigegeben. {{name}} fragt dafür nicht mehr nach.",
       "undoHere": "Zum Rückgängigmachen geh auf der Seite von {{name}} zu Tools und Zugriff.",
@@ -11103,6 +11113,9 @@
       },
       "gave": "übergeben",
       "answered": "beantwortet",
+      "autoApproved": "Automatisch freigegeben (immer freigegeben von {{name}})",
+      "autoApprovedReads": "Automatisch freigegeben (Lesezugriff immer freigegeben von {{name}})",
+      "autoApprovedNobody": "Automatisch freigegeben",
       "error": "Fehler",
       "seconds": "{{n}} s",
       "minutes": "{{n}} Min.",

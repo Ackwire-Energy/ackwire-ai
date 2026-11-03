@@ -20,7 +20,14 @@ import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
-import { approvalSaid, approvalTable, approvalTraits, approveAlwaysHint, approveAlwaysOffered } from "./logic";
+import {
+  approvalSaid,
+  approvalTable,
+  approvalTraits,
+  approveAlwaysHint,
+  approveAlwaysLabel,
+  approveAlwaysOffered,
+} from "./logic";
 
 /**
  * The exact request, in reading order: the action in words, the action itself (an email as it will be,
@@ -353,7 +360,10 @@ export function useCancelAhead() {
   };
 }
 
-/** "Aprovar sempre" where the request offers it, and under it what one tap approves for good, as on the web. */
+/**
+ * "Aprovar sempre" ("Aprovar sempre leituras" for a SQL tool's reads) where the request offers it, and under it
+ * exactly what one tap approves for good and where to undo it, as on the web.
+ */
 export function ApproveAlways({
   approval: a,
   name,
@@ -369,11 +379,39 @@ export function ApproveAlways({
   if (!approveAlwaysOffered(a)) return null;
   return (
     <View style={styles.always}>
-      <Button variant="ghost" wide label={t("approval.always.button")} disabled={disabled} onPress={onPress} />
+      <Button variant="ghost" wide label={approveAlwaysLabel(t, a)} disabled={disabled} onPress={onPress} />
       <Text variant="caption" tone="faint" style={styles.alwaysHint}>
         {approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}
       </Text>
     </View>
+  );
+}
+
+/** "Aprovar sempre" in a request card's row of buttons, the same size as the others (its hint: `ApproveAlwaysHint`). */
+export function ApproveAlwaysButton({
+  approval: a,
+  disabled,
+  onPress,
+}: {
+  approval: Approval;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  if (!approveAlwaysOffered(a)) return null;
+  return (
+    <Button variant="secondary" size="card" label={approveAlwaysLabel(t, a)} disabled={disabled} onPress={onPress} />
+  );
+}
+
+/** What "Aprovar sempre" covers and where to undo it, on a line of its own under the row of buttons. */
+export function ApproveAlwaysHint({ approval: a, name }: { approval: Approval; name: string }) {
+  const { t } = useTranslation();
+  if (!approveAlwaysOffered(a)) return null;
+  return (
+    <Text variant="caption" tone="faint">
+      {approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}
+    </Text>
   );
 }
 

@@ -2352,10 +2352,20 @@
       "waitingCount_one": "{{count}} bekliyor",
       "waitingCount_other": "{{count}} bekliyor"
     },
+    "run": {
+      "head_one": "{{name}} adlı ajandan {{count}} istek: {{what}}",
+      "head_other": "{{name}} adlı ajandan {{count}} istek: {{what}}",
+      "approve": "Tümünü onayla",
+      "show": "Tek tek gör"
+    },
     "always": {
       "button": "Her zaman onayla",
-      "hint": "Bunu ve {{name}} ajanından gelecek benzerlerini onaylar: {{actions}}, hangi değerlerle olursa olsun.",
-      "hintTarget": "Bunu ve {{name}} ajanından gelecek benzerlerini onaylar: {{actions}}.",
+      "reads": "Okumaları her zaman onayla",
+      "note": "Bundan sonra {{actions}} için, her değerle geçerli. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "noteTarget": "Bundan sonra {{actions}} için geçerli. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "noteReads": "Bundan sonra yalnızca bu projede ({{target}}) {{actions}} ile yapılan okumalar için geçerli. Veriyi değiştiren her şey yine onay ister. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "noteReadsAll": "Bundan sonra yalnızca bu bağlantıda {{actions}} ile yapılan okumalar için geçerli. Veriyi değiştiren her şey yine onay ister. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "readsRule": "{{tool}} okumaları",
       "pushTo": "{{repo}} içinde {{branch}} dalına gönder",
       "done": "Onaylandı. {{name}} bunu bir daha sormayacak.",
       "undoHere": "Geri almak için {{name}} sayfasındaki Araçlar ve erişim bölümüne gidin.",
@@ -11035,6 +11045,9 @@
       },
       "gave": "verildi",
       "answered": "yanıtlandı",
+      "autoApproved": "Otomatik onaylandı (her zaman onaylayan: {{name}})",
+      "autoApprovedReads": "Otomatik onaylandı (okumayı her zaman onaylayan: {{name}})",
+      "autoApprovedNobody": "Otomatik onaylandı",
       "error": "hata",
       "seconds": "{{n}} sn",
       "minutes": "{{n}} dk",

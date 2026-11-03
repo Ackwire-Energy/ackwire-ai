@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { guardSql, normalizeDatabasePolicy, type SqlRules } from "../src";
+import { guardSql, normalizeDatabasePolicy, provenReadOnly, type SqlRules } from "../src";
 
 const open: SqlRules = { tables: [], hiddenColumns: [] };
 const reason = async (sql: string, rules = open) => {
@@ -176,4 +176,50 @@ test("a table allowlist saved lowercase still allows the table with capitals", a
   expect(
     await reason('select * from dbo."ClientesNFSe"', { tables: ['dbo."clientesNFSe"'], hiddenColumns: [] }),
   ).toContain("may only read the tables");
+});
+
+test("proven read-only (Aprovar sempre leituras): SELECTs and EXPLAINs calling only computing built-ins", async () => {
+  const cases: [string, boolean][] = [
+    ["select count(*) from orders where created_at > now() - interval '7 days'", true],
+    ["-- weekly\nselect status, count(*) from orders /* all */ group by 1;", true],
+    ["select count(*) from orders; select count(*) from customers;", true],
+    ["with x as (select id from orders) select date_trunc('day', now()), count(*) from x", true],
+    ["explain select * from orders", true],
+    ["select pg_catalog.count(*) from orders", true],
+    // Statement positions count bytes: text with accents before the next statement still proves it.
+    ["select count(*) from clientes where cidade = 'São Paulo';select 2", true],
+    ["select a ->> 'k', b between 1 and 2, c like 'x%', d in (1, 2), e::text, cast(f as int) from t", true],
+    ["select 1 = any(select 2), j @> '{}'::jsonb, now()::date, x::timestamptz from t", true],
+    // Writes, in a CTE or after a read; DDL, COPY, state-changing SET, transactions.
+    ["with d as (insert into orders default values returning id) select * from d", false],
+    ["select 1; delete from orders", false],
+    ["select count(*) from orders; drop table orders", false],
+    ["copy orders to stdout", false],
+    ["set role postgres", false],
+    ["begin; select 1; commit", false],
+    ["explain analyze select 1", false],
+    ["select * from orders for update", false],
+    ["select * into backup from orders", false],
+    // Functions with side effects, or that aren't known to only compute (the workspace's own may write).
+    ["select nextval('orders_id_seq')", false],
+    ["select setval('orders_id_seq', 1)", false],
+    ["select pg_sleep(5)", false],
+    ["select lo_import('/etc/passwd')", false],
+    ["select archive_old_orders()", false],
+    ["select public.count(*) from orders", false],
+    ["select 1 operator(public.+) 2", false],
+    // The workspace's own operators, types and sampling methods run its functions.
+    ["select 1 <=> 2", false],
+    ["select a <=> b from t", false],
+    ["select cast(x as evil) from t", false],
+    ["select x::public.evil from t", false],
+    ["select 1 = any(select 2) and 3 <=> any(select 4)", false],
+    ["select * from orders tablesample bernoulli (5)", false],
+    ["", false],
+    ["-- nothing here", false],
+    ["select from where", false],
+  ];
+  const got: [string, boolean][] = [];
+  for (const [sql] of cases) got.push([sql, await provenReadOnly(sql)]);
+  expect(got).toEqual(cases);
 });

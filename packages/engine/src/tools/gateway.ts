@@ -1,7 +1,7 @@
 import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
-import { coveringRules, type RememberedKind } from "../approval-rules";
+import { coveringRules, type RememberedKind, rulesApprover, SQL_READS, sqlReadsTarget } from "../approval-rules";
 import { fedByRoutine, type RunAuthority, runAuthorityById, UUID } from "../authority";
 import { type CostKind, costlyGate, costlyKind, LONG_STEPS, unrequested } from "../brakes";
 import { countToolCall } from "../connector-usage";
@@ -10,6 +10,7 @@ import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { answersAgentsOnly, consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
+import { provenReadOnly } from "../databases/guard";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
 import { recordRead } from "../outbound";
 import { routineCreatorOf } from "../requester";
@@ -100,6 +101,24 @@ export function rememberable(
   if (!actions || actions.some((a) => actionLevel(a) === "sensitive")) return null;
   if ([tool.name, tool.rememberAs, tool.scope, ...actions].some(alwaysAsks)) return null;
   return { tool: tool.rememberAs, actions };
+}
+
+/**
+ * The kind "Aprovar sempre leituras" covers for a call of a tool that runs SQL (`sqlReads`), or null: the same runs
+ * as `rememberable`, and only SQL the Postgres guard proves read-only, kept by the call's other arguments (its
+ * project or database). A write is never offered and never covered: it asks every time.
+ */
+export async function rememberableSqlRead(
+  tool: ToolDefinition,
+  input: Record<string, unknown>,
+  authority: RunAuthority | null,
+  decision: PolicyDecision,
+): Promise<RememberedKind | null> {
+  if (!tool.sqlReads || !tool.connectionId || ALWAYS_SENSITIVE.test(tool.name)) return null;
+  if (!authority || authority.kind === "routine" || decision.action === "approve") return null;
+  const sql = input[tool.sqlReads.arg];
+  if (typeof sql !== "string" || !(await provenReadOnly(sql))) return null;
+  return { tool: tool.sqlReads.tool, actions: [`${SQL_READS}${sqlReadsTarget(input, tool.sqlReads.arg)}`] };
 }
 
 /**
@@ -273,8 +292,11 @@ export type ToolCall = { toolUseId: string; name: string; input: Record<string, 
 export type Approval = typeof approvals.$inferSelect;
 
 export type InvokeResult =
-  /** `ran`: the action approved ahead this call did, as it is now (its cards are told, `invokeWithChip`). */
-  | { type: "result"; output: ToolOutput; ran?: Approval }
+  /**
+   * `ran`: the action approved ahead this call did, as it is now (its cards are told, `invokeWithChip`).
+   * `autoApproved`: a rule ("Aprovar sempre") let it run, whose person and whether a reads one (its live line).
+   */
+  | { type: "result"; output: ToolOutput; ran?: Approval; autoApproved?: { by: string | null; reads: boolean } }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
   | { type: "question"; text: string; choices: string[] | null; why: string }
@@ -747,6 +769,8 @@ export function createToolGateway(deps: {
       });
       /** The rules ("Aprovar sempre") this call ran under instead of asking. */
       let approvedBy: string[] | null = null;
+      /** What the call's line in the chat says of it: approved by a rule, whose person, a read-only SQL one or not. */
+      let autoApproved: { by: string | null; reads: boolean } | null = null;
       // The audit (agent-audit.ts): every call that matters, with how it ended. A routine's belongs where it
       // delivers, never to its room.
       const actionChannel =
@@ -791,9 +815,10 @@ export function createToolGateway(deps: {
           // `shown` drops the outside-content envelope; learning still needs to know the text came from outside.
           ...(tool?.external ? { external: true } : {}),
           ...(data ? { data } : {}),
+          ...(autoApproved ? { autoApproved } : {}),
         });
         if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
-        return { type: "result" as const, output };
+        return { type: "result" as const, output, ...(autoApproved ? { autoApproved } : {}) };
       };
 
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
@@ -863,11 +888,21 @@ export function createToolGateway(deps: {
       const check = await checkToolCall(tool, call.input, ctx);
       if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} }, "refused");
       // "Aprovar sempre": a call of a kind someone approved for good runs like an allowed one, why or not.
-      const remember = approves ? rememberable(tool, call.input, authority, decision) : null;
+      const remember = !approves
+        ? null
+        : tool.sqlReads
+          ? await rememberableSqlRead(tool, call.input, authority, decision)
+          : rememberable(tool, call.input, authority, decision);
       if (remember && tool.connectionId) {
         const at = { orgId: ctx.orgId, agentId: ctx.agentId, connectionId: tool.connectionId };
         approvedBy = await coveringRules(ctx.db, at, remember);
-        if (approvedBy) approves = false;
+        if (approvedBy) {
+          approves = false;
+          autoApproved = {
+            by: await rulesApprover(ctx.db, approvedBy),
+            reads: remember.actions.some((a) => a.startsWith(SQL_READS)),
+          };
+        }
       }
       // Approved ahead: the exact call a person approved for this routine run's slot runs like an allowed one, why
       // or not; the one they refused never runs.

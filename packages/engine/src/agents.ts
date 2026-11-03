@@ -16,6 +16,7 @@ import {
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
+import { dropAgentRules } from "./approval-rules";
 import { answersOthers, audienceOf, canTalkTo, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
 import { type AutonomySettings, autonomySettings } from "./autonomy-settings";
@@ -395,6 +396,8 @@ export async function updateAgent(
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
   if (before && before.ownerUserId !== agent.ownerUserId) {
+    // What its old owner approved for good was theirs to decide: the new owner is asked again.
+    await dropAgentRules(db, orgId, [agentId], { type: "person", id: actorId });
     await handOver({ db, pubsub: options.pubsub }, actorId, before, agent.ownerUserId);
   }
   if (input.name !== undefined || handle !== undefined) {

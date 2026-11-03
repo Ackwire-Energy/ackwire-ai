@@ -5767,14 +5767,38 @@
       "other": "{{count}} waiting"
     }
   },
+  "approval.run.head": {
+    "value": {
+      "one": "{{count}} request from {{name}} to {{what}}",
+      "other": "{{count}} requests from {{name}} to {{what}}"
+    }
+  },
+  "approval.run.approve": {
+    "value": "Approve all"
+  },
+  "approval.run.show": {
+    "value": "See each one"
+  },
   "approval.always.button": {
     "value": "Always approve"
   },
-  "approval.always.hint": {
-    "value": "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values."
+  "approval.always.reads": {
+    "value": "Always approve reads"
   },
-  "approval.always.hintTarget": {
-    "value": "Approves this one and the next ones like it from {{name}}: {{actions}}."
+  "approval.always.note": {
+    "value": "Covers {{actions}} from now on, with any values. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.noteTarget": {
+    "value": "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.noteReads": {
+    "value": "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.noteReadsAll": {
+    "value": "Covers only reads by {{actions}} on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.readsRule": {
+    "value": "Reads by {{tool}}"
   },
   "approval.always.pushTo": {
     "value": "push to {{branch}} in {{repo}}"
@@ -26981,6 +27005,15 @@
   },
   "chat.work.answered": {
     "value": "answered"
+  },
+  "chat.work.autoApproved": {
+    "value": "Approved automatically (always approved by {{name}})"
+  },
+  "chat.work.autoApprovedReads": {
+    "value": "Approved automatically (read always approved by {{name}})"
+  },
+  "chat.work.autoApprovedNobody": {
+    "value": "Approved automatically"
   },
   "chat.work.error": {
     "value": "error"

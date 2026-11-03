@@ -2299,10 +2299,19 @@
       "partialAdmin": "admin",
       "waitingCount_other": "{{count}} menunggu"
     },
+    "run": {
+      "head_other": "{{count}} permintaan dari {{name}} untuk {{what}}",
+      "approve": "Setujui semua",
+      "show": "Lihat satu per satu"
+    },
     "always": {
       "button": "Selalu setujui",
-      "hint": "Menyetujui yang ini dan yang serupa berikutnya dari {{name}}: {{actions}}, dengan nilai apa pun.",
-      "hintTarget": "Menyetujui yang ini dan yang serupa berikutnya dari {{name}}: {{actions}}.",
+      "reads": "Selalu setujui pembacaan",
+      "note": "Mencakup {{actions}} mulai sekarang, dengan nilai apa pun. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "noteTarget": "Mencakup {{actions}} mulai sekarang. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "noteReads": "Hanya mencakup pembacaan oleh {{actions}} di proyek ini ({{target}}) mulai sekarang. Yang mengubah data tetap meminta persetujuan. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "noteReadsAll": "Hanya mencakup pembacaan oleh {{actions}} di koneksi ini mulai sekarang. Yang mengubah data tetap meminta persetujuan. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "readsRule": "Pembacaan oleh {{tool}}",
       "pushTo": "push ke {{branch}} di {{repo}}",
       "done": "Disetujui. {{name}} tidak akan meminta ini lagi.",
       "undoHere": "Untuk membatalkannya, buka Alat dan akses di halaman {{name}}.",
@@ -10761,6 +10770,9 @@
       },
       "gave": "diberikan",
       "answered": "dijawab",
+      "autoApproved": "Disetujui otomatis (selalu disetujui oleh {{name}})",
+      "autoApprovedReads": "Disetujui otomatis (pembacaan selalu disetujui oleh {{name}})",
+      "autoApprovedNobody": "Disetujui otomatis",
       "error": "gagal",
       "seconds": "{{n}} dtk",
       "minutes": "{{n}} mnt",
