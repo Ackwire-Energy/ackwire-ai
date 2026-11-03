@@ -285,11 +285,11 @@ export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "cursor"
 };
 
 /**
- * Whether an account (its CLI's kind, and a coding plan's `provider` for a key, or `cursor` for a Cursor API key)
- * may have one login per agent.
+ * Whether an account (its CLI's kind, and a coding plan's `provider` for a key, `cursor` for a Cursor API key or `zen`
+ * for an OpenCode key) may have one login per agent.
  */
 export const loginPerAgent = (kind: string, provider?: string | null) =>
-  isPlanId(provider) || provider === "cursor"
+  isPlanId(provider) || provider === "cursor" || provider === "zen"
     ? LOGIN_PER_AGENT.key
     : kind === "codex" || kind === "cursor"
       ? LOGIN_PER_AGENT[kind]
@@ -313,3 +313,26 @@ export const SHARED_SIGN_INS: Readonly<Record<"claude_code" | "codex" | "key", b
 /** Whether a new sign-in of an account (its CLI's kind, and a coding plan's `provider`) is made for all agents. */
 export const sharedSignIn = (kind: string, provider?: string | null) =>
   isPlanId(provider) ? SHARED_SIGN_INS.key : (kind === "claude_code" || kind === "codex") && SHARED_SIGN_INS[kind];
+
+/**
+ * OpenCode's free tier (ADR 0132): models OpenCode serves at no cost and only to its own CLI ("Free-tier chat models
+ * require OpenCode", opencode.ai/docs/zen, read 2026-11-02). Its CLI runs them with no key at all. What `opencode
+ * models` lists on the computer comes first; this list is the fallback where it listed nothing.
+ * ponytail: hand-copied list, the CLI's own listing replaces it wherever the runner reports one.
+ */
+export const OPENCODE_FREE_MODELS: readonly { id: string; label: string }[] = [
+  { id: "opencode/big-pickle", label: "Big Pickle" },
+  { id: "opencode/beam-free", label: "Beam Free" },
+  { id: "opencode/deepseek-v4.1-flash-free", label: "DeepSeek V4.1 Flash Free" },
+  { id: "opencode/flint-40b-free", label: "Flint 40B Free" },
+  { id: "opencode/glm-5.3-flash-free", label: "GLM-5.3 Flash Free" },
+  { id: "opencode/jev-1.13-free", label: "Jev 1.13 Free" },
+  { id: "opencode/mimo-v2.6-flash-free", label: "MiMo V2.6 Flash Free" },
+  { id: "opencode/nemotron-3-ultra-free", label: "Nemotron 3 Ultra Free" },
+  { id: "opencode/nemotron-3.5-lightning-free", label: "Nemotron 3.5 Lightning Free" },
+  { id: "opencode/nemotron-3.5-super-vl-free", label: "Nemotron 3.5 Super VL Free" },
+];
+
+/** A model of OpenCode's free tier by its `provider/model` id: one OpenCode serves (`opencode/`) named `-free`, or listed. */
+export const isOpencodeFreeModel = (id: string) =>
+  /^opencode\/[\w.-]+-free$/.test(id) || OPENCODE_FREE_MODELS.some((m) => m.id === id);

@@ -86,8 +86,8 @@ describe("Quem pensa as one list (the new agent's step)", () => {
     for (const id of ["zai", "kimi", "minimax", "opencode"] as const)
       expect(groups).toContain(`brain.line.codingAuto${JSON.stringify({ model: "", plan: CODING_PLANS[id].label })}`);
     expect(options.find((o) => o.value === "none:chatgpt")?.disabled).toBe(true);
-    // Cursor shows only where a computer runs it.
-    expect(options.some((o) => o.value.startsWith("cursor"))).toBe(false);
+    // Cursor and OpenCode show only where a computer runs them.
+    expect(options.some((o) => o.value.startsWith("cursor") || o.value.startsWith("zen"))).toBe(false);
     // A model without the provider's key says so and can't be picked.
     const gpt = options.find((o) => o.value === "gpt-6.1-sol");
     expect(gpt?.disabled).toBe(true);
@@ -206,5 +206,30 @@ describe("Quem pensa as one list (the new agent's step)", () => {
     expect(needsOwnSignIn([{ ...mine, mine: false, own: { claude_code: {} } }] as never, plan)).toBe(true);
     expect(needsOwnSignIn(undefined, plan)).toBe(true);
     expect(needsOwnSignIn([], { ...plan, accountId: "acc-1" })).toBe(false);
+  });
+});
+
+describe("OpenCode (ADR 0132) in Quem pensa", () => {
+  test("on a computer that runs it: Automático and the models its CLI listed, the free ones marked Free", () => {
+    const opencode: BrainOption = {
+      kind: "opencode",
+      available: true,
+      models: [
+        { value: "opencode/big-pickle", label: "Big Pickle", free: true },
+        { value: "opencode/glm-5.3", label: "glm-5.3" },
+      ],
+      defaultModel: null,
+    };
+    const box: BrainMachine = { machineId: "m2", name: "Box", online: true, options: [opencode] };
+    const options = brainPickOptions(t, "en", { api: [], machines: [box], accounts: [], ownerIsMe: true });
+    const rows = options.filter((o) => o.pick.kind === "opencode");
+    expect(rows.map((o) => [(o.pick as { model: string }).model, o.free, o.mark])).toEqual([
+      [AUTO, false, "opencode"],
+      ["opencode/big-pickle", true, "opencode"],
+      ["opencode/glm-5.3", false, "opencode"],
+    ]);
+    expect(rows[1]?.description).toBe("brain.free");
+    expect(rows[1]?.keywords).toContain("free");
+    expect(rows[0]?.description).toBe("brain.opencodeText");
   });
 });

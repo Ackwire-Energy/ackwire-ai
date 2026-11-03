@@ -744,7 +744,7 @@ async function viewerRights(
   return out;
 }
 
-const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor"];
+const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode"];
 const brainKindOf = (v: unknown): BrainKind => (BRAINS.includes(v as BrainKind) ? (v as BrainKind) : "model");
 
 /** Who paid the week: a computer brain's plan, the API, or both; no usage yet: what its brain would bill. */

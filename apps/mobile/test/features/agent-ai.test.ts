@@ -549,6 +549,26 @@ describe("the agent's AI", () => {
     expect(own.find((r) => r.checked)?.label).toBe("Sonnet");
     // An alias the plan leaves out runs its main model.
     expect(modelRows(t, view("opus"), planOf("zai")).find((r) => r.checked)?.label).toBe("GLM-5.3");
+    // OpenCode (ADR 0132): the models its CLI listed, the free ones marked Grátis.
+    const opencode: AgentBrain["options"][number] = {
+      kind: "opencode",
+      available: true,
+      models: [
+        { value: "opencode/big-pickle", label: "Big Pickle", free: true },
+        { value: "opencode/glm-5.3", label: "glm-5.3" },
+      ],
+      defaultModel: null,
+    };
+    const oc = modelRows(
+      t,
+      { brain: "opencode", effectiveModel: "opencode/big-pickle", options: [opencode] },
+      undefined,
+    );
+    expect(oc.map((r) => [r.label, r.sub ?? null, r.checked])).toEqual([
+      ["Automático", "Escolhe o modelo e o esforço para cada tarefa", false],
+      ["Big Pickle", "Grátis", true],
+      ["glm-5.3", null, false],
+    ]);
   });
 
   test("picking a model saves as the web does: Automático picks the effort too, a fixed one after it starts at Médio", () => {

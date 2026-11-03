@@ -62,6 +62,7 @@ export const BRAIN_NAME: Record<ComputerBrain, string> = {
   claude_code: "Claude Code",
   codex: "Codex",
   cursor: "Cursor",
+  opencode: "OpenCode",
 };
 
 // ── Words ───────────────────────────────────────────────────────────────────

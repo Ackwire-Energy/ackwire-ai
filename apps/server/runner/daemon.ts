@@ -803,6 +803,7 @@ export class RunnerDaemon implements RequestObserver {
       claude: "Claude Code",
       codex: "Codex",
       cursor: "Cursor",
+      opencode: "OpenCode",
       commands: "commands",
       browser: "the browser",
       desktop: "the agents' desktops",

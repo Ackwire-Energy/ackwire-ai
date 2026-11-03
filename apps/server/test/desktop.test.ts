@@ -314,6 +314,11 @@ test("reduce over HTTP: admins or the pairer, only removing or turning off", asy
   const offCursor = await api(`/machines/${paired.machineId}/access/reduce`, { json: { disableTool: "cursor" } });
   expect(offCursor.status).toBe(200);
   expect(((await offCursor.json()) as { access: { tools: { cursor?: boolean } } }).access.tools.cursor).toBe(false);
+  const offOpencode = await api(`/machines/${paired.machineId}/access/reduce`, { json: { disableTool: "opencode" } });
+  expect(offOpencode.status).toBe(200);
+  expect(((await offOpencode.json()) as { access: { tools: { opencode?: boolean } } }).access.tools.opencode).toBe(
+    false,
+  );
   // A sign-up and a pairing on a fresh database: seconds on a loaded runner, and the preload's longer
   // default timeout reaches only the first test file of a run.
 }, 30_000);

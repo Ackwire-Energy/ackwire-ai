@@ -928,8 +928,11 @@ export async function buildRunContext(
           a
             ? [
                 { text: machineAccessText(a) },
-                // Cursor's sandbox can't write a folder outside the turn's workspace (ADR 0114), so its shell couldn't use it.
-                ...(a.shared && agent.brain !== "cursor" ? [{ text: sharedFolderText(a.name, a.shared) }] : []),
+                // Cursor's sandbox (ADR 0114) and OpenCode's permissions (ADR 0132) keep its shell out of a folder
+                // outside the turn's workspace, so it couldn't use it.
+                ...(a.shared && agent.brain !== "cursor" && agent.brain !== "opencode"
+                  ? [{ text: sharedFolderText(a.name, a.shared) }]
+                  : []),
                 ...(a.shares && a.tools.commands ? [{ text: sharingText(a.name, a.size) }] : []),
               ]
             : [],

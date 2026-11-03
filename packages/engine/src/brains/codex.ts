@@ -6,6 +6,7 @@ import {
   brainTopic,
   CODEX_FOLDER_PROTOCOL,
   CURSOR_PROTOCOL,
+  OPENCODE_PROTOCOL,
   type PubSub,
   parseBrainEvent,
   STEER_PROTOCOL,
@@ -55,12 +56,21 @@ export interface ComputerBrainLink {
     execAllowed: boolean;
     /** The runner's protocol (absent: not checked). */
     protocol?: number;
-    executors: { codex?: { version: string }; claude?: { version: string }; cursor?: { version: string } };
+    executors: {
+      codex?: { version: string };
+      claude?: { version: string };
+      cursor?: { version: string };
+      opencode?: { version: string };
+    };
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
     name?: string;
+    /** Who connected the computer; null: nobody (a server), absent: not known. */
+    pairedByUserId?: string | null;
     /** What the machine allows (protocol 10): with it, Codex needs its own tool on, not commands. */
-    access?: { tools: { claude: boolean; codex: boolean; cursor?: boolean; commands: boolean } } | null;
+    access?: {
+      tools: { claude: boolean; codex: boolean; cursor?: boolean; opencode?: boolean; commands: boolean };
+    } | null;
   } | null>;
   /** Sends `brain.turn` and calls `onEvent` per `brain.event`; resolves on `brain.done`. */
   turn(
@@ -135,12 +145,16 @@ function channel<T>() {
  * protocol 36, no version gate, no live steering). Everything else, from the request to the events, is shared.
  */
 interface CliBrainSpec {
-  kind: "codex" | "cursor";
+  kind: "codex" | "cursor" | "opencode";
   name: string;
   /** The runner protocol it needs. */
   protocol: number;
   /** The CLI is installed (`hello.executors`) and new enough; else why not. */
-  check(executors: { codex?: { version: string }; cursor?: { version: string } }): BrainEvent | null;
+  check(executors: {
+    codex?: { version: string };
+    cursor?: { version: string };
+    opencode?: { version: string };
+  }): BrainEvent | null;
 }
 
 const CODEX_CLI: CliBrainSpec = {
@@ -183,8 +197,23 @@ const CURSOR_CLI: CliBrainSpec = {
         },
 };
 
+const OPENCODE_CLI: CliBrainSpec = {
+  kind: "opencode",
+  name: "OpenCode",
+  protocol: OPENCODE_PROTOCOL,
+  check: ({ opencode }) =>
+    opencode
+      ? null
+      : {
+          type: "error",
+          code: "opencode_missing",
+          message: "OpenCode's CLI is not installed on the computer.",
+          retryable: true,
+        },
+};
+
 export class CodexBrain implements Brain {
-  readonly kind: "codex" | "cursor";
+  readonly kind: "codex" | "cursor" | "opencode";
 
   constructor(
     private readonly deps: CodexBrainDeps,
@@ -211,7 +240,7 @@ export class CodexBrain implements Brain {
       return;
     }
     const tools = status.access?.tools;
-    const toolOn = tools && (this.kind === "cursor" ? (tools.cursor ?? tools.codex) : tools.codex);
+    const toolOn = tools && (this.kind === "codex" ? tools.codex : (tools[this.kind] ?? tools.codex));
     if (tools ? toolOn !== true : !status.execAllowed) {
       yield tools
         ? {
@@ -245,6 +274,17 @@ export class CodexBrain implements Brain {
     const account = accountUnavailable(status, turn.account, this.kind);
     if (account) {
       yield { type: "error", code: account.code, message: account.message, retryable: true };
+      return;
+    }
+    // OpenCode with no account on a computer nobody connected: its free tier, never a key the computer holds.
+    const freeTier = this.kind === "opencode" && !turn.account && status.pairedByUserId === null;
+    if (freeTier && turn.model && !turn.model.startsWith("opencode/")) {
+      yield {
+        type: "error",
+        code: "not_logged_in",
+        message: `${name} isn't signed in on ${status.name ?? "the computer"}: only OpenCode's own models work there. Choose one, or connect an OpenCode account on the agent's page.`,
+        retryable: true,
+      };
       return;
     }
     const permissions = await this.deps.permissions?.(turn);
@@ -283,6 +323,7 @@ export class CodexBrain implements Brain {
       ...contextFields(status.protocol, turn),
       ...(permissions ? { permissions } : {}),
       ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
+      ...(freeTier ? { freeTier } : {}),
     };
 
     const events = channel<BrainEvent>();
@@ -355,6 +396,17 @@ export class CodexBrain implements Brain {
 export class CursorBrain extends CodexBrain {
   constructor(deps: CodexBrainDeps) {
     super(deps, CURSOR_CLI);
+  }
+}
+
+/**
+ * The OpenCode brain (ADR 0132): OpenCode's CLI on the agent's computer, on OpenCode's free tier or a person's OpenCode
+ * key, through the same `brain.turn` as Codex (`kind: "opencode"`, runner protocol 39, `brain-opencode.ts` there). A
+ * person's messages wait for the turn's end: the runner answers `brain.steer` with `unsupported`.
+ */
+export class OpencodeBrain extends CodexBrain {
+  constructor(deps: CodexBrainDeps) {
+    super(deps, OPENCODE_CLI);
   }
 }
 

@@ -84,6 +84,7 @@ import {
   messageRouter,
   missionTurnPermissions,
   notifyOwnerOnBudget,
+  OpencodeBrain,
   platformCapJudge,
   prepareAgentCode,
   queueBudgetEmail,
@@ -502,6 +503,15 @@ export function buildEngine(o: EngineOptions) {
     // ADR 0114: Cursor's CLI, one process per turn (nothing kept alive between turns).
     cursor: (_agent, _run, setup) =>
       new CursorBrain({
+        link: brainLink,
+        mcp: async () => ({ token: setup.mcpToken() }),
+        agent: agentScope,
+        permissions: turnPermissions,
+        prepare: prepareCode,
+      }),
+    // ADR 0132: OpenCode's CLI, one process per turn like Cursor's.
+    opencode: (_agent, _run, setup) =>
+      new OpencodeBrain({
         link: brainLink,
         mcp: async () => ({ token: setup.mcpToken() }),
         agent: agentScope,

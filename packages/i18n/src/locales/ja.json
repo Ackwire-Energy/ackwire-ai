@@ -1557,7 +1557,8 @@
     "notSignedIn": {
       "claude_code": "このコンピューターでClaude Codeにログインしていません。{{name}}のページでClaudeアカウントを接続してください。",
       "codex": "このコンピューターでCodexにログインしていません。{{name}}のページでChatGPTアカウントを接続してください。",
-      "cursor": "このコンピューターでCursorにログインしていません。{{name}}のページでCursorアカウントを接続してください。"
+      "cursor": "このコンピューターでCursorにログインしていません。{{name}}のページでCursorアカウントを接続してください。",
+      "opencode": "このコンピューターではOpenCodeが動きません。{{name}}のページでOpenCodeのキーを接続してください。"
     },
     "card": {
       "connected": "完了しました。{{name}}にAIが接続されました。",
@@ -1577,6 +1578,7 @@
       "claude": "Claudeのプランを接続",
       "chatgpt": "ChatGPTのプランを接続",
       "cursor": "Cursorのプランを接続",
+      "zen": "OpenCodeを接続",
       "api_key": "APIキーを追加"
     },
     "titleFor": "{{name}}のAIを接続",
@@ -1598,6 +1600,10 @@
       "cursor": {
         "title": "あなたのCursorプラン",
         "tiers": "Pro、Pro+、Ultra、Teams、またはCursorのAPIキー"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "無料モデル、またはあなたのOpenCodeキー"
       },
       "zai": {
         "tiers": "Lite、Pro、Max"
@@ -1669,7 +1675,8 @@
     "otherAccount": {
       "claude_code": "Claudeは{{account}}ではなく{{email}}でログインしています。Claudeのページでログアウトして、もう一度お試しください。",
       "codex": "ChatGPTは{{account}}ではなく{{email}}でログインしています。ChatGPTのページでログアウトして、もう一度お試しください。",
-      "cursor": "Cursorは{{account}}ではなく{{email}}でログインしています。Cursorのページでログアウトして、もう一度お試しください。"
+      "cursor": "Cursorは{{account}}ではなく{{email}}でログインしています。Cursorのページでログアウトして、もう一度お試しください。",
+      "opencode": "OpenCodeは{{account}}ではなく{{email}}でログインしました。正しいキーでもう一度お試しください。"
     },
     "useAnyway": "{{email}}を使う",
     "assignFailed": "{{label}}のアカウントは接続されましたが、{{agent}}を切り替えられませんでした。",
@@ -2976,7 +2983,8 @@
           "title": {
             "claude_code": "Claudeアカウントを追加",
             "codex": "ChatGPTアカウントを追加",
-            "cursor": "Cursorアカウントを追加"
+            "cursor": "Cursorアカウントを追加",
+            "opencode": "OpenCodeのキーを追加"
           },
           "stepOne": {
             "claude_code": "プランを契約しているアカウント",
@@ -2989,6 +2997,7 @@
             "codex": "ChatGPTでログイン",
             "cursor": "Cursorでログイン"
           },
+          "opencodeFree": "OpenCodeの無料モデルにキーは不要です。OpenCodeのコンソールのキーで有料モデルも使えます。",
           "cursorFinish": "Cursorのページでログインすると、{{computer}}でのログインは自動で完了します。",
           "cursorKey": "代わりにCursorのAPIキーを使う",
           "openAgain": "もう一度開く",
@@ -3009,7 +3018,8 @@
           "duplicate": {
             "claude_code": "Claudeは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Claudeのページでログアウトしてからもう一度お試しください。",
             "codex": "ChatGPTは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、ChatGPTのページでログアウトしてからもう一度お試しください。",
-            "cursor": "Cursorは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Cursorのページでログアウトしてからもう一度お試しください。"
+            "cursor": "Cursorは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Cursorのページでログアウトしてからもう一度お試しください。",
+            "opencode": "そのOpenCodeキーは{{account}}としてすでに接続されています。"
           },
           "startFailed": "{{computer}}から応答がありません。少し待ってからもう一度お試しください。",
           "sendFailed": "コードを送信できませんでした。確認してもう一度お試しください。",
@@ -6096,6 +6106,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "プランのキーを使うには、コンピューターのagentesをアップデートしてください"
       },
@@ -6105,6 +6116,7 @@
         "claude_code": "{{computer}}ではまだ準備ができていません",
         "codex": "{{computer}}ではまだ準備ができていません",
         "cursor": "{{computer}}ではまだ準備ができていません",
+        "opencode": "{{computer}}ではまだ準備できていません",
         "online": "{{computer}}は現在応答していません。対応中です。"
       }
     },
@@ -7369,18 +7381,22 @@
       "claude": "Claudeプランの{{model}}",
       "chatgpt": "ChatGPTプランの{{model}}",
       "cursor": "Cursorプランの{{model}}",
+      "zen": "OpenCodeの{{model}}",
       "coding": "{{plan}}の{{model}}",
       "claudeOf": "{{owner}}のClaudeプランの{{model}}",
       "chatgptOf": "{{owner}}のChatGPTプランの{{model}}",
       "cursorOf": "{{owner}}のCursorプランの{{model}}",
+      "zenOf": "{{owner}}のOpenCodeの{{model}}",
       "codingOf": "{{owner}}の{{plan}}の{{model}}",
       "claudeAuto": "Claudeプラン",
       "chatgptAuto": "ChatGPTプラン",
       "cursorAuto": "Cursorプラン",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}}のClaudeプラン",
       "chatgptAutoOf": "{{owner}}のChatGPTプラン",
       "cursorAutoOf": "{{owner}}のCursorプラン",
+      "zenAutoOf": "{{owner}}のOpenCode",
       "codingAutoOf": "{{owner}}の{{plan}}",
       "on": "{{computer}}上の{{line}}"
     },
@@ -7390,7 +7406,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "API経由",
@@ -7401,6 +7418,7 @@
     "claude_codeText": "コンピューターを接続した人のClaudeプランを使います。",
     "codexText": "コンピューターを接続した人のChatGPTプランを使います。",
     "cursorText": "コンピューターを接続した人のCursorプランを使います。",
+    "opencodeText": "OpenCodeの無料モデル、またはコンピューターを接続した人のOpenCodeキーを使います。",
     "cursorModel": {
       "inPlan": "Cursorプランに含まれます",
       "apiPrice": "CursorからAPI料金で請求されます"
@@ -7443,6 +7461,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}、APIへの切り替えなし"
     },
     "mission": {
@@ -9640,6 +9659,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "コマンド",
         "browser": "ブラウザ"
       },
@@ -9647,6 +9667,7 @@
         "claude": "許可されたフォルダ内でのみ、ファイルを作成・変更します。",
         "codex": "Claude Codeと同様で、ChatGPTアカウントを使います。許可されたフォルダ内のみです。",
         "cursor": "Claude Codeと同様で、Cursorアカウントを使います。許可されたフォルダ内のみです。",
+        "opencode": "Claude Codeと同様で、OpenCodeの無料モデルかOpenCodeキーを使います。許可されたフォルダ内のみです。",
         "commands": "テストやビルドなど、ターミナルのコマンドを実行します。"
       },
       "commandsWarn": "コマンドは、許可されたフォルダ以外の場所にも届く可能性があります。",

@@ -211,7 +211,7 @@ const AgentProposal = z
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
-            brain: z.enum(["claude_code", "codex", "cursor"]),
+            brain: z.enum(["claude_code", "codex", "cursor", "opencode"]),
             machineId: z.uuid(),
             accountId: z.uuid(),
             label: z.string(),
@@ -446,7 +446,7 @@ export function agentRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 state: z.enum(["ready", "no_ai", "waiting"]),
                 reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
-                own: z.enum(["claude_code", "codex", "cursor"]).optional(),
+                own: z.enum(["claude_code", "codex", "cursor", "opencode"]).optional(),
               }),
             ),
             routing: z.object({

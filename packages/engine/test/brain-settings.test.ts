@@ -99,6 +99,7 @@ describe("brain settings", () => {
       ["claude_code", false, "no_computer"],
       ["codex", false, "no_computer"],
       ["cursor", false, "no_computer"],
+      ["opencode", false, "no_computer"],
     ]);
     expect(reasons(mac())).toEqual([
       ["model", true, null],
@@ -106,6 +107,8 @@ describe("brain settings", () => {
       ["codex", false, "not_installed"],
       // Cursor needs runner protocol 36 (`CURSOR_PROTOCOL`).
       ["cursor", false, "runner_old"],
+      // OpenCode needs runner protocol 39 (`OPENCODE_PROTOCOL`).
+      ["opencode", false, "runner_old"],
     ]);
     expect(reasons(mac({ execAllowed: false }))[1]).toEqual(["claude_code", false, "exec_off"]);
     expect(reasons(mac({ protocol: MISSION_PROTOCOL - 1 }))[1]).toEqual(["claude_code", false, "runner_old"]);
@@ -121,7 +124,7 @@ describe("brain settings", () => {
       ["codex", false, "outdated"],
     ]);
     const both = mac({ executors: { claude: { version: "2" }, codex: { version: "0.170.0" }, detectedAt: "x" } });
-    expect(brainOptions(both).every((o) => o.available || o.kind === "cursor")).toBe(true);
+    expect(brainOptions(both).every((o) => o.available || o.kind === "cursor" || o.kind === "opencode")).toBe(true);
     // Installed but turned off in the app's Tools: says so (not "not installed"); turned on, available.
     const off = mac({ ...both, access: { tools: { claude: false, codex: true } } });
     expect(reasons(off).slice(1, 3)).toEqual([

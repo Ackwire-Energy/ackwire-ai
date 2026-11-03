@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 38;
+export const MACHINE_PROTOCOL_VERSION = 39;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -449,11 +449,22 @@ export const SHARED_COMPUTER_PROTOCOL = 37;
  * `shared` for `codex`): root keeps its `auth.json`, hands each turn a copy and takes refreshed copies back.
  */
 export const SHARED_CODEX_PROTOCOL = 38;
+/**
+ * From this protocol on (ADR 0132): the OpenCode brain. `brain.turn` takes `kind: "opencode"` (OpenCode's CLI,
+ * `opencode run --format json`, one process per turn), `account` takes `kind: "opencode"` (only an OpenCode key sealed
+ * to the machine: `begin` with `provider: "zen"`), `hello.executors.opencode` reports the CLI with the models it lists
+ * (`free` on OpenCode's free tier), and `access.tools.opencode` turns it on or off. The server never sends any of these
+ * to an older runner.
+ */
+export const OPENCODE_PROTOCOL = 39;
+/** `account` `begin`'s `provider` for an OpenCode account: an OpenCode (Zen / Go) API key, its only sign-in. */
+export const OPENCODE_KEY_PROVIDER = "zen";
 
 /** Which CLI an account signs in. */
-export type AccountKind = "claude_code" | "codex" | "cursor";
-export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex", "cursor"];
-export const isAccountKind = (v: unknown): v is AccountKind => v === "claude_code" || v === "codex" || v === "cursor";
+export type AccountKind = "claude_code" | "codex" | "cursor" | "opencode";
+export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex", "cursor", "opencode"];
+export const isAccountKind = (v: unknown): v is AccountKind =>
+  v === "claude_code" || v === "codex" || v === "cursor" || v === "opencode";
 /** Account and sign-in ids: UUIDs (the server makes them; the desktop app's runner too). */
 export const isAccountId = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
@@ -522,6 +533,7 @@ export const OWN_USAGE_ID: Record<AccountKind, string> = {
   claude_code: "own:claude_code",
   codex: "own:codex",
   cursor: "own:cursor",
+  opencode: "own:opencode",
 };
 
 export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
@@ -1068,16 +1080,21 @@ export interface RunnerExecutorInfo {
   /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `ultra`…). */
   authMethod?: string;
   plan?: string;
-  /** Protocol 36, `cursor` only: the models its sign-in lists (`agent models`), and which its plan includes when the CLI says. */
+  /**
+   * Protocol 36, `cursor`: the models its sign-in lists (`agent models`), and which its plan includes when the CLI
+   * says. Protocol 39, `opencode`: the models `opencode models` lists (`provider/model`), `free` on OpenCode's free tier.
+   */
   models?: CursorModelInfo[];
 }
 
-/** A model Cursor's CLI lists (`agent models`). */
+/** A model Cursor's CLI (`agent models`) or OpenCode's (`opencode models`) lists. */
 export interface CursorModelInfo {
   id: string;
   label?: string;
-  /** The CLI said the plan includes it (absent: it didn't say; other models are billed at API prices). */
+  /** Cursor: the CLI said the plan includes it (absent: it didn't say; other models are billed at API prices). */
   inPlan?: boolean;
+  /** OpenCode (protocol 39): a model of OpenCode's free tier (no key, no cost). */
+  free?: boolean;
 }
 
 /** Most models kept from `agent models`, and their longest id and label. */
@@ -1154,8 +1171,8 @@ export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
  */
 export interface BrainTurnRequest {
   runId: string;
-  /** `cursor`: protocol 36 (`CURSOR_PROTOCOL`). */
-  kind: "claude_code" | "codex" | "cursor";
+  /** `cursor`: protocol 36 (`CURSOR_PROTOCOL`); `opencode`: protocol 39 (`OPENCODE_PROTOCOL`). */
+  kind: "claude_code" | "codex" | "cursor" | "opencode";
   /** The executor's session (a UUID, stable per thread); `resume`: the server knows it ran before (a hint). */
   session: { id: string; resume: boolean };
   /** Relative to the agent's folder ("" = the folder). */
@@ -1184,6 +1201,11 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /**
+   * `opencode`: no account on a computer nobody connected, so OpenCode's own free tier alone (`opencode/*` models,
+   * no key from the runner's env); ADR 0132.
+   */
+  freeTier?: boolean;
   /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
   contextTokens?: number;
 }
@@ -1342,6 +1364,8 @@ export interface RunnerTools {
   codex: boolean;
   /** Protocol 36: Cursor's CLI (ADR 0114). Absent = off (older runners). */
   cursor?: boolean;
+  /** Protocol 39: OpenCode's CLI (ADR 0132). Absent = off (older runners). */
+  opencode?: boolean;
   /** Shell commands (`exec`, `shell` tasks). The same as `exec` in `hello` once protocol 10 is in use. */
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
@@ -1401,7 +1425,12 @@ export interface RunnerInfo {
   /** `false` when started with `--no-exec`: files and uploads only. */
   exec: boolean;
   /** Protocol 7: the coding CLIs found on the machine's PATH (best effort, cached by the runner). */
-  executors?: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo; cursor?: RunnerExecutorInfo };
+  executors?: {
+    claude?: RunnerExecutorInfo;
+    codex?: RunnerExecutorInfo;
+    cursor?: RunnerExecutorInfo;
+    opencode?: RunnerExecutorInfo;
+  };
   /** Protocol 9: whether the owner paused this computer. */
   paused?: RunnerPause;
   /** Protocol 10: folders and tools allowed on the machine. */
@@ -1994,17 +2023,22 @@ export function parseCursorModels(v: unknown): CursorModelInfo[] {
     if (!isObject(m) || !isString(m.id) || !/^[\w.:/-]{1,80}$/.test(m.id)) continue;
     if (out.some((x) => x.id === m.id)) continue;
     const label = isString(m.label) ? m.label.replace(/\s+/g, " ").trim().slice(0, CURSOR_MODEL_LIMITS.label) : "";
-    out.push({ id: m.id, ...(label ? { label } : {}), ...(m.inPlan === true ? { inPlan: true } : {}) });
+    out.push({
+      id: m.id,
+      ...(label ? { label } : {}),
+      ...(m.inPlan === true ? { inPlan: true } : {}),
+      ...(m.free === true ? { free: true } : {}),
+    });
     if (out.length >= CURSOR_MODEL_LIMITS.models) break;
   }
   return out;
 }
 
-/** `hello.executors`: only `claude`, `codex` and `cursor`, each with a short version line (and Claude Code's login). */
+/** `hello.executors`: only `claude`, `codex`, `cursor` and `opencode`, each with a short version line (and Claude Code's login). */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   const word = (x: unknown) => (isString(x) && /^[\w.-]{1,40}$/.test(x) ? x : undefined);
-  for (const name of ["claude", "codex", "cursor"] as const) {
+  for (const name of ["claude", "codex", "cursor", "opencode"] as const) {
     const e = v[name];
     if (!isObject(e) || !isString(e.version)) continue;
     const authMethod = word(e.authMethod);
@@ -2015,7 +2049,7 @@ export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerIn
       ...(authMethod ? { authMethod } : {}),
       ...(plan ? { plan } : {}),
     };
-    const models = name === "cursor" ? parseCursorModels(e.models) : [];
+    const models = name === "cursor" || name === "opencode" ? parseCursorModels(e.models) : [];
     if (models.length) out[name] = { ...out[name], models } as RunnerExecutorInfo;
   }
   return out;
@@ -2862,6 +2896,8 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
       codex: t.codex === true,
       // Kept off too: absent means a runner before Cursor's switch, where Cursor follows Codex.
       ...(typeof t.cursor === "boolean" ? { cursor: t.cursor } : {}),
+      // Absent: a runner before OpenCode's switch, where OpenCode follows Codex.
+      ...(typeof t.opencode === "boolean" ? { opencode: t.opencode } : {}),
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
       ...(t.desktop === true ? { desktop: true } : {}),

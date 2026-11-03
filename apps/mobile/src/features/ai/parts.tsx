@@ -94,7 +94,7 @@ export function PlanReplies({
   onChange: (on: boolean) => void;
   /** The agent's name, for the line under the switch. */
   agent: string;
-  brain: "claude_code" | "codex" | "cursor";
+  brain: "claude_code" | "codex" | "cursor" | "opencode";
   /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
   plan?: string | null;
   /** A coding plan, named by the line, its maker's words behind the ⓘ. */

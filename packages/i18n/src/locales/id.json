@@ -1562,7 +1562,9 @@
       "codex": "Codex belum masuk di komputer ini. Hubungkan akun ChatGPT di halaman {{name}}.",
       "codex_female": "Codex belum masuk di komputer ini. Hubungkan akun ChatGPT di halaman {{name}}.",
       "cursor": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
-      "cursor_female": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}."
+      "cursor_female": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
+      "opencode": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}.",
+      "opencode_female": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}."
     },
     "card": {
       "connected": "Beres: {{name}} sekarang punya AI.",
@@ -1582,6 +1584,7 @@
       "claude": "Hubungkan paket Claude-mu",
       "chatgpt": "Hubungkan paket ChatGPT-mu",
       "cursor": "Hubungkan paket Cursor-mu",
+      "zen": "Hubungkan OpenCode",
       "api_key": "Tambahkan kunci API"
     },
     "titleFor": "Hubungkan AI untuk {{name}}",
@@ -1605,6 +1608,10 @@
       "cursor": {
         "title": "Paket Cursor-mu",
         "tiers": "Pro, Pro+, Ultra, atau Teams, atau kunci API Cursor"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "Model gratis, atau kunci OpenCode-mu"
       },
       "zai": {
         "tiers": "Lite, Pro, atau Max"
@@ -1678,7 +1685,8 @@
     "otherAccount": {
       "claude_code": "Claude masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Claude lalu coba lagi.",
       "codex": "ChatGPT masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman ChatGPT lalu coba lagi.",
-      "cursor": "Cursor masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Cursor lalu coba lagi."
+      "cursor": "Cursor masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Cursor lalu coba lagi.",
+      "opencode": "OpenCode masuk sebagai {{email}}, bukan {{account}}. Coba lagi dengan kunci yang benar."
     },
     "useAnyway": "Pakai {{email}}",
     "assignFailed": "Akun {{label}} sudah terhubung, tapi {{agent}} tidak bisa beralih ke akun itu.",
@@ -2990,7 +2998,8 @@
           "title": {
             "claude_code": "Tambah akun Claude",
             "codex": "Tambah akun ChatGPT",
-            "cursor": "Tambah akun Cursor"
+            "cursor": "Tambah akun Cursor",
+            "opencode": "Tambah kunci OpenCode"
           },
           "stepOne": {
             "claude_code": "Akun dengan paketmu",
@@ -3003,6 +3012,7 @@
             "codex": "Masuk dengan ChatGPT",
             "cursor": "Masuk dengan Cursor"
           },
+          "opencodeFree": "Model gratis OpenCode tidak perlu kunci. Kunci dari konsol OpenCode menambahkan model berbayarnya.",
           "cursorFinish": "Masuk di halaman Cursor, dan proses masuk selesai sendiri di {{computer}}.",
           "cursorKey": "Pakai kunci API Cursor saja",
           "openAgain": "Buka lagi",
@@ -3023,7 +3033,8 @@
           "duplicate": {
             "claude_code": "Claude masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Claude lalu coba lagi.",
             "codex": "ChatGPT masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman ChatGPT lalu coba lagi.",
-            "cursor": "Cursor masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Cursor lalu coba lagi."
+            "cursor": "Cursor masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Cursor lalu coba lagi.",
+            "opencode": "Kunci OpenCode itu sudah terhubung sebagai {{account}}."
           },
           "startFailed": "Tidak ada jawaban dari {{computer}}. Coba lagi sebentar lagi.",
           "sendFailed": "Tidak bisa mengirim kode. Periksa lalu coba lagi.",
@@ -6144,6 +6155,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "Perbarui agentes di komputer untuk memakai kunci paket"
       },
@@ -6153,6 +6165,7 @@
         "claude_code": "Belum siap di {{computer}}",
         "codex": "Belum siap di {{computer}}",
         "cursor": "Belum siap di {{computer}}",
+        "opencode": "Belum siap di {{computer}}",
         "online": "{{computer}} sedang tidak merespons. Kami sedang menanganinya."
       }
     },
@@ -7435,18 +7448,22 @@
       "claude": "{{model}} dengan paket Claude",
       "chatgpt": "{{model}} dengan paket ChatGPT",
       "cursor": "{{model}} dengan paket Cursor",
+      "zen": "{{model}} lewat OpenCode",
       "coding": "{{model}} dengan {{plan}}",
       "claudeOf": "{{model}} dengan paket Claude milik {{owner}}",
       "chatgptOf": "{{model}} dengan paket ChatGPT milik {{owner}}",
       "cursorOf": "{{model}} dengan paket Cursor milik {{owner}}",
+      "zenOf": "{{model}} lewat OpenCode milik {{owner}}",
       "codingOf": "{{model}} dengan {{plan}} milik {{owner}}",
       "claudeAuto": "Paket Claude",
       "chatgptAuto": "Paket ChatGPT",
       "cursorAuto": "Paket Cursor",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Paket Claude milik {{owner}}",
       "chatgptAutoOf": "Paket ChatGPT milik {{owner}}",
       "cursorAutoOf": "Paket Cursor milik {{owner}}",
+      "zenAutoOf": "OpenCode milik {{owner}}",
       "codingAutoOf": "{{plan}} milik {{owner}}",
       "on": "{{line}} di {{computer}}"
     },
@@ -7456,7 +7473,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "Lewat API",
@@ -7467,6 +7485,7 @@
     "claude_codeText": "Memakai paket Claude milik orang yang menghubungkan komputer.",
     "codexText": "Memakai paket ChatGPT milik orang yang menghubungkan komputer.",
     "cursorText": "Memakai paket Cursor milik orang yang menghubungkan komputer.",
+    "opencodeText": "Model gratis OpenCode, atau kunci OpenCode milik orang yang menghubungkan komputer.",
     "cursorModel": {
       "inPlan": "Termasuk dalam paket Cursor-mu",
       "apiPrice": "Ditagih oleh Cursor dengan harga API"
@@ -7509,6 +7528,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, tanpa cadangan API"
     },
     "mission": {
@@ -9707,6 +9727,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "Perintah",
         "browser": "Browser"
       },
@@ -9714,6 +9735,7 @@
         "claude": "Menulis dan mengubah file, hanya di folder yang diizinkan.",
         "codex": "Seperti Claude Code, dengan akun ChatGPT. Hanya di folder yang diizinkan.",
         "cursor": "Seperti Claude Code, dengan akun Cursor. Hanya di folder yang diizinkan.",
+        "opencode": "Seperti Claude Code, dengan model gratis OpenCode atau kunci OpenCode. Hanya di folder yang diizinkan.",
         "commands": "Menjalankan perintah Terminal, seperti tes dan build."
       },
       "commandsWarn": "Perintah bisa menjangkau bagian lain komputer, tidak hanya folder yang diizinkan.",

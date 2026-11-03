@@ -1503,12 +1503,14 @@ describe("the onboarding where the workspace gets its own computer", () => {
         accountsIn = done;
       });
       const brain = r.api.agents.brain;
-      // The Cloud's computer has Cursor's CLI for every agent, as Claude's and Codex's: its tile is ready too.
+      // The Cloud's computer has Cursor's and OpenCode's CLIs for every agent, as Claude's and Codex's: their tiles are
+      // ready too.
       const cursor = { kind: "cursor" as const, available: true, models: [], defaultModel: null };
+      const opencode = { ...cursor, kind: "opencode" as const };
       r.api.agents.brain = async (...args) => {
         const answer = await brain(...args);
         await viewBack;
-        return { ...answer, options: [...answer.options, cursor] };
+        return { ...answer, options: [...answer.options, cursor, opencode] };
       };
       const accounts = r.api.machines.aiAccounts;
       r.api.machines.aiAccounts = async (...args) => {

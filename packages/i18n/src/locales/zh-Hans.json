@@ -1557,7 +1557,8 @@
     "notSignedIn": {
       "claude_code": "这台电脑上的 Claude Code 未登录。请在 {{name}} 的页面上连接 Claude 账号。",
       "codex": "这台电脑上的 Codex 未登录。请在 {{name}} 的页面上连接 ChatGPT 账号。",
-      "cursor": "这台电脑上的 Cursor 未登录。请在 {{name}} 的页面上连接 Cursor 账号。"
+      "cursor": "这台电脑上的 Cursor 未登录。请在 {{name}} 的页面上连接 Cursor 账号。",
+      "opencode": "OpenCode 无法在这台电脑上思考。请在 {{name}} 的页面连接一个 OpenCode 密钥。"
     },
     "card": {
       "connected": "完成：{{name}} 现在有 AI 了。",
@@ -1577,6 +1578,7 @@
       "claude": "连接你的 Claude 套餐",
       "chatgpt": "连接你的 ChatGPT 套餐",
       "cursor": "连接你的 Cursor 套餐",
+      "zen": "连接 OpenCode",
       "api_key": "添加 API 密钥"
     },
     "titleFor": "为 {{name}} 连接 AI",
@@ -1600,6 +1602,10 @@
       "cursor": {
         "title": "你的 Cursor 套餐",
         "tiers": "Pro、Pro+、Ultra 或 Teams，或者 Cursor API 密钥"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "免费模型，或你的 OpenCode 密钥"
       },
       "zai": {
         "tiers": "Lite、Pro 或 Max"
@@ -1673,7 +1679,8 @@
     "otherAccount": {
       "claude_code": "Claude 登录的是 {{email}}，而不是 {{account}}。请在 Claude 页面退出登录后重试。",
       "codex": "ChatGPT 登录的是 {{email}}，而不是 {{account}}。请在 ChatGPT 页面退出登录后重试。",
-      "cursor": "Cursor 登录的是 {{email}}，而不是 {{account}}。请在 Cursor 页面退出登录后重试。"
+      "cursor": "Cursor 登录的是 {{email}}，而不是 {{account}}。请在 Cursor 页面退出登录后重试。",
+      "opencode": "OpenCode 登录的是 {{email}}，不是 {{account}}。请用正确的密钥重试。"
     },
     "useAnyway": "使用 {{email}}",
     "assignFailed": "{{label}} 账号已连接，但 {{agent}} 无法切换到它。",
@@ -3003,7 +3010,8 @@
           "title": {
             "claude_code": "添加 Claude 账号",
             "codex": "添加 ChatGPT 账号",
-            "cursor": "添加 Cursor 账号"
+            "cursor": "添加 Cursor 账号",
+            "opencode": "添加 OpenCode 密钥"
           },
           "stepOne": {
             "claude_code": "有你套餐的那个账号",
@@ -3016,6 +3024,7 @@
             "codex": "使用 ChatGPT 登录",
             "cursor": "使用 Cursor 登录"
           },
+          "opencodeFree": "OpenCode 的免费模型无需密钥。用 OpenCode 控制台的密钥还能使用付费模型。",
           "cursorFinish": "在 Cursor 的页面上登录后，{{computer}} 上的登录会自动完成。",
           "cursorKey": "改用 Cursor API 密钥",
           "openAgain": "再次打开",
@@ -3036,7 +3045,8 @@
           "duplicate": {
             "claude_code": "Claude 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Claude 的页面上退出登录后重试。",
             "codex": "ChatGPT 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 ChatGPT 的页面上退出登录后重试。",
-            "cursor": "Cursor 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Cursor 的页面上退出登录后重试。"
+            "cursor": "Cursor 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Cursor 的页面上退出登录后重试。",
+            "opencode": "这个 OpenCode 密钥已作为 {{account}} 连接。"
           },
           "startFailed": "{{computer}} 没有响应，请稍后重试。",
           "sendFailed": "无法发送代码，请检查后重试。",
@@ -6153,6 +6163,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "在电脑上更新 agentes，即可使用套餐密钥"
       },
@@ -6162,6 +6173,7 @@
         "claude_code": "{{computer}} 上还没准备好",
         "codex": "{{computer}} 上还没准备好",
         "cursor": "{{computer}} 上还没准备好",
+        "opencode": "{{computer}} 上还没准备好",
         "online": "{{computer}} 目前无响应，我们正在处理。"
       }
     },
@@ -7449,18 +7461,22 @@
       "claude": "Claude 套餐上的 {{model}}",
       "chatgpt": "ChatGPT 套餐上的 {{model}}",
       "cursor": "Cursor 套餐上的 {{model}}",
+      "zen": "通过 OpenCode 使用 {{model}}",
       "coding": "{{plan}} 上的 {{model}}",
       "claudeOf": "{{owner}} 的 Claude 套餐上的 {{model}}",
       "chatgptOf": "{{owner}} 的 ChatGPT 套餐上的 {{model}}",
       "cursorOf": "{{owner}} 的 Cursor 套餐上的 {{model}}",
+      "zenOf": "通过 {{owner}} 的 OpenCode 使用 {{model}}",
       "codingOf": "{{owner}} 的 {{plan}} 上的 {{model}}",
       "claudeAuto": "Claude 套餐",
       "chatgptAuto": "ChatGPT 套餐",
       "cursorAuto": "Cursor 套餐",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}} 的 Claude 套餐",
       "chatgptAutoOf": "{{owner}} 的 ChatGPT 套餐",
       "cursorAutoOf": "{{owner}} 的 Cursor 套餐",
+      "zenAutoOf": "{{owner}} 的 OpenCode",
       "codingAutoOf": "{{owner}} 的 {{plan}}",
       "on": "{{computer}} 上的{{line}}"
     },
@@ -7471,7 +7487,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "通过 API",
@@ -7482,6 +7499,7 @@
     "claude_codeText": "使用连接这台电脑的人的 Claude 套餐。",
     "codexText": "使用连接这台电脑的人的 ChatGPT 套餐。",
     "cursorText": "使用连接这台电脑的人的 Cursor 套餐。",
+    "opencodeText": "使用 OpenCode 的免费模型，或连接这台电脑的人的 OpenCode 密钥。",
     "cursorModel": {
       "inPlan": "包含在你的 Cursor 套餐中",
       "apiPrice": "由 Cursor 按 API 价格计费"
@@ -7524,6 +7542,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}，不回退到 API"
     },
     "mission": {
@@ -9718,6 +9737,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "命令",
         "browser": "浏览器"
       },
@@ -9725,6 +9745,7 @@
         "claude": "编写和修改文件，仅限允许的文件夹。",
         "codex": "类似 Claude Code，使用 ChatGPT 账号。仅限允许的文件夹。",
         "cursor": "类似 Claude Code，使用 Cursor 账号。仅限允许的文件夹。",
+        "opencode": "类似 Claude Code，使用 OpenCode 的免费模型或 OpenCode 密钥。仅限允许的文件夹。",
         "commands": "运行终端命令，比如测试和构建。"
       },
       "commandsWarn": "命令可能会访问这台电脑的其他部分，而不只是允许的文件夹。",

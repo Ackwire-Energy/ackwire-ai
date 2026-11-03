@@ -42,6 +42,8 @@ export interface MachineExecutors {
   codex?: { version: string };
   /** Cursor's CLI (protocol 36, ADR 0114) and the models its sign-in lists; `inPlan`: the CLI said the plan includes it. */
   cursor?: { version: string; models?: { id: string; label?: string; inPlan?: boolean }[] };
+  /** OpenCode's CLI (protocol 39, ADR 0132) and the models it lists; `free`: OpenCode's free tier. */
+  opencode?: { version: string; models?: { id: string; label?: string; free?: boolean }[] };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
   browser?: { available: boolean; version?: string; chrome?: string; reason?: string };
   /** `hello.desktop` (ADR 0058): whether the agents' desktops can run there; absent = not reported. */
@@ -53,7 +55,12 @@ export interface MachineExecutors {
   /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
   mode?: "system";
   /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
-  ownUsage?: { claude_code?: MachinePlanUsage; codex?: MachinePlanUsage; cursor?: MachinePlanUsage };
+  ownUsage?: {
+    claude_code?: MachinePlanUsage;
+    codex?: MachinePlanUsage;
+    cursor?: MachinePlanUsage;
+    opencode?: MachinePlanUsage;
+  };
   detectedAt?: string;
 }
 
@@ -102,6 +109,7 @@ export interface MachineAccess {
     claude: boolean;
     codex: boolean;
     cursor?: boolean;
+    opencode?: boolean;
     commands: boolean;
     browser?: boolean;
     desktop?: boolean;

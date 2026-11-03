@@ -24,6 +24,7 @@ import { type BrainManager, brainKey } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
 import { type CursorBrainTurnRequest, handleCursorBrainTurn } from "./brain-cursor";
+import { handleOpencodeBrainTurn, type OpencodeBrainTurnRequest } from "./brain-opencode";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
 import { commandApproval, ownBranches } from "./command-gate";
@@ -269,6 +270,7 @@ const TOOL_LABEL: Record<keyof RunnerTools, string> = {
   claude: "Claude Code",
   codex: "Codex",
   cursor: "Cursor",
+  opencode: "OpenCode",
   commands: "Commands",
   browser: "Browser",
   desktop: "The desktop",
@@ -874,10 +876,11 @@ async function doBrainTurn(
   scope: RequestScope,
   secrets: Secrets,
 ): Promise<MachineReplies["brain.turn"]> {
-  requireTool(ctx, req.kind === "codex" || req.kind === "cursor" ? req.kind : "claude");
+  const cli = req.kind === "codex" || req.kind === "cursor" || req.kind === "opencode" ? req.kind : null;
+  requireTool(ctx, cli ?? "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
-  if (req.kind === "codex" || req.kind === "cursor") return doCodexTurn(ctx, req, scope, runId);
+  if (cli) return doCodexTurn(ctx, req, scope, runId);
   if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
@@ -893,8 +896,11 @@ async function doBrainTurn(
   return { runId, final };
 }
 
-/** Cursor turns in progress: `brain.steer` answers `unsupported` for them (print mode takes nothing mid-turn). */
-const cursorRuns = new Set<string>();
+/**
+ * Cursor and OpenCode turns in progress, by run: `brain.steer` answers `unsupported` for them (`agent -p` and
+ * `opencode run` take nothing mid-turn).
+ */
+const turnOnlyRuns = new Map<string, "Cursor" | "OpenCode">();
 
 const STEER_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -919,7 +925,8 @@ function doBrainSteer(
     if (typeof m.text !== "string" || !m.text.trim()) throw new RunnerError("bad_request", "Empty message");
     return { uuid: m.uuid, text: m.text.slice(0, STEER_LIMITS.text), ...(m.urgent === true ? { urgent: true } : {}) };
   });
-  if (cursorRuns.has(runId)) return { status: "unsupported", reason: "Cursor reads messages only between turns" };
+  const turnOnly = turnOnlyRuns.get(runId);
+  if (turnOnly) return { status: "unsupported", reason: `${turnOnly} reads messages only between turns` };
   if (ctx.codex?.runs.has(runId)) {
     return ctx.codex.app
       ? ctx.codex.app.steer(String(req.agent.id), { runId, session, messages })
@@ -944,7 +951,7 @@ function signedOut(
   const accounts = ctx.accounts;
   if (!accounts || typeof req.account !== "string" || !req.account || final?.type !== "error") return;
   if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
-  const kind = req.kind === "codex" || req.kind === "cursor" ? req.kind : "claude_code";
+  const kind = req.kind === "codex" || req.kind === "cursor" || req.kind === "opencode" ? req.kind : "claude_code";
   void (final.code === "not_logged_in" ? accounts.refused(kind, req.account) : Promise.resolve())
     .catch(() => undefined)
     .then(() => {
@@ -969,10 +976,14 @@ async function doCodexTurn(
 ): Promise<MachineReplies["brain.turn"]> {
   const codex = ctx.codex;
   const cursor = req.kind === "cursor";
-  if (!codex) throw new RunnerError("bad_request", `This runner runs no ${cursor ? "Cursor" : "Codex"} brain turns`);
-  let final: CodexBrainEvent = cursor
-    ? { type: "error", code: "cursor_failed", message: "Cursor ended without an answer." }
-    : { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
+  const opencode = req.kind === "opencode";
+  const name = cursor ? "Cursor" : opencode ? "OpenCode" : "Codex";
+  if (!codex) throw new RunnerError("bad_request", `This runner runs no ${name} brain turns`);
+  let final: CodexBrainEvent = {
+    type: "error",
+    code: `${cursor ? "cursor" : opencode ? "opencode" : "codex"}_failed`,
+    message: `${name} ended without an answer.`,
+  };
   let ended = false;
   const token = req.mcp?.token;
   // `handleRequest` made the workspace the agent's own folder already.
@@ -996,9 +1007,24 @@ async function doCodexTurn(
     }
     scope.emit?.({ type: "brain.event", runId, event });
   };
-  if (cursor) cursorRuns.add(runId);
+  if (cursor || opencode) turnOnlyRuns.set(runId, cursor ? "Cursor" : "OpenCode");
   try {
-    if (cursor) {
+    if (opencode) {
+      await handleOpencodeBrainTurn(
+        {
+          folder,
+          exec: toolOn(ctx, "opencode"),
+          runnerHome: codex.runnerHome,
+          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(codex.mcp ? { mcp: codex.mcp } : {}),
+          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+          ...(codex.spawn ? { spawn: codex.spawn } : {}),
+        },
+        req as unknown as OpencodeBrainTurnRequest,
+        { signal: scope.signal, emit },
+      );
+    } else if (cursor) {
       await handleCursorBrainTurn(
         {
           folder,
@@ -1032,7 +1058,7 @@ async function doCodexTurn(
       );
   } finally {
     codex.runs.delete(runId);
-    cursorRuns.delete(runId);
+    turnOnlyRuns.delete(runId);
   }
   signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });
