@@ -43,7 +43,8 @@ allow per role or member). People who never used Discord need it said plainly.
    follows without change: sending, threads, voice, blocks, pins, routines and reminders. `managesChannel` reads them
    with one indexed query. The message insert, the router and dispatch pass the channel to `audienceSql`; a DM, a
    mission or the forum keep the workspace key. A routine whose creator may no longer send there pauses
-   (`creator_no_access`, through `personCanPost`).
+   (`creator_no_access`, through `personCanPost`), and one whose creator may no longer call agents there pauses
+   (`audience`). An agent's `post_message` for a person needs that person's Enviar mensagens in the target channel.
 5. **Who changes them.** Whoever manages the channel, and nobody gives what they can't do (ADR 0085 §7): someone
    who isn't an owner changes only keys they hold in that channel, and only for `everyone`, roles below their own and
    people below them, never themselves. Empty allow and deny remove the row. Audited as
