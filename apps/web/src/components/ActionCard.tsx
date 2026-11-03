@@ -125,7 +125,6 @@ export function ActionCard({ message }: { message: Message }) {
 }
 
 /**
-/**
  * "Conectar Linear" / "Adicionar MCP" (`offer_connect_app`): Conectar opens the same connect dialog as Settings, at the
  * catalog entry or at connecting by address with the address filled in; the person signs in or types the key there.
  * Who may not connect reads who does. Done once the workspace has it.
@@ -155,7 +154,11 @@ function ConnectAppCardView({ card }: { card: ConnectAppCard }) {
         <span>{title}</span>
       </span>
       {card.why && <p>{card.why}</p>}
-      {card.url && <code className="small">{card.url}</code>}
+      {card.url && (
+        <p className="small">
+          <code>{card.url}</code>
+        </p>
+      )}
       <span className="waitcard__acts">
         {can(org, "manage_connectors") ? (
           <Button size="sm" onClick={() => setFlow(def ? { step: 0, def } : { step: 0, def: null, url: card.url })}>

@@ -10331,7 +10331,7 @@
     "value": "Set up the workspace"
   },
   "scopes.setup_write.description": {
-    "value": "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo."
+    "value": "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo."
   },
   "scopes.github_git_read.label": {
     "value": "Clone repositories (git)"
@@ -28037,6 +28037,18 @@
   },
   "builtinTools.offer_connect_ai.description": {
     "value": "Posts a card whose button opens the dialog to connect a plan or an API key."
+  },
+  "builtinTools.offer_connect_app.label": {
+    "value": "Offer to connect an app or MCP"
+  },
+  "builtinTools.offer_connect_app.description": {
+    "value": "Posts a card whose button opens the dialog to connect an app or an MCP server by its address."
+  },
+  "builtinTools.offer_invites.label": {
+    "value": "Offer to invite people"
+  },
+  "builtinTools.offer_invites.description": {
+    "value": "Posts a card whose button opens the invite dialog with the addresses filled in."
   },
   "builtinTools.propose_agent.label": {
     "value": "Propose an agent"

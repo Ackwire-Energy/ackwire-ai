@@ -1514,8 +1514,6 @@
     "mcpsNone": "Adresiyle bağladığınız MCP sunucuları burada görünür.",
     "addMcp": "MCP ekle",
     "connected": "Bağlı",
-    "address": "Adres",
-    "byAddress": "Adresle",
     "suggested": "{{org}} için önerilenler",
     "all": "Tümü",
     "empty": "Ajanlarınız henüz hiçbir şey kullanmıyor",

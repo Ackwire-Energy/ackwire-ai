@@ -1437,8 +1437,6 @@
     "mcpsNone": "Server MCP yang kamu hubungkan lewat alamatnya muncul di sini.",
     "addMcp": "Tambah MCP",
     "connected": "Terhubung",
-    "address": "Alamat",
-    "byAddress": "Lewat alamat",
     "suggested": "Disarankan untuk {{org}}",
     "all": "Semua",
     "empty": "Agenmu belum memakai apa pun",

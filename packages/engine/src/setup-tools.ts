@@ -17,6 +17,7 @@ import { AGENT_LOOK } from "./appearance";
 import { addChannelMember, createChannel } from "./channels";
 import { findMember } from "./chat-tools";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
+import { connectorListing, type ServerCatalog } from "./connectors/listing";
 import { MCP_PRESETS, presetForServer } from "./connectors/presets";
 import type { ContextDeps } from "./context/summaries";
 import { publishMessageCreated } from "./events";
@@ -102,14 +103,37 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "");
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** A catalog connector or one-click MCP server by its id or name ("GitHub", "google-drive"), as the catalog lists it. */
-export function catalogConnector(name: string): { id: string; label: string } | null {
+/**
+ * A catalog connector or one-click MCP server by its id or name ("GitHub", "google-drive"). With `server`, as this
+ * server's "Adicionar conector" lists it, whether it connects here (`soon`: its vendor hasn't approved agentes.chat).
+ */
+export function catalogConnector(
+  name: string,
+  server?: ServerCatalog,
+): { id: string; label: string; available: boolean; soon: boolean } | null {
   const key = slug(name);
   if (!key) return null;
-  const all = [...Object.values(CONNECTOR_CATALOG), ...MCP_PRESETS];
+  const all = server
+    ? connectorListing(server)
+    : [...Object.values(CONNECTOR_CATALOG), ...MCP_PRESETS].map((c) => ({ ...c, available: true, soon: false }));
   const hit = all.find((c) => slug(c.id) === key) ?? all.find((c) => slug(c.label) === key);
-  return hit ? { id: hit.id, label: hit.label } : null;
+  return hit ? { id: hit.id, label: hit.label, available: hit.available, soon: hit.soon } : null;
 }
+
+/** Names of what "Adicionar conector" connects outside the catalog list: a mailbox (Email) or a database. */
+const MAILBOX_NAMES = new Set([
+  "email",
+  "mail",
+  "gmail",
+  "outlook",
+  "hotmail",
+  "icloud",
+  "yahoo",
+  "imap",
+  "mailbox",
+  "inbox",
+]);
+const DATABASE_NAMES = new Set(["database", "db", "postgres", "postgresql", "banco", "bancodedados"]);
 
 /** An MCP server's address as a card may carry it: https, with no user or password in it. */
 export function mcpAddress(raw: string): string | null {
@@ -180,6 +204,8 @@ export function createSetupToolSource(deps: {
   ai?: { gateway: AiStatusDeps["gateway"] };
   /** Reads the schedule of the routine a proposed agent comes with (cron needs none). */
   context?: ContextDeps;
+  /** What this server connects, so a card never offers a service it can't (none: the whole catalog). */
+  catalog?: ServerCatalog;
 }): ToolSource {
   const tools: ToolDefinition[] = [
     {
@@ -538,10 +564,22 @@ export function createSetupToolSource(deps: {
           const app = str(input.app).trim();
           // A one-click server's address is that service: the card shows its name and icon.
           const preset = url ? presetForServer(url) : null;
-          const known = preset ? { id: preset.id, label: preset.label } : app && !url ? catalogConnector(app) : null;
-          if (app && !url && !known) {
+          const listed = app && !url ? catalogConnector(app, deps.catalog) : null;
+          const known = preset ? { id: preset.id, label: preset.label } : listed;
+          if (app && !url && !listed) {
+            const where = MAILBOX_NAMES.has(slug(app)) ? "Email" : DATABASE_NAMES.has(slug(app)) ? "Database" : null;
             return {
-              content: `"${app}" isn't in the catalog. Ask the person for its MCP server's https address and pass it as \`url\`.`,
+              content: where
+                ? `This isn't connected with a card: a person who manages connectors does it in Settings › Connectors and MCPs › Add connector › ${where} (in Portuguese, Configurações › Conectores e MCPs › Adicionar conector › ${where === "Email" ? "Email" : "Banco de dados"}). Tell the person exactly this.`
+                : `"${app}" isn't in the catalog. Ask the person for its MCP server's https address and pass it as \`url\`.`,
+              isError: true,
+            };
+          }
+          if (listed && !listed.available) {
+            return {
+              content: listed.soon
+                ? `${listed.label} doesn't let agentes.chat connect in one click yet. If it gives an API key, ask the person for its MCP server's https address and pass it as \`url\` (the dialog asks for the key).`
+                : `${listed.label} isn't available on this installation: whoever runs it has to turn it on first. Tell the person.`,
               isError: true,
             };
           }

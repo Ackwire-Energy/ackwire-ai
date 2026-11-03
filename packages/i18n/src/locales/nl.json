@@ -4318,7 +4318,7 @@
     },
     "setup_write": {
       "label": "De werkruimte inrichten",
-      "description": "Aanbieden om een AI te koppelen met een kaart waarop iemand klikt, en kanalen maken voor wie erom vroeg, met Ongedaan maken."
+      "description": "Aanbieden om een AI, een app of een MCP-server te koppelen of mensen uit te nodigen met een kaart waarop iemand klikt, en kanalen maken voor wie erom vroeg, met Ongedaan maken."
     },
     "github_git_read": {
       "label": "Repositories klonen (git)",
@@ -11675,6 +11675,14 @@
     "offer_connect_ai": {
       "label": "Aanbieden een AI te koppelen",
       "description": "Plaatst een kaart met een knop die het venster opent om een abonnement of API-sleutel te koppelen."
+    },
+    "offer_connect_app": {
+      "label": "Aanbieden een app of MCP te koppelen",
+      "description": "Plaatst een kaart met een knop die het venster opent om een app of een MCP-server via zijn adres te koppelen."
+    },
+    "offer_invites": {
+      "label": "Aanbieden mensen uit te nodigen",
+      "description": "Plaatst een kaart met een knop die het uitnodigingsvenster opent met de adressen al ingevuld."
     },
     "propose_agent": {
       "label": "Agent voorstellen",

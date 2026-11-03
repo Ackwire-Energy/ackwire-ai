@@ -1668,8 +1668,6 @@
     "mcpsNone": "Tu pojawiają się serwery MCP połączone przez ich adres.",
     "addMcp": "Dodaj MCP",
     "connected": "Połączone",
-    "address": "Adres",
-    "byAddress": "Przez adres",
     "suggested": "Sugerowane dla {{org}}",
     "all": "Wszystkie",
     "empty": "Twoi agenci jeszcze z niczego nie korzystają",

@@ -1437,8 +1437,6 @@
     "mcpsNone": "通过地址连接的 MCP 服务器会显示在这里。",
     "addMcp": "添加 MCP",
     "connected": "已连接",
-    "address": "地址",
-    "byAddress": "通过地址",
     "suggested": "为 {{org}} 推荐",
     "all": "全部",
     "empty": "你的智能体还没有使用任何服务",

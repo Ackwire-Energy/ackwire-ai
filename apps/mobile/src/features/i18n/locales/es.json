@@ -1591,8 +1591,6 @@
     "mcpsNone": "Aquí aparecen los servidores MCP que conectes por su dirección.",
     "addMcp": "Agregar MCP",
     "connected": "Conectados",
-    "address": "Dirección",
-    "byAddress": "Por dirección",
     "suggested": "Sugeridos para {{org}}",
     "all": "Todos",
     "empty": "Tus agentes todavía no usan nada",

@@ -1510,8 +1510,6 @@ export const featureKeysEn = {
     mcpsNone: "MCP servers you connect by their address show up here.",
     addMcp: "Add MCP",
     connected: "Connected",
-    address: "Address",
-    byAddress: "By address",
     suggested: "Suggested for {{org}}",
     all: "All",
     empty: "Your agents don't use anything yet",

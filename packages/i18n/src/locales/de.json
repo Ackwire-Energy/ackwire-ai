@@ -4273,7 +4273,7 @@
     },
     "setup_write": {
       "label": "Workspace einrichten",
-      "description": "Anbieten, eine KI mit einer Karte zu verbinden, die eine Person anklickt, und Kanäle für die anfragende Person erstellen, mit Rückgängig."
+      "description": "Anbieten, eine KI, eine App oder einen MCP-Server zu verbinden oder Personen einzuladen, mit einer Karte, die eine Person anklickt, und Kanäle für die anfragende Person erstellen, mit Rückgängig."
     },
     "github_git_read": {
       "label": "Repositorys klonen (git)",
@@ -11586,6 +11586,14 @@
     "offer_connect_ai": {
       "label": "Anbieten, eine KI zu verbinden",
       "description": "Postet eine Karte, deren Taste den Dialog zum Verbinden eines Abos oder API-Schlüssels öffnet."
+    },
+    "offer_connect_app": {
+      "label": "Anbieten, eine App oder einen MCP zu verbinden",
+      "description": "Postet eine Karte, deren Taste den Dialog zum Verbinden einer App oder eines MCP-Servers über seine Adresse öffnet."
+    },
+    "offer_invites": {
+      "label": "Anbieten, Personen einzuladen",
+      "description": "Postet eine Karte, deren Taste den Einladungsdialog mit den eingetragenen Adressen öffnet."
     },
     "propose_agent": {
       "label": "Agenten vorschlagen",

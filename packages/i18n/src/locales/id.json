@@ -4143,7 +4143,7 @@
     },
     "setup_write": {
       "label": "Siapkan ruang kerja",
-      "description": "Tawarkan untuk menghubungkan AI lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
+      "description": "Tawarkan untuk menghubungkan AI, aplikasi, atau server MCP, atau mengundang orang, lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
     },
     "github_git_read": {
       "label": "Kloning repositori (git)",
@@ -11238,6 +11238,14 @@
     "offer_connect_ai": {
       "label": "Tawarkan menghubungkan AI",
       "description": "Memposting kartu yang tombolnya membuka dialog untuk menghubungkan paket atau kunci API."
+    },
+    "offer_connect_app": {
+      "label": "Tawarkan menghubungkan aplikasi atau MCP",
+      "description": "Memposting kartu yang tombolnya membuka dialog untuk menghubungkan aplikasi atau server MCP lewat alamatnya."
+    },
+    "offer_invites": {
+      "label": "Tawarkan mengundang orang",
+      "description": "Memposting kartu yang tombolnya membuka dialog undangan dengan alamat yang sudah terisi."
     },
     "propose_agent": {
       "label": "Usulkan agen",

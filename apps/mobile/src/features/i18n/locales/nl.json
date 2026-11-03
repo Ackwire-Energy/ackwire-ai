@@ -1514,8 +1514,6 @@
     "mcpsNone": "MCP-servers die je via hun adres koppelt, verschijnen hier.",
     "addMcp": "MCP toevoegen",
     "connected": "Verbonden",
-    "address": "Adres",
-    "byAddress": "Via adres",
     "suggested": "Voorgesteld voor {{org}}",
     "all": "Alle",
     "empty": "Je agents gebruiken nog niets",

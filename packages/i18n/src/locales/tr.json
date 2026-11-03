@@ -4236,7 +4236,7 @@
     },
     "setup_write": {
       "label": "Çalışma alanını kurma",
-      "description": "Bir kişinin tıklayacağı bir kartla yapay zeka bağlamayı önerme ve isteyen kişi için Geri al seçeneğiyle kanal oluşturma."
+      "description": "Bir kişinin tıklayacağı bir kartla yapay zeka, uygulama veya MCP sunucusu bağlamayı ya da kişileri davet etmeyi önerme ve isteyen kişi için Geri al seçeneğiyle kanal oluşturma."
     },
     "github_git_read": {
       "label": "Depo klonlama (git)",
@@ -11519,6 +11519,14 @@
     "offer_connect_ai": {
       "label": "Yapay zeka bağlamayı öner",
       "description": "Düğmesi plan veya API anahtarı bağlama penceresini açan bir kart paylaşır."
+    },
+    "offer_connect_app": {
+      "label": "Uygulama veya MCP bağlamayı öner",
+      "description": "Düğmesi bir uygulamayı veya MCP sunucusunu adresiyle bağlama penceresini açan bir kart paylaşır."
+    },
+    "offer_invites": {
+      "label": "Kişileri davet etmeyi öner",
+      "description": "Düğmesi adresleri doldurulmuş davet penceresini açan bir kart paylaşır."
     },
     "propose_agent": {
       "label": "Ajan öner",

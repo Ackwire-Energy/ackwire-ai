@@ -4103,7 +4103,7 @@ export const en = {
     setup_write: {
       label: "Set up the workspace",
       description:
-        "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo.",
+        "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo.",
     },
     github_git_read: {
       label: "Clone repositories (git)",
@@ -10975,6 +10975,14 @@ export const en = {
     offer_connect_ai: {
       label: "Offer to connect an AI",
       description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+    },
+    offer_connect_app: {
+      label: "Offer to connect an app or MCP",
+      description: "Posts a card whose button opens the dialog to connect an app or an MCP server by its address.",
+    },
+    offer_invites: {
+      label: "Offer to invite people",
+      description: "Posts a card whose button opens the invite dialog with the addresses filled in.",
     },
     propose_agent: {
       label: "Propose an agent",

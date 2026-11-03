@@ -4112,7 +4112,7 @@
     },
     "setup_write": {
       "label": "워크스페이스 설정",
-      "description": "사람이 클릭할 수 있는 카드로 AI 연결을 제안하고, 요청한 사람을 위해 채널을 만들어요(실행 취소 가능)."
+      "description": "사람이 클릭할 수 있는 카드로 AI, 앱, MCP 서버 연결이나 사람 초대를 제안하고, 요청한 사람을 위해 채널을 만들어요(실행 취소 가능)."
     },
     "github_git_read": {
       "label": "저장소 클론(git)",
@@ -11162,6 +11162,14 @@
     "offer_connect_ai": {
       "label": "AI 연결 제안",
       "description": "요금제나 API 키를 연결하는 대화상자를 여는 버튼이 있는 카드를 게시해요."
+    },
+    "offer_connect_app": {
+      "label": "앱 또는 MCP 연결 제안",
+      "description": "앱이나 MCP 서버를 주소로 연결하는 대화상자를 여는 버튼이 있는 카드를 게시해요."
+    },
+    "offer_invites": {
+      "label": "사람 초대 제안",
+      "description": "주소가 미리 입력된 초대 대화상자를 여는 버튼이 있는 카드를 게시해요."
     },
     "propose_agent": {
       "label": "에이전트 제안",

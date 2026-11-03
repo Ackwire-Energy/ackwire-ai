@@ -4228,7 +4228,7 @@ export const ptBR = {
     setup_write: {
       label: "Configurar o workspace",
       description:
-        "Oferecer conectar uma IA com um card que uma pessoa clica, e criar canais para quem pediu, com Desfazer.",
+        "Oferecer conectar uma IA, um app ou um servidor MCP, ou convidar pessoas, com um card que uma pessoa clica, e criar canais para quem pediu, com Desfazer.",
     },
     github_git_read: {
       label: "Clonar repositórios (git)",
@@ -11216,6 +11216,14 @@ export const ptBR = {
     offer_connect_ai: {
       label: "Oferecer conectar uma IA",
       description: "Posta um card cujo botão abre a conexão de um plano ou de uma chave de API.",
+    },
+    offer_connect_app: {
+      label: "Oferecer conectar um app ou MCP",
+      description: "Posta um card cujo botão abre a conexão de um app ou de um servidor MCP pelo endereço.",
+    },
+    offer_invites: {
+      label: "Oferecer convidar pessoas",
+      description: "Posta um card cujo botão abre o convite com os endereços já preenchidos.",
     },
     propose_agent: {
       label: "Propor um agente",

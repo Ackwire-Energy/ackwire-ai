@@ -4559,7 +4559,7 @@
     },
     "setup_write": {
       "label": "Konfigurowanie przestrzeni roboczej",
-      "description": "Proponowanie podłączenia AI kartą, którą klika osoba, i tworzenie kanałów dla tego, kto prosi, z opcją Cofnij."
+      "description": "Proponowanie podłączenia AI, aplikacji lub serwera MCP albo zaproszenia osób kartą, którą klika osoba, i tworzenie kanałów dla tego, kto prosi, z opcją Cofnij."
     },
     "github_git_read": {
       "label": "Klonowanie repozytoriów (git)",
@@ -12368,6 +12368,14 @@
     "offer_connect_ai": {
       "label": "Zaproponuj połączenie AI",
       "description": "Publikuje kartę z przyciskiem, który otwiera okno połączenia planu lub klucza API."
+    },
+    "offer_connect_app": {
+      "label": "Zaproponuj połączenie aplikacji lub MCP",
+      "description": "Publikuje kartę z przyciskiem, który otwiera okno połączenia aplikacji lub serwera MCP po jego adresie."
+    },
+    "offer_invites": {
+      "label": "Zaproponuj zaproszenie osób",
+      "description": "Publikuje kartę z przyciskiem, który otwiera okno zaproszenia z wpisanymi adresami."
     },
     "propose_agent": {
       "label": "Zaproponuj agenta",

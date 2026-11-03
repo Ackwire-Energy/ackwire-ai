@@ -4160,7 +4160,7 @@
     },
     "setup_write": {
       "label": "设置工作区",
-      "description": "用一张由成员点击的卡片提议连接 AI，并为提出请求的人创建频道，可撤销。"
+      "description": "用一张由成员点击的卡片提议连接 AI、应用或 MCP 服务器，或邀请成员，并为提出请求的人创建频道，可撤销。"
     },
     "github_git_read": {
       "label": "克隆仓库（git）",
@@ -11259,6 +11259,14 @@
     "offer_connect_ai": {
       "label": "提议连接 AI",
       "description": "发布一张卡片，点击按钮即可打开连接套餐或 API 密钥的对话框。"
+    },
+    "offer_connect_app": {
+      "label": "提议连接应用或 MCP",
+      "description": "发布一张卡片，点击按钮即可打开按地址连接应用或 MCP 服务器的对话框。"
+    },
+    "offer_invites": {
+      "label": "提议邀请成员",
+      "description": "发布一张卡片，点击按钮即可打开已填好地址的邀请对话框。"
     },
     "propose_agent": {
       "label": "提议创建智能体",

@@ -7,6 +7,7 @@ import {
   CONNECT_AI_CARD,
   CONNECT_APP_CARD,
   type ConnectAppCard,
+  connectorListing,
   createChannel,
   createSetupToolSource,
   createToolGateway,
@@ -202,6 +203,30 @@ describe("offer_connect_app", () => {
     expect(none.content).toContain("offer to ask one");
     expect((await cards(f)).length).toBe(1);
   });
+});
+
+test("offer_connect_app: a mailbox or a database says where it's connected; a service this server can't connect posts nothing", async () => {
+  f = await setup();
+  const server = { oauthApps: {} };
+  const gateway = createToolGateway({ sources: [createSetupToolSource({ pubsub: f.pubsub, catalog: server })] });
+  const ctx = await runFor(f, f.owner.id, "conecta");
+  const run = async (input: Record<string, unknown>) => {
+    const res = await gateway.invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name: "offer_connect_app", input });
+    if (res.type !== "result") throw new Error(res.type);
+    return res.output;
+  };
+  const gmail = await run({ app: "Gmail", why: "x" });
+  expect(gmail).toMatchObject({ isError: true });
+  expect(gmail.content).toContain("Add connector › Email");
+  expect(gmail.content).not.toContain("https address");
+  expect((await run({ app: "Postgres", why: "x" })).content).toContain("Add connector › Database");
+  const listing = connectorListing(server);
+  const soon = listing.find((e) => e.soon);
+  const off = listing.find((e) => !e.available && !e.soon);
+  if (!soon || !off) throw new Error("no soon or unavailable entry");
+  expect((await run({ app: soon.label, why: "x" })).content).toContain("doesn't let agentes.chat connect in one click");
+  expect((await run({ app: off.label, why: "x" })).content).toContain("isn't available on this installation");
+  expect(await cards(f)).toEqual([]);
 });
 
 describe("offer_invites", () => {

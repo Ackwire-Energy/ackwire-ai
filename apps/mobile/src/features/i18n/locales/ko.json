@@ -1437,8 +1437,6 @@
     "mcpsNone": "주소로 연결한 MCP 서버가 여기에 표시돼요.",
     "addMcp": "MCP 추가",
     "connected": "연결됨",
-    "address": "주소",
-    "byAddress": "주소로 연결",
     "suggested": "{{org}}에 추천",
     "all": "전체",
     "empty": "아직 에이전트가 사용하는 서비스가 없어요",

@@ -202,7 +202,7 @@ function Gallery() {
               </ScrollView>
             </>
           ) : items.length === 0 ? (
-            <EmptyHint admin={admin} onAddress={() => sheet.open(<AddressSheet />)} />
+            <EmptyHint />
           ) : null}
           {searching ? null : (
             <>
@@ -290,8 +290,8 @@ function Gallery() {
   );
 }
 
-/** Nothing connected yet: who would use it, in a line (agents only on a subject about them). */
-function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void }) {
+/** Nothing connected yet: who would use it, in a line (the MCPs section under it adds one by its address). */
+function EmptyHint() {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -312,22 +312,6 @@ function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void
         <Text variant="small" tone="muted">
           {t("mobile.connectors.emptySub")}
         </Text>
-        {admin ? (
-          // Under the text, spelled out: beside it, it squeezed the text into a narrow column; a globe alone
-          // didn't say it connects a service by its MCP address.
-          <Pressable
-            onPress={onAddress}
-            accessibilityRole="button"
-            accessibilityLabel={t("mobile.connectors.addressTitle")}
-            hitSlop={6}
-            style={styles.byAddress}
-          >
-            <Icon name="globe" size={15} color={c.muted} />
-            <Text variant="small" style={styles.bold}>
-              {t("mobile.connectors.byAddress")}
-            </Text>
-          </Pressable>
-        ) : null}
       </View>
     </View>
   );
@@ -466,7 +450,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   hintText: { gap: 2 },
-  byAddress: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 8 },
   suggestions: { gap: 10, paddingHorizontal: 16 },
   filters: { paddingTop: 20 },
   card: {

@@ -4394,7 +4394,7 @@
     },
     "setup_write": {
       "label": "Configurar el espacio de trabajo",
-      "description": "Ofrecer conectar una IA con una tarjeta en la que una persona hace clic, y crear canales para quien lo pidió, con Deshacer."
+      "description": "Ofrecer conectar una IA, una app o un servidor MCP, o invitar personas, con una tarjeta en la que una persona hace clic, y crear canales para quien lo pidió, con Deshacer."
     },
     "github_git_read": {
       "label": "Clonar repositorios (git)",
@@ -11960,6 +11960,14 @@
     "offer_connect_ai": {
       "label": "Ofrecer conectar una IA",
       "description": "Publica una tarjeta cuyo botón abre el diálogo para conectar un plan o una clave de API."
+    },
+    "offer_connect_app": {
+      "label": "Ofrecer conectar una app o un MCP",
+      "description": "Publica una tarjeta cuyo botón abre el diálogo para conectar una app o un servidor MCP por su dirección."
+    },
+    "offer_invites": {
+      "label": "Ofrecer invitar personas",
+      "description": "Publica una tarjeta cuyo botón abre el diálogo de invitación con las direcciones ya completadas."
     },
     "propose_agent": {
       "label": "Proponer un agente",

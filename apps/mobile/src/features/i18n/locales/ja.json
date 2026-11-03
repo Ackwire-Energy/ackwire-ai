@@ -1437,8 +1437,6 @@
     "mcpsNone": "アドレスで接続したMCPサーバーがここに表示されます。",
     "addMcp": "MCPを追加",
     "connected": "接続済み",
-    "address": "アドレス",
-    "byAddress": "アドレスで接続",
     "suggested": "{{org}}へのおすすめ",
     "all": "すべて",
     "empty": "エージェントはまだ何も使っていません",

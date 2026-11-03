@@ -1515,8 +1515,6 @@ export const featureKeysPtBR = {
     mcpsNone: "Os servidores MCP que você conectar pelo endereço aparecem aqui.",
     addMcp: "Adicionar MCP",
     connected: "Conectados",
-    address: "Endereço",
-    byAddress: "Pelo endereço",
     suggested: "Sugeridos para a {{org}}",
     all: "Todos",
     empty: "Seus agentes ainda não usam nada",

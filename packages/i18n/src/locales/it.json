@@ -4451,7 +4451,7 @@
     },
     "setup_write": {
       "label": "Configurare lo spazio di lavoro",
-      "description": "Proporre di collegare un'IA con una scheda su cui una persona fa clic, e creare canali per chi li chiede, con Annulla."
+      "description": "Proporre di collegare un'IA, un'app o un server MCP, o di invitare persone, con una scheda su cui una persona fa clic, e creare canali per chi li chiede, con Annulla."
     },
     "github_git_read": {
       "label": "Clonare repository (git)",
@@ -12047,6 +12047,14 @@
     "offer_connect_ai": {
       "label": "Proponi di collegare un'IA",
       "description": "Pubblica una scheda il cui pulsante apre la finestra per collegare un piano o una chiave API."
+    },
+    "offer_connect_app": {
+      "label": "Proponi di collegare un'app o un MCP",
+      "description": "Pubblica una scheda il cui pulsante apre la finestra per collegare un'app o un server MCP dal suo indirizzo."
+    },
+    "offer_invites": {
+      "label": "Proponi di invitare persone",
+      "description": "Pubblica una scheda il cui pulsante apre la finestra di invito con gli indirizzi già compilati."
     },
     "propose_agent": {
       "label": "Proponi un agente",

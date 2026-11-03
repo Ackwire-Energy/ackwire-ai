@@ -4448,7 +4448,7 @@
     },
     "setup_write": {
       "label": "Configurer l'espace de travail",
-      "description": "Proposer de connecter une IA avec une carte sur laquelle une personne clique, et créer des canaux pour qui l'a demandé, avec Annuler."
+      "description": "Proposer de connecter une IA, une app ou un serveur MCP, ou d'inviter des personnes, avec une carte sur laquelle une personne clique, et créer des canaux pour qui l'a demandé, avec Annuler."
     },
     "github_git_read": {
       "label": "Cloner des dépôts (git)",
@@ -12048,6 +12048,14 @@
     "offer_connect_ai": {
       "label": "Proposer de connecter une IA",
       "description": "Publie une carte dont le bouton ouvre la fenêtre pour connecter un abonnement ou une clé API."
+    },
+    "offer_connect_app": {
+      "label": "Proposer de connecter une app ou un MCP",
+      "description": "Publie une carte dont le bouton ouvre la fenêtre pour connecter une app ou un serveur MCP par son adresse."
+    },
+    "offer_invites": {
+      "label": "Proposer d'inviter des personnes",
+      "description": "Publie une carte dont le bouton ouvre la fenêtre d'invitation avec les adresses déjà remplies."
     },
     "propose_agent": {
       "label": "Proposer un agent",

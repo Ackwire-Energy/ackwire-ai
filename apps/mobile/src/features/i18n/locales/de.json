@@ -1514,8 +1514,6 @@
     "mcpsNone": "Hier erscheinen die MCP-Server, die du über ihre Adresse verbindest.",
     "addMcp": "MCP hinzufügen",
     "connected": "Verbunden",
-    "address": "Adresse",
-    "byAddress": "Per Adresse",
     "suggested": "Vorgeschlagen für {{org}}",
     "all": "Alle",
     "empty": "Deine Agenten nutzen noch nichts",

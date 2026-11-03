@@ -3695,12 +3695,6 @@
   "connectors.connected": {
     "value": "Connected"
   },
-  "connectors.address": {
-    "value": "Address"
-  },
-  "connectors.byAddress": {
-    "value": "By address"
-  },
   "connectors.suggested": {
     "value": "Suggested for {{org}}"
   },
