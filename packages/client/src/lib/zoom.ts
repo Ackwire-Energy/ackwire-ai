@@ -122,9 +122,9 @@ export type WheelIntent = "pinch" | "wheel" | "scroll";
 
 /**
  * Browsers don't say which device sent a wheel event, so it is read from its shape: a pinch comes as a wheel with
- * ctrlKey (Chrome, Edge, Firefox and Safari); a mouse wheel counts in lines or pages (Firefox) or in large whole
- * steps on Y alone (a notch is 100 or 120 px in Chrome, Edge and Safari); anything else, small or fractional steps or
- * any X, is a trackpad's two-finger scroll.
+ * ctrlKey (Chrome, Edge and Firefox; Safari sends its own gesture events instead); a mouse wheel counts in lines or
+ * pages (Firefox) or in large whole steps on Y alone (a notch is 100 or 120 px in Chrome, Edge and Safari); anything
+ * else, small or fractional steps or any X, is a trackpad's two-finger scroll.
  * ponytail: a shape heuristic, so a fast trackpad flick of whole 50+ px steps with no X zooms like a wheel; read
  * `wheelDeltaY` multiples of 120 too if that shows up.
  */

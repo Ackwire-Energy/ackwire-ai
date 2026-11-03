@@ -29,6 +29,7 @@ const CLICK_SLOP = 4;
 const DOUBLE_CLICK_MS = 400;
 /** Arrow keys move the zoomed picture this share of the stage. */
 const ARROW_STEP = 0.1;
+const GESTURES = ["gesturestart", "gesturechange", "gestureend"];
 /** The floating zoom bar's height and its gap above the stage's bottom edge: the lens pane stays clear of it. */
 const BAR_ROOM = 52;
 
@@ -100,10 +101,19 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
   useEffect(() => {
     const el = stageRef.current;
     if (!el || !img || !stage) return;
+    // Safari sends a trackpad pinch as its own gesture events, not a ctrl wheel, and zooms the page unless stopped.
+    // `scale` counts from the gesture's start. A touch pinch also fires them there: the pointers handle that one.
+    let last = 1;
+    let gesturing = false;
     const onWheel = (e: WheelEvent) => {
       const v = viewRef.current;
       if (!v) return;
       const intent = wheelIntent(e);
+      // A browser that sends both for one pinch zooms once, by the gesture.
+      if (gesturing && intent === "pinch") {
+        e.preventDefault();
+        return;
+      }
       if (intent === "scroll") {
         // Two fingers on a trackpad move a zoomed picture; on a fitted one there is nothing to move.
         if (!isZoomed(v, img, stage)) return;
@@ -117,8 +127,24 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
       const r = el.getBoundingClientRect();
       go(zoomAt(v, v.scale * k, { x: e.clientX - r.left, y: e.clientY - r.top }, img, stage), false);
     };
+    const onGesture = (e: Event) => {
+      e.preventDefault();
+      const g = e as Event & { scale?: number; clientX?: number; clientY?: number };
+      const v = viewRef.current;
+      gesturing = e.type !== "gestureend";
+      if (e.type === "gesturestart") last = 1;
+      if (e.type !== "gesturechange" || !v || !g.scale || pointers.current.size > 1) return;
+      const r = el.getBoundingClientRect();
+      const at = { x: (g.clientX ?? r.left + r.width / 2) - r.left, y: (g.clientY ?? r.top + r.height / 2) - r.top };
+      go(zoomAt(v, (v.scale * g.scale) / last, at, img, stage), false);
+      last = g.scale;
+    };
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    for (const type of GESTURES) el.addEventListener(type, onGesture);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      for (const type of GESTURES) el.removeEventListener(type, onGesture);
+    };
   }, [img, stage, go]);
 
   // On the window, in the capture phase: ahead of the dialog's own Esc, which then sees it handled and stays open.

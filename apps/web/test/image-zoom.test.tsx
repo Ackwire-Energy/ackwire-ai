@@ -158,6 +158,22 @@ describe("the picture viewer's zoom", () => {
     expect(img.style.transform).toContain("translate(-40.5px,");
   });
 
+  test("a Safari trackpad pinch (gesture events) zooms the picture, not the page", async () => {
+    const { img, stage } = await show();
+    const gesture = (type: string, scale: number) => {
+      const e = Object.assign(new Event(type, { cancelable: true }), { scale, clientX: 600, clientY: 350 });
+      act(() => {
+        stage.dispatchEvent(e);
+      });
+      return e;
+    };
+    expect(gesture("gesturestart", 1).defaultPrevented).toBe(true);
+    gesture("gesturechange", 1.5);
+    expect(scaleOf(img)).toBeCloseTo(0.5);
+    gesture("gesturechange", 3);
+    expect(scaleOf(img)).toBeCloseTo(1);
+  });
+
   test("on a touch screen the hints say tap and pinch", async () => {
     touch = true;
     const { stage, getByText } = await show();
