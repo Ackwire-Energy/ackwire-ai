@@ -738,15 +738,14 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * that speaks to no agent in particular goes to the agent the person last
  * talked to in the last half hour, when the router picks another agent, that
  * one could do it too, and it doesn't clearly fit another agent better. A
- * person's message the policy gives to nobody goes to the team's coordinator
- * when it needs an agent or the person is alone here with several agents
- * (ADR 0093), or to the agent it speaks to when the step heard one.
+ * person's message the policy gives to nobody goes to the agent it speaks to
+ * when the step heard one, else to the best placed agent when it needs one
+ * (R5; ADR 0134: also when the person is alone here with several agents).
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
  * alone with it, R3 the agent of the author's own previous exchange when the
- * message names no other person, R4 the coordinator when the author is alone
- * with the agents and names no person. Else nobody (`mention_needed`), stored
+ * message names no other person. Else nobody (`mention_needed`), stored
  * with every candidate and what failed. Nothing is retried through the outbox.
  * With no AI in the organization (`hasAi`) nothing is asked: `no_ai`.
  */
@@ -790,7 +789,6 @@ export async function routeMessage(
       name: agents.name,
       role: agents.role,
       instructions: agents.instructions,
-      coordinator: agents.coordinator,
     })
     .from(agents)
     .innerJoin(
@@ -820,8 +818,6 @@ export async function routeMessage(
     about: cutText(r.instructions, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
-  // The team's coordinator (ADR 0093), when it is a candidate here: never for an agent's message.
-  const coordinatorId = byAgent ? null : (rows.find((r) => r.coordinator)?.agentId ?? null);
   // Routed to nobody without asking the strategy, and why (the receipts say it).
   const unrouted = async (reason: typeof NO_AI | typeof PLATFORM_CAP): Promise<RouteResult> => {
     const stored = await db
@@ -1062,7 +1058,7 @@ export async function routeMessage(
   const repliedAgentId = quotedAgentId ?? rootAgentId;
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
-  // No other person here (R2 and the coordinator ask it): read once, and only when one of them needs it.
+  // No other person here (R2 asks it): read once, and only when it needs it.
   let alone: Promise<boolean> | undefined;
   const aloneHere = () => {
     alone ??= aloneInChannel(db, message);
@@ -1102,9 +1098,8 @@ export async function routeMessage(
         after.threadId === m.threadId &&
         after.createdAt.getTime() - m.createdAt.getTime() <= quietMs;
       if (m.routable && m.routedTo === null && !continued && !answeredBy) break;
-      // The coordinator took it because nobody else did: that is no talk with it, or the generalist would pull
-      // every later pick back to itself.
-      // A default pick (R5) is no talk either, or one bad pick would pull every later message to that agent.
+      // A default pick (R5) is no talk, or one bad pick would pull every later message to that agent. Nor is one a
+      // coordinator took (ADR 0093, before ADR 0134).
       const routedTo = m.routedBy === "rule:coordinator" || m.routedBy === DEFAULT_STRATEGY ? [] : m.routedTo;
       const routed = routedTo?.length === 1 ? routedTo.filter((id) => m.working || spoke.has(id)) : routedTo;
       const to =
@@ -1179,6 +1174,7 @@ export async function routeMessage(
           eq(routingDecisions.orgId, message.orgId),
           eq(routingDecisions.channelId, message.channelId),
           gt(routingDecisions.createdAt, new Date(Date.now() - 60 * 60_000)),
+          // A coordinator's default (ADR 0093, before ADR 0134) within the hour still counts.
           sql`(${routingDecisions.strategy} = ${DEFAULT_STRATEGY} or ${routingDecisions.reason} like 'coordinator; default%')`,
         ),
       );
@@ -1241,8 +1237,8 @@ export async function routeMessage(
       () => undefined,
     );
   };
-  // Which default tier picked (R5): the agent the person talks with, the coordinator, the best placed agent.
-  let fallback: "talk" | "coordinator" | "best" | null = null;
+  // Which default tier picked (R5): the agent the person talks with, the best placed agent.
+  let fallback: "talk" | "best" | null = null;
   // A default pick the agent may pass on: one the router could not read, or an ack said alone with the team.
   let mayPass = false;
 
@@ -1288,11 +1284,7 @@ export async function routeMessage(
         ? { rule: "only_agent", agentId: onlyAgentId }
         : fromOwn && !namesPerson
           ? { rule: "follow_up", agentId: fromOwn }
-          : // R4: a person alone here with the agents, naming no person, goes to the coordinator. Not more: a rule
-            // for every message nobody could read would start a run for each.
-            coordinatorId && !namesPerson && (await aloneHere())
-            ? { rule: "coordinator", agentId: coordinatorId }
-            : null;
+          : null;
     if (rule) {
       result = {
         agents: [{ agentId: rule.agentId, score: 1 }],
@@ -1301,18 +1293,17 @@ export async function routeMessage(
         decidedBy: { step: "rule", rule: rule.rule },
       };
     } else if (failures.length > 0 && !peopleTalking && !isAck(0) && !(await defaultCapReached())) {
-      // A router failure is never silence (R5): the agent they talk with, the coordinator, the best placed. Not
-      // when no step could even try (no key, no sign-in): that stays `mention_needed`, or every message would wake one.
-      const agentId = talkingWith ?? coordinatorId ?? bestPlaced(() => 0);
+      // A router failure is never silence (R5): the agent they talk with, else the best placed. Not when no step
+      // could even try (no key, no sign-in): that stays `mention_needed`, or every message would wake one.
+      const agentId = talkingWith ?? bestPlaced(() => 0);
       if (agentId) {
-        fallback = talkingWith ? "talk" : coordinatorId ? "coordinator" : "best";
+        fallback = talkingWith ? "talk" : "best";
         mayPass = true;
-        const ruleName = fallback === "coordinator" ? "coordinator" : "default";
         result = {
           agents: [{ agentId, score: 1 }],
           needsAgent: 1,
-          strategy: `rule:${ruleName}`,
-          decidedBy: { step: "rule", rule: ruleName },
+          strategy: DEFAULT_STRATEGY,
+          decidedBy: { step: "rule", rule: "default" },
         };
       }
     }
@@ -1409,11 +1400,10 @@ export async function routeMessage(
   // R5 (ADR 0074, "A message for the agents always gets one"): a person's message the policy gave nobody, that
   // is for the agents, gets one: never one for a person, one already answered, or an ack ("valeu"). The agent it
   // speaks to, as the step's own pick. Else, unless people talk among themselves: the agent they talk with, the
-  // team's coordinator (ADR 0093), the best placed agent, at most `DEFAULT_PICKS_PER_HOUR` a channel.
+  // best placed agent, at most `DEFAULT_PICKS_PER_HOUR` a channel. Alone with several agents it is the same (ADR 0134):
+  // the best placed answers what needs an agent, and a greeting that needs none wakes nobody.
   const needs = decided.needsAgent ?? 0;
   let chosen = selected;
-  // Alone with a team, even a greeting is for it (ADR 0093): the agent may still pass on an "ok".
-  const aloneWithTeam = async () => candidates.length >= 2 && (await aloneHere());
   // Alone with the channel's one agent (R2), the strategy decided knowing it (`aloneWith`): its nobody stands.
   const ack = isAck(needs);
   if (
@@ -1422,9 +1412,8 @@ export async function routeMessage(
     selected.length === 0 &&
     !duplicate &&
     !toPerson &&
-    // An ack goes to someone only alone with a coordinated team (ADR 0093): elsewhere "valeu" after an answer
-    // wakes nobody, it costs a run for nothing.
-    (!ack || (coordinatorId !== null && (await aloneWithTeam())))
+    // "valeu" after an answer wakes nobody: it costs a run for nothing.
+    !ack
   ) {
     if (addressee) chosen = [addressee];
     else if (
@@ -1434,23 +1423,19 @@ export async function routeMessage(
         needs >= needGateOf(policy, candidates.length === 1) ||
         // Talking with an agent is no reason on its own: "vou almoçar agora, volto em uma hora" 15 minutes after a
         // talk needs nobody. A question, or some need, is for the agent ("Entenderam?").
-        (!peopleTalking &&
-          ((talkingWith !== null && hasQuestionMark(saidText)) || needs >= DEFAULT_NEED || (await aloneWithTeam())))) &&
+        (!peopleTalking && ((talkingWith !== null && hasQuestionMark(saidText)) || needs >= DEFAULT_NEED))) &&
       !(await defaultCapReached())
     ) {
-      const agentId = talkingWith ?? coordinatorId ?? bestPlaced(scoreOf, decided.best);
+      const agentId = talkingWith ?? bestPlaced(scoreOf, decided.best);
       if (agentId) {
-        fallback = talkingWith ? "talk" : coordinatorId ? "coordinator" : "best";
-        mayPass = ack;
+        fallback = talkingWith ? "talk" : "best";
         chosen = [agentId];
       }
     }
   }
   const stepName = decided.strategy ?? deps.strategy.name;
-  const strategy = fallback === "coordinator" ? "rule:coordinator" : fallback ? DEFAULT_STRATEGY : stepName;
-  const decidedBy: DecidedBy | undefined = fallback
-    ? { step: "rule", rule: fallback === "coordinator" ? "coordinator" : "default" }
-    : decided.decidedBy;
+  const strategy = fallback ? DEFAULT_STRATEGY : stepName;
+  const decidedBy: DecidedBy | undefined = fallback ? { step: "rule", rule: "default" } : decided.decidedBy;
   // Code's markers first: `reply-policy.ts` reads a leading "follow-up" as "addressed", and a step's own
   // words come only after its name, so no model can write a marker.
   const words = decided.reason ? `${decided.decidedBy?.step ?? stepName}: ${decided.reason}` : null;
@@ -1471,7 +1456,6 @@ export async function routeMessage(
         reason:
           [
             followUp || (fallback === "talk" && !mayPass) ? FOLLOW_UP : null,
-            strategy === "rule:coordinator" ? "coordinator" : null,
             fallback ? "default" : null,
             fallback === "talk" ? "talking to" : fallback === "best" ? "best" : null,
             followUp && resumes ? "last talked to" : null,
@@ -1504,7 +1488,7 @@ export async function routeMessage(
 /** The marker a decision's `reason` starts with when the router kept the person with the agent they talk to. */
 export const FOLLOW_UP = "follow-up";
 
-/** A default pick's `strategy` (R5), but the coordinator's (`rule:coordinator`, reason `coordinator; default`). */
+/** A default pick's `strategy` (R5). Decisions before ADR 0134 may also read `rule:coordinator` (reason `coordinator; default`). */
 export const DEFAULT_STRATEGY = "rule:default";
 
 /** From this need-any-agent score, a person's message the policy gave nobody is for the agents (R5): half the pick bar. */

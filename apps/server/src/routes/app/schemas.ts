@@ -285,10 +285,6 @@ export const Agent = z
       description:
         "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
     }),
-    coordinator: z.boolean().openapi({
-      description:
-        "It coordinates the team (ADR 0093): a message that needs an agent and that no other agent took goes to it, in the channels where it answers on its own. One per workspace.",
-    }),
     brakes: AgentBrakes,
     brain: z
       .object({
@@ -522,7 +518,7 @@ const MessageBase = z.object({
         .optional()
         .openapi({
           description:
-            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule (`coordinator`: nobody else took it, so the team's coordinator did, ADR 0093). Absent before the chain.",
+            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule (`coordinator` only on decisions from before ADR 0134 retired the team's coordinator). Absent before the chain.",
         }),
       reason: z
         .literal("mention_needed")

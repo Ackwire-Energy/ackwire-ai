@@ -690,9 +690,8 @@ describe("the agent a person last talked to", () => {
     expect(tasks.selected).toEqual([t.theo.id]);
   });
 
-  test("with a coordinator, a message it took isn't a talk with it", async () => {
+  test("a message the team's coordinator took (before ADR 0134) isn't a talk with it", async () => {
     const t = await privateRoom();
-    await f.db.update(schema.agents).set({ coordinator: true }).where(eq(schema.agents.id, t.theo.id));
     // Theo took Ana's question as the coordinator and handed it to Ada, who did the work.
     const handedOver = await t.talk(
       [
@@ -717,10 +716,9 @@ describe("the agent a person last talked to", () => {
     expect(greeted.selected).toEqual([t.ada.id]);
   });
 
-  test("with a coordinator, a message nobody picked goes to the agent last talked to", async () => {
+  test("a message nobody picked goes to the agent last talked to", async () => {
     const t = await privateRoom();
-    await f.db.update(schema.agents).set({ coordinator: true }).where(eq(schema.agents.id, t.theo.id));
-    // Nobody picked, 23 minutes after a talk with Ada: she gets it (R5), addressed, not the coordinator.
+    // Nobody picked, 23 minutes after a talk with Ada: she gets it (R5), addressed.
     const nobody = await t.talk(
       [
         [null, "ada quanto ta seu limite de uso?", 23.4, [t.ada]],
@@ -1111,8 +1109,8 @@ describe("a message for the agents always gets one (R5)", () => {
     strategy?: string,
   ];
 
-  /** #engenharia with Ana and Bruno, and Caio (Dev) and Ada (Design); Theo (PM) coordinates when `coordinator`. */
-  async function room(options: { coordinator?: boolean } = {}) {
+  /** #engenharia with Ana and Bruno, and Caio (Dev) and Ada (Design); Theo (PM) is in the workspace. */
+  async function room() {
     f = await setup();
     const bruno = await addMember(f.db, f.org.id, "member", "Bruno");
     const make = (name: string, role: string) =>
@@ -1126,17 +1124,13 @@ describe("a message for the agents always gets one (R5)", () => {
     const caio = await make("Caio", "Dev");
     const ada = await make("Ada", "Design");
     const theo = await make("Theo", "PM");
-    await f.db.update(schema.agents).set({ coordinator: false });
-    if (options.coordinator)
-      await f.db.update(schema.agents).set({ coordinator: true }).where(eq(schema.agents.id, theo.id));
     let n = 0;
     async function talk(before: Line[], body: string, answer: Parameters<typeof fakeJev>[0], by: Line[0] = "ana") {
       n += 1;
       const now = Date.now();
       const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: `engenharia-${n}` });
       await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { userId: bruno.id });
-      for (const a of options.coordinator ? [caio, ada, theo] : [caio, ada])
-        await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
+      for (const a of [caio, ada]) await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
       const say = async ([author, text, minutesAgo, routedTo, strategy]: Line) => {
         const m = await insertMessage(f.db, {
           orgId: f.org.id,
@@ -1249,30 +1243,22 @@ describe("a message for the agents always gets one (R5)", () => {
     expect(toAll.decision?.reason).toStartWith("default; best");
   });
 
-  test("no talk: the coordinator, else the best placed agent; a talk with an agent comes before the coordinator", async () => {
-    const coordinated = await room({ coordinator: true });
-    const toTheo = await coordinated.talk([], "alguém consegue olhar a tela de login?", low(0.3, "ada", 0.4));
-    expect(toTheo.selected).toEqual([coordinated.theo.id]);
-    expect(toTheo.decidedBy).toEqual({ step: "rule", rule: "coordinator" });
-    expect(toTheo.decision?.strategy).toBe("rule:coordinator");
-    expect(toTheo.decision?.reason).toStartWith("coordinator; default");
-    const backToAda = await coordinated.talk(
-      [
-        ["ana", "ada, revisa o layout da tela de login", 12.4, [coordinated.ada.id]],
-        [{ id: coordinated.ada.id }, "Revisei, mandei os ajustes.", 12],
-      ],
-      "e a tela de cadastro, consegue olhar também?",
-      low(0.3),
-    );
-    expect(backToAda.selected).toEqual([coordinated.ada.id]);
-    expect(backToAda.decision?.reason).toStartWith("follow-up; default; talking to");
-
-    await f.close();
+  test("no talk: the best placed agent; a talk with an agent comes first", async () => {
     const r = await room();
     const toAda = await r.talk([], "alguém consegue olhar a tela de login?", low(0.3, "ada", 0.4));
     expect(toAda.selected).toEqual([r.ada.id]);
     expect(toAda.decidedBy).toEqual({ step: "rule", rule: "default" });
     expect(toAda.decision?.reason).toStartWith("default; best; jev:");
+    const backToAda = await r.talk(
+      [
+        ["ana", "ada, revisa o layout da tela de login", 12.4, [r.ada.id]],
+        [{ id: r.ada.id }, "Revisei, mandei os ajustes.", 12],
+      ],
+      "e a tela de cadastro, consegue olhar também?",
+      low(0.3, "caio", 0.4),
+    );
+    expect(backToAda.selected).toEqual([r.ada.id]);
+    expect(backToAda.decision?.reason).toStartWith("follow-up; default; talking to");
   });
 
   test("a default pick is no talk: the next message is picked again, not kept with that agent", async () => {
@@ -1315,10 +1301,6 @@ describe("a message for the agents always gets one (R5)", () => {
     expect((await r.talk([], "boa tarde bruno", down)).selected).toEqual([]);
     expect((await r.talk([["bruno", "bora almoçar?", 1]], "bora sim", down)).selected).toEqual([]);
     expect((await r.talk([], "ok", down)).selected).toEqual([]);
-    await f.close();
-    const coordinated = await room({ coordinator: true });
-    const toTheo = await coordinated.talk([], "alguém viu o relatório?", down);
-    expect(toTheo).toMatchObject({ selected: [coordinated.theo.id], decidedBy: { step: "rule", rule: "coordinator" } });
   });
 });
 

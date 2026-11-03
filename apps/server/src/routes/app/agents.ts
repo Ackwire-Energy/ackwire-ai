@@ -49,7 +49,6 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
-  setCoordinator,
   speakerOf,
   updateAgent,
   updateAgentGroup,
@@ -807,8 +806,8 @@ export function agentRoutes(deps: AppDeps) {
                 "Its new @handle (admins): the one it leaves keeps reaching it. Taken by another agent (now or before) or a person: 409 `agent.handle_taken` with a free `suggestion`.",
             }),
             coordinator: z.boolean().optional().openapi({
-              description:
-                "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
+              deprecated: true,
+              description: "Ignored. Older apps send it: the team's coordinator (ADR 0093) is retired (ADR 0134).",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,
@@ -825,17 +824,16 @@ export function agentRoutes(deps: AppDeps) {
         monthlyBudgetUsd,
         audience,
         appearance,
-        coordinator,
+        coordinator: _coordinator,
         acceptPlanTerms: _,
         brakes,
         ...rest
       } = c.req.valid("json");
       const input = { ...rest, ...(brakes ? { autonomyBrakes: brakes } : {}) };
       const actor = c.get("user").id;
-      // The audience and the look can be changed by the agent's owner too, and who coordinates has its own call;
-      // everything else needs an admin.
+      // The audience and the look can be changed by the agent's owner too; everything else needs an admin.
       const other =
-        (!audience && appearance === undefined && coordinator === undefined) ||
+        (!audience && appearance === undefined) ||
         Object.values(input).some((v) => v !== undefined) ||
         monthlyBudgetUsd !== undefined;
       let agent = other
@@ -850,8 +848,6 @@ export function agentRoutes(deps: AppDeps) {
         : null;
       if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
-      if (coordinator !== undefined)
-        agent = await setCoordinator({ db, pubsub: adapters.pubsub }, actor, orgId, agentId, coordinator);
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");

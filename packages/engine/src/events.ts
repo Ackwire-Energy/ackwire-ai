@@ -44,8 +44,8 @@ export type DecidedBy =
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
   /**
-   * `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). `default`: nobody was picked, so
-   * the agent the person talks with, or the best placed one, answered (ADR 0074, R5).
+   * `default`: nobody was picked, so the agent the person talks with, or the best placed one, answered (ADR 0074,
+   * R5). `coordinator` is only read: decisions stored before ADR 0134 retired the team's coordinator (ADR 0093).
    */
   | { step: "rule"; rule: RouterRule };
 
