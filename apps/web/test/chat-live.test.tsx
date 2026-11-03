@@ -1011,6 +1011,9 @@ describe("direct messages with an agent", () => {
     expect(dmLinks()).not.toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
     expect(bar().textContent).toBe("Ada");
+    // With its first message, it is.
+    await settle(4);
+    expect(dmLinks()).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
   });
 });
 

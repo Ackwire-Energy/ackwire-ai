@@ -10502,7 +10502,7 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section-add[data-status="active"] {
   opacity: 1;
 }
-/* Equipe on the Agentes header: the page open, it stays in sight on the bell's plate. */
+/* Equipe on the Mensagens diretas header: the page open, it stays in sight on the bell's plate. */
 .sidebar__section-add.ac-btn[data-status="active"] {
   background: var(--plate);
   color: var(--ink);
