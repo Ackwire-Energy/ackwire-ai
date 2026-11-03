@@ -10,11 +10,14 @@ import {
 } from "@agenteschat/providers";
 import { REQUEST_APPROVAL_TOOL } from "./approval-requests";
 import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, START_POLL_TOOL } from "./blocks";
+import { ASK_PERSON_TOOL, DESKTOP_ASK_PERSON_TOOL } from "./browser/handoff";
+import { ASK_AGENT_TOOL } from "./consultations";
 import { EXPAND_TOOL } from "./context/tools";
 import { cutText, cutTextEnd } from "./format";
 import type { Judge } from "./judge";
 import { ASK_USER_TOOL } from "./questions";
 import { REQUEST_SECRET_TOOL } from "./secrets";
+import { LOAD_SKILL_TOOL } from "./skill-tools";
 import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 
 /**
@@ -208,10 +211,14 @@ export const LONG_OLD_INPUT = 1500;
 const LONG_INPUT_STRING = 300;
 const INPUT_STRING_HEAD = 200;
 
-/** Where a person's decision or answer comes back: read whole however old. */
-const fromPerson = (name: string) =>
+/** Where a person's decision or answer, another agent's answer, or a skill's instructions come back: read whole. */
+const keptWhole = (name: string) =>
   [
     ASK_USER_TOOL,
+    ASK_PERSON_TOOL,
+    DESKTOP_ASK_PERSON_TOOL,
+    ASK_AGENT_TOOL,
+    LOAD_SKILL_TOOL,
     ASK_CHOICES_TOOL,
     SHOW_BLOCK_TOOL,
     START_POLL_TOOL,
@@ -234,7 +241,7 @@ const cutStrings = (value: unknown, id: string): unknown =>
 /**
  * The view of a run's messages a model reads when it can `expand` (`tools`): tool calls and results older than the
  * last `KEEP_TOOL_STEPS` steps (to `TOOL_STEP_ANCHOR - 1` more) read cut, each with the call's id `expand` reopens
- * it whole by (`toolCallText`). Never cut: errors, what a person decided or answered (`fromPerson`), short ones, the
+ * it whole by (`toolCallText`). Never cut: errors, answers and skills (`keptWhole`), short ones, the
  * text people and the agent wrote, images. A function of the messages alone: the same history gives the same bytes.
  */
 export function cutOldToolSteps(messages: ModelMessage[], tools: readonly { name: string }[]): ModelMessage[] {
@@ -251,7 +258,7 @@ export function cutOldToolSteps(messages: ModelMessage[], tools: readonly { name
     let changed = false;
     const content = m.content.map((b) => {
       if (b.type === "tool_use") {
-        const cut = i < end && !fromPerson(b.name);
+        const cut = i < end && !keptWhole(b.name);
         calls.set(b.id, { name: b.name, cut });
         if (!cut || JSON.stringify(b.input).length <= LONG_OLD_INPUT) return b;
         changed = true;
@@ -264,7 +271,8 @@ export function cutOldToolSteps(messages: ModelMessage[], tools: readonly { name
       const cut = b.content.length - OLD_RESULT_HEAD - OLD_RESULT_TAIL;
       return {
         ...b,
-        content: `${cutText(b.content, OLD_RESULT_HEAD)}\n[… cut: ${cut} of this ${call.name} result's ${b.content.length} characters; expand ${b.toolUseId} reopens it whole]\n${cutTextEnd(b.content, OLD_RESULT_TAIL)}`,
+        // The note after the end: outside an envelope (`untrustedBlock`), read as ours, not as the data's.
+        content: `${cutText(b.content, OLD_RESULT_HEAD)}\n[…]\n${cutTextEnd(b.content, OLD_RESULT_TAIL)}\n[Cut: ${cut} of this ${call.name} result's ${b.content.length} characters, in the middle; expand ${b.toolUseId} reopens it whole]`,
       };
     });
     return changed ? { ...m, content } : m;
@@ -413,7 +421,7 @@ export async function fitContextWindow(
     task?: string;
     timeoutMs?: number;
   },
-): Promise<{ messages: ModelMessage[]; report: ContextBudgetReport } | null> {
+): Promise<{ messages: ModelMessage[]; removed: Set<string>; report: ContextBudgetReport } | null> {
   const windowTokens = contextWindowWithin(input.windowTokens ?? contextWindowOf(input.model), input.limitTokens);
   const budgetTokens = contextBudgetTokens(
     windowTokens,
@@ -450,6 +458,7 @@ export async function fitContextWindow(
   const afterTokens = estimateRequestTokens({ ...input, messages });
   return {
     messages,
+    removed,
     report: {
       windowTokens,
       budgetTokens,

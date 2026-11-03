@@ -300,6 +300,8 @@ export class ClaudeStreamParser {
   session?: string;
   /** The CLI compacted the conversation (`compact_boundary`) since the last turn that read "# This conversation". */
   compacted = false;
+  /** Told at the compaction itself: a runner that dies before the turn ends still knows on its next start. */
+  onCompacted?: () => void;
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
@@ -349,7 +351,10 @@ export class ClaudeStreamParser {
         if (ev.subtype === "api_retry" && ev.error === "rate_limit") this.limited = true;
         // Claude Code says `init` as each turn starts (also one it starts by itself).
         if (ev.subtype === "init") return { events: [], turnStart: true };
-        if (ev.subtype === "compact_boundary" && main) this.compacted = true;
+        if (ev.subtype === "compact_boundary" && main) {
+          this.compacted = true;
+          this.onCompacted?.();
+        }
         const task = taskOf(ev);
         return task ? { events: [], task } : { events: [] };
       }
@@ -1778,6 +1783,7 @@ export class BrainManager {
     };
     // Compacted in an earlier process that closed or crashed before the next turn read the conversation again.
     if (resume && started.kept && existsSync(compactedMark(keptSystem))) proc.parser.compacted = true;
+    proc.parser.onCompacted = () => this.keepCompacted(live);
     if (persistent) this.live.set(key, live);
     // Crashed while idle: forgotten; the next turn starts it again (resumed).
     proc.onExit(() => {

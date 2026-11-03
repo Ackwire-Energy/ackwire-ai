@@ -9,6 +9,7 @@ import {
   computerPrompt,
   createAgent,
   createBlockToolSource,
+  createContextToolSource,
   createJobHandlers,
   createWorkToolSource,
   drainOutbox,
@@ -17,6 +18,7 @@ import {
   getMessage,
   grantScopes,
   historyStart,
+  insertMessage,
   type MachineStatus,
   type Message,
   openDm,
@@ -255,7 +257,7 @@ test("B9: long messages before the last eight read cut, with the id expand reope
 const toolRun = (steps: number): ModelMessage[] => [
   { role: "user", content: "[Ana]: @dev por que o deploy falhou?" },
   ...Array.from({ length: steps }, (_, i): ModelMessage[] => {
-    const name = i === 1 ? "ask_user" : "read_log";
+    const name = i === 1 ? "ask_user" : i === 3 ? "load_skill" : "read_log";
     return [
       {
         role: "assistant",
@@ -287,13 +289,14 @@ test("B12: old tool calls and results read cut, reopened by expand; the last ste
   const text = JSON.stringify(cut);
   // The first eight steps cut (an anchor), the last six whole.
   for (let i = 0; i < steps; i++) {
-    const old = i < 8 && i !== 1 && i !== 2;
+    const old = i < 8 && i !== 1 && i !== 2 && i !== 3;
     expect(text.includes(`expand toolu_${i} reopens it whole`), `step ${i}`).toBe(old);
   }
   expect(text).toContain("expand toolu_0 reopens the call");
   // An error and a person's answer stay whole however old; so does every text people and the agent wrote.
   expect(text).toContain(JSON.stringify(`Ana answered: linha 1 `.repeat(400)));
   expect(text).toContain(JSON.stringify(`linha 2 `.repeat(400)));
+  expect(text).toContain(JSON.stringify(`linha 3 `.repeat(400)));
   expect(text).toContain("[Ana]: @dev por que o deploy falhou?");
   for (let i = 0; i < steps; i++) expect(text).toContain(`Lendo a parte ${i}.`);
   // Byte-stable: two builds of the same history give the same bytes, and the input is left as it was.
@@ -320,7 +323,7 @@ test("B12: old tool calls and results read cut, reopened by expand; the last ste
   console.log(
     `B12, ${steps} steps of 3.6k-character results: API messages ${size(run)} -> ${size(cut)} chars; computer prompt ${flat(run)} -> ${flat(cut)}`,
   );
-  expect(size(cut)).toBeLessThan(size(run) * 0.75);
+  expect(size(cut)).toBeLessThan(size(run) * 0.8);
 });
 
 test("B12: an agent that needs a cut tool result calls expand and reads it whole", async () => {
@@ -371,6 +374,54 @@ test("B12: an agent that needs a cut tool result calls expand and reads it whole
   console.log(
     `B12, ${reads} log reads and an expand: messages ${JSON.stringify(kept).length} -> ${JSON.stringify(last.messages).length} chars`,
   );
+});
+
+test("B12: expand reopens a cut call from an earlier run of the same computer session, never another session's", async () => {
+  f = await setup({ contextTools: true });
+  const runOf = async (session: string, messages: ModelMessage[]): Promise<ToolContext> => {
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "@dev lê os logs",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: said.id,
+        triggerMessageId: said.id,
+        trigger: "mention",
+        hop: 1,
+        status: "running",
+        brainSessionId: session,
+        transcript: { messages },
+      })
+      .returning();
+    if (!run) throw new Error("no run");
+    return {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: said.id,
+      triggerMessageId: said.id,
+    };
+  };
+  await runOf("session-a", toolRun(9));
+  const later = await runOf("session-a", toolRun(0));
+  const other = await runOf("session-b", toolRun(0));
+  const expand = async (ctx: ToolContext) => {
+    const tool = (await createContextToolSource(f.context).tools(ctx)).find((t) => t.name === "expand");
+    return tool?.execute({ item_id: "toolu_4" }, ctx);
+  };
+  expect((await expand(later))?.content).toBe(
+    `Tool call read_log {"note":"xxxxxxxxxx","page":4}\n\nResult:\n${"linha 4 ".repeat(400)}`,
+  );
+  expect(await expand(other)).toMatchObject({ isError: true, content: "Not found." });
 });
 
 test("B10: during the quiet window the first call's prompt is pre-warmed: the same request with no output", async () => {

@@ -278,12 +278,28 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
       async execute(input, ctx) {
         const id = str(input.item_id);
-        // A call of this run its history shows cut short (`cutOldToolSteps`): whole, from the run's own transcript.
+        // A call its history shows cut short (`cutOldToolSteps`): whole, from this run's transcript, or an earlier
+        // run's of the same computer session (a session started mid-run read the cut in its first message).
         if (ctx.runId && /^[\w.:-]{1,128}$/.test(id)) {
+          const session = ctx.db
+            .select({ id: agentRuns.brainSessionId })
+            .from(agentRuns)
+            .where(and(eq(agentRuns.orgId, ctx.orgId), eq(agentRuns.id, ctx.runId)));
           const [run] = await ctx.db
             .select({ transcript: agentRuns.transcript })
             .from(agentRuns)
-            .where(and(eq(agentRuns.orgId, ctx.orgId), eq(agentRuns.id, ctx.runId)));
+            .where(
+              and(
+                eq(agentRuns.orgId, ctx.orgId),
+                or(
+                  eq(agentRuns.id, ctx.runId),
+                  and(eq(agentRuns.agentId, ctx.agentId), inArray(agentRuns.brainSessionId, session)),
+                ),
+                sql`${agentRuns.transcript} -> 'messages' @> ${JSON.stringify([{ content: [{ type: "tool_use", id }] }])}::jsonb`,
+              ),
+            )
+            .orderBy(desc(agentRuns.createdAt))
+            .limit(1);
           const text = toolCallText((run?.transcript as { messages?: ModelMessage[] } | null)?.messages ?? [], id);
           if (text !== null) return { content: text };
         }
