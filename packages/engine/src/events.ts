@@ -279,6 +279,8 @@ export type ChannelEvent =
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
+      passed?: true;
       error?: string;
       errorCode?: string;
       errorParams?: Record<string, string>;

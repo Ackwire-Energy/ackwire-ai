@@ -363,7 +363,7 @@ export function applyReceiptEvent(
         event.runId,
         event.threadId,
         event.agentId,
-        phaseOf(event.status, event.outage, event.computer),
+        phaseOf(event.status, event.outage, event.computer, event.passed),
         event.status === "waiting_approval",
       );
     case "question.asked":

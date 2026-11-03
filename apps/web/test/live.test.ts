@@ -200,6 +200,22 @@ describe("receipts", () => {
     expect(receiptView(listed(false).m1).status?.kind).toBe("handled");
   });
 
+  test("a message sent into a run that then passed didn't get a reply either, live as after a reload", () => {
+    // m1 started the run, m2 went into it (`agent.run.steered`); only m1 gets `message.handled`.
+    let s = step(seedReceipt({}, person()), {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: ["ada"],
+      pickedBy: ["ada"],
+      runs: [{ agentId: "ada", runId: "r" }],
+    });
+    s = step(s, { type: "agent.run.steered", messageId: "m2", runId: "r", agentId: "ada" } as never);
+    s = step(s, { type: "agent.run", threadId: "m1", runId: "r", agentId: "ada", status: "done" });
+    s = step(s, { type: "run.finished", threadId: "m1", runId: "r", agentId: "ada", status: "done", passed: true });
+    expect(s.m2?.agents).toEqual([["ada", "passed"]]);
+    expect(receiptView(s.m2).status).toEqual({ kind: "passed", agents: ["ada"] });
+  });
+
   test("an agent's message that mentions agents: whom it handed off to, the one only mentioned, never 'nobody'", () => {
     const byTheo = {
       id: "m1",

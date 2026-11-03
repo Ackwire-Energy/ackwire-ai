@@ -1214,11 +1214,13 @@ export type ChannelEvent =
       threadId: string;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval" | "waiting_input";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
+      passed?: true;
       error?: string;
       /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
       errorCode?: string;

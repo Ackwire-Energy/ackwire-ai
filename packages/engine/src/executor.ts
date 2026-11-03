@@ -999,6 +999,7 @@ async function executeRunInner(
       ...(error ? { error, ...runErrorDetail(error) } : {}),
       ...(outage ? { outage } : {}),
       ...(computer ? { computer } : {}),
+      ...(passed ? { passed } : {}),
     });
     // Long work (ADR 0121): a wait pauses its promise (the card that stopped it is the update); an end goes home.
     if (run.workId) {
@@ -2199,8 +2200,9 @@ async function executeRunInner(
     }
     await deferred;
     t.postedUpTo = t.messages.length;
-    // `silent`: it said nothing anywhere, so its receipt reads "didn't reply" (`receiptsFor`), not "replied".
-    const silent = t.postedCount === 0;
+    // `silent`: it said nothing anywhere, so its receipt reads "didn't reply" (`receiptsFor`), not "replied". A reaction,
+    // a GIF or a sticker it sent earlier was its answer, though none of them counts as a post.
+    const silent = t.postedCount === 0 && !t.reacted && !t.mediaSent;
     await addRunStep(db, run, "context", {
       passed: { how, ...(reason ? { reason } : {}), ...(silent ? { silent } : {}) },
     });
