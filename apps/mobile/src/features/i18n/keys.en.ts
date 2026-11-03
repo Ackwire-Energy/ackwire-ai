@@ -1202,6 +1202,7 @@ export const featureKeysEn = {
       browser: "Browser",
       secret: "Secret",
       join: "Members",
+      tools: "Tools",
     },
     review: "Review",
     answer: "Reply",

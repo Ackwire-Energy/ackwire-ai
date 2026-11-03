@@ -460,13 +460,16 @@ export function snoozeTimes(now = new Date()) {
 
 /**
  * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
- * a secret, or let someone in.
+ * a secret, let someone in, or review tools a connected server changed.
  */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join";
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join" | "tools";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
-  /** The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join. */
+  /**
+   * The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join,
+   * the tools that changed.
+   */
   title: string;
   /** Only requests expire. */
   expiresAt: string | null;
@@ -489,6 +492,9 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
   if (n.kind === "join_request")
     return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
+  // A connected server changed approved tools (ADR 0117): reviewed in Connectors, never answered like a question.
+  if (n.kind === "connector_tool_changed")
+    return { kind: "tools", title: l.title ?? "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
 }
 

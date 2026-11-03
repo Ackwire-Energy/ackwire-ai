@@ -84,6 +84,14 @@ export const touchOnPage = (
 export const LIVE_KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
 export type LiveKey = (typeof LIVE_KEYS)[number];
 
+/**
+ * The phone keyboard's key that goes on to the page or screen, past the typing field. The field holds a draft sent
+ * whole, so Backspace edits that draft while it has text; on an empty draft it deletes in the field in focus there
+ * (iOS reports it even with nothing to delete, once per repeat while held). Return on an empty draft is Enter there.
+ */
+export const keyPastDraft = (draft: string, key: string): LiveKey | null =>
+  draft === "" && (key === "Backspace" || key === "Enter") ? key : null;
+
 /** Quick reasons on "Não consegui" (the person may also write their own). */
 export const FAILED_REASONS = ["code", "password", "blocked"] as const;
 export type FailedReason = (typeof FAILED_REASONS)[number];

@@ -1207,6 +1207,7 @@ export const featureKeysPtBR = {
       browser: "Navegador",
       secret: "Segredo",
       join: "Membros",
+      tools: "Ferramentas",
     },
     review: "Revisar",
     answer: "Responder",
