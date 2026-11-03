@@ -2578,6 +2578,8 @@
       "reads": "Zawsze zatwierdzaj odczyty",
       "note": "Obejmuje {{actions}} od teraz, z dowolnymi wartościami. Aby cofnąć: Narzędzia i dostęp na stronie agenta {{name}}.",
       "noteTarget": "Obejmuje {{actions}} od teraz. Aby cofnąć: Narzędzia i dostęp na stronie agenta {{name}}.",
+      "noteCommand": "Obejmuje {{actions}} na komputerze od teraz, z dowolnymi argumentami. Aby cofnąć: Narzędzia i dostęp na stronie agenta {{name}}.",
+      "computer": "Polecenia na komputerze",
       "noteReads": "Obejmuje od teraz tylko odczyty przez {{actions}} w tym projekcie ({{target}}). To, co zmienia dane, nadal wymaga zgody. Aby cofnąć: Narzędzia i dostęp na stronie agenta {{name}}.",
       "noteReadsAll": "Obejmuje od teraz tylko odczyty przez {{actions}} w tym połączeniu. To, co zmienia dane, nadal wymaga zgody. Aby cofnąć: Narzędzia i dostęp na stronie agenta {{name}}.",
       "readsRule": "Odczyty przez {{tool}}",
@@ -4738,6 +4740,18 @@
       "label": "Pisanie zgłoszeń",
       "description": "Tworzenie zgłoszeń i komentowanie."
     },
+    "github_actions_read": {
+      "label": "Odczyt Actions",
+      "description": "Wyświetlanie workflow i uruchomień oraz odczyt ich zadań i logów."
+    },
+    "github_projects_read": {
+      "label": "Odczyt Projects",
+      "description": "Wyświetlanie i odczyt GitHub Projects, ich pól i elementów."
+    },
+    "github_projects_write": {
+      "label": "Edycja Projects",
+      "description": "Dodawanie elementów do GitHub Projects oraz ich przenoszenie i edycja."
+    },
     "github_actions_run": {
       "label": "Uruchamianie workflow",
       "description": "Uruchamianie workflow GitHub Actions (mogą wdrażać). Zawsze prosi o zatwierdzenie."
@@ -5947,6 +5961,9 @@
       "allowedBy": "Zatwierdzone przez {{name}} · {{time}}",
       "deniedBy": "Odrzucone przez {{name}} · {{time}}",
       "alwaysBy": "Dozwolone w tej misji przez {{name}} · {{time}}: {{rules}}",
+      "alwaysAgent": "Zawsze zatwierdzaj dla tego agenta",
+      "alwaysAgentHint": "Zawsze zatwierdzaj dla tego agenta pozwala na {{kind}} z dowolnymi argumentami, w każdej misji i rozmowie. Aby cofnąć: Narzędzia i dostęp na stronie agenta.",
+      "alwaysAgentBy": "Dozwolone dla tego agenta przez {{name}} · {{time}}: {{kind}}",
       "state": {
         "allowed": "Zatwierdzone",
         "denied": "Odrzucone",
@@ -9741,6 +9758,10 @@
     "connectedList": "Połączone",
     "connected": "Połączono",
     "connectedAs": "Połączono jako {{account}}",
+    "reconnectAdds": "Połącz ponownie {{name}}, aby agenci mogli też {{what}}.",
+    "adds": {
+      "github_project": "korzystać z GitHub Projects (czytać tablice i przenosić karty)"
+    },
     "toolsCount_one": "{{count}} narzędzie",
     "toolsCount_few": "{{count}} narzędzia",
     "toolsCount_many": "{{count}} narzędzi",

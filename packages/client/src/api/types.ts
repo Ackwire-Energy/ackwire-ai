@@ -1502,9 +1502,10 @@ export interface Approval {
 /** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */
 export interface ApprovalRule {
   id: string;
-  connectionId: string;
-  /** The connection's name ("Composio"). */
-  server: string;
+  /** Null: a command on the agent's computer (`tool` is `command`, `action` its kind: `gh issue create`). */
+  connectionId: string | null;
+  /** The connection's name ("Composio"); null for a command. */
+  server: string | null;
   /** The server's own tool name. */
   tool: string;
   /** How the workspace labelled that tool. */
@@ -1603,6 +1604,8 @@ export interface Connection {
   tokenExpiresAt: string | null;
   createdAt: string;
   revokedAt: string | null;
+  /** OAuth scopes this sign-in lacks that the connector asks for now (GitHub's `project`). Older servers leave it out. */
+  reconnectAdds?: string[];
 }
 
 /** An installation of our GitHub App bound to the organization (repository access for git and PRs). */
@@ -5386,9 +5389,16 @@ export interface MissionCommand {
   decidedBy: string | null;
   decidedAt: string | null;
   always: boolean;
+  /** "Aprovar sempre para o agente" is offered: the kind of command it keeps (`gh issue create`). Older servers leave it out. */
+  agentKind?: string | null;
+  /** The person chose it. */
+  forAgent?: boolean;
   createdAt: string;
   expiresAt: string;
 }
+
+/** A mission command card's answer: `always` for the rest of the mission, `agent` that kind for the agent for good. */
+export type MissionCommandDecision = "allow" | "deny" | "always" | "agent";
 
 // ── Notifications (contract: one inbox per person per organization) ─────────────
 

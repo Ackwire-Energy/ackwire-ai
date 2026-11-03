@@ -40,7 +40,11 @@ async function withCommand() {
   api.missions.commands = async () => ({ commands: [{ ...command }], rules: [] });
   api.missions.decideCommand = async (_org, _mission, _id, decision) => {
     decided.push(decision);
-    Object.assign(command, { state: decision === "deny" ? "denied" : "allowed", always: decision === "always" });
+    Object.assign(command, {
+      state: decision === "deny" ? "denied" : "allowed",
+      always: decision === "always",
+      forAgent: decision === "agent",
+    });
     return { ...command };
   };
   return { api, mission, command, decided, state };
@@ -71,6 +75,32 @@ describe("command approvals", () => {
     expect(decided).toEqual(["always"]);
     expect(card.textContent).toContain("Liberado nesta missão");
     expect(within(card).queryByRole("button", { name: "Recusar" })).toBeNull();
+  });
+
+  test("Aprovar sempre para este agente keeps the command's kind for the agent, said on the card", async () => {
+    const { api, mission, command, decided } = await withCommand();
+    Object.assign(command, { command: "gh issue create --title x", agentKind: "gh issue create" });
+    await renderPage(
+      <MissionCommandCard
+        command={{
+          id: command.id,
+          missionId: mission.id,
+          taskId: command.taskId,
+          tool: "Bash",
+          command: command.command,
+        }}
+      />,
+      { api, org: true },
+    );
+    await settle(6);
+    const card = screen().getByRole("region", { name: "Claude Code pede para rodar um comando" });
+    expect(card.textContent).toContain("libera gh issue create com quaisquer argumentos");
+    await act(async () =>
+      fireEvent.click(within(card).getByRole("button", { name: "Aprovar sempre para este agente" })),
+    );
+    await settle(6);
+    expect(decided).toEqual(["agent"]);
+    expect(card.textContent).toContain("Liberado para este agente");
   });
 
   const blockedList = [

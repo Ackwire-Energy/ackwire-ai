@@ -2514,6 +2514,8 @@
       "reads": "Toujours approuver les lectures",
       "note": "Couvre {{actions}} à partir de maintenant, avec n'importe quelles valeurs. Pour l'annuler : Outils et accès, sur la page de {{name}}.",
       "noteTarget": "Couvre {{actions}} à partir de maintenant. Pour l'annuler : Outils et accès, sur la page de {{name}}.",
+      "noteCommand": "Couvre {{actions}} sur l'ordinateur à partir de maintenant, avec n'importe quels arguments. Pour l'annuler : Outils et accès, sur la page de {{name}}.",
+      "computer": "Commandes sur l'ordinateur",
       "noteReads": "Couvre seulement les lectures de {{actions}} dans ce projet ({{target}}) à partir de maintenant. Ce qui modifie des données demande toujours. Pour l'annuler : Outils et accès, sur la page de {{name}}.",
       "noteReadsAll": "Couvre seulement les lectures de {{actions}} sur cette connexion à partir de maintenant. Ce qui modifie des données demande toujours. Pour l'annuler : Outils et accès, sur la page de {{name}}.",
       "readsRule": "Lectures de {{tool}}",
@@ -4619,6 +4621,18 @@
       "label": "Écrire des issues",
       "description": "Créer des issues et commenter."
     },
+    "github_actions_read": {
+      "label": "Lire Actions",
+      "description": "Lister les workflows et les exécutions et lire leurs jobs et logs."
+    },
+    "github_projects_read": {
+      "label": "Lire Projects",
+      "description": "Lister et lire les GitHub Projects, leurs champs et éléments."
+    },
+    "github_projects_write": {
+      "label": "Modifier Projects",
+      "description": "Ajouter des éléments aux GitHub Projects, les déplacer ou les modifier."
+    },
     "github_actions_run": {
       "label": "Lancer des workflows",
       "description": "Lancer des workflows GitHub Actions (peut déployer). Demande toujours une approbation."
@@ -5798,6 +5812,9 @@
       "allowedBy": "Approuvée par {{name}} · {{time}}",
       "deniedBy": "Refusée par {{name}} · {{time}}",
       "alwaysBy": "Autorisé dans cette mission par {{name}} · {{time}} : {{rules}}",
+      "alwaysAgent": "Toujours approuver pour cet agent",
+      "alwaysAgentHint": "Toujours approuver pour cet agent autorise {{kind}} avec n'importe quels arguments, dans chaque mission et conversation. Pour l'annuler : Outils et accès, sur la page de l'agent.",
+      "alwaysAgentBy": "Autorisé pour cet agent par {{name}} · {{time}} : {{kind}}",
       "state": {
         "allowed": "Approuvée",
         "denied": "Refusée",
@@ -9480,6 +9497,10 @@
     "connectedList": "Connectés",
     "connected": "Connecté",
     "connectedAs": "Connecté en tant que {{account}}",
+    "reconnectAdds": "Reconnectez {{name}} pour que les agents puissent aussi {{what}}.",
+    "adds": {
+      "github_project": "utiliser GitHub Projects (lire les tableaux et déplacer les cartes)"
+    },
     "toolsCount_one": "{{count}} outil",
     "toolsCount_many": "{{count}} outils",
     "toolsCount_other": "{{count}} outils",

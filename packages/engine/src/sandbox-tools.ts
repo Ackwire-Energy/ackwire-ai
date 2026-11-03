@@ -526,6 +526,7 @@ export function createSandboxToolSource(
         additionalProperties: false,
       },
       describe: (input) => ({ title: `Run ${str(input.language)} code`, detail: str(input.code).slice(0, 500) }),
+      rememberCommand: (input) => (str(input.language) === "bash" ? str(input.code).trim() : null),
       async execute(input, ctx) {
         try {
           const lang = str(input.language) as Language;
@@ -910,6 +911,10 @@ export function createSandboxToolSource(
         required: ["title"],
         additionalProperties: false,
       },
+      rememberCommand: (input) =>
+        str(input.prompt) || (str(input.executor) && str(input.executor) !== "shell")
+          ? null
+          : str(input.command).trim(),
       describe: (input) => ({
         title: `Start the task ${str(input.title)}`,
         detail: (str(input.prompt) || str(input.command)).slice(0, 500),

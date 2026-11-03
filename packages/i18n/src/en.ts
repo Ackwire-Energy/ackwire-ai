@@ -2387,6 +2387,11 @@ export const en = {
       reads: "Always approve reads",
       note: "Covers {{actions}} from now on, with any values. To undo: Tools and access, on {{name}}'s page.",
       noteTarget: "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page.",
+      /** A command on the agent's computer, by its kind (`gh issue create`). */
+      noteCommand:
+        "Covers {{actions}} on the computer from now on, with any arguments. To undo: Tools and access, on {{name}}'s page.",
+      /** Where a command rule applies, in the agent's list of what it runs without asking. */
+      computer: "Commands on the computer",
       /** `target`: the call's other arguments, as `project_id=abc`. */
       noteReads:
         "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
@@ -4304,6 +4309,18 @@ export const en = {
     github_pr_merge: { label: "Merge pull requests", description: "Merge a pull request. Always asks for approval." },
     github_issues_read: { label: "Read issues", description: "List and read GitHub issues." },
     github_issues_write: { label: "Write issues", description: "Create issues and comment." },
+    github_actions_read: {
+      label: "Read Actions",
+      description: "List workflows and runs and read their jobs and logs.",
+    },
+    github_projects_read: {
+      label: "Read Projects",
+      description: "List and read GitHub Projects, their fields and items.",
+    },
+    github_projects_write: {
+      label: "Write Projects",
+      description: "Add items to GitHub Projects and move or edit them.",
+    },
     github_actions_run: {
       label: "Run workflows",
       description: "Start GitHub Actions workflows (may deploy). Always asks for approval.",
@@ -5374,6 +5391,11 @@ export const en = {
       allowedBy: "Approved by {{name}} · {{time}}",
       deniedBy: "Declined by {{name}} · {{time}}",
       alwaysBy: "Allowed in this mission by {{name}} · {{time}}: {{rules}}",
+      /** That kind of command (`kind`: `gh issue create`) for the agent, for good: its owner or an admin. */
+      alwaysAgent: "Always approve for this agent",
+      alwaysAgentHint:
+        "Always approve for this agent allows {{kind}} with any arguments, in every mission and conversation. To undo: Tools and access, on the agent's page.",
+      alwaysAgentBy: "Allowed for this agent by {{name}} · {{time}}: {{kind}}",
       state: { allowed: "Approved", denied: "Declined", expired: "No answer", pending: "Waiting" },
       blockedLabel: "Blocked commands",
       blocked: "Blocked:",
@@ -8574,6 +8596,9 @@ export const en = {
     connectedList: "Connected",
     connected: "Connected",
     connectedAs: "Connected as {{account}}",
+    /** A sign-in that lacks scopes the connector asks for now; `what` lists what reconnecting adds (`adds.*`). */
+    reconnectAdds: "Reconnect {{name}} so agents can also {{what}}.",
+    adds: { github_project: "use GitHub Projects (read boards and move cards)" },
     toolsCount_one: "{{count}} tool",
     toolsCount_other: "{{count}} tools",
     active: "Active",

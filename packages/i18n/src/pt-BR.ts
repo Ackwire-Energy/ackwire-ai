@@ -2421,6 +2421,11 @@ export const ptBR = {
       noteTarget: "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
       noteTarget_female:
         "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      noteCommand:
+        "Cobre {{actions}} no computador, de agora em diante, com quaisquer argumentos. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      noteCommand_female:
+        "Cobre {{actions}} no computador, de agora em diante, com quaisquer argumentos. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      computer: "Comandos no computador",
       /** `target`: the call's other arguments, as `project_id=abc`. */
       noteReads:
         "Cobre só leituras de {{actions}}, neste projeto ({{target}}), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
@@ -4420,6 +4425,15 @@ export const ptBR = {
     github_pr_merge: { label: "Fazer merge", description: "Fazer merge de um PR. Sempre pede aprovação." },
     github_issues_read: { label: "Ler issues", description: "Listar e ler issues do GitHub." },
     github_issues_write: { label: "Criar issues", description: "Criar issues e comentar." },
+    github_actions_read: { label: "Ler Actions", description: "Listar workflows e execuções e ler os jobs e logs." },
+    github_projects_read: {
+      label: "Ler Projects",
+      description: "Listar e ler os GitHub Projects, os campos e os itens.",
+    },
+    github_projects_write: {
+      label: "Editar Projects",
+      description: "Adicionar itens aos GitHub Projects e mover ou editar os itens.",
+    },
     github_actions_run: {
       label: "Rodar workflows",
       description: "Iniciar workflows do GitHub Actions (pode fazer deploy). Sempre pede aprovação.",
@@ -5513,6 +5527,10 @@ export const ptBR = {
       allowedBy: "Aprovado por {{name}} · {{time}}",
       deniedBy: "Recusado por {{name}} · {{time}}",
       alwaysBy: "Liberado nesta missão por {{name}} · {{time}}: {{rules}}",
+      alwaysAgent: "Aprovar sempre para este agente",
+      alwaysAgentHint:
+        "Aprovar sempre para este agente libera {{kind}} com quaisquer argumentos, em toda missão e conversa. Para desfazer: Ferramentas e acesso, na página do agente.",
+      alwaysAgentBy: "Liberado para este agente por {{name}} · {{time}}: {{kind}}",
       state: { allowed: "Aprovado", denied: "Recusado", expired: "Sem resposta", pending: "Esperando" },
       blockedLabel: "Comandos bloqueados",
       blocked: "Bloqueado:",
@@ -8772,6 +8790,8 @@ export const ptBR = {
     connectedList: "Conectados",
     connected: "Conectado",
     connectedAs: "Conectado como {{account}}",
+    reconnectAdds: "Reconecte o {{name}} para os agentes também poderem {{what}}.",
+    adds: { github_project: "usar o GitHub Projects (ler quadros e mover cards)" },
     toolsCount_one: "{{count}} ferramenta",
     toolsCount_other: "{{count}} ferramentas",
     active: "Ativo",

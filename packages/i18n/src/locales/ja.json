@@ -2355,6 +2355,8 @@
       "reads": "読み取りを常に承認",
       "note": "今後の{{actions}}を、どんな値でも対象にします。取り消すには{{name}}のページの「ツールとアクセス」へ。",
       "noteTarget": "今後の{{actions}}を対象にします。取り消すには{{name}}のページの「ツールとアクセス」へ。",
+      "noteCommand": "今後、コンピューター上の{{actions}}を引数を問わず対象にします。取り消すには{{name}}のページの「ツールとアクセス」へ。",
+      "computer": "コンピューター上のコマンド",
       "noteReads": "このプロジェクト（{{target}}）での{{actions}}の読み取りだけを、今後対象にします。データを変更するものは引き続き確認します。取り消すには{{name}}のページの「ツールとアクセス」へ。",
       "noteReadsAll": "この接続での{{actions}}の読み取りだけを、今後対象にします。データを変更するものは引き続き確認します。取り消すには{{name}}のページの「ツールとアクセス」へ。",
       "readsRule": "{{tool}}の読み取り",
@@ -4272,6 +4274,18 @@
       "label": "Issueを書く",
       "description": "Issueを作成し、コメントします。"
     },
+    "github_actions_read": {
+      "label": "Actions を読む",
+      "description": "ワークフローと実行を一覧し、ジョブとログを読みます。"
+    },
+    "github_projects_read": {
+      "label": "Projects を読む",
+      "description": "GitHub Projects とそのフィールドやアイテムを一覧して読みます。"
+    },
+    "github_projects_write": {
+      "label": "Projects を編集",
+      "description": "GitHub Projects にアイテムを追加し、移動や編集をします。"
+    },
     "github_actions_run": {
       "label": "ワークフローを実行",
       "description": "GitHub Actionsのワークフローを開始します（デプロイを伴う場合があります）。必ず承認を求めます。"
@@ -5358,6 +5372,9 @@
       "allowedBy": "{{name}}が承認 · {{time}}",
       "deniedBy": "{{name}}が却下 · {{time}}",
       "alwaysBy": "{{name}}がこのミッションで許可 · {{time}}: {{rules}}",
+      "alwaysAgent": "このエージェントに常に承認",
+      "alwaysAgentHint": "「このエージェントに常に承認」は、すべてのミッションと会話で、引数を問わず{{kind}}を許可します。取り消すにはエージェントのページの「ツールとアクセス」へ。",
+      "alwaysAgentBy": "{{name}}がこのエージェントに許可 · {{time}}：{{kind}}",
       "state": {
         "allowed": "承認済み",
         "denied": "却下",
@@ -8748,6 +8765,10 @@
     "connectedList": "接続済み",
     "connected": "接続済み",
     "connectedAs": "{{account}}として接続済み",
+    "reconnectAdds": "{{name}}を再接続すると、エージェントは{{what}}こともできます。",
+    "adds": {
+      "github_project": "GitHub Projects を使う（ボードを読み、カードを移動する）"
+    },
     "toolsCount_other": "{{count}}個のツール",
     "active": "有効",
     "notReviewed": "確認待ち",

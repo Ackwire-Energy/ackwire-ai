@@ -2437,6 +2437,8 @@
       "reads": "Lezen altijd goedkeuren",
       "note": "Geldt vanaf nu voor {{actions}}, met elke waarde. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
       "noteTarget": "Geldt vanaf nu voor {{actions}}. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "noteCommand": "Geldt vanaf nu voor {{actions}} op de computer, met alle argumenten. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "computer": "Opdrachten op de computer",
       "noteReads": "Geldt vanaf nu alleen voor lezen door {{actions}} in dit project ({{target}}). Wat gegevens wijzigt, blijft om goedkeuring vragen. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
       "noteReadsAll": "Geldt vanaf nu alleen voor lezen door {{actions}} via deze verbinding. Wat gegevens wijzigt, blijft om goedkeuring vragen. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
       "readsRule": "Lezen door {{tool}}",
@@ -4482,6 +4484,18 @@
       "label": "Issues schrijven",
       "description": "Issues maken en erop reageren."
     },
+    "github_actions_read": {
+      "label": "Actions lezen",
+      "description": "Workflows en runs opsommen en hun jobs en logs lezen."
+    },
+    "github_projects_read": {
+      "label": "Projects lezen",
+      "description": "GitHub Projects met hun velden en items opsommen en lezen."
+    },
+    "github_projects_write": {
+      "label": "Projects bewerken",
+      "description": "Items aan GitHub Projects toevoegen en ze verplaatsen of bewerken."
+    },
     "github_actions_run": {
       "label": "Workflows uitvoeren",
       "description": "GitHub Actions-workflows starten (kan deployen). Vraagt altijd om goedkeuring."
@@ -5620,6 +5634,9 @@
       "allowedBy": "Goedgekeurd door {{name}} · {{time}}",
       "deniedBy": "Geweigerd door {{name}} · {{time}}",
       "alwaysBy": "Toegestaan in deze missie door {{name}} · {{time}}: {{rules}}",
+      "alwaysAgent": "Altijd goedkeuren voor deze agent",
+      "alwaysAgentHint": "Altijd goedkeuren voor deze agent staat {{kind}} toe met alle argumenten, in elke missie en elk gesprek. Ongedaan maken: Tools en toegang, op de pagina van de agent.",
+      "alwaysAgentBy": "Toegestaan voor deze agent door {{name}} · {{time}}: {{kind}}",
       "state": {
         "allowed": "Goedgekeurd",
         "denied": "Geweigerd",
@@ -9178,6 +9195,10 @@
     "connectedList": "Gekoppeld",
     "connected": "Gekoppeld",
     "connectedAs": "Gekoppeld als {{account}}",
+    "reconnectAdds": "Verbind {{name}} opnieuw zodat agents ook {{what}}.",
+    "adds": {
+      "github_project": "GitHub Projects kunnen gebruiken (borden lezen en kaarten verplaatsen)"
+    },
     "toolsCount_one": "{{count}} tool",
     "toolsCount_other": "{{count}} tools",
     "active": "Actief",

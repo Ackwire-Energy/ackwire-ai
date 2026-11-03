@@ -11,10 +11,12 @@ import {
   actionName,
   aheadEndLine,
   approvalGroupWaitsFor,
+  approvalRuleServer,
   approvalRuleWords,
   approvalSummary,
   approvalValues,
   approvalWaitsFor,
+  approveAlwaysHint,
   approveAlwaysWords,
   ownActionName,
   requesterDecidesLine,
@@ -95,6 +97,19 @@ describe("Aprovar sempre in words", () => {
     expect(approvalRuleWords(t, { tool: "close_ticket", action: "", toolLabel: "Fechar chamado" })).toBe(
       "Fechar chamado",
     );
+  });
+
+  test("a command kept for the agent says the command; its rule is the agent's computer's", () => {
+    const say = ((key: string, o?: Record<string, unknown>) =>
+      `${key} ${JSON.stringify(o ?? {})}`) as unknown as TFunction;
+    const approval = { approveAlways: { tool: "command", actions: ["gh issue create"] } };
+    expect(approveAlwaysWords(say, approval)).toBe("gh issue create");
+    expect(approveAlwaysHint(say, approval, "Ada")).toBe(
+      'approval.always.noteCommand {"name":"Ada","context":"female","actions":"gh issue create","target":""}',
+    );
+    const rule = { tool: "command", action: "gh issue create", toolLabel: "command", connectionId: null, server: null };
+    expect(approvalRuleWords(say, rule)).toBe("gh issue create");
+    expect(approvalRuleServer(say, rule)).toBe("approval.always.computer {}");
   });
 
   test("a remembered push says its branch and repository, never a slug made of them", () => {

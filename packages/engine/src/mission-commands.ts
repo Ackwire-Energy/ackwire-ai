@@ -1,6 +1,7 @@
 import {
   allowedBy,
   type CommandScope,
+  commandKind,
   commandOf,
   deniedMessage,
   forbiddenCode,
@@ -18,8 +19,10 @@ import {
   TASK_LIMITS,
 } from "@agenteschat/adapters";
 import { type Executor, rowsOf, schema, sql } from "@agenteschat/db";
+import { getAgent } from "./agents";
+import { addApprovalRules, COMMAND_RULE_TOOL, coveringRules, decidesAgentApprovals } from "./approval-rules";
 import { recordAudit } from "./audit";
-import { ConflictError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
 import { cutText } from "./format";
 import type { MachineTaskRow } from "./machine-tasks";
@@ -74,7 +77,8 @@ const { missionEvents, machineTasks } = schema;
  * what code allows, and the deny list and code rules stay hard.
  */
 
-export type CommandDecision = "allow" | "deny" | "always";
+/** `always`: for the rest of the mission (its rules); `agent`: this kind of command for the agent, for good. */
+export type CommandDecision = "allow" | "deny" | "always" | "agent";
 export type CommandState = "pending" | "allowed" | "denied" | "expired";
 
 /** Prompts per task in 10 minutes: a loop can't flood the thread. */
@@ -201,6 +205,10 @@ export interface MissionCommandView {
   decidedAt: string | null;
   /** The person chose "Aprovar sempre". */
   always: boolean;
+  /** "Aprovar sempre para o agente" is offered: the kind it keeps (`gh issue create`); null: not offered. */
+  agentKind: string | null;
+  /** The person chose it. */
+  forAgent: boolean;
   createdAt: string;
   expiresAt: string;
 }
@@ -241,6 +249,8 @@ async function readPrompts(db: Executor, missionId: string, promptId?: string): 
         decidedBy: null,
         decidedAt: null,
         always: false,
+        agentKind: str(d.agentKind) || null,
+        forAgent: false,
         createdAt: created,
         expiresAt: new Date(Date.parse(created) + PERMISSION_WAIT_MS).toISOString(),
       });
@@ -251,6 +261,7 @@ async function readPrompts(db: Executor, missionId: string, promptId?: string): 
     const decision = str(d.decision);
     p.state = decision === "expired" ? "expired" : decision === "deny" ? "denied" : "allowed";
     p.always = decision === "always";
+    p.forAgent = decision === "agent";
     p.decidedBy = str(d.by) || null;
     p.decidedAt = iso(r.created_at);
   }
@@ -330,6 +341,9 @@ export async function handlePermissionPrompt(
     return deny("The plan isn't approved yet: only read for now.", "plan");
   // "Aprovar sempre nesta missão" covers it.
   if (allowedBy(await missionAllowRules(deps.db, mission.id), tool, input)) return allow();
+  // "Aprovar sempre para o agente" covers its kind (never the deny list, a push, a secret or what code refuses).
+  const agentKind = agentCommandKind(tool, input, scope);
+  if (agentKind && (await agentCommandRule(deps.db, mission, agentKind))) return allow();
   const recent = (await readPrompts(deps.db, mission.id)).filter((p) => p.taskId === task.id);
   // Asked again while the card is open (Claude Code retries): the same card.
   const open = recent.find((p) => p.state === "pending" && p.command === command && p.tool === tool);
@@ -365,6 +379,7 @@ export async function handlePermissionPrompt(
       tool,
       command: shown,
       rules,
+      ...(agentKind ? { agentKind } : {}),
     });
     return postMissionMessage(
       deps,
@@ -383,6 +398,20 @@ export async function handlePermissionPrompt(
   await notifyCommand(deps, mission, promptId);
   return JSON.stringify({ status: "pending", request_id: promptId });
 }
+
+/** The kind "Aprovar sempre para o agente" keeps for a shell command code would let run (`forbiddenReason`), or null. */
+function agentCommandKind(tool: string, input: Record<string, unknown>, scope: CommandScope | null) {
+  if (tool !== "Bash" || typeof input.command !== "string") return null;
+  return forbiddenReason(tool, input, scope ?? NO_SCOPE) === null ? commandKind(input.command) : null;
+}
+
+/** The agent's rule for this kind of command, read fresh: a removed one asks at once. */
+const agentCommandRule = (db: Executor, mission: MissionRow, kind: string) =>
+  coveringRules(
+    db,
+    { orgId: mission.orgId, agentId: mission.agentId, connectionId: null },
+    { tool: COMMAND_RULE_TOOL, actions: [kind] },
+  );
 
 const executorName = (e: string | null | undefined) => (e === "codex" ? "Codex" : "Claude Code");
 
@@ -404,7 +433,7 @@ export async function decideCommand(
   promptId: string,
   decision: CommandDecision,
 ) {
-  if (!["allow", "deny", "always"].includes(decision)) throw new ValidationError("Unknown decision");
+  if (!["allow", "deny", "always", "agent"].includes(decision)) throw new ValidationError("Unknown decision");
   const { mission, role } = await requireMission(deps, userId, orgId, missionId);
   requireAct(role, "answer the executor's commands");
   requireOpen(mission);
@@ -416,16 +445,37 @@ export async function decideCommand(
       p.state === "expired" ? "mission.command_expired" : "mission.command_decided",
     );
   }
+  if (decision === "agent") {
+    // Only who decides the agent's approvals keeps something for it everywhere (its owner, `approve_actions`).
+    const agent = p.agentKind ? await getAgent(deps.db, orgId, mission.agentId) : null;
+    if (!agent) throw new ConflictError("This command can't be approved for good", "approval.always_unavailable");
+    if (!(await decidesAgentApprovals(deps.db, orgId, userId, agent.ownerUserId))) {
+      throw new ForbiddenError("Only the agent's owner or an admin can approve this for good");
+    }
+  }
   await deps.db.transaction(async (tx) => {
     await recordMissionEvent(tx, mission, "command_decided", { promptId, decision, by: userId });
     if (decision === "always") await addMissionAllowRules(tx, mission, p.rules, { userId, promptId });
+    if (decision === "agent" && p.agentKind) {
+      await addApprovalRules(
+        tx,
+        { orgId, agentId: mission.agentId, connectionId: null },
+        { tool: COMMAND_RULE_TOOL, actions: [p.agentKind] },
+        userId,
+      );
+    }
   });
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: userId },
     action: `mission.command_${decision}`,
     target: { type: "mission", id: mission.id },
-    details: { promptId, command: cutText(p.command, 300), ...(decision === "always" ? { rules: p.rules } : {}) },
+    details: {
+      promptId,
+      command: cutText(p.command, 300),
+      ...(decision === "always" ? { rules: p.rules } : {}),
+      ...(decision === "agent" ? { agentId: mission.agentId, kind: p.agentKind } : {}),
+    },
   });
   await publishMissionEvent(deps, mission, "command", { promptId });
   await notifyCommand(deps, mission, promptId);

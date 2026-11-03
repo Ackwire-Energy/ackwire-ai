@@ -1831,3 +1831,49 @@ const FORBIDDEN_CODES: Record<string, string> = {
 };
 
 export const forbiddenCode = (reason: string) => FORBIDDEN_CODES[reason] ?? "rules";
+
+// ── "Aprovar sempre" for a command: its kind ──────────────────────────────────
+
+/** Interpreters whose first plain word is a script: alone, their kind would cover any code. */
+const SCRIPT_RUNNERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php)$/;
+/** Words of a kind that delete, publish, deploy, sign in or change settings and secrets: never approved for good. */
+const NEVER_FOR_GOOD_WORD =
+  /^(delete|del|destroy|remove|rm|drop|uninstall|purge|prune|clean|reset|restore|revert|rollback|merge|deploy|release|publish|unpublish|push|secret|secrets|variable|variables|ruleset|rerun|archive|unarchive|transfer|rename|apply|login|logout|auth|token|kill|approve|revoke|rotate|sudo)$/;
+/** Kinds that start workflows, change a repository's settings or approve pull requests (`gh pr review --approve`). */
+const NEVER_FOR_GOOD_KIND = /^gh (workflow (run|enable|disable)|repo edit|pr review)(\s|$)/;
+/** A subcommand word: lower case, no path, no value. */
+const KIND_WORD = /^[a-z][a-z0-9_-]*$/;
+/** The program and at most this many subcommands (`gh issue create`). */
+const KIND_WORDS = 3;
+
+/**
+ * The kind "Aprovar sempre" keeps for one command on the agent's computer (ADR 0015, amended 2026-11-03): the program
+ * and its subcommands, without arguments or values (`gh issue create --title x` → `gh issue create`, `npm test`), or
+ * null when it is never offered: not exactly one plain command (a pipeline, a list, a redirection, a wrapper, a path to
+ * the program, options before its subcommand), the deny list, a secret, inline code, a push, a script run by an
+ * interpreter, anything that deletes, deploys, publishes, signs in or changes settings. gh's `-R`/`--repo` only pick a
+ * repository and stay out of it.
+ */
+export function commandKind(command: string): string | null {
+  const cmds = simpleCommands(command);
+  const s = cmds?.length === 1 ? cmds[0] : undefined;
+  if (!s || s.writes.length > 0 || s.reads.length > 0) return null;
+  const [program = "", ...rest] = s.argv;
+  if (!KIND_WORD.test(program) || WRAPPERS.has(program) || SHELL_NAMES.test(program) || PASS_THROUGH.has(program))
+    return null;
+  if (SYSTEM.has(program) || REMOTE.has(program) || INTERPRETERS.has(program) || WRITERS.has(program)) return null;
+  const input = { command };
+  if (deniedMessage("Bash", input) || secretRead("Bash", input) || inlineCode(s.argv)) return null;
+  if (outboundCallProblem("Bash", input) || gitPushes(command)?.length !== 0) return null;
+  const args = program === "gh" ? rest.filter((a, i) => !GH_VALUE.has(a) && !GH_VALUE.has(rest[i - 1] ?? "")) : rest;
+  if (args[0]?.startsWith("-")) return null;
+  const words = [program];
+  for (const a of args) {
+    if (!KIND_WORD.test(a) || words.length > KIND_WORDS) break;
+    words.push(a);
+  }
+  if (words.length === 1 && SCRIPT_RUNNERS.test(program)) return null;
+  const kind = words.join(" ");
+  if (words.slice(1).some((w) => NEVER_FOR_GOOD_WORD.test(w)) || NEVER_FOR_GOOD_KIND.test(kind)) return null;
+  return kind;
+}

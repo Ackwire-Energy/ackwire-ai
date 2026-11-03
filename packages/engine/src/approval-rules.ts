@@ -1,4 +1,4 @@
-import { and, asc, type Database, type Executor, eq, inArray, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError } from "./errors";
@@ -10,8 +10,13 @@ const { approvalRules, connectorConnections, customTools, users } = schema;
  * "Aprovar sempre" (docs/adr/0015): someone who decides an agent's approvals approves a kind of call for good, and
  * the Tool Gateway runs the next calls of that kind without asking. The kind is the agent, the connection, the
  * server's own tool name and, for a tool that runs other actions, each action (`''`: the tool itself); never the
- * params. A rule only skips the question: access, the run policy and the arguments' checks still decide first.
+ * params. A rule only skips the question: access, the run policy and the arguments' checks still decide first. A
+ * command on the agent's computer has no connection: its tool is `COMMAND_RULE_TOOL` and its one action the command's
+ * kind (`commandKind`: `gh issue create`), on every brain and wherever the agent works.
  */
+
+/** The tool of a command rule (`approval_rules.tool`, no connection). Mirrored in `@agenteschat/client` `lib/approval-words.ts`. */
+export const COMMAND_RULE_TOOL = "command";
 
 /** What "Aprovar sempre" covers on one approval (`approvals.approve_always`). */
 export interface RememberedKind {
@@ -41,7 +46,8 @@ export function sqlReadsTarget(input: Record<string, unknown>, sqlArg: string): 
 export interface RuleScope {
   orgId: string;
   agentId: string;
-  connectionId: string;
+  /** Null: a command rule. */
+  connectionId: string | null;
 }
 
 const actionsOf = (kind: RememberedKind) => (kind.actions.length > 0 ? kind.actions : [""]);
@@ -74,7 +80,7 @@ export async function coveringRules(db: Executor, at: RuleScope, kind: Remembere
       and(
         eq(approvalRules.orgId, at.orgId),
         eq(approvalRules.agentId, at.agentId),
-        eq(approvalRules.connectionId, at.connectionId),
+        at.connectionId ? eq(approvalRules.connectionId, at.connectionId) : isNull(approvalRules.connectionId),
         eq(approvalRules.tool, kind.tool),
         inArray(approvalRules.action, wanted),
       ),
@@ -132,9 +138,10 @@ export async function dropAgentRules(
 
 export interface ApprovalRuleView {
   id: string;
-  connectionId: string;
-  /** The connection's name ("Cmposio"). */
-  server: string;
+  /** Null: a command on the agent's computer (`COMMAND_RULE_TOOL`). */
+  connectionId: string | null;
+  /** The connection's name ("Composio"); null for a command. */
+  server: string | null;
   /** The server's own tool name. */
   tool: string;
   /** How the workspace labelled that tool (its review), else the tool's name. */
@@ -166,7 +173,7 @@ export async function listApprovalRules(
       createdAt: approvalRules.createdAt,
     })
     .from(approvalRules)
-    .innerJoin(connectorConnections, eq(connectorConnections.id, approvalRules.connectionId))
+    .leftJoin(connectorConnections, eq(connectorConnections.id, approvalRules.connectionId))
     .leftJoin(
       customTools,
       and(eq(customTools.connectionId, approvalRules.connectionId), eq(customTools.name, approvalRules.tool)),

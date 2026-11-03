@@ -2423,6 +2423,8 @@
       "reads": "Okumaları her zaman onayla",
       "note": "Bundan sonra {{actions}} için, her değerle geçerli. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
       "noteTarget": "Bundan sonra {{actions}} için geçerli. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "noteCommand": "Bundan sonra bilgisayardaki {{actions}} için her argümanla geçerli. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "computer": "Bilgisayardaki komutlar",
       "noteReads": "Bundan sonra yalnızca bu projede ({{target}}) {{actions}} ile yapılan okumalar için geçerli. Veriyi değiştiren her şey yine onay ister. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
       "noteReadsAll": "Bundan sonra yalnızca bu bağlantıda {{actions}} ile yapılan okumalar için geçerli. Veriyi değiştiren her şey yine onay ister. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
       "readsRule": "{{tool}} okumaları",
@@ -4400,6 +4402,18 @@
       "label": "Issue yazma",
       "description": "Issue oluşturma ve yorum yapma."
     },
+    "github_actions_read": {
+      "label": "Actions okuma",
+      "description": "Workflow'ları ve çalıştırmaları listeler, işlerini ve loglarını okur."
+    },
+    "github_projects_read": {
+      "label": "Projects okuma",
+      "description": "GitHub Projects'i, alanlarını ve öğelerini listeler ve okur."
+    },
+    "github_projects_write": {
+      "label": "Projects düzenleme",
+      "description": "GitHub Projects'e öğe ekler, öğeleri taşır veya düzenler."
+    },
     "github_actions_run": {
       "label": "Workflow çalıştırma",
       "description": "GitHub Actions workflow'larını başlatma (dağıtım yapabilir). Her zaman onay ister."
@@ -5525,6 +5539,9 @@
       "allowedBy": "Onaylayan: {{name}} · {{time}}",
       "deniedBy": "Reddeden: {{name}} · {{time}}",
       "alwaysBy": "Bu misyonda izin veren: {{name}} · {{time}}: {{rules}}",
+      "alwaysAgent": "Bu ajan için her zaman onayla",
+      "alwaysAgentHint": "Bu ajan için her zaman onayla, her görevde ve sohbette {{kind}} komutuna her argümanla izin verir. Geri almak için: ajanın sayfasındaki Araçlar ve erişim.",
+      "alwaysAgentBy": "Bu ajan için {{name}} izin verdi · {{time}}: {{kind}}",
       "state": {
         "allowed": "Onaylandı",
         "denied": "Reddedildi",
@@ -9038,6 +9055,10 @@
     "connectedList": "Bağlı",
     "connected": "Bağlı",
     "connectedAs": "{{account}} olarak bağlı",
+    "reconnectAdds": "Ajanlar {{what}} diye {{name}} bağlantısını yeniden kurun.",
+    "adds": {
+      "github_project": "GitHub Projects'i de kullanabilsin (panoları okuyup kartları taşıyabilsin)"
+    },
     "toolsCount_one": "{{count}} araç",
     "toolsCount_other": "{{count}} araç",
     "active": "Etkin",

@@ -17,7 +17,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
-import { addApprovalRules, type RememberedKind, rememberedKindOf } from "./approval-rules";
+import { addApprovalRules, COMMAND_RULE_TOOL, type RememberedKind, rememberedKindOf } from "./approval-rules";
 import { recordAudit } from "./audit";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { learnFromRefusal } from "./context/feedback";
@@ -397,7 +397,7 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   why: a.why.trim() || null,
   origin: approvalOriginOf(a.origin),
   issue: null,
-  approveAlways: a.connectionId ? rememberedKindOf(a.approveAlways) : null,
+  approveAlways: alwaysKindOf(a),
   runAt: a.runAt ? a.runAt.toISOString() : null,
   routineId: a.routineId,
   canCancel: canDecide && aheadLive(a) && a.status === "approved",
@@ -409,6 +409,12 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
       }
     : null,
 });
+
+/** What "Aprovar sempre" would keep for an approval: a connector's kind, or with no connection only a command's. */
+function alwaysKindOf(a: Pick<Approval, "connectionId" | "approveAlways">): RememberedKind | null {
+  const kind = rememberedKindOf(a.approveAlways);
+  return kind && (a.connectionId || (kind.tool === COMMAND_RULE_TOOL && kind.actions.length === 1)) ? kind : null;
+}
 
 /** An approval ahead that may still run: waiting for a person, or approved and not run yet. */
 const aheadLive = (a: Pick<Approval, "runAt" | "status" | "executedAt">) =>
@@ -666,8 +672,8 @@ export async function decideApproval(
               : "Only the agent's owner or an admin can decide this",
     );
   }
-  const kind = input.always ? rememberedKindOf(current.approveAlways) : null;
-  if (input.always && (input.decision !== "approve" || !kind || !current.connectionId)) {
+  const kind = input.always ? alwaysKindOf(current) : null;
+  if (input.always && (input.decision !== "approve" || !kind)) {
     throw new ConflictError("This request can't be approved for good", "approval.always_unavailable");
   }
 
@@ -690,7 +696,7 @@ export async function decideApproval(
       .where(eq(approvals.id, approvalId))
       .returning();
     await enqueueResume(tx, row);
-    const always = !expired && kind && row.connectionId ? { connectionId: row.connectionId, ...kind } : null;
+    const always = !expired && kind ? { connectionId: row.connectionId, ...kind } : null;
     if (always) {
       // The agent changed hands since it asked: what its old owner approves for good is dropped with the handover
       // (`dropAgentRules`), so they make none now. Locked, so a handover running now waits for this rule and drops it.
@@ -801,7 +807,7 @@ function auditDecision(
   tx: Executor,
   row: Approval,
   personId: string | null,
-  always: (RememberedKind & { connectionId: string }) | null = null,
+  always: (RememberedKind & { connectionId: string | null }) | null = null,
 ) {
   return recordAudit(tx, {
     orgId: row.orgId,
