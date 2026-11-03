@@ -10616,6 +10616,7 @@
       "measuring": "Dimensione non ancora misurata",
       "diskFullNotice": "Il disco di {{name}} è quasi pieno"
     },
+    "chromeMissingNotice": "{{name}} ha bisogno di Google Chrome per il browser degli agenti. Scaricalo da google.com/chrome",
     "access": {
       "folders": "Cartelle consentite",
       "ownFolder": "La cartella di ogni agente",

@@ -10137,6 +10137,7 @@
       "measuring": "Boyut henüz ölçülmedi",
       "diskFullNotice": "{{name}} diski neredeyse dolu"
     },
+    "chromeMissingNotice": "{{name}}, ajanların tarayıcısı için Google Chrome'a ihtiyaç duyuyor. google.com/chrome adresinden indirin",
     "access": {
       "folders": "İzin verilen klasörler",
       "ownFolder": "Her ajanın klasörü",

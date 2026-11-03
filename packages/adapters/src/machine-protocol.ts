@@ -379,7 +379,7 @@ export const CONTEXT_LIMIT_PROTOCOL = 28;
 /**
  * Protocol 27: what an agent's browser request waited on before it ran, in
  * milliseconds, each only when it happened: its worker starting (system mode),
- * `agent-browser` and Chrome for Testing being found or installed, the
+ * `agent-browser` being found or downloaded, the
  * requests ahead of it in the agent's queue, the agent's desktop starting, and
  * Chrome starting.
  */
@@ -631,16 +631,55 @@ export const BROWSER_LIMITS = {
   message: 500,
 } as const;
 
+/** Where people get Google Chrome, which agents' browsers run on (ADR 0133). */
+export const CHROME_DOWNLOAD_URL = "https://www.google.com/chrome/";
+
+/** What a runner's update or install says on a computer without Google Chrome (no root to install it). */
+export const CHROME_NEEDED = `The agents' browser needs Google Chrome, which this computer doesn't have: install it from ${CHROME_DOWNLOAD_URL}`;
+
+/**
+ * What the agent is told, in plain words, when the computer's Google Chrome fails it (a `browser_unavailable` error,
+ * whose message starts with one of these): missing (`missingServer` where root installs it), not starting (more may
+ * follow: the libraries it lacks), the agent's profile not opening, or Chrome older than the one that last opened the
+ * agent's profile (by a major version: an older Chrome can't open what a newer one wrote, and the agent would seem
+ * signed out). The server reports each (`chromeFailureKind`).
+ */
+export const CHROME_FAILURES = {
+  missing: "Google Chrome isn't installed on this computer. Install it from google.com/chrome, then try again.",
+  missingServer:
+    "Google Chrome isn't installed on this computer. Its admin should run the agentes.chat installer on it again.",
+  start: "Google Chrome didn't start on this computer.",
+  profile: "The agent's browser profile on this computer didn't open. Try again in a minute.",
+  outdated:
+    "Google Chrome on this computer is older than the one the agent's browser last ran on. Update Google Chrome on it, then try again.",
+} as const;
+
+export type ChromeFailure = "missing" | "start" | "profile" | "outdated";
+
+/** Which of `CHROME_FAILURES` a runner's message is, or null for another one (an older runner's, a busy computer). */
+export function chromeFailureKind(message: string): ChromeFailure | null {
+  if (message.startsWith("Google Chrome isn't installed")) return "missing";
+  if (message.startsWith(CHROME_FAILURES.start)) return "start";
+  if (message.startsWith(CHROME_FAILURES.profile)) return "profile";
+  if (message.startsWith(CHROME_FAILURES.outdated)) return "outdated";
+  return null;
+}
+
 /** `hello.browser` (protocol 12): whether this machine can run the agent browser. */
 export interface RunnerBrowserInfo {
-  /** The binary is there (checked) and a Chrome was found. */
+  /** The binary is there (checked). */
   available: boolean;
   /** `agent-browser`'s version. */
   version?: string;
-  /** The Chrome it uses ("Google Chrome 141.0…", "Chrome for Testing …"). */
+  /** The Chrome it uses, with its version when known ("Google Chrome 156.0.8078.79"). */
   chrome?: string;
   /** Why it isn't available, for people ("Chrome's libraries are missing: run …"). */
   reason?: string;
+  /**
+   * The computer has no Google Chrome at its standard path: the server tells the person once (or reports it, on a
+   * computer of the Cloud's). Absent from runners before ADR 0133, which fetched Chrome for Testing themselves.
+   */
+  chromeMissing?: true;
 }
 
 /** `hello.desktop` (protocol 18): whether this machine can run the agents' desktops. */
@@ -2916,6 +2955,7 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
     ...(version !== undefined ? { version } : {}),
     ...(chrome !== undefined ? { chrome } : {}),
     ...(reason !== undefined ? { reason } : {}),
+    ...(v.chromeMissing === true ? { chromeMissing: true as const } : {}),
   };
 }
 

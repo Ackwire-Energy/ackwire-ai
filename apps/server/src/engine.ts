@@ -274,6 +274,7 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
     replicaId: o.replicaId,
     readyEmail: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, gateway } : null,
+    errors: o.errors,
   });
   const sandbox: SandboxDeps = {
     db,
@@ -307,6 +308,7 @@ export function buildEngine(o: EngineOptions) {
     judge: context.judge,
     vision,
     publicUrl: config.PUBLIC_URL,
+    errors: o.errors,
   });
   // The workspace's cap of live background works (ADR 0121 §7).
   setWorkOrgCap(config.AGENT_WORK_MAX_PER_ORG);

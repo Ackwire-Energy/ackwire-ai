@@ -10277,6 +10277,7 @@
       "measuring": "Grootte nog niet gemeten",
       "diskFullNotice": "De schijf van {{name}} is bijna vol"
     },
+    "chromeMissingNotice": "{{name}} heeft Google Chrome nodig voor de browser van de agents. Download het op google.com/chrome",
     "access": {
       "folders": "Toegestane mappen",
       "ownFolder": "De map van elke agent",

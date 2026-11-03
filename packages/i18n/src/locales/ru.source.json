@@ -24673,6 +24673,9 @@
   "machines.shared.diskFullNotice": {
     "value": "The disk of {{name}} is almost full"
   },
+  "machines.chromeMissingNotice": {
+    "value": "{{name}} needs Google Chrome for the agents' browser. Get it at google.com/chrome"
+  },
   "machines.access.folders": {
     "value": "Allowed folders"
   },

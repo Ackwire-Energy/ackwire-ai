@@ -749,6 +749,7 @@
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
+      "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
       "app_created_other": "一个 AI 应用为你创建了内容"
     },
     "markRead": "标为已读",

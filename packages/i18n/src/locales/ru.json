@@ -10868,6 +10868,7 @@
       "measuring": "Размер ещё не измерен",
       "diskFullNotice": "Диск {{name}} почти заполнен"
     },
+    "chromeMissingNotice": "Для браузера агентов на {{name}} нужен Google Chrome. Скачайте его на google.com/chrome",
     "access": {
       "folders": "Разрешённые папки",
       "ownFolder": "Папка каждого агента",

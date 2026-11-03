@@ -861,6 +861,9 @@
       "computer_disk_full_one": "Il disco di un computer è quasi pieno",
       "computer_disk_full_many": "Il disco di un computer è quasi pieno",
       "computer_disk_full_other": "Il disco di un computer è quasi pieno",
+      "computer_no_chrome_one": "Un computer ha bisogno di Google Chrome. Scaricalo da google.com/chrome",
+      "computer_no_chrome_many": "Alcuni computer hanno bisogno di Google Chrome. Scaricalo da google.com/chrome",
+      "computer_no_chrome_other": "Alcuni computer hanno bisogno di Google Chrome. Scaricalo da google.com/chrome",
       "app_created_one": "Un'app di IA ha creato qualcosa per te",
       "app_created_many": "Un'app di IA ha creato qualcosa per te",
       "app_created_other": "Un'app di IA ha creato qualcosa per te"

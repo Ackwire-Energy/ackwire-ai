@@ -9816,6 +9816,7 @@
       "measuring": "サイズはまだ測定されていません",
       "diskFullNotice": "{{name}}のディスクがもうすぐいっぱいです"
     },
+    "chromeMissingNotice": "{{name}}でエージェントのブラウザを使うにはGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
     "access": {
       "folders": "許可されたフォルダ",
       "ownFolder": "各エージェントのフォルダ",

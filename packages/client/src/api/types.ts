@@ -5458,6 +5458,8 @@ export type NotificationKind =
   | "connector_tool_changed"
   /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
   | "computer_disk_full"
+  /** ADR 0133: a computer has no Google Chrome for its agents' browsers (who connected it). `source.machineId`. */
+  | "computer_no_chrome"
   /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.

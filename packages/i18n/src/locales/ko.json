@@ -9807,6 +9807,7 @@
       "measuring": "아직 크기를 측정하지 않았어요",
       "diskFullNotice": "{{name}}의 디스크가 거의 가득 찼어요"
     },
+    "chromeMissingNotice": "{{name}}에서 에이전트 브라우저를 쓰려면 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
     "access": {
       "folders": "허용된 폴더",
       "ownFolder": "각 에이전트의 폴더",

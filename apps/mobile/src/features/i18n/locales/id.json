@@ -749,6 +749,7 @@
       "browser_profile_request_other": "{{names}} meminta satu profil browser lagi",
       "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",
+      "computer_no_chrome_other": "Komputer memerlukan Google Chrome. Unduh di google.com/chrome",
       "app_created_other": "Aplikasi AI membuat sesuatu untukmu"
     },
     "markRead": "Tandai sudah dibaca",

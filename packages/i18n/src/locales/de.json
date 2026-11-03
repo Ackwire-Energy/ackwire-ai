@@ -10199,6 +10199,7 @@
       "measuring": "Größe noch nicht gemessen",
       "diskFullNotice": "Die Festplatte von {{name}} ist fast voll"
     },
+    "chromeMissingNotice": "{{name}} braucht Google Chrome für den Browser der Agenten. Lade es unter google.com/chrome herunter",
     "access": {
       "folders": "Erlaubte Ordner",
       "ownFolder": "Ordner jedes Agenten",

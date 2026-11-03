@@ -10902,6 +10902,7 @@
       "measuring": "Rozmiar jeszcze niezmierzony",
       "diskFullNotice": "Dysk komputera {{name}} jest prawie pełny"
     },
+    "chromeMissingNotice": "{{name}} potrzebuje Google Chrome do przeglądarki agentów. Pobierz go z google.com/chrome",
     "access": {
       "folders": "Dozwolone foldery",
       "ownFolder": "Folder każdego agenta",
