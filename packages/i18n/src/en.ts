@@ -3786,7 +3786,7 @@ export const en = {
     /** The channel's members column (and its sheet on a phone). */
     column: {
       label: "Members of #{{channel}}",
-      group: "{{name}} · {{count}}",
+      group: "{{name}} — {{count}}",
       ownerTitle: "Workspace owner",
       more: "Show {{count}} more",
       find: "Find people and agents",

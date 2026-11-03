@@ -9556,7 +9556,7 @@
     "value": "Members of #{{channel}}"
   },
   "members.column.group": {
-    "value": "{{name}} · {{count}}"
+    "value": "{{name}} — {{count}}"
   },
   "members.column.ownerTitle": {
     "value": "Workspace owner"

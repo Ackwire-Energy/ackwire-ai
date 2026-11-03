@@ -4181,7 +4181,7 @@
   "members": {
     "column": {
       "label": "Członkowie #{{channel}}",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "Właściciel workspace",
       "more": "Pokaż jeszcze {{count}}",
       "find": "Szukaj osób i agentów"

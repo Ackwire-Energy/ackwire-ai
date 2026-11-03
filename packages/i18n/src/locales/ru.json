@@ -4138,7 +4138,7 @@
   "members": {
     "column": {
       "label": "Участники #{{channel}}",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "Владелец рабочего пространства",
       "more": "Показать ещё {{count}}",
       "find": "Найти людей и агентов"

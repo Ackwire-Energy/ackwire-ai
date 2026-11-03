@@ -3903,7 +3903,7 @@ export const ptBR = {
     /** The channel's members column (and its sheet on a phone). */
     column: {
       label: "Membros de #{{channel}}",
-      group: "{{name}} · {{count}}",
+      group: "{{name}} — {{count}}",
       ownerTitle: "Dono do workspace",
       more: "Mostrar mais {{count}}",
       find: "Buscar pessoas e agentes",

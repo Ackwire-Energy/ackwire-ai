@@ -3886,7 +3886,7 @@
   "members": {
     "column": {
       "label": "#{{channel}} üyeleri",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "Çalışma alanının sahibi",
       "more": "{{count}} tane daha göster",
       "find": "Kişi ve ajan ara"

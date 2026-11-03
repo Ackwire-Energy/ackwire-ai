@@ -3967,7 +3967,7 @@
   "members": {
     "column": {
       "label": "Leden van #{{channel}}",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "Eigenaar van de workspace",
       "more": "Nog {{count}} tonen",
       "find": "Mensen en agents zoeken"

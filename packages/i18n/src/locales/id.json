@@ -3807,7 +3807,7 @@
   "members": {
     "column": {
       "label": "Anggota #{{channel}}",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "Pemilik workspace",
       "more": "Tampilkan {{count}} lagi",
       "find": "Cari orang dan agen"

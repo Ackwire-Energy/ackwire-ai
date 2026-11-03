@@ -3824,7 +3824,7 @@
   "members": {
     "column": {
       "label": "#{{channel}} 的成员",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "工作区所有者",
       "more": "再显示 {{count}} 个",
       "find": "查找人员和智能体"

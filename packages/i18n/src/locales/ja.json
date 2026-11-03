@@ -3780,7 +3780,7 @@
   "members": {
     "column": {
       "label": "#{{channel}} のメンバー",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "ワークスペースのオーナー",
       "more": "さらに {{count}} 件表示",
       "find": "人とエージェントを検索"

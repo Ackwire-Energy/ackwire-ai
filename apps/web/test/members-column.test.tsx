@@ -84,7 +84,7 @@ describe("the members column", () => {
     const { sockets } = await open(state);
     const side = column() as HTMLElement;
     const heads = [...side.querySelectorAll(".members-side__head")].map((h) => h.textContent);
-    expect(heads).toEqual(["Dono · 1", "Admin · 1", "Agentes · 2"]);
+    expect(heads).toEqual(["Dono — 1", "Admin — 1", "Agentes — 2"]);
     // The owner's and each role's group carry their mark.
     expect(side.querySelectorAll(".members-side__head .ac-rolemark")).toHaveLength(2);
     const owner = within(side).getByRole("region", { name: "Dono" });

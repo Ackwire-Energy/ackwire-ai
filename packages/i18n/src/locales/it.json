@@ -4087,7 +4087,7 @@
   "members": {
     "column": {
       "label": "Membri di #{{channel}}",
-      "group": "{{name}} · {{count}}",
+      "group": "{{name}} — {{count}}",
       "ownerTitle": "Proprietario del workspace",
       "more": "Mostra altri {{count}}",
       "find": "Cerca persone e agenti"
