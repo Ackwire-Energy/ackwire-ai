@@ -29,6 +29,8 @@ interface Lists {
   channelId: string;
   people: Member[];
   agents: Agent[];
+  /** Who manages the channel: "Adicionar pessoa ou agente" at the bottom, the channel details' add flow. */
+  onAdd?: () => void;
 }
 
 /** The channel's members on the right, as Discord's: grouped by the owner, hoisted roles, agents, online, offline. */
@@ -132,6 +134,7 @@ export function MembersSheet({
             channelId={channel.id}
             people={lists.people.filter((m) => matches(m.name, m.handle))}
             agents={lists.agents.filter((a) => matches(a.name, a.handle))}
+            {...(lists.onAdd ? { onAdd: lists.onAdd } : {})}
           />
         </div>
       </aside>
@@ -139,7 +142,7 @@ export function MembersSheet({
   );
 }
 
-function MembersList({ channelId, people, agents }: Lists) {
+function MembersList({ channelId, people, agents, onAdd }: Lists) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const presences = usePresences();
@@ -219,6 +222,14 @@ function MembersList({ channelId, people, agents }: Lists) {
           </section>
         );
       })}
+      {onAdd && (
+        <button type="button" className="members-side__add" onClick={onAdd}>
+          <span className="member-row__plus" aria-hidden="true">
+            <Icon name="plus" />
+          </span>
+          {t("channelMembers.addRow")}
+        </button>
+      )}
     </div>
   );
 }

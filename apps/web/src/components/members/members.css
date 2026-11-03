@@ -37,6 +37,32 @@
   text-transform: uppercase;
   color: var(--faint);
 }
+/* Last in the list, for who manages the channel: the channel details' add flow (the plus tile is theirs too). */
+.members-side__add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 5px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--control-r-md);
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.members-side__add:hover {
+  background: var(--side-hover);
+  color: var(--ink);
+}
+html:not([data-pointer]) .members-side__add:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .members-side__row.profile-trigger {
   display: flex;
   width: 100%;

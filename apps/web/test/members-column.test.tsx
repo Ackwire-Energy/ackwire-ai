@@ -174,6 +174,41 @@ describe("the members column", () => {
   });
 });
 
+describe("Adicionar pessoa ou agente at the bottom", () => {
+  test("the column's last row opens the channel details' add flow, alone", async () => {
+    widthIs(DESKTOP_QUERY);
+    await open();
+    const add = within(column() as HTMLElement).getByRole("button", { name: "Adicionar pessoa ou agente" });
+    expect(add.parentElement?.lastElementChild).toBe(add);
+    await act(async () => fireEvent.click(add));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Adicionar a #eng" })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: /^#eng/ })).toBeNull();
+  });
+
+  test("the phone's sheet has it too, and it closes the sheet", async () => {
+    widthIs(COMPACT_QUERY);
+    await open();
+    await act(async () => fireEvent.click(toggle()));
+    await settle(2);
+    await act(async () =>
+      fireEvent.click(within(sheet() as HTMLElement).getByRole("button", { name: "Adicionar pessoa ou agente" })),
+    );
+    await settle(4);
+    expect(sheet()).toBeNull();
+    expect(screen().getByRole("dialog", { name: "Adicionar a #eng" })).toBeTruthy();
+  });
+
+  test("not for who can't add members", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState();
+    const org = state.me?.organizations[0];
+    if (org) Object.assign(org, { role: "member", permissions: [] });
+    await open(state);
+    expect(within(column() as HTMLElement).queryByRole("button", { name: "Adicionar pessoa ou agente" })).toBeNull();
+  });
+});
+
 describe("the phone's members sheet: a dialog over the channel", () => {
   const openSheet = async () => {
     widthIs(COMPACT_QUERY);

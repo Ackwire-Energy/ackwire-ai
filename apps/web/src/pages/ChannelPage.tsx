@@ -733,6 +733,12 @@ function ChannelView({
   const membersColumn = useMembersColumn();
   // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
   const [addFirst, setAddFirst] = useState(false);
+  // The members column's "Adicionar pessoa ou agente": the details' add flow alone, as from a sidebar row.
+  const addsMembers = isMember && managesChannel(channel, me.user.id, org);
+  const addMembers = () => {
+    setAddFirst(true);
+    setDetailsOpen(true);
+  };
   // "Editar canal" from the sidebar's right click: the details open once this channel shows.
   useEffect(() => {
     if (chrome?.header) return;
@@ -2270,7 +2276,12 @@ function ChannelView({
             )}
           </Tag>
           {!chrome && membersColumn.column && (
-            <MembersColumn channel={channel} people={channelPeople} agents={channelAgents} />
+            <MembersColumn
+              channel={channel}
+              people={channelPeople}
+              agents={channelAgents}
+              {...(addsMembers ? { onAdd: addMembers } : {})}
+            />
           )}
           {!chrome && membersColumn.sheet && (
             <MembersSheet
@@ -2282,6 +2293,14 @@ function ChannelView({
                 membersColumn.closeSheet();
                 setDetailsOpen(true);
               }}
+              {...(addsMembers
+                ? {
+                    onAdd: () => {
+                      membersColumn.closeSheet();
+                      addMembers();
+                    },
+                  }
+                : {})}
               onClose={membersColumn.closeSheet}
             />
           )}
