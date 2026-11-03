@@ -376,6 +376,9 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
       account: BIAS,
     }).catch((e) => e);
     expect(admin.code).toBe("account.not_owner");
+    // The plan's paid extra usage bills its owner: an admin never turns it off or on.
+    const extra = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { extraUsage: false }).catch((e) => e);
+    expect(extra.code).toBe("brain.extra_owner_only");
     const taken = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, {
       brain: "claude_code",
       account: ANAS,

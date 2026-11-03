@@ -1093,7 +1093,7 @@ export function agentRoutes(deps: AppDeps) {
             fallback: z.boolean().optional(),
             extraUsage: z.boolean().optional().openapi({
               description:
-                "Long work may go on into the plan's paid extra usage when the provider reports it on (ADR 0118; Claude's plans); false: it pauses at 95% of the plan like any other. Omitted = keep.",
+                "Long work may go on into the plan's paid extra usage when the provider reports it on (ADR 0118; Claude's plans); false: it pauses at 95% of the plan like any other. Only the agent's owner changes it (`brain.extra_owner_only`): it bills their plan. Omitted = keep.",
             }),
             onlyOwner: z.boolean().optional().openapi({
               description:

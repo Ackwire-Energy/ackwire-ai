@@ -575,6 +575,13 @@ export async function setAgentBrain(
         : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
   const extraUsage = (input.extraUsage as boolean | undefined) ?? agent.brainExtraUsage;
+  // Paid extra usage bills the plan's owner, who is the agent's owner: an admin picks the account, not this.
+  if (extraUsage !== agent.brainExtraUsage && agent.ownerUserId !== userId) {
+    throw new ForbiddenError(
+      "Only the agent's owner turns its plan's paid extra usage on or off",
+      "brain.extra_owner_only",
+    );
+  }
   if (input.effort !== undefined && input.effort !== null && !isBrainEffortSetting(input.effort)) {
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
