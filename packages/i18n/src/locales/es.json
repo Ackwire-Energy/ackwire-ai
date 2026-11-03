@@ -10574,7 +10574,17 @@
     "imageAlt": "Imagen: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Demasiado grande para la vista previa. Descárgalo para abrirlo.",
-    "downloadOnly": "No hay vista previa para este tipo de archivo. Descárgalo para abrirlo."
+    "downloadOnly": "No hay vista previa para este tipo de archivo. Descárgalo para abrirlo.",
+    "zoom": {
+      "toolbar": "Zoom",
+      "in": "Ampliar",
+      "out": "Reducir",
+      "fit": "Ajustar",
+      "actual": "Tamaño real",
+      "lens": "Lupa",
+      "hint": "Haz clic o desplázate para ampliar",
+      "hintZoomed": "Arrastra para moverte. Esc vuelve a ajustar"
+    }
   },
   "errors": {
     "connector": {

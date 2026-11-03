@@ -9837,7 +9837,17 @@
     "imageAlt": "이미지: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "너무 커서 미리 볼 수 없어요. 다운로드해서 여세요.",
-    "downloadOnly": "이 유형의 파일은 미리보기가 없어요. 다운로드해서 여세요."
+    "downloadOnly": "이 유형의 파일은 미리보기가 없어요. 다운로드해서 여세요.",
+    "zoom": {
+      "toolbar": "확대/축소",
+      "in": "확대",
+      "out": "축소",
+      "fit": "맞춤",
+      "actual": "실제 크기",
+      "lens": "돋보기",
+      "hint": "클릭하거나 스크롤해 확대",
+      "hintZoomed": "드래그해 이동. Esc로 다시 맞춤"
+    }
   },
   "errors": {
     "connector": {

@@ -5562,6 +5562,9 @@
   "presence.offline": {
     "value": "Offline"
   },
+  "presence.out": {
+    "value": "Out of office"
+  },
   "presence.lower.online": {
     "value": "online"
   },
@@ -5576,6 +5579,9 @@
   },
   "presence.lower.offline": {
     "value": "offline"
+  },
+  "presence.lower.out": {
+    "value": "out of office"
   },
   "presence.setStatus": {
     "value": "Set status"
@@ -5636,6 +5642,9 @@
   },
   "presence.help.busy": {
     "value": "Everyone sees it's better not to interrupt right now."
+  },
+  "presence.help.out": {
+    "value": "Away from work (vacation, a day off): everyone sees it until your status clears."
   },
   "presence.help.hidden": {
     "value": "You show as offline to everyone, and can still use everything."
@@ -5736,6 +5745,15 @@
   "presence.agent.provider_down": {
     "value": "The AI provider is down · retries by itself"
   },
+  "presence.agent.out_of_plan": {
+    "value": "Out of plan limit"
+  },
+  "presence.agent.out_of_budget": {
+    "value": "Monthly budget spent"
+  },
+  "presence.agent.backAt": {
+    "value": "back {{when}}"
+  },
   "presence.agent.work": {
     "value": "In the background: {{subject}}"
   },
@@ -5753,6 +5771,9 @@
   },
   "presence.agentWhy.offline": {
     "value": "Paused"
+  },
+  "presence.agentWhy.out": {
+    "value": "Out of limit for now · answers after the reset"
   },
   "presence.agentWhy.noAi": {
     "value": "No AI connected"
@@ -24793,6 +24814,30 @@
   "files.downloadOnly": {
     "value": "No preview for this type of file. Download it to open."
   },
+  "files.zoom.toolbar": {
+    "value": "Zoom"
+  },
+  "files.zoom.in": {
+    "value": "Zoom in"
+  },
+  "files.zoom.out": {
+    "value": "Zoom out"
+  },
+  "files.zoom.fit": {
+    "value": "Fit"
+  },
+  "files.zoom.actual": {
+    "value": "Actual size"
+  },
+  "files.zoom.lens": {
+    "value": "Magnifier"
+  },
+  "files.zoom.hint": {
+    "value": "Click or scroll to zoom in"
+  },
+  "files.zoom.hintZoomed": {
+    "value": "Drag to move around. Esc fits it back"
+  },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
   },
@@ -31740,26 +31785,5 @@
   },
   "taskManager.agentPanel.none": {
     "value": "{{name}} is free now."
-  },
-  "presence.out": {
-    "value": "Out of office"
-  },
-  "presence.lower.out": {
-    "value": "out of office"
-  },
-  "presence.agent.out_of_plan": {
-    "value": "Out of plan limit"
-  },
-  "presence.agent.out_of_budget": {
-    "value": "Monthly budget spent"
-  },
-  "presence.agent.backAt": {
-    "value": "back {{when}}"
-  },
-  "presence.agentWhy.out": {
-    "value": "Out of limit for now · answers after the reset"
-  },
-  "presence.help.out": {
-    "value": "Away from work (vacation, a day off): everyone sees it until your status clears."
   }
 }

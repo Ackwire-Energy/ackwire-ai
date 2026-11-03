@@ -17,7 +17,15 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { clampZoomTranslate, DISMISS_DISTANCE, DISMISS_VELOCITY, MAX_ZOOM, zoomAround } from "./zoom";
+import {
+  clampZoomTranslate,
+  containSize,
+  DISMISS_DISTANCE,
+  DISMISS_VELOCITY,
+  doubleTapZoom,
+  MAX_ZOOM,
+  zoomAround,
+} from "./zoom";
 
 /**
  * One picture of the viewer: pinch to zoom (around the fingers), double tap to zoom in at that spot or
@@ -53,6 +61,8 @@ export function ZoomableImage({
   const ty = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
+  // The picture as drawn unzoomed: the pan stops at its edges, not the screen's.
+  const content = useSharedValue({ w: width, h: height });
 
   const report = (z: boolean) => {
     setZoomed(z);
@@ -68,7 +78,7 @@ export function ZoomableImage({
       scheduleOnRN(report, false);
       return;
     }
-    const c = clampZoomTranslate(tx.value, ty.value, scale.value, width, height);
+    const c = clampZoomTranslate(tx.value, ty.value, scale.value, width, height, content.value.w, content.value.h);
     tx.value = withTiming(c.x);
     ty.value = withTiming(c.y);
     scheduleOnRN(report, true);
@@ -148,9 +158,9 @@ export function ZoomableImage({
         scheduleOnRN(report, false);
         return;
       }
-      const next = 2.5;
+      const next = doubleTapZoom(content.value.w, content.value.h, width, height);
       const z = zoomAround({ x: 0, y: 0 }, 1, next, e.x - width / 2, e.y - height / 2);
-      const c = clampZoomTranslate(z.x, z.y, next, width, height);
+      const c = clampZoomTranslate(z.x, z.y, next, width, height, content.value.w, content.value.h);
       scale.value = withTiming(next);
       tx.value = withTiming(c.x);
       ty.value = withTiming(c.y);
@@ -185,6 +195,9 @@ export function ZoomableImage({
           recyclingKey={cacheKey}
           contentFit="contain"
           transition={160}
+          onLoad={(e) => {
+            content.value = containSize(e.source.width, e.source.height, width, height);
+          }}
           style={StyleSheet.absoluteFill}
           accessible={false}
         />

@@ -10168,7 +10168,17 @@
     "imageAlt": "Görsel: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Önizleme için çok büyük. Açmak için indirin.",
-    "downloadOnly": "Bu dosya türü için önizleme yok. Açmak için indirin."
+    "downloadOnly": "Bu dosya türü için önizleme yok. Açmak için indirin.",
+    "zoom": {
+      "toolbar": "Yakınlaştırma",
+      "in": "Yakınlaştır",
+      "out": "Uzaklaştır",
+      "fit": "Sığdır",
+      "actual": "Gerçek boyut",
+      "lens": "Büyüteç",
+      "hint": "Yakınlaştırmak için tıklayın veya kaydırın",
+      "hintZoomed": "Gezinmek için sürükleyin. Esc yeniden sığdırır"
+    }
   },
   "errors": {
     "connector": {

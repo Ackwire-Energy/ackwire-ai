@@ -7090,8 +7090,8 @@
       "savedEveryone": "Ora {{name}} risponde ad altre persone.",
       "savedEveryone_female": "Ora {{name}} risponde ad altre persone.",
       "savedOwner": "Ora {{name}} risponde solo a te.",
-      "savedOwnerOf": "Ora {{name}} risponde solo a {{owner}}.",
       "savedOwner_female": "Ora {{name}} risponde solo a te.",
+      "savedOwnerOf": "Ora {{name}} risponde solo a {{owner}}.",
       "backOnApi": "{{name}} è tornato sull'API e risponde ancora solo a te.",
       "backOnApi_female": "{{name}} è tornata sull'API e risponde ancora solo a te.",
       "letEveryone": "Lascia che {{name}} risponda a tutti",
@@ -10651,7 +10651,17 @@
     "imageAlt": "Immagine: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Troppo grande per l'anteprima. Scaricalo per aprirlo.",
-    "downloadOnly": "Nessuna anteprima per questo tipo di file. Scaricalo per aprirlo."
+    "downloadOnly": "Nessuna anteprima per questo tipo di file. Scaricalo per aprirlo.",
+    "zoom": {
+      "toolbar": "Zoom",
+      "in": "Ingrandisci",
+      "out": "Riduci",
+      "fit": "Adatta",
+      "actual": "Dimensioni reali",
+      "lens": "Lente",
+      "hint": "Fai clic o scorri per ingrandire",
+      "hintZoomed": "Trascina per spostarti. Esc la riadatta"
+    }
   },
   "errors": {
     "connector": {

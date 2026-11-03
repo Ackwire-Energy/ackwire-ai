@@ -9842,6 +9842,16 @@ export const ptBR = {
     pdfFrame: "PDF: {{title}}",
     tooBigToPreview: "Arquivo grande demais para a prévia. Baixe para abrir.",
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
+    zoom: {
+      toolbar: "Zoom",
+      in: "Ampliar",
+      out: "Reduzir",
+      fit: "Ajustar",
+      actual: "Tamanho real",
+      lens: "Lupa",
+      hint: "Clique ou role para ampliar",
+      hintZoomed: "Arraste para mover. Esc volta a ajustar",
+    },
   },
   errors: {
     connector: {

@@ -2,9 +2,9 @@ import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@agentesch
 import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@agenteschat/client";
 import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { fileIcon, formatBytes } from "@agenteschat/client/lib/files";
+import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Alert, Button, Chip, DetailsDialog, Field, Icon, Input, Menu, MenuItem, Textarea } from "@agenteschat/ui";
+import { Alert, Button, Chip, cx, DetailsDialog, Field, Icon, Input, Menu, MenuItem, Textarea } from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -98,6 +98,13 @@ export function ArtifactViewer({
   // A snapshot (a screenshot, a photo) has no versions: no history beside it, no "Enviar nova versão" (ADR 0019).
   const versioned = a?.versioned !== false;
   const canUploadVersion = Boolean(a?.canEdit && !old && a?.kind === "file" && versioned);
+  // A picture takes the whole viewer: its versions open beside it only when asked.
+  const image =
+    a?.content.kind === "file" && previewKind(a.content.contentType) === "image" && a.content.size <= MAX_PREVIEW_BYTES;
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const sideVersions = versioned && (!image || versionsOpen);
+  const focusVersions = () =>
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(".artifact-viewer__versions button")?.focus());
   const actions = a && (
     <>
       {a.kind === "file" ? (
@@ -141,11 +148,26 @@ export function ArtifactViewer({
           <span className="artifact-edit__label">{t("artifacts.edit")}</span>
         </Button>
       )}
+      {image && versioned && (
+        <Button
+          size="sm"
+          variant="ghost"
+          iconOnly
+          icon="waiting"
+          aria-label={t("artifacts.history")}
+          title={t("artifacts.history")}
+          aria-pressed={versionsOpen}
+          onClick={() => setVersionsOpen(!versionsOpen)}
+        />
+      )}
       <ArtifactMoreMenu
         artifact={a}
         onVersions={
           versioned
-            ? () => document.querySelector<HTMLElement>(".artifact-viewer__versions button")?.focus()
+            ? () => {
+                setVersionsOpen(true);
+                focusVersions();
+              }
             : undefined
         }
         onDelete={() => remover.ask(a)}
@@ -156,9 +178,10 @@ export function ArtifactViewer({
     <DetailsDialog
       open
       size="xl"
+      fill={image}
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("artifacts.close")}
-      className="artifact-sheet"
+      className={image ? "artifact-sheet artifact-sheet--image" : "artifact-sheet"}
       title={
         a ? (
           <span className="artifact-sheet__title" title={a.title}>
@@ -190,7 +213,13 @@ export function ArtifactViewer({
     >
       {query.isError && <Alert>{t("artifacts.notFound")}</Alert>}
       {a && (
-        <div className={versioned ? "artifact-viewer" : "artifact-viewer artifact-viewer--single"}>
+        <div
+          className={cx(
+            "artifact-viewer",
+            !sideVersions && "artifact-viewer--single",
+            image && "artifact-viewer--image",
+          )}
+        >
           <div className="artifact-viewer__main">
             {old && (
               <div className="row artifact-viewer__old" role="status">
@@ -216,7 +245,7 @@ export function ArtifactViewer({
               />
             )}
           </div>
-          {versioned && <Versions artifact={a} onVersion={onVersion} />}
+          {sideVersions && <Versions artifact={a} onVersion={onVersion} />}
         </div>
       )}
       {remover.dialog}

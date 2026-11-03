@@ -6856,12 +6856,112 @@ html:not([data-pointer]) .file-row__open:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
-/* As tall as the dialog leaves it (its header and padding): a picture fills the window's height. */
-.file-view__image {
-  max-width: 100%;
-  max-height: max(320px, calc(100vh - 200px));
-  height: auto;
-  object-fit: contain;
+/* A picture: the viewer at the window's full height, the picture's stage taking all of it but the zoom bar. */
+.ac-details__body > .artifact-viewer--image {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.artifact-viewer--image .artifact-viewer__main,
+.file-view--image {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.artifact-viewer--image .artifact-viewer__versions {
+  min-height: 0;
+  overflow-y: auto;
+}
+.file-view--image .file-view__preview {
+  flex: 1 1 auto;
+  align-items: center;
+}
+.izoom {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.izoom__stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 240px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  touch-action: none;
+  user-select: none;
+  cursor: zoom-in;
+}
+.izoom__stage[data-zoomed] {
+  cursor: grab;
+}
+.izoom__stage[data-dragging] {
+  cursor: grabbing;
+}
+.izoom__stage:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.izoom__img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  -webkit-user-drag: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .izoom__img[data-animate] {
+    transition: transform 0.2s var(--out);
+  }
+}
+.izoom__lens {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 30%, transparent);
+}
+.izoom__pane {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--e3);
+}
+.izoom__pane img {
+  display: block;
+  max-width: none;
+  transform-origin: 0 0;
+}
+.izoom__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+.izoom__hint {
+  margin: 0;
+  min-width: 0;
+}
+.izoom__tools {
+  margin-left: auto;
+  align-items: center;
+}
+.izoom__level {
+  min-width: 48px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+@media (max-width: 640px) {
+  .izoom__hint {
+    display: none;
+  }
 }
 .file-view__pdf {
   width: 100%;
