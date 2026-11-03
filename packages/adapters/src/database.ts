@@ -145,7 +145,9 @@ export function createPostgresDatabaseDriver(options: { connectTimeoutSeconds?: 
           return out as Awaited<ReturnType<typeof fn>>;
         },
         async close() {
-          await sql.end({ timeout: 5 });
+          // Running queries finish first (a whole server closes its least recently used pool while one may be
+          // running); the longest an agent's query runs is 60 s.
+          await sql.end({ timeout: 65 });
         },
       };
     },

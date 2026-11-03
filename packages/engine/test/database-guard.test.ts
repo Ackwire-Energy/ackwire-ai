@@ -237,6 +237,8 @@ test("a database name in a table is refused; a whole server also hides other dat
     "select datname from pg_stat_database",
     "select query from public.pg_stat_statements",
     "select * from pg_stat_get_activity(null)",
+    "select pg_stat_get_backend_activity(s) from pg_stat_get_backend_idset() s",
+    "select pg_database_size('cliente_z')",
   ]) {
     expect(await whole(sql)).toContain("not allowed");
     expect(await reason(sql)).toBeNull();

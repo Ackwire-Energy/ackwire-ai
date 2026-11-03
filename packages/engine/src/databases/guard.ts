@@ -98,7 +98,11 @@ const WHOLE_SERVER_BLOCKED_FUNCTIONS = new Set([
   "pg_stat_get_activity",
   "pg_stat_statements",
   "pg_stat_statements_info",
+  // Probes whether a database outside the agent's list exists.
+  "pg_database_size",
 ]);
+/** `pg_stat_get_backend_activity(n)` and its siblings: another session's SQL text, database and user. */
+const WHOLE_SERVER_BLOCKED_PREFIXES = ["pg_stat_get_backend"];
 const CATALOG_SCHEMAS = new Set(["pg_catalog", "information_schema"]);
 /**
  * Relations of `pg_catalog` that an unqualified name resolves to (Postgres searches `pg_catalog` before
@@ -274,7 +278,8 @@ export async function guardSql(
     if (
       BLOCKED_FUNCTIONS.has(fn) ||
       BLOCKED_PREFIXES.some((p) => fn.startsWith(p)) ||
-      (options.wholeServer && WHOLE_SERVER_BLOCKED_FUNCTIONS.has(fn))
+      (options.wholeServer &&
+        (WHOLE_SERVER_BLOCKED_FUNCTIONS.has(fn) || WHOLE_SERVER_BLOCKED_PREFIXES.some((p) => fn.startsWith(p))))
     )
       return { ok: false, reason: `The function ${fn}() is not allowed here.` };
   }

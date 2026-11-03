@@ -116,7 +116,22 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
   }
 
   /** A database failure as the model sees it; a refused password marks the connection for reconnecting. */
-  async function failure(db: Database, connection: DbConnectionRow, error: unknown): Promise<ToolOutput> {
+  async function failure(
+    db: Database,
+    connection: DbConnectionRow,
+    error: unknown,
+    database = connection.database,
+  ): Promise<ToolOutput> {
+    // A whole server's access rules (pg_hba) may refuse the role on some databases only: that one is closed,
+    // the connection still works. A refused password (28P01) or the sample database refusing it is a reconnect.
+    if (
+      error instanceof DatabaseError &&
+      error.code === "auth" &&
+      connection.wholeServer &&
+      database !== connection.database &&
+      error.sqlState !== "28P01"
+    )
+      return { content: `Postgres refused this user on the database ${database}: ${error.message}`, isError: true };
     if (error instanceof DatabaseError && error.code === "auth") {
       await markDatabaseNeedsReconnect(db, connection.id, error.message).catch(() => {});
       return {
@@ -234,7 +249,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
               data: { dbConnectionId: connection.id, tables: visible.length, ...(whole ? { database } : {}) },
             };
           } catch (error) {
-            return failure(ctx.db, connection, error);
+            return failure(ctx.db, connection, error, database);
           }
         },
       },
@@ -310,7 +325,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
               data: { dbConnectionId: connection.id, ...(whole ? { database } : {}) },
             };
           } catch (error) {
-            return failure(ctx.db, connection, error);
+            return failure(ctx.db, connection, error, database);
           }
         },
       },
@@ -391,7 +406,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
               durationMs: Date.now() - started,
               error: error instanceof Error ? error.message : String(error),
             });
-            return failure(ctx.db, connection, error);
+            return failure(ctx.db, connection, error, database);
           }
         },
       },

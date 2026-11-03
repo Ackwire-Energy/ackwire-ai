@@ -371,7 +371,7 @@ async function testSettings(deps: DatabaseDeps, s: Settings): Promise<Tested> {
   if (!t.ok) return t;
   let databases: string[];
   try {
-    databases = await fromEntry(s.database ? [s.database] : ENTRY_DATABASES, async (database) => {
+    databases = await fromEntry([s.database, ...ENTRY_DATABASES].filter(Boolean), async (database) => {
       const client = await driverOf(deps).open({ ...t.target, database });
       try {
         return await client.readOnly(CATALOG_LIMITS, (run) => readDatabases(run, s.databasePrefix));
@@ -382,7 +382,9 @@ async function testSettings(deps: DatabaseDeps, s: Settings): Promise<Tested> {
   } catch (error) {
     return { ok: false, error: testErrorOf(error) };
   }
-  const sample = s.database || databases[0];
+  // The database given is only an entry when agents can't read it (outside the prefix, no CONNECT): the rules'
+  // tables and sensitive columns come from one they can.
+  const sample = s.database && databases.includes(s.database) ? s.database : databases[0];
   if (!sample) return { ok: false, error: "no_databases" };
   const tested = await testDatabase(deps, { ...s, database: sample });
   return tested.ok ? { ok: true, result: { ...tested.result, database: sample, databases } } : tested;
