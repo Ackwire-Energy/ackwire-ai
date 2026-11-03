@@ -3625,6 +3625,22 @@ html:not([data-pointer]) .ac-token__remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Inside a field (a search's filters): low enough to stay clear of its top and bottom, square-ish like Discord's. */
+.ac-token--sm {
+  gap: 4px;
+  height: 22px;
+  padding: 0 2px 0 6px;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+}
+.ac-token--sm:not(:has(.ac-token__remove)) {
+  padding-right: 6px;
+}
+.ac-token--sm .ac-token__remove {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-cut);
+}
 
 /* "@" suggestions above the composer */
 .ac-suggest {

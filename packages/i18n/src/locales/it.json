@@ -2440,7 +2440,11 @@
     "alreadyAnswered": "Questa domanda ha già una risposta o è stata chiusa.",
     "closed": "Chiusa senza risposta.",
     "failed": "Non è stato possibile inviare la risposta. Riprova.",
-    "withdrawn": "{{name}} non ha più bisogno di una risposta."
+    "withdrawn": "{{name}} non ha più bisogno di una risposta.",
+    "skip": "Salta",
+    "skipFailed": "Impossibile saltare la domanda. Riprova.",
+    "dismissed": "{{name}} ha saltato questa domanda.",
+    "dismissedByYou": "Hai saltato questa domanda."
   },
   "ask": {
     "kind": {

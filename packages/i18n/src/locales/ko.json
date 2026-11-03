@@ -2288,7 +2288,11 @@
     "closed": "답변 없이 닫혔어요.",
     "failed": "답변을 보내지 못했어요. 다시 시도해 주세요.",
     "withdrawn": "{{name}}에게 더 이상 답변이 필요하지 않아요.",
-    "withdrawn_female": "{{name}}에게 더 이상 답변이 필요하지 않아요."
+    "withdrawn_female": "{{name}}에게 더 이상 답변이 필요하지 않아요.",
+    "skip": "건너뛰기",
+    "skipFailed": "질문을 건너뛸 수 없습니다. 다시 시도해 주세요.",
+    "dismissed": "{{name}}님이 이 질문을 건너뛰었습니다.",
+    "dismissedByYou": "이 질문을 건너뛰었습니다."
   },
   "ask": {
     "kind": {

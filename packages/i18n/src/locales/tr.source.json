@@ -5791,6 +5791,18 @@
   "question.withdrawn": {
     "value": "{{name}} no longer needs an answer."
   },
+  "question.skip": {
+    "value": "Skip"
+  },
+  "question.skipFailed": {
+    "value": "Couldn't skip the question. Try again."
+  },
+  "question.dismissed": {
+    "value": "{{name}} skipped this question."
+  },
+  "question.dismissedByYou": {
+    "value": "You skipped this question."
+  },
   "ask.kind.approval": {
     "value": "Asks for your approval"
   },

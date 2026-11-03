@@ -2369,7 +2369,11 @@
     "alreadyAnswered": "Deze vraag is al beantwoord of gesloten.",
     "closed": "Gesloten zonder antwoord.",
     "failed": "Kon het antwoord niet sturen. Probeer het opnieuw.",
-    "withdrawn": "{{name}} heeft geen antwoord meer nodig."
+    "withdrawn": "{{name}} heeft geen antwoord meer nodig.",
+    "skip": "Overslaan",
+    "skipFailed": "De vraag kon niet worden overgeslagen. Probeer het opnieuw.",
+    "dismissed": "{{name}} heeft deze vraag overgeslagen.",
+    "dismissedByYou": "Je hebt deze vraag overgeslagen."
   },
   "ask": {
     "kind": {

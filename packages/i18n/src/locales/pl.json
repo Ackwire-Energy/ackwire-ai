@@ -2504,7 +2504,11 @@
     "alreadyAnswered": "To pytanie ma już odpowiedź albo zostało zamknięte.",
     "closed": "Zamknięte bez odpowiedzi.",
     "failed": "Nie udało się wysłać odpowiedzi. Spróbuj ponownie.",
-    "withdrawn": "{{name}} nie potrzebuje już odpowiedzi."
+    "withdrawn": "{{name}} nie potrzebuje już odpowiedzi.",
+    "skip": "Pomiń",
+    "skipFailed": "Nie udało się pominąć pytania. Spróbuj ponownie.",
+    "dismissed": "Pytanie pominięte przez: {{name}}.",
+    "dismissedByYou": "Pominięto to pytanie."
   },
   "ask": {
     "kind": {

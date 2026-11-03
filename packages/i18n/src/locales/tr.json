@@ -2355,7 +2355,11 @@
     "alreadyAnswered": "Bu soru zaten yanıtlandı ya da kapatıldı.",
     "closed": "Yanıtlanmadan kapatıldı.",
     "failed": "Yanıt gönderilemedi. Yeniden deneyin.",
-    "withdrawn": "{{name}} artık yanıt beklemiyor."
+    "withdrawn": "{{name}} artık yanıt beklemiyor.",
+    "skip": "Atla",
+    "skipFailed": "Soru atlanamadı. Tekrar deneyin.",
+    "dismissed": "{{name}} bu soruyu atladı.",
+    "dismissedByYou": "Bu soruyu atladınız."
   },
   "ask": {
     "kind": {

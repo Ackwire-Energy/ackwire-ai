@@ -2291,7 +2291,11 @@
     "alreadyAnswered": "这个问题已被回答或已关闭。",
     "closed": "未回答就关闭了。",
     "failed": "无法发送回答，请重试。",
-    "withdrawn": "{{name}} 不再需要回答了。"
+    "withdrawn": "{{name}} 不再需要回答了。",
+    "skip": "跳过",
+    "skipFailed": "无法跳过此问题，请重试。",
+    "dismissed": "{{name}}跳过了此问题。",
+    "dismissedByYou": "你跳过了此问题。"
   },
   "ask": {
     "kind": {

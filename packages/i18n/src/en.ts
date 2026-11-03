@@ -2313,6 +2313,11 @@ export const en = {
     closed: "Closed without an answer.",
     failed: "Couldn't send the answer. Try again.",
     withdrawn: "{{name}} no longer needs an answer.",
+    /** Closes the question without an answer: the agent goes on with its own judgement. */
+    skip: "Skip",
+    skipFailed: "Couldn't skip the question. Try again.",
+    dismissed: "{{name}} skipped this question.",
+    dismissedByYou: "You skipped this question.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
   ask: {

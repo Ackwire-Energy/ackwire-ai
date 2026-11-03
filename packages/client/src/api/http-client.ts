@@ -1469,6 +1469,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     questions: {
       answer: (orgId, questionId, input) =>
         request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/answer`, { json: input }),
+      dismiss: (orgId, questionId) =>
+        request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/dismiss`, { json: {} }),
     },
     secrets: {
       deliver: (orgId, requestId, box) =>

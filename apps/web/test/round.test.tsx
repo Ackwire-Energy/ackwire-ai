@@ -504,6 +504,46 @@ describe("agent questions (ask_user)", () => {
     expect(done.textContent).toContain("Você respondeu: https://api.example.test/v1");
   });
 
+  test("Cancelar leaves the answer field for the card; Pular closes the question without an answer", async () => {
+    const state = seedState();
+    const question = {
+      id: "q5",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: null,
+      messageId: "msg-q5",
+      text: "Qual ambiente?",
+      choices: null,
+      status: "open",
+      answer: null,
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-q5",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-q5",
+      meta: { question },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    await settle();
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    await click(within(card).getByRole("button", { name: "Responder" }));
+    await type(within(card).getByRole("textbox", { name: "Sua resposta" }), "staging");
+    await click(within(card).getByRole("button", { name: "Cancelar" }));
+    expect(within(card).queryByRole("textbox")).toBeNull();
+    expect(within(card).getByRole("button", { name: "Responder" })).toBeTruthy();
+    await click(within(card).getByRole("button", { name: "Pular" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "questions.answer")).toHaveLength(0);
+    expect(state.calls.find((c) => c.method === "questions.dismiss")?.args).toEqual([ORG_ID, "q5"]);
+    expect(screen().getByRole("group", { name: "Pergunta de Ada" }).textContent).toContain("Você pulou esta pergunta.");
+  });
+
   test("the question shows once: its card, not its text above it too", async () => {
     const state = seedState();
     const text = "Quais datas eu coloco na viagem para o Chile?";

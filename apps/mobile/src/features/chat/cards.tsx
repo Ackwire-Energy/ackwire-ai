@@ -664,6 +664,25 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       )
       .finally(() => setPicking(null));
   };
+  const [skipping, setSkipping] = useState(false);
+  const skip = () => {
+    setSkipping(true);
+    api.questions
+      .dismiss(orgId, q.id)
+      .then((res) => {
+        asks?.settle(q.id);
+        setAnswered(res);
+      })
+      .catch((err: unknown) =>
+        toast({
+          title:
+            (err as { status?: number }).status === 409 ? t("mobile.chat.question.taken") : t("question.skipFailed"),
+          icon: "x",
+        }),
+      )
+      .finally(() => setSkipping(false));
+  };
+  const busy = picking !== null || skipping;
 
   if (q.status === "answered") {
     const who = q.answeredByUserId && q.answeredByUserId !== meId ? dir.memberById.get(q.answeredByUserId)?.name : null;
@@ -674,11 +693,15 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         words={
           q.withdrawn
             ? t("question.withdrawn", agentGrammar(dir.anyAgent(q.agentId)?.name ?? t("channel.unknownAgent")))
-            : q.answer === null
-              ? t("mobile.chat.question.closed")
-              : who
-                ? t("mobile.chat.question.answered", { name: who, answer: said })
-                : t("mobile.chat.question.answeredByYou", { answer: said })
+            : q.dismissed
+              ? who
+                ? t("question.dismissed", { name: who })
+                : t("question.dismissedByYou")
+              : q.answer === null
+                ? t("mobile.chat.question.closed")
+                : who
+                  ? t("mobile.chat.question.answered", { name: who, answer: said })
+                  : t("mobile.chat.question.answeredByYou", { answer: said })
         }
       />
     );
@@ -709,10 +732,10 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                 return (
                   <Pressable
                     key={choice}
-                    disabled={picking !== null}
+                    disabled={busy}
                     onPress={() => void answer({ choice })}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: on, disabled: picking !== null }}
+                    accessibilityState={{ selected: on, disabled: busy }}
                     style={({ pressed }) => [
                       styles.opt,
                       { backgroundColor: on ? c.ink : c.sunken },
@@ -726,7 +749,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                 );
               })}
               <Pressable
-                disabled={picking !== null}
+                disabled={busy}
                 onPress={write}
                 accessibilityRole="button"
                 style={({ pressed }) => [
@@ -742,8 +765,24 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
               </Pressable>
             </View>
           ) : (
-            <Button variant="primary" size="card" wide label={t("question.answer")} onPress={write} />
+            <Button
+              variant="primary"
+              size="card"
+              wide
+              label={t("question.answer")}
+              disabled={skipping}
+              onPress={write}
+            />
           )}
+          <Button
+            variant="ghost"
+            size="card"
+            wide
+            label={t("question.skip")}
+            loading={skipping}
+            disabled={picking !== null}
+            onPress={skip}
+          />
         </AskFoot>
       }
     />

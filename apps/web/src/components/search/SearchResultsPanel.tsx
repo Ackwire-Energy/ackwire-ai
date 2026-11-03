@@ -21,6 +21,7 @@ import {
   Select,
 } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { useChannelActions } from "@/components/channel-actions";
@@ -45,6 +46,12 @@ export function SearchResultsPanel({ channelId, onClose }: { channelId: string; 
   const channels = useChannels(org.id);
   const categories = useChannelCategories(org.id);
   const phone = useMatchMedia(COMPACT_QUERY);
+  const setShown = ws?.setShown;
+  useEffect(() => {
+    if (!setShown) return;
+    setShown(true);
+    return () => setShown(false);
+  }, [setShown]);
   if (!ws) return null;
   const { hits, search, chips } = ws;
   const sorts = SEARCH_SORTS.map((s) => ({ value: s, label: t(`searchPage.sort.${s}`) }));

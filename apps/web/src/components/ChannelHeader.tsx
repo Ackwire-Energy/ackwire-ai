@@ -78,7 +78,7 @@ export function ChannelHeader({
             <Icon name="members" />
           </button>
         )}
-        {isMember && <HeaderSearch onOpen={onSearch} />}
+        {isMember && <HeaderSearch channelId={channel.id} onOpen={onSearch} />}
       </div>
     </header>
   );

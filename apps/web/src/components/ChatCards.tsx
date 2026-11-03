@@ -24,7 +24,7 @@ import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-wor
 import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -513,6 +513,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const [error, setError] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const [text, setText] = useState("");
+  const reopen = useRef<HTMLButtonElement>(null);
   const answer = useMutation({
     mutationFn: (input: { choice: string } | { text: string }) => api.questions.answer(org.id, question.id, input),
     // Errors are explained on the card.
@@ -523,6 +524,15 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
     onError: (err) =>
       setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.failed")),
   });
+  const skip = useMutation({
+    mutationFn: () => api.questions.dismiss(org.id, question.id),
+    meta: { silent: true },
+    onMutate: () => setError(null),
+    onSuccess: (res) => live.answered(res),
+    onError: (err) =>
+      setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.skipFailed")),
+  });
+  const busy = answer.isPending || skip.isPending;
   const agent = dir.anyAgent(question.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
@@ -531,7 +541,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   if (!done) {
     const choices = current.choices ?? [];
     const send = () => {
-      if (text.trim() && !answer.isPending) answer.mutate({ text: text.trim() });
+      if (text.trim() && !busy) answer.mutate({ text: text.trim() });
     };
     const errorLine = error ? (
       <p className="rq__error" role="alert">
@@ -579,7 +589,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                 key={choice}
                 size="sm"
                 data-choice=""
-                disabled={answer.isPending}
+                disabled={busy}
                 loading={answer.isPending && "choice" in answer.variables && answer.variables.choice === choice}
                 onClick={() => answer.mutate({ choice })}
               >
@@ -587,21 +597,47 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
               </Button>
             ))}
             {writing ? (
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={!text.trim() || (answer.isPending && !("text" in answer.variables))}
-                loading={answer.isPending && "text" in answer.variables}
-              >
-                {t("channel.send")}
-              </Button>
+              <>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
+                  loading={answer.isPending && "text" in answer.variables}
+                >
+                  {t("channel.send")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setWriting(false);
+                    setText("");
+                    setError(null);
+                    // The button leaves with the field: focus goes back to the one that opened it.
+                    requestAnimationFrame(() => reopen.current?.focus());
+                  }}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </>
             ) : (
-              <Button variant={choices.length > 0 ? "ghost" : "primary"} size="sm" onClick={() => setWriting(true)}>
+              <Button
+                ref={reopen}
+                variant={choices.length > 0 ? "ghost" : "primary"}
+                size="sm"
+                onClick={() => setWriting(true)}
+              >
                 {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
               </Button>
             )}
           </>
+        }
+        end={
+          <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>
+            {t("question.skip")}
+          </Button>
         }
         what={current.text}
         onSubmit={writing ? send : undefined}
@@ -617,6 +653,12 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       <RequestDone done label={t("question.group", { agent: name })}>
         {current.withdrawn ? (
           t("question.withdrawn", agentGrammar(name))
+        ) : current.dismissed ? (
+          who ? (
+            t("question.dismissed", { name: who })
+          ) : (
+            t("question.dismissedByYou")
+          )
         ) : current.answer === null ? (
           t("question.closed")
         ) : who ? (

@@ -1804,7 +1804,7 @@ async function executeRunInner(
         });
       } else if (!result && call.questionId) {
         const [question] = await db.select().from(agentQuestions).where(eq(agentQuestions.id, call.questionId));
-        if (question?.status === "answered") byPerson = true;
+        if (question?.status === "answered" || question?.status === "dismissed") byPerson = true;
         result = { isError: false, ...questionResult(question) };
         await addRunStep(db, run, "tool_result", {
           toolUseId: call.toolUseId,

@@ -62,6 +62,12 @@ describe("the header search (Discord's)", () => {
   test("focused: the filters with an example, the rest folded under Mais filtros; de: lists agents, then people", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(6);
+    // It starts in this channel, a small chip the person may remove; then it is the whole workspace's.
+    const header = document.querySelector(".channel__header") as HTMLElement;
+    expect(header.querySelector(".ac-token--sm")?.textContent).toBe("em: #eng");
+    expect(box().getAttribute("placeholder")).toBe("");
+    await act(async () => fireEvent.keyDown(box(), { key: "Backspace" }));
+    expect(header.querySelector(".ac-token")).toBeNull();
     expect(box().getAttribute("placeholder")).toBe("Buscar em Acme");
     await act(async () => fireEvent.focus(box()));
     const menu = screen().getByRole("listbox", { name: "Opções de busca" });
@@ -101,6 +107,7 @@ describe("the header search (Discord's)", () => {
     const state = seeded();
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("zebra");
     await enter();
     const panel = results() as HTMLElement;
@@ -132,6 +139,26 @@ describe("the header search (Discord's)", () => {
     // The trash forgets them.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Limpar buscas recentes" })));
     expect(screen().queryByRole("option", { name: "zebra" })).toBeNull();
+  });
+
+  test("moving to another channel scopes an untouched search there; words typed keep the search as it is", async () => {
+    const api = createFakeApi(seedState());
+    const query = spyOn(api.search, "query");
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    const chip = () => document.querySelector(".channel__header .ac-token")?.textContent;
+    expect(chip()).toBe("em: #eng");
+    // The starting chip alone runs no search until the results show.
+    expect(query).not.toHaveBeenCalled();
+    await act(() =>
+      router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId: GENERAL_ID } }),
+    );
+    await settle(6);
+    expect(chip()).toBe("em: #general");
+    await typeIn("zebra");
+    await act(() => router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId: ENG_ID } }));
+    await settle(6);
+    expect(chip()).toBe("em: #general");
   });
 
   test("Mais filtros opens from the keyboard too", async () => {
