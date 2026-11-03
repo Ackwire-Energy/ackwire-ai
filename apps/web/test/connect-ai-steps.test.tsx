@@ -570,10 +570,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(layout).not.toContain(".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text");
     expect(layout).not.toContain(".ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline)");
     // None of it waits for a narrow screen, and nothing pulls the words down to a button beside them.
-    for (const rule of [
-      ".agp-addacct__step {",
-      ".agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {",
-    ])
+    for (const rule of [".agp-addacct__step {", ".agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {"])
       expect(layout).toContain(`\n${rule}`);
     expect(layout).not.toContain(".agp-addacct__step:has(> .ac-btn--sm)");
     expect(layout).not.toContain("> .agp-addacct__step > .ac-btn--sm)");
