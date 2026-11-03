@@ -15,7 +15,7 @@ import {
   type ZoomView,
   zoomAt,
 } from "@agenteschat/client/lib/zoom";
-import { Button } from "@agenteschat/ui";
+import { Button, Spinner } from "@agenteschat/ui";
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
@@ -24,6 +24,8 @@ import { STORAGE_KEYS, storage } from "@/lib/storage";
 const HOVER = "(hover: hover) and (pointer: fine)";
 /** A press that moves less than this is a click, not a drag. */
 const CLICK_SLOP = 4;
+/** A second click this soon after a click zoomed in is a double-click: it keeps the zoom instead of fitting back. */
+const DOUBLE_CLICK_MS = 400;
 /** Arrow keys move the zoomed picture this share of the stage. */
 const ARROW_STEP = 0.1;
 
@@ -42,6 +44,7 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<Size | null>(null);
   const [img, setImg] = useState<Size | null>(null);
+  const [broken, setBroken] = useState(false);
   const [view, setView] = useState<ZoomView | null>(null);
   const [animate, setAnimate] = useState(false);
   const [pointer, setPointer] = useState<Point | null>(null);
@@ -52,6 +55,7 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
   const gesture = useRef<{ start: Point; view: ZoomView; moved: boolean; pinch?: { d: number; mid: Point } } | null>(
     null,
   );
+  const zoomedInAt = useRef(0);
   const viewRef = useRef(view);
   viewRef.current = view;
 
@@ -61,9 +65,9 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
+    // The layout size, not getBoundingClientRect: the dialog opens with a scale animation that would shrink the fit.
     const measure = () => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) setStage({ w: r.width, h: r.height });
+      if (el.clientWidth > 0 && el.clientHeight > 0) setStage({ w: el.clientWidth, h: el.clientHeight });
     };
     measure();
     if (typeof ResizeObserver === "undefined") return;
@@ -207,10 +211,12 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
     setDragging(false);
     const v = viewRef.current;
     if (e.type !== "pointerup" || !g || g.moved || !v || !img || !stage) return;
-    go(
-      isZoomed(v, img, stage) ? fitView(img, stage) : zoomAt(v, clickZoom(fitScale(img, stage)), local(e), img, stage),
-      true,
-    );
+    if (isZoomed(v, img, stage)) {
+      if (e.timeStamp - zoomedInAt.current > DOUBLE_CLICK_MS) go(fitView(img, stage), true);
+      return;
+    }
+    zoomedInAt.current = e.timeStamp;
+    go(zoomAt(v, clickZoom(fitScale(img, stage)), local(e), img, stage), true);
   };
 
   const center = () => ({ x: (stage?.w ?? 0) / 2, y: (stage?.h ?? 0) / 2 });
@@ -269,10 +275,23 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
           onLoad={(e) => {
             const el = e.currentTarget;
             // An SVG without a size of its own takes the stage's.
-            const r = stageRef.current?.getBoundingClientRect();
-            setImg({ w: el.naturalWidth || r?.width || 1, h: el.naturalHeight || r?.height || 1 });
+            const st = stageRef.current;
+            setImg({ w: el.naturalWidth || st?.clientWidth || 1, h: el.naturalHeight || st?.clientHeight || 1 });
           }}
+          onError={() => setBroken(true)}
         />
+        {!img && (
+          <span className="izoom__status row small muted" role="status">
+            {broken ? (
+              t("files.previewFailed")
+            ) : (
+              <>
+                <Spinner />
+                {t("files.previewLoading")}
+              </>
+            )}
+          </span>
+        )}
         {lens && box && (
           <>
             <span

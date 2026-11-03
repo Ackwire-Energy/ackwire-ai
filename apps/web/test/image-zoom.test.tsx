@@ -13,9 +13,13 @@ const realRect = HTMLElement.prototype.getBoundingClientRect;
 let realMatch: typeof matchMedia;
 beforeAll(() => {
   HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-    const r = { x: 0, y: 0, left: 0, top: 0, width: STAGE.w, height: STAGE.h, right: STAGE.w, bottom: STAGE.h };
+    // Mid open animation (the dialog scales in from 0.97): the fit must come from the layout size, not this one.
+    const [w, h] = [STAGE.w * 0.97, STAGE.h * 0.97];
+    const r = { x: 0, y: 0, left: 0, top: 0, width: w, height: h, right: w, bottom: h };
     return { ...r, toJSON: () => r } as DOMRect;
   };
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => STAGE.w });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => STAGE.h });
   realMatch = globalThis.matchMedia;
   // A mouse: the hover lens is offered.
   globalThis.matchMedia = ((query: string) => ({
@@ -27,6 +31,8 @@ beforeAll(() => {
 });
 afterAll(() => {
   HTMLElement.prototype.getBoundingClientRect = realRect;
+  Reflect.deleteProperty(HTMLElement.prototype, "clientWidth");
+  Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
   globalThis.matchMedia = realMatch;
 });
 afterEach(() => {
@@ -81,6 +87,13 @@ describe("the picture viewer's zoom", () => {
     // The banner's middle stays under the pointer.
     expect(img.style.transform).toContain("translate(-1200px, 50px)");
     expect(getByText("Arraste para mover. Esc volta a ajustar")).toBeTruthy();
+    // The second click of a double-click keeps the zoom.
+    await act(async () => {
+      fireEvent.pointerDown(stage, { pointerId: 1, button: 0, clientX: 600, clientY: 350 });
+      fireEvent.pointerUp(stage, { pointerId: 1, button: 0, clientX: 600, clientY: 350 });
+    });
+    expect(scaleOf(img)).toBe(1);
+    await Bun.sleep(450);
     await act(async () => {
       fireEvent.pointerDown(stage, { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
       fireEvent.pointerUp(stage, { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
@@ -138,5 +151,18 @@ describe("the picture viewer's zoom", () => {
     expect(lens.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector(".izoom__lens")).toBeNull();
     expect(localStorage.getItem("agentes.image.lens")).toBe("0");
+  });
+
+  test("a picture the browser can't draw says so instead of an empty stage", async () => {
+    const r = render(
+      <I18nextProvider i18n={createI18n("pt-BR")}>
+        <ImageZoom src="blob:broken" alt="Imagem: x.png" />
+      </I18nextProvider>,
+    );
+    expect(r.getByRole("status").textContent).toContain("Carregando");
+    const img = r.container.querySelector<HTMLImageElement>(".izoom__img");
+    if (!img) throw new Error("no picture");
+    await act(async () => fireEvent.error(img));
+    expect(r.getByRole("status").textContent).toContain("Não deu para mostrar a prévia");
   });
 });

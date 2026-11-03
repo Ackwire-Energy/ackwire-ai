@@ -61,8 +61,8 @@ export function ZoomableImage({
   const ty = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
-  // The picture as drawn unzoomed: the pan stops at its edges, not the screen's.
-  const content = useSharedValue({ w: width, h: height });
+  // The picture's own size (0 until it loads): the pan stops at its edges as drawn, not the screen's.
+  const natural = useSharedValue({ w: 0, h: 0 });
 
   const report = (z: boolean) => {
     setZoomed(z);
@@ -78,7 +78,8 @@ export function ZoomableImage({
       scheduleOnRN(report, false);
       return;
     }
-    const c = clampZoomTranslate(tx.value, ty.value, scale.value, width, height, content.value.w, content.value.h);
+    const d = containSize(natural.value.w, natural.value.h, width, height);
+    const c = clampZoomTranslate(tx.value, ty.value, scale.value, width, height, d.w, d.h);
     tx.value = withTiming(c.x);
     ty.value = withTiming(c.y);
     scheduleOnRN(report, true);
@@ -158,9 +159,10 @@ export function ZoomableImage({
         scheduleOnRN(report, false);
         return;
       }
-      const next = doubleTapZoom(content.value.w, content.value.h, width, height);
+      const d = containSize(natural.value.w, natural.value.h, width, height);
+      const next = doubleTapZoom(d.w, d.h, width, height);
       const z = zoomAround({ x: 0, y: 0 }, 1, next, e.x - width / 2, e.y - height / 2);
-      const c = clampZoomTranslate(z.x, z.y, next, width, height, content.value.w, content.value.h);
+      const c = clampZoomTranslate(z.x, z.y, next, width, height, d.w, d.h);
       scale.value = withTiming(next);
       tx.value = withTiming(c.x);
       ty.value = withTiming(c.y);
@@ -196,7 +198,7 @@ export function ZoomableImage({
           contentFit="contain"
           transition={160}
           onLoad={(e) => {
-            content.value = containSize(e.source.width, e.source.height, width, height);
+            natural.value = { w: e.source.width, h: e.source.height };
           }}
           style={StyleSheet.absoluteFill}
           accessible={false}

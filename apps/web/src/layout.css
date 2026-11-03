@@ -6916,6 +6916,12 @@ html:not([data-pointer]) .file-row__open:focus-visible {
     transition: transform 0.2s var(--out);
   }
 }
+.izoom__status {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  gap: 8px;
+}
 .izoom__lens {
   position: absolute;
   pointer-events: none;
