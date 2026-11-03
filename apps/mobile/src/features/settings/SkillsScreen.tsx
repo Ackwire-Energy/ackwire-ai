@@ -213,7 +213,10 @@ export function SkillScreen({ id }: { id: string }) {
       : f.status === "ignored"
         ? {
             value: t("skills.needsSandbox"),
-            sub: `${t("skills.reinstall")} ${t("skills.assetLimit", { max: SKILL_ASSET_MB })}`,
+            sub: t("common.joinSentences", {
+              a: t("skills.reinstall"),
+              b: t("skills.assetLimit", { max: SKILL_ASSET_MB }),
+            }),
           }
         : { value: f.mime };
 
