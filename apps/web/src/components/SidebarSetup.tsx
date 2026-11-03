@@ -1,7 +1,9 @@
 import type { SidebarItem, SidebarPlace } from "@agenteschat/client";
-import { useSetSidebarItem, useSidebarItems } from "@agenteschat/client";
+import { useSetSidebarItem, useSetSidebarToolOrder, useSidebarItems, useSidebarToolOrder } from "@agenteschat/client";
 import {
   moveSection,
+  moveShownTool,
+  placeTool,
   SIDEBAR_COUNTED,
   SIDEBAR_ITEMS,
   SIDEBAR_SECTIONS,
@@ -18,7 +20,15 @@ import {
   Segmented,
   type SegmentedOption,
 } from "@agenteschat/ui";
-import { useEffect } from "react";
+import {
+  cloneElement,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactElement,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "./org-context";
 import { sectionName, useSectionOrder } from "./SidebarOrder";
@@ -35,6 +45,71 @@ export const SIDEBAR_TOOLS = {
   forum: { to: "/org/$orgId/forum", icon: "message" },
 } as const satisfies Record<SidebarItem, { to: string; icon: IconName }>;
 
+/** The person's order of the tools in this workspace (`…/me/sidebar/tools`), saved as `null` when it is the default. */
+function useToolOrder(orgId: string) {
+  const order = useSidebarToolOrder(orgId);
+  const save = useSetSidebarToolOrder(orgId);
+  const put = (next: SidebarItem[]) => {
+    if (!sameOrder(next, order)) save.mutate(sameOrder(next, SIDEBAR_ITEMS) ? null : next);
+  };
+  return { order, put };
+}
+
+const TOOL_DRAG = "application/x-agentes-tool";
+const MOVE_KEYS = "Alt+Shift+ArrowUp Alt+Shift+ArrowDown";
+
+/**
+ * The tools shown in the sidebar's list, in the person's order: each dragged onto another goes before or after it,
+ * and Alt+Shift+↑/↓ on a focused one moves it past its neighbour (the setup dialog's arrows do it too). The rows stay
+ * the links `row` makes, so the browser's own menu on them is kept.
+ */
+export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: SidebarItem) => ReactElement }) {
+  const { org } = useOrg();
+  const { order, put } = useToolOrder(org.id);
+  const dragging = useRef<SidebarItem | null>(null);
+  const [mark, setMark] = useState<{ id: SidebarItem; where: "before" | "after" } | null>(null);
+  const shown = order.filter((id) => items.includes(id));
+  const end = () => {
+    dragging.current = null;
+    setMark(null);
+  };
+  return shown.map((id) =>
+    cloneElement(row(id) as ReactElement<Record<string, unknown>>, {
+      draggable: true,
+      "aria-keyshortcuts": MOVE_KEYS,
+      "data-drop": mark?.id === id ? mark.where : undefined,
+      onKeyDown: (e: KeyboardEvent) => {
+        if (!e.altKey || !e.shiftKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+        e.preventDefault();
+        put(moveShownTool(order, shown, id, e.key === "ArrowUp" ? -1 : 1));
+      },
+      onDragStart: (e: DragEvent) => {
+        dragging.current = id;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData(TOOL_DRAG, id);
+      },
+      onDragOver: (e: DragEvent) => {
+        const from = dragging.current;
+        if (!from || from === id) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const r = e.currentTarget.getBoundingClientRect();
+        const where = e.clientY > r.top + r.height / 2 ? "after" : "before";
+        if (mark?.id !== id || mark.where !== where) setMark({ id, where });
+      },
+      onDrop: (e: DragEvent) => {
+        const from = dragging.current;
+        const m = mark;
+        end();
+        if (!from || !m) return;
+        e.preventDefault();
+        put(placeTool(order, from, m.id, m.where));
+      },
+      onDragEnd: end,
+    }),
+  );
+}
+
 /**
  * "Personalizar a barra lateral", from More: one line per tool and where it goes, Sempre, Em Mais or, for a tool with
  * a count, Quando tiver algo. A choice applies at once (no Save) and is kept on the server for this person in this
@@ -46,6 +121,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
   const { data: items, refetch } = useSidebarItems(org.id);
   const save = useSetSidebarItem(org.id);
   const sections = useSectionOrder(org.id);
+  const tools = useToolOrder(org.id);
   // What another device changed since this one loaded shows as the dialog opens.
   useEffect(() => {
     if (open) void refetch();
@@ -68,7 +144,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
     >
       <DialogBody>
         <ul className="sidebar-setup">
-          {SIDEBAR_ITEMS.map((id) => (
+          {tools.order.map((id, i) => (
             <li key={id} className="sidebar-setup__row">
               <span className="settings-row__icon" aria-hidden="true">
                 <Icon name={SIDEBAR_TOOLS[id].icon} size={16} />
@@ -80,6 +156,24 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 value={sidebarPlace(items, id)}
                 onValueChange={(place) => save.mutate({ item: id, place })}
                 options={options(id)}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon="chevronUp"
+                aria-label={`${t("contextMenu.moveUp")}: ${t(`shell.${id}`)}`}
+                disabled={i === 0}
+                onClick={() => tools.put(moveSection(tools.order, id, -1))}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon="chevronDown"
+                aria-label={`${t("contextMenu.moveDown")}: ${t(`shell.${id}`)}`}
+                disabled={i === tools.order.length - 1}
+                onClick={() => tools.put(moveSection(tools.order, id, 1))}
               />
             </li>
           ))}
@@ -127,8 +221,11 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
         <Button
           variant="ghost"
           icon="undo"
-          disabled={Object.keys(items ?? {}).length === 0}
-          onClick={() => save.mutate(null)}
+          disabled={Object.keys(items ?? {}).length === 0 && sameOrder(tools.order, SIDEBAR_ITEMS)}
+          onClick={() => {
+            save.mutate(null);
+            tools.put([...SIDEBAR_ITEMS]);
+          }}
         >
           {t("shell.sidebarSetup.reset")}
         </Button>

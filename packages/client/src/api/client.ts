@@ -409,6 +409,10 @@ export interface ApiClient {
     sidebarOrder(orgId: string): Promise<SidebarSection[]>;
     /** Saves my section order here (`null`: the default). */
     setSidebarOrder(orgId: string, order: SidebarSection[] | null): Promise<SidebarSection[]>;
+    /** The sidebar's tools in my order here (every tool; its place says list or More). */
+    sidebarToolOrder(orgId: string): Promise<SidebarItem[]>;
+    /** Saves my order of the tools here (`null`: the default). */
+    setSidebarToolOrder(orgId: string, order: SidebarItem[] | null): Promise<SidebarItem[]>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;

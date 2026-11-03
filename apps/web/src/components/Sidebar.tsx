@@ -125,7 +125,7 @@ import { useOrg } from "./org-context";
 import { StatusLine } from "./Presence";
 import { MyFace, OrgMark } from "./ProfilePhoto";
 import { sectionName, useSectionOrder } from "./SidebarOrder";
-import { SIDEBAR_TOOLS, SidebarSetupDialog } from "./SidebarSetup";
+import { SIDEBAR_TOOLS, SidebarSetupDialog, ToolList } from "./SidebarSetup";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { SetStatusDialog, useSaveStatus } from "./StatusDialog";
 
@@ -436,7 +436,7 @@ export function Sidebar() {
           <Icon name="home" />
           <span className="sidebar__item-label">{t("shell.home")}</span>
         </Link>
-        {listed.map(toolRow)}
+        <ToolList items={listed} row={toolRow} />
         <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} />
       </div>
     ),

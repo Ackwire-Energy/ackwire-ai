@@ -30,17 +30,44 @@ export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "threads"];
 /** The sidebar's sections in their default order (mirrors `SIDEBAR_SECTIONS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "channels", "agents", "people"];
 
-/** `order` with `section` moved one place up (-1) or down (+1); the same order at an end. */
-export function moveSection(order: readonly SidebarSection[], section: SidebarSection, by: -1 | 1): SidebarSection[] {
+/** `order` with `section` (a section or a tool) moved one place up (-1) or down (+1); the same order at an end. */
+export function moveSection<T extends string>(order: readonly T[], section: T, by: -1 | 1): T[] {
   const next = [...order];
   const i = next.indexOf(section);
   const j = i + by;
   if (i < 0 || j < 0 || j >= next.length) return next;
-  [next[i], next[j]] = [next[j] as SidebarSection, section];
+  [next[i], next[j]] = [next[j] as T, section];
   return next;
 }
 
-export const sameOrder = (a: readonly SidebarSection[], b: readonly SidebarSection[]) => a.join() === b.join();
+export const sameOrder = (a: readonly string[], b: readonly string[]) => a.join() === b.join();
+
+/** `order` with `item` put just before or after `target`; the same order when either isn't in it or they're one. */
+export function placeTool(
+  order: readonly SidebarItem[],
+  item: SidebarItem,
+  target: SidebarItem,
+  where: "before" | "after",
+): SidebarItem[] {
+  if (item === target || !order.includes(item) || !order.includes(target)) return [...order];
+  const rest = order.filter((x) => x !== item);
+  rest.splice(rest.indexOf(target) + (where === "after" ? 1 : 0), 0, item);
+  return rest;
+}
+
+/**
+ * `item` one place up (-1) or down (+1) among the tools `shown` in the list: past its neighbour there, whatever sits
+ * in More between them. The same order at an end.
+ */
+export function moveShownTool(
+  order: readonly SidebarItem[],
+  shown: readonly SidebarItem[],
+  item: SidebarItem,
+  by: -1 | 1,
+): SidebarItem[] {
+  const target = shown[shown.indexOf(item) + by];
+  return target ? placeTool(order, item, target, by < 0 ? "before" : "after") : [...order];
+}
 
 export const sidebarPlace = (items: SidebarItems | undefined, item: SidebarItem): SidebarPlace =>
   items?.[item] ?? SIDEBAR_DEFAULTS[item];
