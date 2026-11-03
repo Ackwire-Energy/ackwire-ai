@@ -1,6 +1,6 @@
 # 0093. The team's coordinator
 
-- Status: Accepted
+- Status: Superseded 2026-11-03 by ADR 0134: the team's right hand replaces the coordinator, its switch, its rule and its column's use; a person alone with two or more agents gets the top-scored one when the message needs an agent
 - Date: 2026-10-31
 - Code: `packages/db/src/schema/agents.ts` (`agents.coordinator`, index `agents_one_coordinator`, migration 0141), `packages/engine/src/agents.ts` (`createAgent`, `setCoordinator`, `archiveAgent`), `packages/engine/src/agent-deletion.ts`, `packages/engine/src/router.ts`, `packages/engine/src/context.ts`, `packages/engine/src/events.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/coordinator.ts`, `packages/client/src/realtime/machines.ts`, `apps/web/src/pages/agent/SettingsTab.tsx`, `apps/web/src/components/CoordinatorChip.tsx`, `apps/mobile/src/features/agents/AgentEditScreen.tsx`
 

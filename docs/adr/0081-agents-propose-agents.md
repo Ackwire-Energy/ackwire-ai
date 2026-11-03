@@ -1,6 +1,6 @@
 # 0081. Agents propose agents; a person creates them
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-11-03 by ADR 0134: the right hand's cards create in one click (Criar, or Criar e testar with a first task) without the review screen, a newer card puts the older one away, and a person who can't create agents sends it to whoever may
 - Date: 2026-10-30
 - Extends: ADR 0061 §8 (action cards: "creating agents … come after, as proposals"), ADR 0059 §3 (a plan thinks only for its owner's agents), ADR 0053 (who is behind a run)
 - Code: `packages/engine/src/agent-proposals.ts`, `packages/engine/src/setup-tools.ts` (`propose_agent`), `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/action-cards.ts`, `apps/web/src/components/ActionCard.tsx`, `apps/web/src/pages/NewAgentPage.tsx`, `apps/mobile/src/features/agents/ProposalCard.tsx`, `apps/mobile/src/features/agents/NewAgentScreen.tsx`
