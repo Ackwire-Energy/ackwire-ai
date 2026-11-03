@@ -661,8 +661,9 @@ test("back from a wait on the plan, the agent's status moves at once: the apps d
   const handlers = handlersWith(f, brain);
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
+  // Parked on its plan with no model to fall back on: out of office until the reset (ADR 0084 §12).
   const [status] = await loadAgentStatuses(f.db, f.org.id);
-  expect(status?.status?.kind).toBe("waiting_plan");
+  expect(status?.status?.kind).toBe("out_of_plan");
   const parked = statusEvents.length;
   await Bun.sleep(200);
   await drainOutbox(f.db, handlers, { now: later(RESUME_AFTER_MS + RESUME_GAP_MS) });
@@ -689,8 +690,9 @@ test("Don't run it: who asked cancels a reply waiting on the plan; its note says
   const [after] = await notes(f, "plan_limit_wait");
   expect((after?.meta.usageWait as { canceled?: boolean } | undefined)?.canceled).toBe(true);
   expect(await resumeJob(f, run?.id ?? "")).toBeUndefined();
+  // Nothing waits any more; the plan is still at its limit, so it reads out of office, not waiting.
   const [status] = await loadAgentStatuses(f.db, f.org.id);
-  expect(status?.status).toBeNull();
+  expect(status?.status?.kind).toBe("out_of_plan");
   await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + RESUME_GAP_MS) });
   expect(seen).toHaveLength(1);
 });

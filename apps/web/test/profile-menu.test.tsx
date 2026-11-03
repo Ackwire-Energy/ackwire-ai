@@ -119,13 +119,14 @@ describe("the account menu", () => {
     await go();
     const status = await openStatus();
     const radios = within(status).getAllByRole("menuitemradio");
-    expect(names(radios)).toEqual(["Online", "Ausente", "Ocupado", "Oculto"]);
-    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
+    expect(names(radios)).toEqual(["Online", "Ausente", "Ocupado", "Fora do escritório", "Oculto"]);
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false", "false"]);
     // Each choice with its badge, drawn as on my face.
     expect(radios.map((r) => r.querySelector(".ac-presence")?.getAttribute("data-presence"))).toEqual([
       "online",
       "away",
       "busy",
+      "out",
       "hidden",
     ]);
     expect(within(status).getByRole("menuitem", { name: "O que você está fazendo?" })).toBeTruthy();
@@ -232,7 +233,13 @@ describe("the account menu", () => {
     await click(screen().getAllByRole("button", { name: "Abrir menu" })[0] as HTMLElement);
     const menu = await openMenu();
     expect(within(menu).queryByRole("menuitem", { name: "Definir status" })).toBeNull();
-    expect(names(within(menu).getAllByRole("menuitemradio"))).toEqual(["Online", "Ausente", "Ocupado", "Oculto"]);
+    expect(names(within(menu).getAllByRole("menuitemradio"))).toEqual([
+      "Online",
+      "Ausente",
+      "Ocupado",
+      "Fora do escritório",
+      "Oculto",
+    ]);
     expect(names(within(menu).getAllByRole("menuitem"))).toEqual([
       "O que você está fazendo?",
       "Editar perfil",
