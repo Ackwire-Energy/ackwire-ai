@@ -20,7 +20,17 @@ import {
   queueWhereText,
   waitingFor,
 } from "@agenteschat/client/lib/computer-queue";
-import { Button, Chip, Dialog, DialogBody, Icon, Message as MessageRow, useNow } from "@agenteschat/ui";
+import {
+  Button,
+  Chip,
+  CountChip,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Icon,
+  Message as MessageRow,
+  useNow,
+} from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -93,10 +103,12 @@ export function QueueDialog({
   machineId,
   open,
   onOpenChange,
+  onOpenComputer,
 }: {
   machineId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenComputer?: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -130,6 +142,13 @@ export function QueueDialog({
           <LoadingList count={3} />
         )}
       </DialogBody>
+      {onOpenComputer && (
+        <DialogFooter>
+          <Button icon="computer" onClick={onOpenComputer}>
+            {t("queue.openComputer")}
+          </Button>
+        </DialogFooter>
+      )}
     </Dialog>
   );
 }
@@ -319,22 +338,51 @@ export function FanOutStrip({ message, otherwise = null }: { message: Message; o
   );
 }
 
-/** The conversation header's button while anyone waits for this computer: "Computer · 9 waiting", opening the line. */
-export function QueueButton({ machineId }: { machineId: string | null }) {
+/**
+ * The conversation header's computer button: "Computer · 9 waiting" while anyone waits for this computer, opening the
+ * line, else `idle` (a DM's own Computer button). `onOpenComputer` gives the line "Open the computer".
+ */
+export function QueueButton({
+  machineId,
+  idle = null,
+  onOpenComputer,
+}: {
+  machineId: string | null;
+  idle?: ReactNode;
+  onOpenComputer?: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const q = useMachineQueue(org.id, machineId);
   const [open, setOpen] = useState(false);
-  if (!machineId) return null;
+  const waiting = machineId ? (q.data?.waiting.length ?? 0) : 0;
   return (
     <>
-      {q.data?.waiting.length ? (
-        <Button size="sm" icon="computer" onClick={() => setOpen(true)}>
-          {queueButtonText(t, q.data)}
+      {waiting > 0 ? (
+        <Button size="sm" icon="computer" className="cq-btn" onClick={() => setOpen(true)}>
+          <span className="cq-btn__label">{queueButtonText(t, q.data)}</span>
+          <CountChip size="sm" className="cq-btn__count" aria-hidden="true">
+            {waiting > 99 ? "99+" : waiting}
+          </CountChip>
         </Button>
-      ) : null}
+      ) : (
+        idle
+      )}
       {/* Stays open as the line empties: the person sees it end. */}
-      {open && <QueueDialog machineId={machineId} open={open} onOpenChange={setOpen} />}
+      {open && machineId && (
+        <QueueDialog
+          machineId={machineId}
+          open={open}
+          onOpenChange={setOpen}
+          onOpenComputer={
+            onOpenComputer &&
+            (() => {
+              setOpen(false);
+              onOpenComputer();
+            })
+          }
+        />
+      )}
     </>
   );
 }

@@ -24,6 +24,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { QueueButton, useAgentMachineId } from "@/components/ComputerQueue";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useKeyboardLock } from "@/hooks/useKeyboardLock";
 import { useNow } from "@/hooks/useNow";
@@ -608,17 +609,30 @@ function Banner({
 }
 
 /**
- * "Computador" in the agent's DM header, for whoever may watch its computer: the same dialog, in place, with a
- * dot while the agent needs someone (amber) or works on it (its color).
+ * "Computador" in the agent's DM header: while turns wait for its computer, "Computador · 4 aguardando" opening the
+ * line (with a way on to the computer for whoever may watch it), else, for whoever may watch it, the same dialog in
+ * place, with a dot while the agent needs someone (amber) or works on it (its color).
  */
 export function ComputerButton({ agent }: { agent: Agent }) {
+  const view = useAgentComputer(agent);
+  const openComputer = useOpenComputer();
+  const watch = view.ready && !view.forbidden && view.facts;
+  return (
+    <QueueButton
+      machineId={useAgentMachineId(agent.id)}
+      idle={watch ? <WatchButton agent={agent} view={view} /> : null}
+      onOpenComputer={watch ? () => openComputer(agent.id) : undefined}
+    />
+  );
+}
+
+function WatchButton({ agent, view }: { agent: Agent; view: AgentComputerView }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const view = useAgentComputer(agent);
   const openComputer = useOpenComputer();
-  if (!view.ready || view.forbidden || !view.facts) return null;
   const f = view.facts;
+  if (!f) return null;
   const entry = entryState(f);
   const state =
     entry.kind === "needsYou" || entry.kind === "needsOther"

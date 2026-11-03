@@ -174,3 +174,24 @@ html:not([data-pointer]) .cq-link:focus-visible {
 .cq-away.ac-chip {
   flex: none;
 }
+
+/* The header's "Computador · 4 aguardando": the computer and its count alone where the header is narrow. */
+.cq-btn.ac-btn {
+  white-space: nowrap;
+}
+.cq-btn .cq-btn__count {
+  display: none;
+}
+@media (max-width: 640px) {
+  .cq-btn .cq-btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .cq-btn .cq-btn__count {
+    display: inline-flex;
+  }
+}

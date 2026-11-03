@@ -1353,14 +1353,21 @@ function Chat({
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
-  // An agent's DM also opens its computer (as the web's DM header), for whoever may watch it.
+  // An agent's DM also opens its computer (as the web's DM header), for whoever may watch it: one entry, the line
+  // while turns wait for the computer (the way on to it inside), else the computer.
+  const dmComputer = dmAgentId && !isThread ? { agentId: dmAgentId, onOpen: leavePlace } : undefined;
   const right =
     (isThread && info) || dm || channel ? (
       <>
         {queueShown && barQueue && queueMachineId ? (
-          <QueueButton queue={barQueue} onPress={() => openQueue(queueMachineId)} />
+          <QueueButton
+            queue={barQueue}
+            icon={dmComputer ? "laptop" : undefined}
+            onPress={() => openQueue(queueMachineId, dmComputer)}
+          />
+        ) : dmComputer ? (
+          <DmComputerButton agentId={dmComputer.agentId} onOpen={leavePlace} />
         ) : null}
-        {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} onOpen={leavePlace} /> : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
     ) : null;

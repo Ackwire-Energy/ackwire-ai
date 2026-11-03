@@ -23,7 +23,9 @@ import {
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { CHROME_MAX_SCALE, Chip, Count, Icon, PressScale, Text } from "@/ui";
+import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text } from "@/ui";
+import { useWatchableComputer } from "../chat/DmComputerButton";
+import { openComputer } from "../computer/AgentComputerRow";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -39,17 +41,29 @@ export function useAgentsQueue(agentIds: readonly string[]) {
   return { machineId, queue: queue.data ?? null };
 }
 
-/** Opens a computer's line in the screen's sheet, over the conversation. */
+/** Opens a computer's line in the screen's sheet, over the conversation; `computer` adds the way on to it. */
 export function useOpenQueue() {
   const sheet = useSheet();
-  return useCallback((machineId: string) => sheet.open(<QueueSheet machineId={machineId} />), [sheet]);
+  return useCallback(
+    (machineId: string, computer?: OpenComputerProps) =>
+      sheet.open(<QueueSheet machineId={machineId} computer={computer} />),
+    [sheet],
+  );
 }
 
 /**
  * The conversation bar's way into the line while turns wait for the computer: the waiting icon with how many wait.
  * The bar sits outside the screen's sheet host, so the screen opens the sheet (`onPress`).
  */
-export function QueueButton({ queue, onPress }: { queue: ComputerQueue; onPress: () => void }) {
+export function QueueButton({
+  queue,
+  onPress,
+  icon = "wait",
+}: {
+  queue: ComputerQueue;
+  onPress: () => void;
+  icon?: IconName;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   return (
@@ -61,7 +75,7 @@ export function QueueButton({ queue, onPress }: { queue: ComputerQueue; onPress:
       hitSlop={4}
       style={styles.button}
     >
-      <Icon name="wait" size={20} color={c.ink2} />
+      <Icon name={icon} size={20} color={c.ink2} />
       <View style={styles.badge} pointerEvents="none">
         <Count value={queue.waiting.length} size={10} inverted max={99} />
       </View>
@@ -74,7 +88,7 @@ export function QueueButton({ queue, onPress }: { queue: ComputerQueue; onPress:
  * running: what for, where, for how long, the time left) and "In line" (the order, who asked, the estimated start;
  * my own request marked "You go first"), and the rule that keeps it. What a turn is for, never its content.
  */
-export function QueueSheet({ machineId }: { machineId: string }) {
+export function QueueSheet({ machineId, computer }: { machineId: string; computer?: OpenComputerProps }) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
@@ -115,7 +129,34 @@ export function QueueSheet({ machineId }: { machineId: string }) {
       <Text variant="caption" tone="faint" style={styles.rule}>
         {t("queue.rule")}
       </Text>
+      {computer ? <OpenComputer {...computer} /> : null}
     </>
+  );
+}
+
+interface OpenComputerProps {
+  agentId: string;
+  /** The conversation keeps its place before the computer covers it. */
+  onOpen?: () => void;
+}
+
+/** "Open the computer", for whoever may watch the agent's computer (as the DM header's own button). */
+function OpenComputer({ agentId, onOpen }: OpenComputerProps) {
+  const { t } = useTranslation();
+  const sheet = useSheet();
+  if (!useWatchableComputer(agentId)) return null;
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      icon="laptop"
+      label={t("queue.openComputer")}
+      onPress={() => {
+        sheet.close();
+        onOpen?.();
+        openComputer(agentId);
+      }}
+    />
   );
 }
 

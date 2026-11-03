@@ -405,6 +405,56 @@ describe("a new computer connected (ADR 0036, admins)", () => {
   });
 });
 
+describe("agents that failed for one cause (ADR 0097)", () => {
+  const failure = (agentId: string, messageId: string) => ({
+    key: `run_failed:${agentId}:${ENG_ID}:${messageId}`,
+    agentId,
+    channelId: ENG_ID,
+    messageId,
+    label: "eng",
+  });
+  test("one row says how many and why, opens to each agent, and each goes to its conversation", async () => {
+    const grouped = notification({
+      id: "n-fails",
+      kind: "run_failed",
+      count: 2,
+      actors: [
+        { type: "agent", id: ATLAS_ID },
+        { type: "agent", id: ADA_ID },
+      ],
+      source: { channelId: ENG_ID, messageId: "m-a", agentId: ADA_ID, label: "eng" },
+      latest: {
+        reason: "not_logged_in",
+        plan: "Claude",
+        failures: [failure(ADA_ID, "m-a"), failure(ATLAS_ID, "m-b")],
+      },
+      updatedAt: ago(2),
+    });
+    const lone = notification({
+      id: "n-fail",
+      kind: "run_failed",
+      actors: [{ type: "agent", id: ADA_ID }],
+      source: { channelId: ENG_ID, messageId: "m-c", agentId: ADA_ID, label: "eng" },
+      latest: { reason: "budget_exceeded", failures: [failure(ADA_ID, "m-c")] },
+      updatedAt: ago(4),
+    });
+    const { router } = await go(seedState({ notifications: [grouped, lone] }));
+    const row = document.querySelector('[data-n="n-fails"]') as HTMLElement;
+    expect(row.querySelector(".nt-what")?.textContent).toBe(
+      "2 agentes não conseguiram continuar: a conta do Claude foi desconectada",
+    );
+    // A lone failure reads as it always did.
+    expect(document.querySelector('[data-n="n-fail"] .nt-what')?.textContent).toBe("Ada não conseguiu terminar");
+    await click(within(row).getByRole("button", { name: "Ver 2 agentes" }));
+    await settle(2);
+    const agents = [...row.querySelectorAll(".nt-fails .nt-rep")];
+    expect(agents.map((a) => a.textContent)).toEqual(["Ada#eng", "Atlas#eng"]);
+    await click(agents[1] as Element);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+  });
+});
+
 describe("what the workspace itself tells: nobody's face, its own", () => {
   test("its computer ready, its standing: an icon where the face goes, and unread in the headline's weight", async () => {
     const ready = notification({ id: "n-ready", kind: "computer_ready", updatedAt: ago(3) });

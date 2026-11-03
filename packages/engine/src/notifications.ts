@@ -219,6 +219,20 @@ export interface NotificationLatest {
   created?: Record<string, number>;
   /** `browser_handoff` still unanswered an hour later (`remindNotifications`): its push says the agent still needs them. */
   reminder?: boolean;
+  /** `run_failed`: every run it stands for (`joinRunFailure`), one per agent and conversation. */
+  failures?: RunFailure[];
+  /** `run_failed` on a computer brain: the plan's name its cause may name ("the Claude account was disconnected"). */
+  plan?: string;
+}
+
+/** A run that failed, as its `run_failed` row lists it: `key` its agent and conversation, the rest its source. */
+export interface RunFailure {
+  key: string;
+  agentId: string;
+  channelId: string;
+  threadId?: string;
+  messageId: string;
+  label?: string;
 }
 
 export interface NotificationView {
@@ -490,9 +504,9 @@ async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: str
 export async function resolveNotifications(
   deps: NotificationDeps,
   orgId: string,
-  match: { groupKey?: string; groupKeyPrefix?: string; userIds?: string[]; kind?: NotificationKind },
+  match: { groupKey?: string; groupKeyPrefix?: string; ids?: string[]; userIds?: string[]; kind?: NotificationKind },
 ): Promise<number> {
-  if (!match.groupKey && !match.groupKeyPrefix) return 0;
+  if (!match.groupKey && !match.groupKeyPrefix && !match.ids?.length) return 0;
   if (match.userIds && match.userIds.length === 0) return 0;
   const rows = await deps.db
     .update(notifications)
@@ -503,6 +517,7 @@ export async function resolveNotifications(
         isNull(notifications.doneAt),
         match.groupKey ? eq(notifications.groupKey, match.groupKey) : undefined,
         match.groupKeyPrefix ? like(notifications.groupKey, `${escapeLike(match.groupKeyPrefix)}%`) : undefined,
+        match.ids ? inArray(notifications.id, match.ids) : undefined,
         match.userIds ? inArray(notifications.userId, match.userIds) : undefined,
         match.kind ? eq(notifications.kind, match.kind) : undefined,
       ),
@@ -515,6 +530,142 @@ export async function resolveNotifications(
   }
   for (const userId of users) await publishCounts(deps, orgId, userId);
   return rows.length;
+}
+
+// ── Failures of one cause ─────────────────────────────────────────────────────
+
+/**
+ * Runs failing for one cause this close together (a signed-out account, a computer refusing turns) share one
+ * `run_failed` row while it is open: "15 agents couldn't go on: the Claude account was disconnected".
+ */
+export const RUN_FAILED_GROUP_MS = 15 * 60_000;
+/** How many runs a row lists (`count` goes on counting). */
+const MAX_FAILURES = 100;
+
+/** The runs a `run_failed` row stands for (a row from before `failures` stands for its own source). */
+function failuresOf(r: Row): RunFailure[] {
+  const l = r.latest as NotificationLatest;
+  if (l.failures) return l.failures;
+  const s = r.source as NotificationSource;
+  return s.agentId && s.channelId && s.messageId
+    ? [
+        compact({
+          key: r.groupKey,
+          agentId: s.agentId,
+          channelId: s.channelId,
+          threadId: s.threadId,
+          messageId: s.messageId,
+          label: s.label,
+        }),
+      ]
+    : [];
+}
+
+const hasFailure = (key: string) => sql`${notifications.latest}->'failures' @> ${JSON.stringify([{ key }])}::jsonb`;
+
+async function publishRow(deps: NotificationDeps, row: Row) {
+  await publishUserEvent(deps.pubsub, row.orgId, row.userId, {
+    type: "notification.upserted",
+    notification: notificationView(row),
+  });
+  await publishCounts(deps, row.orgId, row.userId);
+}
+
+/**
+ * A run failed for `cause` (`latest.reason`, `latest.plan`): when the person has an open `run_failed` row already
+ * listing it, nothing; when one of that cause moved within `RUN_FAILED_GROUP_MS`, it joins that row (unread again,
+ * no push). False when it needs a row of its own. Call it under a lock on the person's failures, with the insert.
+ */
+export async function joinRunFailure(
+  deps: NotificationDeps,
+  orgId: string,
+  userId: string,
+  failure: RunFailure,
+  cause: { reason: string; plan?: string },
+): Promise<boolean> {
+  const { db } = deps;
+  const now = nowOf(deps);
+  const mine = and(
+    eq(notifications.orgId, orgId),
+    eq(notifications.userId, userId),
+    eq(notifications.kind, "run_failed"),
+    isNull(notifications.doneAt),
+  );
+  const [listed] = await db
+    .select({ id: notifications.id })
+    .from(notifications)
+    .where(and(mine, hasFailure(failure.key)))
+    .limit(1);
+  if (listed) return true;
+  const [open] = await db
+    .select()
+    .from(notifications)
+    .where(
+      and(
+        mine,
+        sql`${notifications.latest}->>'reason' = ${cause.reason}`,
+        sql`${notifications.latest}->>'plan' is not distinct from ${cause.plan ?? null}`,
+        gt(notifications.updatedAt, new Date(now.getTime() - RUN_FAILED_GROUP_MS)),
+      ),
+    )
+    .orderBy(desc(notifications.updatedAt))
+    .limit(1);
+  if (!open) return false;
+  const before = failuresOf(open);
+  if (before.some((f) => f.key === failure.key)) return true;
+  const [row] = await db
+    .update(notifications)
+    .set({
+      actors: mergeActors({ type: "agent", id: failure.agentId }, open.actors),
+      count: sql`${notifications.count} + 1`,
+      latest: { ...open.latest, failures: [...before, failure].slice(0, MAX_FAILURES) },
+      readAt: null,
+      updatedAt: now,
+    })
+    .where(eq(notifications.id, open.id))
+    .returning();
+  if (row) await publishRow(deps, row);
+  return true;
+}
+
+/**
+ * The agent's run in that conversation (`key`) ended well: it leaves every open `run_failed` row listing it, and a
+ * row left with none is done. A row left with one reads as that one's again.
+ */
+export async function dropRunFailure(deps: NotificationDeps, orgId: string, key: string): Promise<void> {
+  const rows = await deps.db
+    .select()
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.orgId, orgId),
+        eq(notifications.kind, "run_failed"),
+        isNull(notifications.doneAt),
+        or(eq(notifications.groupKey, key), hasFailure(key)),
+      ),
+    );
+  const done: string[] = [];
+  for (const r of rows) {
+    const rest = failuresOf(r).filter((f) => f.key !== key);
+    const first = rest[0];
+    if (!first) {
+      done.push(r.id);
+      continue;
+    }
+    const { key: _, ...source } = first;
+    const [row] = await deps.db
+      .update(notifications)
+      .set({
+        actors: rest.reduce<NotificationActor[]>((list, f) => mergeActors({ type: "agent", id: f.agentId }, list), []),
+        count: Math.max(1, r.count - 1),
+        source,
+        latest: { ...r.latest, failures: rest },
+      })
+      .where(eq(notifications.id, r.id))
+      .returning();
+    if (row) await publishRow(deps, row);
+  }
+  if (done.length) await resolveNotifications(deps, orgId, { ids: done });
 }
 
 /**

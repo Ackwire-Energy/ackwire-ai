@@ -5429,6 +5429,20 @@ export interface NotificationLatest {
   diskFreeGb?: number;
   /** `app_created`: how many of each kind (`agent`, `routine`, `skill`, `memory`, `channel`). */
   created?: Record<string, number>;
+  /** `run_failed`: every run the row stands for, failed for one cause close together (`latest.reason`). */
+  failures?: RunFailure[];
+  /** `run_failed` on a computer brain: the plan's name its cause names ("Claude"). */
+  plan?: string;
+}
+
+/** A run a `run_failed` row lists: its agent and where it failed (`key` names both). */
+export interface RunFailure {
+  key: string;
+  agentId: string;
+  channelId: string;
+  threadId?: string;
+  messageId: string;
+  label?: string;
 }
 
 export interface AppNotification {

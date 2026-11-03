@@ -49,6 +49,7 @@ import {
   joinRequestLine,
   nextRoutine,
   placeOf,
+  runFailedLines,
   type SayWords,
   subtitleOf,
   upcomingDay,
@@ -376,7 +377,9 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           plan: n.latest.title ?? "",
           defaultValue: NAMES,
         });
-  const parts = template.split(NAMES);
+  // Agents that failed for one cause close together: one line for all, who they are under it.
+  const failed = runFailedLines(t, n, (id) => dir.nameOf({ type: "agent", id }));
+  const parts = failed ? [failed.title] : template.split(NAMES);
   const title = parts.join(names);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.
   const say: SayWords = (w, otherwise = "") => {
@@ -387,7 +390,9 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const line = subtitleOf(n, say, (kind) => mediaWord(t, kind));
   const sub = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
-    : [emojisOf(n).join(" "), [line, placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
+    : failed
+      ? failed.sub
+      : [emojisOf(n).join(" "), [line, placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
   const time = when.short(n.updatedAt);
 
   // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.

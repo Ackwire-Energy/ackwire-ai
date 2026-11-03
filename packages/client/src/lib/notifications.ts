@@ -14,6 +14,7 @@ import type {
   NotificationPage,
 } from "../api/types";
 import { billingHoldOf } from "./billing";
+import type { Words } from "./routine-view";
 import { secretNoticeLine } from "./secret-requests";
 
 /** The inbox's filters, each counted ("Concluídas" is apart: `done`). */
@@ -227,11 +228,47 @@ export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
   return { code: l.statusTo === "hold" ? "org.paused" : "org.suspended", facts: { reason: l.text, cloud: true } };
 }
 
-/** Grouped (several replies or comments): it expands to show them. */
+/** Grouped (several replies or comments, several agents' failures of one cause): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>
   n.count > 1 &&
   ((n.kind === "thread_reply" && !!n.source.threadId && !!channelOf(n)) ||
-    (n.kind === "issue_comment" && !!n.source.issueId));
+    (n.kind === "issue_comment" && !!n.source.issueId) ||
+    runFailedGroupOf(n) !== null);
+
+/** Causes a shared failure row says in words (`notifications.failedCause.<reason>`); the plan's need its name. */
+const FAILED_CAUSES = new Set([
+  "not_logged_in",
+  "plan_limit",
+  "machine_offline",
+  "machine_paused",
+  "computer_busy",
+  "runner_outdated",
+  "budget_exceeded",
+  "provider_error",
+  "provider_unavailable",
+  "gave_up",
+  "missing_credential",
+  "credential_revoked",
+]);
+const PLAN_CAUSES = new Set(["not_logged_in", "plan_limit"]);
+
+/**
+ * A `run_failed` row standing for several agents (failures of one cause close together, ADR 0097): the runs, how many
+ * agents and the cause in words when it has some ("the Claude account was disconnected"). Null for a lone failure,
+ * which reads as it always did.
+ */
+export function runFailedGroupOf(n: Pick<AppNotification, "kind" | "latest">) {
+  if (n.kind !== "run_failed") return null;
+  const failures = n.latest.failures ?? [];
+  const agents = new Set(failures.map((f) => f.agentId)).size;
+  if (agents < 2) return null;
+  const { reason, plan } = n.latest;
+  const cause: Words | null =
+    reason && FAILED_CAUSES.has(reason) && (plan || !PLAN_CAUSES.has(reason))
+      ? { key: `notifications.failedCause.${reason}`, values: plan ? { plan } : {} }
+      : null;
+  return { failures, agents, cause };
+}
 
 /** How I answer from the inbox, if I can (through the endpoints that already exist). */
 export type ReplyTarget =
