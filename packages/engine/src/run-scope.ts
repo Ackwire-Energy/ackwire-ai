@@ -15,3 +15,10 @@ export const inChannelRun = (r: SQL) => sql`(${r}.thread_root_id = ${r}.trigger_
  */
 export const workKeepsThread = (r: SQL) =>
   sql`(${r}.work_id is null or exists (select 1 from agent_works w where w.id = ${r}.work_id and w.own_thread))`;
+
+/**
+ * SQL: the run `r` waits on its plan's limit or its budget (a conversation's catch-up): like a run waiting for its
+ * computer, it takes every new message of its conversation instead of a second run beside it.
+ */
+export const waitsOnUsage = (r: SQL) =>
+  sql`(${r}.status = 'waiting_input' and ${r}.transcript->'waitingForBrain'->>'code' in ('plan_limit', 'budget'))`;

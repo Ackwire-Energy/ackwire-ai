@@ -3,27 +3,34 @@ import { channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic, type PlanUsage } from
 import { and, eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
+  archiveAgent,
   type Brain,
   type BrainEvent,
   type BrainTurn,
   CANCELED_NOTE_QUIET_MS,
   cancelRun,
+  cancelUsageQueue,
   clearPlanLimits,
   createJobHandlers,
   createRoutine,
   drainOutbox,
+  LINE_SAFETY_MS,
   listMessages,
   listRoutines,
   loadAgentStatuses,
+  loadReplyPolicy,
   type MachineStatus,
   nextMonthStart,
   postPersonMessage,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
   recoverStaleRuns,
+  resumeBudgetWaits,
   runRoutineNow,
+  stopRun,
   storedPlanLimit,
   updateAgent,
+  usageQueue,
   usageWaitKey,
   wakePlanWaits,
 } from "../src";
@@ -308,9 +315,20 @@ test("a limit with no reset: the stored window's reset, else a re-check in 2 min
   const [, b] = await runs(f);
   expect(b?.status).toBe("waiting_input");
   const at = (await resumeJob(f, b?.id ?? ""))?.nextAttemptAt.getTime() ?? 0;
-  // Behind the first run of the same plan: one gap later.
-  expect(at).toBeGreaterThanOrEqual(before + 2 * 60_000 + RESUME_AFTER_MS + RESUME_GAP_MS);
-  expect(at).toBeLessThan(Date.now() + 2 * 60_000 + RESUME_AFTER_MS + RESUME_GAP_MS + 1000);
+  // Behind the head of the same plan's line, with no reset known: only the head asks the plan again. This one sleeps
+  // on the safety timer, one gap later, and goes on when the head gets through.
+  expect(at).toBeGreaterThanOrEqual(before + LINE_SAFETY_MS + RESUME_AFTER_MS + RESUME_GAP_MS);
+  expect(at).toBeLessThan(Date.now() + LINE_SAFETY_MS + RESUME_AFTER_MS + RESUME_GAP_MS + 1000);
+
+  // The head alone, with no reset known: the re-checks of the ladder (2 minutes first).
+  await f.db.delete(schema.agentRuns);
+  const start = Date.now();
+  await post(f, "@dev três");
+  await drainOutbox(f.db, handlers);
+  const [head] = await runs(f);
+  const first = (await resumeJob(f, head?.id ?? ""))?.nextAttemptAt.getTime() ?? 0;
+  expect(first).toBeGreaterThanOrEqual(start + 2 * 60_000 + RESUME_AFTER_MS);
+  expect(first).toBeLessThan(Date.now() + 2 * 60_000 + RESUME_AFTER_MS + 1000);
 });
 
 test("runs waiting on one plan resume 60 s apart, people's first; a resume still limited parks again quietly", async () => {
@@ -663,8 +681,9 @@ test("back from a wait on the plan, the agent's status moves at once: the apps d
   const handlers = handlersWith(f, brain);
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
+  // Waiting on its plan with nothing to fall back on: out of office, with how many conversations wait (ADR 0084 §12).
   const [status] = await loadAgentStatuses(f.db, f.org.id);
-  expect(status?.status?.kind).toBe("waiting_plan");
+  expect(status).toMatchObject({ presence: "out", status: { kind: "out_of_plan", count: 1 } });
   const parked = statusEvents.length;
   await Bun.sleep(200);
   await drainOutbox(f.db, handlers, { now: later(RESUME_AFTER_MS + RESUME_GAP_MS) });
@@ -691,13 +710,15 @@ test("Don't run it: who asked cancels a reply waiting on the plan; its note says
   const [after] = await notes(f, "plan_limit_wait");
   expect((after?.meta.usageWait as { canceled?: boolean } | undefined)?.canceled).toBe(true);
   expect(await resumeJob(f, run?.id ?? "")).toBeUndefined();
+  // Still out of office (the plan is still at its limit), with nothing waiting anymore.
   const [status] = await loadAgentStatuses(f.db, f.org.id);
-  expect(status?.status).toBeNull();
+  expect(status?.status).toMatchObject({ kind: "out_of_plan" });
+  expect(status?.status?.count).toBeUndefined();
   await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + RESUME_GAP_MS) });
   expect(seen).toHaveLength(1);
 });
 
-test("one note per conversation and limit: a later ask joins it, its Não rodar stops both, and a new ask right after a cancel stays quiet", async () => {
+test("one catch-up per conversation: a later ask joins the waiting run, its Não rodar stops both, and a new ask right after a cancel stays quiet", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   await computerAgent(f, { brainFallback: false });
   const resetsAt = later(3600_000).toISOString();
@@ -708,31 +729,40 @@ test("one note per conversation and limit: a later ask joins it, its Não rodar 
   const handlers = handlersWith(f, brain);
   const first = await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
-  // The channel's main timeline: a second ask is a run of its own, and no second note.
+  // The channel's main timeline: a second ask joins the waiting run (no second run, no second note, no early look).
   const second = await post(f, "@dev e aí?");
   await drainOutbox(f.db, handlers);
-  const [a, b] = await runs(f);
-  expect([a?.status, b?.status]).toEqual(["waiting_input", "waiting_input"]);
-  const [note, ...more] = await notes(f, "plan_limit_wait");
+  const [a, ...more] = await runs(f);
   expect(more).toHaveLength(0);
-  expect(note?.meta.usageWait).toMatchObject({ runId: a?.id, runIds: [b?.id] });
+  expect(a?.status).toBe("waiting_input");
+  expect(a?.pendingMessageIds).toEqual([second.id]);
+  const looks = (await f.db.select().from(schema.outbox)).filter(
+    (j) => j.kind === "agent_run.execute" && j.payload.runId === a?.id && j.status === "pending",
+  );
+  expect(looks.map((j) => j.dedupeKey)).toEqual([expect.stringContaining(":usage:")]);
+  const [note, ...others] = await notes(f, "plan_limit_wait");
+  expect(others).toHaveLength(0);
+  expect(note?.meta.usageWait).toMatchObject({ runId: a?.id });
   // Each ask's receipt says it waits on the plan, not that the agent waits for an answer.
   const receiptOf = async (id: string) =>
     (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find((m) => m.id === id)?.receipts?.handled[0];
   expect(await receiptOf(second.id)).toMatchObject({ status: "waiting_input", usage: "plan" });
 
+  // Não rodar: the catch-up goes with what joined it, nothing is handed on to a run of its own.
   await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, a?.id ?? "");
-  expect((await runs(f)).map((r) => r.status)).toEqual(["canceled", "canceled"]);
+  expect((await runs(f)).map((r) => r.status)).toEqual(["canceled"]);
   expect(await receiptOf(first.id)).toMatchObject({ status: "canceled" });
+  expect(await receiptOf(second.id)).toMatchObject({ status: "canceled" });
   expect((await notes(f, "plan_limit_wait"))[0]?.meta.usageWait).toMatchObject({ canceled: true });
 
   // Asked again right after: the receipt says it waits, the note isn't repeated.
   await post(f, "@dev e agora?");
   await drainOutbox(f.db, handlers);
-  expect((await runs(f))[2]?.status).toBe("waiting_input");
+  expect((await runs(f))[1]?.status).toBe("waiting_input");
   expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
 
   // A while after the cancel, a new ask is told again.
+  await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, (await runs(f))[1]?.id ?? "");
   await f.db
     .update(schema.messages)
     .set({
@@ -751,7 +781,7 @@ test("one note per conversation and limit: a later ask joins it, its Não rodar 
   expect(await notes(f, "plan_limit_wait")).toHaveLength(2);
 });
 
-test("one note per person in a channel: someone else's ask gets its own note, which only they can stop", async () => {
+test("two people asking in a channel share one catch-up and one note: only who asked first, the owner or an admin stops it", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   await computerAgent(f, { brainFallback: false });
   const resetsAt = later(3600_000).toISOString();
@@ -764,19 +794,16 @@ test("one note per person in a channel: someone else's ask gets its own note, wh
   await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
-  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, { body: "@dev e eu?" });
+  const asked = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, {
+    body: "@dev e eu?",
+  });
   await drainOutbox(f.db, handlers);
-  // Ana again: her note takes it in, though Bia's is the agent's last word.
-  await post(f, "@dev e aí?");
-  await drainOutbox(f.db, handlers);
-  const [a, b, c] = await runs(f);
-  const shown = await notes(f, "plan_limit_wait");
-  expect(shown.map((n) => n.meta.usageWait)).toEqual([
-    expect.objectContaining({ runId: a?.id, forUserId: f.owner.id, runIds: [c?.id] }),
-    expect.objectContaining({ runId: b?.id, forUserId: bia.id }),
-  ]);
-  await cancelRun({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, b?.id ?? "");
-  expect((await runs(f)).map((r) => r.status)).toEqual(["waiting_input", "canceled", "waiting_input"]);
+  const [a, ...more] = await runs(f);
+  expect(more).toHaveLength(0);
+  expect(a?.pendingMessageIds).toEqual([asked.id]);
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
+  await expect(cancelRun({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, a?.id ?? "")).rejects.toThrow();
+  expect((await runs(f))[0]?.status).toBe("waiting_input");
 });
 
 test("another reset is another note, and so is another conversation", async () => {
@@ -806,6 +833,8 @@ test("another reset is another note, and so is another conversation", async () =
   expect(steered).toEqual([expect.objectContaining({ usage: "plan" })]);
   expect(await notes(f, "plan_limit_wait", other.id)).toHaveLength(1);
 
+  // A conversation's run gone, its next limit with another reset: a note of its own.
+  await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, (await runs(f))[0]?.id ?? "");
   clearPlanLimits();
   resetsAt = later(5 * 3600_000).toISOString();
   await post(f, "@dev e agora?");
@@ -858,4 +887,221 @@ test("a turn through on another model doesn't wake a wait parked on its own mode
   const key = usageWaitKey({ code: "plan_limit", machineId, kind: "claude_code" });
   expect(await wakePlanWaits(f.db, f.org.id, key, "another-model")).toEqual([]);
   expect(await wakePlanWaits(f.db, f.org.id, key, parkedOn ?? null)).toEqual([slot?.id ?? ""]);
+});
+
+test("the line keeps its order on a second hit: the head parks again in its place and the rest wait behind it, 60 s apart", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const first = Date.now() + 3600_000;
+  let resetsAt = new Date(first).toISOString();
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const roots = [(await post(f, "um")).id, (await post(f, "dois")).id, (await post(f, "três")).id];
+  for (const root of roots) {
+    await post(f, "@dev oi", root);
+    await drainOutbox(f.db, handlers);
+  }
+  const [a, b, c] = await runs(f);
+  const at = async (id?: string) => (await resumeJob(f, id ?? ""))?.nextAttemptAt.getTime();
+  expect([await at(a?.id), await at(b?.id), await at(c?.id)]).toEqual([
+    first + RESUME_AFTER_MS,
+    first + RESUME_AFTER_MS + RESUME_GAP_MS,
+    first + RESUME_AFTER_MS + 2 * RESUME_GAP_MS,
+  ]);
+
+  // At the reset the head finds the plan full again, with a later reset: it keeps its place, the others move with it.
+  clearPlanLimits();
+  const second = first + 2 * 3600_000;
+  resetsAt = new Date(second).toISOString();
+  await drainOutbox(f.db, handlers, { now: new Date(first + RESUME_AFTER_MS + 1000) });
+  expect((await runs(f)).map((r) => r.status)).toEqual(["waiting_input", "waiting_input", "waiting_input"]);
+  expect([await at(a?.id), await at(b?.id), await at(c?.id)]).toEqual([
+    second + RESUME_AFTER_MS,
+    second + RESUME_AFTER_MS + RESUME_GAP_MS,
+    second + RESUME_AFTER_MS + 2 * RESUME_GAP_MS,
+  ]);
+  // Its note tells the new time.
+  expect((await notes(f, "plan_limit_wait", roots[0]))[0]?.meta.usageWait).toMatchObject({ resetsAt });
+});
+
+test("a raised budget wakes the waiting conversations in line order, 60 s apart", async () => {
+  f = await setup({ budgetNanoUsd: 0, reply: () => ({ chunks: ["Feito pela API."] }) });
+  const roots = [(await post(f, "um")).id, (await post(f, "dois")).id];
+  for (const root of roots) {
+    await post(f, "@dev oi", root);
+    await drainOutbox(f.db, f.handlers);
+  }
+  const [a, b] = await runs(f);
+  const now = Date.now();
+  await resumeBudgetWaits(f.db, f.org.id, f.agent.id, now);
+  const jobs = (await f.db.select().from(schema.outbox)).filter(
+    (j) => j.status === "pending" && String(j.dedupeKey).includes(":budget_raised:"),
+  );
+  const timeOf = (id?: string) => jobs.find((j) => j.payload.runId === id)?.nextAttemptAt.getTime();
+  expect([timeOf(a?.id), timeOf(b?.id)]).toEqual([now, now + RESUME_GAP_MS]);
+});
+
+test("a stopped turn's note speaks on for the turns it took in, and the archive ends the line with a reason", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [a] = await runs(f);
+  // A second turn on the same note (a run that didn't join, as one from before catch-ups did).
+  const [note] = await notes(f, "plan_limit_wait");
+  const extra = await post(f, "@dev e aí?");
+  await drainOutbox(f.db, handlers);
+  await f.db
+    .update(schema.agentRuns)
+    .set({ pendingMessageIds: [] })
+    .where(eq(schema.agentRuns.id, a?.id ?? ""));
+  const [b] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: extra.id,
+      triggerMessageId: extra.id,
+      trigger: "mention",
+      hop: 1,
+      status: "waiting_input",
+      transcript: { waitingForBrain: { code: "plan_limit", machineId: "", kind: "claude_code" } } as never,
+    })
+    .returning();
+  await f.db
+    .update(schema.messages)
+    .set({ meta: { ...note?.meta, usageWait: { ...(note?.meta.usageWait as object), runIds: [b?.id] } } })
+    .where(eq(schema.messages.id, note?.id ?? ""));
+
+  // The system stops the first turn: the note isn't canceled, the joined turn holds it now.
+  const [run] = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, a?.id ?? ""));
+  await stopRun({ db: f.db, pubsub: f.pubsub }, f.org.id, run as never, "channel", {
+    type: "system",
+    reason: "consultation_expired",
+  });
+  expect((await notes(f, "plan_limit_wait"))[0]?.meta.usageWait).toMatchObject({ runId: b?.id, runIds: [] });
+
+  // Archived: the line won't run, and the note says why.
+  await archiveAgent(f.db, f.owner.id, f.org.id, f.agent.id, f.pubsub);
+  expect((await runs(f)).map((r) => r.status)).toEqual(["canceled", "canceled"]);
+  expect((await notes(f, "plan_limit_wait"))[0]?.meta.usageWait).toMatchObject({ canceled: true, reason: "archived" });
+});
+
+test("back after a long wait, a conversation catches up: how long, what was posted since, and it may pass", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted((n) =>
+    n === 0
+      ? [
+          { type: "limit", resetsAt: later(3600_000).toISOString() },
+          { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+        ]
+      : [{ type: "done", text: "Respondido." }],
+  );
+  const handlers = handlersWith(f, brain);
+  const nina = await addMember(f.db, f.org.id, "member", "nina");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: nina.id });
+  await post(f, "@dev qual o status do deploy?");
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, nina.id, f.org.id, f.general.id, {
+    body: "O deploy terminou às 14h.",
+  });
+  await drainOutbox(f.db, handlers);
+  // Paused two days ago.
+  const [run] = await runs(f);
+  const t = run?.transcript as { usageWait: { since: number } };
+  t.usageWait.since = Date.now() - 2 * 24 * 3600_000;
+  await f.db
+    .update(schema.agentRuns)
+    .set({ transcript: t as never })
+    .where(eq(schema.agentRuns.id, run?.id ?? ""));
+  clearPlanLimits();
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  expect(seen).toHaveLength(2);
+  const prompt = String(seen[1]?.trigger ?? "");
+  expect(prompt).toContain("# Catching up");
+  expect(prompt).toContain("You were paused 2 days ago because the Claude plan hit its limit");
+  expect(prompt).toContain("O deploy terminou às 14h.");
+  expect(prompt).toContain("call `pass`");
+  expect(prompt).toContain("ask whether it is still needed before starting long work");
+  expect(await loadReplyPolicy(f.db, f.org.id, run?.id ?? "")).toMatchObject({ mayPass: true, listsPass: true });
+});
+
+test("long work waiting in the agent's line of work reads as in line, not as waiting for your answer", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const asked = await post(f, "@dev um trabalho longo");
+  await drainOutbox(f.db, f.handlers);
+  const [run] = await runs(f);
+  await f.db
+    .update(schema.agentRuns)
+    .set({
+      status: "waiting_input",
+      transcript: { waitingForBrain: { code: "work_queue", machineId: "", kind: "model" } } as never,
+    })
+    .where(eq(schema.agentRuns.id, run?.id ?? ""));
+  const shown = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find((m) => m.id === asked.id);
+  expect(shown?.receipts?.handled[0]).toMatchObject({ status: "waiting_input", computer: "line" });
+});
+
+test("the usage queue: rows in line order with what happened since, hidden rows counted, Don't run any for the owner", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const nina = await addMember(f.db, f.org.id, "member", "nina");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: nina.id });
+  const root = await post(f, "um assunto");
+  await post(f, "@dev oi", root.id);
+  await drainOutbox(f.db, handlers);
+  await post(f, "@dev e aí?");
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, nina.id, f.org.id, f.general.id, {
+    body: "Já respondi isso",
+    threadId: root.id,
+  });
+  const [a, b] = await runs(f);
+  const q = await usageQueue(f.db, f.owner.id, f.org.id, f.agent.id);
+  expect(q).toMatchObject({ reason: "plan", plan: "Claude", hidden: 0, mayStopAll: true });
+  expect(q.rows.map((r) => r.runId)).toEqual([a?.id ?? "", b?.id ?? ""]);
+  expect(q.rows[0]).toMatchObject({
+    kind: "conversation",
+    threadId: root.id,
+    // A reply in the thread joins its catch-up: Nina is one more person waiting on it.
+    askers: [f.owner.id, nina.id],
+    state: "queued",
+    mayStop: true,
+    after: { count: 1, names: ["nina"] },
+  });
+  expect(q.rows[1]).toMatchObject({ threadId: null, after: { count: 0, names: [] } });
+
+  // Nina joined one catch-up, she didn't start either: she sees the rows, can't stop them, nor all of them.
+  const theirs = await usageQueue(f.db, nina.id, f.org.id, f.agent.id);
+  expect(theirs.rows.map((r) => r.mayStop)).toEqual([false, false]);
+  expect(theirs.mayStopAll).toBe(false);
+  await expect(cancelUsageQueue({ db: f.db, pubsub: f.pubsub }, nina.id, f.org.id, f.agent.id)).rejects.toThrow();
+
+  // Someone outside the channel sees none of it, only how many.
+  const bob = await addMember(f.db, f.org.id, "member", "bob");
+  expect(await usageQueue(f.db, bob.id, f.org.id, f.agent.id)).toMatchObject({ rows: [], hidden: 2 });
+
+  expect(await cancelUsageQueue({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id)).toEqual({
+    canceled: 2,
+    skipped: 0,
+  });
+  expect((await runs(f)).map((r) => r.status)).toEqual(["canceled", "canceled"]);
 });

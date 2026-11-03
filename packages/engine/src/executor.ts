@@ -94,6 +94,7 @@ import {
   unregisterTurnAbort,
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
+import { catchUpText, isCatchUp } from "./catch-up";
 import { REACT_TOOL } from "./chat-tools";
 import { kickRoomQueue, publishQueueChanged, roomGate, roomHead } from "./computer-queue";
 import { announceConsultationChange, answersOpen, onConsultedRunFinished } from "./consultations";
@@ -249,6 +250,7 @@ import {
   continuesPastPlan,
   isLongWork,
   joinUsageNote,
+  LINE_SAFETY_MS,
   ladderDelay,
   nextMonthStart,
   overrideHolds,
@@ -256,11 +258,13 @@ import {
   planName,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
+  retimeLine,
   routineRunByHand,
   UNKNOWN_RESET_NOTICE_MS,
   USAGE_WAIT_CODES,
   USAGE_WINDOW_WORDS,
   usageCardResumed,
+  usageNoteHandOn,
   usageNoticeText,
   usageWaitKey,
   usageWaitNoteEnded,
@@ -508,6 +512,8 @@ export interface Transcript {
     source?: "plan" | "budget";
     /** When the limit resets, when known (Rotinas says "Pausada até…"; `until` is later by the stagger). */
     resetsAt?: string;
+    /** A usage wait's: when its conversation first paused (`usageWait.since`), its place in line (`usageWaitPlace`). */
+    since?: number;
     /** A usage wait's plan in words ("Claude", "ChatGPT"): Rotinas says what it waits for. */
     plan?: string;
     /** A plan wait's model (null: the brain's default): a turn through on another model doesn't wake it. */
@@ -546,6 +552,8 @@ export interface Transcript {
   roomAsked?: boolean;
   /** When this run last sent a turn to its computer: agents' turns there are spaced (`roomGate`). */
   roomAsk?: { machineId: string; at: number };
+  /** Caught up after a long wait on its plan or budget (`catch-up.ts`): since when it paused; it may pass. */
+  catchUp?: { since: number };
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
   activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
@@ -889,6 +897,9 @@ async function executeRunInner(
   let backFromWait = false;
   /** What it waited on, when it comes back from a wait for its computer, plan or budget. */
   let waitedOn: string | undefined;
+  /** And since when, and on which plan in words, for its catch-up (`catch-up.ts`). */
+  let waitedSince: number | undefined;
+  let waitedPlan: string | undefined;
   const started = await transitionRun(db, runId, "queued", "running");
   if (started) {
     run = started;
@@ -921,6 +932,8 @@ async function executeRunInner(
       run = resumed;
       backFromWait = true;
       waitedOn = stored?.waitingForBrain?.code;
+      waitedSince = stored?.usageWait?.since;
+      waitedPlan = stored?.waitingForBrain?.plan;
       // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
       // run instead of finding it no longer waiting and doing nothing.
       if (options.wait && options.jobId) {
@@ -1004,7 +1017,7 @@ async function executeRunInner(
     status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
     error?: string,
     outage?: true,
-    computer?: "queued" | "away",
+    computer?: "queued" | "away" | "line",
     passed?: true,
     /** `waiting_input` on its plan's limit or its budget: the apps say it answers when that renews. */
     usage?: "plan" | "budget",
@@ -1044,6 +1057,9 @@ async function executeRunInner(
     }
     // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
     await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
+    // Back from its plan or budget and over: the turns its note took in still wait, so the note speaks on for them.
+    if (waitedOn && USAGE_WAIT_CODES.has(waitedOn) && status !== "waiting_input" && status !== "waiting_approval")
+      await usageNoteHandOn(deps, run).catch(() => {});
     // It left its computer's "working now" (still in line, `brainUnavailable` already said so).
     if (transcript?.roomAsk && computer !== "queued")
       await publishQueueChanged(deps.pubsub, run.orgId, transcript.roomAsk.machineId);
@@ -1104,7 +1120,7 @@ async function executeRunInner(
     status: RunStatus,
     error?: string,
     outage?: true,
-    computer?: "queued" | "away",
+    computer?: "queued" | "away" | "line",
     usage?: "plan" | "budget",
   ): ChannelEvent => ({
     type: "agent.run",
@@ -1383,9 +1399,12 @@ async function executeRunInner(
   // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
   const report = routineReportTagOf(triggerMessage);
   // Who must answer (reply-policy.ts): a run nobody called by name may pass; a background run never posts.
+  /** Back from a wait on its plan or budget long enough to catch up (`catch-up.ts`): since when it paused. */
+  const catchUpSince = isCatchUp(run, waitedOn, waitedSince) ? waitedSince : undefined;
   const policy = replyPolicyFor(run, triggerMessage, {
     followUp: await routedAsFollowUp(db, run).catch(() => false),
     answerOwed: Boolean((run.transcript as unknown as Transcript | null)?.answerOwed),
+    catchUp: catchUpSince !== undefined,
   });
   /** Whether this run read outside content (`runReadOutside`): sticky once true. */
   let readOutside = false;
@@ -2187,6 +2206,23 @@ async function executeRunInner(
       if (plan.kind !== "model") nextPrompt = [nextPrompt ?? triggerText, meanwhile].join("\n\n");
     }
   }
+  // Back after a long wait on its plan or budget: it reads how long it was away and everything posted here since, and
+  // answers once for what is still open. Its transcript takes it once; a computer brain reads it fresh at every claim.
+  if (catchUpSince !== undefined && triggerMessage) {
+    const why = waitedOn === "budget" ? ("budget" as const) : ("plan" as const);
+    const text = await catchUpText(db, run, triggerMessage, {
+      since: catchUpSince,
+      why,
+      ...(waitedPlan ? { plan: waitedPlan } : {}),
+      mayPass: policy.mayPass,
+    }).catch(() => null);
+    if (text) {
+      if (!transcript.catchUp) appendUserText(transcript, text);
+      if (plan.kind !== "model") nextPrompt = [nextPrompt ?? triggerText, text].join("\n\n");
+      transcript.catchUp = { since: catchUpSince };
+      await saveTranscript(db, transcript);
+    }
+  }
 
   /**
    * A forum's turn or synthesis belongs to the topic's order (ADR 0022): at the cap it fails, so the topic stalls
@@ -2763,16 +2799,24 @@ async function executeRunInner(
     const paused = u.code === "usage_pause";
     const machineId = plan.session?.machineId ?? agent.machineId ?? "";
     const wait = t.usageWait ?? { since: now, step: 0 };
+    const key = budget
+      ? usageWaitKey({ code: "budget", agentId: agent.id })
+      : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
+    // Its place in line: by when its conversation first paused, so parking again never moves it back.
+    const line = await usageWaitPlace(db, run, key, wait.since);
     let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
     if (!budget && !(at > now) && machineId) {
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
       at = bindingReset(stored, now) ?? Number.NaN;
     }
     const known = at > now;
-    if (!known) {
+    // An unknown reset: only the head of the line asks the plan again (one re-check an hour per plan, not one per
+    // conversation). The others sleep on a safety timer and go on when the head gets through (`wakePlanWaits`).
+    const head = line.place === 0 || u.soon === true;
+    if (!known && head) {
       at = now + ladderDelay(wait.step);
       wait.step++;
-    }
+    } else if (!known) at = now + LINE_SAFETY_MS;
     const resetsAt = known ? new Date(at).toISOString() : undefined;
     // Thinking through the API only because its computer brain couldn't: that brain may be back (its plan reset)
     // long before the budget renews, and a resume picks it again. The note still says when the budget renews.
@@ -2780,10 +2824,7 @@ async function executeRunInner(
       const brainBack = Date.parse(t.fallback.resetsAt ?? "");
       at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
     }
-    const key = budget
-      ? usageWaitKey({ code: "budget", agentId: agent.id })
-      : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
-    const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * (await usageWaitPlace(db, run, key)));
+    const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * line.place);
     const tellOwner = !budget && !paused && !known && !wait.noticed && now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
     if (tellOwner) wait.noticed = true;
     t.usageWait = wait;
@@ -2839,8 +2880,8 @@ async function executeRunInner(
           return m;
         })
       : null;
-    // Parked again on the same wait, with no new note: its old one offers "Don't run it" again.
-    if (!note) await usageWaitNoteEnded(deps, run, false).catch(() => {});
+    // Parked again on the same wait, with no new note: its old one offers "Don't run it" again, with the new reset.
+    if (!note) await usageWaitNoteEnded(deps, run, false, u.pause ? undefined : (resetsAt ?? null)).catch(() => {});
     t.postedUpTo = t.messages.length;
     if (!u.soon) t.brainNotice = u.code;
     delete t.roomWaitSince;
@@ -2859,6 +2900,7 @@ async function executeRunInner(
       waitId,
       waitKey: key,
       until: runAt.toISOString(),
+      since: wait.since,
       ...(resetsAt ? { resetsAt } : {}),
       ...(budget ? {} : { plan: name, model: plan.model ?? null }),
       ...(u.pause ? { source: u.pause.source } : {}),
@@ -2890,6 +2932,12 @@ async function executeRunInner(
       runAt,
       maxAttempts: 4,
     });
+    // The line pauses together: whoever is behind it waits for the same reset, in its place, 60 s apart (with an
+    // unknown reset, on the safety timer until the head gets through).
+    if (!u.soon) {
+      const base = known ? at : now + LINE_SAFETY_MS;
+      await retimeLine(db, line.behind, (i) => new Date(base + RESUME_AFTER_MS + RESUME_GAP_MS * (line.place + 1 + i)));
+    }
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: storedTranscript(t),
       waitingMachineId: null,
@@ -2910,7 +2958,7 @@ async function executeRunInner(
           agentId: agent.id,
           agentName: agent.name,
           plan: name,
-          runId: run.id,
+          waitKey: key,
           channelId: run.channelId,
           threadId: replyThreadId,
         },
@@ -2983,8 +3031,9 @@ async function executeRunInner(
       waitingMachineId: null,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
-    await publishChannelEvent(deps.pubsub, event("waiting_input"));
-    await finished("waiting_input");
+    // In the agent's line of work, not waiting on anyone: the apps say so, not "waiting for your answer".
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, undefined, "line"));
+    await finished("waiting_input", undefined, undefined, "line");
     // Released between the check and the park: it goes on now.
     if (!(await workQueued(db, workId))) await wakeQueuedRun(db, run.orgId, run.id, workId, "parked");
   };

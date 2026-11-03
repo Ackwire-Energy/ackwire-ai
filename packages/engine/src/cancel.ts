@@ -325,12 +325,24 @@ export async function stopRun(
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
   // Waiting on its plan or budget: its note or card says it won't run when the limit is back.
-  const wait = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain;
+  const wait = (run.transcript as { waitingForBrain?: { code?: string; waitKey?: string } } | null)?.waitingForBrain;
   let joined: string[] = [];
+  /** A conversation's catch-up a person said not to run: the messages it took in go with it. */
+  let catchUpDropped = false;
   if (previous === "waiting_input" && wait?.code) {
     // Loaded here: the usage pause checks who may stop a run through this module.
-    const { USAGE_WAIT_CODES, usageWaitCanceled } = await import("./usage-pause");
-    if (USAGE_WAIT_CODES.has(wait.code)) joined = (await usageWaitCanceled(deps, run).catch(() => null)) ?? [];
+    const { USAGE_WAIT_CODES, lineHeadLooks, usageNoteHandOn, usageWaitCanceled } = await import("./usage-pause");
+    if (USAGE_WAIT_CODES.has(wait.code)) {
+      if (actor.type === "person") {
+        joined = (await usageWaitCanceled(deps, run).catch(() => null)) ?? [];
+        catchUpDropped = wait.code !== "usage_pause";
+      } else {
+        // Stopped by the system: the turns its note took in still wait, so the note speaks on for them.
+        const reason = actor.reason === "agent_archived" ? "archived" : undefined;
+        await usageNoteHandOn(deps, run, reason ? { reason } : {}).catch(() => null);
+      }
+      if (wait.waitKey) await lineHeadLooks(db, orgId, wait.waitKey).catch(() => null);
+    }
   }
   // Long work (ADR 0121): its end goes home now ("Parado por …"), whoever runs it; the card goes back to A fazer.
   if (run.workId) await endWork(deps, run, "canceled").catch(() => null);
@@ -385,8 +397,8 @@ export async function stopRun(
       await onConsultedRunStopped(deps, run, reason).catch(() => null);
     }
     // Nobody executes it: what was sent to it and not read gets a run of its own now, unless its workspace
-    // stopped it (that run would only fail too).
-    if (!standingErrorDetail(error)) {
+    // or its agent's end stopped it (that run would only fail too), or a person said not to run its catch-up.
+    if (!standingErrorDetail(error) && !catchUpDropped && error !== "agent_archived") {
       await releaseInbox(db, deps.pubsub, run, {
         reason: "canceled",
         ...(options.stopMessageId ? { exclude: [options.stopMessageId] } : {}),

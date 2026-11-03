@@ -2032,6 +2032,28 @@ const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", out:
  * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows
  * time (busy after 2 minutes on one run, away after 30 idle) and runs elsewhere in the workspace.
  */
+/** What an agent picks up when its plan or budget is back (ADR 0118); `agent.status` events refetch it. */
+export const useUsageQueue = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.usageQueue(orgId, agentId),
+    queryFn: () => api.agents.usageQueue(orgId, agentId),
+    enabled: enabled && orgId.length > 0 && agentId.length > 0,
+    retry: false,
+    meta: { quiet: true },
+  });
+};
+
+/** "Don't run any" on an agent's usage queue: the queue and the statuses follow. */
+export function useCancelUsageQueue(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.agents.cancelUsageQueue(orgId, agentId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) }),
+  });
+}
+
 export const useAgentStatuses = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({

@@ -196,6 +196,7 @@ import type {
   ToolChange,
   TrashedArtifact,
   UndoAllResult,
+  UsageQueue,
   UsageReport,
   WikiGraph,
   WikiImportResult,
@@ -651,6 +652,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
       statuses: async (orgId) => (await request<{ agents: AgentStatus[] }>(`${org(orgId)}/agent-status`)).agents,
+      usageQueue: (orgId, agentId) => request<UsageQueue>(`${org(orgId)}/agents/${enc(agentId)}/usage-queue`),
+      cancelUsageQueue: (orgId, agentId) =>
+        request<{ canceled: number; skipped: number }>(`${org(orgId)}/agents/${enc(agentId)}/usage-queue/cancel`, {
+          method: "POST",
+        }),
       importFromGithub: (orgId, url) =>
         request<{ files: { path: string; text: string }[]; skipped?: string[] }>(`${org(orgId)}/agent-imports/github`, {
           json: { url },

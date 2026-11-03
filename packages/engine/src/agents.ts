@@ -444,7 +444,7 @@ export async function updateAgent(
   return agent;
 }
 
-export async function archiveAgent(db: Database, actorId: string, orgId: string, agentId: string) {
+export async function archiveAgent(db: Database, actorId: string, orgId: string, agentId: string, pubsub?: PubSub) {
   await requirePermission(db, actorId, orgId, "manage_agents");
   const [gone] = await db
     .update(agents)
@@ -460,6 +460,9 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
       target: { type: "agent", id: agentId },
       details: { name: gone.name, handle: gone.handle },
     });
+    // What waits on its plan or budget won't run: its notes say so now. Loaded here: the usage pause loads agents.
+    const { stopAgentUsageWaits } = await import("./usage-pause");
+    await stopAgentUsageWaits({ db, pubsub }, orgId, agentId).catch(() => null);
   }
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);

@@ -30,6 +30,8 @@ export type ReceiptPhase =
   | "away"
   | "plan"
   | "budget"
+  /** Long work waiting in the agent's line of work (ADR 0121): nobody is asked anything. */
+  | "line"
   | "handled"
   | "passed"
   | "canceled"
@@ -79,7 +81,7 @@ export type ReceiptsState = Record<string, MessageReceipt>;
 const phaseOf = (
   status: RunStatus | "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
   outage?: boolean,
-  computer?: "queued" | "away",
+  computer?: "queued" | "away" | "line",
   passed?: boolean,
   usage?: "plan" | "budget",
 ): ReceiptPhase =>
@@ -116,6 +118,7 @@ const RANK: Record<ReceiptPhase, number> = {
   away: 2,
   plan: 2,
   budget: 2,
+  line: 2,
   handled: 3,
   passed: 3,
   canceled: 3,
@@ -420,6 +423,7 @@ export interface ReceiptView {
           | "queued"
           | "plan"
           | "budget"
+          | "line"
           | "handled"
           | "canceled"
           | "failed";
@@ -464,6 +468,7 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
     "queued",
     "plan",
     "budget",
+    "line",
     "asking",
     "waiting",
     "claimed",

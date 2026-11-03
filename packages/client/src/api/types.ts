@@ -989,7 +989,7 @@ export interface MessageReceipts {
     /** `waiting_input` because its AI provider is down: it retries by itself. */
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-    computer?: "queued" | "away";
+    computer?: "queued" | "away" | "line";
     /** `waiting_input` on its plan's limit or its budget: it answers when that renews. */
     usage?: "plan" | "budget";
     /** It ended without answering: passed and posted nothing, or canceled before it started. */
@@ -1212,7 +1212,7 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
       /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
       usage?: "plan" | "budget";
     }
@@ -1301,7 +1301,7 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
       /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
       usage?: "plan" | "budget";
       /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
@@ -1395,7 +1395,7 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
       /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
       usage?: "plan" | "budget";
       /** It ended without answering: passed and posted nothing, or canceled before it started. */
@@ -3851,6 +3851,43 @@ export interface QueueWaiting {
 }
 
 /** `GET …/machines/{machineId}/queue`: a computer's line; `computer.queue` org events say it changed. */
+/** One conversation (or routine, or long work) an agent picks up when its plan or budget is back (ADR 0118). */
+export interface UsageQueueRow {
+  runId: string;
+  kind: "conversation" | "routine" | "work";
+  channelId: string;
+  threadId: string | null;
+  channelKind: string;
+  /** Null for a DM. */
+  channelName: string | null;
+  /** Who asked (people's ids): the trigger's author, then whoever joined. */
+  askers: string[];
+  /** When it first paused. */
+  since: string;
+  /** What was posted after it in its conversation. */
+  after: { count: number; names: string[] };
+  state: "queued" | "answering";
+  /** A routine's or a long work's title. */
+  title: string | null;
+  /** The viewer may say not to run it. */
+  mayStop: boolean;
+}
+
+/** What an agent picks up when its plan or budget is back, in order (`GET …/agents/{agentId}/usage-queue`). */
+export interface UsageQueue {
+  agentId: string;
+  reason: "plan" | "budget" | null;
+  plan: string | null;
+  resetsAt: string | null;
+  /** Other agents in the same plan's line. */
+  sharedWith: string[];
+  rows: UsageQueueRow[];
+  /** Waiting in conversations the viewer can't read. */
+  hidden: number;
+  /** "Don't run any": the agent's owner and admins. */
+  mayStopAll: boolean;
+}
+
 export interface ComputerQueue {
   machineId: string;
   name: string;

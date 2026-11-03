@@ -79,6 +79,8 @@ export const keys = {
   overview: (orgId: string) => ["org", orgId, "overview"] as const,
   people: (orgId: string) => ["org", orgId, "people"] as const,
   agentStatus: (orgId: string) => ["org", orgId, "agent-status"] as const,
+  /** Under `agentStatus`: an `agent.status` event refetches it too. */
+  usageQueue: (orgId: string, agentId: string) => ["org", orgId, "agent-status", "usage-queue", agentId] as const,
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,

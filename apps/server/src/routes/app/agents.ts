@@ -10,6 +10,7 @@ import {
   audienceMailLoss,
   audienceOf,
   budgetPercent,
+  cancelUsageQueue,
   canTalkTo,
   canViewCost,
   createAgent,
@@ -54,6 +55,7 @@ import {
   speakerOf,
   updateAgent,
   updateAgentGroup,
+  usageQueue,
   usageSummary,
 } from "@agenteschat/engine";
 import { contextWindowOf, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
@@ -802,6 +804,74 @@ export function agentRoutes(deps: AppDeps) {
   );
 
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });
+
+  const UsageQueueRow = z.object({
+    runId: z.uuid(),
+    kind: z.enum(["conversation", "routine", "work"]),
+    channelId: z.uuid(),
+    threadId: z.uuid().nullable(),
+    channelKind: z.string(),
+    channelName: z.string().nullable().openapi({ description: "Null for a DM." }),
+    askers: z
+      .array(z.string())
+      .openapi({ description: "Who asked (people's ids): the trigger's author, then who joined." }),
+    since: z.string().openapi({ description: "When it first paused." }),
+    after: z.object({ count: z.number().int(), names: z.array(z.string()) }).openapi({
+      description: "What was posted in its conversation after it: how many messages, and by whom.",
+    }),
+    state: z.enum(["queued", "answering"]),
+    title: z.string().nullable().openapi({ description: "A routine's or a long work's title." }),
+    mayStop: z.boolean().openapi({ description: "The viewer may say not to run it (who asked, the owner, an admin)." }),
+  });
+  const UsageQueue = z
+    .object({
+      agentId: z.uuid(),
+      reason: z.enum(["plan", "budget"]).nullable(),
+      plan: z.string().nullable(),
+      resetsAt: z.string().nullable(),
+      sharedWith: z.array(z.uuid()).openapi({ description: "Other agents waiting in the same plan's line." }),
+      rows: z.array(UsageQueueRow),
+      hidden: z.number().int().openapi({ description: "Waiting in conversations the viewer can't read." }),
+      mayStopAll: z.boolean().openapi({ description: "\"Don't run any\": the agent's owner and admins." }),
+    })
+    .openapi("UsageQueue");
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/usage-queue",
+      tags,
+      security,
+      summary: "What an agent picks up when its plan or budget is back, in order",
+      description:
+        "One row per conversation waiting on the agent's plan or budget (ADR 0118), people's first, then long work, then routines, each by when it first paused; the one answering now first. Rows only for conversations the viewer reads (`hidden` counts the rest). Refetch on `agent.status` events.",
+      request: { params: AgentParams },
+      responses: { 200: json(UsageQueue), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json(await usageQueue(db, c.get("user").id, orgId, agentId), 200);
+    },
+  );
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/usage-queue/cancel",
+      tags,
+      security,
+      summary: "Don't run anything waiting on the agent's plan or budget",
+      description:
+        "Every conversation, routine and long work waiting on the agent's plan or budget is stopped, each audited as a stop and its note saying it won't run. The agent's owner and admins.",
+      request: { params: AgentParams },
+      responses: {
+        200: json(z.object({ canceled: z.number().int(), skipped: z.number().int() })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json(await cancelUsageQueue({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, agentId), 200);
+    },
+  );
   app.openapi(
     createRoute({
       method: "patch",
@@ -952,7 +1022,7 @@ export function agentRoutes(deps: AppDeps) {
         await deleteAgent({ db, pubsub: adapters.pubsub, hub, mail: adapters.mail }, actor, orgId, agentId);
         return c.body(null, 204);
       }
-      await archiveAgent(db, actor, orgId, agentId);
+      await archiveAgent(db, actor, orgId, agentId, adapters.pubsub);
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.body(null, 204);
     },

@@ -70,15 +70,18 @@ const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_resu
  * `ask_agent` consultation (a DM between agents), a forum turn, a routine's
  * call or report, a quote reply to this agent, a router follow-up to the agent
  * the person was talking to, nor a run a person answered or wrote into
- * (`answerOwed`).
+ * (`answerOwed`). A run catching up after a usage pause (`catchUp`) may pass whoever called it: what it was asked
+ * may have been answered or dropped while it waited.
  */
 export function replyPolicyFor(
   run: Pick<AgentRun, "agentId" | "trigger" | "background" | "hop">,
   trigger: (Pick<Message, "authorType" | "meta"> & { authorAgentId?: string | null }) | null | undefined,
-  options: { followUp?: boolean; answerOwed?: boolean } = {},
+  options: { followUp?: boolean; answerOwed?: boolean; catchUp?: boolean } = {},
 ): ReplyPolicy {
   if (run.background) return { mayPass: false, background: true };
   if (options.answerOwed) return { mayPass: false, background: false };
+  // Catching up after a usage pause (`catch-up.ts`): someone else may have answered it meanwhile.
+  if (options.catchUp) return { mayPass: true, background: false };
   const notice = trigger?.meta?.notice as { kind?: unknown; refs?: { report?: unknown } } | undefined;
   if (typeof notice?.kind === "string" && INFORMING_NOTICES.has(notice.kind))
     return { mayPass: true, background: false };
@@ -126,6 +129,7 @@ export async function loadReplyPolicy(
       background: agentRuns.background,
       answerOwed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'answerOwed')::boolean, false)`,
       passListed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'passListed')::boolean, false)`,
+      catchUp: sql<boolean>`(${agentRuns.transcript} -> 'catchUp') is not null`,
       authorType: messages.authorType,
       authorAgentId: messages.authorAgentId,
       meta: messages.meta,
@@ -141,6 +145,7 @@ export async function loadReplyPolicy(
   const policy = replyPolicyFor(row, trigger, {
     followUp: row.followUp === true,
     answerOwed: row.answerOwed === true,
+    catchUp: row.catchUp === true,
   });
   return { ...policy, listsPass: policy.mayPass || row.passListed === true };
 }

@@ -23,10 +23,14 @@ export const passedSql = sql<boolean>`((${agentRuns.status} = 'done' and ${agent
   and ${agentRunSteps.kind} = 'context' and ${agentRunSteps.data}->'passed'->>'silent' = 'true'))
   or (${agentRuns.status} = 'canceled' and ${agentRuns.startedAt} is null))`;
 
-/** For a select over `agent_runs`: waiting for its computer, in line for room (`queued`) or for it to be back (`away`). */
-export const computerWaitSql = sql<"queued" | "away" | null>`(case when ${agentRuns.status} = 'waiting_input'
+/**
+ * For a select over `agent_runs`: waiting for its computer, in line for room (`queued`) or for it to be back (`away`),
+ * or long work waiting in the agent's line of work (`line`, ADR 0121): nobody is asked anything.
+ */
+export const computerWaitSql = sql<"queued" | "away" | "line" | null>`(case when ${agentRuns.status} = 'waiting_input'
   and ${agentRuns.waitingMachineId} is not null then (case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'
-  then 'queued' else 'away' end) end)`;
+  then 'queued' else 'away' end)
+  when ${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'work_queue' then 'line' end)`;
 
 /**
  * For a select over `agent_runs`: waiting on its plan's limit (`plan`) or its budget (`budget`), long work paused near

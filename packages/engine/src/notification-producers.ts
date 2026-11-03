@@ -877,7 +877,7 @@ export async function notifyRoutineWaitingPlan(
 
 /**
  * An agent's work has waited `UNKNOWN_RESET_NOTICE_MS` on its plan's limit and the plan never said when it resets:
- * the agent's owner hears it once per wait, opening the conversation the work waits in.
+ * the agent's owner hears it once per plan line (the count says how many conversations), opening the first one.
  */
 export async function notifyPlanResetUnknown(
   deps: NotificationDeps,
@@ -886,7 +886,8 @@ export async function notifyPlanResetUnknown(
     agentId: string;
     agentName: string;
     plan: string;
-    runId: string;
+    /** The plan's line (`usageWaitKey`): one notice per line, each conversation that waits a day merges in. */
+    waitKey: string;
     channelId: string;
     threadId: string | null;
   },
@@ -895,7 +896,7 @@ export async function notifyPlanResetUnknown(
     orgId: input.orgId,
     userIds: [await agentOwner(deps, input.agentId)],
     kind: "plan_reset_unknown",
-    groupKey: `plan_reset_unknown:${input.runId}`,
+    groupKey: `plan_reset_unknown:${input.waitKey}`,
     actor: agent(input.agentId),
     source: {
       channelId: input.channelId,

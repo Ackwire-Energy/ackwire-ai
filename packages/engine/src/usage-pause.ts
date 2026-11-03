@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { extraUsageLeft, planBinding } from "@agenteschat/ui/plan-state";
 import { recordAudit } from "./audit";
 import { storedPlanUsage } from "./brains/select";
@@ -47,46 +47,108 @@ export const usageWaitKey = (
     | { code: "budget"; agentId: string },
 ) => (w.code === "budget" ? `budget:${w.agentId}` : `plan:${w.machineId}:${w.kind}:${w.accountId ?? "own"}`);
 
-/**
- * This run's place in line among the runs already waiting on the same `key`: the runs a person waits on
- * (not background) go first, then the rest in the order they parked. A person's run that parks after
- * background ones moves their jobs one gap later, so it goes before them.
- */
-export async function usageWaitPlace(
-  db: Database,
-  run: { id: string; background: boolean; workId?: string | null },
-  key: string,
-) {
-  const { agentRuns, outbox } = schema;
-  const parked = await db
-    .select({ id: agentRuns.id, background: agentRuns.background, workId: agentRuns.workId })
+/** A run in a usage line: people's conversations (0), then long work (1), then routines (2). */
+const lineRank = (r: { background: boolean; workId: string | null }) => (r.background ? 2 : r.workId ? 1 : 0);
+
+/** When a waiting run first paused, across its re-parks (`waitingForBrain.since`; older waits: its start). */
+const waitSinceSql = sql<string>`coalesce(${schema.agentRuns.transcript}->'waitingForBrain'->>'since',
+  ${schema.agentRuns.transcript}->'usageWait'->>'since',
+  (extract(epoch from ${schema.agentRuns.createdAt}) * 1000)::bigint::text)`;
+
+interface LineRow {
+  id: string;
+  background: boolean;
+  workId: string | null;
+  since: number;
+  createdAt: Date;
+}
+
+/** The order of a usage line: by group, then by when each first paused. Parking again never changes a place. */
+const inLineOrder = (a: LineRow, b: LineRow) =>
+  lineRank(a) - lineRank(b) || a.since - b.since || a.createdAt.getTime() - b.createdAt.getTime();
+
+/** The runs waiting on `key` (a plan's sign-in or a budget), in line order. */
+async function lineRows(db: Executor, orgId: string, key: string): Promise<LineRow[]> {
+  const { agentRuns } = schema;
+  const rows = await db
+    .select({
+      id: agentRuns.id,
+      background: agentRuns.background,
+      workId: agentRuns.workId,
+      since: waitSinceSql,
+      createdAt: agentRuns.createdAt,
+    })
     .from(agentRuns)
     .where(
       and(
+        eq(agentRuns.orgId, orgId),
         eq(agentRuns.status, "waiting_input"),
-        ne(agentRuns.id, run.id),
         sql`${agentRuns.transcript}->'waitingForBrain'->>'waitKey' = ${key}`,
       ),
-    );
-  // Background work (ADR 0121) goes on after the conversations a person waits on, before routines.
-  const people = parked.filter((r) => !r.background && !r.workId);
-  if (run.background) return parked.length;
-  if (run.workId) return people.length + parked.filter((r) => !r.background && r.workId).length;
-  const behind = parked.filter((r) => r.background).map((r) => r.id);
-  if (behind.length > 0) {
-    await db
-      .update(outbox)
-      .set({ nextAttemptAt: sql`${outbox.nextAttemptAt} + ${`${RESUME_GAP_MS / 1000} seconds`}::interval` })
-      .where(
-        and(
-          eq(outbox.kind, "agent_run.execute"),
-          eq(outbox.status, "pending"),
-          sql`${outbox.payload} ? 'wait'`,
-          inArray(sql<string>`${outbox.payload}->>'runId'`, behind),
-        ),
-      );
-  }
-  return people.length;
+    )
+    .limit(500);
+  return rows.map((r) => ({ ...r, since: Number(r.since) })).sort(inLineOrder);
+}
+
+/**
+ * This run's place in the line of `key` among the runs already waiting there (`inLineOrder`, `since`: when it first
+ * paused), and the runs behind it, in order.
+ */
+export async function usageWaitPlace(
+  db: Executor,
+  run: { id: string; orgId: string; background: boolean; workId?: string | null; createdAt: Date },
+  key: string,
+  since: number,
+): Promise<{ place: number; behind: string[] }> {
+  const others = (await lineRows(db, run.orgId, key)).filter((r) => r.id !== run.id);
+  const me: LineRow = { ...run, workId: run.workId ?? null, since };
+  const place = others.filter((r) => inLineOrder(r, me) < 0).length;
+  return { place, behind: others.slice(place).map((r) => r.id) };
+}
+
+/**
+ * The line pauses together: the waits of `runIds` (in line order) are timed `at(i)`, in one statement. Every pending
+ * job of a wait moves (its own timer, a plan-back wake), so none of them asks the plan early.
+ */
+export async function retimeLine(db: Executor, runIds: string[], at: (i: number) => Date) {
+  if (runIds.length === 0) return;
+  const { outbox } = schema;
+  const times = runIds.map((_, i) => at(i).toISOString());
+  await db.execute(sql`update ${outbox} o set next_attempt_at = v.at
+    from unnest(${`{${runIds.join(",")}}`}::text[], ${`{${times.join(",")}}`}::timestamptz[]) as v(run_id, at)
+    where o.kind = 'agent_run.execute' and o.status = 'pending' and o.payload ? 'wait'
+      and o.payload->>'runId' = v.run_id`);
+}
+
+/** With an unknown reset only the head re-checks the plan; the others wait this long at most, woken by the head. */
+export const LINE_SAFETY_MS = 24 * 3600_000;
+
+/**
+ * The head of a line left it without getting through (stopped, archived): with an unknown reset the new head starts
+ * the re-checks, or it would sleep on its safety timer.
+ */
+export async function lineHeadLooks(db: Executor, orgId: string, key: string, now = Date.now()) {
+  const [head] = await lineRows(db, orgId, key);
+  if (!head) return;
+  const { agentRuns } = schema;
+  const [row] = await db
+    .select({
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+      until: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'until'`,
+    })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, head.id));
+  const soon = now + ladderDelay(0);
+  if (!row?.waitId || row.resetsAt || Date.parse(row.until ?? "") <= soon) return;
+  await enqueue(db, {
+    orgId,
+    kind: "agent_run.execute",
+    payload: { runId: head.id, wait: row.waitId },
+    dedupeKey: `agent_run.execute:${head.id}:head:${row.waitId}`,
+    runAt: new Date(soon),
+    maxAttempts: 4,
+  });
 }
 
 /**
@@ -113,6 +175,8 @@ export async function wakePlanWaits(
       workId: agentRuns.workId,
       waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
       until: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'until'`,
+      since: waitSinceSql,
+      createdAt: agentRuns.createdAt,
     })
     .from(agentRuns)
     .where(
@@ -126,10 +190,10 @@ export async function wakePlanWaits(
     )
     .orderBy(agentRuns.createdAt)
     .limit(100);
-  const rank = (r: { background: boolean; workId: string | null }) => (r.background ? 2 : r.workId ? 1 : 0);
   const due = rows
+    .map((r) => ({ ...r, since: Number(r.since) }))
     .filter((r) => r.waitId && !(Date.parse(r.until ?? "") <= now + RESUME_GAP_MS))
-    .sort((a, b) => rank(a) - rank(b));
+    .sort(inLineOrder);
   for (const [i, r] of due.entries()) {
     await enqueue(db, {
       orgId,
@@ -147,10 +211,22 @@ export async function wakePlanWaits(
  * The agent's budget went up (its own, or the workspace's default): the runs that wait for it go on now.
  * One that still doesn't fit parks again quietly. `agentId` null: every agent of the workspace.
  */
-export async function resumeBudgetWaits(db: Executor, orgId: string, agentId: string | null): Promise<string[]> {
+export async function resumeBudgetWaits(
+  db: Executor,
+  orgId: string,
+  agentId: string | null,
+  now = Date.now(),
+): Promise<string[]> {
   const { agentRuns } = schema;
-  const rows = await db
-    .select({ id: agentRuns.id, waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'` })
+  const found = await db
+    .select({
+      id: agentRuns.id,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      background: agentRuns.background,
+      workId: agentRuns.workId,
+      since: waitSinceSql,
+      createdAt: agentRuns.createdAt,
+    })
     .from(agentRuns)
     .where(
       and(
@@ -161,13 +237,15 @@ export async function resumeBudgetWaits(db: Executor, orgId: string, agentId: st
       ),
     )
     .limit(500);
-  for (const r of rows) {
-    if (!r.waitId) continue;
+  // In line order and 60 s apart, as after a reset: the conversations that paused first are answered first.
+  const rows = found.map((r) => ({ ...r, since: Number(r.since) })).sort(inLineOrder);
+  for (const [i, r] of rows.filter((r) => r.waitId).entries()) {
     await enqueue(db, {
       orgId,
       kind: "agent_run.execute",
       payload: { runId: r.id, wait: r.waitId },
       dedupeKey: `agent_run.execute:${r.id}:budget_raised:${r.waitId}`,
+      runAt: new Date(now + i * RESUME_GAP_MS),
       maxAttempts: 4,
     });
   }
@@ -389,6 +467,13 @@ async function setUsageCardState(
 }
 
 /**
+ * Where a run's usage note can be (the messages' partitions): a run that took a note over (`usageNoteHandOn`) started
+ * after it, within the longest wait (a month's budget).
+ */
+const noteSince = (run: { createdAt: Date }) =>
+  sql`${schema.messages.createdAt} >= ${new Date(run.createdAt.getTime() - 35 * 24 * 3600_000).toISOString()}::timestamptz`;
+
+/**
  * A run's "I'll answer when it resets" note while it is back at work (`ended`: true) or parked on it again (false):
  * "Don't run it" shows only while it waits, never stopping a live answer or a run already over.
  */
@@ -396,25 +481,36 @@ export async function usageWaitNoteEnded(
   deps: { db: Database; pubsub?: PubSub },
   run: { id: string; orgId: string; channelId: string; createdAt: Date },
   ended: boolean,
+  /** Parked again: when the limit resets now (null: unknown), so the note's promise stays true. */
+  resetsAt?: string | null,
 ) {
   const { messages } = schema;
+  const reset =
+    resetsAt === undefined
+      ? sql`${messages.meta}`
+      : resetsAt === null
+        ? sql`${messages.meta} #- '{usageWait,resetsAt}'`
+        : sql`jsonb_set(${messages.meta}, '{usageWait,resetsAt}', to_jsonb(${resetsAt}::text))`;
   const rows = await deps.db
     .update(messages)
     .set({
       meta: ended
         ? sql`jsonb_set(${messages.meta}, '{usageWait,ended}', 'true'::jsonb)`
-        : sql`${messages.meta} #- '{usageWait,ended}'`,
+        : sql`(${reset}) #- '{usageWait,ended}'`,
     })
     .where(
       and(
         eq(messages.orgId, run.orgId),
         eq(messages.channelId, run.channelId),
-        sql`${messages.createdAt} >= ${run.createdAt.toISOString()}::timestamptz`,
+        noteSince(run),
         sql`${messages.meta}->'usageWait'->>'runId' = ${run.id}`,
         sql`${messages.meta}->'usageWait'->'canceled' is null`,
         ended
           ? sql`${messages.meta}->'usageWait'->'ended' is null`
-          : sql`${messages.meta}->'usageWait'->'ended' is not null`,
+          : resetsAt === undefined
+            ? sql`${messages.meta}->'usageWait'->'ended' is not null`
+            : sql`(${messages.meta}->'usageWait'->'ended' is not null
+              or ${messages.meta}->'usageWait'->>'resetsAt' is distinct from ${resetsAt}::text)`,
       ),
     )
     .returning();
@@ -516,7 +612,7 @@ export async function usageWaitCanceled(
       and(
         eq(messages.orgId, run.orgId),
         eq(messages.channelId, run.channelId),
-        sql`${messages.createdAt} >= ${run.createdAt.toISOString()}::timestamptz`,
+        noteSince(run),
         sql`((${card} and ${messages.meta}->'actionCard'->>'runId' = ${run.id} and ${messages.meta}->'actionCard'->>'state' = 'paused')
           or (not ${card} and ${messages.meta}->'usageWait'->>'runId' = ${run.id} and ${messages.meta}->'usageWait'->'canceled' is null))`,
       ),
@@ -640,4 +736,123 @@ export async function continueUsagePause(
   }
   if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(done));
   return { runs: [{ agentId: card.agentId, runId: card.runId }] };
+}
+
+/**
+ * A run waiting on its plan or budget left the wait without a person saying not to run it (its turn ran and ended,
+ * the system stopped it): its note speaks on for the turns it took in (`joinUsageNote`). The first of them still
+ * waiting holds it now, its "Don't run it" back; with none waiting, a stopped run's note says it won't run
+ * (`reason`: `archived` for an archived agent) and a finished one's stays as it is.
+ */
+export async function usageNoteHandOn(
+  deps: { db: Database; pubsub?: PubSub },
+  run: { id: string; orgId: string; channelId: string; createdAt: Date },
+  stop?: { reason?: string },
+) {
+  const { agentRuns, messages } = schema;
+  const notes = await deps.db
+    .select()
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        noteSince(run),
+        sql`${messages.meta}->'usageWait'->>'runId' = ${run.id}`,
+        sql`${messages.meta}->'usageWait'->'canceled' is null`,
+        sql`${messages.meta}->'actionCard' is null`,
+      ),
+    );
+  for (const note of notes) {
+    const joined = (note.meta.usageWait as { runIds?: unknown }).runIds;
+    const ids = Array.isArray(joined) ? joined.filter((id): id is string => typeof id === "string") : [];
+    const live = ids.length
+      ? (
+          await deps.db
+            .select({ id: agentRuns.id })
+            .from(agentRuns)
+            .where(and(inArray(agentRuns.id, ids), eq(agentRuns.status, "waiting_input")))
+            .orderBy(agentRuns.createdAt)
+        ).map((r) => r.id)
+      : [];
+    const [holder, ...rest] = live;
+    const next = holder
+      ? sql`((${messages.meta}->'usageWait') - 'ended') || jsonb_build_object('runId', ${holder}::text, 'runIds', ${JSON.stringify(rest)}::jsonb)`
+      : stop
+        ? sql`(${messages.meta}->'usageWait') || jsonb_build_object('canceled', true, 'canceledAt', ${new Date().toISOString()}::text${stop.reason ? sql`, 'reason', ${stop.reason}::text` : sql``})`
+        : null;
+    if (!next) continue;
+    const [row] = await deps.db
+      .update(messages)
+      .set({ meta: sql`jsonb_set(${messages.meta}, '{usageWait}', ${next})` })
+      .where(and(eq(messages.id, note.id), eq(messages.createdAt, note.createdAt)))
+      .returning();
+    if (row && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(row));
+  }
+}
+
+/**
+ * An archived agent's catch-ups won't run: each wait on its plan or budget stops now (a system stop, so each note
+ * says why, `usageNoteHandOn`) instead of failing at the reset, days later.
+ */
+export async function stopAgentUsageWaits(deps: { db: Database; pubsub?: PubSub }, orgId: string, agentId: string) {
+  const { agentRuns, channels } = schema;
+  const { stopRun } = await import("./cancel");
+  const rows = await deps.db
+    .select({ run: agentRuns, channelKind: channels.kind })
+    .from(agentRuns)
+    .leftJoin(channels, eq(channels.id, agentRuns.channelId))
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        eq(agentRuns.agentId, agentId),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'code' in ('plan_limit', 'budget', 'usage_pause')`,
+      ),
+    );
+  for (const { run, channelKind } of rows) {
+    await stopRun(deps, orgId, run, channelKind, { type: "system", reason: "agent_archived" }).catch(() => null);
+  }
+}
+
+/**
+ * The agent thinks with another AI account or model now: what waited on the old one's limit goes on, in line order,
+ * 60 s apart, on the new sign-in (each claim reads the agent's brain again; one still limited parks in its new line).
+ */
+export async function wakeAgentUsageWaits(db: Executor, orgId: string, agentId: string, now = Date.now()) {
+  const { agentRuns } = schema;
+  const found = await db
+    .select({
+      id: agentRuns.id,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      background: agentRuns.background,
+      workId: agentRuns.workId,
+      since: waitSinceSql,
+      createdAt: agentRuns.createdAt,
+    })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        eq(agentRuns.agentId, agentId),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'code' in ('plan_limit', 'budget', 'usage_pause')`,
+      ),
+    )
+    .limit(500);
+  const rows = found
+    .filter((r) => r.waitId)
+    .map((r) => ({ ...r, since: Number(r.since) }))
+    .sort(inLineOrder);
+  for (const [i, r] of rows.entries()) {
+    await enqueue(db, {
+      orgId,
+      kind: "agent_run.execute",
+      payload: { runId: r.id, wait: r.waitId },
+      dedupeKey: `agent_run.execute:${r.id}:switched:${r.waitId}`,
+      runAt: new Date(now + i * RESUME_GAP_MS),
+      maxAttempts: 4,
+    });
+  }
+  return rows.map((r) => r.id);
 }
