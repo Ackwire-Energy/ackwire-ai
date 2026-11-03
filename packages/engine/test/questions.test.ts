@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
@@ -14,6 +14,10 @@ import {
   ValidationError,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+
+// The first test pays for migrating the PGlite template (2-3 s idle, past 5 s under a full suite's load), and the
+// preload's longer default reaches only a run's first file.
+setDefaultTimeout(30_000);
 
 let f: Fixture;
 afterEach(async () => {
