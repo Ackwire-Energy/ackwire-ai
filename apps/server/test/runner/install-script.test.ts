@@ -518,6 +518,7 @@ esac
 `,
   );
   fake("dpkg", '#!/bin/sh\n[ "$1" = --print-architecture ] && echo amd64\n');
+  fake("dpkg-statoverride", '#!/bin/sh\n[ "$1" = --list ] && exit 1\necho "dpkg-statoverride $*" >> "$LOG"\n');
   fake(
     "gpg",
     `#!/bin/sh
@@ -579,6 +580,8 @@ test.skipIf(process.platform === "win32")(
     expect(r.log).toContain(
       "apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends google-chrome-stable\n",
     );
+    // Its sandbox helper never set-user-id root, for this install and every upgrade, before the package lands.
+    expect(r.log).toContain(`dpkg-statoverride --add root root 0755 ${pc.at("google/chrome/chrome-sandbox")}\napt-get`);
     // Updated with the computer's other packages (unattended upgrades included), never pinned.
     expect(read(pc.at("apt/apt.conf.d/52agentes-google-chrome"))).toBe(
       'Unattended-Upgrade::Origins-Pattern { "origin=Google LLC,codename=stable"; };\n',

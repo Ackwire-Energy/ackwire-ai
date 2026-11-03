@@ -462,10 +462,13 @@ chrome_key() {
 }
 
 # Google Chrome stable from Google's apt repository, set up as its own package sets it up, so the computer's package
-# updates keep it current (unattended upgrades included). The package makes itself the default web browser: the
-# computer's own choice is put back.
+# updates keep it current (unattended upgrades included). Its sandbox helper never runs as root for the agents' users:
+# Chrome sandboxes with user namespaces (which --system's Debian has), and dpkg keeps that mode across upgrades. The
+# package makes itself the default web browser: the computer's own choice is put back.
 install_chrome() {
   chrome_key || return 1
+  SANDBOX="$(dirname "$CHROME_EXE")/chrome-sandbox"
+  dpkg-statoverride --list "$SANDBOX" >/dev/null 2>&1 || dpkg-statoverride --add root root 0755 "$SANDBOX" || return 1
   ARCH=$(dpkg --print-architecture) || return 1
   mkdir -p "$(dirname "$CHROME_SOURCES")"
   printf '%s\\n' '### THIS FILE IS AUTOMATICALLY CONFIGURED ###' '# Changes to this file will not be preserved.' \\
