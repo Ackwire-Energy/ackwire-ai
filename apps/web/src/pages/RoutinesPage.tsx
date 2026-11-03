@@ -2256,7 +2256,7 @@ function RoutineDialog({
               options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
             />
           </div>
-          <div className="routine-kind">
+          <div className="routine-own-actions">
             <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
             <OwnActions routine={routine} />
           </div>
