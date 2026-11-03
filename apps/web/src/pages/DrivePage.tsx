@@ -45,6 +45,7 @@ import { DriveTrash } from "@/components/drive/DriveTrash";
 import { DropOverlay, UploadProgress, useFileDrop } from "@/components/drive/DriveUploads";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { SelectionBar } from "@/components/SelectionBar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -619,7 +620,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
             )}
 
             {picked.length > 0 && (
-              <div className="drive-selbar" role="toolbar" aria-label={t("drive.selection")}>
+              <SelectionBar label={t("drive.selection")}>
                 <span className="drive-selbar__count">{t("drive.selected", { count: picked.length })}</span>
                 <Button size="sm" variant="ghost" icon="download" onClick={() => void downloadPicked()}>
                   <span className="drive-selbar__label">{t("artifacts.download")}</span>
@@ -648,7 +649,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                   title={t("drive.clearSelection")}
                   onClick={() => setSelected(new Set())}
                 />
-              </div>
+              </SelectionBar>
             )}
           </>
         )}
