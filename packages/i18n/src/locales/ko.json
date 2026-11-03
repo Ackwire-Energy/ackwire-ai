@@ -10482,7 +10482,6 @@
         "install": "{{app}}에 추가"
       },
       "note": {
-        "untested": "이 앱에서 로그인하는 것은 아직 테스트하지 않았어요. 안 되면 알려 주세요.",
         "chatgptPlans": "ChatGPT 유료 요금제에서 쓸 수 있어요. Free와 Go는 제외예요. Business에서는 관리자만 추가할 수 있어요.",
         "chatgptPhone": "휴대폰 앱에서는 추가할 수 없어요. 웹에서 추가하면 데스크톱과 휴대폰에도 표시돼요.",
         "geminiPlans": "웹에서만, 개인 Google 계정으로 쓸 수 있어요. Google AI Pro 또는 Ultra가 필요할 수 있어요.",

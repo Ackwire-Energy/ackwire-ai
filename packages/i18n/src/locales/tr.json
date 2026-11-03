@@ -10830,7 +10830,6 @@
         "install": "{{app}} uygulamasına ekle"
       },
       "note": {
-        "untested": "Bu uygulamadan girişi henüz test etmedik. Başarısız olursa bize haber verin.",
         "chatgptPlans": "ChatGPT'nin ücretli planlarında, Free ve Go hariç. Business'ta yalnızca adminler ekleyebilir.",
         "chatgptPhone": "Telefon uygulamasından eklenemez. Web'de eklendikten sonra masaüstünde ve telefonda da görünür.",
         "geminiPlans": "Yalnızca web'de, kişisel bir Google hesabıyla. Google AI Pro veya Ultra gerekebilir.",

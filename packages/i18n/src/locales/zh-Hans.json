@@ -10569,7 +10569,6 @@
         "install": "添加到 {{app}}"
       },
       "note": {
-        "untested": "我们还没有测试过从这个应用登录。如果失败，请告诉我们。",
         "chatgptPlans": "适用于 ChatGPT 付费套餐，不含 Free 和 Go。Business 中只有管理员可以添加。",
         "chatgptPhone": "无法在手机应用中添加。在网页上添加后，桌面端和手机上也会显示。",
         "geminiPlans": "仅限网页版，需使用个人 Google 账号。可能需要 Google AI Pro 或 Ultra。",

@@ -26391,9 +26391,6 @@
   "apps.dialog.step.install": {
     "value": "Add to {{app}}"
   },
-  "apps.dialog.note.untested": {
-    "value": "We haven't tested signing in from this app yet. If it fails, let us know."
-  },
   "apps.dialog.note.chatgptPlans": {
     "value": "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it."
   },

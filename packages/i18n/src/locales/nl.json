@@ -10971,7 +10971,6 @@
         "install": "Toevoegen aan {{app}}"
       },
       "note": {
-        "untested": "We hebben inloggen vanuit deze app nog niet getest. Lukt het niet, laat het ons weten.",
         "chatgptPlans": "Op betaalde ChatGPT-abonnementen, niet op Free of Go. Bij Business kunnen alleen admins hem toevoegen.",
         "chatgptPhone": "Toevoegen kan niet vanuit de telefoon-app. Zodra hij op het web is toegevoegd, verschijnt hij ook op desktop en telefoon.",
         "geminiPlans": "Alleen op het web, met een persoonlijk Google-account. Mogelijk is Google AI Pro of Ultra nodig.",

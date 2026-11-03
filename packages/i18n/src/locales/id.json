@@ -10559,7 +10559,6 @@
         "install": "Tambahkan ke {{app}}"
       },
       "note": {
-        "untested": "Kami belum menguji masuk dari aplikasi ini. Kalau gagal, kabari kami.",
         "chatgptPlans": "Di paket berbayar ChatGPT, kecuali Free dan Go. Di Business, hanya admin yang bisa menambahkannya.",
         "chatgptPhone": "Tidak bisa ditambahkan dari aplikasi ponsel. Setelah ditambahkan di web, ia juga muncul di desktop dan ponsel.",
         "geminiPlans": "Hanya di web, dengan akun Google pribadi. Mungkin perlu Google AI Pro atau Ultra.",

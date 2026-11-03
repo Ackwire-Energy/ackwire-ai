@@ -11328,7 +11328,6 @@
         "install": "Aggiungi a {{app}}"
       },
       "note": {
-        "untested": "Non abbiamo ancora provato l'accesso da questa app. Se non funziona, faccelo sapere.",
         "chatgptPlans": "Nei piani a pagamento di ChatGPT, non in Free o Go. In Business, solo gli admin possono aggiungerlo.",
         "chatgptPhone": "Non si può aggiungere dall'app del telefono. Una volta aggiunto sul web, compare anche sul computer e sul telefono.",
         "geminiPlans": "Solo sul web, con un account Google personale. Potrebbe servire Google AI Pro o Ultra.",

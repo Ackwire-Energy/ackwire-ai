@@ -10315,7 +10315,6 @@ export const en = {
         install: "Add to {{app}}",
       },
       note: {
-        untested: "We haven't tested signing in from this app yet. If it fails, let us know.",
         chatgptPlans: "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it.",
         chatgptPhone: "It can't be added from the phone app. Once added on the web, it shows on desktop and phone too.",
         geminiPlans: "On the web only, with a personal Google account. It may need Google AI Pro or Ultra.",

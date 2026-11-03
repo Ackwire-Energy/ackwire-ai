@@ -10491,7 +10491,6 @@
         "install": "{{app}}に追加"
       },
       "note": {
-        "untested": "このアプリからのログインはまだテストしていません。うまくいかない場合はお知らせください。",
         "chatgptPlans": "ChatGPTの有料プランで使えます(FreeとGoを除く)。Businessでは管理者だけが追加できます。",
         "chatgptPhone": "スマートフォンアプリからは追加できません。ウェブで追加すると、デスクトップとスマートフォンにも表示されます。",
         "geminiPlans": "ウェブのみ、個人のGoogleアカウントで使えます。Google AI ProまたはUltraが必要な場合があります。",

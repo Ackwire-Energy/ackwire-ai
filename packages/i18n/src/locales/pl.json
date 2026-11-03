@@ -11633,7 +11633,6 @@
         "install": "Dodaj do {{app}}"
       },
       "note": {
-        "untested": "Nie testowaliśmy jeszcze logowania z tej aplikacji. Jeśli się nie uda, daj nam znać.",
         "chatgptPlans": "W płatnych planach ChatGPT, poza Free i Go. W Business dodać go mogą tylko admini.",
         "chatgptPhone": "Nie da się go dodać z aplikacji na telefon. Po dodaniu w przeglądarce pojawi się też na komputerze i telefonie.",
         "geminiPlans": "Tylko w przeglądarce, na prywatnym koncie Google. Może wymagać Google AI Pro albo Ultra.",

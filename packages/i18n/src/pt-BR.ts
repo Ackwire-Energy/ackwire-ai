@@ -10501,7 +10501,6 @@ export const ptBR = {
         install: "Adicionar ao {{app}}",
       },
       note: {
-        untested: "Ainda não testamos a entrada por este app. Se falhar, avise a gente.",
         chatgptPlans: "Nos planos pagos do ChatGPT, menos Free e Go. No Business, só admins adicionam.",
         chatgptPhone:
           "Não dá para adicionar pelo app do celular. Depois de adicionado na web, ele aparece no desktop e no celular.",
