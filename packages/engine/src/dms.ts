@@ -5,7 +5,7 @@ import { audienceError, canTalkTo, speakerOf } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent } from "./events";
+import { publishChannelEvent, publishUserEvent } from "./events";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
@@ -393,13 +393,39 @@ export async function markChannelRead(
     userIds: [actorId],
     kind: "agent_reply",
   });
-  if (member.kind === "dm")
-    await publishChannelEvent(pubsub, {
-      type: "channel.read",
-      channelId,
-      userId: actorId,
-      lastReadAt: at.toISOString(),
-    });
+  const read = { type: "channel.read" as const, channelId, userId: actorId, lastReadAt: at.toISOString() };
+  if (member.kind === "dm") await publishChannelEvent(pubsub, read);
+  // My other devices: the conversation stops looking unread there too.
+  await publishUserEvent(pubsub, orgId, actorId, read);
+}
+
+/**
+ * Mutes (or unmutes) a channel for me: it never looks unread to me, though a mention of me still counts. My other
+ * devices hear `channel.muted`. Not a DM: its lists count every unread message, muted or not.
+ */
+export async function setChannelMuted(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  muted: boolean,
+  pubsub?: PubSub,
+) {
+  const [member] = await db
+    .select({ id: channelMembers.id, joinedAt: channelMembers.createdAt, kind: channels.kind })
+    .from(channelMembers)
+    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+    .where(
+      and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, actorId)),
+    );
+  if (!member) throw new NotFoundError("Channel not found");
+  if (member.kind === "dm") throw new ValidationError("Only a channel can be muted", "channel.mute_dm");
+  // Never read yet: the new row reads from my joining (listChannels' fallback), so muting marks nothing read.
+  await db
+    .insert(channelReads)
+    .values({ orgId, channelId, userId: actorId, muted, lastReadAt: member.joinedAt })
+    .onConflictDoUpdate({ target: [channelReads.channelId, channelReads.userId], set: { muted } });
+  await publishUserEvent(pubsub, orgId, actorId, { type: "channel.muted", channelId, muted });
 }
 
 /**

@@ -5,7 +5,7 @@ setupDom();
 
 import type { MachineOutages } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 const MAC = "00000000-0000-4000-8000-0000000009aa";
@@ -246,7 +246,9 @@ describe("in the chat and the sidebar", () => {
   });
 
   test("a waiting agent's sidebar row says 'esperando', not working", async () => {
-    const { api } = setup();
+    const { api, state } = setup();
+    seedDm(state, { type: "agent", id: ADA_ID });
+    seedDm(state, { type: "agent", id: ATLAS_ID });
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
     const rows = [...document.querySelectorAll(".sidebar__waiting")];

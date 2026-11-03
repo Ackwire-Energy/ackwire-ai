@@ -53,6 +53,7 @@ import {
   useHeldPlaces,
   useJoinChannel,
   useMarkChannelRead,
+  useMarkThreadRead,
   useMessages,
   useMissionControl,
   useModels,
@@ -107,7 +108,7 @@ import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
@@ -235,11 +236,11 @@ import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
-import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
+import { ChannelHeader } from "@/components/ChannelHeader";
 import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
-import { QueueButton, QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
+import { QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
   ConsultAnswerLine,
@@ -254,7 +255,7 @@ import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { DatePill, type DatePillHandle } from "@/components/DatePill";
 import { MenuEntries } from "@/components/DesktopMenus";
-import { useArchiveChannelWithUndo, useChannelMenu } from "@/components/entity-menus";
+import { useArchiveChannelWithUndo } from "@/components/entity-menus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
@@ -270,6 +271,7 @@ import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
 import { MessageReceipts, SeenMark } from "@/components/MessageReceipts";
+import { MembersColumn, MembersSheet } from "@/components/members/MembersColumn";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
   AutoApprovedLine,
@@ -309,7 +311,7 @@ import {
 } from "@/components/RequestCard";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
-import { SearchHereButton } from "@/components/search/SearchHereButton";
+import { SearchResultsPanel } from "@/components/search/SearchResultsPanel";
 import { TeamChecks } from "@/components/TeamChecks";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
@@ -317,7 +319,6 @@ import { AgentTasksContext } from "@/components/tasks/agent-tasks-context";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
-  ChannelThreadsButton,
   ChannelThreadsContext,
   type ChannelThreadsView,
   ClosedThreadLine,
@@ -331,6 +332,7 @@ import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/Wo
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
@@ -338,7 +340,6 @@ import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
-import { entityMenu } from "@/lib/entity-menu";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -682,6 +683,8 @@ function ChannelView({
   });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
   const [panel, setPanel] = useState<{ id: string; reply: boolean; focus?: string } | null>(null);
+  // The header search's results, in the same panel (one panel at a time).
+  const [searchOpen, setSearchOpen] = useState(false);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
   // (its memory); one panel at a time.
   const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
@@ -701,6 +704,7 @@ function ChannelView({
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
     setPanel(null);
+    setSearchOpen(false);
     setConsultId(null);
     setProfile({ agentId, tab });
   }, []);
@@ -725,9 +729,9 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const membersColumn = useMembersColumn();
   // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
   const [addFirst, setAddFirst] = useState(false);
-  const channelEntries = useChannelMenu();
   // "Editar canal" from the sidebar's right click: the details open once this channel shows.
   useEffect(() => {
     if (chrome?.header) return;
@@ -849,6 +853,19 @@ function ChannelView({
     document.addEventListener("visibilitychange", mark);
     return () => document.removeEventListener("visibilitychange", mark);
   }, [markChannelRead, channel.id, isMember, lastId]);
+  // A thread open in view: its replies are read (its unread and the Threads mark clear, on every device).
+  const markThreadRead = useMarkThreadRead(org.id).mutate;
+  const threadId = thread?.id;
+  const lastReplyId = threadId ? threadMessages.data?.at(-1)?.id : undefined;
+  useEffect(() => {
+    if (!threadId || !isMember || !lastReplyId || lastReplyId.startsWith("local-")) return;
+    const mark = () => {
+      if (document.visibilityState === "visible") markThreadRead(threadId);
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
+  }, [markThreadRead, threadId, isMember, lastReplyId]);
 
   // The skeleton was on screen: the real messages fade in (once).
   const hadSkeleton = useRef(messages.isLoading);
@@ -1793,16 +1810,19 @@ function ChannelView({
       : (message) => {
           setProfile(null);
           setConsultId(null);
+          setSearchOpen(false);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id, focus) => {
       setProfile(null);
       setConsultId(null);
+      setSearchOpen(false);
       setPanel({ id, reply: false, focus });
     },
     openConsultation: (id) => {
       setProfile(null);
       setPanel(null);
+      setSearchOpen(false);
       setConsultId(id);
     },
     requestCorrection: (message, text) => {
@@ -1848,16 +1868,6 @@ function ChannelView({
     [tasksAgentId, agentTasks, tasksOpen, toggleTasks],
   );
   const Tag = chrome?.panel ? "section" : "main";
-  const agentNames = joinNames(
-    channelAgents.map((a) => a.name),
-    t,
-  );
-  const subtitle = [
-    channel.topic,
-    channelAgents.length > 0 ? t("channel.agentsAnswer", { count: channelAgents.length, names: agentNames }) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   return (
     // A thread inside the panel opens profiles in its channel's panel, not inside itself.
@@ -1871,28 +1881,22 @@ function ChannelView({
             {chrome?.header ? (
               <AgentTasksContext.Provider value={tasksControl}>{chrome.header}</AgentTasksContext.Provider>
             ) : (
-              <header className="channel__header">
-                <NavToggle />
-                <div
-                  style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}
-                  {...entityMenu(() => channelEntries(channel))}
-                >
-                  <h1 className="channel__title"># {channel.name}</h1>
-                  {subtitle && <span className="channel__topic">{subtitle}</span>}
-                </div>
-                <div className="channel__acts ac-acts">
-                  <QueueButton machineId={queueMachine} />
-                  <ChannelMembersStack
-                    channelId={channel.id}
-                    people={channelPeople}
-                    agents={channelAgents}
-                    onDetails={() => setDetailsOpen(true)}
-                  />
-                  {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                  {isMember && <SearchHereButton channelId={channel.id} />}
-                  <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
-                </div>
-              </header>
+              <ChannelHeader
+                channel={channel}
+                isMember={isMember}
+                queueMachine={queueMachine}
+                people={channelPeople}
+                agents={channelAgents}
+                membersOpen={membersColumn.open}
+                onMembers={membersColumn.toggle}
+                onDetails={() => setDetailsOpen(true)}
+                onSearch={() => {
+                  setPanel(null);
+                  setProfile(null);
+                  setConsultId(null);
+                  setSearchOpen(true);
+                }}
+              />
             )}
             {isMember && (
               <ChannelPinnedBar
@@ -2264,6 +2268,22 @@ function ChannelView({
               />
             )}
           </Tag>
+          {!chrome && membersColumn.column && (
+            <MembersColumn channel={channel} people={channelPeople} agents={channelAgents} />
+          )}
+          {!chrome && membersColumn.sheet && (
+            <MembersSheet
+              channel={channel}
+              isMember={isMember}
+              people={channelPeople}
+              agents={channelAgents}
+              onDetails={() => {
+                membersColumn.closeSheet();
+                setDetailsOpen(true);
+              }}
+              onClose={membersColumn.closeSheet}
+            />
+          )}
           {panel && (
             <button
               type="button"
@@ -2284,6 +2304,7 @@ function ChannelView({
               />
             </aside>
           )}
+          {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
           {profile && (
             <AgentPanel
               key={`${profile.agentId}:${profile.tab ?? ""}`}

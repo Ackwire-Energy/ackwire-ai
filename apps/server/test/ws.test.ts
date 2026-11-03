@@ -427,3 +427,38 @@ test("a missed revocation event is reconciled from durable membership", async ()
   expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
   expect(await Promise.race([closed, Bun.sleep(20_000).then(() => -1)])).toBe(4403);
 }, 60_000);
+
+test("a new message reaches the other members' sockets as `channel.activity` (no content), never the author's", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  // Neither socket subscribes to the channel: the sidebar hears it anyway.
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  const o = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await Promise.all([a.opened, o.opened]);
+  await Promise.all([a.next((f) => f.type === "ready"), o.next((f) => f.type === "ready")]);
+
+  await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "hello all" } });
+  const heard = await a.next((f) => (f.event as { type?: string } | undefined)?.type === "channel.activity");
+  expect(heard).toEqual({
+    type: "event",
+    scope: "user",
+    event: { type: "channel.activity", channelId, threadId: null, dm: false },
+  });
+  await Bun.sleep(200);
+  expect(o.frames.some((f) => (f.event as { type?: string } | undefined)?.type === "channel.activity")).toBe(false);
+
+  // A reply in a thread Ana doesn't follow never reaches her.
+  const root = (await (
+    await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "a topic" } })
+  ).json()) as { id: string };
+  await a.next((f) => (f.event as { type?: string } | undefined)?.type === "channel.activity");
+  await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, {
+    json: { body: "a reply", threadId: root.id },
+  });
+  await Bun.sleep(500);
+  expect(a.frames.some((f) => (f.event as { threadId?: string } | undefined)?.threadId === root.id)).toBe(false);
+  a.ws.close();
+  o.ws.close();
+});

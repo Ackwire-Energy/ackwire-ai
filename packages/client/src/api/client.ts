@@ -1406,6 +1406,13 @@ export interface ApiClient {
     follow(orgId: string, threadId: string): Promise<ThreadFollow>;
     unfollow(orgId: string, threadId: string): Promise<ThreadFollow>;
   };
+  /** Unread marks: muting a conversation, reading a thread, the threads with unread replies. */
+  reads?: {
+    mute(orgId: string, channelId: string, muted: boolean): Promise<void>;
+    markThreadRead(orgId: string, threadId: string): Promise<void>;
+    /** How many threads I follow have a reply I haven't read (at most 100). */
+    unreadThreads(orgId: string): Promise<number>;
+  };
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {
     list(orgId: string): Promise<WorkingRun[]>;

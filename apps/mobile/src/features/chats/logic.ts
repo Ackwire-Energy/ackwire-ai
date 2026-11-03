@@ -1,18 +1,17 @@
 import type {
-  Agent,
   AppNotification,
   Channel,
   DirectMessage,
   MediaKind,
   Mission,
   MissionStatus,
-  OrgSummary,
   PreviewMeta,
   ThreadActor,
   ThreadInfo,
 } from "@agenteschat/client";
-import { listsAgent } from "@agenteschat/client/lib/audience";
+import { hiddenAgentIds, hiddenDm } from "@agenteschat/client/lib/audience";
 import type { FirstStepId } from "@agenteschat/client/lib/home";
+import { looksUnread, unreadTotal } from "@agenteschat/client/lib/unread";
 import type { IconName } from "@/ui";
 import { previewOf } from "../shared/logic";
 
@@ -44,7 +43,10 @@ export type ConversationRow =
       categoryId: string | null;
       last: LastLine | null;
       at: string | null;
+      /** New messages (0 while I muted it: it never looks unread). */
       unread: number;
+      /** Unread mentions of me: the row's number, as on the web (even while muted). */
+      mentions: number;
     }
   | {
       kind: "dm";
@@ -99,16 +101,7 @@ export function isListedThread(t: Pick<ThreadInfo, "mission" | "title" | "contex
 
 export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || previewOf(t.rootText);
 
-/**
- * The agents my lists leave out (`listsAgent`, from the server's `canTalk`): unless I manage agents, the ones not
- * answering me.
- */
-export const hiddenAgentIds = (org: OrgSummary | null | undefined, agents: readonly Pick<Agent, "id" | "canTalk">[]) =>
-  new Set(agents.filter((a) => !listsAgent(org, a)).map((a) => a.id));
-
-/** A DM with one of `hiddenAgents` (`hiddenAgentIds`): off the home and its badge. */
-const hiddenDm = (d: Pick<DirectMessage, "with">, hiddenAgents: ReadonlySet<string> | undefined) =>
-  d.with.type === "agent" && hiddenAgents?.has(d.with.id) === true;
+export { hiddenAgentIds };
 
 /**
  * One list: threads and missions, DMs and channels, by the latest activity (channels without any last, by
@@ -148,7 +141,7 @@ export function buildConversations(input: {
           }
         : null,
       at: t.lastActivityAt,
-      unread: 0,
+      unread: Math.max(0, t.unread ?? 0),
       mission: m
         ? {
             id: m.id,
@@ -201,7 +194,8 @@ export function buildConversations(input: {
           }
         : null,
       at: last?.createdAt ?? null,
-      unread: Math.max(0, c.unreadCount ?? 0),
+      unread: looksUnread(c) ? Math.max(0, c.unreadCount ?? 0) : 0,
+      mentions: Math.max(0, c.mentionCount ?? 0),
     });
   }
   return rows.sort((a, b) => {
@@ -250,13 +244,22 @@ export const unreadConversations = (rows: ConversationRow[]) => rows.filter((r) 
  * badge (`unreadThreadCount`), so nothing is counted twice.
  */
 export function unreadConversationCount(input: {
-  channels: Pick<Channel, "isMember" | "unreadCount">[];
+  channels: Pick<Channel, "isMember" | "unreadCount" | "muted">[];
   dms: Pick<DirectMessage, "unread" | "with">[];
   hiddenAgents?: ReadonlySet<string>;
 }): number {
-  const channels = input.channels.filter((c) => c.isMember && (c.unreadCount ?? 0) > 0).length;
+  const channels = input.channels.filter(looksUnread).length;
   const dms = input.dms.filter((d) => d.unread > 0 && !hiddenDm(d, input.hiddenAgents)).length;
   return channels + dms;
+}
+
+/** The app icon's number: the web tab title's total (unread DM messages and mentions of me), DMs the home hides left out. */
+export function appBadgeCount(input: {
+  channels: Pick<Channel, "isMember" | "mentionCount">[];
+  dms: Pick<DirectMessage, "unread" | "with">[];
+  hiddenAgents?: ReadonlySet<string>;
+}): number {
+  return unreadTotal(input.channels, input.dms, input.hiddenAgents);
 }
 
 // ── The home by kind ───────────────────────────────────────────────────────
@@ -398,11 +401,7 @@ export const toggleHomeCollapsed = (list: readonly string[], key: string) =>
 /** The Threads tab: threads and missions, by latest activity. */
 export const threadRows = (rows: ConversationRow[]) => rowsOfKind(rows, "threads");
 
-/**
- * The badge of the Threads tab: thread and mission rows with something unread. The server keeps reads per
- * channel (a thread's replies count in its channel), so today a thread row's `unread` is 0 and the badge
- * stays empty until the thread list carries a count of its own.
- */
+/** The badge of the Threads tab: thread and mission rows with something unread (replies in threads I follow). */
 export const unreadThreadCount = (rows: ConversationRow[]) => threadRows(rows).filter((r) => r.unread > 0).length;
 
 /**

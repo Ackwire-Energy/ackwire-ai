@@ -127,6 +127,8 @@
     "color": "Colore",
     "colorDesc": "Colora il segno del ruolo.",
     "colorOf": "Colore {{color}}",
+    "hoist": "Mostra a parte nell'elenco dei membri",
+    "hoistDesc": "Chi ha questo ruolo ha un gruppo tutto suo nella colonna dei membri.",
     "icon": "Icona",
     "iconDesc": "Appare accanto al nome.",
     "more": "Altre opzioni",
@@ -1126,9 +1128,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Sistema",
     "markRead": "Segna come letto",
+    "muteChannel": "Silenzia canale",
+    "unmuteChannel": "Riattiva canale",
     "mention": "Menziona",
     "copyHandle": "Copia @{{handle}}",
     "handleCopied": "@ copiato.",
+    "copyId": "Copia ID",
+    "idCopied": "ID copiato.",
     "editAgent": "Modifica agente",
     "openPage": "Apri pagina intera",
     "moveUp": "Sposta su",
@@ -1237,9 +1243,8 @@
     "sidebarMenu": {
       "title": "Barra laterale",
       "newChannel": "Nuovo canale",
-      "newAgentGroup": "Nuovo gruppo di agenti",
       "addToChannels": "Nuovo canale o categoria",
-      "addToAgents": "Crea agente o gruppo",
+      "addToDms": "Nuovo messaggio o agente",
       "newMessage": "Nuovo messaggio",
       "addMembers": "Aggiungi persone o agenti",
       "channelSettings": "Impostazioni del canale",
@@ -1341,6 +1346,13 @@
     "pendingApprovals_other": "{{count}} approvazioni in sospeso",
     "home": "Home",
     "notifications": "Notifiche",
+    "unreadMark": "Non letto",
+    "unreadMentions_one": "{{count}} menzione a te",
+    "unreadMentions_many": "{{count}} menzioni a te",
+    "unreadMentions_other": "{{count}} menzioni a te",
+    "unreadThreads_one": "Thread: {{count}} con risposte non lette",
+    "unreadThreads_many": "Thread: {{count}} con risposte non lette",
+    "unreadThreads_other": "Thread: {{count}} con risposte non lette",
     "unreadNotifications_one": "{{count}} notifica non letta",
     "unreadNotifications_many": "{{count}} notifiche non lette",
     "unreadNotifications_other": "{{count}} notifiche non lette"
@@ -1375,6 +1387,9 @@
   },
   "team": {
     "title": "Team",
+    "groups": {
+      "title": "Gruppi di agenti"
+    },
     "subtitle_one": "{{count}} agente, raggruppato per chi se ne occupa.",
     "subtitle_many": "{{count}} agenti, raggruppati per chi si occupa di ciascuno.",
     "subtitle_other": "{{count}} agenti, raggruppati per chi si occupa di ciascuno.",
@@ -1464,12 +1479,17 @@
       "button_other": "Messaggi fissati ({{count}})",
       "label": "Messaggi fissati in #{{channel}}",
       "in": "Fissato in #{{channel}}",
-      "unpin": "Togli dai fissati il messaggio di {{name}}"
+      "unpin": "Togli dai fissati il messaggio di {{name}}",
+      "empty": "Qui non c'è ancora niente di fissato"
+    },
+    "header": {
+      "pins": "Messaggi fissati",
+      "showMembers": "Mostra i membri",
+      "hideMembers": "Nascondi i membri"
     },
     "membersButton_one": "Membri del canale ({{count}})",
     "membersButton_many": "Membri del canale ({{count}})",
     "membersButton_other": "Membri del canale ({{count}})",
-    "membersPeople": "Persone",
     "membersAgents": "Agenti",
     "you": "tu",
     "agentState": {
@@ -1479,7 +1499,6 @@
     },
     "autoReplyChip": "risponde senza menzione",
     "coordinatorChip": "coordina il team",
-    "seeDetails": "Vedi i dettagli del canale",
     "more": "Altre azioni sul messaggio",
     "copyLink": "Copia link",
     "linkCopied": "Link copiato.",
@@ -1501,9 +1520,6 @@
     "messages": "Messaggi",
     "members": "Membri: {{names}}",
     "details": "Dettagli del canale",
-    "agentsAnswer_one": "{{names}} risponde qui",
-    "agentsAnswer_many": "{{names}} rispondono qui",
-    "agentsAnswer_other": "{{names}} rispondono qui",
     "composerLabel": "Scrivi in #{{channel}}",
     "composerDm": "Scrivi a {{name}}",
     "composerPlaceholder": "Scrivi in #{{channel}} · usa @ per chiamare un agente",
@@ -2197,6 +2213,12 @@
   "profile": {
     "audience": "Chi può parlare",
     "cardLabel": "Profilo",
+    "roles": "Ruoli",
+    "memberSince": "Nello spazio di lavoro da",
+    "messageTo": "Messaggio per {{name}}",
+    "audienceEdit": "Modifica",
+    "nowIn": "ora, in #{{channel}}",
+    "more": "Altro",
     "of": "Profilo di {{name}}",
     "presence": "Presenza",
     "offline": "Non è ancora entrato",
@@ -4155,6 +4177,13 @@
     "routineNotMade": "La routine non è stata creata: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Membri di #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Proprietario del workspace",
+      "more": "Mostra altri {{count}}",
+      "find": "Cerca persone e agenti"
+    },
     "agentsOnlyYou": "I tuoi agenti rispondono solo a te.",
     "agentsOnlyYouHint": "Con un piano, puoi far rispondere ognuno anche ad altre persone dalla sua pagina.",
     "filters": "Filtra persone",
@@ -10220,6 +10249,31 @@
       "relevance": "Più pertinenti"
     },
     "searchHere": "Cerca in questa conversazione",
+    "optionHint": {
+      "from": "nome",
+      "in": "canale",
+      "has": "link, file, immagine o scheda",
+      "mentions": "nome"
+    },
+    "moreFiltersHint": "date, solo agenti, fissati",
+    "clearRecentAll": "Cancella le ricerche recenti",
+    "header": {
+      "placeholder": "Cerca in {{org}}",
+      "clear": "Cancella la ricerca"
+    },
+    "panel": {
+      "label": "Risultati della ricerca",
+      "count_one": "{{count}} risultato",
+      "count_many": "{{count}} risultati",
+      "count_other": "{{count}} risultati",
+      "filters": "Filtri",
+      "filtersCount_one": "Filtri ({{count}})",
+      "filtersCount_many": "Filtri ({{count}})",
+      "filtersCount_other": "Filtri ({{count}})",
+      "jump": "Vai",
+      "jumpLabel": "Vai al messaggio di {{name}}",
+      "threadIn": "thread in #{{channel}}"
+    },
     "dm": "Messaggio diretto con {{name}}"
   },
   "files": {

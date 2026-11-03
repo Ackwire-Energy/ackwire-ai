@@ -748,3 +748,10 @@ export function dayInView(
   const next = top ? (top.item.kind === "day" ? (top.item.iso ?? null) : (top.item.message?.createdAt ?? null)) : null;
   return prev && next && dayKey(prev) === dayKey(next) ? prev : next;
 }
+
+/**
+ * What seeing the end of a conversation marks read. A thread view marks only its thread: the channel's own timeline
+ * isn't on screen, and reading the channel would clear its unread and mentions unseen.
+ */
+export const readMark = (channelId: string, threadId: string | null | undefined) =>
+  threadId ? ({ kind: "thread", id: threadId } as const) : ({ kind: "channel", id: channelId } as const);

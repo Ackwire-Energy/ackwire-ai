@@ -5,7 +5,7 @@ setupDom();
 
 import type { AgentStatus, StatusInput } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /* Presence and written status (ADR 0084): the "Definir status" dialog, and where a status shows. */
@@ -161,6 +161,7 @@ describe("where a status shows", () => {
     const state = seedState();
     state.online.add("u-joao");
     state.statuses = new Map([["u-joao", { availability: "hidden", status: null }]]);
+    seedDm(state, { type: "person", id: "u-joao" });
     await go(`c/${ENG_ID}`, state);
     const joao = within(nav()).getByRole("link", { name: /^João/ });
     expect(joao.getAttribute("data-presence")).toBe("offline");
@@ -178,6 +179,7 @@ describe("where a status shows", () => {
     state.statuses = new Map([
       ["u-joao", { availability: "busy", status: { text: "Focado no relatório", emoji: "🎧", until: null } }],
     ]);
+    seedDm(state, { type: "person", id: "u-joao" });
     await go(`c/${ENG_ID}`, state);
     const message = screen()
       .getAllByRole("article")
@@ -185,12 +187,12 @@ describe("where a status shows", () => {
     const emoji = within(message).getByRole("img", { name: "Focado no relatório" });
     expect([emoji.textContent, emoji.getAttribute("title")]).toEqual(["🎧", "Focado no relatório"]);
     expect(badgeOf(message.querySelector(".ac-msg__avatar"))).toBe("busy");
-    // The sidebar row: the emoji after the name, the words in its title.
+    // The sidebar's DM row: the emoji after the name, the words in its title.
     const joao = within(nav()).getByRole("link", { name: /^João/ });
     expect(joao.getAttribute("title")).toBe("João · Ocupado · Focado no relatório");
-    await click(screen().getByRole("button", { name: "Membros do canal (4)" }));
-    await settle(4);
-    expect(screen().getByRole("region", { name: "Pessoas" }).textContent).toContain("🎧Focado no relatório");
+    // The members column: the line under the name.
+    const side = screen().getByRole("complementary", { name: "Membros de #eng" });
+    expect(within(side).getByRole("button", { name: "Perfil de João" }).textContent).toContain("🎧Focado no relatório");
     cleanup();
 
     await go(`c/${ENG_ID}`, state);
@@ -226,6 +228,8 @@ describe("where a status shows", () => {
       },
     ];
     const state = seedState({ agentStatuses: statuses });
+    seedDm(state, { type: "agent", id: ADA_ID });
+    seedDm(state, { type: "agent", id: ATLAS_ID });
     await go(`c/${ENG_ID}`, state);
     // The sidebar: the badge, and the line in the row's title (no emoji in the list).
     const ada = within(nav()).getByRole("link", { name: /^Ada/ });
@@ -246,11 +250,10 @@ describe("where a status shows", () => {
     expect(badgeOf(card)).toBe("busy");
     cleanup();
 
-    // In the members list: its own words, as written.
+    // In the members column: its own words, as written.
     await go(`c/${ENG_ID}`, seedState({ agentStatuses: statuses }));
-    await click(screen().getByRole("button", { name: "Membros do canal (4)" }));
-    await settle(4);
-    expect(screen().getByRole("region", { name: "Agentes" }).textContent).toContain("🛠️Deploy da v2 em staging");
+    const side = screen().getByRole("complementary", { name: "Membros de #eng" });
+    expect(within(side).getByRole("region", { name: "Agentes" }).textContent).toContain("🛠️Deploy da v2 em staging");
   });
 
   test("an agent with no AI is drawn offline, and its card says why", async () => {
@@ -263,6 +266,7 @@ describe("where a status shows", () => {
         ],
       },
     });
+    seedDm(state, { type: "agent", id: ADA_ID });
     await go(`c/${ENG_ID}`, state);
     const ada = within(nav()).getByRole("link", { name: /^Ada/ });
     expect(ada.getAttribute("data-presence")).toBe("offline");

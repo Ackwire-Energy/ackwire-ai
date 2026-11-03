@@ -130,6 +130,8 @@
     "color": "Цвет",
     "colorDesc": "Цвет метки роли.",
     "colorOf": "Цвет: {{color}}",
+    "hoist": "Показывать отдельно в списке участников",
+    "hoistDesc": "У людей с этой ролью своя группа в колонке участников.",
     "icon": "Значок",
     "iconDesc": "Показывается рядом с названием.",
     "more": "Ещё",
@@ -1162,9 +1164,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Системное",
     "markRead": "Отметить как прочитанное",
+    "muteChannel": "Отключить звук канала",
+    "unmuteChannel": "Включить звук канала",
     "mention": "Упомянуть",
     "copyHandle": "Копировать @{{handle}}",
     "handleCopied": "@ скопирован.",
+    "copyId": "Копировать ID",
+    "idCopied": "ID скопирован.",
     "editAgent": "Изменить агента",
     "openPage": "Открыть на всю страницу",
     "moveUp": "Переместить выше",
@@ -1273,9 +1279,8 @@
     "sidebarMenu": {
       "title": "Боковая панель",
       "newChannel": "Новый канал",
-      "newAgentGroup": "Новая группа агентов",
       "addToChannels": "Новый канал или категория",
-      "addToAgents": "Создать агента или группу",
+      "addToDms": "Новое сообщение или агент",
       "newMessage": "Новое сообщение",
       "addMembers": "Добавить людей или агентов",
       "channelSettings": "Настройки канала",
@@ -1381,6 +1386,15 @@
     "pendingApprovals_other": "{{count}} одобрения ждут",
     "home": "Главная",
     "notifications": "Уведомления",
+    "unreadMark": "Не прочитано",
+    "unreadMentions_one": "{{count}} упоминание вас",
+    "unreadMentions_few": "{{count}} упоминания вас",
+    "unreadMentions_many": "{{count}} упоминаний вас",
+    "unreadMentions_other": "{{count}} упоминания вас",
+    "unreadThreads_one": "Треды: {{count}} с непрочитанными ответами",
+    "unreadThreads_few": "Треды: {{count}} с непрочитанными ответами",
+    "unreadThreads_many": "Треды: {{count}} с непрочитанными ответами",
+    "unreadThreads_other": "Треды: {{count}} с непрочитанными ответами",
     "unreadNotifications_one": "{{count}} непрочитанное уведомление",
     "unreadNotifications_few": "{{count}} непрочитанных уведомления",
     "unreadNotifications_many": "{{count}} непрочитанных уведомлений",
@@ -1416,6 +1430,9 @@
   },
   "team": {
     "title": "Команда",
+    "groups": {
+      "title": "Группы агентов"
+    },
     "subtitle_one": "{{count}} агент, сгруппированы по тем, кто за них отвечает.",
     "subtitle_few": "{{count}} агента, сгруппированы по тем, кто за них отвечает.",
     "subtitle_many": "{{count}} агентов, сгруппированы по тем, кто за них отвечает.",
@@ -1512,13 +1529,18 @@
       "button_other": "Закреплённые сообщения ({{count}})",
       "label": "Закреплённые сообщения в #{{channel}}",
       "in": "Закреплено в #{{channel}}",
-      "unpin": "Открепить сообщение {{name}}"
+      "unpin": "Открепить сообщение {{name}}",
+      "empty": "Здесь пока ничего не закреплено"
+    },
+    "header": {
+      "pins": "Закреплённые сообщения",
+      "showMembers": "Показать участников",
+      "hideMembers": "Скрыть участников"
     },
     "membersButton_one": "Участники канала ({{count}})",
     "membersButton_few": "Участники канала ({{count}})",
     "membersButton_many": "Участники канала ({{count}})",
     "membersButton_other": "Участники канала ({{count}})",
-    "membersPeople": "Люди",
     "membersAgents": "Агенты",
     "you": "вы",
     "agentState": {
@@ -1528,7 +1550,6 @@
     },
     "autoReplyChip": "отвечает без упоминания",
     "coordinatorChip": "координирует команду",
-    "seeDetails": "Подробнее о канале",
     "more": "Другие действия с сообщением",
     "copyLink": "Копировать ссылку",
     "linkCopied": "Ссылка скопирована.",
@@ -1550,10 +1571,6 @@
     "messages": "Сообщения",
     "members": "Участники: {{names}}",
     "details": "О канале",
-    "agentsAnswer_one": "{{names}} отвечает здесь",
-    "agentsAnswer_few": "{{names}} отвечают здесь",
-    "agentsAnswer_many": "{{names}} отвечают здесь",
-    "agentsAnswer_other": "{{names}} отвечают здесь",
     "composerLabel": "Сообщение в #{{channel}}",
     "composerDm": "Сообщение для {{name}}",
     "composerPlaceholder": "Сообщение в #{{channel}} · @, чтобы позвать агента",
@@ -2259,6 +2276,12 @@
   "profile": {
     "audience": "Кто может писать",
     "cardLabel": "Профиль",
+    "roles": "Роли",
+    "memberSince": "В рабочем пространстве с",
+    "messageTo": "Сообщение для {{name}}",
+    "audienceEdit": "Изменить",
+    "nowIn": "сейчас, в #{{channel}}",
+    "more": "Ещё",
     "of": "Профиль: {{name}}",
     "presence": "Статус",
     "offline": "Ещё не присоединился",
@@ -4209,6 +4232,13 @@
     "routineNotMade": "Регулярная задача не создана: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Участники #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Владелец рабочего пространства",
+      "more": "Показать ещё {{count}}",
+      "find": "Найти людей и агентов"
+    },
     "agentsOnlyYou": "Ваши агенты отвечают только вам.",
     "agentsOnlyYouHint": "С платным тарифом вы можете разрешить каждому отвечать и другим людям, на его странице.",
     "filters": "Фильтровать людей",
@@ -10467,6 +10497,33 @@
       "relevance": "По релевантности"
     },
     "searchHere": "Искать в этом разговоре",
+    "optionHint": {
+      "from": "имя",
+      "in": "канал",
+      "has": "ссылка, файл, изображение или карточка",
+      "mentions": "имя"
+    },
+    "moreFiltersHint": "даты, только агенты, закреплённые",
+    "clearRecentAll": "Очистить недавние запросы",
+    "header": {
+      "placeholder": "Поиск в {{org}}",
+      "clear": "Очистить поиск"
+    },
+    "panel": {
+      "label": "Результаты поиска",
+      "count_one": "{{count}} результат",
+      "count_few": "{{count}} результата",
+      "count_many": "{{count}} результатов",
+      "count_other": "{{count}} результата",
+      "filters": "Фильтры",
+      "filtersCount_one": "Фильтры ({{count}})",
+      "filtersCount_few": "Фильтры ({{count}})",
+      "filtersCount_many": "Фильтры ({{count}})",
+      "filtersCount_other": "Фильтры ({{count}})",
+      "jump": "Перейти",
+      "jumpLabel": "Перейти к сообщению от {{name}}",
+      "threadIn": "ветка в #{{channel}}"
+    },
     "dm": "Личные сообщения с {{name}}"
   },
   "files": {

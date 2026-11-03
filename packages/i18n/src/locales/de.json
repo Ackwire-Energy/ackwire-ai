@@ -124,6 +124,8 @@
     "color": "Farbe",
     "colorDesc": "Färbt das Abzeichen der Rolle.",
     "colorOf": "Farbe {{color}}",
+    "hoist": "Getrennt in der Mitgliederliste zeigen",
+    "hoistDesc": "Wer diese Rolle hat, bekommt eine eigene Gruppe in der Mitgliederspalte.",
     "icon": "Symbol",
     "iconDesc": "Wird neben dem Namen angezeigt.",
     "more": "Weitere Optionen",
@@ -1090,9 +1092,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "System",
     "markRead": "Als gelesen markieren",
+    "muteChannel": "Kanal stummschalten",
+    "unmuteChannel": "Stummschaltung aufheben",
     "mention": "Erwähnen",
     "copyHandle": "@{{handle}} kopieren",
     "handleCopied": "@ kopiert.",
+    "copyId": "ID kopieren",
+    "idCopied": "ID kopiert.",
     "editAgent": "Agent bearbeiten",
     "openPage": "Ganze Seite öffnen",
     "moveUp": "Nach oben",
@@ -1201,9 +1207,8 @@
     "sidebarMenu": {
       "title": "Seitenleiste",
       "newChannel": "Neuer Kanal",
-      "newAgentGroup": "Neue Agentengruppe",
       "addToChannels": "Neuer Kanal oder neue Kategorie",
-      "addToAgents": "Agent oder Gruppe erstellen",
+      "addToDms": "Neue Nachricht oder neuer Agent",
       "newMessage": "Neue Nachricht",
       "addMembers": "Personen oder Agenten hinzufügen",
       "channelSettings": "Kanaleinstellungen",
@@ -1301,6 +1306,11 @@
     "pendingApprovals_other": "{{count}} offene Freigaben",
     "home": "Start",
     "notifications": "Benachrichtigungen",
+    "unreadMark": "Ungelesen",
+    "unreadMentions_one": "{{count}} Erwähnung von dir",
+    "unreadMentions_other": "{{count}} Erwähnungen von dir",
+    "unreadThreads_one": "Threads: {{count}} mit ungelesenen Antworten",
+    "unreadThreads_other": "Threads: {{count}} mit ungelesenen Antworten",
     "unreadNotifications_one": "{{count}} ungelesene Benachrichtigung",
     "unreadNotifications_other": "{{count}} ungelesene Benachrichtigungen"
   },
@@ -1334,6 +1344,9 @@
   },
   "team": {
     "title": "Team",
+    "groups": {
+      "title": "Agentengruppen"
+    },
     "subtitle_one": "{{count}} Agent, gruppiert danach, wer sich um ihn kümmert.",
     "subtitle_other": "{{count}} Agenten, gruppiert danach, wer sich um sie kümmert.",
     "working_one": "{{count}} arbeitet gerade.",
@@ -1416,11 +1429,16 @@
       "button_other": "Angeheftete Nachrichten ({{count}})",
       "label": "Angeheftete Nachrichten in #{{channel}}",
       "in": "Angeheftet in #{{channel}}",
-      "unpin": "Nachricht von {{name}} lösen"
+      "unpin": "Nachricht von {{name}} lösen",
+      "empty": "Hier ist noch nichts angeheftet"
+    },
+    "header": {
+      "pins": "Angeheftete Nachrichten",
+      "showMembers": "Mitglieder zeigen",
+      "hideMembers": "Mitglieder ausblenden"
     },
     "membersButton_one": "Mitglieder des Kanals ({{count}})",
     "membersButton_other": "Mitglieder des Kanals ({{count}})",
-    "membersPeople": "Personen",
     "membersAgents": "Agenten",
     "you": "du",
     "agentState": {
@@ -1430,7 +1448,6 @@
     },
     "autoReplyChip": "antwortet ohne Erwähnung",
     "coordinatorChip": "koordiniert das Team",
-    "seeDetails": "Kanaldetails ansehen",
     "more": "Weitere Nachrichtenaktionen",
     "copyLink": "Link kopieren",
     "linkCopied": "Link kopiert.",
@@ -1452,8 +1469,6 @@
     "messages": "Nachrichten",
     "members": "Mitglieder: {{names}}",
     "details": "Kanaldetails",
-    "agentsAnswer_one": "{{names}} antwortet hier",
-    "agentsAnswer_other": "{{names}} antworten hier",
     "composerLabel": "Nachricht an #{{channel}}",
     "composerDm": "Nachricht an {{name}}",
     "composerPlaceholder": "Nachricht an #{{channel}} · mit @ rufst du einen Agenten",
@@ -2129,6 +2144,12 @@
   "profile": {
     "audience": "Wer schreiben kann",
     "cardLabel": "Profil",
+    "roles": "Rollen",
+    "memberSince": "Mitglied seit",
+    "messageTo": "Nachricht an {{name}}",
+    "audienceEdit": "Bearbeiten",
+    "nowIn": "jetzt in #{{channel}}",
+    "more": "Mehr",
     "of": "Profil von {{name}}",
     "presence": "Status",
     "offline": "Ist noch nicht beigetreten",
@@ -3988,6 +4009,13 @@
     "routineNotMade": "Die Routine wurde nicht erstellt: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Mitglieder von #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Inhaber des Workspace",
+      "more": "{{count}} weitere zeigen",
+      "find": "Personen und Agenten suchen"
+    },
     "agentsOnlyYou": "Deine Agenten antworten nur dir.",
     "agentsOnlyYouHint": "Mit einem Abo kannst du auf der Seite jedes Agenten festlegen, dass er auch anderen Personen antwortet.",
     "filters": "Personen filtern",
@@ -9808,6 +9836,29 @@
       "relevance": "Relevanteste"
     },
     "searchHere": "In dieser Unterhaltung suchen",
+    "optionHint": {
+      "from": "Name",
+      "in": "Kanal",
+      "has": "Link, Datei, Bild oder Karte",
+      "mentions": "Name"
+    },
+    "moreFiltersHint": "Daten, nur Agenten, angeheftet",
+    "clearRecentAll": "Letzte Suchen löschen",
+    "header": {
+      "placeholder": "{{org}} durchsuchen",
+      "clear": "Suche löschen"
+    },
+    "panel": {
+      "label": "Suchergebnisse",
+      "count_one": "{{count}} Ergebnis",
+      "count_other": "{{count}} Ergebnisse",
+      "filters": "Filter",
+      "filtersCount_one": "Filter ({{count}})",
+      "filtersCount_other": "Filter ({{count}})",
+      "jump": "Springen",
+      "jumpLabel": "Zur Nachricht von {{name}} springen",
+      "threadIn": "Thread in #{{channel}}"
+    },
     "dm": "Direktnachricht mit {{name}}"
   },
   "files": {

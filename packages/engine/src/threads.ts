@@ -1,11 +1,24 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  rowsOf,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
-import { followsThreadSql } from "./follows";
+import { followsThreadSql, threadReadAtSql } from "./follows";
 import { type PreviewMeta, previewMeta, readableBody } from "./message-preview";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
@@ -121,6 +134,11 @@ export interface ThreadInfo {
    * …/threads/{id}/follow` choose explicitly.
    */
   following: boolean;
+  /**
+   * Replies I haven't read in a thread I follow (0 otherwise), at most `MAX_THREAD_UNREAD`: not mine, after my read
+   * of the thread (`markThreadRead`; reading its channel doesn't count, replies aren't shown there).
+   */
+  unread: number;
   /** The thread's mission (ADR 0029), in short: details at `GET …/threads/{id}/mission`. */
   mission: ThreadMissionSummary | null;
   createdAt: string;
@@ -932,6 +950,7 @@ interface ThreadSqlRow {
   needs_you: boolean;
   suggested_resolved?: boolean | null;
   following?: boolean | null;
+  unread?: number | string | null;
   mission_id?: string | null;
   mission_agent_id?: string | null;
   mission_status?: ThreadMissionSummary["status"] | null;
@@ -971,7 +990,7 @@ const ACTIVE_RUN = sql`('queued', 'running', 'waiting_approval', 'waiting_input'
  * replies plus the `threads` rows (a thread made from a range may have no
  * reply yet). Most recent activity first, paginated by a cursor.
  *
- * No unread count: reads are kept per channel (`channel_reads`), not per thread.
+ * Unread: replies after my read of the thread, or my joining its channel (`unreadReplySql`).
  */
 async function queryThreads(
   db: Database,
@@ -1008,7 +1027,7 @@ async function queryThreads(
     : sql``;
   const rows = rowsOf<ThreadSqlRow>(
     await db.execute(sql`with visible as (
-        select c.id, c.name, c.kind from ${channelMembers} cm
+        select c.id, c.name, c.kind, cm.created_at as joined_at from ${channelMembers} cm
         join ${channels} c on c.id = cm.channel_id
         where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId} and c.org_id = ${orgId}::uuid
           and c.archived_at is null and c.kind in ('channel', 'dm')
@@ -1030,7 +1049,7 @@ async function queryThreads(
         where t.org_id = ${orgId}::uuid and t.channel_id in (select id from visible)
           ${input.rootId ? sql`and t.root_message_id = ${input.rootId}::uuid` : sql``}
       ), listed as (
-        select root.id, root.channel_id, v.name as channel_name, v.kind as channel_kind, root.created_at,
+        select root.id, root.channel_id, v.name as channel_name, v.kind as channel_kind, v.joined_at, root.created_at,
           root.body, root.meta as root_meta, root.author_type, root.author_user_id, root.author_agent_id,
           coalesce(r.reply_count, 0) as reply_count, coalesce(r.last_at, root.created_at) as last_at,
           t.title, coalesce(t.state, 'open') as state, t.opened_by_reply_at, t.created_by, t.closed_by, t.closed_at,
@@ -1078,7 +1097,10 @@ async function queryThreads(
         left join ${schema.missions} mi on mi.org_id = ${orgId}::uuid and mi.thread_root_id = root.id
         where root.thread_id is null and root.deleted_at is null
       )
-      select l.*, to_char(l.last_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at
+      select l.*, to_char(l.last_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at,
+        case when l.following then (select count(*)::int from (select 1 from ${messages} ur
+          where ${unreadReplySql(orgId, userId, sql`l.id`, sql`l.joined_at`)} limit ${MAX_THREAD_UNREAD}) x) else 0 end
+          as unread
       from listed l
       where ${stateFilter}
         ${agentFilter}
@@ -1189,6 +1211,7 @@ function toView(
     suggestedResolved: r.suggested_resolved === true,
     canManage: r.created_by === userId || (r.author_type === "person" && r.author_user_id === userId) || isAdmin,
     following: r.following === true,
+    unread: Number(r.unread ?? 0),
     mission:
       r.mission_id && r.mission_status
         ? {
@@ -1279,7 +1302,12 @@ export async function getThread(db: Database, actorId: string, orgId: string, ro
   return toView(found, await threadExtras(db, orgId, rows), actorId, isAdmin);
 }
 
-const withoutFollowing = ({ following: _, ...view }: ThreadInfo): Omit<ThreadInfo, "following"> => view;
+/** What everyone may hear of a thread: nothing only the actor has (following it, its unread for them). */
+const withoutFollowing = ({
+  following: _,
+  unread: __,
+  ...view
+}: ThreadInfo): Omit<ThreadInfo, "following" | "unread"> => view;
 
 async function followsRoot(db: Database, orgId: string, userId: string, rootId: string) {
   const [row] = rowsOf<{ following: boolean | null }>(
@@ -1317,6 +1345,72 @@ export async function setThreadFollow(
   const result = { threadId: root.id, channelId: root.channelId, following };
   await publishUserEvent(deps.pubsub, orgId, actorId, { type: "thread.follow", ...result });
   return result;
+}
+
+// ── Reading ───────────────────────────────────────────────────────────────────
+
+/** The most unread replies counted per thread, and threads counted by `countUnreadThreads` (clients show "99+"). */
+export const MAX_THREAD_UNREAD = 100;
+
+/**
+ * Reply `ur` of thread `root` that this person hasn't read: not theirs, shown to people, not an agent's silent
+ * sticker after its reply (ADR 0091), and after their read of the thread, else their joining its channel (`joinedAt`).
+ * Reading the channel doesn't count: its main timeline doesn't show replies. Messages moved in from the channel
+ * ("Tirar do canal") aren't replies: they were read, or not, in the channel.
+ */
+function unreadReplySql(orgId: string, userId: string, root: SQL, joinedAt: SQL): SQL {
+  return sql`ur.org_id = ${orgId}::uuid and ur.thread_id = ${root} and ur.deleted_at is null
+    and (ur.author_user_id is null or ur.author_user_id <> ${userId})
+    and not ${quietNoticeSql(sql`ur.meta`)} and ur.meta->>'mediaAfter' is null
+    and ur.created_at > greatest(${joinedAt}, ${threadReadAtSql(userId, root)})
+    and not exists (select 1 from ${threads} mt where mt.root_message_id = ${root}
+      and ur.id = any(mt.context_moved_message_ids))`;
+}
+
+/**
+ * Marks a thread's replies read up to now for the actor (the thread open at its end). Their other devices hear
+ * `thread.read` on their own topic, so its unread clears there too.
+ */
+export async function markThreadRead(
+  deps: ThreadDeps,
+  actorId: string,
+  orgId: string,
+  rootId: string,
+  at = new Date(),
+): Promise<void> {
+  if (!UUID.test(rootId)) throw new NotFoundError("Thread not found");
+  const { root } = await requireThread(deps.db, actorId, orgId, rootId);
+  await deps.db
+    .insert(schema.threadReads)
+    .values({ orgId, channelId: root.channelId, rootMessageId: root.id, userId: actorId, lastReadAt: at })
+    .onConflictDoUpdate({
+      target: [schema.threadReads.rootMessageId, schema.threadReads.userId],
+      set: { lastReadAt: at },
+    });
+  await publishUserEvent(deps.pubsub, orgId, actorId, {
+    type: "thread.read",
+    threadId: root.id,
+    channelId: root.channelId,
+    lastReadAt: at.toISOString(),
+  });
+}
+
+/** How many threads I follow have a reply I haven't read (the Threads entry's mark), at most `MAX_THREAD_UNREAD`. */
+export async function countUnreadThreads(db: Database, userId: string, orgId: string): Promise<number> {
+  await requirePermission(db, userId, orgId, "read");
+  const [row] = rowsOf<{ n: number | string }>(
+    await db.execute(sql`select count(*)::int as n from (
+        select distinct ur.thread_id from ${channelMembers} cm
+        join ${channels} c on c.id = cm.channel_id and c.org_id = ${orgId}::uuid and c.archived_at is null
+          and c.kind in ('channel', 'dm')
+        join ${messages} ur on ur.channel_id = c.id
+          and ${unreadReplySql(orgId, userId, sql`ur.thread_id`, sql`cm.created_at`)}
+        where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId}
+          and ${followsThreadSql(orgId, userId, sql`ur.thread_id`)}
+        limit ${MAX_THREAD_UNREAD}
+      ) x`),
+  );
+  return Number(row?.n ?? 0);
 }
 
 // ── Run context ───────────────────────────────────────────────────────────────

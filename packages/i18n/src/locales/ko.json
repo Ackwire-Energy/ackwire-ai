@@ -121,6 +121,8 @@
     "color": "색상",
     "colorDesc": "역할 표시의 색이에요.",
     "colorOf": "{{color}} 색상",
+    "hoist": "멤버 목록에 따로 표시",
+    "hoistDesc": "이 역할이 있는 사람은 멤버 열에서 별도 그룹으로 표시돼요.",
     "icon": "아이콘",
     "iconDesc": "이름 옆에 표시돼요.",
     "more": "옵션 더 보기",
@@ -1054,9 +1056,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "시스템",
     "markRead": "읽음으로 표시",
+    "muteChannel": "채널 알림 끄기",
+    "unmuteChannel": "채널 알림 켜기",
     "mention": "멘션",
     "copyHandle": "@{{handle}} 복사",
     "handleCopied": "@를 복사했어요.",
+    "copyId": "ID 복사",
+    "idCopied": "ID를 복사했어요.",
     "editAgent": "에이전트 편집",
     "openPage": "전체 페이지 열기",
     "moveUp": "위로 이동",
@@ -1165,9 +1171,8 @@
     "sidebarMenu": {
       "title": "사이드바",
       "newChannel": "새 채널",
-      "newAgentGroup": "새 에이전트 그룹",
       "addToChannels": "새 채널 또는 카테고리",
-      "addToAgents": "에이전트 또는 그룹 만들기",
+      "addToDms": "새 메시지 또는 에이전트",
       "newMessage": "새 메시지",
       "addMembers": "사람 또는 에이전트 추가",
       "channelSettings": "채널 설정",
@@ -1261,6 +1266,9 @@
     "pendingApprovals_other": "대기 중인 승인 {{count}}개",
     "home": "홈",
     "notifications": "알림",
+    "unreadMark": "읽지 않음",
+    "unreadMentions_other": "나를 언급한 메시지 {{count}}개",
+    "unreadThreads_other": "스레드: 읽지 않은 답글이 있는 스레드 {{count}}개",
     "unreadNotifications_other": "읽지 않은 알림 {{count}}개"
   },
   "agentGroups": {
@@ -1293,6 +1301,9 @@
   },
   "team": {
     "title": "팀",
+    "groups": {
+      "title": "에이전트 그룹"
+    },
     "subtitle_other": "에이전트 {{count}}명, 담당자별로 묶었어요.",
     "working_other": "지금 {{count}}명 작업 중.",
     "skyLabel": "담당자별로 묶은 에이전트예요. 에이전트를 탭하면 하는 일을 볼 수 있어요.",
@@ -1368,10 +1379,15 @@
       "button_other": "고정된 메시지({{count}})",
       "label": "#{{channel}}의 고정된 메시지",
       "in": "#{{channel}}에 고정됨",
-      "unpin": "{{name}}의 메시지 고정 해제"
+      "unpin": "{{name}}의 메시지 고정 해제",
+      "empty": "아직 고정된 항목이 없어요"
+    },
+    "header": {
+      "pins": "고정된 메시지",
+      "showMembers": "멤버 보기",
+      "hideMembers": "멤버 숨기기"
     },
     "membersButton_other": "채널 멤버({{count}})",
-    "membersPeople": "사람",
     "membersAgents": "에이전트",
     "you": "나",
     "agentState": {
@@ -1381,7 +1397,6 @@
     },
     "autoReplyChip": "멘션 없이 답해요",
     "coordinatorChip": "팀을 조율해요",
-    "seeDetails": "채널 세부 정보 보기",
     "more": "메시지 작업 더 보기",
     "copyLink": "링크 복사",
     "linkCopied": "링크를 복사했어요.",
@@ -1403,7 +1418,6 @@
     "messages": "메시지",
     "members": "멤버: {{names}}",
     "details": "채널 세부 정보",
-    "agentsAnswer_other": "{{names}}이(가) 여기서 답해요",
     "composerLabel": "#{{channel}}에 메시지 보내기",
     "composerDm": "{{name}}에게 메시지 보내기",
     "composerPlaceholder": "#{{channel}}에 메시지 보내기 · @로 에이전트 부르기",
@@ -2054,6 +2068,12 @@
   "profile": {
     "audience": "대화할 수 있는 사람",
     "cardLabel": "프로필",
+    "roles": "역할",
+    "memberSince": "워크스페이스 참여일",
+    "messageTo": "{{name}}에게 보낼 메시지",
+    "audienceEdit": "편집",
+    "nowIn": "지금 #{{channel}}에서",
+    "more": "더 보기",
     "of": "{{name}}의 프로필",
     "presence": "상태",
     "offline": "아직 참여하지 않았어요",
@@ -3838,6 +3858,13 @@
     "routineNotMade": "루틴을 만들지 못했어요: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} 멤버",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "워크스페이스 소유자",
+      "more": "{{count}}명 더 보기",
+      "find": "사람과 에이전트 찾기"
+    },
     "agentsOnlyYou": "에이전트는 나에게만 답해요.",
     "agentsOnlyYouHint": "요금제를 사용하면 각 에이전트 페이지에서 다른 사람에게도 답하도록 설정할 수 있어요.",
     "filters": "사람 필터",
@@ -9423,6 +9450,27 @@
       "relevance": "관련도순"
     },
     "searchHere": "이 대화에서 검색",
+    "optionHint": {
+      "from": "이름",
+      "in": "채널",
+      "has": "링크, 파일, 이미지 또는 카드",
+      "mentions": "이름"
+    },
+    "moreFiltersHint": "날짜, 에이전트만, 고정됨",
+    "clearRecentAll": "최근 검색 지우기",
+    "header": {
+      "placeholder": "{{org}} 검색",
+      "clear": "검색 지우기"
+    },
+    "panel": {
+      "label": "검색 결과",
+      "count_other": "결과 {{count}}개",
+      "filters": "필터",
+      "filtersCount_other": "필터 ({{count}})",
+      "jump": "이동",
+      "jumpLabel": "{{name}}님의 메시지로 이동",
+      "threadIn": "#{{channel}}의 스레드"
+    },
     "dm": "{{name}}과(와)의 DM"
   },
   "files": {

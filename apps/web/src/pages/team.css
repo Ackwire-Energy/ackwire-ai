@@ -356,3 +356,40 @@ html:not([data-pointer]) .team-sky__agent:focus-visible {
     transition: none;
   }
 }
+
+/* Grupos de agentes (ADR 0083): one list per group, the agents in none first, for who arranges. */
+.team-groups {
+  gap: 4px;
+  padding: 8px;
+}
+.team-groups__group {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px 8px;
+  border-radius: var(--control-r-sm);
+}
+.team-groups__group[data-drop="true"] {
+  background: color-mix(in srgb, var(--agent) 9%, transparent);
+}
+.team-groups__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.team-groups__head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.team-groups__agent {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}

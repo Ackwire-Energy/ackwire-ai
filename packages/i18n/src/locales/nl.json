@@ -124,6 +124,8 @@
     "color": "Kleur",
     "colorDesc": "Kleurt het teken van de rol.",
     "colorOf": "Kleur {{color}}",
+    "hoist": "Apart tonen in de ledenlijst",
+    "hoistDesc": "Wie deze rol heeft, krijgt een eigen groep in de ledenkolom.",
     "icon": "Icoon",
     "iconDesc": "Naast de naam getoond.",
     "more": "Meer opties",
@@ -1090,9 +1092,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Systeem",
     "markRead": "Markeren als gelezen",
+    "muteChannel": "Kanaal dempen",
+    "unmuteChannel": "Kanaal niet meer dempen",
     "mention": "Vermelden",
     "copyHandle": "@{{handle}} kopiëren",
     "handleCopied": "@ gekopieerd.",
+    "copyId": "ID kopiëren",
+    "idCopied": "ID gekopieerd.",
     "editAgent": "Agent bewerken",
     "openPage": "Volledige pagina openen",
     "moveUp": "Omhoog",
@@ -1201,9 +1207,8 @@
     "sidebarMenu": {
       "title": "Zijbalk",
       "newChannel": "Nieuw kanaal",
-      "newAgentGroup": "Nieuwe agentgroep",
       "addToChannels": "Nieuw kanaal of nieuwe categorie",
-      "addToAgents": "Agent of groep maken",
+      "addToDms": "Nieuw bericht of agent",
       "newMessage": "Nieuw bericht",
       "addMembers": "Mensen of agents toevoegen",
       "channelSettings": "Kanaalinstellingen",
@@ -1301,6 +1306,11 @@
     "pendingApprovals_other": "{{count}} goedkeuringen open",
     "home": "Start",
     "notifications": "Meldingen",
+    "unreadMark": "Ongelezen",
+    "unreadMentions_one": "{{count}} vermelding van jou",
+    "unreadMentions_other": "{{count}} vermeldingen van jou",
+    "unreadThreads_one": "Threads: {{count}} met ongelezen antwoorden",
+    "unreadThreads_other": "Threads: {{count}} met ongelezen antwoorden",
     "unreadNotifications_one": "{{count}} ongelezen melding",
     "unreadNotifications_other": "{{count}} ongelezen meldingen"
   },
@@ -1334,6 +1344,9 @@
   },
   "team": {
     "title": "Team",
+    "groups": {
+      "title": "Agentgroepen"
+    },
     "subtitle_one": "{{count}} agent, gegroepeerd naar wie ervoor zorgt.",
     "subtitle_other": "{{count}} agents, gegroepeerd naar wie voor elk zorgt.",
     "working_one": "{{count}} nu aan het werk.",
@@ -1416,11 +1429,16 @@
       "button_other": "Vastgezette berichten ({{count}})",
       "label": "Vastgezette berichten in #{{channel}}",
       "in": "Vastgezet in #{{channel}}",
-      "unpin": "Bericht van {{name}} losmaken"
+      "unpin": "Bericht van {{name}} losmaken",
+      "empty": "Hier is nog niets vastgezet"
+    },
+    "header": {
+      "pins": "Vastgezette berichten",
+      "showMembers": "Leden tonen",
+      "hideMembers": "Leden verbergen"
     },
     "membersButton_one": "Kanaalleden ({{count}})",
     "membersButton_other": "Kanaalleden ({{count}})",
-    "membersPeople": "Mensen",
     "membersAgents": "Agents",
     "you": "jij",
     "agentState": {
@@ -1430,7 +1448,6 @@
     },
     "autoReplyChip": "antwoordt zonder vermelding",
     "coordinatorChip": "coördineert het team",
-    "seeDetails": "Kanaaldetails bekijken",
     "more": "Meer berichtacties",
     "copyLink": "Link kopiëren",
     "linkCopied": "Link gekopieerd.",
@@ -1452,8 +1469,6 @@
     "messages": "Berichten",
     "members": "Leden: {{names}}",
     "details": "Kanaaldetails",
-    "agentsAnswer_one": "{{names}} antwoordt hier",
-    "agentsAnswer_other": "{{names}} antwoorden hier",
     "composerLabel": "Bericht aan #{{channel}}",
     "composerDm": "Bericht aan {{name}}",
     "composerPlaceholder": "Bericht aan #{{channel}} · gebruik @ om een agent te roepen",
@@ -2131,6 +2146,12 @@
   "profile": {
     "audience": "Wie kan praten",
     "cardLabel": "Profiel",
+    "roles": "Rollen",
+    "memberSince": "Lid sinds",
+    "messageTo": "Bericht aan {{name}}",
+    "audienceEdit": "Bewerken",
+    "nowIn": "nu, in #{{channel}}",
+    "more": "Meer",
     "of": "Profiel van {{name}}",
     "presence": "Aanwezigheid",
     "offline": "Nog niet lid geworden",
@@ -4032,6 +4053,13 @@
     "routineNotMade": "De routine is niet gemaakt: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Leden van #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Eigenaar van de workspace",
+      "more": "Nog {{count}} tonen",
+      "find": "Mensen en agents zoeken"
+    },
     "agentsOnlyYou": "Je agents antwoorden alleen jou.",
     "agentsOnlyYouHint": "Met een abonnement kun je op de pagina van elke agent instellen dat hij ook anderen antwoordt.",
     "filters": "Mensen filteren",
@@ -9886,6 +9914,29 @@
       "relevance": "Meest relevant"
     },
     "searchHere": "Zoeken in dit gesprek",
+    "optionHint": {
+      "from": "naam",
+      "in": "kanaal",
+      "has": "link, bestand, afbeelding of kaart",
+      "mentions": "naam"
+    },
+    "moreFiltersHint": "datums, alleen agents, vastgezet",
+    "clearRecentAll": "Recente zoekopdrachten wissen",
+    "header": {
+      "placeholder": "Zoeken in {{org}}",
+      "clear": "Zoekopdracht wissen"
+    },
+    "panel": {
+      "label": "Zoekresultaten",
+      "count_one": "{{count}} resultaat",
+      "count_other": "{{count}} resultaten",
+      "filters": "Filters",
+      "filtersCount_one": "Filters ({{count}})",
+      "filtersCount_other": "Filters ({{count}})",
+      "jump": "Ga naar",
+      "jumpLabel": "Ga naar het bericht van {{name}}",
+      "threadIn": "thread in #{{channel}}"
+    },
     "dm": "DM met {{name}}"
   },
   "files": {

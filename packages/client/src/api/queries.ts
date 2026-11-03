@@ -73,6 +73,7 @@ import type {
   DeletionProofInput,
   DirectMessage,
   DmRead,
+  DmTarget,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -137,6 +138,7 @@ import type {
   ThreadInfo,
   ThreadPatch,
   ToolDecision,
+  UnreadEvent,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -960,15 +962,15 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
 }
 
 /**
- * Início's "Peça a um agente" (ADR 0108): the DM with the agent (made if new), the message sent there and kept in its
- * cache, so the conversation opens with it and the agent at work.
+ * A message straight into a DM (Início's "Peça a um agente", ADR 0108, and the profile card's box): the DM (made if
+ * new), the message sent there and kept in its cache, so the conversation opens with it (and the agent at work).
  */
-export function useAskAgent(orgId: string) {
+export function useSendDm(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ agentId, body }: { agentId: string; body: string }) => {
-      const { channelId } = await api.dms.open(orgId, { agentId });
+    mutationFn: async ({ body, ...target }: DmTarget & { body: string }) => {
+      const { channelId } = await api.dms.open(orgId, target);
       return api.chat.post(orgId, channelId, { body, clientId: newClientId() });
     },
     onSuccess: (message) => {
@@ -4419,10 +4421,9 @@ export function useNotificationReply(orgId: string) {
 // ── Phone app: read state, pins, following, working now, reminders ─────────────
 
 /** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
-function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions" | "agentForYou" | "gifs">(
-  api: ApiClient,
-  name: K,
-): NonNullable<ApiClient[K]> {
+function part<
+  K extends "pins" | "threadFollows" | "reads" | "working" | "reminders" | "actions" | "agentForYou" | "gifs",
+>(api: ApiClient, name: K): NonNullable<ApiClient[K]> {
   const value = api[name];
   if (!value) throw new Error(`This API client has no ${name}`);
   return value as NonNullable<ApiClient[K]>;
@@ -4435,19 +4436,121 @@ export function useMarkChannelRead(orgId: string) {
   return useMutation({
     meta: { silent: true },
     mutationFn: (channelId: string) => api.dms.markRead(orgId, channelId),
-    onMutate: (channelId) => {
-      qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
-        list?.map((c) => (c.id === channelId ? { ...c, unreadCount: 0 } : c)),
-      );
-      qc.setQueryData<DirectMessage[]>(keys.dms(orgId), (list) =>
-        list?.map((d) => (d.channelId === channelId ? { ...d, unread: 0 } : d)),
-      );
-    },
+    onMutate: (channelId) => clearUnread(qc, orgId, channelId),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.unreadThreads(orgId) });
     },
   });
+}
+
+/** A conversation shows nothing unread in the cached lists (read here or on another device). */
+function clearUnread(qc: QueryClient, orgId: string, channelId: string) {
+  qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
+    list?.map((c) => (c.id === channelId ? { ...c, unreadCount: 0, mentionCount: 0 } : c)),
+  );
+  qc.setQueryData<DirectMessage[]>(keys.dms(orgId), (list) =>
+    list?.map((d) => (d.channelId === channelId ? { ...d, unread: 0 } : d)),
+  );
+}
+
+/** Mutes or unmutes a channel for me: it never looks unread while muted (a mention of me still counts). */
+export function useMuteChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ channelId, muted }: { channelId: string; muted: boolean }) =>
+      part(api, "reads").mute(orgId, channelId, muted),
+    onMutate: ({ channelId, muted }) => setMuted(qc, orgId, channelId, muted),
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
+function setMuted(qc: QueryClient, orgId: string, channelId: string, muted: boolean) {
+  qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
+    list?.map((c) => (c.id === channelId ? { ...c, muted } : c)),
+  );
+}
+
+/** Marks a thread's replies read now (the thread open at its end); its unread and the Threads mark follow. */
+export function useMarkThreadRead(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    // A client without reads (a test's fake) has nothing to mark.
+    mutationFn: async (threadId: string) => api.reads?.markThreadRead(orgId, threadId),
+    onMutate: (threadId) => clearThreadUnread(qc, orgId, threadId),
+    onSettled: () => refreshThreadUnread(qc, orgId),
+  });
+}
+
+function clearThreadUnread(qc: QueryClient, orgId: string, threadId: string) {
+  qc.setQueryData<ThreadInfo>(keys.threadInfo(orgId, threadId), (t) => (t ? { ...t, unread: 0 } : t));
+}
+
+/** The thread lists, the Threads mark and the channels (a thread's replies count there too) read again. */
+function refreshThreadUnread(qc: QueryClient, orgId: string) {
+  void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+  void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+}
+
+/** How many threads I follow have a reply I haven't read (the Threads entry's mark); live via `applyUnreadEvent`. */
+export function useUnreadThreads(orgId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.unreadThreads(orgId),
+    queryFn: () => part(api, "reads").unreadThreads(orgId),
+    enabled: Boolean(api.reads),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * How long `channel.activity` waits for more before a list reads again: a burst of messages (an agent's steps) is one
+ * read per client, however many members hear it.
+ */
+export const UNREAD_REFRESH_MS = 2000;
+const activityTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Runs `read` once `UNREAD_REFRESH_MS` after the first call for `key`; calls meanwhile join it. */
+function readOncePerBurst(key: string, read: () => void) {
+  if (activityTimers.has(key)) return;
+  activityTimers.set(
+    key,
+    setTimeout(() => {
+      activityTimers.delete(key);
+      read();
+    }, UNREAD_REFRESH_MS),
+  );
+}
+
+/**
+ * My own topic's unread marks, on the web and the phone: a message in a conversation I'm in has its list read again
+ * (the DMs or the channels; a thread's reply, which the server sends only to its followers, the threads too), once
+ * per burst; a read or a mute from any of my devices shows at once.
+ */
+export function applyUnreadEvent(qc: QueryClient, orgId: string, event: { type: string }) {
+  const e = event as UnreadEvent;
+  if (e.type === "channel.activity") {
+    if (e.dm) readOncePerBurst(`${orgId}:dms`, () => void qc.invalidateQueries({ queryKey: keys.dms(orgId) }));
+    else readOncePerBurst(`${orgId}:channels`, () => void qc.invalidateQueries({ queryKey: keys.channels(orgId) }));
+    if (e.threadId)
+      readOncePerBurst(
+        `${orgId}:threads`,
+        () => void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" }),
+      );
+  } else if (e.type === "channel.read") {
+    clearUnread(qc, orgId, e.channelId);
+    void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+    void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+    void qc.invalidateQueries({ queryKey: keys.unreadThreads(orgId) });
+  } else if (e.type === "channel.muted") setMuted(qc, orgId, e.channelId, e.muted);
+  else if (e.type === "thread.read") {
+    clearThreadUnread(qc, orgId, e.threadId);
+    refreshThreadUnread(qc, orgId);
+  }
 }
 
 /** A channel's pinned messages, newest pin first (live: `message.pinned` / `message.unpinned`). */

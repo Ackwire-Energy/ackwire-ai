@@ -124,6 +124,8 @@
     "color": "Renk",
     "colorDesc": "Rolün işaretini boyar.",
     "colorOf": "{{color}} renk",
+    "hoist": "Üye listesinde ayrı göster",
+    "hoistDesc": "Bu role sahip kişiler üye sütununda kendi grubunda görünür.",
     "icon": "Simge",
     "iconDesc": "Adın yanında gösterilir.",
     "more": "Diğer seçenekler",
@@ -1090,9 +1092,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Sistem",
     "markRead": "Okundu olarak işaretle",
+    "muteChannel": "Kanalı sessize al",
+    "unmuteChannel": "Kanalın sesini aç",
     "mention": "Bahset",
     "copyHandle": "@{{handle}} kopyala",
     "handleCopied": "@ kopyalandı.",
+    "copyId": "ID’yi kopyala",
+    "idCopied": "ID kopyalandı.",
     "editAgent": "Ajanı düzenle",
     "openPage": "Tam sayfa aç",
     "moveUp": "Yukarı taşı",
@@ -1201,9 +1207,8 @@
     "sidebarMenu": {
       "title": "Kenar çubuğu",
       "newChannel": "Yeni kanal",
-      "newAgentGroup": "Yeni ajan grubu",
       "addToChannels": "Yeni kanal veya kategori",
-      "addToAgents": "Ajan veya grup oluştur",
+      "addToDms": "Yeni mesaj veya ajan",
       "newMessage": "Yeni mesaj",
       "addMembers": "Kişi veya ajan ekle",
       "channelSettings": "Kanal ayarları",
@@ -1301,6 +1306,11 @@
     "pendingApprovals_other": "{{count}} bekleyen onay",
     "home": "Ana sayfa",
     "notifications": "Bildirimler",
+    "unreadMark": "Okunmadı",
+    "unreadMentions_one": "Sizden {{count}} bahsetme",
+    "unreadMentions_other": "Sizden {{count}} bahsetme",
+    "unreadThreads_one": "Konular: okunmamış yanıtı olan {{count}} konu",
+    "unreadThreads_other": "Konular: okunmamış yanıtı olan {{count}} konu",
     "unreadNotifications_one": "{{count}} okunmamış bildirim",
     "unreadNotifications_other": "{{count}} okunmamış bildirim"
   },
@@ -1334,6 +1344,9 @@
   },
   "team": {
     "title": "Ekip",
+    "groups": {
+      "title": "Ajan grupları"
+    },
     "subtitle_one": "{{count}} ajan, onunla kimin ilgilendiğine göre gruplandı.",
     "subtitle_other": "{{count}} ajan, her biriyle kimin ilgilendiğine göre gruplandı.",
     "working_one": "Şu anda {{count}} tanesi çalışıyor.",
@@ -1416,11 +1429,16 @@
       "button_other": "Sabitlenen mesajlar ({{count}})",
       "label": "#{{channel}} kanalında sabitlenen mesajlar",
       "in": "#{{channel}} kanalında sabitlendi",
-      "unpin": "{{name}} mesajının sabitlemesini kaldır"
+      "unpin": "{{name}} mesajının sabitlemesini kaldır",
+      "empty": "Burada henüz sabitlenen bir şey yok"
+    },
+    "header": {
+      "pins": "Sabitlenen mesajlar",
+      "showMembers": "Üyeleri göster",
+      "hideMembers": "Üyeleri gizle"
     },
     "membersButton_one": "Kanal üyeleri ({{count}})",
     "membersButton_other": "Kanal üyeleri ({{count}})",
-    "membersPeople": "Kişiler",
     "membersAgents": "Ajanlar",
     "you": "siz",
     "agentState": {
@@ -1430,7 +1448,6 @@
     },
     "autoReplyChip": "bahsetme olmadan yanıt verir",
     "coordinatorChip": "ekibi koordine eder",
-    "seeDetails": "Kanal ayrıntılarını gör",
     "more": "Diğer mesaj işlemleri",
     "copyLink": "Bağlantıyı kopyala",
     "linkCopied": "Bağlantı kopyalandı.",
@@ -1452,8 +1469,6 @@
     "messages": "Mesajlar",
     "members": "Üyeler: {{names}}",
     "details": "Kanal ayrıntıları",
-    "agentsAnswer_one": "{{names}} burada yanıt verir",
-    "agentsAnswer_other": "{{names}} burada yanıt verir",
     "composerLabel": "#{{channel}} kanalına mesaj",
     "composerDm": "{{name}} kişisine mesaj",
     "composerPlaceholder": "#{{channel}} kanalına mesaj · bir ajana seslenmek için @ kullanın",
@@ -2117,6 +2132,12 @@
   "profile": {
     "audience": "Kimler konuşabilir",
     "cardLabel": "Profil",
+    "roles": "Roller",
+    "memberSince": "Çalışma alanında şu tarihten beri",
+    "messageTo": "{{name}} için mesaj",
+    "audienceEdit": "Düzenle",
+    "nowIn": "şu an #{{channel}} kanalında",
+    "more": "Daha fazla",
     "of": "{{name}} profili",
     "presence": "Durum",
     "offline": "Henüz katılmadı",
@@ -3951,6 +3972,13 @@
     "routineNotMade": "Rutin oluşturulmadı: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} üyeleri",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Çalışma alanının sahibi",
+      "more": "{{count}} tane daha göster",
+      "find": "Kişi ve ajan ara"
+    },
     "agentsOnlyYou": "Ajanlarınız yalnızca size yanıt veriyor.",
     "agentsOnlyYouHint": "Bir planla, her birinin sayfasından diğer kişilere de yanıt vermesine izin verebilirsiniz.",
     "filters": "Kişileri filtrele",
@@ -9746,6 +9774,29 @@
       "relevance": "En alakalı"
     },
     "searchHere": "Bu konuşmada ara",
+    "optionHint": {
+      "from": "ad",
+      "in": "kanal",
+      "has": "bağlantı, dosya, görsel veya kart",
+      "mentions": "ad"
+    },
+    "moreFiltersHint": "tarihler, yalnızca ajanlar, sabitlenenler",
+    "clearRecentAll": "Son aramaları temizle",
+    "header": {
+      "placeholder": "{{org}} içinde ara",
+      "clear": "Aramayı temizle"
+    },
+    "panel": {
+      "label": "Arama sonuçları",
+      "count_one": "{{count}} sonuç",
+      "count_other": "{{count}} sonuç",
+      "filters": "Filtreler",
+      "filtersCount_one": "Filtreler ({{count}})",
+      "filtersCount_other": "Filtreler ({{count}})",
+      "jump": "Git",
+      "jumpLabel": "{{name}} adlı kişinin mesajına git",
+      "threadIn": "#{{channel}} kanalındaki ileti dizisi"
+    },
     "dm": "{{name}} ile DM"
   },
   "files": {

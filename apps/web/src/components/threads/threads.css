@@ -225,9 +225,6 @@ html:not([data-pointer]) .thread-pop__row:focus-visible {
   color: var(--ink2);
 }
 @media (max-width: 720px) {
-  .thread-pop__label {
-    display: none;
-  }
   .channel__messages {
     --thread-indent: 58px;
   }

@@ -179,6 +179,8 @@ export interface FakeState {
   answeredElsewhere?: Set<string>;
   /** Answers to questions wait for this before the server replies (a slow network). */
   answerHold?: Promise<void>;
+  /** Threads I follow with an unread reply (`reads.unreadThreads`). */
+  unreadThreads?: number;
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
@@ -238,7 +240,12 @@ export interface FakeState {
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
   autoReply: Record<string, boolean>;
-  dms: { channelId: string; with: { type: "person" | "agent"; id: string; name: string; handle: string | null } }[];
+  /** `unread`: its count (0 when unset); the last message is the channel's latest in `messages`. */
+  dms: {
+    channelId: string;
+    with: { type: "person" | "agent"; id: string; name: string; handle: string | null };
+    unread?: number;
+  }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
   defaultCredentialId?: string | null;
@@ -390,6 +397,7 @@ export function seedRoles(): OrgRole[] {
       color: "indigo",
       position: 0,
       permissions: ["administrator"],
+      hoist: true,
     },
     {
       ...role,
@@ -561,6 +569,37 @@ function mediaSettings(state: FakeState): Pick<OrgSettings, MediaSetting> {
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
+/**
+ * A DM of mine with a message in it, so the sidebar's "Mensagens diretas" lists it (`ago`: minutes since that
+ * message). The person's are from the seed's members, the agent's from its agents.
+ */
+export function seedDm(
+  state: FakeState,
+  partner: { type: "person" | "agent"; id: string },
+  { ago = 5, unread = 0, body = "Oi" }: { ago?: number; unread?: number; body?: string } = {},
+) {
+  const agent = partner.type === "agent" ? state.agents.find((a) => a.id === partner.id) : undefined;
+  const person = partner.type === "person" ? state.members.find((m) => m.userId === partner.id) : undefined;
+  const channelId = `dm-${partner.id}`;
+  state.dms.push({
+    channelId,
+    with: { ...partner, name: agent?.name ?? person?.name ?? "", handle: agent?.handle ?? null },
+    unread,
+  });
+  state.channelMembers[channelId] = [{ type: "person", id: state.me?.user.id ?? "" }, partner];
+  state.messages.push({
+    id: `m-${channelId}`,
+    channelId,
+    threadId: null,
+    author: partner,
+    body,
+    mentionedAgentIds: [],
+    agentRunId: null,
+    createdAt: minutesAgo(ago),
+  });
+  return channelId;
+}
+
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   const walter: Member = {
     userId: "u-walter",
@@ -2744,6 +2783,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
               createdAt: m.createdAt,
               messageId: m.id,
               threadId: m.threadId,
+              threadTitle:
+                m.threadId && m.threadId !== m.id
+                  ? (state.messages.find((r) => r.id === m.threadId)?.body.split("\n")[0] ?? null)
+                  : null,
               author: m.author.id ? { type: m.author.type, id: m.author.id, name } : null,
             };
           });
@@ -2774,7 +2817,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     dms: {
-      list: async () => state.dms.map((d) => ({ ...d, lastMessage: null, unread: 0 })),
+      list: async () =>
+        state.dms.map((d) => {
+          const last = state.messages
+            .filter((m) => m.channelId === d.channelId && !m.threadId)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+          return {
+            ...d,
+            lastMessage: last
+              ? { id: last.id, body: last.body, createdAt: last.createdAt, authorType: last.author.type }
+              : null,
+            unread: d.unread ?? 0,
+          };
+        }),
       open: async (orgId, target) => {
         log("dms.open", orgId, target);
         const existing = state.dms.find((d) =>
@@ -2798,6 +2853,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
       reads: async () => [],
+    },
+    reads: {
+      mute: async (orgId, channelId, muted) => {
+        log("reads.mute", orgId, channelId, muted);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (c) c.muted = muted;
+      },
+      markThreadRead: async (orgId, threadId) => log("reads.markThreadRead", orgId, threadId),
+      unreadThreads: async () => state.unreadThreads ?? 0,
     },
     questions: {
       // Same rules as the server: the choice must be one of the options; answering twice is 409.

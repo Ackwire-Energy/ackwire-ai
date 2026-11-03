@@ -3508,6 +3508,10 @@ html:not([data-pointer]) .ac-date__day:focus-visible {
 .ac-token__label {
   white-space: nowrap;
 }
+/* One that stays (no ✕): even on both sides. */
+.ac-token:not(:has(.ac-token__remove)) {
+  padding-right: 10px;
+}
 .ac-token__remove {
   display: inline-flex;
   align-items: center;
@@ -4877,13 +4881,13 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   background: var(--ink);
 }
 
-/* A role's mark (RoleMark, ADR 0085): the role's color in the agents' dither, on the people tile's shape, its icon in white. */
+/* A role's mark (RoleMark, ADR 0085): the role's color in the agents' dither in a full circle, its icon in white. */
 .ac-rolemark {
   display: inline-grid;
   flex: none;
   place-items: center;
   overflow: hidden;
-  border-radius: var(--radius-agent);
+  border-radius: 50%;
   background: var(--plate) center / 100% 100% no-repeat;
   image-rendering: pixelated;
   color: #fff;

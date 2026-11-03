@@ -121,6 +121,8 @@
     "color": "色",
     "colorDesc": "ロールのマークの色です。",
     "colorOf": "{{color}}色",
+    "hoist": "メンバーリストで別に表示",
+    "hoistDesc": "このロールを持つ人は、メンバー欄で専用のグループに表示されます。",
     "icon": "アイコン",
     "iconDesc": "名前の横に表示されます。",
     "more": "その他のオプション",
@@ -1054,9 +1056,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "システム",
     "markRead": "既読にする",
+    "muteChannel": "チャンネルをミュート",
+    "unmuteChannel": "ミュートを解除",
     "mention": "メンション",
     "copyHandle": "@{{handle}}をコピー",
     "handleCopied": "@をコピーしました。",
+    "copyId": "IDをコピー",
+    "idCopied": "IDをコピーしました。",
     "editAgent": "エージェントを編集",
     "openPage": "ページ全体を開く",
     "moveUp": "上へ移動",
@@ -1165,9 +1171,8 @@
     "sidebarMenu": {
       "title": "サイドバー",
       "newChannel": "新しいチャンネル",
-      "newAgentGroup": "新しいエージェントグループ",
       "addToChannels": "新しいチャンネルまたはカテゴリ",
-      "addToAgents": "エージェントまたはグループを作成",
+      "addToDms": "新しいメッセージまたはエージェント",
       "newMessage": "新しいメッセージ",
       "addMembers": "人またはエージェントを追加",
       "channelSettings": "チャンネルの設定",
@@ -1261,6 +1266,9 @@
     "pendingApprovals_other": "{{count}}件の承認待ち",
     "home": "ホーム",
     "notifications": "通知",
+    "unreadMark": "未読",
+    "unreadMentions_other": "あなたへのメンション {{count}} 件",
+    "unreadThreads_other": "スレッド: 未読の返信あり {{count}} 件",
     "unreadNotifications_other": "{{count}}件の未読の通知"
   },
   "agentGroups": {
@@ -1293,6 +1301,9 @@
   },
   "team": {
     "title": "チーム",
+    "groups": {
+      "title": "エージェントグループ"
+    },
     "subtitle_other": "{{count}}体のエージェントを、担当者ごとにまとめています。",
     "working_other": "{{count}}体が作業中です。",
     "skyLabel": "担当者ごとにまとめたエージェント。エージェントをタップすると、何をしているかが見られます。",
@@ -1368,10 +1379,15 @@
       "button_other": "ピン留めしたメッセージ（{{count}}）",
       "label": "#{{channel}}のピン留めしたメッセージ",
       "in": "#{{channel}}にピン留め",
-      "unpin": "{{name}}のメッセージのピン留めを外す"
+      "unpin": "{{name}}のメッセージのピン留めを外す",
+      "empty": "まだ何もピン留めされていません"
+    },
+    "header": {
+      "pins": "ピン留めしたメッセージ",
+      "showMembers": "メンバーを表示",
+      "hideMembers": "メンバーを隠す"
     },
     "membersButton_other": "チャンネルのメンバー（{{count}}）",
-    "membersPeople": "人",
     "membersAgents": "エージェント",
     "you": "あなた",
     "agentState": {
@@ -1381,7 +1397,6 @@
     },
     "autoReplyChip": "メンションなしで返信",
     "coordinatorChip": "チームのまとめ役",
-    "seeDetails": "チャンネルの詳細を見る",
     "more": "メッセージのその他の操作",
     "copyLink": "リンクをコピー",
     "linkCopied": "リンクをコピーしました。",
@@ -1403,7 +1418,6 @@
     "messages": "メッセージ",
     "members": "メンバー: {{names}}",
     "details": "チャンネルの詳細",
-    "agentsAnswer_other": "{{names}}がここで返信します",
     "composerLabel": "#{{channel}}へのメッセージ",
     "composerDm": "{{name}}へのメッセージ",
     "composerPlaceholder": "#{{channel}}へのメッセージ · @でエージェントを呼べます",
@@ -2056,6 +2070,12 @@
   "profile": {
     "audience": "話しかけられる人",
     "cardLabel": "プロフィール",
+    "roles": "ロール",
+    "memberSince": "参加日",
+    "messageTo": "{{name}}へのメッセージ",
+    "audienceEdit": "編集",
+    "nowIn": "現在 #{{channel}} で作業中",
+    "more": "その他",
     "of": "{{name}}のプロフィール",
     "presence": "ステータス",
     "offline": "まだ参加していません",
@@ -3842,6 +3862,13 @@
     "routineNotMade": "ルーティンは作成されませんでした: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} のメンバー",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "ワークスペースのオーナー",
+      "more": "さらに {{count}} 件表示",
+      "find": "人とエージェントを検索"
+    },
     "agentsOnlyYou": "あなたのエージェントは、あなたにだけ返信します。",
     "agentsOnlyYouHint": "プランがあれば、エージェントのページでほかの人にも返信できるよう設定できます。",
     "filters": "人を絞り込む",
@@ -9430,6 +9457,27 @@
       "relevance": "関連度順"
     },
     "searchHere": "この会話を検索",
+    "optionHint": {
+      "from": "名前",
+      "in": "チャンネル",
+      "has": "リンク、ファイル、画像、カード",
+      "mentions": "名前"
+    },
+    "moreFiltersHint": "日付、エージェントのみ、ピン留め",
+    "clearRecentAll": "最近の検索を消去",
+    "header": {
+      "placeholder": "{{org}}を検索",
+      "clear": "検索をクリア"
+    },
+    "panel": {
+      "label": "検索結果",
+      "count_other": "{{count}}件の結果",
+      "filters": "フィルター",
+      "filtersCount_other": "フィルター（{{count}}）",
+      "jump": "移動",
+      "jumpLabel": "{{name}} のメッセージに移動",
+      "threadIn": "#{{channel}}のスレッド"
+    },
     "dm": "{{name}}とのDM"
   },
   "files": {

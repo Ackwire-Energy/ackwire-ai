@@ -121,6 +121,8 @@
     "color": "Warna",
     "colorDesc": "Mewarnai tanda peran.",
     "colorOf": "Warna {{color}}",
+    "hoist": "Tampilkan terpisah di daftar anggota",
+    "hoistDesc": "Orang dengan peran ini mendapat grup sendiri di kolom anggota.",
     "icon": "Ikon",
     "iconDesc": "Ditampilkan di samping nama.",
     "more": "Opsi lainnya",
@@ -1054,9 +1056,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Sistem",
     "markRead": "Tandai sudah dibaca",
+    "muteChannel": "Bisukan saluran",
+    "unmuteChannel": "Bunyikan saluran",
     "mention": "Sebut",
     "copyHandle": "Salin @{{handle}}",
     "handleCopied": "@ disalin.",
+    "copyId": "Salin ID",
+    "idCopied": "ID disalin.",
     "editAgent": "Ubah agen",
     "openPage": "Buka halaman penuh",
     "moveUp": "Pindah ke atas",
@@ -1165,9 +1171,8 @@
     "sidebarMenu": {
       "title": "Bilah samping",
       "newChannel": "Kanal baru",
-      "newAgentGroup": "Grup agen baru",
       "addToChannels": "Kanal atau kategori baru",
-      "addToAgents": "Buat agen atau grup",
+      "addToDms": "Pesan baru atau agen",
       "newMessage": "Pesan baru",
       "addMembers": "Tambah orang atau agen",
       "channelSettings": "Pengaturan kanal",
@@ -1261,6 +1266,9 @@
     "pendingApprovals_other": "{{count}} persetujuan tertunda",
     "home": "Beranda",
     "notifications": "Notifikasi",
+    "unreadMark": "Belum dibaca",
+    "unreadMentions_other": "{{count}} sebutan untuk Anda",
+    "unreadThreads_other": "Thread: {{count}} dengan balasan belum dibaca",
     "unreadNotifications_other": "{{count}} notifikasi belum dibaca"
   },
   "agentGroups": {
@@ -1293,6 +1301,9 @@
   },
   "team": {
     "title": "Tim",
+    "groups": {
+      "title": "Grup agen"
+    },
     "subtitle_other": "{{count}} agen, dikelompokkan berdasarkan siapa yang mengurusnya.",
     "working_other": "{{count}} sedang bekerja.",
     "skyLabel": "Agen dikelompokkan berdasarkan penanggung jawabnya. Ketuk agen untuk melihat apa yang dikerjakannya.",
@@ -1368,10 +1379,15 @@
       "button_other": "Pesan yang disematkan ({{count}})",
       "label": "Pesan yang disematkan di #{{channel}}",
       "in": "Disematkan di #{{channel}}",
-      "unpin": "Lepas sematan pesan {{name}}"
+      "unpin": "Lepas sematan pesan {{name}}",
+      "empty": "Belum ada yang disematkan di sini"
+    },
+    "header": {
+      "pins": "Pesan yang disematkan",
+      "showMembers": "Tampilkan anggota",
+      "hideMembers": "Sembunyikan anggota"
     },
     "membersButton_other": "Anggota kanal ({{count}})",
-    "membersPeople": "Orang",
     "membersAgents": "Agen",
     "you": "kamu",
     "agentState": {
@@ -1381,7 +1397,6 @@
     },
     "autoReplyChip": "menjawab tanpa disebut",
     "coordinatorChip": "mengoordinasikan tim",
-    "seeDetails": "Lihat detail kanal",
     "more": "Tindakan pesan lainnya",
     "copyLink": "Salin tautan",
     "linkCopied": "Tautan disalin.",
@@ -1403,7 +1418,6 @@
     "messages": "Pesan",
     "members": "Anggota: {{names}}",
     "details": "Detail kanal",
-    "agentsAnswer_other": "{{names}} menjawab di sini",
     "composerLabel": "Kirim pesan ke #{{channel}}",
     "composerDm": "Kirim pesan ke {{name}}",
     "composerPlaceholder": "Kirim pesan ke #{{channel}} · pakai @ untuk memanggil agen",
@@ -2067,6 +2081,12 @@
   "profile": {
     "audience": "Siapa yang bisa bicara",
     "cardLabel": "Profil",
+    "roles": "Peran",
+    "memberSince": "Di ruang kerja sejak",
+    "messageTo": "Pesan untuk {{name}}",
+    "audienceEdit": "Ubah",
+    "nowIn": "sekarang, di #{{channel}}",
+    "more": "Lainnya",
     "of": "Profil {{name}}",
     "presence": "Kehadiran",
     "offline": "Belum bergabung",
@@ -3870,6 +3890,13 @@
     "routineNotMade": "Rutinitas tidak dibuat: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Anggota #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Pemilik workspace",
+      "more": "Tampilkan {{count}} lagi",
+      "find": "Cari orang dan agen"
+    },
     "agentsOnlyYou": "Agenmu hanya menjawabmu.",
     "agentsOnlyYouHint": "Dengan paket, kamu bisa membiarkan tiap agen menjawab orang lain dari halamannya.",
     "filters": "Filter orang",
@@ -9498,6 +9525,27 @@
       "relevance": "Paling relevan"
     },
     "searchHere": "Cari di percakapan ini",
+    "optionHint": {
+      "from": "nama",
+      "in": "kanal",
+      "has": "tautan, file, gambar, atau kartu",
+      "mentions": "nama"
+    },
+    "moreFiltersHint": "tanggal, hanya agen, disematkan",
+    "clearRecentAll": "Hapus pencarian terbaru",
+    "header": {
+      "placeholder": "Cari di {{org}}",
+      "clear": "Hapus pencarian"
+    },
+    "panel": {
+      "label": "Hasil pencarian",
+      "count_other": "{{count}} hasil",
+      "filters": "Filter",
+      "filtersCount_other": "Filter ({{count}})",
+      "jump": "Buka",
+      "jumpLabel": "Buka pesan dari {{name}}",
+      "threadIn": "utas di #{{channel}}"
+    },
     "dm": "DM dengan {{name}}"
   },
   "files": {

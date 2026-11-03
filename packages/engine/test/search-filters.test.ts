@@ -20,6 +20,7 @@ async function message(
     mentionedAgentIds?: string[];
     meta?: Record<string, unknown>;
     at?: Date;
+    threadId?: string;
   },
 ) {
   const [m] = await fx.db
@@ -27,6 +28,7 @@ async function message(
     .values({
       orgId: fx.org.id,
       channelId: input.channelId ?? fx.general.id,
+      threadId: input.threadId ?? null,
       authorType: input.agent ? "agent" : "person",
       authorUserId: input.agent ? null : (input.userId ?? fx.owner.id),
       authorAgentId: input.agent ? fx.agent.id : null,
@@ -165,6 +167,24 @@ describe("search filters (ADR 0123)", () => {
     expect(hits.map((h) => [h.snippet, h.mediaKind])).toEqual([
       ["release party gif", "gif"],
       ["", "voice"],
+    ]);
+  });
+
+  test("a reply comes with its thread's title, else its root's first line; the timeline's hits with none", async () => {
+    f = await setup();
+    const titled = await message(f, { body: "invite link broken" });
+    await f.db
+      .insert(schema.threads)
+      .values({ orgId: f.org.id, channelId: f.general.id, rootMessageId: titled.id, title: "Invite link error" });
+    await message(f, { body: "the invite expires at 23h", threadId: titled.id, at: day("2026-10-16") });
+    const untitled = await message(f, { body: "pricing page\nsecond line", at: day("2026-10-17") });
+    await message(f, { body: "invite copy reviewed", threadId: untitled.id, at: day("2026-10-18") });
+    const found = await searchForUser(deps(f), f.owner.id, f.org.id, { text: "invite", sort: "newest" });
+    const hits = await describeHits(f.db, f.org.id, found);
+    expect(hits.map((h) => [h.snippet, h.threadTitle])).toEqual([
+      ["invite copy reviewed", "pricing page second line"],
+      ["the invite expires at 23h", "Invite link error"],
+      ["invite link broken", null],
     ]);
   });
 

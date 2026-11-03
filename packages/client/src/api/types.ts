@@ -831,6 +831,10 @@ export interface Channel {
    * thread you follow. At most 100 (show "99+"); 0 when not a member.
    */
   unreadCount?: number;
+  /** Channel list only: of `unreadCount`, the messages that mention you (counted even while muted). */
+  mentionCount?: number;
+  /** Channel list only: you muted it, so it never looks unread. */
+  muted?: boolean;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
 }
@@ -2174,6 +2178,8 @@ export interface SearchHit {
   /** Message hits: the message (open it there) and its thread (null = the main timeline). */
   messageId?: string | null;
   threadId?: string | null;
+  /** Message hits in a thread: its title (else its root message's first line); null on the main timeline. */
+  threadTitle?: string | null;
   /** Message hits: a voice message (its snippet is empty, ADR 0100), a GIF or a sticker. `hitText` says which. */
   mediaKind?: MediaKind;
 }
@@ -4530,6 +4536,11 @@ export interface ThreadInfo {
    * API; absent in `thread.updated` events (it is per person).
    */
   following?: boolean;
+  /**
+   * Replies you haven't read in a thread you follow (0 otherwise), at most 100. Always sent by the API; absent in
+   * `thread.updated` events (it is per person).
+   */
+  unread?: number;
   /** The thread's mission, in short (details: `GET …/threads/{id}/mission`). */
   mission?: ThreadMissionSummary | null;
   createdAt: string;
@@ -5670,6 +5681,16 @@ export interface ThreadFollow {
   channelId: string;
   following: boolean;
 }
+
+/**
+ * Unread marks on my own topic: a message in a conversation I'm in (no content: the lists read again), and my
+ * reads and mutes from any device.
+ */
+export type UnreadEvent =
+  | { type: "channel.activity"; channelId: string; threadId: string | null; dm?: boolean }
+  | { type: "channel.read"; channelId: string; userId: string; lastReadAt: string }
+  | { type: "channel.muted"; channelId: string; muted: boolean }
+  | { type: "thread.read"; threadId: string; channelId: string; lastReadAt: string };
 
 /** A pinned message (`GET …/channels/{id}/pins`, newest pin first). */
 export interface MessagePin {

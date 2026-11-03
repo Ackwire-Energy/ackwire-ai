@@ -101,6 +101,8 @@ export function chatRoutes(deps: AppDeps) {
             categoryId: r.categoryId,
             position: r.position,
             unreadCount: r.unreadCount,
+            mentionCount: r.mentionCount,
+            muted: r.muted,
             lastMessage: r.lastMessage ? { ...r.lastMessage, createdAt: r.lastMessage.createdAt.toISOString() } : null,
           })),
         },
