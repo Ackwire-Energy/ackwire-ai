@@ -549,6 +549,9 @@ export function chromeLaunchArgs(
     `--user-data-dir=${profile}`,
     ...(ua ? [`--user-agent=${ua}`] : []),
     ...(lang ? [`--lang=${lang}`] : []),
+    // Only Chromium and Chrome for Testing honor --load-extension; Google Chrome stable ignores it
+    // since 137, so on Chrome stable the start page needs a policy (ExtensionInstallForcelist or
+    // NewTabPageLocation) instead.
     ...(startPage ? [`--load-extension=${startPage}`] : []),
     ...(privateNetwork ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"] : []),
     startPage && page === "about:blank" ? START_PAGE_URL : page,
