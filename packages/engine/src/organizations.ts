@@ -1033,13 +1033,7 @@ export async function removalPreview(
   const losePlan = await db
     .select({ id: agents.id, name: agents.name })
     .from(agents)
-    .where(
-      and(
-        live,
-        inArray(agents.brain, ["claude_code", "codex"]),
-        or(inArray(agents.brainAccountId, theirAccounts), onTheirs),
-      ),
-    )
+    .where(and(live, ne(agents.brain, "model"), or(inArray(agents.brainAccountId, theirAccounts), onTheirs)))
     .orderBy(asc(agents.name));
   const [routines] = await db
     .select({ n: sql<number>`count(*)::int` })
@@ -1053,6 +1047,28 @@ export async function removalPreview(
       ),
     );
   return { heir: heir ?? null, agents: owned, losePlan, computers, routines: routines?.n ?? 0 };
+}
+
+/**
+ * A plan thinks only for its owner's agents (ADR 0059 §3, `updateAgent`): of these agents, each one on a computer
+ * brain (any of them: Claude Code, Codex, Cursor, OpenCode) whose plan (an account, or the computer's own sign-in)
+ * isn't its owner's, or that has no computer left, goes back to the API.
+ */
+async function offPlansNotOwners(tx: Executor, orgId: string, ids: string[]) {
+  if (ids.length === 0) return;
+  await tx
+    .update(agents)
+    .set({ brain: "model", brainAccountId: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        inArray(agents.id, ids),
+        ne(agents.brain, "model"),
+        sql`not exists (select 1 from ${schema.machines} m where m.id = ${agents.machineId} and m.deleted_at is null
+            and ${agents.ownerUserId} = case when ${agents.brainAccountId} is null then m.paired_by_user_id
+              else (select a.created_by from ${schema.machineAccounts} a where a.id = ${agents.brainAccountId}) end)`,
+      ),
+    );
 }
 
 /**
@@ -1157,23 +1173,8 @@ export async function removeMember(
     for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
       removed.push({ computer, freed: await detachMachine(tx, computer) });
     }
-    // A plan thinks only for its owner's agents (ADR 0059 §3, `updateAgent`): a handed agent, or one that was on
-    // their computer, whose plan (an account, or the computer's own sign-in) isn't its owner's now goes back to the API.
     const touched = [...new Set([...handed.map((a) => a.id), ...removed.flatMap((r) => r.freed)])];
-    if (touched.length)
-      await tx
-        .update(agents)
-        .set({ brain: "model", brainAccountId: null, updatedAt: new Date() })
-        .where(
-          and(
-            eq(agents.orgId, orgId),
-            inArray(agents.id, touched),
-            inArray(agents.brain, ["claude_code", "codex"]),
-            sql`not exists (select 1 from ${schema.machines} m where m.id = ${agents.machineId} and m.deleted_at is null
-                and ${agents.ownerUserId} = case when ${agents.brainAccountId} is null then m.paired_by_user_id
-                  else (select a.created_by from ${schema.machineAccounts} a where a.id = ${agents.brainAccountId}) end)`,
-          ),
-        );
+    await offPlansNotOwners(tx, orgId, touched);
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
     return { released, removed, handed, changed, heir, secrets, mailActions };
   });
@@ -1278,7 +1279,10 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     }
     const removed = [];
     for (const computer of plan.computers) {
-      removed.push({ computer, freed: await detachMachine(tx, { ...computer, kind: "connected" }) });
+      const freed = await detachMachine(tx, { ...computer, kind: "connected" });
+      // Their computer's own sign-in thought for these agents, whatever the brain: back to the API (`removeMember`).
+      await offPlansNotOwners(tx, computer.orgId, freed);
+      removed.push({ computer, freed });
     }
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
@@ -1311,7 +1315,13 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
   for (const org of [...plan.closes, ...plan.leaves]) {
     await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId, quiet: true });
   }
-  for (const org of plan.leaves) await announceMembers(options.pubsub, org.id);
+  for (const org of plan.leaves) {
+    const changed = [
+      ...released.agents.filter((a) => a.orgId === org.id).flatMap((a) => a.agentIds),
+      ...removed.filter((r) => r.computer.orgId === org.id).flatMap((r) => r.freed),
+    ];
+    await announceMembers(options.pubsub, org.id, [...new Set(changed)]);
+  }
   for (const one of closed) await afterClosing({ ...options, db }, one);
 }
 

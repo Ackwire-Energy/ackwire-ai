@@ -6,6 +6,7 @@ import {
   changeMemberRole,
   createRole,
   declineSecret,
+  deleteAccount,
   ForbiddenError,
   getSecretRequest,
   joinOrganization,
@@ -168,6 +169,61 @@ test("an agent thinking with the removed person's own computer goes back to the 
     userId: caio.id,
   });
 });
+
+for (const brain of ["cursor", "opencode"] as const) {
+  test(`an agent on ${brain} with the removed person's plan goes back to the API too, from an account or their computer`, async () => {
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, caio.id, f.org.id, MAC);
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: caio.id, machineId, brain, brainAccountId: null })
+      .where(eq(schema.agents.id, f.agent.id));
+    expect((await removalPreview(f.db, f.owner.id, f.org.id, caio.id))?.losePlan).toEqual([
+      { id: f.agent.id, name: f.agent.name },
+    ]);
+    await removeMember(f.db, f.owner.id, f.org.id, caio.id, { pubsub: f.pubsub });
+    expect(await agentRow()).toMatchObject({ ownerUserId: f.owner.id, machineId: null, brain: "model" });
+
+    // On a computer nobody here signed in, with an account of theirs.
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const mac = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { ...MAC, name: "mac2" });
+    await f.db.update(schema.machines).set({ pairedByUserId: null }).where(eq(schema.machines.id, mac.machineId));
+    await f.db.insert(schema.machineAccounts).values({
+      id: ACCOUNT_ID,
+      orgId: f.org.id,
+      machineId: mac.machineId,
+      kind: brain,
+      label: "Trabalho",
+      status: "active",
+      createdBy: bia.id,
+    });
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bia.id, machineId: mac.machineId, brain, brainAccountId: ACCOUNT_ID })
+      .where(eq(schema.agents.id, f.agent.id));
+    await removeMember(f.db, f.owner.id, f.org.id, bia.id, { pubsub: f.pubsub });
+    expect(await agentRow()).toMatchObject({ machineId: mac.machineId, brain: "model", brainAccountId: null });
+  });
+
+  test(`deleting the account: an agent on ${brain} with their computer's own sign-in goes back to the API`, async () => {
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, caio.id, f.org.id, MAC);
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: caio.id, machineId, brain, brainAccountId: null })
+      .where(eq(schema.agents.id, f.agent.id));
+    const told: RealtimeEvent[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => told.push(e));
+
+    await deleteAccount(f.db, caio.id, { pubsub: f.pubsub });
+    expect(await agentRow()).toMatchObject({ machineId: null, brain: "model", brainAccountId: null });
+    expect(told).toContainEqual({
+      type: "org.broadcast",
+      orgId: f.org.id,
+      event: { type: "org.members", agents: [f.agent.id] },
+    });
+  });
+}
 
 test("leaving on one's own is quiet, and the agents skip a blocked owner", async () => {
   const blocked = await addMember(f.db, f.org.id, "member", "old");
