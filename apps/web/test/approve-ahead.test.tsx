@@ -99,6 +99,10 @@ describe("actions approved ahead, on one shared card", () => {
   test("each waiting item says it approves a future action, and when", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(twoAhead("pending")) });
     await settle(4);
+    // Two waiting requests of one kind fold into one run; unfolded, each still says it for itself.
+    await click(
+      within(screen().getByRole("group", { name: "Pedido de aprovação" })).getByRole("button", { name: "Ver cada um" }),
+    );
     expect(items()).toHaveLength(2);
     for (const item of items()) {
       expect(item.textContent).toContain(`Aprova uma ação futura: roda sozinha ${WHEN}, sem pedir de novo`);

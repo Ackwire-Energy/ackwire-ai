@@ -201,7 +201,9 @@ describe("typing bar above the composer", () => {
     expect(bar().textContent).toBe("Atlas está escrevendo · João está digitando…");
     for (const v of ["o", "oi", "oi ", "oi j"])
       await act(async () => fireEvent.change(composer(), { target: { value: v } }));
+    // One frame per new message (the first one's, then this one's first keystroke), its next keystrokes throttled.
     expect(socket.sent.filter((f) => (f as { type: string }).type === "typing")).toEqual([
+      { type: "typing", channelId: ENG_ID },
       { type: "typing", channelId: ENG_ID },
     ]);
   });

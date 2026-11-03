@@ -28,7 +28,8 @@ async function workspace() {
   return { ...seeded, owner: api(owner), member: api(member) };
 }
 
-const money = /usd|cost/i;
+// "costly" is the agent brake for paid actions (ask, go or never), not an amount.
+const money = /usd|cost(?!ly)/i;
 
 test("members never receive money: only percentages and tokens", async () => {
   const w = await workspace();

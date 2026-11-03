@@ -325,7 +325,7 @@ describe("an early-access link on the phone", () => {
     const config = appConfig({ config: {} } as any);
     const host = new URL(config.extra?.apiUrl).host;
     const links = (config.android?.intentFilters ?? []).flatMap((filter) => [filter.data ?? []].flat());
-    expect(links).toContainEqual({ scheme: "https", host, path: "/signup" });
+    expect(links).toContainEqual({ scheme: "https", host, pathPattern: "/signup" });
     expect(existsSync(join(import.meta.dir, "..", "..", "app", "signup.tsx"))).toBe(true);
   });
 
