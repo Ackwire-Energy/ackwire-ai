@@ -970,7 +970,7 @@
     "issuesWithMe_many": "{{count}} avec vous",
     "issuesWithMe_other": "{{count}} avec vous",
     "drive": "Drive",
-    "connectors": "Connecteurs",
+    "connectors": "Connecteurs et MCP",
     "usage": "Consommation",
     "preferences": "Préférences",
     "editProfile": "Modifier le profil",
@@ -1585,8 +1585,11 @@
     }
   },
   "connectors": {
-    "title": "Connecteurs",
+    "title": "Connecteurs et MCP",
     "search": "Rechercher un service",
+    "mcps": "MCP",
+    "mcpsNone": "Les serveurs MCP que vous connectez par leur adresse s'affichent ici.",
+    "addMcp": "Ajouter un MCP",
     "connected": "Connectés",
     "address": "Adresse",
     "byAddress": "Par adresse",

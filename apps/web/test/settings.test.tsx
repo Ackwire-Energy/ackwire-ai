@@ -538,7 +538,7 @@ describe("Configurações do workspace", () => {
       "Apps de IA",
       // The people, where a member who may not invite suggests someone (ADR 0090).
       "Membros e convites",
-      "Conectores",
+      "Conectores e MCPs",
       "Computadores",
       // Their own plans' meters, in percentages (ADR 0063).
       "Orçamento e uso",

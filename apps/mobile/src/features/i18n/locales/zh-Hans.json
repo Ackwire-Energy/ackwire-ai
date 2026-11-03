@@ -852,7 +852,7 @@
     "issues": "任务",
     "issuesWithMe_other": "{{count}} 个与你有关",
     "drive": "Drive",
-    "connectors": "连接器",
+    "connectors": "连接器和 MCP",
     "usage": "用量",
     "preferences": "偏好设置",
     "editProfile": "编辑资料",
@@ -1431,8 +1431,11 @@
     }
   },
   "connectors": {
-    "title": "连接器",
+    "title": "连接器和 MCP",
     "search": "搜索服务",
+    "mcps": "MCP",
+    "mcpsNone": "通过地址连接的 MCP 服务器会显示在这里。",
+    "addMcp": "添加 MCP",
     "connected": "已连接",
     "address": "地址",
     "byAddress": "通过地址",

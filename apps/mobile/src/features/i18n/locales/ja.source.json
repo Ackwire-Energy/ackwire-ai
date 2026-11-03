@@ -2223,7 +2223,7 @@
     "value": "Drive"
   },
   "me.connectors": {
-    "value": "Connectors"
+    "value": "Connectors and MCPs"
   },
   "me.usage": {
     "value": "Usage"
@@ -3678,10 +3678,19 @@
     "value": "The site blocked it"
   },
   "connectors.title": {
-    "value": "Connectors"
+    "value": "Connectors and MCPs"
   },
   "connectors.search": {
     "value": "Search a service"
+  },
+  "connectors.mcps": {
+    "value": "MCPs"
+  },
+  "connectors.mcpsNone": {
+    "value": "MCP servers you connect by their address show up here."
+  },
+  "connectors.addMcp": {
+    "value": "Add MCP"
   },
   "connectors.connected": {
     "value": "Connected"

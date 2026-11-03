@@ -852,7 +852,7 @@
     "issues": "タスク",
     "issuesWithMe_other": "あなた担当: {{count}}件",
     "drive": "Drive",
-    "connectors": "コネクタ",
+    "connectors": "コネクタとMCP",
     "usage": "使用量",
     "preferences": "環境設定",
     "editProfile": "プロフィールを編集",
@@ -1431,8 +1431,11 @@
     }
   },
   "connectors": {
-    "title": "コネクタ",
+    "title": "コネクタとMCP",
     "search": "サービスを検索",
+    "mcps": "MCP",
+    "mcpsNone": "アドレスで接続したMCPサーバーがここに表示されます。",
+    "addMcp": "MCPを追加",
     "connected": "接続済み",
     "address": "アドレス",
     "byAddress": "アドレスで接続",

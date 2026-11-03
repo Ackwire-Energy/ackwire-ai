@@ -911,7 +911,7 @@
     "issuesWithMe_one": "{{count}} tanesi sizde",
     "issuesWithMe_other": "{{count}} tanesi sizde",
     "drive": "Drive",
-    "connectors": "Bağlayıcılar",
+    "connectors": "Bağlayıcılar ve MCP'ler",
     "usage": "Kullanım",
     "preferences": "Tercihler",
     "editProfile": "Profili düzenle",
@@ -1508,8 +1508,11 @@
     }
   },
   "connectors": {
-    "title": "Bağlayıcılar",
+    "title": "Bağlayıcılar ve MCP'ler",
     "search": "Bir hizmet arayın",
+    "mcps": "MCP'ler",
+    "mcpsNone": "Adresiyle bağladığınız MCP sunucuları burada görünür.",
+    "addMcp": "MCP ekle",
     "connected": "Bağlı",
     "address": "Adres",
     "byAddress": "Adresle",

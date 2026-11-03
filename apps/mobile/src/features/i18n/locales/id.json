@@ -852,7 +852,7 @@
     "issues": "Tugas",
     "issuesWithMe_other": "{{count}} bersamamu",
     "drive": "Drive",
-    "connectors": "Konektor",
+    "connectors": "Konektor dan MCP",
     "usage": "Pemakaian",
     "preferences": "Preferensi",
     "editProfile": "Ubah profil",
@@ -1431,8 +1431,11 @@
     }
   },
   "connectors": {
-    "title": "Konektor",
+    "title": "Konektor dan MCP",
     "search": "Cari layanan",
+    "mcps": "MCP",
+    "mcpsNone": "Server MCP yang kamu hubungkan lewat alamatnya muncul di sini.",
+    "addMcp": "Tambah MCP",
     "connected": "Terhubung",
     "address": "Alamat",
     "byAddress": "Lewat alamat",

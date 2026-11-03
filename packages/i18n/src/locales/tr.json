@@ -1781,6 +1781,18 @@
     },
     "connect": "Bağla",
     "connected": "Bağlandı",
+    "connect_app": {
+      "title": "{{name}} bağla",
+      "mcp": "Bir MCP sunucusu ekle",
+      "adminOnly": "Bir yönetici bağlar"
+    },
+    "invite": {
+      "title_one": "{{count}} kişiyi davet et",
+      "title_other": "{{count}} kişiyi davet et",
+      "open": "Davet et",
+      "done": "Davet gönderildi",
+      "adminOnly": "Davet etme yetkisi olan biri gönderir"
+    },
     "agentProposal": {
       "title": "{{agent}} yeni bir ajan öneriyor",
       "review": "İncele",
@@ -8336,6 +8348,12 @@
   "connectors": {
     "title": "Bağlayıcılar",
     "add": "Bağlayıcı ekle",
+    "mcp": {
+      "title": "MCP'ler",
+      "add": "MCP ekle",
+      "list": "Bağlı MCP sunucuları",
+      "none": "Adresiyle bağladığınız MCP sunucuları burada görünür."
+    },
     "addTitle": "Bağlayıcı ekle",
     "catalogText": "{{org}} için bir kez bağlayın. Sonra her ajanın neyi kullanabileceğini seçin.",
     "catalog": "Kullanılabilir bağlayıcılar",
@@ -10551,7 +10569,7 @@
       "members": "Üyeler ve davetler",
       "roles": "Roller ve izinler",
       "access": "Ajanlar ve erişim",
-      "connectors": "Bağlayıcılar",
+      "connectors": "Bağlayıcılar ve MCP'ler",
       "skills": "Beceriler",
       "keys": "Yapay zeka hesapları",
       "storage": "Depolama",
@@ -10571,7 +10589,7 @@
       "members": "Çalışma alanında kimler var ve davetler.",
       "roles": "Her kişinin neler yapabileceği. Roller toplanır.",
       "access": "Her ajanın neleri kullanabileceği: bağlayıcı başına bir düzey.",
-      "connectors": "Tüm çalışma alanı için bir kez bağlanan hizmetler.",
+      "connectors": "Tüm çalışma alanı için bir kez bağlanan hizmetler ve MCP sunucuları.",
       "skills": "Ajanların ihtiyaç duyduklarında açtıkları Markdown talimatları.",
       "keys": "Planlarınız ve çalışma alanının API anahtarları.",
       "storage": "Çalışma alanının dosyalarının durduğu yer.",
@@ -11115,6 +11133,8 @@
         "readingForum": "Forumu okudu",
         "creatingChannel": "Bir kanal oluşturdu",
         "offeringConnectAi": "Bir yapay zeka bağlamayı önerdi",
+        "offeringConnectApp": "Bir uygulama bağlamayı önerdi",
+        "offeringInvites": "Kişileri davet etmeyi önerdi",
         "proposingAgent": "Bir ajan önerdi",
         "askingAgent": "Başka bir ajana sordu",
         "tellingAgent": "Başka bir ajana iletti",
@@ -11197,6 +11217,8 @@
       "readingForum": "forumu okuyor",
       "creatingChannel": "kanal oluşturuyor",
       "offeringConnectAi": "yapay zeka bağlantısını hazırlıyor",
+      "offeringConnectApp": "uygulama bağlantısını hazırlıyor",
+      "offeringInvites": "davetleri hazırlıyor",
       "proposingAgent": "ajan öneriyor",
       "askingAgent": "başka bir ajana soruyor",
       "tellingAgent": "başka bir ajana iletiyor",
@@ -11295,6 +11317,9 @@
       "no_ai_signed_out": "Henüz yanıt veremiyorum: yapay zekamın oturumu kapalı.",
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
       "action_connect_ai": "Yapay zeka bağla",
+      "action_connect_app": "{{name}} bağla",
+      "action_add_mcp": "Bir MCP sunucusu ekle",
+      "action_invite_people": "Kişileri davet et",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "approval_request": "Onay isteği: {{title}}",
       "secret_request": "{{agent}} bir anahtar istedi: {{name}}",

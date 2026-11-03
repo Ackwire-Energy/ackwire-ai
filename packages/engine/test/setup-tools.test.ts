@@ -2,16 +2,23 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
   type ActionCard,
+  ADD_MCP_CARD,
   actionsFor,
   CONNECT_AI_CARD,
+  CONNECT_APP_CARD,
+  type ConnectAppCard,
+  createChannel,
   createSetupToolSource,
   createToolGateway,
   DEFAULT_AGENT_SCOPES,
   deferrableGroups,
+  INVITE_CARD,
+  type InviteCard,
   insertMessage,
   linkRunActions,
   MAX_CARDS_PER_RUN,
   MAX_CHANNELS_PER_RUN,
+  MCP_PRESETS,
   presentTools,
   redoAgentAction,
   replyThreadOf,
@@ -28,10 +35,10 @@ afterEach(async () => {
 });
 
 /** A run of @dev on a message `userId` wrote in #general: the tools act for that person. */
-async function runFor(fx: Fixture, userId: string, body: string): Promise<ToolContext> {
+async function runFor(fx: Fixture, userId: string, body: string, channelId = fx.general.id): Promise<ToolContext> {
   const trigger = await insertMessage(fx.db, {
     orgId: fx.org.id,
-    channelId: fx.general.id,
+    channelId,
     author: { type: "person", userId },
     body,
   });
@@ -40,7 +47,7 @@ async function runFor(fx: Fixture, userId: string, body: string): Promise<ToolCo
     .values({
       orgId: fx.org.id,
       agentId: fx.agent.id,
-      channelId: fx.general.id,
+      channelId,
       threadRootId: trigger.id,
       triggerMessageId: trigger.id,
       trigger: "mention",
@@ -54,7 +61,7 @@ async function runFor(fx: Fixture, userId: string, body: string): Promise<ToolCo
     orgId: fx.org.id,
     agentId: fx.agent.id,
     runId: run.id,
-    channelId: fx.general.id,
+    channelId,
     threadRootId: trigger.id,
     triggerMessageId: trigger.id,
   };
@@ -98,21 +105,132 @@ describe("the setup group", () => {
     expect(DEFAULT_AGENT_SCOPES).toContain(SETUP_SCOPE);
     const ctx = await runFor(f, f.owner.id, "cria um canal pro lançamento");
     const granted = await gatewayOf(f).granted(ctx);
-    expect(granted.map((t) => t.name)).toEqual(["create_channel", "offer_connect_ai", "propose_agent"]);
+    expect(granted.map((t) => t.name)).toEqual([
+      "create_channel",
+      "offer_connect_ai",
+      "offer_connect_app",
+      "offer_invites",
+      "propose_agent",
+    ]);
     expect(deferrableGroups(granted).map((g) => [g.key, g.label])).toEqual([
-      ["setup", "Workspace setup (connect an AI, create channels, propose agents)"],
+      [
+        "setup",
+        "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents)",
+      ],
     ]);
     // Not loaded: behind find_tools; loaded: as they are.
     expect(presentTools(granted, undefined, []).map((t) => t.name)).toEqual(["find_tools", "use_tool"]);
     expect(presentTools(granted, undefined, ["setup"]).map((t) => t.name)).toEqual([
       "create_channel",
       "offer_connect_ai",
+      "offer_connect_app",
+      "offer_invites",
       "propose_agent",
     ]);
     const kind = (name: string) => toolKind({ name, scope: SETUP_SCOPE, connectionId: null }).kind;
     expect(kind("offer_connect_ai")).toBe("here");
     expect(kind("propose_agent")).toBe("here");
+    expect(kind("offer_connect_app")).toBe("here");
+    expect(kind("offer_invites")).toBe("here");
     expect(kind("create_channel")).toBe("elsewhere");
+  });
+});
+
+describe("offer_connect_app", () => {
+  test("an MCP server's address: a card whose button opens connecting by address with it; no address, the dialog asks", async () => {
+    f = await setup();
+    const ctx = await runFor(f, f.owner.id, "conecta https://mcp.acme.example.com/mcp");
+    const events = f.listen(f.general.id);
+    const out = await call(f, ctx, "offer_connect_app", {
+      url: "https://mcp.acme.example.com/mcp",
+      why: "Você pediu o MCP da Acme.",
+    });
+    expect(out.isError).toBeUndefined();
+    expect(out.content).toContain("Posted the card to connect mcp.acme.example.com");
+    expect(out.content).not.toContain("can't connect");
+    await call(f, ctx, "offer_connect_app", { why: "Me passe o endereço no diálogo." });
+    const [mcp, any] = await cards(f);
+    expect(mcp?.meta.actionCard).toEqual({
+      kind: "connect_app",
+      forUserId: f.owner.id,
+      params: { url: "https://mcp.acme.example.com/mcp", why: "Você pediu o MCP da Acme." },
+    } satisfies ConnectAppCard);
+    expect(mcp?.meta).toMatchObject({ bodyCode: CONNECT_APP_CARD, bodyParams: { name: "mcp.acme.example.com" } });
+    expect(mcp?.threadId).toBe(replyThreadOf(ctx));
+    expect(any?.meta).toMatchObject({
+      bodyCode: ADD_MCP_CARD,
+      actionCard: { params: { why: "Me passe o endereço no diálogo." } },
+    });
+    expect(events).toContainEqual(expect.objectContaining({ type: "message.created", messageId: mcp?.id }));
+  });
+
+  test("a service by name, or a one-click server by its address, is the catalog's entry; unknown names and bad addresses are refused", async () => {
+    f = await setup();
+    const ctx = await runFor(f, f.owner.id, "conecta o linear");
+    const preset = MCP_PRESETS.find((p) => !p.composio && !p.soon);
+    if (!preset) throw new Error("no preset");
+    await call(f, ctx, "offer_connect_app", { app: "Linear", why: "Para ler as issues." });
+    await call(f, ctx, "offer_connect_app", { url: preset.serverUrl, why: "Esse." });
+    expect((await cards(f)).map((m) => (m.meta.actionCard as ConnectAppCard).params)).toEqual([
+      { connector: "linear", why: "Para ler as issues." },
+      { connector: preset.id, why: "Esse." },
+    ]);
+    const unknown = await call(f, ctx, "offer_connect_app", { app: "Acme Interno", why: "x" });
+    expect(unknown).toMatchObject({ isError: true });
+    expect(unknown.content).toContain("isn't in the catalog");
+    for (const url of ["http://mcp.acme.example.com", "https://user:secret@mcp.acme.example.com/mcp", "not a url"]) {
+      const out = await call(f, ctx, "offer_connect_app", { url, why: "x" });
+      expect(out.isError).toBe(true);
+    }
+    expect((await cards(f)).length).toBe(2);
+  });
+
+  test("who may not connect: the card for an admin where one can open it; a DM with no admin posts nothing and says to ask one", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const here = await runFor(f, bia.id, "conecta https://mcp.acme.example.com/mcp");
+    const out = await call(f, here, "offer_connect_app", {
+      url: "https://mcp.acme.example.com/mcp",
+      why: "Pedido da Bia.",
+    });
+    expect(out.isError).toBeUndefined();
+    expect(out.content).toContain("can't connect apps: an admin here does it from the card");
+    const hers = await createChannel(f.db, bia.id, f.org.id, { name: "bia-notes", visibility: "private" });
+    const alone = await runFor(f, bia.id, "conecta", hers.id);
+    const none = await call(f, alone, "offer_connect_app", { url: "https://mcp.acme.example.com/mcp", why: "x" });
+    expect(none).toMatchObject({ isError: true });
+    expect(none.content).toContain("offer to ask one");
+    expect((await cards(f)).length).toBe(1);
+  });
+});
+
+describe("offer_invites", () => {
+  test("a card with the addresses for the invite dialog; bad addresses refused; who can't invite reads who does", async () => {
+    f = await setup();
+    const ctx = await runFor(f, f.owner.id, "convida a ana e a bia");
+    const out = await call(f, ctx, "offer_invites", {
+      emails: ["Ana@Example.com", "bia@example.com", "ana@example.com"],
+      why: "O time de design.",
+    });
+    expect(out.isError).toBeUndefined();
+    expect(out.content).toContain("nobody is invited until a person sends it");
+    const [card] = await cards(f);
+    expect(card?.meta).toMatchObject({ bodyCode: INVITE_CARD });
+    expect(card?.meta.actionCard).toEqual({
+      kind: "invite_people",
+      forUserId: f.owner.id,
+      params: { emails: ["ana@example.com", "bia@example.com"], why: "O time de design." },
+    } satisfies InviteCard);
+    expect(await call(f, ctx, "offer_invites", { emails: ["ana"], why: "x" })).toMatchObject({
+      isError: true,
+      content: "Not an email address: ana.",
+    });
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const member = await runFor(f, bia.id, "convida o caio");
+    const theirs = await call(f, member, "offer_invites", { emails: ["caio@example.com"], why: "Caio." });
+    // Every member may invite by default; the card is theirs.
+    expect(theirs.isError).toBeUndefined();
+    expect((await cards(f)).length).toBe(2);
   });
 });
 

@@ -324,10 +324,10 @@ async function readableChannels(ctx: ToolContext, channelIds: string[]) {
 
 /** Where a person connects a mailbox (agents can't), in the apps' words and the Portuguese they show. */
 const CONNECT_HOW =
-  "a person who manages connectors does it. On the web or the desktop app: Settings › Connectors › Add connector › Email, then the mailbox (Gmail, Outlook, iCloud or another), and its step Who can use it lets you read it (in Portuguese, Configurações › Conectores › Adicionar conector › Email, then Quem pode usar). Tell the person exactly this.";
+  "a person who manages connectors does it. On the web or the desktop app: Settings › Connectors and MCPs › Add connector › Email, then the mailbox (Gmail, Outlook, iCloud or another), and its step Who can use it lets you read it (in Portuguese, Configurações › Conectores e MCPs › Adicionar conector › Email, then Quem pode usar). Tell the person exactly this.";
 /** Where a person lets an agent read a mailbox that is connected. */
 const GIVE_HOW =
-  "a person who manages agents must let you. On the web or the desktop app: Settings › Connectors › Who uses it, on the mailbox's row (in Portuguese, Configurações › Conectores › Quem usa). On the phone app: You › Connectors, then the mailbox (in Portuguese, Você › Conectores). Tell the person exactly this.";
+  "a person who manages agents must let you. On the web or the desktop app: Settings › Connectors and MCPs › Who uses it, on the mailbox's row (in Portuguese, Configurações › Conectores e MCPs › Quem usa). On the phone app: You › Connectors and MCPs, then the mailbox (in Portuguese, Você › Conectores e MCPs). Tell the person exactly this.";
 
 /** No mailbox in the workspace: where a person connects one. */
 export const NO_MAILBOX_TEXT = `You can't read any mailbox yet, and you can't connect one yourself: ${CONNECT_HOW}`;

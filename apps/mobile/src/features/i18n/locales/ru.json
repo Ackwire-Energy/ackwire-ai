@@ -1029,7 +1029,7 @@
     "issuesWithMe_many": "{{count}} у вас",
     "issuesWithMe_other": "{{count}} у вас",
     "drive": "Drive",
-    "connectors": "Коннекторы",
+    "connectors": "Коннекторы и MCP",
     "usage": "Расход",
     "preferences": "Предпочтения",
     "editProfile": "Изменить профиль",
@@ -1662,8 +1662,11 @@
     }
   },
   "connectors": {
-    "title": "Коннекторы",
+    "title": "Коннекторы и MCP",
     "search": "Найдите сервис",
+    "mcps": "MCP",
+    "mcpsNone": "Здесь появятся MCP-серверы, подключённые по адресу.",
+    "addMcp": "Добавить MCP",
     "connected": "Подключённые",
     "address": "Адрес",
     "byAddress": "По адресу",

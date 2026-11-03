@@ -377,7 +377,7 @@ const GROUP_LABELS: Record<string, string> = {
   wiki: "Organization wiki (writing)",
   sandbox: "Computer and code",
   browser: "Browser",
-  setup: "Workspace setup (connect an AI, create channels, propose agents)",
+  setup: "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents)",
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",
@@ -547,14 +547,14 @@ export function compactSchema(schema: JsonSchema) {
 /** How a person gets a connector the agent lacks, in the app's words (and the Portuguese the app shows). */
 const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> = {
   not_connected: (label) =>
-    `Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › ${label} (in Portuguese, Configurações › Conectores › Adicionar conector › ${label}).`,
+    `Not connected in this workspace: an admin connects it in Settings › Connectors and MCPs › Add connector › ${label} (in Portuguese, Configurações › Conectores e MCPs › Adicionar conector › ${label}).`,
   not_given: () =>
     "Connected in this workspace but not given to you: an admin gives you access on your page, in Tools and access (in Portuguese, Ferramentas e acesso).",
   unavailable: () => "Not available on this installation: whoever runs the installation has to turn it on first.",
   soon: () =>
-    "Not open to agentes.chat yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors › Add connector › Another service (in Portuguese, Configurações › Conectores › Adicionar conector › Outro serviço).",
+    "Not open to agentes.chat yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors and MCPs › Add MCP (in Portuguese, Configurações › Conectores e MCPs › Adicionar MCP).",
   needs_reconnect: () =>
-    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors (in Portuguese, Configurações › Conectores › Reconectar).",
+    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors and MCPs (in Portuguese, Configurações › Conectores e MCPs › Reconectar).",
 };
 
 /** The connectors the agent lacks that the query names (every word of a label or of an id), with how to get each. */
@@ -568,7 +568,7 @@ function connectorsToGet(query: string, connectors: MissingConnector[] = []) {
     .filter((c) => c.names.some(isNamed))
     .map((c) => `- ${c.label}: ${c.description} ${HOW_TO_GET[c.state](c.label)}`);
   if (lines.length === 0) return "";
-  return `Connectors you don't have yet. If the person wants one, say how to get it, never that it doesn't exist.\n${lines.join("\n")}`;
+  return `Connectors you don't have yet. If the person wants one, offer it with offer_connect_app (a card that opens the app's own connect dialog) or say how to get it, never that it doesn't exist.\n${lines.join("\n")}`;
 }
 
 /**

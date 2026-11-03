@@ -911,7 +911,7 @@
     "issuesWithMe_one": "{{count}} bij jou",
     "issuesWithMe_other": "{{count}} bij jou",
     "drive": "Drive",
-    "connectors": "Connectors",
+    "connectors": "Connectors en MCP's",
     "usage": "Gebruik",
     "preferences": "Voorkeuren",
     "editProfile": "Profiel bewerken",
@@ -1508,8 +1508,11 @@
     }
   },
   "connectors": {
-    "title": "Connectors",
+    "title": "Connectors en MCP's",
     "search": "Zoek een dienst",
+    "mcps": "MCP's",
+    "mcpsNone": "MCP-servers die je via hun adres koppelt, verschijnen hier.",
+    "addMcp": "MCP toevoegen",
     "connected": "Verbonden",
     "address": "Adres",
     "byAddress": "Via adres",

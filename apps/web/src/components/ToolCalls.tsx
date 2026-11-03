@@ -106,6 +106,8 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   requestingApproval: "approve",
   creatingChannel: "channel",
   offeringConnectAi: "plug",
+  offeringConnectApp: "plug",
+  offeringInvites: "personAdd",
   findingTools: "search",
   runningCommand: "code",
   runningCommandAny: "code",

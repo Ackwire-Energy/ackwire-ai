@@ -67,6 +67,8 @@ export type ActivityKind =
   | "readingForum"
   | "creatingChannel"
   | "offeringConnectAi"
+  | "offeringConnectApp"
+  | "offeringInvites"
   | "proposingAgent"
   | "askingAgent"
   | "tellingAgent"
@@ -181,6 +183,8 @@ const BUILTIN: Record<string, ActivityKind> = {
   // Setting up the workspace.
   create_channel: "creatingChannel",
   offer_connect_ai: "offeringConnectAi",
+  offer_connect_app: "offeringConnectApp",
+  offer_invites: "offeringInvites",
   propose_agent: "proposingAgent",
   // Another agent of the team (the consultation card says who and what it answered).
   ask_agent: "askingAgent",

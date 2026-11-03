@@ -1854,6 +1854,19 @@
     },
     "connect": "Connecter",
     "connected": "Connecté",
+    "connect_app": {
+      "title": "Connecter {{name}}",
+      "mcp": "Ajouter un serveur MCP",
+      "adminOnly": "Un admin le connecte"
+    },
+    "invite": {
+      "title_one": "Inviter {{count}} personne",
+      "title_many": "Inviter {{count}} personnes",
+      "title_other": "Inviter {{count}} personnes",
+      "open": "Inviter",
+      "done": "Invitation envoyée",
+      "adminOnly": "Une personne autorisée à inviter l'envoie"
+    },
     "agentProposal": {
       "title": "{{agent}} propose un nouvel agent",
       "review": "Examiner",
@@ -8770,6 +8783,12 @@
   "connectors": {
     "title": "Connecteurs",
     "add": "Ajouter un connecteur",
+    "mcp": {
+      "title": "MCP",
+      "add": "Ajouter un MCP",
+      "list": "Serveurs MCP connectés",
+      "none": "Les serveurs MCP que vous connectez par leur adresse s'affichent ici."
+    },
     "addTitle": "Ajouter un connecteur",
     "catalogText": "Connectez une seule fois pour {{org}}. Choisissez ensuite ce que chaque agent peut utiliser.",
     "catalog": "Connecteurs disponibles",
@@ -11031,7 +11050,7 @@
       "members": "Membres et invitations",
       "roles": "Rôles et permissions",
       "access": "Agents et accès",
-      "connectors": "Connecteurs",
+      "connectors": "Connecteurs et MCP",
       "skills": "Compétences",
       "keys": "Comptes IA",
       "storage": "Stockage",
@@ -11051,7 +11070,7 @@
       "members": "Qui fait partie de l'espace de travail, et les invitations.",
       "roles": "Ce que chaque personne peut faire. Les rôles s'additionnent.",
       "access": "Ce que chaque agent peut utiliser : un niveau par connecteur.",
-      "connectors": "Services connectés une fois pour tout l'espace de travail.",
+      "connectors": "Services et serveurs MCP connectés une fois pour tout l'espace de travail.",
       "skills": "Instructions en Markdown que les agents ouvrent quand ils en ont besoin.",
       "keys": "Vos abonnements et les clés API de l'espace de travail.",
       "storage": "Où sont stockés les fichiers de l'espace de travail.",
@@ -11639,6 +11658,8 @@
         "readingForum": "A lu le forum",
         "creatingChannel": "A créé un canal",
         "offeringConnectAi": "A proposé de connecter une IA",
+        "offeringConnectApp": "A proposé de connecter une app",
+        "offeringInvites": "A proposé d'inviter des personnes",
         "proposingAgent": "A proposé un agent",
         "askingAgent": "A interrogé un autre agent",
         "tellingAgent": "A informé un autre agent",
@@ -11721,6 +11742,8 @@
       "readingForum": "lecture du forum",
       "creatingChannel": "création d'un canal",
       "offeringConnectAi": "préparation de la connexion d'une IA",
+      "offeringConnectApp": "préparation de la connexion d'une app",
+      "offeringInvites": "préparation des invitations",
       "proposingAgent": "proposition d'un agent",
       "askingAgent": "question à un autre agent",
       "tellingAgent": "message à un autre agent",
@@ -11820,6 +11843,9 @@
       "no_ai_signed_out": "Je ne peux pas encore répondre : mon IA est déconnectée.",
       "no_ai_not_signed_in": "Je ne peux pas encore répondre : {{brain}} n'est pas connecté sur mon ordinateur.",
       "action_connect_ai": "Connecter une IA",
+      "action_connect_app": "Connecter {{name}}",
+      "action_add_mcp": "Ajouter un serveur MCP",
+      "action_invite_people": "Inviter des personnes",
       "agent_proposal": "A proposé un nouvel agent : {{name}}",
       "approval_request": "Demande d'approbation : {{title}}",
       "secret_request": "{{agent}} a demandé une clé : {{name}}",

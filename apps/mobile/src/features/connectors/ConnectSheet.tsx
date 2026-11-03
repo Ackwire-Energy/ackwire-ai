@@ -188,7 +188,15 @@ export function ConnectSheet({
  * "Conectar pelo endereço": any MCP server by its https address (sign in there, or a key when it asks). With an
  * `item` of a server not in the catalog: another account of it (`add`) or a new sign-in for it (`reconnect`).
  */
-export function AddressSheet({ item, mode }: { item?: ConnectedItem; mode?: "add" | "reconnect" } = {}) {
+export function AddressSheet({
+  item,
+  mode,
+  url,
+}: {
+  item?: ConnectedItem;
+  mode?: "add" | "reconnect";
+  url?: string;
+} = {}) {
   const { t } = useTranslation();
   const sheet = useSheet();
   const [connected, setConnected] = useState<{ id: string; name: string } | null>(null);
@@ -233,6 +241,7 @@ export function AddressSheet({ item, mode }: { item?: ConnectedItem; mode?: "add
           def={null}
           name={item ? itemName(t, item) : ""}
           item={item}
+          initialUrl={url}
           reconnect={mode === "reconnect"}
           onConnected={(id, name) => {
             setConnected({ id, name });
@@ -436,6 +445,7 @@ function ConnectStep({
   def,
   name,
   item,
+  initialUrl,
   reconnect = false,
   onConnected,
   onDone,
@@ -443,6 +453,8 @@ function ConnectStep({
   def: ConnectorDef | null;
   name: string;
   item?: ConnectedItem;
+  /** The address already typed in (an agent's card in the chat). */
+  initialUrl?: string;
   reconnect?: boolean;
   onConnected: (connectionId: string, name: string) => void;
   onDone: () => void;
@@ -466,7 +478,7 @@ function ConnectStep({
   const connectionId = reconnect && item?.custom ? item.id : undefined;
   const how = def ? connectHow(def) : "either";
   const [mode, setMode] = useState<"signIn" | "key">(how === "key" ? "key" : "signIn");
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl ?? "");
   const [key, setKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const busy = start.isPending || complete.isPending || withKey.isPending || connect.isPending;

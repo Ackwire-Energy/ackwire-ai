@@ -852,7 +852,7 @@
     "issues": "작업",
     "issuesWithMe_other": "나와 관련된 작업 {{count}}개",
     "drive": "Drive",
-    "connectors": "커넥터",
+    "connectors": "커넥터와 MCP",
     "usage": "사용량",
     "preferences": "환경설정",
     "editProfile": "프로필 편집",
@@ -1431,8 +1431,11 @@
     }
   },
   "connectors": {
-    "title": "커넥터",
+    "title": "커넥터와 MCP",
     "search": "서비스 검색",
+    "mcps": "MCP",
+    "mcpsNone": "주소로 연결한 MCP 서버가 여기에 표시돼요.",
+    "addMcp": "MCP 추가",
     "connected": "연결됨",
     "address": "주소",
     "byAddress": "주소로 연결",

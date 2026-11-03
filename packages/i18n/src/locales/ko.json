@@ -1723,6 +1723,17 @@
     },
     "connect": "연결",
     "connected": "연결됨",
+    "connect_app": {
+      "title": "{{name}} 연결",
+      "mcp": "MCP 서버 추가",
+      "adminOnly": "관리자가 연결해요"
+    },
+    "invite": {
+      "title_other": "{{count}}명 초대",
+      "open": "초대",
+      "done": "초대 보냄",
+      "adminOnly": "초대할 수 있는 사람이 보내요"
+    },
     "agentProposal": {
       "title": "{{agent}}이(가) 새 에이전트를 제안해요",
       "review": "검토",
@@ -8048,6 +8059,12 @@
   "connectors": {
     "title": "커넥터",
     "add": "커넥터 추가",
+    "mcp": {
+      "title": "MCP",
+      "add": "MCP 추가",
+      "list": "연결된 MCP 서버",
+      "none": "주소로 연결한 MCP 서버가 여기에 표시돼요."
+    },
     "addTitle": "커넥터 추가",
     "catalogText": "{{org}}에 한 번만 연결하세요. 그다음 에이전트마다 사용할 수 있는 것을 정해요.",
     "catalog": "사용 가능한 커넥터",
@@ -10215,7 +10232,7 @@
       "members": "멤버와 초대",
       "roles": "역할과 권한",
       "access": "에이전트와 접근 권한",
-      "connectors": "커넥터",
+      "connectors": "커넥터와 MCP",
       "skills": "스킬",
       "keys": "AI 계정",
       "storage": "저장 공간",
@@ -10235,7 +10252,7 @@
       "members": "워크스페이스에 있는 사람과 초대예요.",
       "roles": "각 사람이 할 수 있는 일이에요. 역할은 합산돼요.",
       "access": "각 에이전트가 사용할 수 있는 것이에요. 커넥터마다 하나의 수준이 있어요.",
-      "connectors": "워크스페이스 전체에 한 번 연결하는 서비스예요.",
+      "connectors": "워크스페이스 전체에 한 번 연결하는 서비스와 MCP 서버예요.",
       "skills": "에이전트가 필요할 때 여는 Markdown 지침이에요.",
       "keys": "내 요금제와 워크스페이스의 API 키예요.",
       "storage": "워크스페이스의 파일이 저장되는 곳이에요.",
@@ -10762,6 +10779,8 @@
         "readingForum": "포럼을 읽었어요",
         "creatingChannel": "채널을 만들었어요",
         "offeringConnectAi": "AI 연결을 제안했어요",
+        "offeringConnectApp": "앱 연결을 제안했어요",
+        "offeringInvites": "사람 초대를 제안했어요",
         "proposingAgent": "에이전트를 제안했어요",
         "askingAgent": "다른 에이전트에게 물었어요",
         "tellingAgent": "다른 에이전트에게 전했어요",
@@ -10844,6 +10863,8 @@
       "readingForum": "포럼을 읽는 중",
       "creatingChannel": "채널을 만드는 중",
       "offeringConnectAi": "AI 연결을 준비하는 중",
+      "offeringConnectApp": "앱 연결을 준비하는 중",
+      "offeringInvites": "초대를 준비하는 중",
       "proposingAgent": "에이전트를 제안하는 중",
       "askingAgent": "다른 에이전트에게 묻는 중",
       "tellingAgent": "다른 에이전트에게 전하는 중",
@@ -10942,6 +10963,9 @@
       "no_ai_signed_out": "아직 답할 수 없어요: AI가 로그아웃됐어요.",
       "no_ai_not_signed_in": "아직 답할 수 없어요: 제 컴퓨터에서 {{brain}}에 로그인되어 있지 않아요.",
       "action_connect_ai": "AI 연결",
+      "action_connect_app": "{{name}} 연결",
+      "action_add_mcp": "MCP 서버 추가",
+      "action_invite_people": "사람 초대",
       "agent_proposal": "새 에이전트를 제안했어요: {{name}}",
       "approval_request": "승인 요청: {{title}}",
       "secret_request": "{{agent}}이(가) 키를 요청했어요: {{name}}",
